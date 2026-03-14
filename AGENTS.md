@@ -66,6 +66,135 @@ Build a production-quality multi-tenant fire inspection SaaS for inspection comp
 - Seed scripts must keep working
 - Do not introduce breaking auth or schema changes without updating seeds and tests
 
+## Smart inspection report architecture
+
+All inspection report types in this product must use a shared smart-report system rather than one-off hardcoded form logic.
+
+This is a global requirement across:
+- fire_extinguisher
+- fire_alarm
+- wet_fire_sprinkler
+- backflow
+- fire_pump
+- dry_fire_sprinkler
+- kitchen_suppression
+- industrial_suppression
+- emergency_exit_lighting
+- any future inspection report types
+
+### Core rule
+Every report type must be implemented using reusable report-engine patterns that support:
+- prefilled dropdowns
+- auto-populated fields
+- smart defaults
+- carry-forward data from prior inspections where appropriate
+- asset-linked field population where appropriate
+- configurable mappings and option lists
+- repeatable entry rows where appropriate
+- tenant-safe persistence
+- autosave
+- preview
+- finalization
+- PDF rendering
+- customer portal rendering
+
+### Smart field behavior requirements
+For all report types, Codex must prefer a reusable smart-field architecture with support for:
+
+1. Prefilled options
+- common dropdown values should be defined in reusable config/constants files or report-type configuration modules
+- examples include manufacturer lists, equipment sizes/types, service actions, statuses, deficiency categories, etc.
+
+2. Auto-population
+- fields should auto-populate when another field selection logically determines a value
+- examples:
+  - extinguisher size/type -> UL rating
+  - equipment type -> expected service interval
+  - report type + recurrence -> next due logic
+  - prior inspection asset record -> location/manufacturer/model/serial defaults
+
+3. Carry-forward defaults
+- when editing a new inspection for an existing site/asset, the system should prefill known prior values where appropriate
+- examples:
+  - asset location
+  - manufacturer
+  - model
+  - serial number
+  - prior service dates
+  - recurring inspection intervals
+  - known equipment metadata
+
+4. Calculated fields
+- when a field can be derived safely, Codex should implement calculation logic in reusable services
+- examples:
+  - next hydro date from last hydro date
+  - next 6-year date from last 6-year date
+  - due dates based on recurrence
+  - compliance flags based on entered dates/statuses
+
+5. Controlled override support
+- if a field is auto-populated, the implementation may support manual override when appropriate, but the architecture must preserve traceability and consistency
+
+### Report implementation rule
+When implementing or modifying any report type, Codex must not build isolated bespoke logic unless absolutely necessary.
+
+Instead, Codex should:
+- first look for shared report engine extension points
+- add reusable smart-field configuration where possible
+- add reusable mapping/config support where possible
+- keep report-type specifics in config/schema modules, not buried directly in UI components
+- design new report features so future report types can reuse them
+
+### Required shared architecture
+Codex should evolve the codebase toward a report system with reusable concepts such as:
+- report definitions / report schemas
+- field definitions
+- smart default providers
+- option list providers
+- mapping providers
+- carry-forward / prior-inspection hydrators
+- calculated field helpers
+- validation rules
+- PDF render adapters
+
+Names can vary by implementation, but the architecture must support these concepts cleanly.
+
+### Data-source priority for smart prefill
+When pre-filling report fields, use this priority where applicable:
+1. current asset/equipment record
+2. prior completed inspection data for the same asset/site
+3. customer/site defaults
+4. report-type defaults
+5. empty field
+
+### Tenant safety rule
+All smart prefill and auto-population must preserve strict tenant isolation.
+No tenant may ever receive defaults, options, assets, history, or data derived from another tenant.
+
+### UX rule
+Smart behavior must reduce technician/admin typing, not create confusion.
+Therefore:
+- auto-populated values should be visible
+- calculated values should be understandable
+- overrides should be deliberate
+- mobile usability must remain strong
+- autosave must preserve smart-field behavior
+
+### Future-proofing rule
+Whenever Codex adds smart behavior to one report type, it should implement it in a way that can be reused by future report types with minimal rewrites.
+
+### Done criteria for report work
+A report-type implementation is not complete unless it supports, where applicable:
+- reusable field definitions
+- smart defaults
+- auto-population rules
+- persistence
+- autosave
+- preview
+- finalization
+- PDF output
+- customer portal visibility
+- tests for smart behavior
 ## Suggested repo structure
 /apps
   /web
