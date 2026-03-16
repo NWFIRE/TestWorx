@@ -81,7 +81,41 @@ This is a global requirement across:
 - industrial_suppression
 - emergency_exit_lighting
 - any future inspection report types
+- 
+## Report definition implementation rule
 
+All inspection report types must be implemented through the shared report-definition system.
+
+Codex must not build bespoke report screens or report-specific form logic unless absolutely necessary.
+
+Every report type must be defined using:
+- fields
+- repeatableSource
+- optionProvider
+- prefill
+- mappings
+- calculation
+- readOnly
+- validation
+
+Shared dropdown options must be defined in:
+- packages/lib/src/report-options.ts
+
+Shared calculation helpers must be defined in:
+- packages/lib/src/report-calculations.ts
+
+Report-specific structure must be defined in:
+- packages/lib/src/report-config.ts
+
+When implementing a new report type, Codex should:
+1. add or extend the report definition in report-config.ts
+2. reuse an existing optionProvider when possible
+3. reuse an existing calculation helper when possible
+4. add new providers/helpers only when needed
+5. avoid hardcoding report-specific UI logic if the shared engine can support it
+6. preserve autosave, preview, finalization, PDF rendering, and customer portal compatibility
+
+A report implementation is not complete unless it works through the shared engine and not just through ad hoc UI code.
 ### Core rule
 Every report type must be implemented using reusable report-engine patterns that support:
 - prefilled dropdowns
