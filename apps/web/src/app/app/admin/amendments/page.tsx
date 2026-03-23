@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getAdminAmendmentManagementData } from "@testworx/lib";
 
+type AmendmentManagementItem = Awaited<ReturnType<typeof getAdminAmendmentManagementData>>["items"][number];
+
 const lifecycleOptions = [
   { value: "all", label: "All lifecycle states" },
   { value: "original", label: "Original" },
@@ -28,7 +30,7 @@ function formatAuditAction(value: string) {
   return value.replaceAll(".", " ").replaceAll("_", " ");
 }
 
-function getRelationshipSummary(item: Awaited<ReturnType<typeof getAdminAmendmentManagementData>>["items"][number]) {
+function getRelationshipSummary(item: AmendmentManagementItem) {
   if (item.originalAmendment) {
     return {
       label: "Replacement for",
@@ -123,7 +125,7 @@ export default async function AdminAmendmentsPage({
           {data.items.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No inspections matched this lifecycle filter.</p>
           ) : (
-            data.items.map((inspection) => {
+            data.items.map((inspection: AmendmentManagementItem) => {
               const relationship = getRelationshipSummary(inspection);
               const amendmentReason = inspection.originalAmendment?.reason ?? inspection.outgoingAmendment?.reason ?? null;
 
