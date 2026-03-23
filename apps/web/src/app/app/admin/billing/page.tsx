@@ -57,7 +57,7 @@ export default async function AdminBillingPage() {
         <div className="space-y-4">
           {openSummaries.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No billing summaries are ready yet. Finalize an inspection report with billable mappings to populate this queue.</p>
-          ) : openSummaries.map((summary) => (
+          ) : openSummaries.map((summary: AdminBillingSummary) => (
             <div key={summary.id} className="rounded-[1.5rem] border border-slate-200 p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="space-y-2">
@@ -95,7 +95,7 @@ export default async function AdminBillingPage() {
         <div className="space-y-4">
           {invoicedSummaries.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No inspections have been marked invoiced yet.</p>
-          ) : invoicedSummaries.map((summary) => (
+          ) : invoicedSummaries.map((summary: AdminBillingSummary) => (
             <div key={summary.id} className="rounded-[1.5rem] border border-slate-200 p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="space-y-2">
