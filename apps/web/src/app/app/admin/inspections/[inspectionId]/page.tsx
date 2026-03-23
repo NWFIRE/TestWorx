@@ -135,6 +135,7 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
   type TechnicianAssignment = NonNullable<typeof inspectionView.technicianAssignments>[number];
   type InspectionTask = typeof inspectionView.tasks[number];
   type CorrectionEvent = NonNullable<NonNullable<InspectionTask["report"]>["correctionEvents"]>[number];
+  type AuditTrailEntry = NonNullable<typeof inspectionView.auditTrail>[number];
 
   return (
     <section className="space-y-6">
@@ -287,7 +288,7 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Audit trail</p>
             <div className="mt-4 space-y-3">
-              {(inspectionView.auditTrail ?? []).length ? (inspectionView.auditTrail ?? []).map((entry) => {
+              {(inspectionView.auditTrail ?? []).length ? (inspectionView.auditTrail ?? []).map((entry: AuditTrailEntry) => {
                 const metadata = asMetadataRecord(entry.metadata);
                 return (
                 <div key={entry.id} className="rounded-2xl border border-slate-200 p-4">
