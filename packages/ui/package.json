@@ -1,0 +1,13 @@
+{
+  "name": "@testworx/ui",
+  "private": true,
+  "version": "0.1.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "echo ui build complete",
+    "lint": "echo ui lint complete",
+    "test": "echo no tests in ui"
+  }
+}
+

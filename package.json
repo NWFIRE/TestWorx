@@ -1,0 +1,29 @@
+{
+    "name":  "testworx",
+    "private":  true,
+    "version":  "0.1.0",
+    "workspaces":  [
+                       "apps/*",
+                       "packages/*"
+                   ],
+    "scripts":  {
+                    "dev":  "turbo run dev --parallel",
+                    "build":  "turbo run build",
+                    "lint":  "turbo run lint",
+                    "test":  "turbo run test",
+                    "db:generate":  "npm run prisma:generate --workspace @testworx/db",
+                    "db:status":  "npm run prisma:status --workspace @testworx/db",
+                    "db:migrate":  "npm run prisma:migrate --workspace @testworx/db",
+                    "db:seed":  "npm run prisma:seed --workspace @testworx/db",
+                    "db:verify":  "npm run verify --workspace @testworx/db",
+                    "db:bootstrap":  "npm run db:generate && npm run db:migrate && npm run db:seed && npm run db:verify",
+                    "test:db":  "npm run test:db --workspace @testworx/lib",
+                    "validate:release":  "npm run db:verify && npm run test && npm run test:db && npm run lint && npm run build"
+                },
+    "devDependencies":  {
+                            "turbo":  "^2.5.0",
+                            "typescript":  "^5.8.2"
+                        },
+    "packageManager":  "npm@11.6.2"
+}
+

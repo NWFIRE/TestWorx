@@ -1,0 +1,28 @@
+{
+  "name": "@testworx/lib",
+  "private": true,
+  "version": "0.1.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "echo lib build complete",
+    "lint": "echo lib lint complete",
+    "test": "vitest run --config vitest.config.mjs",
+    "test:integration": "vitest run --config vitest.config.mjs",
+    "test:db": "vitest run --config vitest.config.mjs src/__tests__/postgres.integration.test.ts"
+  },
+  "dependencies": {
+    "@testworx/db": "*",
+    "@testworx/types": "*",
+    "@vercel/blob": "^2.3.1",
+    "bcryptjs": "^2.4.3",
+    "date-fns": "^4.1.0",
+    "pdf-lib": "^1.17.1",
+    "stripe": "^20.4.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "vitest": "^3.0.8"
+  }
+}

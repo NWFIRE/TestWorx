@@ -1,0 +1,230 @@
+import Link from "next/link";
+import { format } from "date-fns";
+import { redirect } from "next/navigation";
+
+import { auth } from "@/auth";
+import { formatInspectionStatusLabel, getTechnicianDashboardData, pickEarliestNextDueAt } from "@testworx/lib";
+
+import { AddReportTypeControl } from "./add-report-type-control";
+import { ClaimButton } from "./claim-button";
+import { StatusButton } from "./status-button";
+
+const statusClasses: Record<string, string> = {
+  to_be_completed: "bg-sky-50 text-sky-700 ring-1 ring-sky-100",
+  scheduled: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100",
+  in_progress: "bg-amber-50 text-amber-700 ring-1 ring-amber-100",
+  completed: "bg-slate-100 text-slate-700 ring-1 ring-slate-200",
+  cancelled: "bg-rose-50 text-rose-700 ring-1 ring-rose-100",
+  past_due: "bg-rose-50 text-rose-800 ring-1 ring-rose-100"
+};
+
+const reportStatusClasses: Record<string, string> = {
+  draft: "bg-amber-50 text-amber-700 ring-1 ring-amber-100",
+  submitted: "bg-sky-50 text-sky-700 ring-1 ring-sky-100",
+  finalized: "bg-slate-100 text-slate-700 ring-1 ring-slate-200"
+};
+
+function inspectionStatusLabel(status: string) {
+  return formatInspectionStatusLabel(status as "past_due" | "to_be_completed" | "scheduled" | "in_progress" | "completed" | "cancelled");
+}
+
+function nextDueLabel(nextDueAt: Date | null | undefined, scheduledStart: Date) {
+  return nextDueAt ? format(nextDueAt, "MMM d, yyyy") : format(scheduledStart, "MMM d, yyyy");
+}
+
+function taskActionLabel(task: { inspectionType: string; displayLabel?: string; report?: { status: string } | null }) {
+  const label = task.displayLabel ?? task.inspectionType.replaceAll("_", " ");
+  if (task.report?.status === "finalized") {
+    return `View ${label}`;
+  }
+
+  return `Open ${label}`;
+}
+
+function correctionStateLabel(state: string | null | undefined) {
+  return state ? state.replaceAll("_", " ") : "";
+}
+
+export default async function TechnicianPage() {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    redirect("/login");
+  }
+  if (session.user.role !== "technician") {
+    redirect("/app");
+  }
+
+  const data = await getTechnicianDashboardData({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId });
+
+  return (
+    <section className="space-y-5 pb-8">
+      <div className="rounded-[2rem] bg-ink p-6 text-white shadow-panel">
+        <p className="text-sm uppercase tracking-[0.25em] text-white/60">Technician workspace</p>
+        <h2 className="mt-2 text-3xl font-semibold">Field schedule</h2>
+        <p className="mt-3 max-w-2xl text-white/75">Claim open work, move visits through the day, and finish reports without losing sight of due dates.</p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[["Assigned", data.assigned.length], ["Today", data.today.length], ["This week", data.thisWeek.length], ["Shared queue", data.unassigned.length]].map(([label, value]) => (
+          <div key={String(label)} className="rounded-[1.75rem] bg-white p-5 shadow-panel">
+            <p className="text-sm text-slate-500">{label}</p>
+            <p className="mt-2 text-3xl font-semibold text-ink">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-[2rem] bg-white p-5 shadow-panel">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Month view</p>
+            <h3 className="mt-1 text-2xl font-semibold text-ink">Assigned this month</h3>
+          </div>
+          <p className="text-sm text-slate-500">{data.thisMonth.length} scheduled visit{data.thisMonth.length === 1 ? "" : "s"}</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {data.monthCalendar.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No assigned inspections this month.</p>
+          ) : (
+            data.monthCalendar.map((entry) => (
+              <div key={`${entry.dayKey}-${entry.siteName}`} className="rounded-2xl border border-slate-200 p-4">
+                <p className="text-sm text-slate-500">{entry.label}</p>
+                <p className="mt-1 font-semibold text-ink">{entry.siteName}</p>
+                <span className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[entry.status]}`}>{inspectionStatusLabel(entry.status)}</span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className="rounded-[2rem] bg-white p-5 shadow-panel">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h3 className="text-2xl font-semibold text-ink">Assigned inspections</h3>
+              <p className="mt-1 text-sm text-slate-500">Complete all report tasks before marking the visit completed.</p>
+            </div>
+          </div>
+          <div className="mt-4 space-y-4">
+            {data.assigned.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No assigned inspections yet.</p>
+            ) : (
+              data.assigned.map((inspection) => {
+                const nextDue = pickEarliestNextDueAt(inspection.tasks.map((task) => task.recurrence?.nextDueAt)) ?? undefined;
+                const finalizedTaskCount = inspection.tasks.filter((task) => task.report?.status === "finalized").length;
+                return (
+                  <div key={inspection.id} className="rounded-[1.5rem] border border-slate-200 p-4">
+                    <div className="flex flex-col gap-4">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-lg font-semibold text-ink">{inspection.site.name}</p>
+                          <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[(inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status]}`}>{inspectionStatusLabel((inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status)}</span>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-500">{format(inspection.scheduledStart, "EEE, MMM d h:mm a")} | {inspection.customerCompany.name}</p>
+                        <p className="mt-1 text-sm text-slate-500">Assigned team: {((inspection as typeof inspection & { assignedTechnicianNames?: string[] }).assignedTechnicianNames ?? []).join(", ")}</p>
+                        <p className="mt-1 text-sm text-slate-500">Due date: {nextDueLabel(nextDue, inspection.scheduledStart)}</p>
+                        <p className="mt-1 text-sm text-slate-500">Report types: {inspection.tasks.map((task) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
+                        <p className="mt-1 text-sm text-slate-500">{finalizedTaskCount} of {inspection.tasks.length} report task{inspection.tasks.length === 1 ? "" : "s"} finalized</p>
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                          {inspection.tasks.map((task) => (
+                            <div key={task.id} className="space-y-2 rounded-[1.25rem] bg-slate-50 p-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-sm font-semibold text-ink">{task.displayLabel ?? task.inspectionType.replaceAll("_", " ")}</p>
+                                <span className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${reportStatusClasses[task.report?.status ?? "draft"] ?? reportStatusClasses.draft}`}>{(task.report?.status ?? "draft").replaceAll("_", " ")}</span>
+                              </div>
+                              {task.report?.correctionState && task.report.correctionState !== "none" ? (
+                                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                                  <p className="font-semibold uppercase tracking-[0.16em]">{correctionStateLabel(task.report.correctionState)}</p>
+                                  {task.report.correctionReason ? <p className="mt-1 normal-case">{task.report.correctionReason}</p> : null}
+                                </div>
+                              ) : null}
+                              <Link className="inline-flex min-h-12 w-full items-center justify-center rounded-[1.25rem] bg-white px-4 py-3 text-center text-sm font-semibold text-slateblue ring-1 ring-slate-200" href={`/app/tech/reports/${inspection.id}/${task.id}`}>
+                                {taskActionLabel(task)}
+                              </Link>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 space-y-2">
+                          {((inspection as typeof inspection & {
+                            documents?: Array<{
+                              id: string;
+                              label: string | null;
+                              fileName: string;
+                              requiresSignature: boolean;
+                              status: string;
+                            }>;
+                          }).documents ?? []).length ? (
+                            <>
+                              <p className="text-sm font-semibold text-ink">External documents</p>
+                              {((inspection as typeof inspection & {
+                                documents?: Array<{
+                                  id: string;
+                                  label: string | null;
+                                  fileName: string;
+                                  requiresSignature: boolean;
+                                  status: string;
+                                }>;
+                              }).documents ?? []).map((document) => (
+                                <div key={document.id} className="flex flex-col gap-2 rounded-[1.25rem] border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between">
+                                  <div>
+                                    <p className="text-sm font-semibold text-ink">{document.label || document.fileName}</p>
+                                    <p className="mt-1 text-xs text-slate-500">
+                                      {document.requiresSignature ? "Requires signature" : "Reference only"} | {document.status.replaceAll("_", " ")}
+                                    </p>
+                                  </div>
+                                  <Link className="inline-flex min-h-12 items-center justify-center rounded-[1.25rem] bg-white px-4 py-3 text-center text-sm font-semibold text-slateblue ring-1 ring-slate-200" href={`/app/tech/inspections/${inspection.id}/documents/${document.id}`}>
+                                    {document.requiresSignature && document.status !== "SIGNED" && document.status !== "EXPORTED" ? "Sign PDF" : "View PDF"}
+                                  </Link>
+                                </div>
+                              ))}
+                            </>
+                          ) : null}
+                        </div>
+                        <div className="mt-3">
+                          <AddReportTypeControl inspectionId={inspection.id} />
+                        </div>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {inspection.status === "to_be_completed" || inspection.status === "scheduled" ? <StatusButton inspectionId={inspection.id} status="in_progress" label="Start inspection" /> : null}
+                        {inspection.status === "in_progress" ? <StatusButton inspectionId={inspection.id} status="completed" label="Mark completed" /> : null}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-[2rem] bg-white p-5 shadow-panel">
+          <h3 className="text-2xl font-semibold text-ink">Shared technician queue</h3>
+          <p className="mt-1 text-sm text-slate-500">Unassigned inspections stay claimable until a technician takes ownership.</p>
+          <div className="mt-4 space-y-4">
+            {data.unassigned.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No open inspections to claim.</p>
+            ) : (
+              data.unassigned.map((inspection) => {
+                const nextDue = pickEarliestNextDueAt(inspection.tasks.map((task) => task.recurrence?.nextDueAt)) ?? undefined;
+                return (
+                  <div key={inspection.id} className="rounded-[1.5rem] border border-slate-200 p-4">
+                    <div className="space-y-4">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-lg font-semibold text-ink">{inspection.site.name}</p>
+                          <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[(inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status]}`}>{inspectionStatusLabel((inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status)}</span>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-500">{format(inspection.scheduledStart, "MMM d, h:mm a")} | {inspection.customerCompany.name}</p>
+                        <p className="mt-1 text-sm text-slate-500">Due date: {nextDueLabel(nextDue, inspection.scheduledStart)}</p>
+                        <p className="mt-1 text-sm text-slate-500">{inspection.tasks.length} report task{inspection.tasks.length === 1 ? "" : "s"} ready to claim</p>
+                      </div>
+                      <ClaimButton inspectionId={inspection.id} />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}

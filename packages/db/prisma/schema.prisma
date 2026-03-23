@@ -1,0 +1,595 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  platform_admin
+  tenant_admin
+  office_admin
+  technician
+  customer_user
+}
+
+enum TenantStatus {
+  active
+  trialing
+  suspended
+}
+
+enum InspectionType {
+  fire_extinguisher
+  fire_alarm
+  wet_fire_sprinkler
+  backflow
+  fire_pump
+  dry_fire_sprinkler
+  kitchen_suppression
+  industrial_suppression
+  emergency_exit_lighting
+}
+
+enum InspectionStatus {
+  to_be_completed
+  scheduled
+  in_progress
+  completed
+  cancelled
+}
+
+enum ReportStatus {
+  draft
+  submitted
+  finalized
+}
+
+enum ReportCorrectionState {
+  none
+  admin_edit_in_progress
+  reissued_to_technician
+}
+
+enum RecurrenceFrequency {
+  ONCE
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUAL
+  ANNUAL
+}
+
+enum AttachmentKind {
+  photo
+  pdf
+  file
+}
+
+enum AttachmentSource {
+  uploaded
+  generated
+}
+
+enum SignatureKind {
+  technician
+  customer
+}
+
+enum InspectionDocumentType {
+  EXTERNAL_CUSTOMER_FORM
+}
+
+enum InspectionDocumentStatus {
+  UPLOADED
+  READY_FOR_SIGNATURE
+  SIGNED
+  EXPORTED
+}
+
+enum InspectionAmendmentType {
+  reschedule
+  reassignment
+  scope_change
+}
+
+enum StripeWebhookEventStatus {
+  received
+  processing
+  processed
+  failed
+}
+
+enum QuickBooksConnectionMode {
+  sandbox
+  live
+}
+
+model SubscriptionPlan {
+  id                String   @id @default(cuid())
+  code              String   @unique
+  name              String
+  monthlyPriceCents Int
+  maxTenants        Int?
+  maxUsers          Int?
+  featureFlags      Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  tenants           Tenant[]
+}
+
+model Tenant {
+  id                        String                 @id @default(cuid())
+  slug                      String                 @unique
+  name                      String
+  status                    TenantStatus           @default(active)
+  timezone                  String                 @default("America/Chicago")
+  branding                  Json?
+  subscriptionPlanId        String?
+  billingEmail              String?
+  stripeCustomerId          String?                @unique
+  stripeSubscriptionId      String?                @unique
+  stripeSubscriptionStatus  String?
+  stripePriceId             String?
+  defaultServiceFeeCode     String?                @default("SERVICE_FEE")
+  defaultServiceFeeUnitPrice Float?
+  stripeCurrentPeriodEndsAt DateTime?
+  stripeCancelAtPeriodEnd   Boolean                @default(false)
+  stripeSubscriptionSyncedAt DateTime?
+  stripeSubscriptionEventCreatedAt DateTime?
+  stripeSubscriptionEventId String?
+  quickbooksRealmId          String?                @unique
+  quickbooksCompanyName      String?
+  quickbooksConnectionMode   QuickBooksConnectionMode?
+  quickbooksAccessToken      String?
+  quickbooksRefreshToken     String?
+  quickbooksTokenExpiresAt   DateTime?
+  quickbooksConnectedAt      DateTime?
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
+  subscriptionPlan          SubscriptionPlan?      @relation(fields: [subscriptionPlanId], references: [id])
+  users                     User[]
+  customerCompanies         CustomerCompany[]
+  sites                     Site[]
+  assets                    Asset[]
+  inspections               Inspection[]
+  inspectionTasks           InspectionTask[]
+  inspectionReports         InspectionReport[]
+  recurrences               InspectionRecurrence[]
+  attachments               Attachment[]
+  signatures                Signature[]
+  deficiencies              Deficiency[]
+  billingSummaries          InspectionBillingSummary[]
+  inspectionDocuments       InspectionDocument[]
+  auditLogs                 AuditLog[]
+  reportCorrectionEvents    ReportCorrectionEvent[]
+  inspectionAmendments      InspectionAmendment[]
+  inspectionTechnicianAssignments InspectionTechnicianAssignment[]
+  stripeWebhookEvents       StripeWebhookEvent[]
+  serviceFeeRules           ServiceFeeRule[]
+  quickbooksCatalogItems    QuickBooksCatalogItem[]
+}
+
+model User {
+  id                  String                  @id @default(cuid())
+  tenantId            String?
+  customerCompanyId   String?
+  email               String                  @unique
+  name                String
+  passwordHash        String
+  role                UserRole
+  isActive            Boolean                 @default(true)
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  tenant              Tenant?                 @relation(fields: [tenantId], references: [id])
+  customerCompany     CustomerCompany?        @relation(fields: [customerCompanyId], references: [id])
+  assignedInspections Inspection[]            @relation("InspectionAssignedTechnician")
+  createdInspections  Inspection[]            @relation("InspectionCreatedBy")
+  inspectionReports   InspectionReport[]      @relation("InspectionReportTechnician")
+  requestedReportCorrections InspectionReport[] @relation("ReportCorrectionRequestedBy")
+  resolvedReportCorrections InspectionReport[] @relation("ReportCorrectionResolvedBy")
+  auditLogs           AuditLog[]
+  reportCorrectionEvents ReportCorrectionEvent[] @relation("ReportCorrectionEventActor")
+  createdAmendments   InspectionAmendment[]   @relation("InspectionAmendmentCreatedBy")
+  inspectionAssignments InspectionTechnicianAssignment[]
+}
+
+model CustomerCompany {
+  id           String   @id @default(cuid())
+  tenantId     String
+  name         String
+  contactName  String?
+  billingEmail String?
+  phone        String?
+  quickbooksCustomerId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  users        User[]
+  sites        Site[]
+  inspections  Inspection[]
+  billingSummaries InspectionBillingSummary[]
+  serviceFeeRules ServiceFeeRule[]
+}
+
+model Site {
+  id                String          @id @default(cuid())
+  tenantId          String
+  customerCompanyId String
+  name              String
+  addressLine1      String
+  addressLine2      String?
+  city              String
+  state             String
+  postalCode        String
+  notes             String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  tenant            Tenant          @relation(fields: [tenantId], references: [id])
+  customerCompany   CustomerCompany @relation(fields: [customerCompanyId], references: [id])
+  assets            Asset[]
+  inspections       Inspection[]
+  deficiencies      Deficiency[]
+  billingSummaries  InspectionBillingSummary[]
+  serviceFeeRules   ServiceFeeRule[]
+}
+
+model Asset {
+  id              String           @id @default(cuid())
+  tenantId        String
+  siteId          String
+  name            String
+  assetTag        String?
+  inspectionTypes InspectionType[]
+  metadata        Json?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  site            Site             @relation(fields: [siteId], references: [id])
+  deficiencies    Deficiency[]
+}
+
+model Inspection {
+  id                    String                  @id @default(cuid())
+  tenantId              String
+  customerCompanyId     String
+  siteId                String
+  assignedTechnicianId  String?
+  createdByUserId       String
+  status                InspectionStatus        @default(to_be_completed)
+  scheduledStart        DateTime
+  scheduledEnd          DateTime?
+  notes                 String?
+  claimable             Boolean                 @default(true)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  tenant                Tenant                  @relation(fields: [tenantId], references: [id])
+  customerCompany       CustomerCompany         @relation(fields: [customerCompanyId], references: [id])
+  site                  Site                    @relation(fields: [siteId], references: [id])
+  assignedTechnician    User?                   @relation("InspectionAssignedTechnician", fields: [assignedTechnicianId], references: [id])
+  attachments           Attachment[]
+  createdBy             User                    @relation("InspectionCreatedBy", fields: [createdByUserId], references: [id])
+  tasks                 InspectionTask[]
+  reports               InspectionReport[]
+  deficiencies          Deficiency[]
+  billingSummary        InspectionBillingSummary?
+  documents             InspectionDocument[]
+  amendments            InspectionAmendment[]   @relation("OriginalInspectionAmendments")
+  replacementAmendments InspectionAmendment[]   @relation("ReplacementInspectionAmendments")
+  technicianAssignments InspectionTechnicianAssignment[]
+}
+
+model InspectionTechnicianAssignment {
+  id           String     @id @default(cuid())
+  tenantId     String
+  inspectionId String
+  technicianId String
+  createdAt    DateTime   @default(now())
+  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+  inspection   Inspection @relation(fields: [inspectionId], references: [id])
+  technician   User       @relation(fields: [technicianId], references: [id])
+
+  @@unique([inspectionId, technicianId])
+  @@index([tenantId, inspectionId])
+  @@index([tenantId, technicianId])
+}
+
+model InspectionTask {
+  id             String           @id @default(cuid())
+  tenantId       String
+  inspectionId   String
+  inspectionType InspectionType
+  status         InspectionStatus @default(to_be_completed)
+  sortOrder      Int              @default(0)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  tenant         Tenant           @relation(fields: [tenantId], references: [id])
+  inspection     Inspection       @relation(fields: [inspectionId], references: [id])
+  recurrence     InspectionRecurrence?
+  report         InspectionReport?
+  
+  @@index([inspectionId, inspectionType])
+}
+
+model InspectionRecurrence {
+  id               String              @id @default(cuid())
+  tenantId         String
+  inspectionTaskId String              @unique
+  frequency        RecurrenceFrequency
+  intervalCount    Int                 @default(1)
+  nextDueAt        DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  tenant           Tenant              @relation(fields: [tenantId], references: [id])
+  inspectionTask   InspectionTask      @relation(fields: [inspectionTaskId], references: [id])
+}
+
+model InspectionReport {
+  id                            String                @id @default(cuid())
+  tenantId                      String
+  inspectionId                  String
+  inspectionTaskId              String                @unique
+  technicianId                  String?
+  status                        ReportStatus          @default(draft)
+  correctionState               ReportCorrectionState @default(none)
+  correctionReason              String?
+  correctionRequestedAt         DateTime?
+  correctionRequestedByUserId   String?
+  correctionResolvedAt          DateTime?
+  correctionResolvedByUserId    String?
+  contentJson                   Json?
+  autosaveVersion               Int                   @default(1)
+  finalizedAt                   DateTime?
+  createdAt                     DateTime              @default(now())
+  updatedAt                     DateTime              @updatedAt
+  tenant                        Tenant                @relation(fields: [tenantId], references: [id])
+  inspection                    Inspection            @relation(fields: [inspectionId], references: [id])
+  task                          InspectionTask        @relation(fields: [inspectionTaskId], references: [id])
+  technician                    User?                 @relation("InspectionReportTechnician", fields: [technicianId], references: [id])
+  correctionRequestedBy         User?                 @relation("ReportCorrectionRequestedBy", fields: [correctionRequestedByUserId], references: [id], onDelete: SetNull)
+  correctionResolvedBy          User?                 @relation("ReportCorrectionResolvedBy", fields: [correctionResolvedByUserId], references: [id], onDelete: SetNull)
+  attachments                   Attachment[]
+  signatures                    Signature[]
+  deficiencies                  Deficiency[]
+  correctionEvents              ReportCorrectionEvent[]
+
+  @@index([tenantId, correctionState])
+}
+
+model ReportCorrectionEvent {
+  id             String   @id @default(cuid())
+  tenantId       String
+  reportId       String
+  actionType     String
+  reason         String?
+  previousStatus String?
+  newStatus      String?
+  snapshotJson   Json?
+  actedByUserId  String
+  createdAt      DateTime @default(now())
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  report         InspectionReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  actedBy        User     @relation("ReportCorrectionEventActor", fields: [actedByUserId], references: [id])
+
+  @@index([tenantId, reportId])
+  @@index([tenantId, createdAt])
+}
+
+model Attachment {
+  id                 String            @id @default(cuid())
+  tenantId           String
+  inspectionId       String?
+  inspectionReportId String?
+  kind               AttachmentKind
+  source             AttachmentSource  @default(uploaded)
+  fileName           String
+  mimeType           String
+  storageKey         String
+  customerVisible    Boolean           @default(false)
+  createdAt          DateTime          @default(now())
+  tenant             Tenant            @relation(fields: [tenantId], references: [id])
+  inspection         Inspection?       @relation(fields: [inspectionId], references: [id])
+  inspectionReport   InspectionReport? @relation(fields: [inspectionReportId], references: [id])
+}
+
+model Signature {
+  id                 String           @id @default(cuid())
+  tenantId           String
+  inspectionReportId String
+  signerName         String
+  kind               SignatureKind
+  imageDataUrl       String
+  signedAt           DateTime         @default(now())
+  tenant             Tenant           @relation(fields: [tenantId], references: [id])
+  inspectionReport   InspectionReport @relation(fields: [inspectionReportId], references: [id])
+}
+
+model Deficiency {
+  id                 String           @id @default(cuid())
+  tenantId           String
+  siteId             String
+  inspectionId       String
+  inspectionReportId String
+  reportType         InspectionType
+  section            String
+  source             String           @default("manual")
+  sourceRowKey       String
+  assetId            String?
+  assetTag           String?
+  location           String?
+  deviceType         String?
+  title              String
+  description        String
+  severity           String
+  status             String
+  photoStorageKey    String?
+  notes              String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  tenant             Tenant           @relation(fields: [tenantId], references: [id])
+  site               Site             @relation(fields: [siteId], references: [id])
+  inspection         Inspection       @relation(fields: [inspectionId], references: [id])
+  inspectionReport   InspectionReport @relation(fields: [inspectionReportId], references: [id])
+  asset              Asset?           @relation(fields: [assetId], references: [id])
+
+  @@unique([inspectionReportId, source, section, sourceRowKey])
+  @@index([tenantId, status])
+  @@index([tenantId, siteId])
+  @@index([tenantId, inspectionId])
+}
+
+model InspectionBillingSummary {
+  id                String       @id @default(cuid())
+  tenantId          String
+  inspectionId      String       @unique
+  customerCompanyId String
+  siteId            String
+  status            String       @default("draft")
+  quickbooksSyncStatus String?   @default("not_synced")
+  quickbooksInvoiceId String?
+  quickbooksInvoiceNumber String?
+  quickbooksConnectionMode QuickBooksConnectionMode?
+  quickbooksCustomerId String?
+  quickbooksSyncedAt  DateTime?
+  quickbooksSyncError String?
+  items             Json
+  subtotal          Float        @default(0)
+  notes             String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  tenant            Tenant       @relation(fields: [tenantId], references: [id])
+  inspection        Inspection   @relation(fields: [inspectionId], references: [id])
+  customerCompany   CustomerCompany @relation(fields: [customerCompanyId], references: [id])
+  site              Site         @relation(fields: [siteId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([tenantId, customerCompanyId])
+  @@index([tenantId, siteId])
+}
+
+model ServiceFeeRule {
+  id                String          @id @default(cuid())
+  tenantId          String
+  customerCompanyId String?
+  siteId            String?
+  city              String?
+  state             String?
+  zipCode           String?
+  feeCode           String          @default("SERVICE_FEE")
+  unitPrice         Float
+  priority          Int             @default(0)
+  isActive          Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  tenant            Tenant          @relation(fields: [tenantId], references: [id])
+  customerCompany   CustomerCompany? @relation(fields: [customerCompanyId], references: [id])
+  site              Site?           @relation(fields: [siteId], references: [id])
+
+  @@index([tenantId, isActive, priority])
+  @@index([tenantId, customerCompanyId])
+  @@index([tenantId, siteId])
+  @@index([tenantId, zipCode])
+  @@index([tenantId, city, state])
+}
+
+model QuickBooksCatalogItem {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  quickbooksItemId   String
+  name               String
+  sku                String?
+  itemType           String
+  active             Boolean  @default(true)
+  unitPrice          Float?
+  incomeAccountId    String?
+  incomeAccountName  String?
+  rawJson            Json?
+  importedAt         DateTime @default(now())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  tenant             Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, quickbooksItemId])
+  @@index([tenantId, active, itemType])
+  @@index([tenantId, name])
+  @@index([tenantId, sku])
+}
+
+model InspectionDocument {
+  id                     String                   @id @default(cuid())
+  tenantId               String
+  inspectionId           String
+  fileName               String
+  mimeType               String
+  fileSize               Int?
+  documentType           InspectionDocumentType   @default(EXTERNAL_CUSTOMER_FORM)
+  label                  String?
+  requiresSignature      Boolean                  @default(false)
+  status                 InspectionDocumentStatus @default(UPLOADED)
+  customerVisible        Boolean                  @default(false)
+  originalStorageKey     String
+  signedStorageKey       String?
+  uploadedByUserId       String?
+  signedByUserId         String?
+  uploadedAt             DateTime                 @default(now())
+  signedAt               DateTime?
+  exportedAt             DateTime?
+  externalTransferStatus String?
+  externalTransferRef    String?
+  externalTransferAt     DateTime?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  tenant                 Tenant                   @relation(fields: [tenantId], references: [id])
+  inspection             Inspection               @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, inspectionId])
+  @@index([tenantId, status])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+  actor       User?    @relation(fields: [actorUserId], references: [id])
+}
+
+model InspectionAmendment {
+  id                     String                  @id @default(cuid())
+  tenantId               String
+  inspectionId           String
+  replacementInspectionId String
+  createdByUserId        String
+  type                   InspectionAmendmentType @default(reschedule)
+  reason                 String
+  previousSnapshot       Json
+  replacementSnapshot    Json
+  createdAt              DateTime                @default(now())
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id])
+  inspection             Inspection              @relation("OriginalInspectionAmendments", fields: [inspectionId], references: [id])
+  replacementInspection  Inspection              @relation("ReplacementInspectionAmendments", fields: [replacementInspectionId], references: [id])
+  createdBy              User                    @relation("InspectionAmendmentCreatedBy", fields: [createdByUserId], references: [id])
+}
+
+model StripeWebhookEvent {
+  id            String                   @id @default(cuid())
+  tenantId      String?
+  stripeEventId String                   @unique
+  type          String
+  status        StripeWebhookEventStatus @default(received)
+  deliveryCount Int                      @default(1)
+  stripeCreatedAt DateTime?
+  stripeObjectId String?
+  payload       Json
+  errorMessage  String?
+  processingStartedAt DateTime?
+  processedAt   DateTime?
+  createdAt     DateTime                 @default(now())
+  tenant        Tenant?                  @relation(fields: [tenantId], references: [id])
+}
