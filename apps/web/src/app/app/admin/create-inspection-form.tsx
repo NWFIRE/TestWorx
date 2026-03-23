@@ -1,12 +1,13 @@
 "use client";
 
 import { useActionState } from "react";
-import type { InspectionType, RecurrenceFrequency } from "@prisma/client";
 import type { CustomerOption, SiteOption, TechnicianOption } from "@testworx/types";
 import { getDefaultInspectionRecurrenceFrequency, inspectionTypeRegistry } from "@testworx/lib";
 
 import { createInspectionAction } from "./actions";
 
+type InspectionType = keyof typeof inspectionTypeRegistry;
+type RecurrenceFrequency = "ONCE" | "MONTHLY" | "QUARTERLY" | "SEMI_ANNUAL" | "ANNUAL";
 const recurrenceOptions: RecurrenceFrequency[] = ["ONCE", "MONTHLY", "QUARTERLY", "SEMI_ANNUAL", "ANNUAL"];
 const initialState = { error: null as string | null, success: null as string | null };
 
