@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getAdminBillingSummaries } from "@testworx/lib";
 
+type AdminBillingSummary = Awaited<ReturnType<typeof getAdminBillingSummaries>>[number];
+
 const statusClasses: Record<string, string> = {
   draft: "bg-amber-50 text-amber-700",
   reviewed: "bg-blue-50 text-blue-700",
@@ -64,7 +66,7 @@ export default async function AdminBillingPage() {
                     <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[summary.status] ?? "bg-slate-100 text-slate-700"}`}>{summary.status}</span>
                   </div>
                   <p className="text-sm text-slate-500">{summary.siteName} | {format(summary.inspectionDate, "MMM d, yyyy h:mm a")}</p>
-                  <p className="text-sm text-slate-500">Reports: {summary.reportTypes.length > 0 ? summary.reportTypes.map((type) => type.replaceAll("_", " ")).join(", ") : "Inspection-level billing only"}</p>
+                  <p className="text-sm text-slate-500">Reports: {summary.reportTypes.length > 0 ? summary.reportTypes.map((type: AdminBillingSummary["reportTypes"][number]) => type.replaceAll("_", " ")).join(", ") : "Inspection-level billing only"}</p>
                   <div className="grid gap-3 pt-1 md:grid-cols-4">
                     <p className="text-sm text-slate-600">Labor hours: <span className="font-semibold text-ink">{summary.metrics.laborHoursTotal}</span></p>
                     <p className="text-sm text-slate-600">Materials: <span className="font-semibold text-ink">{summary.metrics.materialItemCount}</span></p>
@@ -102,7 +104,7 @@ export default async function AdminBillingPage() {
                     <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[summary.status] ?? "bg-slate-100 text-slate-700"}`}>{summary.status}</span>
                   </div>
                   <p className="text-sm text-slate-500">{summary.siteName} | {format(summary.inspectionDate, "MMM d, yyyy h:mm a")}</p>
-                  <p className="text-sm text-slate-500">Reports: {summary.reportTypes.length > 0 ? summary.reportTypes.map((type) => type.replaceAll("_", " ")).join(", ") : "Inspection-level billing only"}</p>
+                  <p className="text-sm text-slate-500">Reports: {summary.reportTypes.length > 0 ? summary.reportTypes.map((type: AdminBillingSummary["reportTypes"][number]) => type.replaceAll("_", " ")).join(", ") : "Inspection-level billing only"}</p>
                   <div className="grid gap-3 pt-1 md:grid-cols-4">
                     <p className="text-sm text-slate-600">Labor hours: <span className="font-semibold text-ink">{summary.metrics.laborHoursTotal}</span></p>
                     <p className="text-sm text-slate-600">Materials: <span className="font-semibold text-ink">{summary.metrics.materialItemCount}</span></p>

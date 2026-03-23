@@ -7,6 +7,8 @@ import { buildQuickBooksInvoiceAppUrl, getAdminBillingSummaryDetail, getTenantQu
 
 import { sendQuickBooksInvoiceAction, syncBillingSummaryToQuickBooksAction, updateBillingSummaryItemAction, updateBillingSummaryNotesAction, updateBillingSummaryStatusAction } from "../../actions";
 
+type BillingSummaryDetail = NonNullable<Awaited<ReturnType<typeof getAdminBillingSummaryDetail>>>;
+
 const categoryLabels = {
   labor: "Labor",
   material: "Materials",
@@ -104,7 +106,7 @@ export default async function BillingSummaryDetailPage({
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing detail</p>
             <h2 className="mt-2 text-3xl font-semibold text-ink">{summary.customerName}</h2>
             <p className="mt-3 text-slate-500">{summary.siteName} | {format(summary.inspectionDate, "MMM d, yyyy h:mm a")} | Technician: {summary.technicianName ?? "Unassigned"}</p>
-            <p className="mt-2 text-slate-500">Reports: {summary.reportTypes.length > 0 ? summary.reportTypes.map((type) => type.replaceAll("_", " ")).join(", ") : "Inspection-level billing only"}</p>
+            <p className="mt-2 text-slate-500">Reports: {summary.reportTypes.length > 0 ? summary.reportTypes.map((type: BillingSummaryDetail["reportTypes"][number]) => type.replaceAll("_", " ")).join(", ") : "Inspection-level billing only"}</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Link className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href="/app/admin/billing">
