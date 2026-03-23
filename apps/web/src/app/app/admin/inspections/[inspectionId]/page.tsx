@@ -134,6 +134,7 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
   }>;
   type TechnicianAssignment = NonNullable<typeof inspectionView.technicianAssignments>[number];
   type InspectionTask = typeof inspectionView.tasks[number];
+  type CorrectionEvent = NonNullable<NonNullable<InspectionTask["report"]>["correctionEvents"]>[number];
 
   return (
     <section className="space-y-6">
@@ -275,7 +276,7 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
                 correctionResolvedAt: task.report.correctionResolvedAt?.toISOString() ?? null,
                 correctionRequestedBy: task.report.correctionRequestedBy,
                 correctionResolvedBy: task.report.correctionResolvedBy,
-                correctionEvents: task.report.correctionEvents.map((event) => ({
+                correctionEvents: task.report.correctionEvents.map((event: CorrectionEvent) => ({
                   ...event,
                   createdAt: event.createdAt.toISOString()
                 }))
