@@ -27,8 +27,8 @@ export default async function AdminBillingPage() {
     role: session.user.role,
     tenantId: session.user.tenantId
   });
-  const openSummaries = summaries.filter((summary) => summary.status !== "invoiced");
-  const invoicedSummaries = summaries.filter((summary) => summary.status === "invoiced");
+  const openSummaries = summaries.filter((summary: AdminBillingSummary) => summary.status !== "invoiced");
+  const invoicedSummaries = summaries.filter((summary: AdminBillingSummary) => summary.status === "invoiced");
 
   return (
     <section className="space-y-6">
