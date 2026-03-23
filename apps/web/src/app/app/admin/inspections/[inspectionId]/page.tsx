@@ -1,5 +1,4 @@
 import Link from "next/link";
-import type { InspectionType, RecurrenceFrequency } from "@prisma/client";
 import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
@@ -17,6 +16,9 @@ import { InspectionExternalDocumentsCard } from "../../inspection-external-docum
 import { InspectionPdfUploadCard } from "../../inspection-pdf-upload-card";
 import { InspectionReportCorrectionsCard } from "../../inspection-report-corrections-card";
 import { InspectionSchedulerForm } from "../../inspection-scheduler-form";
+
+type InspectionType = Parameters<typeof getDefaultInspectionRecurrenceFrequency>[0];
+type RecurrenceFrequency = ReturnType<typeof getDefaultInspectionRecurrenceFrequency>;
 
 const lifecycleBadgeStyles: Record<string, string> = {
   original: "bg-slate-100 text-slate-700",
