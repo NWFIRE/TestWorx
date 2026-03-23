@@ -55,13 +55,13 @@ export function CreateInspectionForm({ customers, sites, technicians }: { custom
           <p className="text-sm text-slate-500">Each selected inspection type becomes its own reportable task under one visit.</p>
         </div>
         <div className="grid gap-3">
-          {(Object.keys(inspectionTypeRegistry) as InspectionType[]).map((inspectionType) => (
+          {(Object.entries(inspectionTypeRegistry) as Array<[InspectionType, (typeof inspectionTypeRegistry)[InspectionType]]>).map(([inspectionType, inspectionConfig]) => (
             <div key={inspectionType} className="grid gap-3 rounded-2xl border border-slate-200 p-4 md:grid-cols-[1.5fr_1fr] md:items-center">
               <label className="flex items-start gap-3">
                 <input className="mt-1 h-5 w-5 rounded border-slate-300" type="checkbox" name={`type:${inspectionType}`} value="true" />
                 <span>
-                  <span className="block font-medium text-ink">{inspectionTypeRegistry[inspectionType].label}</span>
-                  <span className="block text-sm text-slate-500">{inspectionTypeRegistry[inspectionType].description}</span>
+                  <span className="block font-medium text-ink">{inspectionConfig.label}</span>
+                  <span className="block text-sm text-slate-500">{inspectionConfig.description}</span>
                 </span>
               </label>
               <select className="rounded-2xl border border-slate-200 px-4 py-3" name={`frequency:${inspectionType}`} defaultValue={getDefaultInspectionRecurrenceFrequency(inspectionType)}>
