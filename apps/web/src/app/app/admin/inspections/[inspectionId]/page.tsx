@@ -132,6 +132,8 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
     signedAt: Date | null;
     signedStorageKey: string | null;
   }>;
+  type TechnicianAssignment = NonNullable<typeof inspectionView.technicianAssignments>[number];
+  type InspectionTask = typeof inspectionView.tasks[number];
 
   return (
     <section className="space-y-6">
@@ -209,10 +211,10 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
             inspectionMonth: format(inspection.scheduledStart, "yyyy-MM"),
             scheduledStart: toDateTimeLocal(inspection.scheduledStart),
             scheduledEnd: toDateTimeLocal(inspection.scheduledEnd),
-            assignedTechnicianIds: inspectionView.technicianAssignments?.map((assignment) => assignment.technicianId) ?? (inspection.assignedTechnicianId ? [inspection.assignedTechnicianId] : []),
+            assignedTechnicianIds: inspectionView.technicianAssignments?.map((assignment: TechnicianAssignment) => assignment.technicianId) ?? (inspection.assignedTechnicianId ? [inspection.assignedTechnicianId] : []),
             status: inspection.status,
             notes: inspection.notes ?? "",
-            tasks: inspectionView.tasks.map((task) => ({ inspectionType: task.inspectionType, frequency: task.recurrence?.frequency ?? getDefaultInspectionRecurrenceFrequency(task.inspectionType) }))
+            tasks: inspectionView.tasks.map((task: InspectionTask) => ({ inspectionType: task.inspectionType, frequency: task.recurrence?.frequency ?? getDefaultInspectionRecurrenceFrequency(task.inspectionType) }))
           }}
         />
         <div className="space-y-6">
