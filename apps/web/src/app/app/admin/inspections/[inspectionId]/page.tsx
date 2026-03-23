@@ -261,7 +261,7 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
           <InspectionReportCorrectionsCard
             action={reopenCompletedReportAction}
             inspectionId={inspection.id}
-            reports={inspectionView.tasks.map((task) => ({
+            reports={inspectionView.tasks.map((task: InspectionTask) => ({
               taskId: task.id,
               inspectionType: task.inspectionType,
               displayLabel: task.inspectionType.replaceAll("_", " "),
