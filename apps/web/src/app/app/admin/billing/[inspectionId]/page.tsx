@@ -8,6 +8,7 @@ import { buildQuickBooksInvoiceAppUrl, getAdminBillingSummaryDetail, getTenantQu
 import { sendQuickBooksInvoiceAction, syncBillingSummaryToQuickBooksAction, updateBillingSummaryItemAction, updateBillingSummaryNotesAction, updateBillingSummaryStatusAction } from "../../actions";
 
 type BillingSummaryDetail = NonNullable<Awaited<ReturnType<typeof getAdminBillingSummaryDetail>>>;
+type BillingSummaryLineItem = BillingSummaryDetail["groupedItems"][keyof BillingSummaryDetail["groupedItems"]][number];
 
 const categoryLabels = {
   labor: "Labor",
@@ -161,7 +162,7 @@ export default async function BillingSummaryDetailPage({
               <div className="space-y-4">
                 {items.length === 0 ? (
                   <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No {categoryLabels[category].toLowerCase()} extracted from this visit.</p>
-                ) : items.map((item) => (
+                ) : items.map((item: BillingSummaryLineItem) => (
                   <form key={item.id} action={updateBillingSummaryItemAction} className="rounded-[1.5rem] border border-slate-200 p-4">
                     <input name="summaryId" type="hidden" value={summary.id} />
                     <input name="inspectionId" type="hidden" value={summary.inspectionId} />
