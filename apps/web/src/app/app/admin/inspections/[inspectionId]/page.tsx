@@ -136,6 +136,7 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
   type InspectionTask = typeof inspectionView.tasks[number];
   type CorrectionEvent = NonNullable<NonNullable<InspectionTask["report"]>["correctionEvents"]>[number];
   type AuditTrailEntry = NonNullable<typeof inspectionView.auditTrail>[number];
+  type InspectionDeficiency = NonNullable<typeof inspectionView.deficiencies>[number];
 
   return (
     <section className="space-y-6">
@@ -310,7 +311,7 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Deficiency records</p>
             <div className="mt-4 space-y-3">
-              {(inspectionView.deficiencies ?? []).length ? (inspectionView.deficiencies ?? []).map((deficiency) => (
+              {(inspectionView.deficiencies ?? []).length ? (inspectionView.deficiencies ?? []).map((deficiency: InspectionDeficiency) => (
                 <div key={deficiency.id} className="rounded-2xl border border-slate-200 p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-semibold text-ink">{deficiency.title}</p>
