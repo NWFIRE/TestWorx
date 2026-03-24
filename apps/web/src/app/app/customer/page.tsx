@@ -5,6 +5,10 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { buildTenantBrandingCss, getCustomerPortalData, inspectionTypeRegistry } from "@testworx/lib";
 
+function getInspectionTypeLabel(inspectionType: keyof typeof inspectionTypeRegistry) {
+  return inspectionTypeRegistry[inspectionType]?.label ?? inspectionType.replaceAll("_", " ");
+}
+
 export default async function CustomerPage() {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -54,7 +58,7 @@ export default async function CustomerPage() {
                     <p className="text-lg font-semibold text-ink">{report.inspection.site.name}</p>
                     <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Finalized</span>
                   </div>
-                  <p className="mt-1 text-sm text-slate-500">{inspectionTypeRegistry[report.task.inspectionType].label} â€¢ {format(report.finalizedAt ?? report.updatedAt, "MMM d, yyyy")}</p>
+                  <p className="mt-1 text-sm text-slate-500">{getInspectionTypeLabel(report.task.inspectionType)} | {format(report.finalizedAt ?? report.updatedAt, "MMM d, yyyy")}</p>
                   <p className="mt-1 text-sm text-slate-500">{report.attachments.length + report.inspection.documents.length} PDF attachment{report.attachments.length + report.inspection.documents.length === 1 ? "" : "s"} available</p>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
