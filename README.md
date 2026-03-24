@@ -55,6 +55,10 @@ Fastest first-time bootstrap:
 npm run db:bootstrap
 ```
 
+`npm run db:bootstrap` is for local/demo environments only because it runs the demo seed and verification flow.
+
+For a live pilot or production database, run migrations only and then use the one-time pilot bootstrap command to create the real tenant and users.
+
 6. Start the app:
 
 ```bash
@@ -216,6 +220,53 @@ Secondary tenant isolation demo:
 - Tenant admin: `admin@northshorelife.com`
 - Technician: `tech@northshorelife.com`
 - Customer user: `facilities@lakefrontresidences.com`
+
+## Pilot bootstrap
+
+Use a clean database for live pilot traffic. Do not run `npm run db:seed` against the live pilot database.
+
+Required environment variables:
+- `PILOT_TENANT_NAME`
+- `PILOT_TENANT_SLUG`
+- `PILOT_OFFICE_ADMIN_NAME`
+- `PILOT_OFFICE_ADMIN_EMAIL`
+- `PILOT_OFFICE_ADMIN_PASSWORD`
+- `PILOT_TECHNICIAN_NAME`
+- `PILOT_TECHNICIAN_EMAIL`
+- `PILOT_TECHNICIAN_PASSWORD`
+
+Optional environment variables:
+- `PILOT_TIMEZONE`
+- `PILOT_BILLING_EMAIL`
+- `PILOT_CUSTOMER_COMPANY_NAME`
+- `PILOT_CUSTOMER_CONTACT_NAME`
+- `PILOT_CUSTOMER_BILLING_EMAIL`
+- `PILOT_CUSTOMER_PHONE`
+- `PILOT_CUSTOMER_USER_NAME`
+- `PILOT_CUSTOMER_USER_EMAIL`
+- `PILOT_CUSTOMER_USER_PASSWORD`
+
+Cutover flow:
+
+```bash
+npm run db:generate
+npm run db:migrate
+npm run db:bootstrap:pilot
+```
+
+Example PowerShell session:
+
+```powershell
+$env:PILOT_TENANT_NAME="TradeWorx Pilot"
+$env:PILOT_TENANT_SLUG="tradeworx-pilot"
+$env:PILOT_OFFICE_ADMIN_NAME="Office Admin"
+$env:PILOT_OFFICE_ADMIN_EMAIL="office@tradeworx.net"
+$env:PILOT_OFFICE_ADMIN_PASSWORD="ChangeMe123!"
+$env:PILOT_TECHNICIAN_NAME="Pilot Technician"
+$env:PILOT_TECHNICIAN_EMAIL="tech@tradeworx.net"
+$env:PILOT_TECHNICIAN_PASSWORD="ChangeMe123!"
+npm run db:bootstrap:pilot
+```
 
 ## Demo walkthroughs
 
@@ -511,8 +562,9 @@ Deployed test environment checklist:
 4. Point Stripe webhooks at `https://<your-domain>/api/stripe/webhook`.
 5. Run `npm run db:generate` and `npm run db:migrate` before serving traffic.
 6. Run `npm run db:seed` only in non-production/demo environments.
-7. Verify `npm run db:verify`, `npm run test`, `npm run test:db`, `npm run lint`, and `npm run build` on the release candidate environment.
-8. Validate technician claim, report autosave, report finalization, customer PDF download, and Stripe plan sync against the deployed environment.
+7. Use `npm run db:bootstrap:pilot` on a fresh live database to create the first real tenant and users.
+8. Verify `npm run db:verify`, `npm run test`, `npm run test:db`, `npm run lint`, and `npm run build` on the release candidate environment.
+9. Validate technician claim, report autosave, report finalization, customer PDF download, and Stripe plan sync against the deployed environment.
 
 ## Verification checklists
 

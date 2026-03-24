@@ -47,7 +47,7 @@ export default function TermsPage() {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold text-ink">Integrations</h2>
           <div className="space-y-3 text-sm leading-7 text-slate-700">
-            <p>TradeWorx may connect to third-party services such as QuickBooks and payment providers. Use of those integrations may also be subject to the third party’s terms and policies.</p>
+            <p>TradeWorx may connect to third-party services such as QuickBooks and payment providers. Use of those integrations may also be subject to the third party&apos;s terms and policies.</p>
           </div>
         </section>
 
@@ -76,7 +76,7 @@ export default function TermsPage() {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold text-ink">Contact</h2>
           <p className="text-sm leading-7 text-slate-700">
-            For questions about these terms, contact TradeWorx at <a className="text-[color:rgb(var(--tenant-primary-rgb))] underline" href="mailto:Jeremy@nwfireandsafety.com">Jeremy@nwfireandsafety.com</a>.
+            For questions about these terms, contact TradeWorx at <a className="text-[color:rgb(var(--tenant-primary-rgb))] underline" href="mailto:Support@tradeworx.net">Support@tradeworx.net</a>.
           </p>
         </section>
       </div>

@@ -70,7 +70,7 @@ export default function PrivacyPage() {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold text-ink">Contact</h2>
           <p className="text-sm leading-7 text-slate-700">
-            For privacy questions, contact TradeWorx at <a className="text-[color:rgb(var(--tenant-primary-rgb))] underline" href="mailto:Jeremy@nwfireandsafety.com">Jeremy@nwfireandsafety.com</a>.
+            For privacy questions, contact TradeWorx at <a className="text-[color:rgb(var(--tenant-primary-rgb))] underline" href="mailto:Support@tradeworx.net">Support@tradeworx.net</a>.
           </p>
         </section>
       </div>

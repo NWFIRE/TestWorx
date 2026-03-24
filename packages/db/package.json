@@ -12,6 +12,7 @@
     "prisma:status": "node ./scripts/run-prisma.cjs migrate status --schema ./prisma/schema.prisma",
     "prisma:migrate": "node ./scripts/run-prisma.cjs migrate deploy --schema ./prisma/schema.prisma",
     "prisma:seed": "node ./scripts/run-seed.cjs",
+    "bootstrap:pilot": "node ./scripts/run-bootstrap-pilot.cjs",
     "verify": "node ./scripts/verify.cjs"
   },
   "dependencies": {

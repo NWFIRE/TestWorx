@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { buildTenantBrandingCss, canManageBilling, evaluatePilotReadiness, getTenantBillingSettings, getTenantBrandingSettings, getTenantQuickBooksSettings, getTenantServiceFeeSettings } from "@testworx/lib";
+import { buildTenantBrandingCss, canManageBilling, getTenantBillingSettings, getTenantBrandingSettings, getTenantQuickBooksSettings, getTenantServiceFeeSettings } from "@testworx/lib";
 
 import {
   createServiceFeeRuleAction,
@@ -17,7 +17,6 @@ import {
 } from "./actions";
 import { ServiceFeeSettingsCard } from "./service-fee-settings-card";
 import { QuickBooksSettingsCard } from "./quickbooks-settings-card";
-import { PilotReadinessCard } from "./pilot-readiness-card";
 import { TenantBrandingForm } from "./tenant-branding-form";
 
 export default async function TenantSettingsPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
@@ -51,14 +50,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   ]);
   const theme = buildTenantBrandingCss(brandingSettings.branding);
   const canManageSubscription = canManageBilling(session.user.role);
-  const pilotReadiness = evaluatePilotReadiness({
-    stripeConfigured: billingSettings.config.enabled,
-    stripeWebhookConfigured: billingSettings.config.webhookConfigured,
-    quickBooksConfigured: quickBooksSettings.config.enabled,
-    quickBooksConnected: quickBooksSettings.tenant.connected,
-    quickBooksMode: quickBooksSettings.tenant.storedConnectionMode,
-    quickBooksReconnectRequired: quickBooksSettings.tenant.reconnectRequired || quickBooksSettings.tenant.modeMismatch
-  });
   const quickBooksNotice = Array.isArray(params.quickbooks)
     ? params.quickbooks[0]
     : params.quickbooks === "connected"
@@ -80,14 +71,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
       </div>
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
-          <PilotReadinessCard
-            checks={pilotReadiness.checks}
-            criticalCount={pilotReadiness.criticalCount}
-            optionalCount={pilotReadiness.optionalCount}
-            readyForPilot={pilotReadiness.readyForPilot}
-            recommendedCount={pilotReadiness.recommendedCount}
-            summary={pilotReadiness.summary}
-          />
           <TenantBrandingForm action={updateTenantBrandingAction} values={{ ...brandingSettings.branding, billingEmail: brandingSettings.billingEmail }} />
           <QuickBooksSettingsCard
             companyName={quickBooksSettings.tenant.quickbooksCompanyName}
