@@ -166,9 +166,9 @@ function parseInspectionTypes(input: string, rowNumber: number) {
   return uniqueValues as InspectionType[];
 }
 
-function buildAssetMetadata(row: CustomerSiteImportRow, existingMetadata: unknown): Prisma.InputJsonValue | undefined {
-  const metadata = existingMetadata && typeof existingMetadata === "object"
-    ? { ...(existingMetadata as Record<string, unknown>) }
+function buildAssetMetadata(row: CustomerSiteImportRow, existingMetadata: unknown): Prisma.JsonObject | undefined {
+  const metadata: Prisma.JsonObject = existingMetadata && typeof existingMetadata === "object"
+    ? { ...(existingMetadata as Record<string, Prisma.JsonValue>) }
     : {};
 
   if (row.assetLocation) {
@@ -184,7 +184,7 @@ function buildAssetMetadata(row: CustomerSiteImportRow, existingMetadata: unknow
     metadata.serialNumber = row.assetSerialNumber;
   }
 
-  return Object.keys(metadata).length > 0 ? metadata as Prisma.InputJsonValue : undefined;
+  return Object.keys(metadata).length > 0 ? metadata : undefined;
 }
 
 export function parseCustomerSiteImportCsv(input: string) {
