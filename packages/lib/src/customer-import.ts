@@ -1,10 +1,11 @@
-import { InspectionType, Prisma, prisma } from "@testworx/db";
+import { Prisma, prisma } from "@testworx/db";
 import { z } from "zod";
 
 import type { ActorContext } from "@testworx/types";
 import { actorContextSchema } from "@testworx/types";
 
 import { assertTenantContext } from "./permissions";
+import { inspectionTypeRegistry } from "./report-config";
 
 const requiredCustomerSiteHeaders = [
   "customerName",
@@ -46,7 +47,9 @@ const headerAliases: Record<string, (typeof customerSiteImportHeaders)[number]> 
 
 const minimumImportHeaders = ["customerName", "addressLine1"] as const;
 
-const inspectionTypeValues = new Set<string>(Object.values(InspectionType));
+type InspectionType = keyof typeof inspectionTypeRegistry;
+
+const inspectionTypeValues = new Set<string>(Object.keys(inspectionTypeRegistry));
 
 const customerSiteImportRowSchema = z.object({
   customerName: z.string().trim().min(1),
