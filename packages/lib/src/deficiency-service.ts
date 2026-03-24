@@ -8,6 +8,13 @@ import { assertTenantContext } from "./permissions";
 import { isTechnicianAssignedToInspection } from "./scheduling";
 import { buildFileDownloadResponse } from "./storage";
 
+type DeficiencyDashboardSite = {
+  id: string;
+  name: string;
+};
+
+type DeficiencyDashboardDeficiency = Awaited<ReturnType<typeof prisma.deficiency.findMany>>[number];
+
 function readTechnicianAssignments(value: unknown): Array<{ technicianId: string }> {
   const assignments = (value as { technicianAssignments?: Array<{ technicianId: string }> } | null | undefined)?.technicianAssignments;
   return Array.isArray(assignments) ? assignments : [];
@@ -67,34 +74,36 @@ export async function getAdminDeficiencyDashboardData(actor: ActorContext, filte
       : {})
   };
 
-  const [sites, deficiencies] = await Promise.all([
-    prisma.site.findMany({
-      where: { tenantId },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true }
-    }),
-    prisma.deficiency.findMany({
-      where,
-      include: {
-        inspection: { select: { id: true, scheduledStart: true } }
-      },
-      orderBy: [{ createdAt: "desc" }]
-    })
-  ]);
-  const siteNames = new Map(sites.map((site) => [site.id, site.name] as const));
+  const siteQuery = prisma.site.findMany({
+    where: { tenantId },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true }
+  });
+  const deficiencyQuery = prisma.deficiency.findMany({
+    where,
+    include: {
+      inspection: { select: { id: true, scheduledStart: true } }
+    },
+    orderBy: [{ createdAt: "desc" }]
+  });
+
+  const [sites, deficiencies] = await Promise.all([siteQuery, deficiencyQuery] as const);
+  const typedSites = sites as DeficiencyDashboardSite[];
+  const typedDeficiencies = deficiencies as DeficiencyDashboardDeficiency[];
+  const siteNames = new Map(typedSites.map((site: DeficiencyDashboardSite) => [site.id, site.name] as const));
 
   return {
     filters: parsedFilters,
-    sites,
+    sites: typedSites,
     counts: {
-      open: deficiencies.filter((item) => item.status === "open").length,
-      quoted: deficiencies.filter((item) => item.status === "quoted").length,
-      approved: deficiencies.filter((item) => item.status === "approved").length,
-      scheduled: deficiencies.filter((item) => item.status === "scheduled").length,
-      resolved: deficiencies.filter((item) => item.status === "resolved").length,
-      ignored: deficiencies.filter((item) => item.status === "ignored").length
+      open: typedDeficiencies.filter((item: DeficiencyDashboardDeficiency) => item.status === "open").length,
+      quoted: typedDeficiencies.filter((item: DeficiencyDashboardDeficiency) => item.status === "quoted").length,
+      approved: typedDeficiencies.filter((item: DeficiencyDashboardDeficiency) => item.status === "approved").length,
+      scheduled: typedDeficiencies.filter((item: DeficiencyDashboardDeficiency) => item.status === "scheduled").length,
+      resolved: typedDeficiencies.filter((item: DeficiencyDashboardDeficiency) => item.status === "resolved").length,
+      ignored: typedDeficiencies.filter((item: DeficiencyDashboardDeficiency) => item.status === "ignored").length
     },
-    deficiencies: deficiencies.map((deficiency) => ({
+    deficiencies: typedDeficiencies.map((deficiency: DeficiencyDashboardDeficiency) => ({
       ...deficiency,
       siteName: siteNames.get(deficiency.siteId) ?? "Unknown site"
     }))
