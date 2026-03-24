@@ -1,9 +1,8 @@
-import { ReportStatus } from "@prisma/client";
 import { prisma } from "@testworx/db";
 import { z } from "zod";
 
 import type { ActorContext } from "@testworx/types";
-import { actorContextSchema } from "@testworx/types";
+import { actorContextSchema, reportStatuses } from "@testworx/types";
 
 import { assertTenantContext } from "./permissions";
 import { isTechnicianAssignedToInspection } from "./scheduling";
@@ -170,7 +169,7 @@ export async function getAuthorizedDeficiencyPhotoDownload(actor: ActorContext, 
   const customerAllowed = sameTenant &&
     parsedActor.role === "customer_user" &&
     actorCustomerCompanyId === deficiency.inspectionReport.inspection.customerCompanyId &&
-    deficiency.inspectionReport.status === ReportStatus.finalized;
+    deficiency.inspectionReport.status === reportStatuses.finalized;
 
   if (!adminAllowed && !technicianAllowed && !customerAllowed) {
     throw new Error("You do not have access to this deficiency photo.");

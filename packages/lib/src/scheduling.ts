@@ -1,10 +1,10 @@
 import { addMonths, endOfMonth, endOfWeek, format, isAfter, isSameDay, startOfDay, startOfMonth } from "date-fns";
-import { InspectionStatus, Prisma, RecurrenceFrequency, ReportStatus } from "@prisma/client";
+import { InspectionStatus, Prisma, RecurrenceFrequency } from "@prisma/client";
 import { prisma } from "@testworx/db";
 import { z } from "zod";
 
 import type { ActorContext } from "@testworx/types";
-import { actorContextSchema } from "@testworx/types";
+import { actorContextSchema, reportStatuses } from "@testworx/types";
 
 import { assertTenantContext } from "./permissions";
 import { assertTenantEntitlementForTenant } from "./billing";
@@ -595,7 +595,7 @@ export async function updateInspection(actor: ActorContext, inspectionId: string
         inspectionId,
         OR: [
           { autosaveVersion: { gt: 1 } },
-          { status: ReportStatus.finalized },
+          { status: reportStatuses.finalized },
           { attachments: { some: {} } },
           { signatures: { some: {} } },
           { deficiencies: { some: {} } }
@@ -694,7 +694,7 @@ export async function updateInspectionStatus(actor: ActorContext, inspectionId: 
       where: {
         tenantId,
         inspectionId,
-        status: { not: ReportStatus.finalized }
+        status: { not: reportStatuses.finalized }
       }
     });
 
@@ -810,7 +810,7 @@ async function getInspectionReportActivityCount(tx: Prisma.TransactionClient, te
       inspectionId,
       OR: [
         { autosaveVersion: { gt: 1 } },
-        { status: ReportStatus.finalized },
+        { status: reportStatuses.finalized },
         { attachments: { some: {} } },
         { signatures: { some: {} } },
         { deficiencies: { some: {} } }
@@ -831,7 +831,7 @@ async function getInspectionReportActivityCountMap(tenantId: string, inspectionI
       inspectionId: { in: inspectionIds },
       OR: [
         { autosaveVersion: { gt: 1 } },
-        { status: ReportStatus.finalized },
+        { status: reportStatuses.finalized },
         { attachments: { some: {} } },
         { signatures: { some: {} } },
         { deficiencies: { some: {} } }
@@ -1108,7 +1108,7 @@ export async function getInspectionForEdit(actor: ActorContext, inspectionId: st
       inspectionId,
       OR: [
         { autosaveVersion: { gt: 1 } },
-        { status: ReportStatus.finalized },
+        { status: reportStatuses.finalized },
         { attachments: { some: {} } },
         { signatures: { some: {} } },
         { deficiencies: { some: {} } }

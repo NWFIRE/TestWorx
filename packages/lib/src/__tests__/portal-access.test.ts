@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ReportStatus } from "@prisma/client";
+import { reportStatuses } from "@testworx/types";
 
 import { canActorAccessAttachmentDownload, canCustomerAccessReport } from "../report-service";
 
@@ -11,7 +11,7 @@ describe("customer portal access controls", () => {
         reportTenantId: "tenant_1",
         actorCustomerCompanyId: "customer_1",
         reportCustomerCompanyId: "customer_1",
-        reportStatus: ReportStatus.finalized
+        reportStatus: reportStatuses.finalized
       })
     ).toBe(true);
 
@@ -21,7 +21,7 @@ describe("customer portal access controls", () => {
         reportTenantId: "tenant_1",
         actorCustomerCompanyId: "customer_2",
         reportCustomerCompanyId: "customer_1",
-        reportStatus: ReportStatus.finalized
+        reportStatus: reportStatuses.finalized
       })
     ).toBe(false);
 
@@ -31,7 +31,7 @@ describe("customer portal access controls", () => {
         reportTenantId: "tenant_1",
         actorCustomerCompanyId: "customer_1",
         reportCustomerCompanyId: "customer_1",
-        reportStatus: ReportStatus.draft
+        reportStatus: reportStatuses.draft
       })
     ).toBe(false);
   });
@@ -46,7 +46,7 @@ describe("customer portal access controls", () => {
         inspectionCustomerCompanyId: "customer_1",
         inspectionAssignedTechnicianId: "tech_1",
         attachmentCustomerVisible: false,
-        reportStatus: ReportStatus.draft
+        reportStatus: reportStatuses.draft
       })
     ).toBe(true);
 
@@ -59,7 +59,7 @@ describe("customer portal access controls", () => {
         inspectionCustomerCompanyId: "customer_1",
         inspectionAssignedTechnicianId: "tech_1",
         attachmentCustomerVisible: false,
-        reportStatus: ReportStatus.draft
+        reportStatus: reportStatuses.draft
       })
     ).toBe(true);
 
@@ -72,7 +72,7 @@ describe("customer portal access controls", () => {
         inspectionCustomerCompanyId: "customer_1",
         inspectionAssignedTechnicianId: "tech_1",
         attachmentCustomerVisible: false,
-        reportStatus: ReportStatus.draft
+        reportStatus: reportStatuses.draft
       })
     ).toBe(false);
 
@@ -86,7 +86,7 @@ describe("customer portal access controls", () => {
         inspectionCustomerCompanyId: "customer_1",
         inspectionAssignedTechnicianId: "tech_1",
         attachmentCustomerVisible: true,
-        reportStatus: ReportStatus.finalized
+        reportStatus: reportStatuses.finalized
       })
     ).toBe(true);
 
@@ -100,7 +100,7 @@ describe("customer portal access controls", () => {
         inspectionCustomerCompanyId: "customer_2",
         inspectionAssignedTechnicianId: "tech_1",
         attachmentCustomerVisible: true,
-        reportStatus: ReportStatus.finalized
+        reportStatus: reportStatuses.finalized
       })
     ).toBe(false);
   });

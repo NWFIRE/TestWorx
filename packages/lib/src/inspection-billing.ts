@@ -1,8 +1,8 @@
-import { Prisma, ReportStatus, type InspectionType } from "@prisma/client";
+import { Prisma, type InspectionType } from "@prisma/client";
 import { prisma } from "@testworx/db";
 
-import type { ActorContext } from "@testworx/types";
-import { actorContextSchema } from "@testworx/types";
+import type { ActorContext, ReportStatus } from "@testworx/types";
+import { actorContextSchema, reportStatuses } from "@testworx/types";
 
 import type { JsonValue } from "./json-types";
 import type { BillableCategory, BillableFieldMapping, BillableRepeaterMapping } from "./report-config";
@@ -644,7 +644,7 @@ export async function syncInspectionBillingSummaryTx(tx: Prisma.TransactionClien
     INNER JOIN "InspectionTask" t ON t."id" = r."inspectionTaskId"
     WHERE r."tenantId" = ${input.tenantId}
       AND r."inspectionId" = ${input.inspectionId}
-      AND r."status"::text = ${ReportStatus.finalized}
+      AND r."status"::text = ${reportStatuses.finalized}
   `);
 
   const extracted = reports.flatMap((report) =>

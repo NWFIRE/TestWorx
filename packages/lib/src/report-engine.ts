@@ -1,5 +1,6 @@
-import type { InspectionType, ReportStatus, SignatureKind, UserRole } from "@prisma/client";
+import type { InspectionType, SignatureKind, UserRole } from "@prisma/client";
 import { z } from "zod";
+import type { ReportStatus } from "@testworx/types";
 
 import {
   resolveReportTemplate,

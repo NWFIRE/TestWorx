@@ -1,4 +1,4 @@
-import { ReportStatus } from "@prisma/client";
+import { reportStatuses } from "@testworx/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock, txMock } = vi.hoisted(() => ({

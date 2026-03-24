@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PrismaClient, RecurrenceFrequency, ReportStatus } from "@prisma/client";
+import { PrismaClient, RecurrenceFrequency } from "@prisma/client";
+import { reportStatuses } from "@testworx/types";
 import { hash } from "bcryptjs";
 
 import { buildInitialReportDraft, createInspectionAmendment, finalizeInspectionReport, claimInspection, reopenCompletedReportForCorrection } from "..";
@@ -166,7 +167,7 @@ async function createInspectionFixture(input: {
               create: {
                 tenantId: input.tenantId,
                 technicianId: input.assignedTechnicianId ?? null,
-                status: ReportStatus.draft,
+                status: reportStatuses.draft,
                 contentJson: { narrative: "" }
               }
             }

@@ -1,4 +1,4 @@
-import { ReportStatus } from "@prisma/client";
+import { reportStatuses } from "@testworx/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock, txMock, buildFileDownloadResponseMock } = vi.hoisted(() => {
@@ -113,7 +113,7 @@ function buildEditableFireAlarmReport() {
     tenantId: "tenant_1",
     inspectionId: "inspection_1",
     inspectionTaskId: "task_1",
-    status: ReportStatus.draft,
+    status: reportStatuses.draft,
     attachments: [],
     signatures: [],
     deficiencies: [],
@@ -166,7 +166,7 @@ describe("deficiency management", () => {
     txMock.deficiency.upsert.mockResolvedValue(undefined);
     txMock.deficiency.deleteMany.mockResolvedValue(undefined);
     txMock.auditLog.create.mockResolvedValue(undefined);
-    txMock.inspectionReport.findUniqueOrThrow.mockResolvedValue({ id: "report_1", status: ReportStatus.draft });
+    txMock.inspectionReport.findUniqueOrThrow.mockResolvedValue({ id: "report_1", status: reportStatuses.draft });
     buildFileDownloadResponseMock.mockReturnValue({ ok: true, type: "photo-download" });
   });
 
@@ -322,7 +322,7 @@ describe("deficiency management", () => {
       tenantId: "tenant_1",
       photoStorageKey: "blob:tenant_1/photo/deficiency-1.png",
       inspectionReport: {
-        status: ReportStatus.finalized,
+        status: reportStatuses.finalized,
         inspection: {
           assignedTechnicianId: "tech_1",
           customerCompanyId: "customer_1"

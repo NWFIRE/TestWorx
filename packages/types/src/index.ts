@@ -12,3 +12,11 @@ export type CustomerOption = { id: string; name: string };
 export type SiteOption = { id: string; name: string; city: string; customerCompanyId: string };
 export type TechnicianOption = { id: string; name: string };
 
+export const reportStatuses = {
+  draft: "draft",
+  submitted: "submitted",
+  finalized: "finalized"
+} as const;
+
+export type ReportStatus = (typeof reportStatuses)[keyof typeof reportStatuses];
+

@@ -1,8 +1,8 @@
-import { AttachmentKind, InspectionDocumentStatus, InspectionStatus, Prisma, ReportCorrectionState, ReportStatus, SignatureKind, type InspectionType } from "@prisma/client";
+import { AttachmentKind, InspectionDocumentStatus, InspectionStatus, Prisma, ReportCorrectionState, SignatureKind, type InspectionType } from "@prisma/client";
 import { prisma } from "@testworx/db";
 
-import type { ActorContext } from "@testworx/types";
-import { actorContextSchema } from "@testworx/types";
+import type { ActorContext, ReportStatus } from "@testworx/types";
+import { actorContextSchema, reportStatuses } from "@testworx/types";
 
 import { resolveTenantBranding } from "./branding";
 import { assertTenantEntitlementForTenant } from "./billing";
@@ -163,7 +163,7 @@ export function canCustomerAccessReport(input: {
       input.actorTenantId === input.reportTenantId &&
       input.actorCustomerCompanyId &&
       input.actorCustomerCompanyId === input.reportCustomerCompanyId &&
-      input.reportStatus === ReportStatus.finalized
+      input.reportStatus === reportStatuses.finalized
   );
 }
 
@@ -204,7 +204,7 @@ export function canActorAccessAttachmentDownload(input: {
         input.actorCustomerCompanyId &&
         input.inspectionCustomerCompanyId &&
         input.actorCustomerCompanyId === input.inspectionCustomerCompanyId &&
-        (!input.reportStatus || input.reportStatus === ReportStatus.finalized)
+        (!input.reportStatus || input.reportStatus === reportStatuses.finalized)
     );
   }
 
@@ -708,7 +708,7 @@ async function persistReportDraftTransaction(input: {
     data: {
       contentJson: input.draft as JsonInputValue,
       autosaveVersion: { increment: 1 },
-      status: input.nextStatus ?? ReportStatus.draft
+      status: input.nextStatus ?? reportStatuses.draft
     }
   });
 
@@ -789,7 +789,7 @@ export async function getInspectionReportDraft(actor: ActorContext, inspectionId
       id: { not: report.id },
       task: { inspectionType: report.task.inspectionType },
       inspection: { siteId: report.inspection.siteId },
-      status: ReportStatus.finalized
+      status: reportStatuses.finalized
     },
     orderBy: { finalizedAt: "desc" }
   });
@@ -896,7 +896,7 @@ export async function reopenCompletedReportForCorrection(actor: ActorContext, in
       throw new Error("Report not found.");
     }
 
-    if (report.status !== ReportStatus.finalized) {
+    if (report.status !== reportStatuses.finalized) {
       throw new Error(hasActiveCorrectionState(report.correctionState) ? "This report is already open for correction." : "Only completed reports can be corrected.");
     }
 
@@ -919,7 +919,7 @@ export async function reopenCompletedReportForCorrection(actor: ActorContext, in
       actionType: input.correctionMode === "admin_edit" ? reportCorrectionActionTypes.adminEditOpened : reportCorrectionActionTypes.reissuedToTechnician,
       reason,
       previousStatus: report.status,
-      newStatus: ReportStatus.draft,
+      newStatus: reportStatuses.draft,
       snapshotJson: buildCorrectionSnapshot(report),
       actedByUserId: parsedActor.userId
     });
@@ -927,7 +927,7 @@ export async function reopenCompletedReportForCorrection(actor: ActorContext, in
     await tx.inspectionReport.update({
       where: { id: report.id },
       data: {
-        status: ReportStatus.draft,
+        status: reportStatuses.draft,
         finalizedAt: null,
         correctionState: input.correctionMode === "admin_edit" ? ReportCorrectionState.admin_edit_in_progress : ReportCorrectionState.reissued_to_technician,
         correctionReason: reason,
@@ -1029,7 +1029,7 @@ export async function saveReportDraft(actor: ActorContext, input: { inspectionRe
       parsedActor,
       report,
       draft: parsedDraft,
-      nextStatus: ReportStatus.draft
+      nextStatus: reportStatuses.draft
     })
   );
 
@@ -1098,14 +1098,14 @@ export async function finalizeInspectionReport(actor: ActorContext, input: { ins
       parsedActor,
       report: transactionalReport,
       draft: persisted.draft,
-      nextStatus: ReportStatus.draft
+      nextStatus: reportStatuses.draft
     });
 
     const finalizedAt = new Date();
     const finalizeResult = await tx.inspectionReport.updateMany({
-      where: { id: report.id, tenantId: parsedActor.tenantId as string, status: { not: ReportStatus.finalized } },
+      where: { id: report.id, tenantId: parsedActor.tenantId as string, status: { not: reportStatuses.finalized } },
       data: {
-        status: ReportStatus.finalized,
+        status: reportStatuses.finalized,
         finalizedAt
       }
     });
@@ -1191,7 +1191,7 @@ export async function finalizeInspectionReport(actor: ActorContext, input: { ins
       where: {
         tenantId: parsedActor.tenantId as string,
         inspectionId: report.inspectionId,
-        status: { not: ReportStatus.finalized }
+        status: { not: reportStatuses.finalized }
       }
     });
 
@@ -1245,8 +1245,8 @@ export async function finalizeInspectionReport(actor: ActorContext, input: { ins
         reportId: report.id,
         actionType: priorCorrectionState === ReportCorrectionState.reissued_to_technician ? reportCorrectionActionTypes.recompleted : reportCorrectionActionTypes.adminEdited,
         reason: priorCorrectionReason,
-        previousStatus: ReportStatus.draft,
-        newStatus: ReportStatus.finalized,
+        previousStatus: reportStatuses.draft,
+        newStatus: reportStatuses.finalized,
         actedByUserId: parsedActor.userId
       });
 
@@ -1372,10 +1372,10 @@ export async function getCustomerPortalData(actor: ActorContext) {
 
   const [siteCount, reportCount, openDeficiencyCount, recentReports] = await Promise.all([
     prisma.site.count({ where: { tenantId: parsedActor.tenantId as string, customerCompanyId: customerCompanyId as string } }),
-    prisma.inspectionReport.count({ where: { tenantId: parsedActor.tenantId as string, status: ReportStatus.finalized, inspection: { customerCompanyId: customerCompanyId as string } } }),
-    prisma.deficiency.count({ where: { tenantId: parsedActor.tenantId as string, status: "open", inspectionReport: { status: ReportStatus.finalized, inspection: { customerCompanyId: customerCompanyId as string } } } }),
+    prisma.inspectionReport.count({ where: { tenantId: parsedActor.tenantId as string, status: reportStatuses.finalized, inspection: { customerCompanyId: customerCompanyId as string } } }),
+    prisma.deficiency.count({ where: { tenantId: parsedActor.tenantId as string, status: "open", inspectionReport: { status: reportStatuses.finalized, inspection: { customerCompanyId: customerCompanyId as string } } } }),
     prisma.inspectionReport.findMany({
-      where: { tenantId: parsedActor.tenantId as string, status: ReportStatus.finalized, inspection: { customerCompanyId: customerCompanyId as string } },
+      where: { tenantId: parsedActor.tenantId as string, status: reportStatuses.finalized, inspection: { customerCompanyId: customerCompanyId as string } },
       include: {
         inspection: {
           include: {
@@ -1417,7 +1417,7 @@ export async function getCustomerReportDetail(actor: ActorContext, reportId: str
     where: {
       id: reportId,
       tenantId: parsedActor.tenantId as string,
-      status: ReportStatus.finalized,
+      status: reportStatuses.finalized,
       inspection: { customerCompanyId: customerCompanyId as string }
     },
     include: {

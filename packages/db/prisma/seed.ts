@@ -2,7 +2,8 @@ import { hash } from "bcryptjs";
 import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 
-import { PrismaClient, RecurrenceFrequency, ReportStatus } from "@prisma/client";
+import { PrismaClient, RecurrenceFrequency } from "@prisma/client";
+import { reportStatuses, type ReportStatus } from "@testworx/types";
 
 function loadRootEnv() {
   const envPath = resolve(__dirname, "..", "..", "..", ".env");
@@ -448,7 +449,7 @@ async function main() {
         frequency: task.frequency,
         report: {
           technicianId: inspection.assignedTechnicianId,
-          status: index === 0 && taskIndex === 0 ? ReportStatus.finalized : ReportStatus.draft,
+          status: index === 0 && taskIndex === 0 ? reportStatuses.finalized : reportStatuses.draft,
           finalizedAt: index === 0 && taskIndex === 0 ? new Date("2026-03-12T11:15:00-05:00") : null,
           contentJson: {
             templateVersion: 1,
@@ -622,7 +623,7 @@ async function main() {
       frequency: RecurrenceFrequency.ANNUAL,
       report: {
         technicianId: northshoreTech.id,
-        status: ReportStatus.draft,
+        status: reportStatuses.draft,
         contentJson: {
           templateVersion: 1,
           inspectionType: "fire_alarm",
