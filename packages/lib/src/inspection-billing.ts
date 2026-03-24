@@ -90,6 +90,12 @@ type FinalizedReportRow = {
   inspectionType: InspectionType;
 };
 
+type InspectionRow = {
+  inspectionId: string;
+  customerCompanyId: string;
+  siteId: string;
+};
+
 const INSPECTION_LEVEL_REPORT_TYPE = "inspection";
 
 function parseActor(actor: ActorContext) {
@@ -628,30 +634,26 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
 }) {
   const db: TransactionClient = tx;
 
-  const inspectionRows = await db.$queryRaw<Array<{
-    inspectionId: string;
-    customerCompanyId: string;
-    siteId: string;
-  }>>(Prisma.sql`
+  const inspectionRows = (await db.$queryRaw(Prisma.sql`
     SELECT "id" AS "inspectionId", "customerCompanyId", "siteId"
     FROM "Inspection"
     WHERE "id" = ${input.inspectionId} AND "tenantId" = ${input.tenantId}
     LIMIT 1
-  `);
+  `)) as InspectionRow[];
 
   const inspection = inspectionRows[0];
   if (!inspection) {
     throw new Error("Inspection not found for billing summary sync.");
   }
 
-  const reports = await db.$queryRaw<FinalizedReportRow[]>(Prisma.sql`
+  const reports = (await db.$queryRaw(Prisma.sql`
     SELECT r."id", r."inspectionId", r."tenantId", r."contentJson", t."inspectionType"
     FROM "InspectionReport" r
     INNER JOIN "InspectionTask" t ON t."id" = r."inspectionTaskId"
     WHERE r."tenantId" = ${input.tenantId}
       AND r."inspectionId" = ${input.inspectionId}
       AND r."status"::text = ${reportStatuses.finalized}
-  `);
+  `)) as FinalizedReportRow[];
 
   const extracted = reports.flatMap((report) =>
     extractBillableItemsFromFinalizedReport({
