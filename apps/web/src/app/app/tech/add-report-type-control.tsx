@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { InspectionType } from "@prisma/client";
 
 import { inspectionTypeRegistry } from "@testworx/lib";
 
 import { addInspectionTaskAction } from "./actions";
+
+type InspectionType = keyof typeof inspectionTypeRegistry;
 
 export function AddReportTypeControl({ inspectionId }: { inspectionId: string }) {
   const [selectedType, setSelectedType] = useState<InspectionType>("fire_extinguisher");
