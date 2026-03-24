@@ -14,6 +14,10 @@ import { createInspectionAction, importCustomerSiteCsvAction } from "./actions";
 import { CustomerSiteImportCard } from "./customer-site-import-card";
 import { InspectionSchedulerForm } from "./inspection-scheduler-form";
 
+type AdminDashboardData = Awaited<ReturnType<typeof getAdminDashboardData>>;
+type DashboardInspection = AdminDashboardData["completedInspections"][number];
+type DashboardTask = DashboardInspection["tasks"][number];
+
 const statusClasses: Record<string, string> = {
   to_be_completed: "bg-sky-50 text-sky-700",
   scheduled: "bg-emerald-50 text-emerald-700",
@@ -77,8 +81,8 @@ export default async function AdminPage() {
           <div className="space-y-3">
             {data.completedInspections.length === 0 ? (
               <p className="rounded-[1.5rem] border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No completed inspections yet.</p>
-            ) : data.completedInspections.map((inspection) => {
-              const nextDue = pickEarliestNextDueAt(inspection.tasks.map((task) => task.recurrence?.nextDueAt));
+            ) : data.completedInspections.map((inspection: DashboardInspection) => {
+              const nextDue = pickEarliestNextDueAt(inspection.tasks.map((task: DashboardTask) => task.recurrence?.nextDueAt));
               return (
                 <div key={inspection.id} className="rounded-[1.5rem] border border-slate-200 p-4">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -99,7 +103,7 @@ export default async function AdminPage() {
                       </div>
                       <p className="mt-1 text-sm text-slate-500">{inspection.customerCompany.name} | {format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}</p>
                       <p className="mt-1 text-sm text-slate-500">Assigned: {((inspection as typeof inspection & { assignedTechnicianNames?: string[] }).assignedTechnicianNames ?? []).length ? ((inspection as typeof inspection & { assignedTechnicianNames?: string[] }).assignedTechnicianNames ?? []).join(", ") : "Shared queue"}</p>
-                      <p className="mt-1 text-sm text-slate-500">Report types: {inspection.tasks.map((task) => taskDisplayLabel(task as typeof task & { displayLabel?: string })).join(", ")}</p>
+                      <p className="mt-1 text-sm text-slate-500">Report types: {inspection.tasks.map((task: DashboardTask) => taskDisplayLabel(task as DashboardTask & { displayLabel?: string })).join(", ")}</p>
                       <p className="mt-1 text-sm text-slate-500">Next due: {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}</p>
                     </div>
                     <Link className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={`/app/admin/inspections/${inspection.id}`}>
@@ -120,8 +124,8 @@ export default async function AdminPage() {
             <p className="text-sm text-slate-500">{data.activeInspections.length} showing of {data.summary.upcomingInspections}</p>
           </div>
           <div className="space-y-3">
-            {data.activeInspections.map((inspection) => {
-              const nextDue = pickEarliestNextDueAt(inspection.tasks.map((task) => task.recurrence?.nextDueAt));
+            {data.activeInspections.map((inspection: DashboardInspection) => {
+              const nextDue = pickEarliestNextDueAt(inspection.tasks.map((task: DashboardTask) => task.recurrence?.nextDueAt));
               return (
                 <div key={inspection.id} className="rounded-[1.5rem] border border-slate-200 p-4">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -137,7 +141,7 @@ export default async function AdminPage() {
                       </div>
                       <p className="mt-1 text-sm text-slate-500">{inspection.customerCompany.name} | {format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}</p>
                       <p className="mt-1 text-sm text-slate-500">Assigned: {((inspection as typeof inspection & { assignedTechnicianNames?: string[] }).assignedTechnicianNames ?? []).length ? ((inspection as typeof inspection & { assignedTechnicianNames?: string[] }).assignedTechnicianNames ?? []).join(", ") : "Shared queue"}</p>
-                      <p className="mt-1 text-sm text-slate-500">Report types: {inspection.tasks.map((task) => taskDisplayLabel(task as typeof task & { displayLabel?: string })).join(", ")}</p>
+                      <p className="mt-1 text-sm text-slate-500">Report types: {inspection.tasks.map((task: DashboardTask) => taskDisplayLabel(task as DashboardTask & { displayLabel?: string })).join(", ")}</p>
                       <p className="mt-1 text-sm text-slate-500">Next due: {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}</p>
                     </div>
                     <Link className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={`/app/admin/inspections/${inspection.id}`}>
