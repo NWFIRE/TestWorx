@@ -11,7 +11,7 @@ import { assertTenantContext } from "./permissions";
 import { reportDraftSchema, type ReportDraft, type ReportPrimitiveValue } from "./report-engine";
 import { resolveInspectionServiceFeeTx } from "./service-fees";
 
-type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+type TransactionClient = Prisma.TransactionClient;
 
 export type BillableItem = {
   id: string;
