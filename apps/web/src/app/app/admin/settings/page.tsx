@@ -116,6 +116,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
             filters={quickBooksSettings.catalog.filters}
             notice={quickBooksNotice}
             realmId={quickBooksSettings.tenant.quickbooksRealmId}
+            supportReference={quickBooksSettings.supportReference}
           />
           <ServiceFeeSettingsCard
             createRuleAction={createServiceFeeRuleAction}

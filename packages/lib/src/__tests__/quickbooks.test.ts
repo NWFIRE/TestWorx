@@ -26,7 +26,8 @@ const prismaMock = {
     updateMany: vi.fn()
   },
   auditLog: {
-    create: vi.fn()
+    create: vi.fn(),
+    findFirst: vi.fn()
   },
   $transaction: vi.fn()
 };
@@ -40,6 +41,18 @@ function jsonResponse(body: unknown, init?: ResponseInit) {
     status: 200,
     headers: { "Content-Type": "application/json" },
     ...init
+  });
+}
+
+function jsonResponseWithTid(body: unknown, intuitTid: string, init?: ResponseInit) {
+  const headers = new Headers(init?.headers);
+  headers.set("Content-Type", "application/json");
+  headers.set("intuit_tid", intuitTid);
+
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    ...init,
+    headers
   });
 }
 
@@ -119,6 +132,8 @@ describe("quickbooks billing sync hardening", () => {
     vi.stubEnv("QUICKBOOKS_CLIENT_ID", "client_id");
     vi.stubEnv("QUICKBOOKS_CLIENT_SECRET", "client_secret");
     vi.stubEnv("QUICKBOOKS_SANDBOX", "false");
+    prismaMock.auditLog.create.mockResolvedValue(undefined);
+    prismaMock.auditLog.findFirst.mockResolvedValue(null);
     resetServerEnvForTests();
   });
 
@@ -323,7 +338,7 @@ describe("quickbooks billing sync hardening", () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
 
     fetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify({
+      jsonResponseWithTid({
         fault: {
           error: [
             {
@@ -333,9 +348,8 @@ describe("quickbooks billing sync hardening", () => {
           ],
           type: "SERVICE"
         }
-      }), {
+      }, "tid_validation_1", {
         status: 403,
-        headers: { "Content-Type": "application/json" }
       })
     );
 
@@ -350,6 +364,17 @@ describe("quickbooks billing sync hardening", () => {
     expect(settings.tenant.quickbooksCompanyName).toBeNull();
     expect(settings.tenant.guidance).toMatch(/authorization is no longer valid/i);
     expect(settings.catalog.itemCount).toBe(0);
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: "tenant_1",
+        action: "quickbooks.auth_failed",
+        metadata: expect.objectContaining({
+          operation: "GET /companyinfo/realm_1",
+          httpStatus: 403,
+          intuitTid: "tid_validation_1"
+        })
+      })
+    });
   });
 
   it("blocks invoice sync when the stored QuickBooks connection mode does not match the app mode", async () => {
@@ -406,5 +431,71 @@ describe("quickbooks billing sync hardening", () => {
     );
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("returns the latest QuickBooks support reference in tenant settings", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue({
+      ...buildTenantConnection(),
+      quickbooksConnectionMode: "sandbox"
+    });
+    prismaMock.auditLog.findFirst.mockResolvedValue({
+      action: "quickbooks.sync_failed",
+      createdAt: new Date("2026-03-24T14:22:00.000Z"),
+      metadata: {
+        intuitTid: "tid_support_1",
+        message: "QuickBooks request failed: Duplicate Document Number Error"
+      }
+    });
+
+    const { getTenantQuickBooksSettings } = await import("../quickbooks");
+
+    const settings = await getTenantQuickBooksSettings(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" }
+    );
+
+    expect(settings.supportReference).toEqual({
+      action: "quickbooks.sync_failed",
+      createdAt: new Date("2026-03-24T14:22:00.000Z"),
+      intuitTid: "tid_support_1",
+      message: "QuickBooks request failed: Duplicate Document Number Error"
+    });
+  });
+
+  it("captures intuit_tid when token refresh fails", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue({
+      ...buildTenantConnection(),
+      quickbooksTokenExpiresAt: new Date(Date.now() - 60 * 1000)
+    });
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponseWithTid(
+        {
+          error: "invalid_grant",
+          error_description: "Refresh token expired"
+        },
+        "tid_refresh_1",
+        { status: 400 }
+      )
+    );
+
+    const { importQuickBooksCatalogItems } = await import("../quickbooks");
+
+    await expect(
+      importQuickBooksCatalogItems(
+        { userId: "office_1", role: "office_admin", tenantId: "tenant_1" }
+      )
+    ).rejects.toThrow(/token exchange failed/i);
+
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: "tenant_1",
+        action: "quickbooks.auth_failed",
+        metadata: expect.objectContaining({
+          operation: "token.refresh",
+          httpStatus: 400,
+          intuitTid: "tid_refresh_1"
+        })
+      })
+    });
   });
 });

@@ -47,7 +47,8 @@ export function QuickBooksSettingsCard({
   inactiveItemCount,
   itemTypes,
   filters,
-  notice
+  notice,
+  supportReference
 }: {
   connected: boolean;
   companyName: string | null;
@@ -94,6 +95,12 @@ export function QuickBooksSettingsCard({
     totalPages: number;
   };
   notice?: string | null;
+  supportReference?: {
+    intuitTid: string | null;
+    message: string | null;
+    action: string;
+    createdAt: Date;
+  } | null;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -126,6 +133,42 @@ export function QuickBooksSettingsCard({
         <p className="mt-2">Imported catalog items: <span className="font-semibold text-ink">{importedItemCount}</span></p>
         <p className="mt-2">Last imported: <span className="font-semibold text-ink">{lastImportedAt ? lastImportedAt.toLocaleString() : "Not imported yet"}</span></p>
         {guidance ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">{guidance}</p> : null}
+        {supportReference ? (
+          <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+            <p className="font-semibold text-ink">Need help with QuickBooks?</p>
+            <p className="mt-2">
+              Contact{" "}
+              <a className="font-semibold text-slateblue underline" href="mailto:Support@tradeworx.net">
+                Support@tradeworx.net
+              </a>
+              {" "}and include the latest support details below.
+            </p>
+            {supportReference.intuitTid ? (
+              <p className="mt-2">
+                Intuit TID: <span className="font-semibold text-ink">{supportReference.intuitTid}</span>
+              </p>
+            ) : null}
+            {supportReference.message ? (
+              <p className="mt-2">
+                Last QuickBooks error: <span className="font-semibold text-ink">{supportReference.message}</span>
+              </p>
+            ) : null}
+            <p className="mt-2">
+              Logged: <span className="font-semibold text-ink">{supportReference.createdAt.toLocaleString()}</span>
+            </p>
+          </div>
+        ) : (
+          <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+            <p className="font-semibold text-ink">Need help with QuickBooks?</p>
+            <p className="mt-2">
+              Contact{" "}
+              <a className="font-semibold text-slateblue underline" href="mailto:Support@tradeworx.net">
+                Support@tradeworx.net
+              </a>
+              {" "}from here if you run into QuickBooks connection or sync problems.
+            </p>
+          </div>
+        )}
       </div>
 
       {notice ? <p className="mt-4 text-sm text-slateblue">{notice}</p> : null}

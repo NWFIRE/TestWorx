@@ -14,6 +14,12 @@ type QuickBooksTokenResponse = {
   expires_in: number;
 };
 
+type QuickBooksTokenExchangeResult = {
+  token: QuickBooksTokenResponse;
+  intuitTid: string | null;
+  httpStatus: number;
+};
+
 type QuickBooksConfig = {
   enabled: boolean;
   clientId: string | null;
@@ -48,6 +54,13 @@ type QuickBooksConnectionStatus = {
   statusLabel: string;
   guidance: string | null;
   validationError: string | null;
+};
+
+type QuickBooksSupportReference = {
+  intuitTid: string | null;
+  message: string | null;
+  action: string;
+  createdAt: Date;
 };
 
 type QuickBooksBillingSummary = {
@@ -96,6 +109,46 @@ type QuickBooksCatalogFilterInput = {
   page?: number;
   limit?: number;
 };
+
+type QuickBooksFailureLogInput = {
+  tenantId: string;
+  actorUserId?: string | null;
+  action: string;
+  operation: string;
+  message: string;
+  entityType?: string;
+  entityId?: string;
+  httpStatus?: number | null;
+  intuitTid?: string | null;
+  rawBody?: string | null;
+  connectionMode?: QuickBooksConnectionMode | null;
+  metadata?: JsonObject;
+};
+
+class QuickBooksRequestError extends Error {
+  operation: string;
+  httpStatus: number | null;
+  intuitTid: string | null;
+  rawBody: string | null;
+  connectionMode: QuickBooksConnectionMode | null;
+
+  constructor(input: {
+    message: string;
+    operation: string;
+    httpStatus?: number | null;
+    intuitTid?: string | null;
+    rawBody?: string | null;
+    connectionMode?: QuickBooksConnectionMode | null;
+  }) {
+    super(input.message);
+    this.name = "QuickBooksRequestError";
+    this.operation = input.operation;
+    this.httpStatus = input.httpStatus ?? null;
+    this.intuitTid = input.intuitTid ?? null;
+    this.rawBody = input.rawBody ?? null;
+    this.connectionMode = input.connectionMode ?? null;
+  }
+}
 
 function parseActor(actor: ActorContext) {
   const parsed = actorContextSchema.parse(actor);
@@ -208,7 +261,22 @@ async function validateQuickBooksConnectionStatus(connection: QuickBooksTenantCo
       companyName
     };
   } catch (error) {
-    const validationError = error instanceof Error ? error.message : "QuickBooks connection validation failed.";
+    const normalizedError = normalizeQuickBooksError({
+      error,
+      fallbackOperation: "connection.validate",
+      connectionMode: connection.quickbooksConnectionMode
+    });
+    await createQuickBooksFailureAuditLog({
+      tenantId: connection.id,
+      action: isQuickBooksAuthorizationError(error) ? "quickbooks.auth_failed" : "quickbooks.request_failed",
+      operation: normalizedError.operation,
+      message: normalizedError.message,
+      httpStatus: normalizedError.httpStatus,
+      intuitTid: normalizedError.intuitTid,
+      rawBody: normalizedError.rawBody,
+      connectionMode: connection.quickbooksConnectionMode
+    });
+    const validationError = normalizedError.message;
     const guidance = isQuickBooksAuthorizationError(error)
       ? `Reconnect QuickBooks in ${baseStatus.appModeLabel} mode before importing or syncing. The current QuickBooks authorization is no longer valid.`
       : `QuickBooks validation failed in ${baseStatus.appModeLabel} mode. Retry the connection if this continues.`;
@@ -266,6 +334,49 @@ function getQuickBooksApiBaseUrl(sandbox: boolean, realmId: string) {
   return `${sandbox ? "https://sandbox-quickbooks.api.intuit.com" : "https://quickbooks.api.intuit.com"}/v3/company/${realmId}`;
 }
 
+function readIntuitTid(headers: Headers) {
+  const raw = headers.get("intuit_tid");
+  return raw && raw.trim().length > 0 ? raw.trim() : null;
+}
+
+function normalizeQuickBooksError(input: {
+  error: unknown;
+  fallbackOperation: string;
+  connectionMode?: QuickBooksConnectionMode | null;
+}) {
+  if (input.error instanceof QuickBooksRequestError) {
+    return input.error;
+  }
+
+  const message = input.error instanceof Error ? input.error.message : "QuickBooks request failed.";
+  return new QuickBooksRequestError({
+    message,
+    operation: input.fallbackOperation,
+    connectionMode: input.connectionMode ?? null
+  });
+}
+
+async function createQuickBooksFailureAuditLog(input: QuickBooksFailureLogInput) {
+  await prisma.auditLog.create({
+    data: {
+      tenantId: input.tenantId,
+      actorUserId: input.actorUserId ?? null,
+      action: input.action,
+      entityType: input.entityType ?? "Tenant",
+      entityId: input.entityId ?? input.tenantId,
+      metadata: {
+        operation: input.operation,
+        message: input.message,
+        httpStatus: input.httpStatus ?? null,
+        intuitTid: input.intuitTid ?? null,
+        rawBody: input.rawBody ?? null,
+        connectionMode: input.connectionMode ?? null,
+        ...(input.metadata ?? {})
+      } satisfies JsonObject
+    }
+  });
+}
+
 function buildAuthorizationHeader(clientId: string, clientSecret: string) {
   return `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
 }
@@ -307,10 +418,21 @@ async function exchangeQuickBooksToken(grant: Record<string, string>) {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`QuickBooks token exchange failed: ${errorText || response.statusText}`);
+    throw new QuickBooksRequestError({
+      message: `QuickBooks token exchange failed: ${errorText || response.statusText}`,
+      operation: grant.grant_type === "refresh_token" ? "token.refresh" : "token.exchange",
+      httpStatus: response.status,
+      intuitTid: readIntuitTid(response.headers),
+      rawBody: errorText || null,
+      connectionMode: resolveQuickBooksAppMode()
+    });
   }
 
-  return response.json() as Promise<QuickBooksTokenResponse>;
+  return {
+    token: await response.json() as QuickBooksTokenResponse,
+    intuitTid: readIntuitTid(response.headers),
+    httpStatus: response.status
+  } satisfies QuickBooksTokenExchangeResult;
 }
 
 async function getTenantQuickBooksConnection(tenantId: string) {
@@ -350,17 +472,37 @@ async function refreshQuickBooksTokenIfNeeded(connection: QuickBooksTenantConnec
     return connection;
   }
 
-  const refreshed = await exchangeQuickBooksToken({
-    grant_type: "refresh_token",
-    refresh_token: connection.quickbooksRefreshToken
-  });
+  let refreshed: QuickBooksTokenExchangeResult;
+  try {
+    refreshed = await exchangeQuickBooksToken({
+      grant_type: "refresh_token",
+      refresh_token: connection.quickbooksRefreshToken
+    });
+  } catch (error) {
+    const normalizedError = normalizeQuickBooksError({
+      error,
+      fallbackOperation: "token.refresh",
+      connectionMode: connection.quickbooksConnectionMode
+    });
+    await createQuickBooksFailureAuditLog({
+      tenantId: connection.id,
+      action: "quickbooks.auth_failed",
+      operation: normalizedError.operation,
+      message: normalizedError.message,
+      httpStatus: normalizedError.httpStatus,
+      intuitTid: normalizedError.intuitTid,
+      rawBody: normalizedError.rawBody,
+      connectionMode: connection.quickbooksConnectionMode
+    });
+    throw normalizedError;
+  }
 
   return prisma.tenant.update({
     where: { id: connection.id },
     data: {
-      quickbooksAccessToken: refreshed.access_token,
-      quickbooksRefreshToken: refreshed.refresh_token,
-      quickbooksTokenExpiresAt: new Date(Date.now() + refreshed.expires_in * 1000)
+      quickbooksAccessToken: refreshed.token.access_token,
+      quickbooksRefreshToken: refreshed.token.refresh_token,
+      quickbooksTokenExpiresAt: new Date(Date.now() + refreshed.token.expires_in * 1000)
     },
     select: {
       id: true,
@@ -401,10 +543,52 @@ async function quickBooksApiRequest<T>(connection: QuickBooksTenantConnection, i
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`QuickBooks request failed: ${errorText || response.statusText}`);
+    throw new QuickBooksRequestError({
+      message: `QuickBooks request failed: ${errorText || response.statusText}`,
+      operation: `${input.method ?? "GET"} ${input.path}`,
+      httpStatus: response.status,
+      intuitTid: readIntuitTid(response.headers),
+      rawBody: errorText || null,
+      connectionMode: connection.quickbooksConnectionMode
+    });
   }
 
   return response.json() as Promise<T>;
+}
+
+async function getLatestQuickBooksSupportReference(tenantId: string) {
+  const latest = await prisma.auditLog.findFirst({
+    where: {
+      tenantId,
+      action: {
+        in: [
+          "quickbooks.auth_failed",
+          "quickbooks.request_failed",
+          "quickbooks.sync_failed",
+          "quickbooks.catalog_import_failed",
+          "quickbooks.send_failed"
+        ]
+      }
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      action: true,
+      createdAt: true,
+      metadata: true
+    }
+  });
+
+  if (!latest || !latest.metadata || typeof latest.metadata !== "object" || Array.isArray(latest.metadata)) {
+    return null;
+  }
+
+  const metadata = latest.metadata as Record<string, unknown>;
+  return {
+    action: latest.action,
+    createdAt: latest.createdAt,
+    intuitTid: typeof metadata.intuitTid === "string" && metadata.intuitTid.trim().length > 0 ? metadata.intuitTid.trim() : null,
+    message: typeof metadata.message === "string" && metadata.message.trim().length > 0 ? metadata.message.trim() : null
+  } satisfies QuickBooksSupportReference;
 }
 
 function readQuickBooksDocNumber(invoice: unknown) {
@@ -719,6 +903,7 @@ export async function getTenantQuickBooksSettings(actor: ActorContext, filters?:
   const tenant = await getTenantQuickBooksConnection(parsedActor.tenantId as string);
   const validatedConnection = await validateQuickBooksConnectionStatus(tenant);
   const connectionStatus = validatedConnection.status;
+  const supportReference = await getLatestQuickBooksSupportReference(parsedActor.tenantId as string);
   const search = filters?.search?.trim() ?? "";
   const itemType = filters?.itemType?.trim() ?? "";
   const status = filters?.status ?? "all";
@@ -841,6 +1026,7 @@ export async function getTenantQuickBooksSettings(actor: ActorContext, filters?:
       statusLabel: connectionStatus.statusLabel,
       guidance: connectionStatus.guidance
     },
+    supportReference,
     catalog: {
       itemCount: totalItemCount,
       filteredItemCount,
@@ -911,20 +1097,44 @@ export async function completeQuickBooksConnection(actor: ActorContext, input: {
     throw new Error("Only tenant administrators can connect QuickBooks.");
   }
 
-  const token = await exchangeQuickBooksToken({
-    grant_type: "authorization_code",
-    code: input.code
-  });
+  let token: QuickBooksTokenExchangeResult;
+  try {
+    token = await exchangeQuickBooksToken({
+      grant_type: "authorization_code",
+      code: input.code
+    });
+  } catch (error) {
+    const normalizedError = normalizeQuickBooksError({
+      error,
+      fallbackOperation: "token.exchange",
+      connectionMode: resolveQuickBooksAppMode()
+    });
+    await createQuickBooksFailureAuditLog({
+      tenantId: parsedActor.tenantId as string,
+      actorUserId: parsedActor.userId,
+      action: "quickbooks.auth_failed",
+      operation: normalizedError.operation,
+      message: normalizedError.message,
+      httpStatus: normalizedError.httpStatus,
+      intuitTid: normalizedError.intuitTid,
+      rawBody: normalizedError.rawBody,
+      connectionMode: resolveQuickBooksAppMode(),
+      metadata: {
+        realmId: input.realmId
+      }
+    });
+    throw normalizedError;
+  }
 
   const updated = await prisma.tenant.update({
     where: { id: parsedActor.tenantId as string },
     data: {
       quickbooksRealmId: input.realmId,
       quickbooksCompanyName: null,
-      quickbooksAccessToken: token.access_token,
-      quickbooksRefreshToken: token.refresh_token,
+      quickbooksAccessToken: token.token.access_token,
+      quickbooksRefreshToken: token.token.refresh_token,
       quickbooksConnectionMode: resolveQuickBooksAppMode(),
-      quickbooksTokenExpiresAt: new Date(Date.now() + token.expires_in * 1000),
+      quickbooksTokenExpiresAt: new Date(Date.now() + token.token.expires_in * 1000),
       quickbooksConnectedAt: new Date()
     },
     select: {
@@ -959,7 +1169,7 @@ export async function completeQuickBooksConnection(actor: ActorContext, input: {
       action: "tenant.quickbooks_connected",
       entityType: "Tenant",
       entityId: parsedActor.tenantId as string,
-      metadata: { realmId: input.realmId, companyName: companyName ?? null, connectionMode: resolveQuickBooksAppMode() }
+      metadata: { realmId: input.realmId, companyName: companyName ?? null, connectionMode: resolveQuickBooksAppMode(), intuitTid: token.intuitTid }
     }
   });
 }
@@ -1042,67 +1252,87 @@ export async function importQuickBooksCatalogItems(actor: ActorContext) {
   let startPosition = 1;
   const pageSize = 500;
 
-  while (true) {
-    const response = await quickBooksApiRequest<{ QueryResponse?: { Item?: unknown[] } }>(tenant, {
-      path: "/query",
-      searchParams: new URLSearchParams({
-        query: `select * from Item startposition ${startPosition} maxresults ${pageSize}`
-      })
-    });
-
-    const pageItems = (response.QueryResponse?.Item ?? [])
-      .map((item) => normalizeQuickBooksCatalogItem(item))
-      .filter((item): item is NonNullable<typeof item> => Boolean(item));
-
-    importedItems.push(...pageItems);
-
-    if (pageItems.length < pageSize) {
-      break;
-    }
-
-    startPosition += pageSize;
-  }
-
-  await prisma.$transaction(async (tx) => {
-    await tx.quickBooksCatalogItem.deleteMany({
-      where: { tenantId: parsedActor.tenantId as string }
-    });
-
-    if (importedItems.length > 0) {
-      await tx.quickBooksCatalogItem.createMany({
-        data: importedItems.map((item) => ({
-          tenantId: parsedActor.tenantId as string,
-          quickbooksItemId: item.quickbooksItemId,
-          name: item.name,
-          sku: item.sku,
-          itemType: item.itemType,
-          active: item.active,
-          unitPrice: item.unitPrice,
-          incomeAccountId: item.incomeAccountId,
-          incomeAccountName: item.incomeAccountName,
-          rawJson: item.rawJson,
-          importedAt: new Date()
-        }))
+  try {
+    while (true) {
+      const response = await quickBooksApiRequest<{ QueryResponse?: { Item?: unknown[] } }>(tenant, {
+        path: "/query",
+        searchParams: new URLSearchParams({
+          query: `select * from Item startposition ${startPosition} maxresults ${pageSize}`
+        })
       });
-    }
-  });
 
-  await prisma.auditLog.create({
-    data: {
+      const pageItems = (response.QueryResponse?.Item ?? [])
+        .map((item) => normalizeQuickBooksCatalogItem(item))
+        .filter((item): item is NonNullable<typeof item> => Boolean(item));
+
+      importedItems.push(...pageItems);
+
+      if (pageItems.length < pageSize) {
+        break;
+      }
+
+      startPosition += pageSize;
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.quickBooksCatalogItem.deleteMany({
+        where: { tenantId: parsedActor.tenantId as string }
+      });
+
+      if (importedItems.length > 0) {
+        await tx.quickBooksCatalogItem.createMany({
+          data: importedItems.map((item) => ({
+            tenantId: parsedActor.tenantId as string,
+            quickbooksItemId: item.quickbooksItemId,
+            name: item.name,
+            sku: item.sku,
+            itemType: item.itemType,
+            active: item.active,
+            unitPrice: item.unitPrice,
+            incomeAccountId: item.incomeAccountId,
+            incomeAccountName: item.incomeAccountName,
+            rawJson: item.rawJson,
+            importedAt: new Date()
+          }))
+        });
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        tenantId: parsedActor.tenantId as string,
+        actorUserId: parsedActor.userId,
+        action: "tenant.quickbooks_catalog_imported",
+        entityType: "Tenant",
+        entityId: parsedActor.tenantId as string,
+        metadata: {
+          importedItemCount: importedItems.length
+        }
+      }
+    });
+
+    return {
+      importedItemCount: importedItems.length
+    };
+  } catch (error) {
+    const normalizedError = normalizeQuickBooksError({
+      error,
+      fallbackOperation: "catalog.import",
+      connectionMode: tenant.quickbooksConnectionMode
+    });
+    await createQuickBooksFailureAuditLog({
       tenantId: parsedActor.tenantId as string,
       actorUserId: parsedActor.userId,
-      action: "tenant.quickbooks_catalog_imported",
-      entityType: "Tenant",
-      entityId: parsedActor.tenantId as string,
-      metadata: {
-        importedItemCount: importedItems.length
-      }
-    }
-  });
-
-  return {
-    importedItemCount: importedItems.length
-  };
+      action: "quickbooks.catalog_import_failed",
+      operation: normalizedError.operation,
+      message: normalizedError.message,
+      httpStatus: normalizedError.httpStatus,
+      intuitTid: normalizedError.intuitTid,
+      rawBody: normalizedError.rawBody,
+      connectionMode: tenant.quickbooksConnectionMode
+    });
+    throw normalizedError;
+  }
 }
 
 export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspectionId: string) {
@@ -1252,6 +1482,11 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
       invoiceNumber: verifiedInvoice.docNumber ?? createdDocNumber ?? docNumber
     };
   } catch (error) {
+    const normalizedError = normalizeQuickBooksError({
+      error,
+      fallbackOperation: "billing.sync",
+      connectionMode: tenant.quickbooksConnectionMode
+    });
     await prisma.inspectionBillingSummary.update({
       where: { id: summary.id },
       data: {
@@ -1261,11 +1496,28 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
         quickbooksCustomerId: null,
         quickbooksSyncedAt: null,
         quickbooksSyncStatus: "failed",
-        quickbooksSyncError: error instanceof Error ? error.message : "QuickBooks sync failed."
+        quickbooksSyncError: normalizedError.message
       }
     });
 
-    throw error;
+    await createQuickBooksFailureAuditLog({
+      tenantId: parsedActor.tenantId as string,
+      actorUserId: parsedActor.userId,
+      action: "quickbooks.sync_failed",
+      operation: normalizedError.operation,
+      message: normalizedError.message,
+      httpStatus: normalizedError.httpStatus,
+      intuitTid: normalizedError.intuitTid,
+      rawBody: normalizedError.rawBody,
+      connectionMode: tenant.quickbooksConnectionMode,
+      entityType: "InspectionBillingSummary",
+      entityId: summary.id,
+      metadata: {
+        inspectionId: summary.inspectionId
+      }
+    });
+
+    throw normalizedError;
   }
 }
 
@@ -1343,14 +1595,37 @@ export async function sendQuickBooksInvoice(actor: ActorContext, inspectionId: s
       sentTo: summary.customerCompany.billingEmail ?? null
     };
   } catch (error) {
+    const normalizedError = normalizeQuickBooksError({
+      error,
+      fallbackOperation: "billing.send",
+      connectionMode: tenant.quickbooksConnectionMode
+    });
     await prisma.inspectionBillingSummary.update({
       where: { id: summary.id },
       data: {
         quickbooksSyncStatus: "failed",
-        quickbooksSyncError: error instanceof Error ? error.message : "QuickBooks send failed."
+        quickbooksSyncError: normalizedError.message
       }
     });
 
-    throw error;
+    await createQuickBooksFailureAuditLog({
+      tenantId: parsedActor.tenantId as string,
+      actorUserId: parsedActor.userId,
+      action: "quickbooks.send_failed",
+      operation: normalizedError.operation,
+      message: normalizedError.message,
+      httpStatus: normalizedError.httpStatus,
+      intuitTid: normalizedError.intuitTid,
+      rawBody: normalizedError.rawBody,
+      connectionMode: tenant.quickbooksConnectionMode,
+      entityType: "InspectionBillingSummary",
+      entityId: summary.id,
+      metadata: {
+        inspectionId: summary.inspectionId,
+        invoiceId: summary.quickbooksInvoiceId
+      }
+    });
+
+    throw normalizedError;
   }
 }
