@@ -1,13 +1,21 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { InspectionStatus, type InspectionType } from "@prisma/client";
 
 import { auth } from "@/auth";
-import { addInspectionTask, claimInspection, signInspectionDocument, updateInspectionStatus } from "@testworx/lib";
+import {
+  addInspectionTask,
+  claimInspection,
+  editableInspectionStatuses,
+  inspectionTypeRegistry,
+  signInspectionDocument,
+  updateInspectionStatus
+} from "@testworx/lib";
 
 type ActionResult = { ok: boolean; error: string | null };
 type FormActionResult = { error: string | null; success: string | null };
+type InspectionStatus = typeof editableInspectionStatuses[number];
+type InspectionType = keyof typeof inspectionTypeRegistry;
 
 export async function claimInspectionAction(inspectionId: string): Promise<ActionResult> {
   const session = await auth();
