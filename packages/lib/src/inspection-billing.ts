@@ -4,6 +4,7 @@ import { prisma } from "@testworx/db";
 import type { ActorContext } from "@testworx/types";
 import { actorContextSchema } from "@testworx/types";
 
+import type { JsonValue } from "./json-types";
 import type { BillableCategory, BillableFieldMapping, BillableRepeaterMapping } from "./report-config";
 import { resolveReportTemplate } from "./report-config";
 import { assertTenantContext } from "./permissions";
@@ -69,7 +70,7 @@ type FinalizedReportRow = {
   id: string;
   inspectionId: string;
   tenantId: string;
-  contentJson: Prisma.JsonValue | null;
+  contentJson: JsonValue | null;
   inspectionType: InspectionType;
 };
 
@@ -501,7 +502,7 @@ export function extractBillableItemsFromFinalizedReport(input: {
   inspectionId: string;
   reportId: string;
   reportType: InspectionType;
-  contentJson: Prisma.JsonValue | null;
+  contentJson: JsonValue | null;
 }) {
   const parsed = reportDraftSchema.safeParse(input.contentJson ?? {});
   if (!parsed.success) {
@@ -593,7 +594,7 @@ async function getExistingBillingSummaryRow(tx: Prisma.TransactionClient | typeo
     customerCompanyId: string;
     siteId: string;
     status: string;
-    items: Prisma.JsonValue;
+    items: JsonValue;
     subtotal: number;
     notes: string | null;
     createdAt: Date;
@@ -799,7 +800,7 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
     quickbooksSyncError: string | null;
     subtotal: number;
     notes: string | null;
-    items: Prisma.JsonValue;
+    items: JsonValue;
   }>>(Prisma.sql`
     SELECT
       s."id",
@@ -862,7 +863,7 @@ async function getAuthorizedBillingSummary(actor: ActorContext, summaryId: strin
     status: string;
     subtotal: number;
     notes: string | null;
-    items: Prisma.JsonValue;
+    items: JsonValue;
   }>>(Prisma.sql`
     SELECT "id", "tenantId", "inspectionId", "status", "subtotal", "notes", "items"
     FROM "InspectionBillingSummary"

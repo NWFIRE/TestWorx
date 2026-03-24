@@ -7,6 +7,7 @@ import { actorContextSchema } from "@testworx/types";
 import { resolveTenantBranding } from "./branding";
 import { assertTenantEntitlementForTenant } from "./billing";
 import { syncInspectionBillingSummaryTx } from "./inspection-billing";
+import type { JsonInputValue, JsonObject, JsonValue } from "./json-types";
 import { assertTenantContext } from "./permissions";
 import { generateInspectionReportPdf } from "./pdf-report";
 import { resolveReportTemplate } from "./report-config";
@@ -52,7 +53,7 @@ async function createAuditLog(tx: Prisma.TransactionClient, input: { tenantId: s
       action: input.action,
       entityType: input.action.startsWith("attachment.") ? "Attachment" : "InspectionReport",
       entityId: input.entityId,
-      metadata: input.metadata as Prisma.InputJsonValue | undefined
+      metadata: input.metadata as JsonObject | undefined
     }
   });
 }
@@ -68,14 +69,14 @@ function hasActiveCorrectionState(state: ReportCorrectionState | null | undefine
   return Boolean(state && state !== ReportCorrectionState.none);
 }
 
-function stripCorrectionSensitiveContent(contentJson: Prisma.JsonValue | null | undefined) {
+function stripCorrectionSensitiveContent(contentJson: unknown) {
   if (!contentJson || typeof contentJson !== "object" || Array.isArray(contentJson)) {
-    return contentJson === null ? undefined : contentJson as Prisma.InputJsonValue | undefined;
+    return contentJson === null ? undefined : contentJson as JsonInputValue | undefined;
   }
 
-  const next = { ...(contentJson as Prisma.JsonObject) };
+  const next = { ...(contentJson as JsonObject) };
   next.signatures = {};
-  return next as Prisma.InputJsonValue;
+  return next;
 }
 
 function buildCorrectionSnapshot(report: {
@@ -83,7 +84,7 @@ function buildCorrectionSnapshot(report: {
   status: ReportStatus;
   correctionState: ReportCorrectionState;
   finalizedAt: Date | null;
-  contentJson: Prisma.JsonValue | null;
+  contentJson: unknown;
   attachments: Array<{ id: string; kind: AttachmentKind; source: string; fileName: string; storageKey: string }>;
   signatures: Array<{ id: string; kind: SignatureKind; signerName: string; signedAt: Date }>;
 }) {
@@ -92,7 +93,7 @@ function buildCorrectionSnapshot(report: {
     status: report.status,
     correctionState: report.correctionState,
     finalizedAt: report.finalizedAt?.toISOString() ?? null,
-    contentJson: report.contentJson,
+    contentJson: report.contentJson as JsonValue | null,
     generatedPdfAttachments: report.attachments
       .filter((attachment) => attachment.kind === AttachmentKind.pdf && attachment.source === "generated")
       .map((attachment) => ({
@@ -106,7 +107,7 @@ function buildCorrectionSnapshot(report: {
       signerName: signature.signerName,
       signedAt: signature.signedAt.toISOString()
     }))
-  } satisfies Prisma.JsonObject;
+  } satisfies JsonObject;
 }
 
 async function createReportCorrectionEvent(tx: Prisma.TransactionClient, input: {
@@ -116,7 +117,7 @@ async function createReportCorrectionEvent(tx: Prisma.TransactionClient, input: 
   reason?: string | null;
   previousStatus?: string | null;
   newStatus?: string | null;
-  snapshotJson?: Prisma.InputJsonValue;
+  snapshotJson?: JsonInputValue;
   actedByUserId: string;
 }) {
   await tx.reportCorrectionEvent.create({
@@ -705,7 +706,7 @@ async function persistReportDraftTransaction(input: {
   await input.tx.inspectionReport.update({
     where: { id: input.report.id },
     data: {
-      contentJson: input.draft as Prisma.InputJsonValue,
+      contentJson: input.draft as JsonInputValue,
       autosaveVersion: { increment: 1 },
       status: input.nextStatus ?? ReportStatus.draft
     }

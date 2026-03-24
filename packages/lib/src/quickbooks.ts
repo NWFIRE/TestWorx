@@ -5,6 +5,7 @@ import type { ActorContext } from "@testworx/types";
 import { actorContextSchema } from "@testworx/types";
 
 import { assertEnvForFeature, getOptionalQuickBooksEnv, getServerEnv } from "./env";
+import type { JsonObject } from "./json-types";
 import { assertTenantContext } from "./permissions";
 
 type QuickBooksTokenResponse = {
@@ -525,7 +526,7 @@ function normalizeQuickBooksCatalogItem(item: unknown) {
     unitPrice: readQuickBooksNumberField(item, "UnitPrice"),
     incomeAccountId: readQuickBooksStringField(incomeAccountRef, "value"),
     incomeAccountName: readQuickBooksStringField(incomeAccountRef, "name"),
-    rawJson: item
+    rawJson: item as JsonObject
   };
 }
 
@@ -1035,7 +1036,7 @@ export async function importQuickBooksCatalogItems(actor: ActorContext) {
     unitPrice: number | null;
     incomeAccountId: string | null;
     incomeAccountName: string | null;
-    rawJson: unknown;
+    rawJson: JsonObject;
   }> = [];
 
   let startPosition = 1;
@@ -1079,7 +1080,7 @@ export async function importQuickBooksCatalogItems(actor: ActorContext) {
           unitPrice: item.unitPrice,
           incomeAccountId: item.incomeAccountId,
           incomeAccountName: item.incomeAccountName,
-          rawJson: item.rawJson as Prisma.InputJsonValue,
+          rawJson: item.rawJson,
           importedAt: new Date()
         }))
       });

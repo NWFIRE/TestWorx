@@ -8,6 +8,7 @@ import { actorContextSchema } from "@testworx/types";
 
 import { assertTenantContext } from "./permissions";
 import { assertTenantEntitlementForTenant } from "./billing";
+import type { JsonInputValue, JsonObject } from "./json-types";
 import { getDefaultInspectionRecurrenceFrequency, inspectionTypeRegistry } from "./report-config";
 
 const inspectionTypeEnum = z.enum(Object.keys(inspectionTypeRegistry) as [keyof typeof inspectionTypeRegistry, ...(keyof typeof inspectionTypeRegistry)[]]);
@@ -491,7 +492,7 @@ async function createAuditLog(tx: Prisma.TransactionClient, input: {
       action: input.action,
       entityType: "Inspection",
       entityId: input.entityId,
-      metadata: input.metadata as Prisma.InputJsonValue | undefined
+      metadata: input.metadata as JsonObject | undefined
     }
   });
 }
@@ -982,8 +983,8 @@ export async function createInspectionAmendment(actor: ActorContext, inspectionI
         createdByUserId: parsedActor.userId,
         type: amendmentType,
         reason,
-        previousSnapshot: previousSnapshot as Prisma.InputJsonValue,
-        replacementSnapshot: { ...replacementSnapshot, inspectionId: replacementInspection.id } as Prisma.InputJsonValue
+        previousSnapshot: previousSnapshot as JsonInputValue,
+        replacementSnapshot: { ...replacementSnapshot, inspectionId: replacementInspection.id } as JsonInputValue
       }
     });
 

@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { ActorContext } from "@testworx/types";
 import { actorContextSchema } from "@testworx/types";
 
+import type { JsonObject, JsonValue } from "./json-types";
 import { assertTenantContext } from "./permissions";
 import { inspectionTypeRegistry } from "./report-config";
 
@@ -166,9 +167,9 @@ function parseInspectionTypes(input: string, rowNumber: number) {
   return uniqueValues as InspectionType[];
 }
 
-function buildAssetMetadata(row: CustomerSiteImportRow, existingMetadata: unknown): Prisma.JsonObject | undefined {
-  const metadata: Prisma.JsonObject = existingMetadata && typeof existingMetadata === "object"
-    ? { ...(existingMetadata as Record<string, Prisma.JsonValue>) }
+function buildAssetMetadata(row: CustomerSiteImportRow, existingMetadata: unknown): JsonObject | undefined {
+  const metadata: JsonObject = existingMetadata && typeof existingMetadata === "object" && !Array.isArray(existingMetadata)
+    ? { ...(existingMetadata as Record<string, JsonValue>) }
     : {};
 
   if (row.assetLocation) {
