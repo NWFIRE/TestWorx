@@ -9,6 +9,22 @@ import { AddReportTypeControl } from "./add-report-type-control";
 import { ClaimButton } from "./claim-button";
 import { StatusButton } from "./status-button";
 
+type TechnicianDashboardData = Awaited<ReturnType<typeof getTechnicianDashboardData>>;
+type AssignedInspection = TechnicianDashboardData["assigned"][number];
+type UnassignedInspection = TechnicianDashboardData["unassigned"][number];
+type DashboardTask = AssignedInspection["tasks"][number];
+type DashboardDocument = NonNullable<
+  (AssignedInspection & {
+    documents?: Array<{
+      id: string;
+      label: string | null;
+      fileName: string;
+      requiresSignature: boolean;
+      status: string;
+    }>;
+  })["documents"]
+>[number];
+
 const statusClasses: Record<string, string> = {
   to_be_completed: "bg-sky-50 text-sky-700 ring-1 ring-sky-100",
   scheduled: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100",
@@ -108,9 +124,9 @@ export default async function TechnicianPage() {
             {data.assigned.length === 0 ? (
               <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No assigned inspections yet.</p>
             ) : (
-              data.assigned.map((inspection) => {
-                const nextDue = pickEarliestNextDueAt(inspection.tasks.map((task) => task.recurrence?.nextDueAt)) ?? undefined;
-                const finalizedTaskCount = inspection.tasks.filter((task) => task.report?.status === "finalized").length;
+              data.assigned.map((inspection: AssignedInspection) => {
+                const nextDue = pickEarliestNextDueAt(inspection.tasks.map((task: DashboardTask) => task.recurrence?.nextDueAt)) ?? undefined;
+                const finalizedTaskCount = inspection.tasks.filter((task: DashboardTask) => task.report?.status === "finalized").length;
                 return (
                   <div key={inspection.id} className="rounded-[1.5rem] border border-slate-200 p-4">
                     <div className="flex flex-col gap-4">
@@ -122,10 +138,10 @@ export default async function TechnicianPage() {
                         <p className="mt-2 text-sm text-slate-500">{format(inspection.scheduledStart, "EEE, MMM d h:mm a")} | {inspection.customerCompany.name}</p>
                         <p className="mt-1 text-sm text-slate-500">Assigned team: {((inspection as typeof inspection & { assignedTechnicianNames?: string[] }).assignedTechnicianNames ?? []).join(", ")}</p>
                         <p className="mt-1 text-sm text-slate-500">Due date: {nextDueLabel(nextDue, inspection.scheduledStart)}</p>
-                        <p className="mt-1 text-sm text-slate-500">Report types: {inspection.tasks.map((task) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
+                        <p className="mt-1 text-sm text-slate-500">Report types: {inspection.tasks.map((task: DashboardTask) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
                         <p className="mt-1 text-sm text-slate-500">{finalizedTaskCount} of {inspection.tasks.length} report task{inspection.tasks.length === 1 ? "" : "s"} finalized</p>
                         <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                          {inspection.tasks.map((task) => (
+                          {inspection.tasks.map((task: DashboardTask) => (
                             <div key={task.id} className="space-y-2 rounded-[1.25rem] bg-slate-50 p-3">
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <p className="text-sm font-semibold text-ink">{task.displayLabel ?? task.inspectionType.replaceAll("_", " ")}</p>
@@ -163,7 +179,7 @@ export default async function TechnicianPage() {
                                   requiresSignature: boolean;
                                   status: string;
                                 }>;
-                              }).documents ?? []).map((document) => (
+                              }).documents ?? []).map((document: DashboardDocument) => (
                                 <div key={document.id} className="flex flex-col gap-2 rounded-[1.25rem] border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between">
                                   <div>
                                     <p className="text-sm font-semibold text-ink">{document.label || document.fileName}</p>
@@ -202,8 +218,8 @@ export default async function TechnicianPage() {
             {data.unassigned.length === 0 ? (
               <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No open inspections to claim.</p>
             ) : (
-              data.unassigned.map((inspection) => {
-                const nextDue = pickEarliestNextDueAt(inspection.tasks.map((task) => task.recurrence?.nextDueAt)) ?? undefined;
+              data.unassigned.map((inspection: UnassignedInspection) => {
+                const nextDue = pickEarliestNextDueAt(inspection.tasks.map((task: UnassignedInspection["tasks"][number]) => task.recurrence?.nextDueAt)) ?? undefined;
                 return (
                   <div key={inspection.id} className="rounded-[1.5rem] border border-slate-200 p-4">
                     <div className="space-y-4">
