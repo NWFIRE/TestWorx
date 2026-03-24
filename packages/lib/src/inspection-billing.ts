@@ -1,7 +1,7 @@
-import { Prisma, type InspectionType } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@testworx/db";
 
-import type { ActorContext, ReportStatus } from "@testworx/types";
+import type { ActorContext, InspectionType, ReportStatus } from "@testworx/types";
 import { actorContextSchema, reportStatuses } from "@testworx/types";
 
 import type { JsonValue } from "./json-types";

@@ -1,5 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
-import type { InspectionType } from "@prisma/client";
+import type { InspectionType } from "@testworx/types";
 
 import { resolveTenantBranding } from "./branding";
 import { buildReportPreview, describeRepeaterValueLines, isFieldVisible, type ReportDraft } from "./report-engine";

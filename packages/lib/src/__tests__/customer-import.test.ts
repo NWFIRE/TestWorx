@@ -1,4 +1,4 @@
-import { InspectionType } from "@prisma/client";
+import { inspectionTypes } from "@testworx/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock } = vi.hoisted(() => ({
@@ -130,7 +130,7 @@ describe("customer/site csv import", () => {
         siteId: "site_1",
         name: "Lobby extinguisher bank",
         assetTag: "EXT-100",
-        inspectionTypes: [InspectionType.fire_extinguisher],
+        inspectionTypes: [inspectionTypes.fire_extinguisher],
         metadata: expect.objectContaining({
           location: "Lobby by east stair",
           manufacturer: "Amerex",
@@ -157,7 +157,7 @@ describe("customer/site csv import", () => {
     prismaMock.asset.findFirst.mockResolvedValue({
       id: "asset_1",
       assetTag: "EXT-100",
-      inspectionTypes: [InspectionType.fire_extinguisher],
+      inspectionTypes: [inspectionTypes.fire_extinguisher],
       metadata: { location: "Old location" }
     });
     prismaMock.asset.update.mockResolvedValue({ id: "asset_1" });
@@ -177,7 +177,7 @@ describe("customer/site csv import", () => {
       data: expect.objectContaining({
         name: "Lobby extinguisher bank",
         assetTag: "EXT-100",
-        inspectionTypes: [InspectionType.fire_extinguisher, InspectionType.fire_alarm],
+        inspectionTypes: [inspectionTypes.fire_extinguisher, inspectionTypes.fire_alarm],
         metadata: expect.objectContaining({
           location: "Lobby by east stair",
           manufacturer: "Amerex",

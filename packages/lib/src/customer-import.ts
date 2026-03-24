@@ -1,7 +1,7 @@
 import { Prisma, prisma } from "@testworx/db";
 import { z } from "zod";
 
-import type { ActorContext } from "@testworx/types";
+import type { ActorContext, InspectionType } from "@testworx/types";
 import { actorContextSchema } from "@testworx/types";
 
 import type { JsonObject, JsonValue } from "./json-types";
@@ -47,8 +47,6 @@ const headerAliases: Record<string, (typeof customerSiteImportHeaders)[number]> 
 };
 
 const minimumImportHeaders = ["customerName", "addressLine1"] as const;
-
-type InspectionType = keyof typeof inspectionTypeRegistry;
 
 const inspectionTypeValues = new Set<string>(Object.keys(inspectionTypeRegistry));
 

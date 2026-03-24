@@ -1,7 +1,7 @@
-import { AttachmentKind, InspectionDocumentStatus, InspectionStatus, Prisma, ReportCorrectionState, SignatureKind, type InspectionType } from "@prisma/client";
+import { AttachmentKind, InspectionDocumentStatus, InspectionStatus, Prisma, ReportCorrectionState, SignatureKind } from "@prisma/client";
 import { prisma } from "@testworx/db";
 
-import type { ActorContext, ReportStatus } from "@testworx/types";
+import type { ActorContext, InspectionType, ReportStatus } from "@testworx/types";
 import { actorContextSchema, reportStatuses } from "@testworx/types";
 
 import { resolveTenantBranding } from "./branding";

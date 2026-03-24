@@ -12,6 +12,20 @@ export type CustomerOption = { id: string; name: string };
 export type SiteOption = { id: string; name: string; city: string; customerCompanyId: string };
 export type TechnicianOption = { id: string; name: string };
 
+export const inspectionTypes = {
+  fire_extinguisher: "fire_extinguisher",
+  fire_alarm: "fire_alarm",
+  wet_fire_sprinkler: "wet_fire_sprinkler",
+  backflow: "backflow",
+  fire_pump: "fire_pump",
+  dry_fire_sprinkler: "dry_fire_sprinkler",
+  kitchen_suppression: "kitchen_suppression",
+  industrial_suppression: "industrial_suppression",
+  emergency_exit_lighting: "emergency_exit_lighting"
+} as const;
+
+export type InspectionType = (typeof inspectionTypes)[keyof typeof inspectionTypes];
+
 export const reportStatuses = {
   draft: "draft",
   submitted: "submitted",

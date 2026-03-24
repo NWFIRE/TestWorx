@@ -1,4 +1,5 @@
-import { RecurrenceFrequency, type InspectionType } from "@prisma/client";
+import { RecurrenceFrequency } from "@prisma/client";
+import type { InspectionType } from "@testworx/types";
 import type { ReportCalculationKey } from "./report-calculations";
 import { resolveOptionProvider } from "./report-options";
 import type { ReportOptionProviderKey } from "./report-options";
