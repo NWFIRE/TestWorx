@@ -15,7 +15,9 @@ import { CustomerSiteImportCard } from "./customer-site-import-card";
 import { InspectionSchedulerForm } from "./inspection-scheduler-form";
 
 type AdminDashboardData = Awaited<ReturnType<typeof getAdminDashboardData>>;
-type DashboardInspection = AdminDashboardData["completedInspections"][number];
+type CompletedDashboardInspection = AdminDashboardData["completedInspections"][number];
+type ActiveDashboardInspection = AdminDashboardData["activeInspections"][number];
+type DashboardInspection = CompletedDashboardInspection | ActiveDashboardInspection;
 type DashboardTask = DashboardInspection["tasks"][number];
 
 const statusClasses: Record<string, string> = {

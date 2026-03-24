@@ -27,6 +27,11 @@ type CustomerReportView = {
   attachments: Array<{ id: string; fileName: string }>;
 };
 
+type PdfAttachmentLink = { id: string; fileName: string; href: string };
+type ReportAttachment = CustomerReportView["attachments"][number];
+type InspectionAttachment = { id: string; fileName: string };
+type InspectionDocument = { id: string; fileName: string; label: string | null };
+
 function formatFieldValue(value: string | number | boolean | Array<Record<string, string | number | boolean | null>> | null | undefined) {
   if (typeof value === "boolean") {
     return value ? "Yes" : "No";
@@ -69,14 +74,14 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
   }
 
   const reportView = detail.report as unknown as CustomerReportView;
-  const inspectionAttachments = detail.inspectionAttachments as unknown as Array<{ id: string; fileName: string }>;
-  const inspectionDocuments = (detail as typeof detail & {
-    inspectionDocuments?: Array<{ id: string; fileName: string; label: string | null }>;
-  }).inspectionDocuments ?? [];
-  const reportPdfAttachments = [
-    ...reportView.attachments.map((attachment) => ({ id: attachment.id, fileName: attachment.fileName, href: `/api/attachments/${attachment.id}` })),
-    ...inspectionAttachments.map((attachment) => ({ id: attachment.id, fileName: attachment.fileName, href: `/api/attachments/${attachment.id}` })),
-    ...inspectionDocuments.map((document) => ({ id: document.id, fileName: document.label || document.fileName, href: `/api/inspection-documents/${document.id}` }))
+  const inspectionAttachments = detail.inspectionAttachments as unknown as InspectionAttachment[];
+  const inspectionDocuments = ((detail as typeof detail & {
+    inspectionDocuments?: InspectionDocument[];
+  }).inspectionDocuments ?? []) as InspectionDocument[];
+  const reportPdfAttachments: PdfAttachmentLink[] = [
+    ...reportView.attachments.map((attachment: ReportAttachment) => ({ id: attachment.id, fileName: attachment.fileName, href: `/api/attachments/${attachment.id}` })),
+    ...inspectionAttachments.map((attachment: InspectionAttachment) => ({ id: attachment.id, fileName: attachment.fileName, href: `/api/attachments/${attachment.id}` })),
+    ...inspectionDocuments.map((document: InspectionDocument) => ({ id: document.id, fileName: document.label || document.fileName, href: `/api/inspection-documents/${document.id}` }))
   ];
   const preview = buildReportPreview(detail.draft);
 
@@ -181,7 +186,7 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
               {reportPdfAttachments.length === 0 ? (
                 <p className="rounded-[1.5rem] border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No customer-authorized PDFs are available for this report.</p>
               ) : (
-                reportPdfAttachments.map((attachment: { id: string; fileName: string; href: string }) => (
+                reportPdfAttachments.map((attachment: PdfAttachmentLink) => (
                   <a key={attachment.id} className="flex items-center justify-between rounded-[1.5rem] border border-slate-200 px-4 py-4 text-sm font-semibold text-slateblue" href={attachment.href}>
                     <span>{attachment.fileName}</span>
                     <span>Download</span>
