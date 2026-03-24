@@ -11,6 +11,8 @@ import { assertTenantContext } from "./permissions";
 import { reportDraftSchema, type ReportDraft, type ReportPrimitiveValue } from "./report-engine";
 import { resolveInspectionServiceFeeTx } from "./service-fees";
 
+type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
 export type BillableItem = {
   id: string;
   tenantId: string;
@@ -566,7 +568,7 @@ export function groupBillableItems(items: BillableItem[]) {
   };
 }
 
-async function buildInspectionServiceFeeItemTx(tx: Prisma.TransactionClient, input: {
+async function buildInspectionServiceFeeItemTx(tx: TransactionClient, input: {
   tenantId: string;
   inspectionId: string;
 }) {
@@ -600,7 +602,7 @@ function subtotalForItems(items: BillableItem[]) {
   return Number(items.reduce((sum, item) => sum + (item.amount ?? 0), 0).toFixed(2));
 }
 
-async function getExistingBillingSummaryRow(tx: Prisma.TransactionClient | typeof prisma, inspectionId: string) {
+async function getExistingBillingSummaryRow(tx: TransactionClient, inspectionId: string) {
   const rows = await tx.$queryRaw`
     SELECT "id", "tenantId", "inspectionId", "customerCompanyId", "siteId", "status", "items", "subtotal", "notes", "createdAt", "updatedAt"
     FROM "InspectionBillingSummary"
@@ -620,7 +622,7 @@ async function getExistingBillingSummaryRow(tx: Prisma.TransactionClient | typeo
   } satisfies PersistedBillingSummary;
 }
 
-export async function syncInspectionBillingSummaryTx(tx: Prisma.TransactionClient, input: {
+export async function syncInspectionBillingSummaryTx(tx: TransactionClient, input: {
   tenantId: string;
   inspectionId: string;
 }) {
