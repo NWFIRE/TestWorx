@@ -12,6 +12,9 @@ export function AddReportTypeControl({ inspectionId }: { inspectionId: string })
   const [selectedType, setSelectedType] = useState<InspectionType>("fire_extinguisher");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const inspectionTypeOptions = Object.entries(inspectionTypeRegistry) as Array<
+    [InspectionType, (typeof inspectionTypeRegistry)[InspectionType]]
+  >;
 
   return (
     <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-3">
@@ -24,9 +27,9 @@ export function AddReportTypeControl({ inspectionId }: { inspectionId: string })
           onChange={(event) => setSelectedType(event.target.value as InspectionType)}
           value={selectedType}
         >
-          {(Object.keys(inspectionTypeRegistry) as InspectionType[]).map((inspectionType) => (
+          {inspectionTypeOptions.map(([inspectionType, inspectionConfig]) => (
             <option key={inspectionType} value={inspectionType}>
-              {inspectionTypeRegistry[inspectionType].label}
+              {inspectionConfig.label}
             </option>
           ))}
         </select>
