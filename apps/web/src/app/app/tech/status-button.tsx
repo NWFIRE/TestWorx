@@ -2,9 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import type { InspectionStatus } from "@prisma/client";
 
 import { updateInspectionStatusAction } from "./actions";
+
+type InspectionStatus = Parameters<typeof updateInspectionStatusAction>[1];
 
 export function StatusButton({ inspectionId, status, label }: { inspectionId: string; status: InspectionStatus; label: string }) {
   const router = useRouter();
