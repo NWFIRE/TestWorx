@@ -82,6 +82,37 @@ type BillingSummaryListRow = {
   items: BillableItem[];
 };
 
+type AdminBillingSummaryDetailRow = {
+  id: string;
+  inspectionId: string;
+  customerCompanyId: string;
+  customerName: string;
+  siteId: string;
+  siteName: string;
+  inspectionDate: Date;
+  technicianName: string | null;
+  status: string;
+  quickbooksSyncStatus: string | null;
+  quickbooksInvoiceId: string | null;
+  quickbooksInvoiceNumber: string | null;
+  quickbooksConnectionMode: string | null;
+  quickbooksSyncedAt: Date | null;
+  quickbooksSyncError: string | null;
+  subtotal: number;
+  notes: string | null;
+  items: JsonValue;
+};
+
+type AuthorizedBillingSummaryRow = {
+  id: string;
+  tenantId: string;
+  inspectionId: string;
+  status: string;
+  subtotal: number;
+  notes: string | null;
+  items: JsonValue;
+};
+
 type FinalizedReportRow = {
   id: string;
   inspectionId: string;
@@ -669,10 +700,10 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
 
   const existing = await getExistingBillingSummaryRow(db, input.inspectionId);
   if (extracted.length === 0) {
-    await db.$executeRaw(Prisma.sql`
-      DELETE FROM "InspectionBillingSummary"
-      WHERE "inspectionId" = ${input.inspectionId} AND "tenantId" = ${input.tenantId}
-    `);
+    await db.$executeRaw`
+  DELETE FROM "InspectionBillingSummary"
+  WHERE "inspectionId" = ${input.inspectionId} AND "tenantId" = ${input.tenantId}
+`;
     return null;
   }
 
@@ -680,7 +711,7 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
   const subtotal = subtotalForItems(mergedItems);
 
   const summaryId = existing?.id ?? crypto.randomUUID();
-  await db.$executeRaw(Prisma.sql`
+  await db.$executeRaw`
     INSERT INTO "InspectionBillingSummary" (
       "id", "tenantId", "inspectionId", "customerCompanyId", "siteId", "status", "items", "subtotal", "notes", "createdAt", "updatedAt"
     ) VALUES (
@@ -705,7 +736,7 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
       "subtotal" = EXCLUDED."subtotal",
       "notes" = COALESCE("InspectionBillingSummary"."notes", EXCLUDED."notes"),
       "updatedAt" = NOW()
-  `);
+  `;
 
   return {
     id: summaryId,
@@ -744,7 +775,7 @@ export async function getAdminBillingSummaries(actor: ActorContext) {
   ensureAdmin(parsedActor);
   const tenantId = parsedActor.tenantId as string;
 
-  const rows = await prisma.$queryRaw<BillingSummaryListRow[]>(Prisma.sql`
+  const rows = (await prisma.$queryRaw`
     SELECT
       s."id",
       s."inspectionId",
@@ -771,7 +802,7 @@ export async function getAdminBillingSummaries(actor: ActorContext) {
     LEFT JOIN "User" tech ON tech."id" = i."assignedTechnicianId"
     WHERE s."tenantId" = ${tenantId}
     ORDER BY i."scheduledStart" DESC
-  `);
+  `) as BillingSummaryListRow[];
 
   return rows.map((row) => {
     const items = normalizeExistingItems((row as unknown as { items: unknown }).items);
@@ -790,26 +821,7 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
   ensureAdmin(parsedActor);
   const tenantId = parsedActor.tenantId as string;
 
-  const rows = await prisma.$queryRaw<Array<{
-    id: string;
-    inspectionId: string;
-    customerCompanyId: string;
-    customerName: string;
-    siteId: string;
-    siteName: string;
-    inspectionDate: Date;
-    technicianName: string | null;
-    status: string;
-    quickbooksSyncStatus: string | null;
-    quickbooksInvoiceId: string | null;
-    quickbooksInvoiceNumber: string | null;
-    quickbooksConnectionMode: string | null;
-    quickbooksSyncedAt: Date | null;
-    quickbooksSyncError: string | null;
-    subtotal: number;
-    notes: string | null;
-    items: JsonValue;
-  }>>(Prisma.sql`
+  const rows = (await prisma.$queryRaw`
     SELECT
       s."id",
       s."inspectionId",
@@ -836,7 +848,7 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
     LEFT JOIN "User" tech ON tech."id" = i."assignedTechnicianId"
     WHERE s."tenantId" = ${tenantId} AND s."inspectionId" = ${inspectionId}
     LIMIT 1
-  `);
+  `) as AdminBillingSummaryDetailRow[];
 
   const row = rows[0];
   if (!row) {
@@ -864,20 +876,12 @@ async function getAuthorizedBillingSummary(actor: ActorContext, summaryId: strin
   const parsedActor = parseActor(actor);
   ensureAdmin(parsedActor);
 
-  const rows = await prisma.$queryRaw<Array<{
-    id: string;
-    tenantId: string;
-    inspectionId: string;
-    status: string;
-    subtotal: number;
-    notes: string | null;
-    items: JsonValue;
-  }>>(Prisma.sql`
+  const rows = (await prisma.$queryRaw`
     SELECT "id", "tenantId", "inspectionId", "status", "subtotal", "notes", "items"
     FROM "InspectionBillingSummary"
     WHERE "id" = ${summaryId} AND "tenantId" = ${parsedActor.tenantId as string}
     LIMIT 1
-  `);
+  `) as AuthorizedBillingSummaryRow[];
 
   const row = rows[0];
   if (!row) {
@@ -898,7 +902,7 @@ export async function updateBillingSummaryStatus(actor: ActorContext, summaryId:
   const { summary } = await getAuthorizedBillingSummary(actor, summaryId);
   const resetQuickBooksFields = summary.status === "invoiced" && status !== "invoiced";
   if (resetQuickBooksFields) {
-    await prisma.$executeRaw(Prisma.sql`
+    await prisma.$executeRaw`
       UPDATE "InspectionBillingSummary"
       SET "status" = ${status},
           "quickbooksSyncStatus" = 'not_synced',
@@ -910,15 +914,15 @@ export async function updateBillingSummaryStatus(actor: ActorContext, summaryId:
           "quickbooksSyncError" = NULL,
           "updatedAt" = NOW()
       WHERE "id" = ${summary.id}
-    `);
+    `;
     return;
   }
 
-  await prisma.$executeRaw(Prisma.sql`
+  await prisma.$executeRaw`
     UPDATE "InspectionBillingSummary"
     SET "status" = ${status}, "updatedAt" = NOW()
     WHERE "id" = ${summary.id}
-  `);
+  `;
 }
 
 export async function updateBillingSummaryNotes(actor: ActorContext, summaryId: string, notes: string) {
@@ -926,7 +930,7 @@ export async function updateBillingSummaryNotes(actor: ActorContext, summaryId: 
   if (summary.status === "invoiced") {
     throw new Error("Invoiced billing summaries must be moved back to review before editing notes.");
   }
-  await prisma.$executeRaw(Prisma.sql`
+  await prisma.$executeRaw`
     UPDATE "InspectionBillingSummary"
     SET "notes" = ${notes || null},
         "quickbooksSyncStatus" = CASE WHEN "quickbooksInvoiceId" IS NULL THEN COALESCE("quickbooksSyncStatus", 'not_synced') ELSE 'not_synced' END,
@@ -938,7 +942,7 @@ export async function updateBillingSummaryNotes(actor: ActorContext, summaryId: 
         "quickbooksSyncError" = NULL,
         "updatedAt" = NOW()
     WHERE "id" = ${summary.id}
-  `);
+  `;
 }
 
 export async function updateBillingSummaryItem(actor: ActorContext, summaryId: string, itemId: string, quantity: number, unitPrice: number | null) {
@@ -956,7 +960,7 @@ export async function updateBillingSummaryItem(actor: ActorContext, summaryId: s
     : item);
   const subtotal = subtotalForItems(items);
 
-  await prisma.$executeRaw(Prisma.sql`
+  await prisma.$executeRaw`
     UPDATE "InspectionBillingSummary"
     SET "items" = ${JSON.stringify(items)}::jsonb,
         "subtotal" = ${subtotal},
@@ -969,5 +973,5 @@ export async function updateBillingSummaryItem(actor: ActorContext, summaryId: s
         "quickbooksSyncError" = NULL,
         "updatedAt" = NOW()
     WHERE "id" = ${summary.id}
-  `);
+  `;
 }
