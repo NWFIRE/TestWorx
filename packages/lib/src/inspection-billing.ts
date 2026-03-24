@@ -601,12 +601,12 @@ function subtotalForItems(items: BillableItem[]) {
 }
 
 async function getExistingBillingSummaryRow(tx: Prisma.TransactionClient | typeof prisma, inspectionId: string) {
-  const rows = await tx.$queryRaw(Prisma.sql`
+  const rows = await tx.$queryRaw`
     SELECT "id", "tenantId", "inspectionId", "customerCompanyId", "siteId", "status", "items", "subtotal", "notes", "createdAt", "updatedAt"
     FROM "InspectionBillingSummary"
     WHERE "inspectionId" = ${inspectionId}
     LIMIT 1
-  `) as PersistedBillingSummaryRow[];
+  ` as PersistedBillingSummaryRow[];
 
   const row = rows[0];
   if (!row) {
