@@ -626,7 +626,9 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
   tenantId: string;
   inspectionId: string;
 }) {
-  const inspectionRows = await tx.$queryRaw<Array<{
+  const db: TransactionClient = tx;
+
+  const inspectionRows = await db.$queryRaw<Array<{
     inspectionId: string;
     customerCompanyId: string;
     siteId: string;
@@ -642,7 +644,7 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
     throw new Error("Inspection not found for billing summary sync.");
   }
 
-  const reports = await tx.$queryRaw<FinalizedReportRow[]>(Prisma.sql`
+  const reports = await db.$queryRaw<FinalizedReportRow[]>(Prisma.sql`
     SELECT r."id", r."inspectionId", r."tenantId", r."contentJson", t."inspectionType"
     FROM "InspectionReport" r
     INNER JOIN "InspectionTask" t ON t."id" = r."inspectionTaskId"
@@ -661,11 +663,11 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
     })
   );
 
-  extracted.push(await buildInspectionServiceFeeItemTx(tx, input));
+  extracted.push(await buildInspectionServiceFeeItemTx(db, input));
 
-  const existing = await getExistingBillingSummaryRow(tx, input.inspectionId);
+  const existing = await getExistingBillingSummaryRow(db, input.inspectionId);
   if (extracted.length === 0) {
-    await tx.$executeRaw(Prisma.sql`
+    await db.$executeRaw(Prisma.sql`
       DELETE FROM "InspectionBillingSummary"
       WHERE "inspectionId" = ${input.inspectionId} AND "tenantId" = ${input.tenantId}
     `);
@@ -676,7 +678,7 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
   const subtotal = subtotalForItems(mergedItems);
 
   const summaryId = existing?.id ?? crypto.randomUUID();
-  await tx.$executeRaw(Prisma.sql`
+  await db.$executeRaw(Prisma.sql`
     INSERT INTO "InspectionBillingSummary" (
       "id", "tenantId", "inspectionId", "customerCompanyId", "siteId", "status", "items", "subtotal", "notes", "createdAt", "updatedAt"
     ) VALUES (
