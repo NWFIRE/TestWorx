@@ -15,6 +15,7 @@ import {
   importQuickBooksCustomers,
   deleteServiceFeeRule,
   importQuickBooksCatalogItems,
+  syncQuickBooksCustomers,
   getTenantBrandingSettings,
   updateServiceFeeRule,
   updateTenantBranding,
@@ -160,6 +161,30 @@ export async function importQuickBooksCustomersAction() {
       throw error;
     }
     const message = error instanceof Error ? error.message : "QuickBooks customer import failed.";
+    redirect(`/app/admin/settings?quickbooks=${encodeURIComponent(message)}`);
+  }
+}
+
+export async function syncQuickBooksCustomersAction() {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    redirect("/login");
+  }
+
+  try {
+    const result = await syncQuickBooksCustomers({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId });
+    revalidatePath("/app/admin");
+    revalidatePath("/app/admin/settings");
+    redirect(
+      `/app/admin/settings?quickbooks=${encodeURIComponent(
+        `Synced QuickBooks customers: ${result.importedCustomerCount} imported, ${result.customersCreated} created, ${result.customersUpdated} updated, ${result.customersSynced} reconciled in TradeWorx.`
+      )}`
+    );
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : "QuickBooks customer sync failed.";
     redirect(`/app/admin/settings?quickbooks=${encodeURIComponent(message)}`);
   }
 }

@@ -112,6 +112,13 @@ type QuickBooksCustomerRecord = {
   contactName: string | null;
 };
 
+type QuickBooksCustomerSyncResult = {
+  importedCustomerCount: number;
+  customersCreated: number;
+  customersUpdated: number;
+  customersSynced: number;
+};
+
 type QuickBooksCatalogFilterInput = {
   search?: string;
   itemType?: string;
@@ -1177,6 +1184,51 @@ export async function syncTradeWorxCustomerCompanyToQuickBooks(actor: ActorConte
     });
     throw normalizedError;
   }
+}
+
+export async function syncQuickBooksCustomers(actor: ActorContext): Promise<QuickBooksCustomerSyncResult> {
+  const parsedActor = parseActor(actor);
+  if (!canManageQuickBooksSync(parsedActor.role)) {
+    throw new Error("Only administrators can sync QuickBooks customers.");
+  }
+
+  const importResult = await importQuickBooksCustomers(actor);
+  const tenantCustomers = await prisma.customerCompany.findMany({
+    where: {
+      tenantId: parsedActor.tenantId as string
+    },
+    select: {
+      id: true
+    }
+  });
+
+  let customersSynced = 0;
+
+  for (const customer of tenantCustomers) {
+    await syncTradeWorxCustomerCompanyToQuickBooks(actor, customer.id);
+    customersSynced += 1;
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      tenantId: parsedActor.tenantId as string,
+      actorUserId: parsedActor.userId,
+      action: "tenant.quickbooks_customers_reconciled",
+      entityType: "Tenant",
+      entityId: parsedActor.tenantId as string,
+      metadata: {
+        importedCustomerCount: importResult.importedCustomerCount,
+        customersCreated: importResult.customersCreated,
+        customersUpdated: importResult.customersUpdated,
+        customersSynced
+      }
+    }
+  });
+
+  return {
+    ...importResult,
+    customersSynced
+  };
 }
 
 async function resolveImportedQuickBooksItem(tenantId: string, item: {

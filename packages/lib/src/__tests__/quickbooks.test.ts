@@ -9,6 +9,7 @@ const prismaMock = {
   },
   customerCompany: {
     findFirst: vi.fn(),
+    findMany: vi.fn(),
     findUnique: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
@@ -575,6 +576,104 @@ describe("quickbooks billing sync hardening", () => {
     expect(prismaMock.customerCompany.update).toHaveBeenCalledWith({
       where: { id: "customer_1" },
       data: { quickbooksCustomerId: "qbo_customer_9" }
+    });
+  });
+
+  it("reconciles QuickBooks customers in both directions for the tenant", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.customerCompany.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: "customer_existing", contactName: null, billingEmail: null, phone: null })
+      .mockResolvedValueOnce({
+        id: "customer_existing",
+        name: "Pinecrest Property Management",
+        contactName: "Alyssa Reed",
+        billingEmail: "billing@pinecrest.example",
+        phone: "312-555-0110",
+        quickbooksCustomerId: "qbo_customer_2"
+      })
+      .mockResolvedValueOnce({
+        id: "customer_new",
+        name: "Acme Tower",
+        contactName: null,
+        billingEmail: "billing@acme.test",
+        phone: "312-555-0101",
+        quickbooksCustomerId: "qbo_customer_1"
+      });
+    prismaMock.customerCompany.findMany.mockResolvedValue([
+      { id: "customer_existing" },
+      { id: "customer_new" }
+    ]);
+    prismaMock.customerCompany.create.mockResolvedValue({ id: "customer_new" });
+    prismaMock.customerCompany.update.mockResolvedValue(undefined);
+    prismaMock.site.findFirst.mockResolvedValue({
+      name: "Pinecrest Tower",
+      addressLine1: "100 State St",
+      addressLine2: null,
+      city: "Chicago",
+      state: "IL",
+      postalCode: "60601"
+    });
+    prismaMock.auditLog.create.mockResolvedValue(undefined);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({
+        QueryResponse: {
+          Customer: [
+            {
+              Id: "qbo_customer_1",
+              DisplayName: "Acme Tower",
+              CompanyName: "Acme Tower",
+              PrimaryEmailAddr: { Address: "billing@acme.test" },
+              PrimaryPhone: { FreeFormNumber: "312-555-0101" }
+            },
+            {
+              Id: "qbo_customer_2",
+              DisplayName: "Pinecrest Property Management",
+              CompanyName: "Pinecrest Property Management"
+            }
+          ]
+        }
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        Customer: { Id: "qbo_customer_2", DisplayName: "Pinecrest Property Management", SyncToken: "1" }
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        Customer: { Id: "qbo_customer_2", DisplayName: "Pinecrest Property Management", SyncToken: "2" }
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        Customer: { Id: "qbo_customer_1", DisplayName: "Acme Tower", SyncToken: "1" }
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        Customer: { Id: "qbo_customer_1", DisplayName: "Acme Tower", SyncToken: "2" }
+      }));
+
+    const { syncQuickBooksCustomers } = await import("../quickbooks");
+
+    const result = await syncQuickBooksCustomers(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" }
+    );
+
+    expect(result).toEqual({
+      importedCustomerCount: 2,
+      customersCreated: 1,
+      customersUpdated: 1,
+      customersSynced: 2
+    });
+    expect(prismaMock.customerCompany.findMany).toHaveBeenCalledWith({
+      where: { tenantId: "tenant_1" },
+      select: { id: true }
+    });
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: "tenant_1",
+        action: "tenant.quickbooks_customers_reconciled",
+        metadata: expect.objectContaining({
+          importedCustomerCount: 2,
+          customersSynced: 2
+        })
+      })
     });
   });
 

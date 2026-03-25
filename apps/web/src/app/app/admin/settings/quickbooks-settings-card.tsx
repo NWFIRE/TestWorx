@@ -37,6 +37,7 @@ export function QuickBooksSettingsCard({
   guidance,
   connectAction,
   disconnectAction,
+  syncCustomersAction,
   importCustomersAction,
   importCatalogAction,
   hasStoredConnection,
@@ -66,6 +67,7 @@ export function QuickBooksSettingsCard({
   guidance: string | null;
   connectAction: () => Promise<void>;
   disconnectAction: () => Promise<void>;
+  syncCustomersAction: () => Promise<void>;
   importCustomersAction: () => Promise<void>;
   importCatalogAction: () => Promise<void>;
   hasStoredConnection: boolean;
@@ -115,7 +117,7 @@ export function QuickBooksSettingsCard({
     <div className="rounded-[2rem] bg-white p-6 shadow-panel">
       <p className="text-sm uppercase tracking-[0.25em] text-slate-500">QuickBooks Online</p>
       <h3 className="mt-2 text-2xl font-semibold text-ink">Invoice sync</h3>
-      <p className="mt-2 text-sm text-slate-500">Connect QuickBooks Online so customer companies can be imported into TradeWorx, TradeWorx customer imports can be pushed into QuickBooks, and finalized billing summaries can be pushed into accounting as invoices from the billing review screen.</p>
+      <p className="mt-2 text-sm text-slate-500">Connect QuickBooks Online so customer companies can be reconciled between QuickBooks and TradeWorx, TradeWorx customer imports can be pushed into QuickBooks, and finalized billing summaries can be pushed into accounting as invoices from the billing review screen.</p>
 
       <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600">
         <div className="flex flex-wrap items-center gap-3">
@@ -183,9 +185,16 @@ export function QuickBooksSettingsCard({
           </button>
         </form>
         {connected ? (
+          <form action={syncCustomersAction}>
+            <button className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-50" disabled={!canImportCatalog} type="submit">
+              Sync Customers
+            </button>
+          </form>
+        ) : null}
+        {connected ? (
           <form action={importCustomersAction}>
             <button className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-50" disabled={!canImportCatalog} type="submit">
-              Import Customers
+              Import Customers Only
             </button>
           </form>
         ) : null}
