@@ -7,6 +7,7 @@ import {
   createServiceFeeRuleAction,
   deleteServiceFeeRuleAction,
   disconnectQuickBooksAction,
+  importQuickBooksCustomersAction,
   importQuickBooksCatalogItemsAction,
   openBillingPortalAction,
   startQuickBooksConnectAction,
@@ -87,6 +88,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
             reconnectRequired={quickBooksSettings.tenant.reconnectRequired}
             statusLabel={quickBooksSettings.tenant.statusLabel}
             guidance={quickBooksSettings.tenant.guidance}
+            importCustomersAction={importQuickBooksCustomersAction}
             importCatalogAction={importQuickBooksCatalogItemsAction}
             hasStoredConnection={quickBooksSettings.tenant.hasStoredConnection}
             importedItemCount={quickBooksSettings.catalog.itemCount}

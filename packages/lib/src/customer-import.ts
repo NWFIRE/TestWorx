@@ -6,6 +6,7 @@ import { actorContextSchema } from "@testworx/types";
 
 import type { JsonObject, JsonValue } from "./json-types";
 import { assertTenantContext } from "./permissions";
+import { getTenantQuickBooksConnectionStatus, syncTradeWorxCustomerCompanyToQuickBooks } from "./quickbooks";
 import { inspectionTypeRegistry } from "./report-config";
 
 const requiredCustomerSiteHeaders = [
@@ -275,6 +276,15 @@ export async function importCustomerSiteCsv(actor: ActorContext, csv: string) {
   let sitesUpdated = 0;
   let assetsCreated = 0;
   let assetsUpdated = 0;
+  let quickBooksCustomersSynced = 0;
+
+  let quickBooksConnected = false;
+  try {
+    const quickBooksStatus = await getTenantQuickBooksConnectionStatus(actor);
+    quickBooksConnected = quickBooksStatus.connection.connected;
+  } catch {
+    quickBooksConnected = false;
+  }
 
   for (const [index, row] of rows.entries()) {
     const existingCustomer = await prisma.customerCompany.findFirst({
@@ -307,6 +317,11 @@ export async function importCustomerSiteCsv(actor: ActorContext, csv: string) {
       customersUpdated += 1;
     } else {
       customersCreated += 1;
+    }
+
+    if (quickBooksConnected) {
+      await syncTradeWorxCustomerCompanyToQuickBooks(actor, customer.id);
+      quickBooksCustomersSynced += 1;
     }
 
     const existingSite = await prisma.site.findFirst({
@@ -398,6 +413,7 @@ export async function importCustomerSiteCsv(actor: ActorContext, csv: string) {
     rowCount: rows.length,
     customersCreated,
     customersUpdated,
+    quickBooksCustomersSynced,
     sitesCreated,
     sitesUpdated,
     assetsCreated,

@@ -21,6 +21,13 @@ const { prismaMock } = vi.hoisted(() => ({
   }
 }));
 
+const { quickBooksMock } = vi.hoisted(() => ({
+  quickBooksMock: {
+    getTenantQuickBooksConnectionStatus: vi.fn(),
+    syncTradeWorxCustomerCompanyToQuickBooks: vi.fn()
+  }
+}));
+
 vi.mock("@testworx/db", async () => {
   const actual = await vi.importActual<typeof import("@testworx/db")>("@testworx/db");
   return {
@@ -29,11 +36,19 @@ vi.mock("@testworx/db", async () => {
   };
 });
 
+vi.mock("../quickbooks", () => ({
+  getTenantQuickBooksConnectionStatus: quickBooksMock.getTenantQuickBooksConnectionStatus,
+  syncTradeWorxCustomerCompanyToQuickBooks: quickBooksMock.syncTradeWorxCustomerCompanyToQuickBooks
+}));
+
 import { getCustomerSiteImportTemplateCsv, importCustomerSiteCsv, parseCustomerSiteImportCsv } from "../customer-import";
 
 describe("customer/site csv import", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    quickBooksMock.getTenantQuickBooksConnectionStatus.mockResolvedValue({
+      connection: { connected: false }
+    });
   });
 
   it("parses the expected csv template headers and row values", () => {
@@ -195,6 +210,34 @@ describe("customer/site csv import", () => {
       assetsCreated: 0,
       assetsUpdated: 1
     });
+  });
+
+  it("syncs imported customers to QuickBooks when the tenant connection is active", async () => {
+    quickBooksMock.getTenantQuickBooksConnectionStatus.mockResolvedValue({
+      connection: { connected: true }
+    });
+    prismaMock.customerCompany.findFirst.mockResolvedValue(null);
+    prismaMock.customerCompany.create.mockResolvedValue({ id: "customer_1" });
+    prismaMock.site.findFirst.mockResolvedValue(null);
+    prismaMock.site.create.mockResolvedValue({ id: "site_1" });
+    quickBooksMock.syncTradeWorxCustomerCompanyToQuickBooks.mockResolvedValue({
+      customerCompanyId: "customer_1",
+      quickbooksCustomerId: "qbo_customer_1"
+    });
+
+    const summary = await importCustomerSiteCsv(
+      { userId: "user_1", role: "office_admin", tenantId: "tenant_1" },
+      [
+        "customerName,contactName,billingEmail,phone,siteName,addressLine1,addressLine2,city,state,postalCode,siteNotes",
+        "Pinecrest Property Management,Alyssa Reed,ap@pinecrestpm.com,312-555-0110,Pinecrest Tower,100 State St,,Chicago,IL,60601,Annual inspections"
+      ].join("\n")
+    );
+
+    expect(quickBooksMock.syncTradeWorxCustomerCompanyToQuickBooks).toHaveBeenCalledWith(
+      { userId: "user_1", role: "office_admin", tenantId: "tenant_1" },
+      "customer_1"
+    );
+    expect(summary.quickBooksCustomersSynced).toBe(1);
   });
 
   it("skips asset creation when asset columns are omitted", async () => {

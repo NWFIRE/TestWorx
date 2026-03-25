@@ -12,6 +12,7 @@ import {
   createServiceFeeRule,
   buildQuickBooksConnectUrl,
   disconnectQuickBooks,
+  importQuickBooksCustomers,
   deleteServiceFeeRule,
   importQuickBooksCatalogItems,
   getTenantBrandingSettings,
@@ -135,6 +136,30 @@ export async function importQuickBooksCatalogItemsAction() {
       throw error;
     }
     const message = error instanceof Error ? error.message : "QuickBooks catalog import failed.";
+    redirect(`/app/admin/settings?quickbooks=${encodeURIComponent(message)}`);
+  }
+}
+
+export async function importQuickBooksCustomersAction() {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    redirect("/login");
+  }
+
+  try {
+    const result = await importQuickBooksCustomers({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId });
+    revalidatePath("/app/admin");
+    revalidatePath("/app/admin/settings");
+    redirect(
+      `/app/admin/settings?quickbooks=${encodeURIComponent(
+        `Imported ${result.importedCustomerCount} QuickBooks customer${result.importedCustomerCount === 1 ? "" : "s"}: ${result.customersCreated} created, ${result.customersUpdated} updated.`
+      )}`
+    );
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : "QuickBooks customer import failed.";
     redirect(`/app/admin/settings?quickbooks=${encodeURIComponent(message)}`);
   }
 }

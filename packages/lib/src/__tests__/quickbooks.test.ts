@@ -8,9 +8,14 @@ const prismaMock = {
     update: vi.fn()
   },
   customerCompany: {
+    findFirst: vi.fn(),
     findUnique: vi.fn(),
+    create: vi.fn(),
     update: vi.fn(),
     updateMany: vi.fn()
+  },
+  site: {
+    findFirst: vi.fn()
   },
   quickBooksCatalogItem: {
     findMany: vi.fn(),
@@ -122,7 +127,7 @@ describe("quickbooks billing sync hardening", () => {
   const fetchMock = vi.fn<typeof fetch>();
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     vi.stubGlobal("fetch", fetchMock);
     vi.stubEnv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/testworx?schema=public");
     vi.stubEnv("AUTH_SECRET", "replace-with-a-long-random-secret");
@@ -147,6 +152,8 @@ describe("quickbooks billing sync hardening", () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
     prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: null });
     prismaMock.customerCompany.update.mockResolvedValue(undefined);
+    prismaMock.customerCompany.update.mockResolvedValue(undefined);
+    prismaMock.site.findFirst.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
     prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue(buildBillingSummary());
     prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
@@ -191,11 +198,14 @@ describe("quickbooks billing sync hardening", () => {
   it("fails closed when QuickBooks returns an incomplete invoice creation response", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
     prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: "qbo_customer_1" });
+    prismaMock.customerCompany.findFirst.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
     prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue(buildBillingSummary());
     prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
 
     fetchMock
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management", SyncToken: "0" } }))
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management" } }))
       .mockResolvedValueOnce(jsonResponse({ QueryResponse: { Account: [{ Id: "income_1" }] } }))
       .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
       .mockResolvedValueOnce(jsonResponse({ Item: { Id: "item_1" } }))
@@ -225,11 +235,14 @@ describe("quickbooks billing sync hardening", () => {
   it("fails when invoice creation appears successful but the returned invoice id cannot be verified", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
     prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: "qbo_customer_1" });
+    prismaMock.customerCompany.update.mockResolvedValue(undefined);
     prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
     prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue(buildBillingSummary());
     prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
 
     fetchMock
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management", SyncToken: "0" } }))
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management" } }))
       .mockResolvedValueOnce(jsonResponse({ QueryResponse: { Account: [{ Id: "income_1" }] } }))
       .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
       .mockResolvedValueOnce(jsonResponse({ Item: { Id: "item_1" } }))
@@ -253,7 +266,7 @@ describe("quickbooks billing sync hardening", () => {
         quickbooksInvoiceNumber: null
       })
     });
-    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(fetchMock).toHaveBeenCalledTimes(7);
   });
 
   it("requires a verified synced invoice before sending to QuickBooks", async () => {
@@ -411,6 +424,7 @@ describe("quickbooks billing sync hardening", () => {
   it("prefers imported QuickBooks catalog items before creating new service items", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
     prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: "qbo_customer_1" });
+    prismaMock.customerCompany.update.mockResolvedValue(undefined);
     prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([
       { quickbooksItemId: "imported_item_1", name: "FE-ANNUAL" }
     ]);
@@ -419,6 +433,8 @@ describe("quickbooks billing sync hardening", () => {
     prismaMock.auditLog.create.mockResolvedValue(undefined);
 
     fetchMock
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management", SyncToken: "0" } }))
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management" } }))
       .mockResolvedValueOnce(jsonResponse({ QueryResponse: { Account: [{ Id: "income_1" }] } }))
       .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
       .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }));
@@ -430,7 +446,7 @@ describe("quickbooks billing sync hardening", () => {
       "inspection_1"
     );
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
   });
 
   it("returns the latest QuickBooks support reference in tenant settings", async () => {
@@ -458,6 +474,107 @@ describe("quickbooks billing sync hardening", () => {
       createdAt: new Date("2026-03-24T14:22:00.000Z"),
       intuitTid: "tid_support_1",
       message: "QuickBooks request failed: Duplicate Document Number Error"
+    });
+  });
+
+  it("imports QuickBooks customers into tenant customer companies", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.customerCompany.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: "customer_existing", contactName: null, billingEmail: null, phone: null });
+    prismaMock.customerCompany.create.mockResolvedValue({ id: "customer_new" });
+    prismaMock.customerCompany.update.mockResolvedValue({ id: "customer_existing" });
+    prismaMock.auditLog.create.mockResolvedValue(undefined);
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      QueryResponse: {
+        Customer: [
+          {
+            Id: "qbo_customer_1",
+            DisplayName: "Acme Tower",
+            CompanyName: "Acme Tower",
+            PrimaryEmailAddr: { Address: "billing@acme.test" },
+            PrimaryPhone: { FreeFormNumber: "312-555-0101" }
+          },
+          {
+            Id: "qbo_customer_2",
+            DisplayName: "Pinecrest Property Management",
+            CompanyName: "Pinecrest Property Management"
+          }
+        ]
+      }
+    }));
+
+    const { importQuickBooksCustomers } = await import("../quickbooks");
+
+    const result = await importQuickBooksCustomers(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" }
+    );
+
+    expect(result).toEqual({
+      importedCustomerCount: 2,
+      customersCreated: 1,
+      customersUpdated: 1
+    });
+    expect(prismaMock.customerCompany.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: "tenant_1",
+        name: "Acme Tower",
+        billingEmail: "billing@acme.test",
+        phone: "312-555-0101",
+        quickbooksCustomerId: "qbo_customer_1"
+      })
+    });
+    expect(prismaMock.customerCompany.update).toHaveBeenCalledWith({
+      where: { id: "customer_existing" },
+      data: expect.objectContaining({
+        name: "Pinecrest Property Management",
+        quickbooksCustomerId: "qbo_customer_2"
+      })
+    });
+  });
+
+  it("syncs a TradeWorx customer company to QuickBooks", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.customerCompany.findFirst.mockResolvedValue({
+      id: "customer_1",
+      name: "Pinecrest Property Management",
+      contactName: "Alyssa Reed",
+      billingEmail: "billing@pinecrest.example",
+      phone: "312-555-0110",
+      quickbooksCustomerId: null
+    });
+    prismaMock.site.findFirst.mockResolvedValue({
+      name: "Pinecrest Tower",
+      addressLine1: "100 State St",
+      addressLine2: null,
+      city: "Chicago",
+      state: "IL",
+      postalCode: "60601"
+    });
+    prismaMock.customerCompany.update.mockResolvedValue(undefined);
+    prismaMock.auditLog.create.mockResolvedValue(undefined);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_9", DisplayName: "Pinecrest Property Management" } }));
+
+    const { syncTradeWorxCustomerCompanyToQuickBooks } = await import("../quickbooks");
+
+    const result = await syncTradeWorxCustomerCompanyToQuickBooks(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "customer_1"
+    );
+
+    expect(result).toEqual({
+      customerCompanyId: "customer_1",
+      quickbooksCustomerId: "qbo_customer_9"
+    });
+    expect(prismaMock.customerCompany.update).toHaveBeenCalledWith({
+      where: { id: "customer_1" },
+      data: { quickbooksCustomerId: "qbo_customer_9" }
     });
   });
 

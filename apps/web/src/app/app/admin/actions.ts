@@ -92,7 +92,7 @@ export async function importCustomerSiteCsvAction(_: { error: string | null; suc
     revalidatePath("/app/admin");
     return {
       error: null,
-      success: `Imported ${summary.rowCount} row(s): ${summary.customersCreated} customer(s) created, ${summary.customersUpdated} customer(s) updated, ${summary.sitesCreated} site(s) created, ${summary.sitesUpdated} site(s) updated, ${summary.assetsCreated} asset(s) created, ${summary.assetsUpdated} asset(s) updated.`
+      success: `Imported ${summary.rowCount} row(s): ${summary.customersCreated} customer(s) created, ${summary.customersUpdated} customer(s) updated, ${summary.sitesCreated} site(s) created, ${summary.sitesUpdated} site(s) updated, ${summary.assetsCreated} asset(s) created, ${summary.assetsUpdated} asset(s) updated.${summary.quickBooksCustomersSynced > 0 ? ` Synced ${summary.quickBooksCustomersSynced} customer${summary.quickBooksCustomersSynced === 1 ? "" : "s"} to QuickBooks.` : ""}`
     };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unable to import CSV.", success: null };
