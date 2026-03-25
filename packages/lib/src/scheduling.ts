@@ -29,8 +29,8 @@ export const inspectionStatusLabels: Record<InspectionStatus | "past_due", strin
 };
 
 export const scheduleInspectionSchema = z.object({
-  customerCompanyId: z.string().min(1),
-  siteId: z.string().min(1),
+  customerCompanyId: z.string().min(1, "Select a customer before creating the inspection."),
+  siteId: z.string().min(1, "Select a site before creating the inspection."),
   inspectionMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   scheduledStart: z.coerce.date(),
   scheduledEnd: z.union([z.null(), z.coerce.date()]).optional(),

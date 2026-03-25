@@ -33,7 +33,21 @@ describe("schedule creation parsing", () => {
     const result = parseCreateInspectionFormData(formData);
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0]?.message).not.toContain("received null");
+      expect(result.error.issues[0]?.message).toBe("Select a customer before creating the inspection.");
+    }
+  });
+
+  it("returns a clear message when the site is missing", () => {
+    const formData = new FormData();
+    formData.set("customerCompanyId", "customer_1");
+    formData.set("scheduledStart", "2026-03-15T09:00:00.000Z");
+    formData.set("type:fire_extinguisher", "true");
+    formData.set("frequency:fire_extinguisher", "ANNUAL");
+
+    const result = parseCreateInspectionFormData(formData);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe("Select a site before creating the inspection.");
     }
   });
 
