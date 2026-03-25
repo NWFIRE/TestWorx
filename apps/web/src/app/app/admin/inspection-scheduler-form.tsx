@@ -2,7 +2,15 @@
 
 import { useActionState, useMemo, useState } from "react";
 import type { CustomerOption, SiteOption, TechnicianOption } from "@testworx/types";
-import { defaultScheduledStartForMonth, editableInspectionStatuses, formatInspectionStatusLabel, getDefaultInspectionRecurrenceFrequency, inspectionTypeRegistry } from "@testworx/lib";
+import {
+  defaultScheduledStartForMonth,
+  editableInspectionStatuses,
+  formatInspectionStatusLabel,
+  genericInspectionSiteName,
+  genericInspectionSiteOptionValue,
+  getDefaultInspectionRecurrenceFrequency,
+  inspectionTypeRegistry
+} from "@testworx/lib";
 
 type InspectionType = keyof typeof inspectionTypeRegistry;
 type RecurrenceFrequency = "ONCE" | "MONTHLY" | "QUARTERLY" | "SEMI_ANNUAL" | "ANNUAL";
@@ -72,7 +80,7 @@ export function InspectionSchedulerForm({
     () => sites.filter((site) => !selectedCustomerId || site.customerCompanyId === selectedCustomerId),
     [selectedCustomerId, sites]
   );
-  const resolvedSiteId = filteredSites.some((site) => site.id === selectedSiteId) ? selectedSiteId : "";
+  const resolvedSiteId = filteredSites.some((site) => site.id === selectedSiteId) || selectedSiteId === genericInspectionSiteOptionValue ? selectedSiteId : "";
 
   return (
     <form action={formAction} className="space-y-6 rounded-[2rem] bg-white p-6 shadow-panel">
@@ -110,13 +118,14 @@ export function InspectionSchedulerForm({
             value={resolvedSiteId}
           >
             <option value="">{selectedCustomerId ? "Select site for customer" : "Select customer first"}</option>
+            {selectedCustomerId ? <option value={genericInspectionSiteOptionValue}>Use generic site ({genericInspectionSiteName})</option> : null}
             {filteredSites.map((site) => <option key={site.id} value={site.id}>{site.name} - {site.city}</option>)}
           </select>
           <p className="mt-2 text-xs text-slate-500">
             {selectedCustomerId
               ? filteredSites.length
-                ? "Only sites for the selected customer are shown."
-                : "No sites are available for this customer yet."
+                ? "Only sites for the selected customer are shown. Choose the generic site option when this visit is not tied to a specific location."
+                : "No sites are available for this customer yet. Use the generic site option to keep scheduling moving safely."
               : "Pick a customer to narrow the site list and avoid mismatched scheduling."}
           </p>
         </div>

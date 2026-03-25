@@ -19,6 +19,12 @@ export type AdminInspectionLifecycle = (typeof adminInspectionLifecycleValues)[n
 const adminInspectionLifecycleFilterSchema = z.enum(["all", ...adminInspectionLifecycleValues]);
 export const unstartedInspectionStatuses = [InspectionStatus.to_be_completed, InspectionStatus.scheduled] as const;
 export const claimableInspectionStatuses = [InspectionStatus.to_be_completed, InspectionStatus.scheduled] as const;
+export const genericInspectionSiteOptionValue = "__generic_site__";
+export const genericInspectionSiteName = "General / No Fixed Site";
+const genericInspectionSiteAddressLine1 = "No fixed service address";
+const genericInspectionSiteCity = "Unknown";
+const genericInspectionSiteState = "Unknown";
+const genericInspectionSitePostalCode = "Unknown";
 export const inspectionStatusLabels: Record<InspectionStatus | "past_due", string> = {
   to_be_completed: "To Be Completed",
   scheduled: "Scheduled",
@@ -355,6 +361,63 @@ function requiresAdvancedRecurrence(tasks: z.infer<typeof scheduleInspectionSche
 }
 export function parseUpdateInspectionFormData(formData: FormData) {
   return parseInspectionFormData(formData);
+}
+
+export async function ensureGenericInspectionSite(
+  actor: ActorContext,
+  customerCompanyId: string
+) {
+  const parsed = parseActor(actor);
+  if (!["tenant_admin", "office_admin", "platform_admin"].includes(parsed.role)) {
+    throw new Error("Only administrators can create generic inspection sites.");
+  }
+
+  const tenantId = parsed.tenantId as string;
+  const customerCompany = await prisma.customerCompany.findFirst({
+    where: {
+      id: customerCompanyId,
+      tenantId
+    },
+    select: {
+      id: true,
+      name: true
+    }
+  });
+
+  if (!customerCompany) {
+    throw new Error("Customer not found.");
+  }
+
+  const existingSite = await prisma.site.findFirst({
+    where: {
+      tenantId,
+      customerCompanyId: customerCompany.id,
+      name: genericInspectionSiteName
+    },
+    select: {
+      id: true
+    }
+  });
+
+  if (existingSite) {
+    return existingSite;
+  }
+
+  return prisma.site.create({
+    data: {
+      tenantId,
+      customerCompanyId: customerCompany.id,
+      name: genericInspectionSiteName,
+      addressLine1: genericInspectionSiteAddressLine1,
+      city: genericInspectionSiteCity,
+      state: genericInspectionSiteState,
+      postalCode: genericInspectionSitePostalCode,
+      notes: `Created automatically for customer ${customerCompany.name} when scheduling without a specific site.`
+    },
+    select: {
+      id: true
+    }
+  });
 }
 
 async function validateSchedulingReferences(tx: Prisma.TransactionClient, tenantId: string, input: z.infer<typeof scheduleInspectionSchema>) {

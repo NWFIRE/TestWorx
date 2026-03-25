@@ -9,6 +9,8 @@ import {
   createInspection,
   importCustomerSiteCsv,
   createInspectionAmendment,
+  ensureGenericInspectionSite,
+  genericInspectionSiteOptionValue,
   getCustomerSiteImportTemplateCsv,
   uploadInspectionDocument,
   parseCreateInspectionFormData,
@@ -25,6 +27,32 @@ import {
 } from "@testworx/lib";
 
 export { getCustomerSiteImportTemplateCsv };
+
+async function resolveInspectionSiteSelection<T extends {
+  customerCompanyId: string;
+  siteId: string;
+}>(
+  actor: {
+    userId: string;
+    role: string;
+    tenantId: string;
+  },
+  input: T
+): Promise<T> {
+  if (input.siteId !== genericInspectionSiteOptionValue) {
+    return input;
+  }
+
+  const genericSite = await ensureGenericInspectionSite(
+    actor,
+    input.customerCompanyId
+  );
+
+  return {
+    ...input,
+    siteId: genericSite.id
+  };
+}
 
 function readExternalDocumentFiles(formData: FormData) {
   return formData
@@ -44,7 +72,9 @@ export async function createInspectionAction(_: { error: string | null; success:
   }
 
   try {
-    const inspection = await createInspection({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, parsed.data);
+    const actor = { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId };
+    const resolvedInput = await resolveInspectionSiteSelection(actor, parsed.data);
+    const inspection = await createInspection(actor, resolvedInput);
     const externalDocumentFiles = readExternalDocumentFiles(formData);
     const requiresSignature = formData.get("externalDocumentsRequireSignature") === "on";
     const customerVisible = formData.get("externalDocumentsCustomerVisible") === "on";
@@ -112,7 +142,9 @@ export async function updateInspectionAction(_: { error: string | null; success:
   }
 
   try {
-    await updateInspection({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId, parsed.data);
+    const actor = { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId };
+    const resolvedInput = await resolveInspectionSiteSelection(actor, parsed.data);
+    await updateInspection(actor, inspectionId, resolvedInput);
     revalidatePath("/app/admin");
     revalidatePath("/app/admin/amendments");
     revalidatePath(`/app/admin/inspections/${inspectionId}`);
@@ -168,10 +200,12 @@ export async function amendInspectionAction(_: { error: string | null; success: 
   }
 
   try {
+    const actor = { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId };
+    const resolvedInput = await resolveInspectionSiteSelection(actor, parsed.data);
     await createInspectionAmendment(
-      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      actor,
       inspectionId,
-      { ...parsed.data, reason }
+      { ...resolvedInput, reason }
     );
     revalidatePath("/app/admin");
     revalidatePath("/app/admin/amendments");
