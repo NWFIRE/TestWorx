@@ -119,6 +119,9 @@ type QuickBooksCustomerSyncResult = {
   customersSynced: number;
 };
 
+type QuickBooksCustomerImportMatchStrategy = "quickbooks_id" | "billing_email" | "display_name" | "new";
+type QuickBooksCustomerOutboundSyncStrategy = "quickbooks_id" | "display_name" | "created";
+
 type QuickBooksCatalogFilterInput = {
   search?: string;
   itemType?: string;
@@ -795,6 +798,74 @@ async function fetchQuickBooksCustomerByDisplayName(connection: QuickBooksTenant
   return normalizeQuickBooksCustomer(response.QueryResponse?.Customer?.[0]);
 }
 
+function normalizeCustomerMatchValue(value: string | null | undefined) {
+  return value?.trim().toLowerCase() || null;
+}
+
+type ExistingCustomerCompanySyncRecord = {
+  id: string;
+  name: string;
+  contactName: string | null;
+  billingEmail: string | null;
+  phone: string | null;
+};
+
+async function findExistingTradeWorxCustomerForQuickBooksImport(
+  tenantId: string,
+  customer: QuickBooksCustomerRecord
+): Promise<{ customer: ExistingCustomerCompanySyncRecord | null; matchStrategy: QuickBooksCustomerImportMatchStrategy }> {
+  const select = {
+    id: true,
+    name: true,
+    contactName: true,
+    billingEmail: true,
+    phone: true
+  } satisfies Prisma.CustomerCompanySelect;
+
+  const existingCustomerByQuickBooksId = await prisma.customerCompany.findFirst({
+    where: {
+      tenantId,
+      quickbooksCustomerId: customer.quickbooksCustomerId
+    },
+    select
+  });
+
+  if (existingCustomerByQuickBooksId) {
+    return { customer: existingCustomerByQuickBooksId, matchStrategy: "quickbooks_id" };
+  }
+
+  const normalizedBillingEmail = normalizeCustomerMatchValue(customer.billingEmail);
+  if (normalizedBillingEmail) {
+    const existingCustomerByBillingEmail = await prisma.customerCompany.findFirst({
+      where: {
+        tenantId,
+        billingEmail: {
+          equals: customer.billingEmail as string,
+          mode: "insensitive"
+        }
+      },
+      select
+    });
+
+    if (existingCustomerByBillingEmail) {
+      return { customer: existingCustomerByBillingEmail, matchStrategy: "billing_email" };
+    }
+  }
+
+  const existingCustomerByDisplayName = await prisma.customerCompany.findFirst({
+    where: {
+      tenantId,
+      name: customer.displayName
+    },
+    select
+  });
+
+  return {
+    customer: existingCustomerByDisplayName,
+    matchStrategy: existingCustomerByDisplayName ? "display_name" : "new"
+  };
+}
+
 function buildQuickBooksCustomerPayload(input: {
   customerName: string;
   billingEmail: string | null;
@@ -947,31 +1018,10 @@ export async function importQuickBooksCustomers(actor: ActorContext) {
     let customersUpdated = 0;
 
     for (const customer of importedCustomers) {
-      const existingCustomerByQuickBooksId = await prisma.customerCompany.findFirst({
-        where: {
-          tenantId: parsedActor.tenantId as string,
-          quickbooksCustomerId: customer.quickbooksCustomerId
-        },
-        select: {
-          id: true,
-          contactName: true,
-          billingEmail: true,
-          phone: true
-        }
-      });
-
-      const existingCustomer = existingCustomerByQuickBooksId ?? await prisma.customerCompany.findFirst({
-        where: {
-          tenantId: parsedActor.tenantId as string,
-          name: customer.displayName
-        },
-        select: {
-          id: true,
-          contactName: true,
-          billingEmail: true,
-          phone: true
-        }
-      });
+      const { customer: existingCustomer, matchStrategy } = await findExistingTradeWorxCustomerForQuickBooksImport(
+        parsedActor.tenantId as string,
+        customer
+      );
 
       if (existingCustomer) {
         await prisma.customerCompany.update({
@@ -985,8 +1035,24 @@ export async function importQuickBooksCustomers(actor: ActorContext) {
           }
         });
         customersUpdated += 1;
+        await prisma.auditLog.create({
+          data: {
+            tenantId: parsedActor.tenantId as string,
+            actorUserId: parsedActor.userId,
+            action: "customer.quickbooks_imported",
+            entityType: "CustomerCompany",
+            entityId: existingCustomer.id,
+            metadata: {
+              importAction: "updated",
+              matchStrategy,
+              quickbooksCustomerId: customer.quickbooksCustomerId,
+              billingEmail: customer.billingEmail,
+              displayName: customer.displayName
+            }
+          }
+        });
       } else {
-        await prisma.customerCompany.create({
+        const createdCustomer = await prisma.customerCompany.create({
           data: {
             tenantId: parsedActor.tenantId as string,
             name: customer.displayName,
@@ -997,6 +1063,22 @@ export async function importQuickBooksCustomers(actor: ActorContext) {
           }
         });
         customersCreated += 1;
+        await prisma.auditLog.create({
+          data: {
+            tenantId: parsedActor.tenantId as string,
+            actorUserId: parsedActor.userId,
+            action: "customer.quickbooks_imported",
+            entityType: "CustomerCompany",
+            entityId: createdCustomer.id,
+            metadata: {
+              importAction: "created",
+              matchStrategy,
+              quickbooksCustomerId: customer.quickbooksCustomerId,
+              billingEmail: customer.billingEmail,
+              displayName: customer.displayName
+            }
+          }
+        });
       }
     }
 
@@ -1091,6 +1173,7 @@ export async function syncTradeWorxCustomerCompanyToQuickBooks(actor: ActorConte
       : await fetchQuickBooksCustomerByDisplayName(tenant, customer.name);
 
     let quickbooksCustomerId: string | null = existingCustomer?.quickbooksCustomerId ?? null;
+    let syncStrategy: QuickBooksCustomerOutboundSyncStrategy = customer.quickbooksCustomerId ? "quickbooks_id" : "display_name";
 
     if (existingCustomer?.quickbooksCustomerId) {
       const updated = await quickBooksApiRequest<{ Customer?: unknown }>(tenant, {
@@ -1117,6 +1200,7 @@ export async function syncTradeWorxCustomerCompanyToQuickBooks(actor: ActorConte
 
       quickbooksCustomerId = normalizeQuickBooksCustomer(updated.Customer)?.quickbooksCustomerId ?? existingCustomer.quickbooksCustomerId;
     } else {
+      syncStrategy = "created";
       const created = await quickBooksApiRequest<{ Customer?: unknown }>(tenant, {
         path: "/customer",
         method: "POST",
@@ -1154,7 +1238,10 @@ export async function syncTradeWorxCustomerCompanyToQuickBooks(actor: ActorConte
         entityId: customer.id,
         metadata: {
           customerCompanyId: customer.id,
-          quickbooksCustomerId
+          quickbooksCustomerId,
+          syncStrategy,
+          billingEmail: customer.billingEmail,
+          customerName: customer.name
         }
       }
     });

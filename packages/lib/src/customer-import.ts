@@ -277,6 +277,7 @@ export async function importCustomerSiteCsv(actor: ActorContext, csv: string) {
   let assetsCreated = 0;
   let assetsUpdated = 0;
   let quickBooksCustomersSynced = 0;
+  let quickBooksCustomerSyncFailures = 0;
 
   let quickBooksConnected = false;
   try {
@@ -320,8 +321,12 @@ export async function importCustomerSiteCsv(actor: ActorContext, csv: string) {
     }
 
     if (quickBooksConnected) {
-      await syncTradeWorxCustomerCompanyToQuickBooks(actor, customer.id);
-      quickBooksCustomersSynced += 1;
+      try {
+        await syncTradeWorxCustomerCompanyToQuickBooks(actor, customer.id);
+        quickBooksCustomersSynced += 1;
+      } catch {
+        quickBooksCustomerSyncFailures += 1;
+      }
     }
 
     const existingSite = await prisma.site.findFirst({
@@ -414,6 +419,7 @@ export async function importCustomerSiteCsv(actor: ActorContext, csv: string) {
     customersCreated,
     customersUpdated,
     quickBooksCustomersSynced,
+    quickBooksCustomerSyncFailures,
     sitesCreated,
     sitesUpdated,
     assetsCreated,

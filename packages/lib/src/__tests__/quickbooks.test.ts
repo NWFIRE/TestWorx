@@ -535,6 +535,77 @@ describe("quickbooks billing sync hardening", () => {
         quickbooksCustomerId: "qbo_customer_2"
       })
     });
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "customer.quickbooks_imported",
+        entityType: "CustomerCompany",
+        entityId: "customer_new",
+        metadata: expect.objectContaining({
+          importAction: "created",
+          matchStrategy: "new"
+        })
+      })
+    });
+  });
+
+  it("matches imported QuickBooks customers by billing email before display name", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.customerCompany.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "customer_email_match",
+        name: "Legacy Customer Name",
+        contactName: null,
+        billingEmail: "billing@acme.test",
+        phone: null
+      });
+    prismaMock.customerCompany.update.mockResolvedValue({ id: "customer_email_match" });
+    prismaMock.auditLog.create.mockResolvedValue(undefined);
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      QueryResponse: {
+        Customer: [
+          {
+            Id: "qbo_customer_email",
+            DisplayName: "Acme Tower",
+            CompanyName: "Acme Tower",
+            PrimaryEmailAddr: { Address: "billing@acme.test" },
+            PrimaryPhone: { FreeFormNumber: "312-555-0101" }
+          }
+        ]
+      }
+    }));
+
+    const { importQuickBooksCustomers } = await import("../quickbooks");
+
+    const result = await importQuickBooksCustomers(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" }
+    );
+
+    expect(result).toEqual({
+      importedCustomerCount: 1,
+      customersCreated: 0,
+      customersUpdated: 1
+    });
+    expect(prismaMock.customerCompany.update).toHaveBeenCalledWith({
+      where: { id: "customer_email_match" },
+      data: expect.objectContaining({
+        name: "Acme Tower",
+        billingEmail: "billing@acme.test",
+        quickbooksCustomerId: "qbo_customer_email"
+      })
+    });
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "customer.quickbooks_imported",
+        entityType: "CustomerCompany",
+        entityId: "customer_email_match",
+        metadata: expect.objectContaining({
+          importAction: "updated",
+          matchStrategy: "billing_email"
+        })
+      })
+    });
   });
 
   it("syncs a TradeWorx customer company to QuickBooks", async () => {
@@ -577,30 +648,77 @@ describe("quickbooks billing sync hardening", () => {
       where: { id: "customer_1" },
       data: { quickbooksCustomerId: "qbo_customer_9" }
     });
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "customer.quickbooks_synced",
+        entityType: "CustomerCompany",
+        entityId: "customer_1",
+        metadata: expect.objectContaining({
+          syncStrategy: "created",
+          quickbooksCustomerId: "qbo_customer_9"
+        })
+      })
+    });
   });
 
   it("reconciles QuickBooks customers in both directions for the tenant", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
-    prismaMock.customerCompany.findFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: "customer_existing", contactName: null, billingEmail: null, phone: null })
-      .mockResolvedValueOnce({
-        id: "customer_existing",
-        name: "Pinecrest Property Management",
-        contactName: "Alyssa Reed",
-        billingEmail: "billing@pinecrest.example",
-        phone: "312-555-0110",
-        quickbooksCustomerId: "qbo_customer_2"
-      })
-      .mockResolvedValueOnce({
-        id: "customer_new",
-        name: "Acme Tower",
-        contactName: null,
-        billingEmail: "billing@acme.test",
-        phone: "312-555-0101",
-        quickbooksCustomerId: "qbo_customer_1"
-      });
+    prismaMock.customerCompany.findFirst.mockImplementation(async ({ where }: { where: Record<string, unknown> }) => {
+      if (where.tenantId === "tenant_1" && where.quickbooksCustomerId === "qbo_customer_1") {
+        return null;
+      }
+
+      if (
+        where.tenantId === "tenant_1"
+        && typeof where.billingEmail === "object"
+        && where.billingEmail !== null
+        && "equals" in where.billingEmail
+        && (where.billingEmail as { equals: string }).equals === "billing@acme.test"
+      ) {
+        return null;
+      }
+
+      if (where.tenantId === "tenant_1" && where.name === "Acme Tower") {
+        return null;
+      }
+
+      if (where.tenantId === "tenant_1" && where.quickbooksCustomerId === "qbo_customer_2") {
+        return null;
+      }
+
+      if (where.tenantId === "tenant_1" && where.name === "Pinecrest Property Management") {
+        return {
+          id: "customer_existing",
+          contactName: null,
+          billingEmail: null,
+          phone: null
+        };
+      }
+
+      if (where.tenantId === "tenant_1" && where.id === "customer_existing") {
+        return {
+          id: "customer_existing",
+          name: "Pinecrest Property Management",
+          contactName: "Alyssa Reed",
+          billingEmail: "billing@pinecrest.example",
+          phone: "312-555-0110",
+          quickbooksCustomerId: "qbo_customer_2"
+        };
+      }
+
+      if (where.tenantId === "tenant_1" && where.id === "customer_new") {
+        return {
+          id: "customer_new",
+          name: "Acme Tower",
+          contactName: null,
+          billingEmail: "billing@acme.test",
+          phone: "312-555-0101",
+          quickbooksCustomerId: "qbo_customer_1"
+        };
+      }
+
+      return null;
+    });
     prismaMock.customerCompany.findMany.mockResolvedValue([
       { id: "customer_existing" },
       { id: "customer_new" }

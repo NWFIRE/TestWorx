@@ -238,6 +238,31 @@ describe("customer/site csv import", () => {
       "customer_1"
     );
     expect(summary.quickBooksCustomersSynced).toBe(1);
+    expect(summary.quickBooksCustomerSyncFailures).toBe(0);
+  });
+
+  it("keeps imported customer data when QuickBooks sync fails", async () => {
+    quickBooksMock.getTenantQuickBooksConnectionStatus.mockResolvedValue({
+      connection: { connected: true }
+    });
+    prismaMock.customerCompany.findFirst.mockResolvedValue(null);
+    prismaMock.customerCompany.create.mockResolvedValue({ id: "customer_1" });
+    prismaMock.site.findFirst.mockResolvedValue(null);
+    prismaMock.site.create.mockResolvedValue({ id: "site_1" });
+    quickBooksMock.syncTradeWorxCustomerCompanyToQuickBooks.mockRejectedValue(new Error("QuickBooks unavailable"));
+
+    const summary = await importCustomerSiteCsv(
+      { userId: "user_1", role: "office_admin", tenantId: "tenant_1" },
+      [
+        "customerName,contactName,billingEmail,phone,siteName,addressLine1,addressLine2,city,state,postalCode,siteNotes",
+        "Pinecrest Property Management,Alyssa Reed,ap@pinecrestpm.com,312-555-0110,Pinecrest Tower,100 State St,,Chicago,IL,60601,Annual inspections"
+      ].join("\n")
+    );
+
+    expect(prismaMock.customerCompany.create).toHaveBeenCalled();
+    expect(prismaMock.site.create).toHaveBeenCalled();
+    expect(summary.quickBooksCustomersSynced).toBe(0);
+    expect(summary.quickBooksCustomerSyncFailures).toBe(1);
   });
 
   it("skips asset creation when asset columns are omitted", async () => {
