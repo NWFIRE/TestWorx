@@ -24,6 +24,19 @@ describe("schedule creation parsing", () => {
     expect(result.success).toBe(false);
   });
 
+  it("normalizes missing customer and site values before validation", () => {
+    const formData = new FormData();
+    formData.set("scheduledStart", "2026-03-15T09:00:00.000Z");
+    formData.set("type:fire_extinguisher", "true");
+    formData.set("frequency:fire_extinguisher", "ANNUAL");
+
+    const result = parseCreateInspectionFormData(formData);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).not.toContain("received null");
+    }
+  });
+
   it("accepts duplicate inspection types in a visit payload", () => {
     const result = scheduleInspectionSchema.safeParse({
       customerCompanyId: "customer_1",

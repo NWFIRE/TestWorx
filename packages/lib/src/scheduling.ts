@@ -319,6 +319,9 @@ function parseInspectionFormData(formData: FormData) {
   const inspectionMonth = String(formData.get("inspectionMonth") ?? "");
   const scheduledStart = String(formData.get("scheduledStart") ?? "") || defaultScheduledStartForMonth(inspectionMonth);
   const scheduledEndValue = String(formData.get("scheduledEnd") ?? "");
+  const customerCompanyId = String(formData.get("customerCompanyId") ?? "").trim();
+  const siteId = String(formData.get("siteId") ?? "").trim();
+  const status = String(formData.get("status") ?? "to_be_completed");
   const assignedTechnicianIds = normalizeAssignedTechnicianIds({
     assignedTechnicianIds: formData.getAll("assignedTechnicianIds").map((value) => String(value)).filter(Boolean),
     assignedTechnicianId: String(formData.get("assignedTechnicianId") ?? "") || null
@@ -327,17 +330,17 @@ function parseInspectionFormData(formData: FormData) {
     .filter((inspectionType) => formData.get(`type:${inspectionType}`) === "true")
     .map((inspectionType) => ({
       inspectionType,
-      frequency: formData.get(`frequency:${inspectionType}`) ?? getDefaultInspectionRecurrenceFrequency(inspectionType)
+      frequency: String(formData.get(`frequency:${inspectionType}`) ?? getDefaultInspectionRecurrenceFrequency(inspectionType))
     }));
 
   return scheduleInspectionSchema.safeParse({
-    customerCompanyId: formData.get("customerCompanyId"),
-    siteId: formData.get("siteId"),
+    customerCompanyId,
+    siteId,
     inspectionMonth: inspectionMonth || undefined,
     scheduledStart: parseDateTimeInput(scheduledStart) ?? scheduledStart,
     scheduledEnd: scheduledEndValue ? parseDateTimeInput(scheduledEndValue) ?? scheduledEndValue : null,
     assignedTechnicianIds,
-    status: formData.get("status") ?? "to_be_completed",
+    status,
     notes: formData.get("notes") || undefined,
     tasks
   });
