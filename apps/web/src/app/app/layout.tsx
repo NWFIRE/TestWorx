@@ -4,19 +4,32 @@ import { auth, signOut } from "@/auth";
 import { buildTenantBrandingCss, getTenantBrandingSettings } from "@testworx/lib";
 import { AppQuickNav } from "./app-quick-nav";
 
+function isStaleSessionError(error: unknown) {
+  return error instanceof Error && /tenant not found|user not found/i.test(error.message);
+}
+
 export default async function AppLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const session = await auth();
   if (!session?.user) {
     redirect("/login");
   }
 
-  const theme = session.user.tenantId
-    ? buildTenantBrandingCss(
+  let theme: React.CSSProperties | undefined;
+
+  if (session.user.tenantId) {
+    try {
+      theme = buildTenantBrandingCss(
         (
           await getTenantBrandingSettings({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId })
         ).branding
-      )
-    : undefined;
+      );
+    } catch (error) {
+      if (isStaleSessionError(error)) {
+        redirect("/login?session=stale");
+      }
+      throw error;
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-100" style={theme}>
