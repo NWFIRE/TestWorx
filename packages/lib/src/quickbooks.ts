@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@testworx/db";
+import { z } from "zod";
 
 import type { ActorContext } from "@testworx/types";
 import { actorContextSchema } from "@testworx/types";
@@ -144,6 +145,15 @@ type QuickBooksFailureLogInput = {
   connectionMode?: QuickBooksConnectionMode | null;
   metadata?: JsonObject;
 };
+
+export const quickBooksCatalogItemInputSchema = z.object({
+  catalogItemId: z.string().trim().optional(),
+  name: z.string().trim().min(1, "Name is required.").max(100),
+  sku: z.string().trim().max(100).optional().transform((value) => value || undefined),
+  itemType: z.enum(["Service", "NonInventory"]).default("Service"),
+  unitPrice: z.number().finite().nonnegative().nullable(),
+  active: z.boolean().default(true)
+});
 
 class QuickBooksRequestError extends Error {
   operation: string;
@@ -770,6 +780,57 @@ function normalizeQuickBooksCatalogItem(item: unknown) {
     incomeAccountName: readQuickBooksStringField(incomeAccountRef, "name"),
     rawJson: item as JsonObject
   };
+}
+
+async function fetchQuickBooksCatalogItemById(connection: QuickBooksTenantConnection, quickbooksItemId: string) {
+  const response = await quickBooksApiRequest<{ Item?: unknown }>(connection, {
+    path: `/item/${encodeURIComponent(quickbooksItemId)}`
+  });
+
+  return response.Item ?? null;
+}
+
+async function upsertTenantQuickBooksCatalogItem(input: {
+  tenantId: string;
+  item: unknown;
+}) {
+  const normalizedItem = normalizeQuickBooksCatalogItem(input.item);
+  if (!normalizedItem) {
+    throw new Error("QuickBooks returned an incomplete catalog item response.");
+  }
+
+  const data = {
+    tenantId: input.tenantId,
+    quickbooksItemId: normalizedItem.quickbooksItemId,
+    name: normalizedItem.name,
+    sku: normalizedItem.sku,
+    itemType: normalizedItem.itemType,
+    active: normalizedItem.active,
+    unitPrice: normalizedItem.unitPrice,
+    incomeAccountId: normalizedItem.incomeAccountId,
+    incomeAccountName: normalizedItem.incomeAccountName,
+    rawJson: normalizedItem.rawJson,
+    importedAt: new Date()
+  };
+
+  const existing = await prisma.quickBooksCatalogItem.findFirst({
+    where: {
+      tenantId: input.tenantId,
+      quickbooksItemId: normalizedItem.quickbooksItemId
+    },
+    select: { id: true }
+  });
+
+  if (existing) {
+    return prisma.quickBooksCatalogItem.update({
+      where: { id: existing.id },
+      data
+    });
+  }
+
+  return prisma.quickBooksCatalogItem.create({
+    data
+  });
 }
 
 async function fetchQuickBooksCompanyName(connection: QuickBooksTenantConnection) {
@@ -1858,6 +1919,193 @@ export async function importQuickBooksCatalogItems(actor: ActorContext) {
       intuitTid: normalizedError.intuitTid,
       rawBody: normalizedError.rawBody,
       connectionMode: tenant.quickbooksConnectionMode
+    });
+    throw normalizedError;
+  }
+}
+
+function assertTradeWorxEditableQuickBooksItemType(itemType: string) {
+  if (itemType !== "Service" && itemType !== "NonInventory") {
+    throw new Error("TradeWorx can only create or edit QuickBooks Service and NonInventory items from Settings right now.");
+  }
+}
+
+export async function createQuickBooksCatalogItem(actor: ActorContext, input: z.infer<typeof quickBooksCatalogItemInputSchema>) {
+  const parsedActor = parseActor(actor);
+  if (!canManageQuickBooksSync(parsedActor.role)) {
+    throw new Error("Only administrators can create QuickBooks products and services.");
+  }
+
+  const parsedInput = quickBooksCatalogItemInputSchema.parse(input);
+  assertTradeWorxEditableQuickBooksItemType(parsedInput.itemType);
+
+  const tenant = await getTenantQuickBooksConnection(parsedActor.tenantId as string);
+  assertQuickBooksConnectionUsable(tenant, "creating products and services");
+
+  try {
+    const incomeAccountId = await resolveIncomeAccountId(tenant);
+    const created = await quickBooksApiRequest<{ Item?: unknown }>(tenant, {
+      path: "/item",
+      method: "POST",
+      body: {
+        Name: sanitizeItemName(parsedInput.name),
+        Type: parsedInput.itemType,
+        Active: parsedInput.active,
+        IncomeAccountRef: { value: incomeAccountId },
+        ...(parsedInput.sku ? { Sku: parsedInput.sku } : {}),
+        ...(parsedInput.unitPrice !== null ? { UnitPrice: parsedInput.unitPrice } : {})
+      }
+    });
+
+    const localItem = await upsertTenantQuickBooksCatalogItem({
+      tenantId: parsedActor.tenantId as string,
+      item: created.Item
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        tenantId: parsedActor.tenantId as string,
+        actorUserId: parsedActor.userId,
+        action: "quickbooks.catalog_item_created",
+        entityType: "QuickBooksCatalogItem",
+        entityId: localItem.id,
+        metadata: {
+          quickbooksItemId: localItem.quickbooksItemId,
+          itemType: localItem.itemType,
+          name: localItem.name,
+          sku: localItem.sku,
+          unitPrice: localItem.unitPrice,
+          active: localItem.active
+        }
+      }
+    });
+
+    return localItem;
+  } catch (error) {
+    const normalizedError = normalizeQuickBooksError({
+      error,
+      fallbackOperation: "catalog.create",
+      connectionMode: tenant.quickbooksConnectionMode
+    });
+    await createQuickBooksFailureAuditLog({
+      tenantId: parsedActor.tenantId as string,
+      actorUserId: parsedActor.userId,
+      action: "quickbooks.catalog_create_failed",
+      operation: normalizedError.operation,
+      message: normalizedError.message,
+      httpStatus: normalizedError.httpStatus,
+      intuitTid: normalizedError.intuitTid,
+      rawBody: normalizedError.rawBody,
+      connectionMode: tenant.quickbooksConnectionMode,
+      entityType: "Tenant",
+      entityId: parsedActor.tenantId as string
+    });
+    throw normalizedError;
+  }
+}
+
+export async function updateQuickBooksCatalogItem(actor: ActorContext, input: z.infer<typeof quickBooksCatalogItemInputSchema>) {
+  const parsedActor = parseActor(actor);
+  if (!canManageQuickBooksSync(parsedActor.role)) {
+    throw new Error("Only administrators can update QuickBooks products and services.");
+  }
+
+  const parsedInput = quickBooksCatalogItemInputSchema.parse(input);
+  if (!parsedInput.catalogItemId) {
+    throw new Error("A catalog item id is required to update a product or service.");
+  }
+
+  const localItem = await prisma.quickBooksCatalogItem.findFirst({
+    where: {
+      id: parsedInput.catalogItemId,
+      tenantId: parsedActor.tenantId as string
+    },
+    select: {
+      id: true,
+      quickbooksItemId: true,
+      itemType: true
+    }
+  });
+
+  if (!localItem) {
+    throw new Error("QuickBooks product or service not found.");
+  }
+
+  assertTradeWorxEditableQuickBooksItemType(localItem.itemType);
+
+  const tenant = await getTenantQuickBooksConnection(parsedActor.tenantId as string);
+  assertQuickBooksConnectionUsable(tenant, "updating products and services");
+
+  try {
+    const currentItem = await fetchQuickBooksCatalogItemById(tenant, localItem.quickbooksItemId);
+    const normalizedCurrentItem = normalizeQuickBooksCatalogItem(currentItem);
+    const syncToken = readQuickBooksStringField(currentItem, "SyncToken");
+
+    if (!normalizedCurrentItem || !syncToken) {
+      throw new Error("QuickBooks did not return enough item data to update this product or service.");
+    }
+
+    assertTradeWorxEditableQuickBooksItemType(normalizedCurrentItem.itemType);
+    const incomeAccountId = normalizedCurrentItem.incomeAccountId ?? await resolveIncomeAccountId(tenant);
+    const updated = await quickBooksApiRequest<{ Item?: unknown }>(tenant, {
+      path: "/item",
+      method: "POST",
+      searchParams: new URLSearchParams({ operation: "update" }),
+      body: {
+        Id: normalizedCurrentItem.quickbooksItemId,
+        SyncToken: syncToken,
+        sparse: true,
+        Name: sanitizeItemName(parsedInput.name),
+        Type: normalizedCurrentItem.itemType,
+        Active: parsedInput.active,
+        IncomeAccountRef: { value: incomeAccountId },
+        Sku: parsedInput.sku ?? "",
+        ...(parsedInput.unitPrice !== null ? { UnitPrice: parsedInput.unitPrice } : {})
+      }
+    });
+
+    const updatedLocalItem = await upsertTenantQuickBooksCatalogItem({
+      tenantId: parsedActor.tenantId as string,
+      item: updated.Item
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        tenantId: parsedActor.tenantId as string,
+        actorUserId: parsedActor.userId,
+        action: "quickbooks.catalog_item_updated",
+        entityType: "QuickBooksCatalogItem",
+        entityId: updatedLocalItem.id,
+        metadata: {
+          quickbooksItemId: updatedLocalItem.quickbooksItemId,
+          itemType: updatedLocalItem.itemType,
+          name: updatedLocalItem.name,
+          sku: updatedLocalItem.sku,
+          unitPrice: updatedLocalItem.unitPrice,
+          active: updatedLocalItem.active
+        }
+      }
+    });
+
+    return updatedLocalItem;
+  } catch (error) {
+    const normalizedError = normalizeQuickBooksError({
+      error,
+      fallbackOperation: "catalog.update",
+      connectionMode: tenant.quickbooksConnectionMode
+    });
+    await createQuickBooksFailureAuditLog({
+      tenantId: parsedActor.tenantId as string,
+      actorUserId: parsedActor.userId,
+      action: "quickbooks.catalog_update_failed",
+      operation: normalizedError.operation,
+      message: normalizedError.message,
+      httpStatus: normalizedError.httpStatus,
+      intuitTid: normalizedError.intuitTid,
+      rawBody: normalizedError.rawBody,
+      connectionMode: tenant.quickbooksConnectionMode,
+      entityType: "QuickBooksCatalogItem",
+      entityId: parsedInput.catalogItemId
     });
     throw normalizedError;
   }

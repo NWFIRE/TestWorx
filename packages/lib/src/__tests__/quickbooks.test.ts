@@ -24,7 +24,9 @@ const prismaMock = {
     groupBy: vi.fn(),
     count: vi.fn(),
     deleteMany: vi.fn(),
-    createMany: vi.fn()
+    createMany: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn()
   },
   inspectionBillingSummary: {
     findUnique: vi.fn(),
@@ -328,6 +330,149 @@ describe("quickbooks billing sync hardening", () => {
         })
       ])
     });
+  });
+
+  it("creates a QuickBooks service item and caches it locally", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItem.create.mockResolvedValue({
+      id: "catalog_1",
+      quickbooksItemId: "qbo_item_9",
+      name: "Annual inspection",
+      sku: "FE-ANNUAL",
+      itemType: "Service",
+      active: true,
+      unitPrice: 95,
+      incomeAccountId: "income_1",
+      incomeAccountName: null,
+      rawJson: {},
+      importedAt: new Date()
+    });
+    prismaMock.auditLog.create.mockResolvedValue(undefined);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ QueryResponse: { Account: [{ Id: "income_1" }] } }))
+      .mockResolvedValueOnce(jsonResponse({
+        Item: {
+          Id: "qbo_item_9",
+          Name: "Annual inspection",
+          Sku: "FE-ANNUAL",
+          Type: "Service",
+          Active: true,
+          UnitPrice: 95,
+          IncomeAccountRef: { value: "income_1" }
+        }
+      }));
+
+    const { createQuickBooksCatalogItem } = await import("../quickbooks");
+
+    const result = await createQuickBooksCatalogItem(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        name: "Annual inspection",
+        sku: "FE-ANNUAL",
+        itemType: "Service",
+        unitPrice: 95,
+        active: true
+      }
+    );
+
+    expect(prismaMock.quickBooksCatalogItem.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: "tenant_1",
+        quickbooksItemId: "qbo_item_9",
+        name: "Annual inspection",
+        sku: "FE-ANNUAL",
+        itemType: "Service",
+        unitPrice: 95
+      })
+    });
+    expect(result).toEqual(expect.objectContaining({
+      id: "catalog_1",
+      quickbooksItemId: "qbo_item_9"
+    }));
+  });
+
+  it("updates an existing QuickBooks service item and refreshes the local cache", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.quickBooksCatalogItem.findFirst
+      .mockResolvedValueOnce({
+        id: "catalog_1",
+        quickbooksItemId: "qbo_item_9",
+        itemType: "Service"
+      })
+      .mockResolvedValueOnce({
+        id: "catalog_1"
+      });
+    prismaMock.quickBooksCatalogItem.update.mockResolvedValue({
+      id: "catalog_1",
+      quickbooksItemId: "qbo_item_9",
+      name: "Annual inspection updated",
+      sku: "FE-ANNUAL",
+      itemType: "Service",
+      active: false,
+      unitPrice: 110,
+      incomeAccountId: "income_1",
+      incomeAccountName: null,
+      rawJson: {},
+      importedAt: new Date()
+    });
+    prismaMock.auditLog.create.mockResolvedValue(undefined);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({
+        Item: {
+          Id: "qbo_item_9",
+          Name: "Annual inspection",
+          Sku: "FE-ANNUAL",
+          Type: "Service",
+          Active: true,
+          UnitPrice: 95,
+          SyncToken: "2",
+          IncomeAccountRef: { value: "income_1" }
+        }
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        Item: {
+          Id: "qbo_item_9",
+          Name: "Annual inspection updated",
+          Sku: "FE-ANNUAL",
+          Type: "Service",
+          Active: false,
+          UnitPrice: 110,
+          IncomeAccountRef: { value: "income_1" }
+        }
+      }));
+
+    const { updateQuickBooksCatalogItem } = await import("../quickbooks");
+
+    const result = await updateQuickBooksCatalogItem(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        catalogItemId: "catalog_1",
+        name: "Annual inspection updated",
+        sku: "FE-ANNUAL",
+        itemType: "Service",
+        unitPrice: 110,
+        active: false
+      }
+    );
+
+    expect(prismaMock.quickBooksCatalogItem.update).toHaveBeenCalledWith({
+      where: { id: "catalog_1" },
+      data: expect.objectContaining({
+        tenantId: "tenant_1",
+        quickbooksItemId: "qbo_item_9",
+        name: "Annual inspection updated",
+        active: false,
+        unitPrice: 110
+      })
+    });
+    expect(result).toEqual(expect.objectContaining({
+      id: "catalog_1",
+      quickbooksItemId: "qbo_item_9",
+      active: false
+    }));
   });
 
   it("blocks catalog access when the stored QuickBooks connection mode does not match the app mode", async () => {

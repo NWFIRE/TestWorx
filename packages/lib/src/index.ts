@@ -1,6 +1,7 @@
 export * from "./auth";
 export * from "./billing";
 export * from "./branding";
+export * from "./customer-companies";
 export * from "./customer-import";
 export * from "./deficiency-service";
 export * from "./env";

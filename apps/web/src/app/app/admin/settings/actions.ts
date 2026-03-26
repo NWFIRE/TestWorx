@@ -9,14 +9,20 @@ import { auth } from "@/auth";
 import {
   createBillingCheckoutSession,
   createBillingPortalSession,
+  createCustomerCompany,
+  createQuickBooksCatalogItem,
   createServiceFeeRule,
   buildQuickBooksConnectUrl,
   disconnectQuickBooks,
   importQuickBooksCustomers,
   deleteServiceFeeRule,
+  customerCompanyInputSchema,
   importQuickBooksCatalogItems,
+  quickBooksCatalogItemInputSchema,
   syncQuickBooksCustomers,
+  updateCustomerCompany,
   getTenantBrandingSettings,
+  updateQuickBooksCatalogItem,
   updateServiceFeeRule,
   updateTenantBranding,
   updateTenantDefaultServiceFee
@@ -51,6 +57,18 @@ async function fileToDataUrl(file: File | null, fallback: string) {
   }
 
   return `data:${file.type || "application/octet-stream"};base64,${Buffer.from(await file.arrayBuffer()).toString("base64")}`;
+}
+
+function buildCustomerResultMessage(result: { quickBooksSynced: boolean; quickBooksSyncError: string | null }, baseMessage: string) {
+  if (result.quickBooksSynced) {
+    return `${baseMessage} QuickBooks customer sync completed.`;
+  }
+
+  if (result.quickBooksSyncError) {
+    return `${baseMessage} TradeWorx saved the customer, but QuickBooks sync needs attention: ${result.quickBooksSyncError}`;
+  }
+
+  return baseMessage;
 }
 
 export async function updateTenantBrandingAction(_: { error: string | null; success: string | null }, formData: FormData) {
@@ -138,6 +156,143 @@ export async function importQuickBooksCatalogItemsAction() {
     }
     const message = error instanceof Error ? error.message : "QuickBooks catalog import failed.";
     redirect(`/app/admin/settings?quickbooks=${encodeURIComponent(message)}`);
+  }
+}
+
+export async function createCustomerCompanyAction(_: { error: string | null; success: string | null }, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { error: "Unauthorized", success: null };
+  }
+
+  const parsed = customerCompanyInputSchema.safeParse({
+    name: String(formData.get("name") ?? ""),
+    contactName: String(formData.get("contactName") ?? ""),
+    billingEmail: String(formData.get("billingEmail") ?? ""),
+    phone: String(formData.get("phone") ?? "")
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid customer input.", success: null };
+  }
+
+  try {
+    const result = await createCustomerCompany(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      parsed.data
+    );
+    revalidatePath("/app/admin");
+    revalidatePath("/app/admin/settings");
+    revalidatePath("/app/admin/billing");
+    return {
+      error: null,
+      success: buildCustomerResultMessage(result, `${result.customer.name} created.`)
+    };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Unable to create customer.", success: null };
+  }
+}
+
+export async function updateCustomerCompanyAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    redirect("/login");
+  }
+
+  const parsed = customerCompanyInputSchema.safeParse({
+    customerCompanyId: String(formData.get("customerCompanyId") ?? ""),
+    name: String(formData.get("name") ?? ""),
+    contactName: String(formData.get("contactName") ?? ""),
+    billingEmail: String(formData.get("billingEmail") ?? ""),
+    phone: String(formData.get("phone") ?? "")
+  });
+
+  if (!parsed.success) {
+    redirect(`/app/admin/settings?customers=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Invalid customer input.")}`);
+  }
+
+  try {
+    const result = await updateCustomerCompany(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      parsed.data
+    );
+    revalidatePath("/app/admin");
+    revalidatePath("/app/admin/settings");
+    revalidatePath("/app/admin/billing");
+    redirect(`/app/admin/settings?customers=${encodeURIComponent(buildCustomerResultMessage(result, `${result.customer.name} updated.`))}`);
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+    redirect(`/app/admin/settings?customers=${encodeURIComponent(error instanceof Error ? error.message : "Unable to update customer.")}`);
+  }
+}
+
+export async function createQuickBooksCatalogItemAction(_: { error: string | null; success: string | null }, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { error: "Unauthorized", success: null };
+  }
+
+  const unitPriceRaw = String(formData.get("unitPrice") ?? "").trim();
+  const parsed = quickBooksCatalogItemInputSchema.safeParse({
+    name: String(formData.get("name") ?? ""),
+    sku: String(formData.get("sku") ?? ""),
+    itemType: String(formData.get("itemType") ?? "Service"),
+    active: formData.get("active") === "on",
+    unitPrice: unitPriceRaw ? Number(unitPriceRaw) : null
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid product or service input.", success: null };
+  }
+
+  try {
+    const item = await createQuickBooksCatalogItem(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      parsed.data
+    );
+    revalidatePath("/app/admin/settings");
+    revalidatePath("/app/admin/billing");
+    return { error: null, success: `${item.name} created in QuickBooks.` };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Unable to create product or service.", success: null };
+  }
+}
+
+export async function updateQuickBooksCatalogItemAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    redirect("/login");
+  }
+
+  const unitPriceRaw = String(formData.get("unitPrice") ?? "").trim();
+  const parsed = quickBooksCatalogItemInputSchema.safeParse({
+    catalogItemId: String(formData.get("catalogItemId") ?? ""),
+    name: String(formData.get("name") ?? ""),
+    sku: String(formData.get("sku") ?? ""),
+    itemType: String(formData.get("itemType") ?? "Service"),
+    active: formData.get("active") === "on",
+    unitPrice: unitPriceRaw ? Number(unitPriceRaw) : null
+  });
+
+  if (!parsed.success) {
+    redirect(`/app/admin/settings?catalog=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Invalid product or service input.")}`);
+  }
+
+  try {
+    const item = await updateQuickBooksCatalogItem(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      parsed.data
+    );
+    revalidatePath("/app/admin/settings");
+    revalidatePath("/app/admin/billing");
+    redirect(`/app/admin/settings?catalog=${encodeURIComponent(`${item.name} updated in QuickBooks.`)}`);
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+    redirect(`/app/admin/settings?catalog=${encodeURIComponent(error instanceof Error ? error.message : "Unable to update product or service.")}`);
   }
 }
 

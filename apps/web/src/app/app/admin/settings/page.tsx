@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { buildTenantBrandingCss, canManageBilling, getTenantBillingSettings, getTenantBrandingSettings, getTenantQuickBooksSettings, getTenantServiceFeeSettings } from "@testworx/lib";
+import { buildTenantBrandingCss, canManageBilling, getTenantBillingSettings, getTenantBrandingSettings, getTenantCustomerCompanySettings, getTenantQuickBooksSettings, getTenantServiceFeeSettings } from "@testworx/lib";
 
 import {
+  createCustomerCompanyAction,
+  createQuickBooksCatalogItemAction,
   createServiceFeeRuleAction,
   deleteServiceFeeRuleAction,
   disconnectQuickBooksAction,
@@ -13,10 +15,14 @@ import {
   openBillingPortalAction,
   startQuickBooksConnectAction,
   startBillingCheckoutAction,
+  updateCustomerCompanyAction,
+  updateQuickBooksCatalogItemAction,
   updateDefaultServiceFeeAction,
   updateServiceFeeRuleAction,
   updateTenantBrandingAction
 } from "./actions";
+import { CustomerManagementCard } from "./customer-management-card";
+import { QuickBooksCatalogManagementCard } from "./quickbooks-catalog-management-card";
 import { ServiceFeeSettingsCard } from "./service-fee-settings-card";
 import { QuickBooksSettingsCard } from "./quickbooks-settings-card";
 import { TenantBrandingForm } from "./tenant-branding-form";
@@ -36,9 +42,10 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   const catalogStatus = typeof params.qboStatus === "string" ? params.qboStatus : Array.isArray(params.qboStatus) ? params.qboStatus[0] ?? "all" : "all";
   const catalogPageRaw = typeof params.qboPage === "string" ? params.qboPage : Array.isArray(params.qboPage) ? params.qboPage[0] ?? "1" : "1";
   const catalogPage = Number.isFinite(Number(catalogPageRaw)) ? Number(catalogPageRaw) : 1;
-  const [billingSettings, brandingSettings, serviceFeeSettings, quickBooksSettings] = await Promise.all([
+  const [billingSettings, brandingSettings, customerCompanies, serviceFeeSettings, quickBooksSettings] = await Promise.all([
     getTenantBillingSettings({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }),
     getTenantBrandingSettings({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }),
+    getTenantCustomerCompanySettings({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }),
     getTenantServiceFeeSettings({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }),
     getTenantQuickBooksSettings(
       { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
@@ -63,6 +70,16 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
           : typeof params.quickbooks === "string"
             ? decodeURIComponent(params.quickbooks)
             : null;
+  const customerNotice = Array.isArray(params.customers)
+    ? params.customers[0]
+    : typeof params.customers === "string"
+      ? decodeURIComponent(params.customers)
+      : null;
+  const catalogNotice = Array.isArray(params.catalog)
+    ? params.catalog[0]
+    : typeof params.catalog === "string"
+      ? decodeURIComponent(params.catalog)
+      : null;
 
   return (
     <section className="space-y-6">
@@ -74,6 +91,12 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
           <TenantBrandingForm action={updateTenantBrandingAction} values={{ ...brandingSettings.branding, billingEmail: brandingSettings.billingEmail }} />
+          <CustomerManagementCard
+            createCustomerAction={createCustomerCompanyAction}
+            customers={customerCompanies}
+            notice={customerNotice}
+            updateCustomerAction={updateCustomerCompanyAction}
+          />
           <QuickBooksSettingsCard
             companyName={quickBooksSettings.tenant.quickbooksCompanyName}
             configured={quickBooksSettings.config.enabled}
@@ -104,6 +127,16 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
             notice={quickBooksNotice}
             realmId={quickBooksSettings.tenant.quickbooksRealmId}
             supportReference={quickBooksSettings.supportReference}
+          />
+          <QuickBooksCatalogManagementCard
+            configured={quickBooksSettings.config.enabled}
+            connected={quickBooksSettings.tenant.connected}
+            createCatalogItemAction={createQuickBooksCatalogItemAction}
+            items={quickBooksSettings.catalog.items}
+            modeMismatch={quickBooksSettings.tenant.modeMismatch}
+            notice={catalogNotice}
+            reconnectRequired={quickBooksSettings.tenant.reconnectRequired}
+            updateCatalogItemAction={updateQuickBooksCatalogItemAction}
           />
           <ServiceFeeSettingsCard
             createRuleAction={createServiceFeeRuleAction}
