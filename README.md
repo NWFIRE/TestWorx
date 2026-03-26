@@ -562,7 +562,7 @@ Deployed test environment checklist:
 4. Point Stripe webhooks at `https://<your-domain>/api/stripe/webhook`.
 5. Run `npm run db:generate` and `npm run db:migrate` before serving traffic.
 6. Run `npm run db:seed` only in non-production/demo environments.
-7. Use `npm run db:bootstrap:pilot` on a fresh live database to create the first real tenant and users.
+7. Use `npm run db:bootstrap:pilot` on a fresh live database to create the first real tenant and users. The bootstrap creates any missing billing plans and defaults new pilot tenants to the Professional plan with an active subscription status.
 8. Verify `npm run db:verify`, `npm run test`, `npm run test:db`, `npm run lint`, and `npm run build` on the release candidate environment.
 9. Validate technician claim, report autosave, report finalization, customer PDF download, and Stripe plan sync against the deployed environment.
 

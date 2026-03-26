@@ -3,6 +3,63 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+async function ensureBillingPlans() {
+  const [starterPlan, professionalPlan] = await Promise.all([
+    prisma.subscriptionPlan.upsert({
+      where: { code: "starter" },
+      update: {
+        name: "Starter",
+        monthlyPriceCents: 19900,
+        maxUsers: 12,
+        featureFlags: { customerPortal: true, reportDrafts: true, advancedRecurrence: false, uploadedInspectionPdfs: false }
+      },
+      create: {
+        code: "starter",
+        name: "Starter",
+        monthlyPriceCents: 19900,
+        maxUsers: 12,
+        featureFlags: { customerPortal: true, reportDrafts: true, advancedRecurrence: false, uploadedInspectionPdfs: false }
+      }
+    }),
+    prisma.subscriptionPlan.upsert({
+      where: { code: "professional" },
+      update: {
+        name: "Professional",
+        monthlyPriceCents: 49900,
+        maxUsers: 50,
+        featureFlags: { customerPortal: true, reportDrafts: true, brandedPdf: true, advancedRecurrence: true, uploadedInspectionPdfs: true }
+      },
+      create: {
+        code: "professional",
+        name: "Professional",
+        monthlyPriceCents: 49900,
+        maxUsers: 50,
+        featureFlags: { customerPortal: true, reportDrafts: true, brandedPdf: true, advancedRecurrence: true, uploadedInspectionPdfs: true }
+      }
+    })
+  ]);
+
+  await prisma.subscriptionPlan.upsert({
+    where: { code: "enterprise" },
+    update: {
+      name: "Enterprise",
+      monthlyPriceCents: 99900,
+      maxUsers: 250,
+      featureFlags: { customerPortal: true, reportDrafts: true, brandedPdf: true, premiumSupport: true, advancedRecurrence: true, uploadedInspectionPdfs: true }
+    },
+    create: {
+      code: "enterprise",
+      name: "Enterprise",
+      monthlyPriceCents: 99900,
+      maxUsers: 250,
+      featureFlags: { customerPortal: true, reportDrafts: true, brandedPdf: true, premiumSupport: true, advancedRecurrence: true, uploadedInspectionPdfs: true }
+    }
+  });
+
+  void starterPlan;
+  return { professionalPlan };
+}
+
 type OptionalBootstrapEnv = {
   PILOT_TIMEZONE?: string;
   PILOT_BILLING_EMAIL?: string;
@@ -82,6 +139,7 @@ async function main() {
   const timezone = optionalEnvValue("PILOT_TIMEZONE") ?? "America/Chicago";
   const billingEmail = optionalEnvValue("PILOT_BILLING_EMAIL");
   const optionalCustomer = validateOptionalCustomerConfig();
+  const { professionalPlan } = await ensureBillingPlans();
 
   assertPassword("PILOT_OFFICE_ADMIN_PASSWORD", officeAdminPassword);
   assertPassword("PILOT_TECHNICIAN_PASSWORD", technicianPassword);
@@ -92,20 +150,36 @@ async function main() {
     optionalCustomer.userPassword ? hash(optionalCustomer.userPassword, 12) : Promise.resolve(null)
   ]);
 
-  const tenant = await prisma.tenant.upsert({
+  const existingTenant = await prisma.tenant.findUnique({
     where: { slug: tenantSlug },
-    update: {
-      name: tenantName,
-      timezone,
-      billingEmail
-    },
-    create: {
-      slug: tenantSlug,
-      name: tenantName,
-      timezone,
-      billingEmail
+    select: {
+      id: true,
+      subscriptionPlanId: true,
+      stripeSubscriptionStatus: true
     }
   });
+
+  const tenant = existingTenant
+    ? await prisma.tenant.update({
+        where: { id: existingTenant.id },
+        data: {
+          name: tenantName,
+          timezone,
+          billingEmail,
+          subscriptionPlanId: existingTenant.subscriptionPlanId ?? professionalPlan.id,
+          stripeSubscriptionStatus: existingTenant.stripeSubscriptionStatus ?? "active"
+        }
+      })
+    : await prisma.tenant.create({
+        data: {
+          slug: tenantSlug,
+          name: tenantName,
+          timezone,
+          billingEmail,
+          subscriptionPlanId: professionalPlan.id,
+          stripeSubscriptionStatus: "active"
+        }
+      });
 
   await prisma.user.upsert({
     where: { email: officeAdminEmail },
