@@ -9,7 +9,8 @@ import {
   getDefaultInspectionRecurrenceFrequency,
   getInspectionDisplayLabels,
   getInspectionDocuments,
-  getInspectionForEdit
+  getInspectionForEdit,
+  isDueAtTimeOfServiceCustomer
 } from "@testworx/lib";
 
 import { amendInspectionAction, deleteInspectionAction, reopenCompletedReportAction, updateInspectionAction, uploadInspectionExternalDocumentAction, uploadInspectionPdfAction } from "../../actions";
@@ -175,6 +176,12 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
           Adjust assignment, status, recurrence mix, scheduling details, and customer-facing PDF delivery for this visit.
         </p>
         {inspectionView.hasStartedWork ? <p className="mt-3 text-sm text-amber-700">Started work is protected. Changes here create an audited follow-up visit instead of rewriting history.</p> : null}
+        {isDueAtTimeOfServiceCustomer(inspection.customerCompany) ? (
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
+            <p className="font-semibold uppercase tracking-[0.16em]">Payment due at time of service</p>
+            <p className="mt-2">Technicians should collect payment on site for this customer and confirm collection before closing the visit.</p>
+          </div>
+        ) : null}
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <div className="rounded-2xl border border-slate-200 p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Visit relationship</p>

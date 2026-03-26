@@ -182,7 +182,28 @@ export async function createCustomerCompanyAction(_: { error: string | null; suc
     name: String(formData.get("name") ?? ""),
     contactName: String(formData.get("contactName") ?? ""),
     billingEmail: String(formData.get("billingEmail") ?? ""),
-    phone: String(formData.get("phone") ?? "")
+    phone: String(formData.get("phone") ?? ""),
+    serviceAddressLine1: String(formData.get("serviceAddressLine1") ?? ""),
+    serviceAddressLine2: String(formData.get("serviceAddressLine2") ?? ""),
+    serviceCity: String(formData.get("serviceCity") ?? ""),
+    serviceState: String(formData.get("serviceState") ?? ""),
+    servicePostalCode: String(formData.get("servicePostalCode") ?? ""),
+    serviceCountry: String(formData.get("serviceCountry") ?? ""),
+    billingAddressSameAsService: formData.get("billingAddressSameAsService") === "on",
+    billingAddressLine1: String(formData.get("billingAddressLine1") ?? ""),
+    billingAddressLine2: String(formData.get("billingAddressLine2") ?? ""),
+    billingCity: String(formData.get("billingCity") ?? ""),
+    billingState: String(formData.get("billingState") ?? ""),
+    billingPostalCode: String(formData.get("billingPostalCode") ?? ""),
+    billingCountry: String(formData.get("billingCountry") ?? ""),
+    notes: String(formData.get("notes") ?? ""),
+    isActive: formData.get("isActive") === "on",
+    paymentTermsCode: String(formData.get("paymentTermsCode") ?? "due_on_receipt"),
+    customPaymentTermsLabel: String(formData.get("customPaymentTermsLabel") ?? ""),
+    customPaymentTermsDays: (() => {
+      const raw = String(formData.get("customPaymentTermsDays") ?? "").trim();
+      return raw ? Number(raw) : undefined;
+    })()
   });
 
   if (!parsed.success) {
@@ -219,7 +240,28 @@ export async function updateCustomerCompanyAction(formData: FormData) {
     name: String(formData.get("name") ?? ""),
     contactName: String(formData.get("contactName") ?? ""),
     billingEmail: String(formData.get("billingEmail") ?? ""),
-    phone: String(formData.get("phone") ?? "")
+    phone: String(formData.get("phone") ?? ""),
+    serviceAddressLine1: String(formData.get("serviceAddressLine1") ?? ""),
+    serviceAddressLine2: String(formData.get("serviceAddressLine2") ?? ""),
+    serviceCity: String(formData.get("serviceCity") ?? ""),
+    serviceState: String(formData.get("serviceState") ?? ""),
+    servicePostalCode: String(formData.get("servicePostalCode") ?? ""),
+    serviceCountry: String(formData.get("serviceCountry") ?? ""),
+    billingAddressSameAsService: formData.get("billingAddressSameAsService") === "on",
+    billingAddressLine1: String(formData.get("billingAddressLine1") ?? ""),
+    billingAddressLine2: String(formData.get("billingAddressLine2") ?? ""),
+    billingCity: String(formData.get("billingCity") ?? ""),
+    billingState: String(formData.get("billingState") ?? ""),
+    billingPostalCode: String(formData.get("billingPostalCode") ?? ""),
+    billingCountry: String(formData.get("billingCountry") ?? ""),
+    notes: String(formData.get("notes") ?? ""),
+    isActive: formData.get("isActive") === "on",
+    paymentTermsCode: String(formData.get("paymentTermsCode") ?? "due_on_receipt"),
+    customPaymentTermsLabel: String(formData.get("customPaymentTermsLabel") ?? ""),
+    customPaymentTermsDays: (() => {
+      const raw = String(formData.get("customPaymentTermsDays") ?? "").trim();
+      return raw ? Number(raw) : undefined;
+    })()
   });
 
   if (!parsed.success) {

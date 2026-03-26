@@ -932,29 +932,32 @@ function buildQuickBooksCustomerPayload(input: {
   billingEmail: string | null;
   phone: string | null;
   siteName?: string | null;
-  addressLine1?: string | null;
-  addressLine2?: string | null;
-  city?: string | null;
-  state?: string | null;
-  postalCode?: string | null;
+  billingAddressLine1?: string | null;
+  billingAddressLine2?: string | null;
+  billingCity?: string | null;
+  billingState?: string | null;
+  billingPostalCode?: string | null;
+  billingCountry?: string | null;
+  notes?: string | null;
 }) {
   return {
     DisplayName: input.customerName,
     CompanyName: input.customerName,
     ...(input.billingEmail ? { PrimaryEmailAddr: { Address: input.billingEmail } } : {}),
     ...(input.phone ? { PrimaryPhone: { FreeFormNumber: input.phone } } : {}),
-    ...(input.addressLine1
+    ...(input.billingAddressLine1
       ? {
           BillAddr: {
-            Line1: input.addressLine1,
-            ...(input.addressLine2 ? { Line2: input.addressLine2 } : {}),
-            ...(input.city ? { City: input.city } : {}),
-            ...(input.state ? { CountrySubDivisionCode: input.state } : {}),
-            ...(input.postalCode ? { PostalCode: input.postalCode } : {})
+            Line1: input.billingAddressLine1,
+            ...(input.billingAddressLine2 ? { Line2: input.billingAddressLine2 } : {}),
+            ...(input.billingCity ? { City: input.billingCity } : {}),
+            ...(input.billingState ? { CountrySubDivisionCode: input.billingState } : {}),
+            ...(input.billingPostalCode ? { PostalCode: input.billingPostalCode } : {}),
+            ...(input.billingCountry ? { Country: input.billingCountry } : {})
           }
         }
       : {}),
-    ...(input.siteName ? { Notes: `Created by TradeWorx for ${input.siteName}` } : {})
+    ...((input.notes || input.siteName) ? { Notes: input.notes ?? `Created by TradeWorx for ${input.siteName}` } : {})
   };
 }
 
@@ -1085,16 +1088,16 @@ export async function importQuickBooksCustomers(actor: ActorContext) {
       );
 
       if (existingCustomer) {
-        await prisma.customerCompany.update({
-          where: { id: existingCustomer.id },
-          data: {
-            name: customer.displayName,
-            quickbooksCustomerId: customer.quickbooksCustomerId,
-            contactName: customer.contactName ?? existingCustomer.contactName,
-            billingEmail: customer.billingEmail ?? existingCustomer.billingEmail,
-            phone: customer.phone ?? existingCustomer.phone
-          }
-        });
+      await prisma.customerCompany.update({
+        where: { id: existingCustomer.id },
+        data: {
+          name: customer.displayName,
+          quickbooksCustomerId: customer.quickbooksCustomerId,
+          contactName: customer.contactName ?? existingCustomer.contactName,
+          billingEmail: customer.billingEmail ?? existingCustomer.billingEmail,
+          phone: customer.phone ?? existingCustomer.phone
+        }
+      });
         customersUpdated += 1;
         await prisma.auditLog.create({
           data: {
@@ -1120,6 +1123,9 @@ export async function importQuickBooksCustomers(actor: ActorContext) {
             contactName: customer.contactName,
             billingEmail: customer.billingEmail,
             phone: customer.phone,
+            billingAddressSameAsService: true,
+            paymentTermsCode: "due_on_receipt",
+            isActive: true,
             quickbooksCustomerId: customer.quickbooksCustomerId
           }
         });
@@ -1204,6 +1210,19 @@ export async function syncTradeWorxCustomerCompanyToQuickBooks(actor: ActorConte
       contactName: true,
       billingEmail: true,
       phone: true,
+      billingAddressLine1: true,
+      billingAddressLine2: true,
+      billingCity: true,
+      billingState: true,
+      billingPostalCode: true,
+      billingCountry: true,
+      serviceAddressLine1: true,
+      serviceAddressLine2: true,
+      serviceCity: true,
+      serviceState: true,
+      servicePostalCode: true,
+      serviceCountry: true,
+      notes: true,
       quickbooksCustomerId: true
     }
   });
@@ -1250,11 +1269,13 @@ export async function syncTradeWorxCustomerCompanyToQuickBooks(actor: ActorConte
             billingEmail: customer.billingEmail,
             phone: customer.phone,
             siteName: primarySite?.name ?? null,
-            addressLine1: primarySite?.addressLine1 ?? null,
-            addressLine2: primarySite?.addressLine2 ?? null,
-            city: primarySite?.city ?? null,
-            state: primarySite?.state ?? null,
-            postalCode: primarySite?.postalCode ?? null
+            billingAddressLine1: customer.billingAddressLine1 ?? customer.serviceAddressLine1 ?? primarySite?.addressLine1 ?? null,
+            billingAddressLine2: customer.billingAddressLine2 ?? customer.serviceAddressLine2 ?? primarySite?.addressLine2 ?? null,
+            billingCity: customer.billingCity ?? customer.serviceCity ?? primarySite?.city ?? null,
+            billingState: customer.billingState ?? customer.serviceState ?? primarySite?.state ?? null,
+            billingPostalCode: customer.billingPostalCode ?? customer.servicePostalCode ?? primarySite?.postalCode ?? null,
+            billingCountry: customer.billingCountry ?? customer.serviceCountry ?? null,
+            notes: customer.notes ?? null
           })
         }
       });
@@ -1270,11 +1291,13 @@ export async function syncTradeWorxCustomerCompanyToQuickBooks(actor: ActorConte
           billingEmail: customer.billingEmail,
           phone: customer.phone,
           siteName: primarySite?.name ?? null,
-          addressLine1: primarySite?.addressLine1 ?? null,
-          addressLine2: primarySite?.addressLine2 ?? null,
-          city: primarySite?.city ?? null,
-          state: primarySite?.state ?? null,
-          postalCode: primarySite?.postalCode ?? null
+          billingAddressLine1: customer.billingAddressLine1 ?? customer.serviceAddressLine1 ?? primarySite?.addressLine1 ?? null,
+          billingAddressLine2: customer.billingAddressLine2 ?? customer.serviceAddressLine2 ?? primarySite?.addressLine2 ?? null,
+          billingCity: customer.billingCity ?? customer.serviceCity ?? primarySite?.city ?? null,
+          billingState: customer.billingState ?? customer.serviceState ?? primarySite?.state ?? null,
+          billingPostalCode: customer.billingPostalCode ?? customer.servicePostalCode ?? primarySite?.postalCode ?? null,
+          billingCountry: customer.billingCountry ?? customer.serviceCountry ?? null,
+          notes: customer.notes ?? null
         })
       });
 

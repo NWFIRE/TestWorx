@@ -1,0 +1,20 @@
+ALTER TABLE "CustomerCompany"
+ADD COLUMN "serviceAddressLine1" TEXT,
+ADD COLUMN "serviceAddressLine2" TEXT,
+ADD COLUMN "serviceCity" TEXT,
+ADD COLUMN "serviceState" TEXT,
+ADD COLUMN "servicePostalCode" TEXT,
+ADD COLUMN "serviceCountry" TEXT,
+ADD COLUMN "billingAddressSameAsService" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN "billingAddressLine1" TEXT,
+ADD COLUMN "billingAddressLine2" TEXT,
+ADD COLUMN "billingCity" TEXT,
+ADD COLUMN "billingState" TEXT,
+ADD COLUMN "billingPostalCode" TEXT,
+ADD COLUMN "billingCountry" TEXT,
+ADD COLUMN "notes" TEXT,
+ADD COLUMN "isActive" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN "paymentTermsCode" TEXT NOT NULL DEFAULT 'due_on_receipt',
+ADD COLUMN "customPaymentTermsLabel" TEXT,
+ADD COLUMN "customPaymentTermsDays" INTEGER;
+

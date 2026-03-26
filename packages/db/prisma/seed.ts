@@ -258,13 +258,60 @@ async function main() {
   });
 
   const pinecrest = await prisma.customerCompany.create({
-    data: { tenantId: tenant.id, name: "Pinecrest Property Management", contactName: "Alyssa Reed", billingEmail: "ap@pinecrestpm.com", phone: "312-555-0110" }
+    data: {
+      tenantId: tenant.id,
+      name: "Pinecrest Property Management",
+      contactName: "Alyssa Reed",
+      billingEmail: "ap@pinecrestpm.com",
+      phone: "312-555-0110",
+      serviceAddressLine1: "1501 Pine Street",
+      serviceCity: "Chicago",
+      serviceState: "IL",
+      servicePostalCode: "60611",
+      serviceCountry: "USA",
+      billingAddressSameAsService: false,
+      billingAddressLine1: "PO Box 1842",
+      billingCity: "Chicago",
+      billingState: "IL",
+      billingPostalCode: "60690",
+      billingCountry: "USA",
+      paymentTermsCode: "net_30",
+      notes: "Prefers invoice summary emailed to AP and facilities."
+    }
   });
   const harbor = await prisma.customerCompany.create({
-    data: { tenantId: tenant.id, name: "Harbor View Hospital", contactName: "Jon Morales", billingEmail: "facilities@harborview.org", phone: "312-555-0111" }
+    data: {
+      tenantId: tenant.id,
+      name: "Harbor View Hospital",
+      contactName: "Jon Morales",
+      billingEmail: "facilities@harborview.org",
+      phone: "312-555-0111",
+      serviceAddressLine1: "220 Harbor Drive",
+      serviceCity: "Chicago",
+      serviceState: "IL",
+      servicePostalCode: "60616",
+      serviceCountry: "USA",
+      billingAddressSameAsService: true,
+      paymentTermsCode: "net_15",
+      notes: "Technicians must check in with security before entering plant rooms."
+    }
   });
   const summit = await prisma.customerCompany.create({
-    data: { tenantId: tenant.id, name: "Summit Logistics", contactName: "Dana Cho", billingEmail: "ops@summitlogistics.com", phone: "312-555-0112" }
+    data: {
+      tenantId: tenant.id,
+      name: "Summit Logistics",
+      contactName: "Dana Cho",
+      billingEmail: "ops@summitlogistics.com",
+      phone: "312-555-0112",
+      serviceAddressLine1: "9900 Summit Parkway",
+      serviceCity: "Bedford Park",
+      serviceState: "IL",
+      servicePostalCode: "60638",
+      serviceCountry: "USA",
+      billingAddressSameAsService: true,
+      paymentTermsCode: "due_on_receipt",
+      notes: "Collect payment on site for non-contracted emergency work."
+    }
   });
 
   const [platformAdmin, tenantAdmin, officeAdmin, tech1, tech2, tech3, customer1, customer2, customer3] = await Promise.all([
@@ -583,7 +630,20 @@ async function main() {
   });
 
   const northshoreCustomer = await prisma.customerCompany.create({
-    data: { tenantId: northshoreTenant.id, name: "Lakefront Residences", contactName: "Mina Patel", billingEmail: "ap@lakefrontresidences.com", phone: "847-555-0140" }
+    data: {
+      tenantId: northshoreTenant.id,
+      name: "Lakefront Residences",
+      contactName: "Mina Patel",
+      billingEmail: "ap@lakefrontresidences.com",
+      phone: "847-555-0140",
+      serviceAddressLine1: "10 Lakefront Plaza",
+      serviceCity: "Evanston",
+      serviceState: "IL",
+      servicePostalCode: "60201",
+      serviceCountry: "USA",
+      billingAddressSameAsService: true,
+      paymentTermsCode: "net_30"
+    }
   });
 
   const [northshoreAdmin, northshoreTech, northshoreCustomerUser] = await Promise.all([

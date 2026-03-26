@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { formatInspectionStatusLabel, getTechnicianDashboardData, pickEarliestNextDueAt } from "@testworx/lib";
+import { formatInspectionStatusLabel, getTechnicianDashboardData, isDueAtTimeOfServiceCustomer, pickEarliestNextDueAt } from "@testworx/lib";
 
 import { AddReportTypeControl } from "./add-report-type-control";
 import { ClaimButton } from "./claim-button";
@@ -59,6 +59,18 @@ function taskActionLabel(task: { inspectionType: string; displayLabel?: string; 
 
 function correctionStateLabel(state: string | null | undefined) {
   return state ? state.replaceAll("_", " ") : "";
+}
+
+function PaymentCollectionBadge({ visible }: { visible: boolean }) {
+  if (!visible) {
+    return null;
+  }
+
+  return (
+    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-900">
+      Payment due on site
+    </span>
+  );
 }
 
 export default async function TechnicianPage({
@@ -151,12 +163,16 @@ export default async function TechnicianPage({
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="text-lg font-semibold text-ink">{(inspection as typeof inspection & { primaryTitle?: string }).primaryTitle ?? inspection.site.name}</p>
                           <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[(inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status]}`}>{inspectionStatusLabel((inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status)}</span>
+                          <PaymentCollectionBadge visible={isDueAtTimeOfServiceCustomer(inspection.customerCompany)} />
                         </div>
                         <p className="mt-2 text-sm text-slate-500">
                           {format(inspection.scheduledStart, "EEE, MMM d h:mm a")} | {((inspection as typeof inspection & { secondaryTitle?: string }).secondaryTitle ?? inspection.customerCompany.name)}
                         </p>
                         <p className="mt-1 text-sm text-slate-500">Assigned team: {((inspection as typeof inspection & { assignedTechnicianNames?: string[] }).assignedTechnicianNames ?? []).join(", ")}</p>
                         <p className="mt-1 text-sm text-slate-500">Due date: {nextDueLabel(nextDue, inspection.scheduledStart)}</p>
+                        {isDueAtTimeOfServiceCustomer(inspection.customerCompany) ? (
+                          <p className="mt-1 text-sm font-semibold text-amber-800">Collect payment before leaving the site.</p>
+                        ) : null}
                         <p className="mt-1 text-sm text-slate-500">Report types: {inspection.tasks.map((task: DashboardTask) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
                         <p className="mt-1 text-sm text-slate-500">{finalizedTaskCount} of {inspection.tasks.length} report task{inspection.tasks.length === 1 ? "" : "s"} finalized</p>
                         <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -246,11 +262,15 @@ export default async function TechnicianPage({
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="text-lg font-semibold text-ink">{(inspection as typeof inspection & { primaryTitle?: string }).primaryTitle ?? inspection.site.name}</p>
                           <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[(inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status]}`}>{inspectionStatusLabel((inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status)}</span>
+                          <PaymentCollectionBadge visible={isDueAtTimeOfServiceCustomer(inspection.customerCompany)} />
                         </div>
                         <p className="mt-2 text-sm text-slate-500">
                           {format(inspection.scheduledStart, "MMM d, h:mm a")} | {((inspection as typeof inspection & { secondaryTitle?: string }).secondaryTitle ?? inspection.customerCompany.name)}
                         </p>
                         <p className="mt-1 text-sm text-slate-500">Due date: {nextDueLabel(nextDue, inspection.scheduledStart)}</p>
+                        {isDueAtTimeOfServiceCustomer(inspection.customerCompany) ? (
+                          <p className="mt-1 text-sm font-semibold text-amber-800">Collect payment before leaving the site.</p>
+                        ) : null}
                         <p className="mt-1 text-sm text-slate-500">{inspection.tasks.length} report task{inspection.tasks.length === 1 ? "" : "s"} ready to claim</p>
                       </div>
                       <ClaimButton inspectionId={inspection.id} />

@@ -231,19 +231,25 @@ async function main() {
     const customerCompany = existingCustomerCompany
       ? await prisma.customerCompany.update({
           where: { id: existingCustomerCompany.id },
-          data: {
-            contactName: optionalCustomer.contactName,
-            billingEmail: optionalCustomer.billingEmail,
-            phone: optionalCustomer.phone
-          }
-        })
+        data: {
+          contactName: optionalCustomer.contactName,
+          billingEmail: optionalCustomer.billingEmail,
+          phone: optionalCustomer.phone,
+          billingAddressSameAsService: true,
+          isActive: true,
+          paymentTermsCode: "due_on_receipt"
+        }
+      })
       : await prisma.customerCompany.create({
           data: {
             tenantId: tenant.id,
             name: optionalCustomer.companyName,
             contactName: optionalCustomer.contactName,
             billingEmail: optionalCustomer.billingEmail,
-            phone: optionalCustomer.phone
+            phone: optionalCustomer.phone,
+            billingAddressSameAsService: true,
+            isActive: true,
+            paymentTermsCode: "due_on_receipt"
           }
         });
 

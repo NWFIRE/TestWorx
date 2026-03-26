@@ -196,21 +196,39 @@ model User {
 }
 
 model CustomerCompany {
-  id           String   @id @default(cuid())
-  tenantId     String
-  name         String
-  contactName  String?
-  billingEmail String?
-  phone        String?
-  quickbooksCustomerId String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  tenant       Tenant   @relation(fields: [tenantId], references: [id])
-  users        User[]
-  sites        Site[]
-  inspections  Inspection[]
-  billingSummaries InspectionBillingSummary[]
-  serviceFeeRules ServiceFeeRule[]
+  id                        String   @id @default(cuid())
+  tenantId                  String
+  name                      String
+  contactName               String?
+  billingEmail              String?
+  phone                     String?
+  serviceAddressLine1       String?
+  serviceAddressLine2       String?
+  serviceCity               String?
+  serviceState              String?
+  servicePostalCode         String?
+  serviceCountry            String?
+  billingAddressSameAsService Boolean @default(true)
+  billingAddressLine1       String?
+  billingAddressLine2       String?
+  billingCity               String?
+  billingState              String?
+  billingPostalCode         String?
+  billingCountry            String?
+  notes                     String?
+  isActive                  Boolean  @default(true)
+  paymentTermsCode          String   @default("due_on_receipt")
+  customPaymentTermsLabel   String?
+  customPaymentTermsDays    Int?
+  quickbooksCustomerId      String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+  tenant                    Tenant   @relation(fields: [tenantId], references: [id])
+  users                     User[]
+  sites                     Site[]
+  inspections               Inspection[]
+  billingSummaries          InspectionBillingSummary[]
+  serviceFeeRules           ServiceFeeRule[]
 }
 
 model Site {

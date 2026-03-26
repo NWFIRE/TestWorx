@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getInspectionDisplayLabels, getInspectionReportDraft } from "@testworx/lib";
+import { getInspectionDisplayLabels, getInspectionReportDraft, isDueAtTimeOfServiceCustomer } from "@testworx/lib";
 
 import { ReportEditor } from "../../../report-editor";
 
@@ -67,6 +67,9 @@ export default async function TechnicianReportPage({ params }: { params: Promise
         siteName: inspectionDisplay.primaryTitle,
         customerName: inspectionDisplay.secondaryTitle || report.inspection.customerCompany.name,
         scheduledDateLabel: format(report.inspection.scheduledStart, "MMM d, yyyy h:mm a"),
+        paymentCollectionNotice: isDueAtTimeOfServiceCustomer(report.inspection.customerCompany)
+          ? "Payment due at time of service. Collect payment before leaving the site."
+          : null,
         template: report.template,
         draft: report.draft
       }}

@@ -21,6 +21,7 @@ type EditorData = {
   siteName: string;
   customerName: string;
   scheduledDateLabel: string;
+  paymentCollectionNotice?: string | null;
   template: ReportTemplateDefinition;
   draft: ReportDraft;
 };
@@ -663,6 +664,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
           {draft.context.priorReportSummary ? <p className="mt-2">Smart default: {draft.context.priorReportSummary}</p> : null}
           <p className="mt-2">Autosave runs every few seconds and when you switch sections.</p>
           {data.finalizedAt ? <p className="mt-2">Finalized at {new Date(data.finalizedAt).toLocaleString()}</p> : null}
+          {data.paymentCollectionNotice ? <p className="mt-2 font-semibold text-amber-900">{data.paymentCollectionNotice}</p> : null}
           {data.correctionNotice ? <p className="mt-2 font-medium text-amber-900">{data.correctionNotice}</p> : null}
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">

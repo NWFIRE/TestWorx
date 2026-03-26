@@ -7,6 +7,7 @@ import {
   formatInspectionStatusLabel,
   getAdminDashboardData,
   getCustomerSiteImportTemplateCsv,
+  isDueAtTimeOfServiceCustomer,
   pickEarliestNextDueAt
 } from "@testworx/lib";
 
@@ -108,6 +109,11 @@ export default async function AdminPage({
                         <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${lifecycleClasses[(inspection as typeof inspection & { lifecycle?: string }).lifecycle ?? "original"]}`}>
                           {((inspection as typeof inspection & { lifecycle?: string }).lifecycle ?? "original").replaceAll("_", " ")}
                         </span>
+                        {isDueAtTimeOfServiceCustomer(inspection.customerCompany) ? (
+                          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-900">
+                            Payment due on site
+                          </span>
+                        ) : null}
                         {(inspection as typeof inspection & { billingStatus?: string | null }).billingStatus ? (
                           <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${billingStatusClasses[(inspection as typeof inspection & { billingStatus?: string | null }).billingStatus ?? "draft"] ?? "bg-slate-100 text-slate-700"}`}>
                             {((inspection as typeof inspection & { billingStatus?: string | null }).billingStatus ?? "").replaceAll("_", " ")}
@@ -118,6 +124,9 @@ export default async function AdminPage({
                         {((inspection as typeof inspection & { secondaryTitle?: string }).secondaryTitle ?? inspection.customerCompany.name)} | {format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}
                       </p>
                       <p className="mt-1 text-sm text-slate-500">Assigned: {((inspection as typeof inspection & { assignedTechnicianNames?: string[] }).assignedTechnicianNames ?? []).length ? ((inspection as typeof inspection & { assignedTechnicianNames?: string[] }).assignedTechnicianNames ?? []).join(", ") : "Shared queue"}</p>
+                      {isDueAtTimeOfServiceCustomer(inspection.customerCompany) ? (
+                        <p className="mt-1 text-sm font-semibold text-amber-800">Technicians must collect payment on site for this customer.</p>
+                      ) : null}
                       <p className="mt-1 text-sm text-slate-500">Report types: {inspection.tasks.map((task: DashboardTask) => taskDisplayLabel(task as DashboardTask & { displayLabel?: string })).join(", ")}</p>
                       <p className="mt-1 text-sm text-slate-500">Next due: {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}</p>
                     </div>
@@ -153,11 +162,19 @@ export default async function AdminPage({
                         <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${lifecycleClasses[(inspection as typeof inspection & { lifecycle?: string }).lifecycle ?? "original"]}`}>
                           {((inspection as typeof inspection & { lifecycle?: string }).lifecycle ?? "original").replaceAll("_", " ")}
                         </span>
+                        {isDueAtTimeOfServiceCustomer(inspection.customerCompany) ? (
+                          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-900">
+                            Payment due on site
+                          </span>
+                        ) : null}
                       </div>
                       <p className="mt-1 text-sm text-slate-500">
                         {((inspection as typeof inspection & { secondaryTitle?: string }).secondaryTitle ?? inspection.customerCompany.name)} | {format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}
                       </p>
                       <p className="mt-1 text-sm text-slate-500">Assigned: {((inspection as typeof inspection & { assignedTechnicianNames?: string[] }).assignedTechnicianNames ?? []).length ? ((inspection as typeof inspection & { assignedTechnicianNames?: string[] }).assignedTechnicianNames ?? []).join(", ") : "Shared queue"}</p>
+                      {isDueAtTimeOfServiceCustomer(inspection.customerCompany) ? (
+                        <p className="mt-1 text-sm font-semibold text-amber-800">Technicians must collect payment on site for this customer.</p>
+                      ) : null}
                       <p className="mt-1 text-sm text-slate-500">Report types: {inspection.tasks.map((task: DashboardTask) => taskDisplayLabel(task as DashboardTask & { displayLabel?: string })).join(", ")}</p>
                       <p className="mt-1 text-sm text-slate-500">Next due: {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}</p>
                     </div>
