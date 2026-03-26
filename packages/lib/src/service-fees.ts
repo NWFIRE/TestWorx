@@ -195,11 +195,31 @@ export async function resolveInspectionServiceFeeTx(tx: Prisma.TransactionClient
 }
 
 export async function getTenantServiceFeeSettings(actor: ActorContext) {
+  const result = await getPaginatedTenantServiceFeeSettings(actor, { page: 1, limit: 5000 });
+  return {
+    tenant: result.tenant,
+    customers: result.customers,
+    sites: result.sites,
+    rules: result.rules
+  };
+}
+
+export async function getPaginatedTenantServiceFeeSettings(
+  actor: ActorContext,
+  input?: {
+    page?: number;
+    limit?: number;
+    includeLookups?: boolean;
+  }
+) {
   const parsedActor = parseActor(actor);
   ensureTenantAdmin(parsedActor);
 
   const tenantId = parsedActor.tenantId as string;
-  const [tenant, customers, sites, rules] = await Promise.all([
+  const page = Math.max(input?.page ?? 1, 1);
+  const limit = Math.min(Math.max(input?.limit ?? 10, 1), 100);
+  const includeLookups = input?.includeLookups ?? true;
+  const [tenant, customers, sites, totalCount, rules] = await Promise.all([
     prisma.tenant.findUnique({
       where: { id: tenantId },
       select: {
@@ -209,19 +229,28 @@ export async function getTenantServiceFeeSettings(actor: ActorContext) {
         defaultServiceFeeUnitPrice: true
       }
     }),
-    prisma.customerCompany.findMany({
-      where: { tenantId },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true }
-    }),
-    prisma.site.findMany({
-      where: { tenantId },
-      orderBy: [{ name: "asc" }],
-      select: { id: true, name: true, customerCompanyId: true, customerCompany: { select: { name: true } } }
+    includeLookups
+      ? prisma.customerCompany.findMany({
+          where: { tenantId },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true }
+        })
+      : Promise.resolve([] as Array<{ id: string; name: string }>),
+    includeLookups
+      ? prisma.site.findMany({
+          where: { tenantId },
+          orderBy: [{ name: "asc" }],
+          select: { id: true, name: true, customerCompanyId: true, customerCompany: { select: { name: true } } }
+        })
+      : Promise.resolve([] as Array<{ id: string; name: string; customerCompanyId: string; customerCompany: { name: string } }>),
+    prisma.serviceFeeRule.count({
+      where: { tenantId }
     }),
     prisma.serviceFeeRule.findMany({
       where: { tenantId },
       orderBy: [{ isActive: "desc" }, { priority: "desc" }, { updatedAt: "desc" }],
+      skip: (page - 1) * limit,
+      take: limit,
       select: {
         id: true,
         customerCompanyId: true,
@@ -243,11 +272,42 @@ export async function getTenantServiceFeeSettings(actor: ActorContext) {
     throw new Error("Tenant not found.");
   }
 
+  const totalPages = Math.max(Math.ceil(totalCount / limit), 1);
+  const safePage = Math.min(page, totalPages);
+  const pagedRules = safePage === page
+    ? rules
+    : await prisma.serviceFeeRule.findMany({
+        where: { tenantId },
+        orderBy: [{ isActive: "desc" }, { priority: "desc" }, { updatedAt: "desc" }],
+        skip: (safePage - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          customerCompanyId: true,
+          siteId: true,
+          city: true,
+          state: true,
+          zipCode: true,
+          feeCode: true,
+          unitPrice: true,
+          priority: true,
+          isActive: true,
+          customerCompany: { select: { name: true } },
+          site: { select: { name: true } }
+        }
+      });
+
   return {
     tenant,
     customers,
     sites,
-    rules
+    rules: pagedRules,
+    pagination: {
+      page: safePage,
+      limit,
+      totalCount,
+      totalPages
+    }
   };
 }
 

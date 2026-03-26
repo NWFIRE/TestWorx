@@ -1,6 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+
+import { buildSettingsHref } from "./settings-query";
 
 const initialState = { error: null as string | null, success: null as string | null };
 
@@ -13,6 +17,12 @@ type CustomerManagementCardProps = {
     phone: string | null;
     quickbooksCustomerId: string | null;
   }>;
+  pagination: {
+    page: number;
+    limit: number;
+    totalCount: number;
+    totalPages: number;
+  };
   createCustomerAction: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
   updateCustomerAction: (formData: FormData) => Promise<void>;
   notice?: string | null;
@@ -20,11 +30,22 @@ type CustomerManagementCardProps = {
 
 export function CustomerManagementCard({
   customers,
+  pagination,
   createCustomerAction,
   updateCustomerAction,
   notice
 }: CustomerManagementCardProps) {
   const [createState, createFormAction, createPending] = useActionState(createCustomerAction, initialState);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const previousPageHref = buildSettingsHref(pathname, searchParams, {
+    customersOpen: 1,
+    customersPage: Math.max(pagination.page - 1, 1)
+  });
+  const nextPageHref = buildSettingsHref(pathname, searchParams, {
+    customersOpen: 1,
+    customersPage: Math.min(pagination.page + 1, pagination.totalPages)
+  });
 
   return (
     <div className="space-y-6 rounded-[2rem] bg-white p-6 shadow-panel">
@@ -68,7 +89,12 @@ export function CustomerManagementCard({
       <div className="space-y-4">
         <div>
           <p className="text-sm uppercase tracking-[0.18em] text-slate-500">Current customers</p>
-          <h4 className="mt-1 text-lg font-semibold text-ink">{customers.length} configured</h4>
+          <h4 className="mt-1 text-lg font-semibold text-ink">{pagination.totalCount} configured</h4>
+          {pagination.totalCount > 0 ? (
+            <p className="mt-2 text-sm text-slate-500">
+              Showing {(pagination.page - 1) * pagination.limit + 1}-{Math.min(pagination.page * pagination.limit, pagination.totalCount)} of {pagination.totalCount}
+            </p>
+          ) : null}
         </div>
         {customers.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No customers yet. Add your first customer company here or bring them over through the import flow.</p>
@@ -84,6 +110,8 @@ export function CustomerManagementCard({
             </div>
             <form action={updateCustomerAction} className="space-y-4">
               <input name="customerCompanyId" type="hidden" value={customer.id} />
+              <input name="customersOpen" type="hidden" value="1" />
+              <input name="customersPage" type="hidden" value={String(pagination.page)} />
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-600">Company name</label>
@@ -108,6 +136,31 @@ export function CustomerManagementCard({
             </form>
           </div>
         ))}
+        {pagination.totalCount > 0 ? (
+          <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600">
+            <p>Page {pagination.page} of {pagination.totalPages}</p>
+            <div className="flex gap-3">
+              {pagination.page > 1 ? (
+                <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={previousPageHref}>
+                  Previous
+                </Link>
+              ) : (
+                <span className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-300">
+                  Previous
+                </span>
+              )}
+              {pagination.page < pagination.totalPages ? (
+                <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={nextPageHref}>
+                  Next
+                </Link>
+              ) : (
+                <span className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-300">
+                  Next
+                </span>
+              )}
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

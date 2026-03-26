@@ -56,23 +56,75 @@ type CustomerCompanySyncResult = {
 };
 
 export async function getTenantCustomerCompanySettings(actor: ActorContext) {
+  const result = await getPaginatedTenantCustomerCompanySettings(actor, { page: 1, limit: 5000 });
+  return result.customers;
+}
+
+export async function getPaginatedTenantCustomerCompanySettings(
+  actor: ActorContext,
+  input?: {
+    page?: number;
+    limit?: number;
+  }
+) {
   const parsedActor = parseActor(actor);
   ensureTenantAdmin(parsedActor);
+  const page = Math.max(input?.page ?? 1, 1);
+  const limit = Math.min(Math.max(input?.limit ?? 10, 1), 100);
+  const tenantId = parsedActor.tenantId as string;
 
-  return prisma.customerCompany.findMany({
-    where: { tenantId: parsedActor.tenantId as string },
-    orderBy: [{ name: "asc" }, { createdAt: "asc" }],
-    select: {
-      id: true,
-      name: true,
-      contactName: true,
-      billingEmail: true,
-      phone: true,
-      quickbooksCustomerId: true,
-      createdAt: true,
-      updatedAt: true
+  const [totalCount, customers] = await Promise.all([
+    prisma.customerCompany.count({
+      where: { tenantId }
+    }),
+    prisma.customerCompany.findMany({
+      where: { tenantId },
+      orderBy: [{ name: "asc" }, { createdAt: "asc" }],
+      skip: (page - 1) * limit,
+      take: limit,
+      select: {
+        id: true,
+        name: true,
+        contactName: true,
+        billingEmail: true,
+        phone: true,
+        quickbooksCustomerId: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    })
+  ]);
+
+  const totalPages = Math.max(Math.ceil(totalCount / limit), 1);
+  const safePage = Math.min(page, totalPages);
+  const pagedCustomers = safePage === page
+    ? customers
+    : await prisma.customerCompany.findMany({
+        where: { tenantId },
+        orderBy: [{ name: "asc" }, { createdAt: "asc" }],
+        skip: (safePage - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          name: true,
+          contactName: true,
+          billingEmail: true,
+          phone: true,
+          quickbooksCustomerId: true,
+          createdAt: true,
+          updatedAt: true
+        }
+      });
+
+  return {
+    customers: pagedCustomers,
+    pagination: {
+      page: safePage,
+      limit,
+      totalCount,
+      totalPages
     }
-  });
+  };
 }
 
 async function syncCustomerCompanyIfQuickBooksConnected(actor: ActorContext, customerCompanyId: string) {

@@ -1,7 +1,18 @@
+import { Suspense } from "react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { buildTenantBrandingCss, canManageBilling, getTenantBillingSettings, getTenantBrandingSettings, getTenantCustomerCompanySettings, getTenantQuickBooksSettings, getTenantServiceFeeSettings } from "@testworx/lib";
+import {
+  buildTenantBrandingCss,
+  canManageBilling,
+  getPaginatedTenantCustomerCompanySettings,
+  getPaginatedTenantQuickBooksCatalogSettings,
+  getPaginatedTenantServiceFeeSettings,
+  getTenantBillingSettings,
+  getTenantBrandingSettings,
+  getTenantQuickBooksConnectionSettings
+} from "@testworx/lib";
 
 import {
   createCustomerCompanyAction,
@@ -27,7 +38,236 @@ import { ServiceFeeSettingsCard } from "./service-fee-settings-card";
 import { QuickBooksSettingsCard } from "./quickbooks-settings-card";
 import { TenantBrandingForm } from "./tenant-branding-form";
 
-export default async function TenantSettingsPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+type SettingsSearchParams = Record<string, string | string[] | undefined>;
+
+function readSearchParam(params: SettingsSearchParams, key: string, fallback = "") {
+  const value = params[key];
+  return typeof value === "string" ? value : Array.isArray(value) ? value[0] ?? fallback : fallback;
+}
+
+function readPositiveInt(value: string, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function isSectionOpen(params: SettingsSearchParams, key: string, notice?: string | null) {
+  if (notice) {
+    return true;
+  }
+
+  return readSearchParam(params, key) === "1";
+}
+
+function buildSettingsHref(params: SettingsSearchParams, nextValues: Record<string, string | number | null | undefined>) {
+  const search = new URLSearchParams();
+
+  for (const [key, rawValue] of Object.entries(params)) {
+    if (Array.isArray(rawValue)) {
+      for (const item of rawValue) {
+        if (typeof item === "string") {
+          search.append(key, item);
+        }
+      }
+    } else if (typeof rawValue === "string") {
+      search.set(key, rawValue);
+    }
+  }
+
+  for (const [key, value] of Object.entries(nextValues)) {
+    if (value === null || value === undefined || value === "") {
+      search.delete(key);
+    } else {
+      search.set(key, String(value));
+    }
+  }
+
+  const query = search.toString();
+  return query ? `/app/admin/settings?${query}` : "/app/admin/settings";
+}
+
+function LazySectionCard({
+  eyebrow,
+  title,
+  description,
+  actionLabel,
+  actionHref,
+  tone = "default"
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  actionLabel: string;
+  actionHref: string;
+  tone?: "default" | "loading" | "error";
+}) {
+  const toneClasses = tone === "error"
+    ? "border-rose-200 bg-rose-50"
+    : tone === "loading"
+      ? "border-slate-200 bg-slate-50"
+      : "border-slate-200 bg-white";
+
+  return (
+    <div className={`rounded-[2rem] border p-6 shadow-panel ${toneClasses}`}>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-2xl">
+          <p className="text-sm uppercase tracking-[0.25em] text-slate-500">{eyebrow}</p>
+          <h3 className="mt-2 text-2xl font-semibold text-ink">{title}</h3>
+          <p className="mt-2 text-sm text-slate-500">{description}</p>
+        </div>
+        <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={actionHref}>
+          {actionLabel}
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+async function CustomersSection({
+  actor,
+  page,
+  notice
+}: {
+  actor: { userId: string; role: string; tenantId: string };
+  page: number;
+  notice?: string | null;
+}) {
+  let data: Awaited<ReturnType<typeof getPaginatedTenantCustomerCompanySettings>>;
+
+  try {
+    data = await getPaginatedTenantCustomerCompanySettings(actor, { page, limit: 10 });
+  } catch (error) {
+    return (
+      <LazySectionCard
+        actionHref={buildSettingsHref({ customersOpen: "1" }, { customersOpen: 1 })}
+        actionLabel="Try again"
+        description={error instanceof Error ? error.message : "Unable to load customers right now."}
+        eyebrow="Customer companies"
+        title="Customers could not be loaded"
+        tone="error"
+      />
+    );
+  }
+
+  return (
+    <CustomerManagementCard
+      createCustomerAction={createCustomerCompanyAction}
+      customers={data.customers}
+      notice={notice}
+      pagination={data.pagination}
+      updateCustomerAction={updateCustomerCompanyAction}
+    />
+  );
+}
+
+async function CatalogSection({
+  actor,
+  page,
+  search,
+  itemType,
+  status,
+  connection,
+  notice
+}: {
+  actor: { userId: string; role: string; tenantId: string };
+  page: number;
+  search: string;
+  itemType: string;
+  status: "all" | "active" | "inactive";
+  connection: Awaited<ReturnType<typeof getTenantQuickBooksConnectionSettings>>;
+  notice?: string | null;
+}) {
+  let data: Awaited<ReturnType<typeof getPaginatedTenantQuickBooksCatalogSettings>>;
+
+  try {
+    data = await getPaginatedTenantQuickBooksCatalogSettings(actor, {
+      page,
+      search,
+      itemType,
+      status
+    });
+  } catch (error) {
+    return (
+      <LazySectionCard
+        actionHref={buildSettingsHref({ catalogOpen: "1" }, { catalogOpen: 1 })}
+        actionLabel="Try again"
+        description={error instanceof Error ? error.message : "Unable to load products and services right now."}
+        eyebrow="QuickBooks products and services"
+        title="Products and services could not be loaded"
+        tone="error"
+      />
+    );
+  }
+
+  return (
+    <QuickBooksCatalogManagementCard
+      activeItemCount={data.activeCount}
+      configured={connection.config.enabled}
+      connected={connection.tenant.connected}
+      createCatalogItemAction={createQuickBooksCatalogItemAction}
+      filteredItemCount={data.filteredItemCount}
+      filters={data.filters}
+      importedItemCount={data.itemCount}
+      itemTypes={data.itemTypes}
+      items={data.items}
+      modeMismatch={connection.tenant.modeMismatch}
+      notice={notice}
+      reconnectRequired={connection.tenant.reconnectRequired}
+      updateCatalogItemAction={updateQuickBooksCatalogItemAction}
+      inactiveItemCount={data.inactiveCount}
+    />
+  );
+}
+
+async function ServiceFeesSection({
+  actor,
+  page,
+  activeEditor
+}: {
+  actor: { userId: string; role: string; tenantId: string };
+  page: number;
+  activeEditor: string | null;
+}) {
+  let data: Awaited<ReturnType<typeof getPaginatedTenantServiceFeeSettings>>;
+
+  try {
+    data = await getPaginatedTenantServiceFeeSettings(actor, {
+      page,
+      limit: 10,
+      includeLookups: Boolean(activeEditor)
+    });
+  } catch (error) {
+    return (
+      <LazySectionCard
+        actionHref={buildSettingsHref({ feesOpen: "1" }, { feesOpen: 1 })}
+        actionLabel="Try again"
+        description={error instanceof Error ? error.message : "Unable to load service fee rules right now."}
+        eyebrow="Inspection service fees"
+        title="Service fee rules could not be loaded"
+        tone="error"
+      />
+    );
+  }
+
+  return (
+    <ServiceFeeSettingsCard
+      createRuleAction={createServiceFeeRuleAction}
+      customers={data.customers}
+      defaultValues={{
+        defaultServiceFeeCode: data.tenant.defaultServiceFeeCode ?? "SERVICE_FEE",
+        defaultServiceFeeUnitPrice: data.tenant.defaultServiceFeeUnitPrice
+      }}
+      deleteRuleAction={deleteServiceFeeRuleAction}
+      activeEditor={activeEditor}
+      pagination={data.pagination}
+      rules={data.rules}
+      sites={data.sites}
+      updateDefaultAction={updateDefaultServiceFeeAction}
+      updateRuleAction={updateServiceFeeRuleAction}
+    />
+  );
+}
+
+export default async function TenantSettingsPage({ searchParams }: { searchParams?: Promise<SettingsSearchParams> }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
     redirect("/login");
@@ -37,39 +277,29 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   }
 
   const params = searchParams ? await searchParams : {};
-  const catalogSearch = typeof params.qboSearch === "string" ? params.qboSearch : Array.isArray(params.qboSearch) ? params.qboSearch[0] ?? "" : "";
-  const catalogItemType = typeof params.qboType === "string" ? params.qboType : Array.isArray(params.qboType) ? params.qboType[0] ?? "" : "";
-  const catalogStatus = typeof params.qboStatus === "string" ? params.qboStatus : Array.isArray(params.qboStatus) ? params.qboStatus[0] ?? "all" : "all";
-  const catalogPageRaw = typeof params.qboPage === "string" ? params.qboPage : Array.isArray(params.qboPage) ? params.qboPage[0] ?? "1" : "1";
-  const catalogPage = Number.isFinite(Number(catalogPageRaw)) ? Number(catalogPageRaw) : 1;
-  const [billingSettings, brandingSettings, customerCompanies, serviceFeeSettings, quickBooksSettings] = await Promise.all([
-    getTenantBillingSettings({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }),
-    getTenantBrandingSettings({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }),
-    getTenantCustomerCompanySettings({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }),
-    getTenantServiceFeeSettings({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }),
-    getTenantQuickBooksSettings(
-      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-      {
-        search: catalogSearch,
-        itemType: catalogItemType,
-        status: catalogStatus === "active" || catalogStatus === "inactive" ? catalogStatus : "all",
-        page: catalogPage
-      }
-    )
+  const actor = { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId };
+
+  const catalogSearch = readSearchParam(params, "qboSearch");
+  const catalogItemType = readSearchParam(params, "qboType");
+  const catalogStatusRaw = readSearchParam(params, "qboStatus", "all");
+  const catalogStatus = catalogStatusRaw === "active" || catalogStatusRaw === "inactive" ? catalogStatusRaw : "all";
+  const catalogPage = readPositiveInt(readSearchParam(params, "qboPage", "1"), 1);
+  const customersPage = readPositiveInt(readSearchParam(params, "customersPage", "1"), 1);
+  const feesPage = readPositiveInt(readSearchParam(params, "feesPage", "1"), 1);
+  const feeEditor = readSearchParam(params, "feeEditor") || null;
+
+  const [billingSettings, brandingSettings, quickBooksSettings] = await Promise.all([
+    getTenantBillingSettings(actor),
+    getTenantBrandingSettings(actor),
+    getTenantQuickBooksConnectionSettings(actor)
   ]);
   const theme = buildTenantBrandingCss(brandingSettings.branding);
   const canManageSubscription = canManageBilling(session.user.role);
   const quickBooksNotice = Array.isArray(params.quickbooks)
     ? params.quickbooks[0]
-    : params.quickbooks === "connected"
-      ? "QuickBooks connected."
-      : params.quickbooks === "disconnected"
-        ? "QuickBooks disconnected."
-        : params.quickbooks === "error"
-          ? "QuickBooks connection failed. Try again."
-          : typeof params.quickbooks === "string"
-            ? decodeURIComponent(params.quickbooks)
-            : null;
+    : typeof params.quickbooks === "string"
+      ? decodeURIComponent(params.quickbooks)
+      : null;
   const customerNotice = Array.isArray(params.customers)
     ? params.customers[0]
     : typeof params.customers === "string"
@@ -81,6 +311,10 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
       ? decodeURIComponent(params.catalog)
       : null;
 
+  const customersOpen = isSectionOpen(params, "customersOpen", customerNotice);
+  const catalogOpen = isSectionOpen(params, "catalogOpen", catalogNotice);
+  const feesOpen = isSectionOpen(params, "feesOpen");
+
   return (
     <section className="space-y-6">
       <div className="rounded-[2rem] p-6 text-white shadow-panel" style={{ background: `linear-gradient(135deg, ${theme["--tenant-primary"]} 0%, ${theme["--tenant-accent"]} 100%)` }}>
@@ -91,12 +325,31 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
           <TenantBrandingForm action={updateTenantBrandingAction} values={{ ...brandingSettings.branding, billingEmail: brandingSettings.billingEmail }} />
-          <CustomerManagementCard
-            createCustomerAction={createCustomerCompanyAction}
-            customers={customerCompanies}
-            notice={customerNotice}
-            updateCustomerAction={updateCustomerCompanyAction}
-          />
+          {customersOpen ? (
+            <Suspense
+              key={`customers-${customersPage}`}
+              fallback={
+                <LazySectionCard
+                  actionHref={buildSettingsHref(params, { customersOpen: null, customersPage: null })}
+                  actionLabel="Hide section"
+                  description="Loading the current customer page..."
+                  eyebrow="Customer companies"
+                  title="Create and edit current customers"
+                  tone="loading"
+                />
+              }
+            >
+              <CustomersSection actor={actor} notice={customerNotice} page={customersPage} />
+            </Suspense>
+          ) : (
+            <LazySectionCard
+              actionHref={buildSettingsHref(params, { customersOpen: 1, customersPage: 1 })}
+              actionLabel="Open customers"
+              description="Load customer companies only when you need them, with a paginated current-customer list and its own empty and error states."
+              eyebrow="Customer companies"
+              title="Create and edit current customers"
+            />
+          )}
           <QuickBooksSettingsCard
             companyName={quickBooksSettings.tenant.quickbooksCompanyName}
             configured={quickBooksSettings.config.enabled}
@@ -116,41 +369,68 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
             importCustomersAction={importQuickBooksCustomersAction}
             importCatalogAction={importQuickBooksCatalogItemsAction}
             hasStoredConnection={quickBooksSettings.tenant.hasStoredConnection}
-            importedItemCount={quickBooksSettings.catalog.itemCount}
-            filteredItemCount={quickBooksSettings.catalog.filteredItemCount}
-            importedItems={quickBooksSettings.catalog.items}
-            lastImportedAt={quickBooksSettings.catalog.lastImportedAt}
-            activeItemCount={quickBooksSettings.catalog.activeCount}
-            inactiveItemCount={quickBooksSettings.catalog.inactiveCount}
-            itemTypes={quickBooksSettings.catalog.itemTypes}
-            filters={quickBooksSettings.catalog.filters}
             notice={quickBooksNotice}
             realmId={quickBooksSettings.tenant.quickbooksRealmId}
             supportReference={quickBooksSettings.supportReference}
           />
-          <QuickBooksCatalogManagementCard
-            configured={quickBooksSettings.config.enabled}
-            connected={quickBooksSettings.tenant.connected}
-            createCatalogItemAction={createQuickBooksCatalogItemAction}
-            items={quickBooksSettings.catalog.items}
-            modeMismatch={quickBooksSettings.tenant.modeMismatch}
-            notice={catalogNotice}
-            reconnectRequired={quickBooksSettings.tenant.reconnectRequired}
-            updateCatalogItemAction={updateQuickBooksCatalogItemAction}
-          />
-          <ServiceFeeSettingsCard
-            createRuleAction={createServiceFeeRuleAction}
-            customers={serviceFeeSettings.customers}
-            defaultValues={{
-              defaultServiceFeeCode: serviceFeeSettings.tenant.defaultServiceFeeCode ?? "SERVICE_FEE",
-              defaultServiceFeeUnitPrice: serviceFeeSettings.tenant.defaultServiceFeeUnitPrice
-            }}
-            deleteRuleAction={deleteServiceFeeRuleAction}
-            rules={serviceFeeSettings.rules}
-            sites={serviceFeeSettings.sites}
-            updateDefaultAction={updateDefaultServiceFeeAction}
-            updateRuleAction={updateServiceFeeRuleAction}
-          />
+          {catalogOpen ? (
+            <Suspense
+              key={`catalog-${catalogPage}-${catalogSearch}-${catalogItemType}-${catalogStatus}`}
+              fallback={
+                <LazySectionCard
+                  actionHref={buildSettingsHref(params, { catalogOpen: null, qboPage: null, qboSearch: null, qboType: null, qboStatus: null })}
+                  actionLabel="Hide section"
+                  description="Loading the current products and services page..."
+                  eyebrow="QuickBooks products and services"
+                  title="Create and edit billing catalog items"
+                  tone="loading"
+                />
+              }
+            >
+              <CatalogSection
+                actor={actor}
+                connection={quickBooksSettings}
+                itemType={catalogItemType}
+                notice={catalogNotice}
+                page={catalogPage}
+                search={catalogSearch}
+                status={catalogStatus}
+              />
+            </Suspense>
+          ) : (
+            <LazySectionCard
+              actionHref={buildSettingsHref(params, { catalogOpen: 1, qboPage: 1 })}
+              actionLabel="Open products and services"
+              description="Load the QuickBooks catalog only when needed, with paginated results, filters, and independent loading and error states."
+              eyebrow="QuickBooks products and services"
+              title="Create and edit billing catalog items"
+            />
+          )}
+          {feesOpen ? (
+            <Suspense
+              key={`fees-${feesPage}`}
+              fallback={
+                <LazySectionCard
+                  actionHref={buildSettingsHref(params, { feesOpen: null, feesPage: null })}
+                  actionLabel="Hide section"
+                  description="Loading the current service fee rules page..."
+                  eyebrow="Inspection service fees"
+                  title="Default fee and location rules"
+                  tone="loading"
+                />
+              }
+            >
+              <ServiceFeesSection activeEditor={feeEditor} actor={actor} page={feesPage} />
+            </Suspense>
+          ) : (
+            <LazySectionCard
+              actionHref={buildSettingsHref(params, { feesOpen: 1, feesPage: 1 })}
+              actionLabel="Open service fee rules"
+              description="Load service fee rules only when you open the section. Rules stay paginated and keep their own loading, empty, and error states."
+              eyebrow="Inspection service fees"
+              title="Default fee and location rules"
+            />
+          )}
         </div>
         <div className="space-y-6">
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">

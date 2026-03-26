@@ -1483,6 +1483,20 @@ function requirePrice(item: QuickBooksBillingSummary["items"][number]) {
 }
 
 export async function getTenantQuickBooksSettings(actor: ActorContext, filters?: QuickBooksCatalogFilterInput) {
+  const [connection, catalog] = await Promise.all([
+    getTenantQuickBooksConnectionSettings(actor),
+    getPaginatedTenantQuickBooksCatalogSettings(actor, filters)
+  ]);
+
+  return {
+    config: connection.config,
+    tenant: connection.tenant,
+    supportReference: connection.supportReference,
+    catalog
+  };
+}
+
+export async function getTenantQuickBooksConnectionSettings(actor: ActorContext) {
   const parsedActor = parseActor(actor);
   if (!canManageQuickBooksSync(parsedActor.role)) {
     throw new Error("Only administrators can access QuickBooks settings.");
@@ -1493,6 +1507,39 @@ export async function getTenantQuickBooksSettings(actor: ActorContext, filters?:
   const validatedConnection = await validateQuickBooksConnectionStatus(tenant);
   const connectionStatus = validatedConnection.status;
   const supportReference = await getLatestQuickBooksSupportReference(parsedActor.tenantId as string);
+  return {
+    config,
+    tenant: {
+      id: tenant.id,
+      name: tenant.name,
+      quickbooksRealmId: tenant.quickbooksRealmId,
+      quickbooksCompanyName: validatedConnection.companyName,
+      quickbooksConnectionMode: tenant.quickbooksConnectionMode,
+      quickbooksConnectedAt: tenant.quickbooksConnectedAt,
+      connected: connectionStatus.connected,
+      hasStoredConnection: connectionStatus.hasStoredConnection,
+      appConnectionMode: connectionStatus.appMode,
+      appConnectionModeLabel: connectionStatus.appModeLabel,
+      storedConnectionMode: connectionStatus.storedMode,
+      storedConnectionModeLabel: connectionStatus.storedModeLabel,
+      modeMismatch: connectionStatus.modeMismatch,
+      reconnectRequired: connectionStatus.reconnectRequired,
+      statusLabel: connectionStatus.statusLabel,
+      guidance: connectionStatus.guidance
+    },
+    supportReference
+  };
+}
+
+export async function getPaginatedTenantQuickBooksCatalogSettings(actor: ActorContext, filters?: QuickBooksCatalogFilterInput) {
+  const parsedActor = parseActor(actor);
+  if (!canManageQuickBooksSync(parsedActor.role)) {
+    throw new Error("Only administrators can access QuickBooks catalog settings.");
+  }
+
+  const tenant = await getTenantQuickBooksConnection(parsedActor.tenantId as string);
+  const validatedConnection = await validateQuickBooksConnectionStatus(tenant);
+  const connectionStatus = validatedConnection.status;
   const search = filters?.search?.trim() ?? "";
   const itemType = filters?.itemType?.trim() ?? "";
   const status = filters?.status ?? "all";
@@ -1595,47 +1642,27 @@ export async function getTenantQuickBooksSettings(actor: ActorContext, filters?:
           importedAt: true
         }
       });
+
   return {
-    config,
-    tenant: {
-      id: tenant.id,
-      name: tenant.name,
-      quickbooksRealmId: tenant.quickbooksRealmId,
-      quickbooksCompanyName: validatedConnection.companyName,
-      quickbooksConnectionMode: tenant.quickbooksConnectionMode,
-      quickbooksConnectedAt: tenant.quickbooksConnectedAt,
-      connected: connectionStatus.connected,
-      hasStoredConnection: connectionStatus.hasStoredConnection,
-      appConnectionMode: connectionStatus.appMode,
-      appConnectionModeLabel: connectionStatus.appModeLabel,
-      storedConnectionMode: connectionStatus.storedMode,
-      storedConnectionModeLabel: connectionStatus.storedModeLabel,
-      modeMismatch: connectionStatus.modeMismatch,
-      reconnectRequired: connectionStatus.reconnectRequired,
-      statusLabel: connectionStatus.statusLabel,
-      guidance: connectionStatus.guidance
+    itemCount: totalItemCount,
+    filteredItemCount,
+    items: pagedItems satisfies QuickBooksCatalogListItem[],
+    lastImportedAt: latestImportedItem?.importedAt ?? null,
+    activeCount,
+    inactiveCount,
+    itemTypes: itemTypeRows.map((row) => ({
+      itemType: row.itemType,
+      count: row._count._all
+    })),
+    filters: {
+      search,
+      itemType,
+      status,
+      page: safePage,
+      limit,
+      totalPages
     },
-    supportReference,
-    catalog: {
-      itemCount: totalItemCount,
-      filteredItemCount,
-      items: pagedItems satisfies QuickBooksCatalogListItem[],
-      lastImportedAt: latestImportedItem?.importedAt ?? null,
-      activeCount,
-      inactiveCount,
-      itemTypes: itemTypeRows.map((row) => ({
-        itemType: row.itemType,
-        count: row._count._all
-      })),
-      filters: {
-        search,
-        itemType,
-        status,
-        page: safePage,
-        limit,
-        totalPages
-      }
-    }
+    visible: catalogVisible
   };
 }
 

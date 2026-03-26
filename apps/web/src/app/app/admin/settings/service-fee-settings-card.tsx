@@ -1,6 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+
+import { buildSettingsHref } from "./settings-query";
 
 const initialState = { error: null as string | null, success: null as string | null };
 
@@ -25,6 +29,13 @@ type ServiceFeeSettingsCardProps = {
     customerCompany: { name: string } | null;
     site: { name: string } | null;
   }>;
+  pagination: {
+    page: number;
+    limit: number;
+    totalCount: number;
+    totalPages: number;
+  };
+  activeEditor: string | null;
   updateDefaultAction: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
   createRuleAction: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
   updateRuleAction: (formData: FormData) => Promise<void>;
@@ -36,6 +47,8 @@ export function ServiceFeeSettingsCard({
   customers,
   sites,
   rules,
+  pagination,
+  activeEditor,
   updateDefaultAction,
   createRuleAction,
   updateRuleAction,
@@ -43,6 +56,26 @@ export function ServiceFeeSettingsCard({
 }: ServiceFeeSettingsCardProps) {
   const [defaultState, defaultFormAction, defaultPending] = useActionState(updateDefaultAction, initialState);
   const [createState, createFormAction, createPending] = useActionState(createRuleAction, initialState);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const previousPageHref = buildSettingsHref(pathname, searchParams, {
+    feesOpen: 1,
+    feesPage: Math.max(pagination.page - 1, 1)
+  });
+  const nextPageHref = buildSettingsHref(pathname, searchParams, {
+    feesOpen: 1,
+    feesPage: Math.min(pagination.page + 1, pagination.totalPages)
+  });
+  const openCreateHref = buildSettingsHref(pathname, searchParams, {
+    feesOpen: 1,
+    feesPage: pagination.page,
+    feeEditor: "create"
+  });
+  const closeEditorHref = buildSettingsHref(pathname, searchParams, {
+    feesOpen: 1,
+    feesPage: pagination.page,
+    feeEditor: null
+  });
 
   return (
     <div className="space-y-6 rounded-[2rem] bg-white p-6 shadow-panel">
@@ -70,70 +103,95 @@ export function ServiceFeeSettingsCard({
         </button>
       </form>
 
-      <form action={createFormAction} className="rounded-[1.5rem] border border-slate-200 p-5">
-        <div className="mb-4">
-          <p className="text-sm uppercase tracking-[0.18em] text-slate-500">New rule</p>
-          <h4 className="mt-1 text-lg font-semibold text-ink">Add location or override pricing</h4>
+      {activeEditor === "create" ? (
+        <form action={createFormAction} className="rounded-[1.5rem] border border-slate-200 p-5">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm uppercase tracking-[0.18em] text-slate-500">New rule</p>
+              <h4 className="mt-1 text-lg font-semibold text-ink">Add location or override pricing</h4>
+            </div>
+            <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={closeEditorHref}>
+              Cancel
+            </Link>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customerCompanyId">Customer override</label>
+              <select className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue="" id="customerCompanyId" name="customerCompanyId">
+                <option value="">Any customer</option>
+                {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="siteId">Site override</label>
+              <select className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue="" id="siteId" name="siteId">
+                <option value="">Any site</option>
+                {sites.map((site) => <option key={site.id} value={site.id}>{site.name} ({site.customerCompany.name})</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-5">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="city">City</label>
+              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="city" name="city" />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="state">State</label>
+              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="state" name="state" />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="zipCode">ZIP code</label>
+              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="zipCode" name="zipCode" />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="feeCode">Fee code</label>
+              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue="SERVICE_FEE" id="feeCode" name="feeCode" />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="priority">Priority</label>
+              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={0} id="priority" min="0" name="priority" type="number" />
+            </div>
+          </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="unitPrice">Unit price</label>
+              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="unitPrice" min="0" name="unitPrice" placeholder="125.00" required step="0.01" type="number" />
+            </div>
+            <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600 md:self-end">
+              <input className="h-5 w-5 rounded border-slate-300" defaultChecked name="isActive" type="checkbox" />
+              Rule is active
+            </label>
+          </div>
+          {createState.error ? <p className="mt-3 text-sm text-rose-600">{createState.error}</p> : null}
+          {createState.success ? <p className="mt-3 text-sm text-emerald-600">{createState.success}</p> : null}
+          <button className="mt-4 inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={createPending} type="submit">
+            {createPending ? "Saving rule..." : "Add service fee rule"}
+          </button>
+        </form>
+      ) : (
+        <div className="rounded-[1.5rem] border border-slate-200 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm uppercase tracking-[0.18em] text-slate-500">New rule</p>
+              <h4 className="mt-1 text-lg font-semibold text-ink">Add location or override pricing</h4>
+              <p className="mt-2 text-sm text-slate-500">Open this editor only when you need to create a new fee rule. Customer and site lookups stay unloaded until then.</p>
+            </div>
+            <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={openCreateHref}>
+              Open new rule
+            </Link>
+          </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customerCompanyId">Customer override</label>
-            <select className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue="" id="customerCompanyId" name="customerCompanyId">
-              <option value="">Any customer</option>
-              {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="siteId">Site override</label>
-            <select className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue="" id="siteId" name="siteId">
-              <option value="">Any site</option>
-              {sites.map((site) => <option key={site.id} value={site.id}>{site.name} ({site.customerCompany.name})</option>)}
-            </select>
-          </div>
-        </div>
-        <div className="mt-4 grid gap-4 md:grid-cols-5">
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="city">City</label>
-            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="city" name="city" />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="state">State</label>
-            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="state" name="state" />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="zipCode">ZIP code</label>
-            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="zipCode" name="zipCode" />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="feeCode">Fee code</label>
-            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue="SERVICE_FEE" id="feeCode" name="feeCode" />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="priority">Priority</label>
-            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={0} id="priority" min="0" name="priority" type="number" />
-          </div>
-        </div>
-        <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="unitPrice">Unit price</label>
-            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="unitPrice" min="0" name="unitPrice" placeholder="125.00" required step="0.01" type="number" />
-          </div>
-          <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600 md:self-end">
-            <input className="h-5 w-5 rounded border-slate-300" defaultChecked name="isActive" type="checkbox" />
-            Rule is active
-          </label>
-        </div>
-        {createState.error ? <p className="mt-3 text-sm text-rose-600">{createState.error}</p> : null}
-        {createState.success ? <p className="mt-3 text-sm text-emerald-600">{createState.success}</p> : null}
-        <button className="mt-4 inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={createPending} type="submit">
-          {createPending ? "Saving rule..." : "Add service fee rule"}
-        </button>
-      </form>
+      )}
 
       <div className="space-y-4">
         <div>
           <p className="text-sm uppercase tracking-[0.18em] text-slate-500">Existing rules</p>
-          <h4 className="mt-1 text-lg font-semibold text-ink">{rules.length} configured</h4>
+          <h4 className="mt-1 text-lg font-semibold text-ink">{pagination.totalCount} configured</h4>
+          {pagination.totalCount > 0 ? (
+            <p className="mt-2 text-sm text-slate-500">
+              Showing {(pagination.page - 1) * pagination.limit + 1}-{Math.min(pagination.page * pagination.limit, pagination.totalCount)} of {pagination.totalCount}
+            </p>
+          ) : null}
         </div>
         {rules.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No service fee rules yet. The default fee will be used for every inspection until you add overrides.</p>
@@ -152,60 +210,87 @@ export function ServiceFeeSettingsCard({
                 {rule.isActive ? "Active" : "Inactive"}
               </span>
             </div>
-            <form action={updateRuleAction} className="space-y-4">
-              <input name="ruleId" type="hidden" value={rule.id} />
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-600">Customer</label>
-                  <select className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.customerCompanyId ?? ""} name="customerCompanyId">
-                    <option value="">Any customer</option>
-                    {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
-                  </select>
+            {activeEditor === rule.id ? (
+              <form action={updateRuleAction} className="space-y-4">
+                <input name="ruleId" type="hidden" value={rule.id} />
+                <input name="feesOpen" type="hidden" value="1" />
+                <input name="feesPage" type="hidden" value={String(pagination.page)} />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-600">Customer</label>
+                    <select className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.customerCompanyId ?? ""} name="customerCompanyId">
+                      <option value="">Any customer</option>
+                      {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-600">Site</label>
+                    <select className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.siteId ?? ""} name="siteId">
+                      <option value="">Any site</option>
+                      {sites.map((site) => <option key={site.id} value={site.id}>{site.name} ({site.customerCompany.name})</option>)}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-600">Site</label>
-                  <select className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.siteId ?? ""} name="siteId">
-                    <option value="">Any site</option>
-                    {sites.map((site) => <option key={site.id} value={site.id}>{site.name} ({site.customerCompany.name})</option>)}
-                  </select>
+                <div className="grid gap-4 md:grid-cols-5">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-600">City</label>
+                    <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.city ?? ""} name="city" />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-600">State</label>
+                    <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.state ?? ""} name="state" />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-600">ZIP</label>
+                    <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.zipCode ?? ""} name="zipCode" />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-600">Fee code</label>
+                    <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.feeCode} name="feeCode" />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-600">Priority</label>
+                    <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.priority} min="0" name="priority" type="number" />
+                  </div>
                 </div>
+                <div className="grid gap-4 md:grid-cols-[1fr_auto_auto]">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-600">Unit price</label>
+                    <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.unitPrice} min="0" name="unitPrice" step="0.01" type="number" />
+                  </div>
+                  <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600 md:self-end">
+                    <input className="h-5 w-5 rounded border-slate-300" defaultChecked={rule.isActive} name="isActive" type="checkbox" />
+                    Active
+                  </label>
+                  <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue md:self-end" type="submit">
+                    Save rule
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={closeEditorHref}>
+                    Close editor
+                  </Link>
+                </div>
+              </form>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600">
+                <div className="space-y-1">
+                  <p>Fee code: <span className="font-semibold text-ink">{rule.feeCode}</span></p>
+                  <p>Unit price: <span className="font-semibold text-ink">${rule.unitPrice.toFixed(2)}</span></p>
+                  <p>Priority: <span className="font-semibold text-ink">{rule.priority}</span></p>
+                </div>
+                <Link
+                  className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
+                  href={buildSettingsHref(pathname, searchParams, {
+                    feesOpen: 1,
+                    feesPage: pagination.page,
+                    feeEditor: rule.id
+                  })}
+                >
+                  Edit rule
+                </Link>
               </div>
-              <div className="grid gap-4 md:grid-cols-5">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-600">City</label>
-                  <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.city ?? ""} name="city" />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-600">State</label>
-                  <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.state ?? ""} name="state" />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-600">ZIP</label>
-                  <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.zipCode ?? ""} name="zipCode" />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-600">Fee code</label>
-                  <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.feeCode} name="feeCode" />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-600">Priority</label>
-                  <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.priority} min="0" name="priority" type="number" />
-                </div>
-              </div>
-              <div className="grid gap-4 md:grid-cols-[1fr_auto_auto]">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-600">Unit price</label>
-                  <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.unitPrice} min="0" name="unitPrice" step="0.01" type="number" />
-                </div>
-                <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600 md:self-end">
-                  <input className="h-5 w-5 rounded border-slate-300" defaultChecked={rule.isActive} name="isActive" type="checkbox" />
-                  Active
-                </label>
-                <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue md:self-end" type="submit">
-                  Save rule
-                </button>
-              </div>
-            </form>
+            )}
             <form action={deleteRuleAction} className="mt-3">
               <input name="ruleId" type="hidden" value={rule.id} />
               <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-600" type="submit">
@@ -214,6 +299,31 @@ export function ServiceFeeSettingsCard({
             </form>
           </div>
         ))}
+        {pagination.totalCount > 0 ? (
+          <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600">
+            <p>Page {pagination.page} of {pagination.totalPages}</p>
+            <div className="flex gap-3">
+              {pagination.page > 1 ? (
+                <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={previousPageHref}>
+                  Previous
+                </Link>
+              ) : (
+                <span className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-300">
+                  Previous
+                </span>
+              )}
+              {pagination.page < pagination.totalPages ? (
+                <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={nextPageHref}>
+                  Next
+                </Link>
+              ) : (
+                <span className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-300">
+                  Next
+                </span>
+              )}
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

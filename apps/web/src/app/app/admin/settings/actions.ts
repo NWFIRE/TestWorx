@@ -71,6 +71,19 @@ function buildCustomerResultMessage(result: { quickBooksSynced: boolean; quickBo
   return baseMessage;
 }
 
+function buildSettingsRedirectWithParams(values: Record<string, string | null | undefined>) {
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(values)) {
+    if (value) {
+      params.set(key, value);
+    }
+  }
+
+  const query = params.toString();
+  return query ? `/app/admin/settings?${query}` : "/app/admin/settings";
+}
+
 export async function updateTenantBrandingAction(_: { error: string | null; success: string | null }, formData: FormData) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -199,6 +212,8 @@ export async function updateCustomerCompanyAction(formData: FormData) {
     redirect("/login");
   }
 
+  const customersPage = String(formData.get("customersPage") ?? "").trim() || "1";
+
   const parsed = customerCompanyInputSchema.safeParse({
     customerCompanyId: String(formData.get("customerCompanyId") ?? ""),
     name: String(formData.get("name") ?? ""),
@@ -208,7 +223,11 @@ export async function updateCustomerCompanyAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirect(`/app/admin/settings?customers=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Invalid customer input.")}`);
+    redirect(buildSettingsRedirectWithParams({
+      customersOpen: "1",
+      customersPage,
+      customers: parsed.error.issues[0]?.message ?? "Invalid customer input."
+    }));
   }
 
   try {
@@ -219,12 +238,20 @@ export async function updateCustomerCompanyAction(formData: FormData) {
     revalidatePath("/app/admin");
     revalidatePath("/app/admin/settings");
     revalidatePath("/app/admin/billing");
-    redirect(`/app/admin/settings?customers=${encodeURIComponent(buildCustomerResultMessage(result, `${result.customer.name} updated.`))}`);
+    redirect(buildSettingsRedirectWithParams({
+      customersOpen: "1",
+      customersPage,
+      customers: buildCustomerResultMessage(result, `${result.customer.name} updated.`)
+    }));
   } catch (error) {
     if (isRedirectError(error)) {
       throw error;
     }
-    redirect(`/app/admin/settings?customers=${encodeURIComponent(error instanceof Error ? error.message : "Unable to update customer.")}`);
+    redirect(buildSettingsRedirectWithParams({
+      customersOpen: "1",
+      customersPage,
+      customers: error instanceof Error ? error.message : "Unable to update customer."
+    }));
   }
 }
 
@@ -266,6 +293,11 @@ export async function updateQuickBooksCatalogItemAction(formData: FormData) {
     redirect("/login");
   }
 
+  const catalogPage = String(formData.get("qboPage") ?? "").trim() || "1";
+  const catalogSearch = String(formData.get("qboSearch") ?? "").trim();
+  const catalogType = String(formData.get("qboType") ?? "").trim();
+  const catalogStatus = String(formData.get("qboStatus") ?? "").trim();
+
   const unitPriceRaw = String(formData.get("unitPrice") ?? "").trim();
   const parsed = quickBooksCatalogItemInputSchema.safeParse({
     catalogItemId: String(formData.get("catalogItemId") ?? ""),
@@ -277,7 +309,14 @@ export async function updateQuickBooksCatalogItemAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirect(`/app/admin/settings?catalog=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Invalid product or service input.")}`);
+    redirect(buildSettingsRedirectWithParams({
+      catalogOpen: "1",
+      qboPage: catalogPage,
+      qboSearch: catalogSearch || null,
+      qboType: catalogType || null,
+      qboStatus: catalogStatus || null,
+      catalog: parsed.error.issues[0]?.message ?? "Invalid product or service input."
+    }));
   }
 
   try {
@@ -287,12 +326,26 @@ export async function updateQuickBooksCatalogItemAction(formData: FormData) {
     );
     revalidatePath("/app/admin/settings");
     revalidatePath("/app/admin/billing");
-    redirect(`/app/admin/settings?catalog=${encodeURIComponent(`${item.name} updated in QuickBooks.`)}`);
+    redirect(buildSettingsRedirectWithParams({
+      catalogOpen: "1",
+      qboPage: catalogPage,
+      qboSearch: catalogSearch || null,
+      qboType: catalogType || null,
+      qboStatus: catalogStatus || null,
+      catalog: `${item.name} updated in QuickBooks.`
+    }));
   } catch (error) {
     if (isRedirectError(error)) {
       throw error;
     }
-    redirect(`/app/admin/settings?catalog=${encodeURIComponent(error instanceof Error ? error.message : "Unable to update product or service.")}`);
+    redirect(buildSettingsRedirectWithParams({
+      catalogOpen: "1",
+      qboPage: catalogPage,
+      qboSearch: catalogSearch || null,
+      qboType: catalogType || null,
+      qboStatus: catalogStatus || null,
+      catalog: error instanceof Error ? error.message : "Unable to update product or service."
+    }));
   }
 }
 
