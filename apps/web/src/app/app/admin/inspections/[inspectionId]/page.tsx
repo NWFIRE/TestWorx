@@ -7,11 +7,13 @@ import {
   getAdminDashboardData,
   getAdminInspectionPdfAttachments,
   getDefaultInspectionRecurrenceFrequency,
+  getInspectionDisplayLabels,
   getInspectionDocuments,
   getInspectionForEdit
 } from "@testworx/lib";
 
-import { amendInspectionAction, reopenCompletedReportAction, updateInspectionAction, uploadInspectionExternalDocumentAction, uploadInspectionPdfAction } from "../../actions";
+import { amendInspectionAction, deleteInspectionAction, reopenCompletedReportAction, updateInspectionAction, uploadInspectionExternalDocumentAction, uploadInspectionPdfAction } from "../../actions";
+import { DeleteInspectionCard } from "../../delete-inspection-card";
 import { InspectionExternalDocumentsCard } from "../../inspection-external-documents-card";
 import { InspectionPdfUploadCard } from "../../inspection-pdf-upload-card";
 import { InspectionReportCorrectionsCard } from "../../inspection-report-corrections-card";
@@ -104,21 +106,21 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
     deficiencyCount?: number;
     deficiencies?: Array<{ id: string; title: string; description: string; severity: string; status: string; section: string; location: string | null }>;
     auditTrail?: Array<{ id: string; action: string; createdAt: Date; metadata: Record<string, unknown> | null }>;
-    originalAmendment?: {
+        originalAmendment?: {
       id: string;
       reason: string;
       type: string;
       createdAt: Date;
-      inspection: { id: string; scheduledStart: Date; site: { name: string }; assignedTechnician: { name: string } | null };
+      inspection: { id: string; scheduledStart: Date; site: { name: string }; customerCompany: { name: string }; assignedTechnician: { name: string } | null };
     } | null;
     outgoingAmendment?: {
       id: string;
       reason: string;
       type: string;
       createdAt: Date;
-      replacementInspection: { id: string; scheduledStart: Date; site: { name: string }; assignedTechnician: { name: string } | null };
+      replacementInspection: { id: string; scheduledStart: Date; site: { name: string }; customerCompany: { name: string }; assignedTechnician: { name: string } | null };
     } | null;
-    amendments?: Array<{ id: string; reason: string; type: string; createdAt: Date; replacementInspection: { id: string; scheduledStart: Date; site: { name: string }; assignedTechnician: { name: string } | null } }>;
+    amendments?: Array<{ id: string; reason: string; type: string; createdAt: Date; replacementInspection: { id: string; scheduledStart: Date; site: { name: string }; customerCompany: { name: string }; assignedTechnician: { name: string } | null } }>;
   };
   const attachmentView = attachments as unknown as Array<{ id: string; fileName: string; source: "uploaded" | "generated"; customerVisible: boolean; createdAt: Date }>;
   const externalDocumentView = documents as unknown as Array<{
@@ -138,13 +140,29 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
   type AuditTrailEntry = { id: string; action: string; createdAt: Date; metadata: unknown };
   type InspectionDeficiency = NonNullable<typeof inspectionView.deficiencies>[number];
   const auditTrailEntries = (inspectionView.auditTrail ?? []) as AuditTrailEntry[];
+  const inspectionDisplay = getInspectionDisplayLabels({
+    siteName: inspectionView.site.name,
+    customerName: inspectionView.customerCompany.name
+  });
+  const originalInspectionDisplay = inspectionView.originalAmendment
+    ? getInspectionDisplayLabels({
+        siteName: inspectionView.originalAmendment.inspection.site.name,
+        customerName: inspectionView.originalAmendment.inspection.customerCompany.name
+      })
+    : null;
+  const replacementInspectionDisplay = inspectionView.outgoingAmendment
+    ? getInspectionDisplayLabels({
+        siteName: inspectionView.outgoingAmendment.replacementInspection.site.name,
+        customerName: inspectionView.outgoingAmendment.replacementInspection.customerCompany.name
+      })
+    : null;
 
   return (
     <section className="space-y-6">
       <div className="rounded-[2rem] bg-white p-6 shadow-panel">
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Inspection editor</p>
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h2 className="text-3xl font-semibold text-ink">{inspectionView.site.name}</h2>
+          <h2 className="text-3xl font-semibold text-ink">{inspectionDisplay.primaryTitle}</h2>
           <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${lifecycleBadgeStyles[inspectionView.lifecycle ?? "original"]}`}>
             {formatLifecycleLabel(inspectionView.lifecycle ?? "original")}
           </span>
@@ -152,7 +170,10 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
             Amendment center
           </Link>
         </div>
-        <p className="mt-3 text-slate-500">Adjust assignment, status, recurrence mix, scheduling details, and customer-facing PDF delivery for this visit.</p>
+        <p className="mt-3 text-slate-500">
+          {inspectionDisplay.secondaryTitle ? `${inspectionDisplay.secondaryTitle} | ` : ""}
+          Adjust assignment, status, recurrence mix, scheduling details, and customer-facing PDF delivery for this visit.
+        </p>
         {inspectionView.hasStartedWork ? <p className="mt-3 text-sm text-amber-700">Started work is protected. Changes here create an audited follow-up visit instead of rewriting history.</p> : null}
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <div className="rounded-2xl border border-slate-200 p-4">
@@ -226,16 +247,20 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Lifecycle timeline</p>
             <div className="mt-4 space-y-4">
               <div className="rounded-2xl border border-slate-200 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Current visit</p>
-                <p className="mt-2 text-sm font-semibold text-ink">{inspectionView.site.name}</p>
-                <p className="mt-1 text-sm text-slate-500">{format(inspectionView.scheduledStart, "MMM d, yyyy h:mm a")}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Current visit</p>
+                <p className="mt-2 text-sm font-semibold text-ink">{inspectionDisplay.primaryTitle}</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  {inspectionDisplay.secondaryTitle ? `${inspectionDisplay.secondaryTitle} | ` : ""}{format(inspectionView.scheduledStart, "MMM d, yyyy h:mm a")}
+                </p>
                 <p className="mt-1 text-sm text-slate-500">Technicians: {(inspectionView.assignedTechnicianNames ?? []).length ? (inspectionView.assignedTechnicianNames ?? []).join(", ") : "Unassigned"}</p>
               </div>
               {inspectionView.originalAmendment ? (
                 <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-800">Replaces original visit</p>
                   <p className="mt-2 text-sm text-blue-900">{inspectionView.originalAmendment.reason}</p>
-                  <p className="mt-2 text-sm text-blue-800">{inspectionView.originalAmendment.inspection.site.name} on {format(inspectionView.originalAmendment.inspection.scheduledStart, "MMM d, yyyy h:mm a")}</p>
+                  <p className="mt-2 text-sm text-blue-800">
+                    {originalInspectionDisplay?.primaryTitle} {originalInspectionDisplay?.secondaryTitle ? `| ${originalInspectionDisplay.secondaryTitle}` : ""} on {format(inspectionView.originalAmendment.inspection.scheduledStart, "MMM d, yyyy h:mm a")}
+                  </p>
                   <Link className="mt-3 inline-flex text-sm font-semibold text-slateblue" href={`/app/admin/inspections/${inspectionView.originalAmendment.inspection.id}`}>
                     Open original visit
                   </Link>
@@ -245,7 +270,9 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-900">Superseded by replacement visit</p>
                   <p className="mt-2 text-sm text-amber-900">{inspectionView.outgoingAmendment.reason}</p>
-                  <p className="mt-2 text-sm text-amber-800">{inspectionView.outgoingAmendment.replacementInspection.site.name} on {format(inspectionView.outgoingAmendment.replacementInspection.scheduledStart, "MMM d, yyyy h:mm a")}</p>
+                  <p className="mt-2 text-sm text-amber-800">
+                    {replacementInspectionDisplay?.primaryTitle} {replacementInspectionDisplay?.secondaryTitle ? `| ${replacementInspectionDisplay.secondaryTitle}` : ""} on {format(inspectionView.outgoingAmendment.replacementInspection.scheduledStart, "MMM d, yyyy h:mm a")}
+                  </p>
                   <Link className="mt-3 inline-flex text-sm font-semibold text-slateblue" href={`/app/admin/inspections/${inspectionView.outgoingAmendment.replacementInspection.id}`}>
                     Open replacement visit
                   </Link>
@@ -287,6 +314,7 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
             }))}
           />
           <InspectionPdfUploadCard action={uploadInspectionPdfAction} attachments={attachmentView} inspectionId={inspection.id} />
+          <DeleteInspectionCard action={deleteInspectionAction} inspectionId={inspection.id} />
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Audit trail</p>
             <div className="mt-4 space-y-3">

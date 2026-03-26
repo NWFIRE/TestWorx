@@ -7,6 +7,7 @@ import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { auth } from "@/auth";
 import {
   createInspection,
+  deleteInspection,
   importCustomerSiteCsv,
   createInspectionAmendment,
   ensureGenericInspectionSite,
@@ -102,6 +103,32 @@ export async function createInspectionAction(_: { error: string | null; success:
     return { error: null, success: `Inspection created successfully for ${inspection.scheduledStart.toLocaleString()}.` };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unable to create inspection.", success: null };
+  }
+}
+
+export async function deleteInspectionAction(_: { error: string | null; success: string | null }, formData: FormData) {
+  const session = await auth();
+  const inspectionId = String(formData.get("inspectionId") ?? "");
+
+  if (!session?.user?.tenantId || !inspectionId) {
+    return { error: "Unauthorized", success: null };
+  }
+
+  try {
+    await deleteInspection(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      inspectionId
+    );
+
+    revalidatePath("/app/admin");
+    revalidatePath("/app/admin/amendments");
+    revalidatePath("/app/admin/billing");
+    revalidatePath("/app/tech");
+    revalidatePath("/app/customer");
+
+    return { error: null, success: "Inspection deleted successfully." };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Unable to delete inspection.", success: null };
   }
 }
 

@@ -50,7 +50,11 @@ function taskDisplayLabel(task: { inspectionType: string; displayLabel?: string 
   return task.displayLabel ?? task.inspectionType.replaceAll("_", " ");
 }
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const session = await auth();
   if (!session?.user?.tenantId) {
     redirect("/login");
@@ -61,10 +65,17 @@ export default async function AdminPage() {
 
   const data = await getAdminDashboardData({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId });
   const importTemplateHref = `data:text/csv;charset=utf-8,${encodeURIComponent(getCustomerSiteImportTemplateCsv())}`;
+  const params = searchParams ? await searchParams : {};
+  const inspectionNotice = Array.isArray(params.inspection) ? params.inspection[0] : params.inspection;
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1.2fr_0.95fr]">
       <section className="space-y-6">
+        {inspectionNotice === "deleted" ? (
+          <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-800 shadow-panel">
+            Inspection deleted successfully.
+          </div>
+        ) : null}
         <div className="grid gap-4 md:grid-cols-3">
           {[["Completed visits", data.summary.completedInspections], ["Shared queue", data.summary.unassignedInspections], ["Sites", data.summary.siteCount]].map(([label, value]) => (
             <div key={String(label)} className="rounded-3xl bg-white p-5 shadow-panel">
@@ -90,7 +101,7 @@ export default async function AdminPage() {
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-lg font-semibold text-ink">{inspection.site.name}</p>
+                        <p className="text-lg font-semibold text-ink">{(inspection as typeof inspection & { primaryTitle?: string }).primaryTitle ?? inspection.site.name}</p>
                         <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[(inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status]}`}>
                           {inspectionStatusLabel((inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status)}
                         </span>
@@ -103,7 +114,9 @@ export default async function AdminPage() {
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-1 text-sm text-slate-500">{inspection.customerCompany.name} | {format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}</p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {((inspection as typeof inspection & { secondaryTitle?: string }).secondaryTitle ?? inspection.customerCompany.name)} | {format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}
+                      </p>
                       <p className="mt-1 text-sm text-slate-500">Assigned: {((inspection as typeof inspection & { assignedTechnicianNames?: string[] }).assignedTechnicianNames ?? []).length ? ((inspection as typeof inspection & { assignedTechnicianNames?: string[] }).assignedTechnicianNames ?? []).join(", ") : "Shared queue"}</p>
                       <p className="mt-1 text-sm text-slate-500">Report types: {inspection.tasks.map((task: DashboardTask) => taskDisplayLabel(task as DashboardTask & { displayLabel?: string })).join(", ")}</p>
                       <p className="mt-1 text-sm text-slate-500">Next due: {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}</p>
@@ -133,7 +146,7 @@ export default async function AdminPage() {
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-lg font-semibold text-ink">{inspection.site.name}</p>
+                        <p className="text-lg font-semibold text-ink">{(inspection as typeof inspection & { primaryTitle?: string }).primaryTitle ?? inspection.site.name}</p>
                         <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[(inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status]}`}>
                           {inspectionStatusLabel((inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status)}
                         </span>
@@ -141,7 +154,9 @@ export default async function AdminPage() {
                           {((inspection as typeof inspection & { lifecycle?: string }).lifecycle ?? "original").replaceAll("_", " ")}
                         </span>
                       </div>
-                      <p className="mt-1 text-sm text-slate-500">{inspection.customerCompany.name} | {format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}</p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {((inspection as typeof inspection & { secondaryTitle?: string }).secondaryTitle ?? inspection.customerCompany.name)} | {format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}
+                      </p>
                       <p className="mt-1 text-sm text-slate-500">Assigned: {((inspection as typeof inspection & { assignedTechnicianNames?: string[] }).assignedTechnicianNames ?? []).length ? ((inspection as typeof inspection & { assignedTechnicianNames?: string[] }).assignedTechnicianNames ?? []).join(", ") : "Shared queue"}</p>
                       <p className="mt-1 text-sm text-slate-500">Report types: {inspection.tasks.map((task: DashboardTask) => taskDisplayLabel(task as DashboardTask & { displayLabel?: string })).join(", ")}</p>
                       <p className="mt-1 text-sm text-slate-500">Next due: {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}</p>

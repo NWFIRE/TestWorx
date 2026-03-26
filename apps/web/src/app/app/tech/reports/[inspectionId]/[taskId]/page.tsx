@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getInspectionReportDraft } from "@testworx/lib";
+import { getInspectionDisplayLabels, getInspectionReportDraft } from "@testworx/lib";
 
 import { ReportEditor } from "../../../report-editor";
 
@@ -48,6 +48,10 @@ export default async function TechnicianReportPage({ params }: { params: Promise
   if (!report) {
     notFound();
   }
+  const inspectionDisplay = getInspectionDisplayLabels({
+    siteName: report.inspection.site.name,
+    customerName: report.inspection.customerCompany.name
+  });
 
   return (
     <ReportEditor
@@ -60,8 +64,8 @@ export default async function TechnicianReportPage({ params }: { params: Promise
         canEdit: report.permissions.canEdit,
         canFinalize: report.permissions.canFinalize,
         inspectionTypeLabel: report.task.displayLabel ?? report.template.label,
-        siteName: report.inspection.site.name,
-        customerName: report.inspection.customerCompany.name,
+        siteName: inspectionDisplay.primaryTitle,
+        customerName: inspectionDisplay.secondaryTitle || report.inspection.customerCompany.name,
         scheduledDateLabel: format(report.inspection.scheduledStart, "MMM d, yyyy h:mm a"),
         template: report.template,
         draft: report.draft

@@ -10,6 +10,7 @@ import { assertTenantContext } from "./permissions";
 import { assertTenantEntitlementForTenant } from "./billing";
 import type { JsonInputValue, JsonObject } from "./json-types";
 import { getDefaultInspectionRecurrenceFrequency, inspectionTypeRegistry } from "./report-config";
+import { deleteStoredFile } from "./storage";
 
 const inspectionTypeEnum = z.enum(Object.keys(inspectionTypeRegistry) as [keyof typeof inspectionTypeRegistry, ...(keyof typeof inspectionTypeRegistry)[]]);
 export const editableInspectionStatuses = ["to_be_completed", "scheduled", "in_progress", "completed", "cancelled"] as const;
@@ -97,6 +98,25 @@ export { getDefaultInspectionRecurrenceFrequency } from "./report-config";
 
 export function formatInspectionTaskTypeLabel(inspectionType: keyof typeof inspectionTypeRegistry) {
   return inspectionTypeRegistry[inspectionType].label;
+}
+
+export function isGenericInspectionSiteName(siteName: string | null | undefined) {
+  return (siteName ?? "").trim() === genericInspectionSiteName;
+}
+
+export function getInspectionDisplayLabels(input: {
+  siteName: string | null | undefined;
+  customerName: string | null | undefined;
+}) {
+  const siteName = (input.siteName ?? "").trim();
+  const customerName = (input.customerName ?? "").trim();
+  const isGenericSite = isGenericInspectionSiteName(siteName);
+
+  return {
+    isGenericSite,
+    primaryTitle: isGenericSite && customerName ? customerName : siteName || customerName || "Untitled inspection",
+    secondaryTitle: isGenericSite ? genericInspectionSiteName : customerName
+  };
 }
 
 export function buildInspectionTaskDisplayLabel(input: {
@@ -272,6 +292,19 @@ export function getAssignmentAuditAction(previousTechnicianId: string | null, ne
   return null;
 }
 
+function hasRiskyInspectionAccountingState(input: {
+  billingStatus?: string | null;
+  quickbooksInvoiceId?: string | null;
+  quickbooksSyncStatus?: string | null;
+}) {
+  return (
+    input.billingStatus === "invoiced" ||
+    Boolean(input.quickbooksInvoiceId) ||
+    input.quickbooksSyncStatus === "synced" ||
+    input.quickbooksSyncStatus === "sent"
+  );
+}
+
 export function canTechnicianClaimInspection(input: {
   actorTenantId: string | null;
   inspectionTenantId: string;
@@ -419,6 +452,198 @@ export async function ensureGenericInspectionSite(
       id: true
     }
   });
+}
+
+export async function deleteInspection(actor: ActorContext, inspectionId: string) {
+  const parsedActor = parseActor(actor);
+  if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
+    throw new Error("Only office administrators can delete inspections.");
+  }
+
+  const tenantId = parsedActor.tenantId as string;
+
+  const inspection = await prisma.inspection.findFirst({
+    where: { id: inspectionId, tenantId },
+    include: {
+      customerCompany: { select: { name: true } },
+      site: { select: { name: true } },
+      amendments: { select: { id: true } },
+      replacementAmendments: { select: { id: true } },
+      billingSummary: {
+        select: {
+          id: true,
+          status: true,
+          quickbooksInvoiceId: true,
+          quickbooksSyncStatus: true
+        }
+      },
+      attachments: {
+        select: {
+          id: true,
+          storageKey: true
+        }
+      },
+      reports: {
+        select: {
+          id: true,
+          attachments: {
+            select: {
+              id: true,
+              storageKey: true
+            }
+          },
+          signatures: {
+            select: {
+              id: true,
+              imageDataUrl: true
+            }
+          },
+          deficiencies: {
+            select: {
+              id: true,
+              photoStorageKey: true
+            }
+          }
+        }
+      },
+      documents: {
+        select: {
+          id: true,
+          originalStorageKey: true,
+          signedStorageKey: true
+        }
+      }
+    }
+  });
+
+  if (!inspection) {
+    throw new Error("Inspection not found.");
+  }
+
+  const blockedReason = inspection.amendments.length > 0 || inspection.replacementAmendments.length > 0
+    ? "This inspection is linked to amendment history and cannot be deleted."
+    : hasRiskyInspectionAccountingState({
+        billingStatus: inspection.billingSummary?.status,
+        quickbooksInvoiceId: inspection.billingSummary?.quickbooksInvoiceId,
+        quickbooksSyncStatus: inspection.billingSummary?.quickbooksSyncStatus
+      })
+      ? "This inspection has invoicing or QuickBooks history and cannot be deleted."
+      : null;
+
+  if (blockedReason) {
+    await prisma.auditLog.create({
+      data: {
+        tenantId,
+        actorUserId: parsedActor.userId,
+        action: "inspection.delete_blocked",
+        entityType: "Inspection",
+        entityId: inspectionId,
+        metadata: {
+          reason: blockedReason,
+          customerName: inspection.customerCompany.name,
+          siteName: inspection.site.name
+        } as JsonObject
+      }
+    });
+
+    throw new Error(blockedReason);
+  }
+
+  const storageKeys = [
+    ...inspection.attachments.map((attachment) => attachment.storageKey),
+    ...inspection.reports.flatMap((report) => [
+      ...report.attachments.map((attachment) => attachment.storageKey),
+      ...report.signatures.map((signature) => signature.imageDataUrl),
+      ...report.deficiencies.map((deficiency) => deficiency.photoStorageKey).filter((key): key is string => Boolean(key))
+    ]),
+    ...inspection.documents.flatMap((document) => [
+      document.originalStorageKey,
+      document.signedStorageKey
+    ].filter((key): key is string => Boolean(key)))
+  ];
+
+  await prisma.$transaction(async (tx) => {
+    const reportIds = inspection.reports.map((report) => report.id);
+
+    if (reportIds.length) {
+      await tx.reportCorrectionEvent.deleteMany({
+        where: { tenantId, reportId: { in: reportIds } }
+      });
+    }
+
+    await tx.attachment.deleteMany({
+      where: {
+        tenantId,
+        OR: [
+          { inspectionId },
+          { inspectionReportId: { in: reportIds } }
+        ]
+      }
+    });
+    await tx.signature.deleteMany({
+      where: { tenantId, inspectionReportId: { in: reportIds } }
+    });
+    await tx.deficiency.deleteMany({
+      where: { tenantId, inspectionId }
+    });
+    await tx.inspectionDocument.deleteMany({
+      where: { tenantId, inspectionId }
+    });
+    await tx.inspectionReport.deleteMany({
+      where: { tenantId, inspectionId }
+    });
+    await tx.inspectionRecurrence.deleteMany({
+      where: { tenantId, inspectionTask: { inspectionId } }
+    });
+    await tx.inspectionTask.deleteMany({
+      where: { tenantId, inspectionId }
+    });
+    await tx.inspectionTechnicianAssignment.deleteMany({
+      where: { tenantId, inspectionId }
+    });
+    await tx.inspectionBillingSummary.deleteMany({
+      where: { tenantId, inspectionId }
+    });
+    await tx.inspection.delete({
+      where: { id: inspectionId }
+    });
+
+    await createAuditLog(tx, {
+      tenantId,
+      actorUserId: parsedActor.userId,
+      action: "inspection.deleted",
+      entityId: inspectionId,
+      metadata: {
+        customerName: inspection.customerCompany.name,
+        siteName: inspection.site.name,
+        deletedReportCount: inspection.reports.length,
+        deletedDocumentCount: inspection.documents.length,
+        deletedAttachmentCount: inspection.attachments.length + inspection.reports.reduce((count, report) => count + report.attachments.length, 0),
+        deletedSignatureCount: inspection.reports.reduce((count, report) => count + report.signatures.length, 0),
+        deletedDeficiencyCount: inspection.reports.reduce((count, report) => count + report.deficiencies.length, 0)
+      }
+    });
+  });
+
+  const cleanupResults = await Promise.allSettled(
+    [...new Set(storageKeys)].map((storageKey) => deleteStoredFile(storageKey))
+  );
+
+  const failedCleanupCount = cleanupResults.filter((result) => result.status === "rejected").length;
+  if (failedCleanupCount > 0) {
+    await prisma.auditLog.create({
+      data: {
+        tenantId,
+        actorUserId: parsedActor.userId,
+        action: "inspection.delete_storage_cleanup_failed",
+        entityType: "Inspection",
+        entityId: inspectionId,
+        metadata: {
+          failedCleanupCount
+        } as JsonObject
+      }
+    });
+  }
 }
 
 async function validateSchedulingReferences(tx: Prisma.TransactionClient, tenantId: string, input: z.infer<typeof scheduleInspectionSchema>) {
@@ -1144,6 +1369,7 @@ export async function getInspectionForEdit(actor: ActorContext, inspectionId: st
           inspection: {
             include: {
               site: true,
+              customerCompany: true,
               assignedTechnician: true,
               technicianAssignments: { include: { technician: true } }
             }
@@ -1155,6 +1381,7 @@ export async function getInspectionForEdit(actor: ActorContext, inspectionId: st
           replacementInspection: {
             include: {
               site: true,
+              customerCompany: true,
               assignedTechnician: true,
               technicianAssignments: { include: { technician: true } }
             }
@@ -1212,6 +1439,10 @@ export async function getInspectionForEdit(actor: ActorContext, inspectionId: st
     ...inspection,
     originalAmendment,
     outgoingAmendment,
+    ...getInspectionDisplayLabels({
+      siteName: inspection.site.name,
+      customerName: inspection.customerCompany.name
+    }),
     lifecycle,
     displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
     assignedTechnicianNames: formatAssignedTechnicianNames({
@@ -1306,10 +1537,15 @@ export async function getAdminDashboardData(actor: ActorContext) {
     const inspectionWithOptionalBillingSummary = inspection as T & {
       billingSummary?: { status?: string | null } | null;
     };
+    const displayLabels = getInspectionDisplayLabels({
+      siteName: inspection.site.name,
+      customerName: inspection.customerCompany.name
+    });
 
     return {
       ...inspection,
       tasks: withInspectionTaskDisplayLabels(inspection.tasks),
+      ...displayLabels,
       displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
       billingStatus: inspectionWithOptionalBillingSummary.billingSummary?.status ?? null,
       assignedTechnicianNames: formatAssignedTechnicianNames({
@@ -1457,8 +1693,12 @@ export async function getAdminAmendmentManagementData(
   };
 }
 
-function buildMonthCalendar(inspections: Array<{ scheduledStart: Date; status: InspectionStatus; site: { name: string } }>) {
+function buildMonthCalendar(inspections: Array<{ scheduledStart: Date; status: InspectionStatus; site: { name: string }; customerCompany: { name: string } }>) {
   return inspections.map((inspection) => ({
+    ...getInspectionDisplayLabels({
+      siteName: inspection.site.name,
+      customerName: inspection.customerCompany.name
+    }),
     dayKey: format(inspection.scheduledStart, "yyyy-MM-dd"),
     label: format(inspection.scheduledStart, "MMM d"),
     siteName: inspection.site.name,
@@ -1525,6 +1765,10 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
     assigned: assignedInspections.map((inspection) => ({
       ...inspection,
       tasks: withInspectionTaskDisplayLabels(inspection.tasks),
+      ...getInspectionDisplayLabels({
+        siteName: inspection.site.name,
+        customerName: inspection.customerCompany.name
+      }),
       displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
       assignedTechnicianNames: formatAssignedTechnicianNames({
         assignedTechnician: inspection.assignedTechnician,
@@ -1534,6 +1778,10 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
     unassigned: unassignedInspections.map((inspection) => ({
       ...inspection,
       tasks: withInspectionTaskDisplayLabels(inspection.tasks),
+      ...getInspectionDisplayLabels({
+        siteName: inspection.site.name,
+        customerName: inspection.customerCompany.name
+      }),
       displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
       assignedTechnicianNames: formatAssignedTechnicianNames({
         assignedTechnician: inspection.assignedTechnician,

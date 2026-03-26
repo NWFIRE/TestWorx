@@ -118,7 +118,10 @@ export default async function TechnicianPage({
             data.monthCalendar.map((entry) => (
               <div key={`${entry.dayKey}-${entry.siteName}`} className="rounded-2xl border border-slate-200 p-4">
                 <p className="text-sm text-slate-500">{entry.label}</p>
-                <p className="mt-1 font-semibold text-ink">{entry.siteName}</p>
+                <p className="mt-1 font-semibold text-ink">{(entry as typeof entry & { primaryTitle?: string }).primaryTitle ?? entry.siteName}</p>
+                {(entry as typeof entry & { secondaryTitle?: string }).secondaryTitle ? (
+                  <p className="mt-1 text-sm text-slate-500">{(entry as typeof entry & { secondaryTitle?: string }).secondaryTitle}</p>
+                ) : null}
                 <span className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[entry.status]}`}>{inspectionStatusLabel(entry.status)}</span>
               </div>
             ))
@@ -146,10 +149,12 @@ export default async function TechnicianPage({
                     <div className="flex flex-col gap-4">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-lg font-semibold text-ink">{inspection.site.name}</p>
+                          <p className="text-lg font-semibold text-ink">{(inspection as typeof inspection & { primaryTitle?: string }).primaryTitle ?? inspection.site.name}</p>
                           <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[(inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status]}`}>{inspectionStatusLabel((inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status)}</span>
                         </div>
-                        <p className="mt-2 text-sm text-slate-500">{format(inspection.scheduledStart, "EEE, MMM d h:mm a")} | {inspection.customerCompany.name}</p>
+                        <p className="mt-2 text-sm text-slate-500">
+                          {format(inspection.scheduledStart, "EEE, MMM d h:mm a")} | {((inspection as typeof inspection & { secondaryTitle?: string }).secondaryTitle ?? inspection.customerCompany.name)}
+                        </p>
                         <p className="mt-1 text-sm text-slate-500">Assigned team: {((inspection as typeof inspection & { assignedTechnicianNames?: string[] }).assignedTechnicianNames ?? []).join(", ")}</p>
                         <p className="mt-1 text-sm text-slate-500">Due date: {nextDueLabel(nextDue, inspection.scheduledStart)}</p>
                         <p className="mt-1 text-sm text-slate-500">Report types: {inspection.tasks.map((task: DashboardTask) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
@@ -239,10 +244,12 @@ export default async function TechnicianPage({
                     <div className="space-y-4">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-lg font-semibold text-ink">{inspection.site.name}</p>
+                          <p className="text-lg font-semibold text-ink">{(inspection as typeof inspection & { primaryTitle?: string }).primaryTitle ?? inspection.site.name}</p>
                           <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[(inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status]}`}>{inspectionStatusLabel((inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status)}</span>
                         </div>
-                        <p className="mt-2 text-sm text-slate-500">{format(inspection.scheduledStart, "MMM d, h:mm a")} | {inspection.customerCompany.name}</p>
+                        <p className="mt-2 text-sm text-slate-500">
+                          {format(inspection.scheduledStart, "MMM d, h:mm a")} | {((inspection as typeof inspection & { secondaryTitle?: string }).secondaryTitle ?? inspection.customerCompany.name)}
+                        </p>
                         <p className="mt-1 text-sm text-slate-500">Due date: {nextDueLabel(nextDue, inspection.scheduledStart)}</p>
                         <p className="mt-1 text-sm text-slate-500">{inspection.tasks.length} report task{inspection.tasks.length === 1 ? "" : "s"} ready to claim</p>
                       </div>

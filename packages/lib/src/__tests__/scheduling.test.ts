@@ -4,6 +4,7 @@ import { InspectionStatus } from "@prisma/client";
 import {
   defaultScheduledStartForMonth,
   genericInspectionSiteOptionValue,
+  getInspectionDisplayLabels,
   getDefaultInspectionRecurrenceFrequency,
   withInspectionTaskDisplayLabels,
   getInspectionDisplayStatus,
@@ -227,5 +228,31 @@ describe("month defaults and past-due status", () => {
         now: new Date("2026-03-20T00:00:00.000Z")
       })
     ).toBe("scheduled");
+  });
+
+  it("shows customer-first labels for generic-site inspections", () => {
+    expect(
+      getInspectionDisplayLabels({
+        siteName: "General / No Fixed Site",
+        customerName: "NW Fire"
+      })
+    ).toEqual({
+      isGenericSite: true,
+      primaryTitle: "NW Fire",
+      secondaryTitle: "General / No Fixed Site"
+    });
+  });
+
+  it("keeps real site names as the primary label for normal inspections", () => {
+    expect(
+      getInspectionDisplayLabels({
+        siteName: "Main Campus",
+        customerName: "NW Fire"
+      })
+    ).toEqual({
+      isGenericSite: false,
+      primaryTitle: "Main Campus",
+      secondaryTitle: "NW Fire"
+    });
   });
 });
