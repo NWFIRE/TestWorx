@@ -31,7 +31,20 @@ export default async function TechnicianReportPage({ params }: { params: Promise
   }
 
   const { inspectionId, taskId } = await params;
-  const report = await getInspectionReportDraft({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId, taskId);
+  let report;
+  try {
+    report = await getInspectionReportDraft({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId, taskId);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      session.user.role === "technician" &&
+      /completed inspections are no longer available in the technician app/i.test(error.message)
+    ) {
+      redirect("/app/tech?report=finalized");
+    }
+
+    throw error;
+  }
   if (!report) {
     notFound();
   }

@@ -617,7 +617,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
     setSaveState("Finalized");
     setDirty(false);
     window.localStorage.removeItem(backupKey);
-    window.location.reload();
+    window.location.assign("/app/tech?report=finalized");
   }
 
   const activeSection = data.template.sections.find((section) => section.id === activeSectionId) ?? data.template.sections[0];

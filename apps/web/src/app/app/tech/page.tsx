@@ -61,7 +61,11 @@ function correctionStateLabel(state: string | null | undefined) {
   return state ? state.replaceAll("_", " ") : "";
 }
 
-export default async function TechnicianPage() {
+export default async function TechnicianPage({
+  searchParams
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const session = await auth();
   if (!session?.user?.tenantId) {
     redirect("/login");
@@ -70,6 +74,10 @@ export default async function TechnicianPage() {
     redirect("/app");
   }
 
+  const params = searchParams ? await searchParams : {};
+  const reportNotice = Array.isArray(params.report)
+    ? params.report[0]
+    : params.report;
   const data = await getTechnicianDashboardData({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId });
 
   return (
@@ -79,6 +87,12 @@ export default async function TechnicianPage() {
         <h2 className="mt-2 text-3xl font-semibold">Field schedule</h2>
         <p className="mt-3 max-w-2xl text-white/75">Claim open work, move visits through the day, and finish reports without losing sight of due dates.</p>
       </div>
+
+      {reportNotice === "finalized" ? (
+        <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-800 shadow-panel">
+          Report finalized successfully. The completed report is now saved and no longer editable from the technician app.
+        </div>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[["Assigned", data.assigned.length], ["Today", data.today.length], ["This week", data.thisWeek.length], ["Shared queue", data.unassigned.length]].map(([label, value]) => (
