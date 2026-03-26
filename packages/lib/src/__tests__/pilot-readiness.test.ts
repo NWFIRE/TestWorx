@@ -44,6 +44,7 @@ describe("evaluatePilotReadiness", () => {
     expect(result.criticalCount).toBe(0);
     expect(result.checks.find((check) => check.id === "deployment")?.level).toBe("ready");
     expect(result.checks.find((check) => check.id === "storage")?.level).toBe("ready");
+    expect(result.checks.find((check) => check.id === "storage")?.detail).toMatch(/private Vercel Blob store/i);
     expect(result.checks.find((check) => check.id === "quickbooks")?.level).toBe("ready");
   });
 

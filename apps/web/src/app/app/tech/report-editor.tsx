@@ -108,6 +108,27 @@ function sectionStatusLabel(summary: ReturnType<typeof buildReportPreview>["sect
   return `○ ${summary.sectionLabel}`;
 }
 
+function toTechnicianFacingSaveMessage(message: string | null | undefined, action: "save" | "finalize") {
+  const normalized = (message ?? "").trim();
+  if (!normalized) {
+    return action === "save"
+      ? "Unable to save your report right now. Check your connection and try again."
+      : "Unable to finalize this report right now. Review the report and try again.";
+  }
+
+  if (/report media storage is unavailable/i.test(normalized)) {
+    return normalized;
+  }
+
+  if (/signatures are required|all report sections must be marked/i.test(normalized)) {
+    return normalized;
+  }
+
+  return action === "save"
+    ? "Unable to save your report right now. Check your connection and try again."
+    : "Unable to finalize this report right now. Review the report and try again.";
+}
+
 export function ReportEditor({ data }: { data: EditorData }) {
   const [draft, setDraft] = useState<ReportDraft>(data.draft);
   const [activeSectionId, setActiveSectionId] = useState<string>(data.draft.activeSectionId ?? data.template.sections[0]?.id ?? "");
@@ -227,7 +248,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
       return true;
     } catch (error) {
       setSaveState("Error");
-      setErrorMessage(error instanceof Error ? error.message : "Unable to save draft.");
+      setErrorMessage(toTechnicianFacingSaveMessage(error instanceof Error ? error.message : null, "save"));
       return false;
     } finally {
       saveInFlightRef.current = false;
@@ -587,7 +608,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
     const payload = await response.json();
 
     if (!response.ok) {
-      setFinalizeErrorMessage(payload.error ?? "Unable to finalize report.");
+      setFinalizeErrorMessage(toTechnicianFacingSaveMessage(payload.error, "finalize"));
       setSaveState("Error");
       return;
     }
@@ -614,6 +635,14 @@ export function ReportEditor({ data }: { data: EditorData }) {
   const signatureCount = countCapturedSignatures(draft);
   const activeSectionSummary = preview.sectionSummaries.find((summary) => summary.sectionId === activeSection.id);
   const visibleErrorMessage = errorMessage ?? finalizeErrorMessage;
+  const pendingSectionCount = preview.sectionSummaries.filter((summary) => summary.status === "pending").length;
+  const hasRequiredSignatures = signatureCount === 2;
+  const finalizeReadinessMessage = pendingSectionCount > 0
+    ? "Complete and mark every section before finalizing."
+    : !hasRequiredSignatures
+      ? "Technician and customer signatures are required before finalizing."
+      : null;
+  const canFinalizeNow = data.canFinalize && data.reportStatus !== "finalized" && !saveInFlightRef.current && !finalizeReadinessMessage;
 
   return (
     <div className="space-y-6 pb-28 lg:pb-8">
@@ -680,9 +709,10 @@ export function ReportEditor({ data }: { data: EditorData }) {
                 Save now
               </button>
             </div>
-            <button className="mt-3 w-full rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={!data.canFinalize || data.reportStatus === "finalized" || saveInFlightRef.current} onClick={() => { void finalizeReport(); }} type="button">
+            <button className="mt-3 w-full rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={!canFinalizeNow} onClick={() => { void finalizeReport(); }} type="button">
               Finalize report
             </button>
+            {finalizeReadinessMessage ? <p className="mt-3 text-sm text-amber-700">{finalizeReadinessMessage}</p> : null}
             {visibleErrorMessage ? <p className="mt-3 text-sm text-rose-600">{visibleErrorMessage}</p> : null}
             {backupWarning ? <p className="mt-3 text-sm text-amber-700">{backupWarning}</p> : null}
           </div>
@@ -1000,6 +1030,16 @@ export function ReportEditor({ data }: { data: EditorData }) {
       </div>
 
       {showBottomBar ? (
+        <>
+          {(visibleErrorMessage || backupWarning || finalizeReadinessMessage) ? (
+            <div className="fixed inset-x-0 bottom-[5.75rem] z-20 px-4 lg:hidden">
+              <div className="mx-auto max-w-7xl space-y-2">
+                {visibleErrorMessage ? <p className="rounded-2xl border border-rose-200 bg-white/95 px-4 py-3 text-sm text-rose-700 shadow-xl backdrop-blur">{visibleErrorMessage}</p> : null}
+                {backupWarning ? <p className="rounded-2xl border border-amber-200 bg-white/95 px-4 py-3 text-sm text-amber-700 shadow-xl backdrop-blur">{backupWarning}</p> : null}
+                {finalizeReadinessMessage ? <p className="rounded-2xl border border-amber-200 bg-white/95 px-4 py-3 text-sm text-amber-700 shadow-xl backdrop-blur">{finalizeReadinessMessage}</p> : null}
+              </div>
+            </div>
+          ) : null}
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur lg:hidden">
           <div className="mx-auto max-w-7xl">
             <div className="mb-2 flex items-center justify-between gap-3 text-xs font-medium text-slate-600">
@@ -1017,16 +1057,15 @@ export function ReportEditor({ data }: { data: EditorData }) {
             <button className="flex-1 rounded-2xl bg-ember px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={saveInFlightRef.current} onClick={() => { void saveDraft(draft, "manual"); }} type="button">
               Save now
             </button>
-            <button className="flex-1 rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={!data.canFinalize || saveInFlightRef.current} onClick={() => { void finalizeReport(); }} type="button">
+            <button className="flex-1 rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={!canFinalizeNow} onClick={() => { void finalizeReport(); }} type="button">
               Finalize
             </button>
             <button className="rounded-2xl border border-slate-200 px-3 py-3 text-sm font-semibold text-ink disabled:opacity-50" disabled={!nextSectionId} onClick={() => { if (nextSectionId) { void handleSectionChange(nextSectionId); } }} type="button">
               Next
             </button>
           </div>
-          {visibleErrorMessage ? <p className="mx-auto mt-2 max-w-7xl text-sm text-rose-600">{visibleErrorMessage}</p> : null}
-          {backupWarning ? <p className="mx-auto mt-2 max-w-7xl text-sm text-amber-700">{backupWarning}</p> : null}
         </div>
+        </>
       ) : null}
     </div>
   );

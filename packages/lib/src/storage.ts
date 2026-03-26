@@ -27,6 +27,9 @@ type ReadStoredFileResult = {
   bytes: Uint8Array;
 };
 
+export const privateBlobStoreRequiredMessage =
+  "TradeWorx requires a private Vercel Blob store for report media. Reconnect storage with private access before technicians save reports, signatures, or PDFs.";
+
 function sanitizePathSegment(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "file";
 }
@@ -47,6 +50,18 @@ function requireBlobToken() {
   }
 
   return token;
+}
+
+export function isPrivateBlobStoreConfigurationError(error: unknown) {
+  return error instanceof Error && /private access on a public store|configured with private access/i.test(error.message);
+}
+
+function toStorageConfigurationError(error: unknown) {
+  if (!isPrivateBlobStoreConfigurationError(error)) {
+    return error;
+  }
+
+  return new Error(privateBlobStoreRequiredMessage, { cause: error });
 }
 
 function toBlobStorageKey(pathname: string) {
@@ -137,12 +152,17 @@ export async function buildStoredFilePayload(input: {
 
   const token = requireBlobToken();
   const pathname = `${sanitizePathSegment(input.tenantId)}/${input.category}/${Date.now()}-${crypto.randomUUID()}-${sanitizePathSegment(input.fileName)}`;
-  const result = await put(pathname, Buffer.from(input.bytes), {
-    access: "private",
-    addRandomSuffix: false,
-    contentType: input.mimeType,
-    token
-  });
+  let result;
+  try {
+    result = await put(pathname, Buffer.from(input.bytes), {
+      access: "private",
+      addRandomSuffix: false,
+      contentType: input.mimeType,
+      token
+    });
+  } catch (error) {
+    throw toStorageConfigurationError(error);
+  }
 
   return {
     fileName: input.fileName,
@@ -176,11 +196,16 @@ export async function readStoredFile(storageKey: string): Promise<ReadStoredFile
 
   if (storageKey.startsWith(BLOB_STORAGE_PREFIX)) {
     const token = requireBlobToken();
-    const result = await get(fromBlobStorageKey(storageKey), {
-      access: "private",
-      token,
-      useCache: false
-    });
+    let result;
+    try {
+      result = await get(fromBlobStorageKey(storageKey), {
+        access: "private",
+        token,
+        useCache: false
+      });
+    } catch (error) {
+      throw toStorageConfigurationError(error);
+    }
 
     if (!result || result.statusCode !== 200 || !result.stream) {
       throw new Error("Stored file could not be retrieved.");

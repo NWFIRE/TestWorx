@@ -26,6 +26,7 @@ export async function GET() {
         appUrl: env.APP_URL,
         nextAuthUrl: env.NEXTAUTH_URL,
         storageDriver: env.STORAGE_DRIVER,
+        storageAccessRequirement: env.STORAGE_DRIVER === "vercel_blob" ? "private" : "n/a",
         stripeConfigured: Boolean(stripe.STRIPE_SECRET_KEY && stripe.STRIPE_PUBLISHABLE_KEY),
         quickBooksConfigured: Boolean(quickbooks.QUICKBOOKS_CLIENT_ID && quickbooks.QUICKBOOKS_CLIENT_SECRET)
       },

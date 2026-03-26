@@ -128,6 +128,7 @@ Required storage env vars:
 
 Storage design notes:
 - Production file access is server-mediated through app routes, not public blob URLs.
+- The connected Vercel Blob store itself must also be configured for private access.
 - Blob objects are written with `access: "private"`.
 - Stored blob paths are tenant-prefixed and category-scoped:
   - `photo`

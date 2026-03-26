@@ -17,3 +17,4 @@ export * from "./report-photo";
 export * from "./report-service";
 export * from "./scheduling";
 export * from "./service-fees";
+export * from "./storage";

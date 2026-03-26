@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { saveReportDraft } from "@testworx/lib";
+import { isPrivateBlobStoreConfigurationError, saveReportDraft } from "@testworx/lib";
 
 function getStatusCode(error: unknown) {
   if (!(error instanceof Error)) {
@@ -42,6 +42,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, autosaveVersion: saved.autosaveVersion, updatedAt: saved.updatedAt.toISOString() });
   } catch (error) {
+    if (isPrivateBlobStoreConfigurationError(error)) {
+      console.error("Blob storage configuration error during report autosave", error);
+      return NextResponse.json(
+        { error: "Report media storage is unavailable right now. Your changes were not saved. Please contact your administrator." },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to save draft." }, { status: getStatusCode(error) });
   }
 }

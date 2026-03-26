@@ -82,6 +82,22 @@ describe("storage abstraction", () => {
     expect(Array.from(result.bytes)).toEqual([37, 80, 68, 70]);
   });
 
+  it("translates public-store private-access failures into a controlled configuration error", async () => {
+    putMock.mockRejectedValue(new Error("Vercel Blob: Cannot use private access on a public store. The store must be configured with private access."));
+
+    const { buildStoredFilePayload, privateBlobStoreRequiredMessage } = await import("../storage");
+
+    await expect(
+      buildStoredFilePayload({
+        tenantId: "tenant_1",
+        category: "photo",
+        fileName: "Test File.png",
+        mimeType: "image/png",
+        bytes: new Uint8Array([1, 2, 3])
+      })
+    ).rejects.toThrow(privateBlobStoreRequiredMessage);
+  });
+
   it("validates blob storage keys against tenant and category constraints", async () => {
     const {
       assertStorageKeyBelongsToTenant,

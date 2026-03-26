@@ -1,4 +1,5 @@
 import { getServerEnv } from "./env";
+import { privateBlobStoreRequiredMessage } from "./storage";
 
 export type PilotReadinessLevel = "ready" | "action_required" | "optional";
 export type PilotReadinessSeverity = "critical" | "recommended" | "optional";
@@ -88,14 +89,14 @@ export function evaluatePilotReadiness(input: PilotReadinessInput = {}): PilotRe
           "Durable report media storage",
           "ready",
           "critical",
-          "Photos, signatures, PDFs, and uploads are configured for durable blob storage."
+          `Photos, signatures, PDFs, and uploads are configured for durable blob storage. ${privateBlobStoreRequiredMessage}`
         )
       : buildCheck(
           "storage",
           "Durable report media storage",
           "action_required",
           "critical",
-          "Report media is still using inline/demo storage. Switch to Vercel Blob with a real token before pilot use so field photos and PDFs stay durable."
+          `Report media is still using inline/demo storage. Switch to Vercel Blob with a real token before pilot use so field photos and PDFs stay durable. ${privateBlobStoreRequiredMessage}`
         )
   );
 
