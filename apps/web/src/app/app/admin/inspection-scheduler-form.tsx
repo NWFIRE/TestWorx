@@ -49,7 +49,8 @@ export function InspectionSchedulerForm({
   workflowNote,
   reasonLabel,
   reasonRequired,
-  allowDocumentUpload = false
+  allowDocumentUpload = false,
+  autoSelectGenericSiteOnCustomerChange = false
 }: {
   action: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
   title: string;
@@ -63,6 +64,7 @@ export function InspectionSchedulerForm({
   reasonLabel?: string;
   reasonRequired?: boolean;
   allowDocumentUpload?: boolean;
+  autoSelectGenericSiteOnCustomerChange?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const initialTaskSelections = new Map((initialValues?.tasks ?? []).map((task) => [task.inspectionType, task.frequency]));
@@ -115,7 +117,7 @@ export function InspectionSchedulerForm({
             name="customerCompanyId"
             onChange={(event) => {
               setSelectedCustomerId(event.target.value);
-              setSelectedSiteId("");
+              setSelectedSiteId(event.target.value && autoSelectGenericSiteOnCustomerChange ? genericInspectionSiteOptionValue : "");
             }}
             required
             value={selectedCustomerId}

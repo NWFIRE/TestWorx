@@ -157,7 +157,7 @@ export default async function AdminPage() {
         </div>
       </section>
       <section className="space-y-6">
-        <InspectionSchedulerForm action={createInspectionAction} title="Create inspection" submitLabel="Create inspection" customers={data.customers} sites={data.sites} technicians={data.technicians} allowDocumentUpload />
+        <InspectionSchedulerForm action={createInspectionAction} title="Create inspection" submitLabel="Create inspection" customers={data.customers} sites={data.sites} technicians={data.technicians} allowDocumentUpload autoSelectGenericSiteOnCustomerChange />
         <CustomerSiteImportCard action={importCustomerSiteCsvAction} templateHref={importTemplateHref} />
       </section>
     </div>
