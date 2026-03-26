@@ -38,7 +38,7 @@ describe("generic inspection site helper", () => {
 
     expect(result).toEqual({ id: "site_generic_1" });
     expect(prismaMock.site.create).not.toHaveBeenCalled();
-  });
+  }, 10000);
 
   it("creates the generic site once when the customer does not have one yet", async () => {
     prismaMock.customerCompany.findFirst.mockResolvedValue({

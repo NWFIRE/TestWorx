@@ -3,6 +3,7 @@ import { InspectionStatus } from "@prisma/client";
 
 import {
   defaultScheduledStartForMonth,
+  genericInspectionSiteOptionValue,
   getDefaultInspectionRecurrenceFrequency,
   withInspectionTaskDisplayLabels,
   getInspectionDisplayStatus,
@@ -45,9 +46,9 @@ describe("schedule creation parsing", () => {
     formData.set("frequency:fire_extinguisher", "ANNUAL");
 
     const result = parseCreateInspectionFormData(formData);
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues[0]?.message).toBe("Select a site before creating the inspection.");
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.siteId).toBe(genericInspectionSiteOptionValue);
     }
   });
 

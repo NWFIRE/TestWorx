@@ -65,7 +65,7 @@ export function InspectionSchedulerForm({
   allowDocumentUpload?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
-  const selectedTasks = new Map((initialValues?.tasks ?? []).map((task) => [task.inspectionType, task.frequency]));
+  const initialTaskSelections = new Map((initialValues?.tasks ?? []).map((task) => [task.inspectionType, task.frequency]));
   const [selectedCustomerId, setSelectedCustomerId] = useState(initialValues?.customerCompanyId ?? "");
   const [selectedSiteId, setSelectedSiteId] = useState(initialValues?.siteId ?? "");
   const [inspectionMonth, setInspectionMonth] = useState(
@@ -74,8 +74,23 @@ export function InspectionSchedulerForm({
   const [scheduledStart, setScheduledStart] = useState(
     initialValues?.scheduledStart ?? defaultScheduledStartForMonth(inspectionMonth)
   );
+  const [scheduledEnd, setScheduledEnd] = useState(initialValues?.scheduledEnd ?? "");
+  const [status, setStatus] = useState<EditableInspectionStatus>(initialValues?.status ?? "to_be_completed");
+  const [notes, setNotes] = useState(initialValues?.notes ?? "");
   const [startManuallyEdited, setStartManuallyEdited] = useState(Boolean(initialValues?.scheduledStart));
-  const selectedTechnicianIds = new Set(initialValues?.assignedTechnicianIds ?? []);
+  const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<string[]>(initialValues?.assignedTechnicianIds ?? []);
+  const [selectedTasks, setSelectedTasks] = useState<Record<InspectionType, { selected: boolean; frequency: RecurrenceFrequency }>>(
+    () =>
+      Object.fromEntries(
+        (Object.keys(inspectionTypeRegistry) as InspectionType[]).map((inspectionType) => [
+          inspectionType,
+          {
+            selected: (initialValues?.tasks ?? []).some((task) => task.inspectionType === inspectionType),
+            frequency: initialTaskSelections.get(inspectionType) ?? getDefaultInspectionRecurrenceFrequency(inspectionType)
+          }
+        ])
+      ) as Record<InspectionType, { selected: boolean; frequency: RecurrenceFrequency }>
+  );
   const filteredSites = useMemo(
     () => sites.filter((site) => !selectedCustomerId || site.customerCompanyId === selectedCustomerId),
     [selectedCustomerId, sites]
@@ -98,7 +113,10 @@ export function InspectionSchedulerForm({
             className="w-full rounded-2xl border border-slate-200 px-4 py-3"
             id="customerCompanyId"
             name="customerCompanyId"
-            onChange={(event) => setSelectedCustomerId(event.target.value)}
+            onChange={(event) => {
+              setSelectedCustomerId(event.target.value);
+              setSelectedSiteId("");
+            }}
             required
             value={selectedCustomerId}
           >
@@ -110,7 +128,7 @@ export function InspectionSchedulerForm({
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="siteId">Site</label>
           <select
             className="w-full rounded-2xl border border-slate-200 px-4 py-3"
-            disabled={selectedCustomerId !== "" && filteredSites.length === 0}
+            disabled={selectedCustomerId === ""}
             id="siteId"
             name="siteId"
             onChange={(event) => setSelectedSiteId(event.target.value)}
@@ -169,12 +187,25 @@ export function InspectionSchedulerForm({
       <div className="grid gap-4 md:grid-cols-2">
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="scheduledEnd">Scheduled end</label>
-          <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={initialValues?.scheduledEnd ?? ""} id="scheduledEnd" name="scheduledEnd" type="datetime-local" />
+          <input
+            className="w-full rounded-2xl border border-slate-200 px-4 py-3"
+            id="scheduledEnd"
+            name="scheduledEnd"
+            onChange={(event) => setScheduledEnd(event.target.value)}
+            type="datetime-local"
+            value={scheduledEnd}
+          />
           <p className="mt-2 text-xs text-slate-500">Optional. Leave blank unless dispatch needs a specific end time.</p>
         </div>
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="status">Status</label>
-          <select className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={initialValues?.status ?? "to_be_completed"} id="status" name="status">
+          <select
+            className="w-full rounded-2xl border border-slate-200 px-4 py-3"
+            id="status"
+            name="status"
+            onChange={(event) => setStatus(event.target.value as EditableInspectionStatus)}
+            value={status}
+          >
             {statusOptions.map((status) => <option key={status} value={status}>{formatInspectionStatusLabel(status)}</option>)}
           </select>
         </div>
@@ -188,8 +219,15 @@ export function InspectionSchedulerForm({
             <label key={tech.id} className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
               <input
                 className="h-5 w-5 rounded border-slate-300"
-                defaultChecked={selectedTechnicianIds.has(tech.id)}
+                checked={selectedTechnicianIds.includes(tech.id)}
                 name="assignedTechnicianIds"
+                onChange={(event) =>
+                  setSelectedTechnicianIds((current) =>
+                    event.target.checked
+                      ? [...current, tech.id]
+                      : current.filter((technicianId) => technicianId !== tech.id)
+                  )
+                }
                 type="checkbox"
                 value={tech.id}
               />
@@ -201,7 +239,13 @@ export function InspectionSchedulerForm({
       </div>
       <div>
         <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="notes">Dispatch notes</label>
-        <textarea className="min-h-24 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={initialValues?.notes ?? ""} id="notes" name="notes" />
+        <textarea
+          className="min-h-24 w-full rounded-2xl border border-slate-200 px-4 py-3"
+          id="notes"
+          name="notes"
+          onChange={(event) => setNotes(event.target.value)}
+          value={notes}
+        />
       </div>
       {reasonLabel ? (
         <div>
@@ -243,13 +287,41 @@ export function InspectionSchedulerForm({
           {(Object.entries(inspectionTypeRegistry) as Array<[InspectionType, (typeof inspectionTypeRegistry)[InspectionType]]>).map(([inspectionType, inspectionConfig]) => (
             <div key={inspectionType} className="grid gap-3 rounded-2xl border border-slate-200 p-4 md:grid-cols-[1.5fr_1fr] md:items-center">
               <label className="flex items-start gap-3">
-                <input className="mt-1 h-5 w-5 rounded border-slate-300" defaultChecked={selectedTasks.has(inspectionType)} type="checkbox" name={`type:${inspectionType}`} value="true" />
+                <input
+                  className="mt-1 h-5 w-5 rounded border-slate-300"
+                  checked={selectedTasks[inspectionType]?.selected ?? false}
+                  onChange={(event) =>
+                    setSelectedTasks((current) => ({
+                      ...current,
+                      [inspectionType]: {
+                        ...(current[inspectionType] ?? { frequency: getDefaultInspectionRecurrenceFrequency(inspectionType) }),
+                        selected: event.target.checked
+                      }
+                    }))
+                  }
+                  type="checkbox"
+                  name={`type:${inspectionType}`}
+                  value="true"
+                />
                 <span>
                   <span className="block font-medium text-ink">{inspectionConfig.label}</span>
                   <span className="block text-sm text-slate-500">{inspectionConfig.description}</span>
                 </span>
               </label>
-              <select className="rounded-2xl border border-slate-200 px-4 py-3" defaultValue={selectedTasks.get(inspectionType) ?? getDefaultInspectionRecurrenceFrequency(inspectionType)} name={`frequency:${inspectionType}`}>
+              <select
+                className="rounded-2xl border border-slate-200 px-4 py-3"
+                name={`frequency:${inspectionType}`}
+                onChange={(event) =>
+                  setSelectedTasks((current) => ({
+                    ...current,
+                    [inspectionType]: {
+                      selected: current[inspectionType]?.selected ?? false,
+                      frequency: event.target.value as RecurrenceFrequency
+                    }
+                  }))
+                }
+                value={selectedTasks[inspectionType]?.frequency ?? getDefaultInspectionRecurrenceFrequency(inspectionType)}
+              >
                 {recurrenceOptions.map((option) => <option key={option} value={option}>{option.replaceAll("_", " ")}</option>)}
               </select>
             </div>

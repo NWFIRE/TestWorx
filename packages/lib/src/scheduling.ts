@@ -326,7 +326,8 @@ function parseInspectionFormData(formData: FormData) {
   const scheduledStart = String(formData.get("scheduledStart") ?? "") || defaultScheduledStartForMonth(inspectionMonth);
   const scheduledEndValue = String(formData.get("scheduledEnd") ?? "");
   const customerCompanyId = String(formData.get("customerCompanyId") ?? "").trim();
-  const siteId = String(formData.get("siteId") ?? "").trim();
+  const selectedSiteId = String(formData.get("siteId") ?? "").trim();
+  const siteId = selectedSiteId || (customerCompanyId ? genericInspectionSiteOptionValue : "");
   const status = String(formData.get("status") ?? "to_be_completed");
   const assignedTechnicianIds = normalizeAssignedTechnicianIds({
     assignedTechnicianIds: formData.getAll("assignedTechnicianIds").map((value) => String(value)).filter(Boolean),
