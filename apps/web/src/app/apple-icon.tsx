@@ -14,14 +14,13 @@ export default function AppleIcon() {
         style={{
           alignItems: "center",
           background: "#FFFFFF",
-          borderRadius: 36,
           display: "flex",
           height: "100%",
           justifyContent: "center",
           width: "100%"
         }}
       >
-        <svg fill="none" height="154" viewBox="0 0 1024 1024" width="154" xmlns="http://www.w3.org/2000/svg">
+        <svg fill="none" height="180" viewBox="0 0 1024 1024" width="180" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <linearGradient id="apple-topBar" x1="302" y1="335" x2="612" y2="335" gradientUnits="userSpaceOnUse">
               <stop offset="0" stopColor="#1D7BFF" />
@@ -41,7 +40,8 @@ export default function AppleIcon() {
               <stop offset="1" stopColor="#22D3EE" />
             </linearGradient>
           </defs>
-          <g transform="translate(8 12) scale(1.16)">
+          <rect fill="#FFFFFF" height="1024" width="1024" x="0" y="0" />
+          <g transform="translate(-70 -8) scale(1.34)">
             <path d="M304 311H610L578 373H304V311Z" fill="url(#apple-topBar)" />
             <path d="M408 373H492L396 640C387 666 350 682 329 664C312 649 309 623 320 603L408 373Z" fill="url(#apple-tStem)" />
             <path d="M414 606L545 494L520 633L736 402L664 385L778 316L754 425L694 383L538 559C510 591 473 621 433 640L414 606Z" fill="url(#apple-tail)" />
