@@ -7,6 +7,7 @@ import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { auth } from "@/auth";
 import {
   createInspection,
+  clearBillingSummaryItemCatalogLink,
   deleteInspection,
   importCustomerSiteCsv,
   createInspectionAmendment,
@@ -17,7 +18,9 @@ import {
   parseCreateInspectionFormData,
   parseUpdateInspectionFormData,
   sendQuickBooksInvoice,
+  searchBillingSummaryItemCatalogMatches,
   syncBillingSummaryToQuickBooks,
+  linkBillingSummaryItemCatalog,
   updateBillingSummaryItem,
   updateBillingSummaryNotes,
   updateBillingSummaryStatus,
@@ -402,6 +405,120 @@ export async function updateBillingSummaryItemAction(formData: FormData) {
 
   revalidatePath("/app/admin/billing");
   revalidatePath(`/app/admin/billing/${inspectionId}`);
+}
+
+export async function searchBillingSummaryItemCatalogMatchesAction(
+  _: {
+    error: string | null;
+    query: string;
+    results: Array<{
+      catalogItemId: string;
+      quickbooksItemId: string;
+      name: string;
+      sku: string | null;
+      itemType: string;
+      unitPrice: number | null;
+      alias: string | null;
+      confidence: number;
+      matchMethod: string;
+      autoMatchEligible: boolean;
+    }>;
+    pagination: { page: number; totalPages: number; totalCount: number; limit: number };
+  },
+  formData: FormData
+) {
+  const session = await auth();
+  const summaryId = String(formData.get("summaryId") ?? "");
+  const itemId = String(formData.get("itemId") ?? "");
+  const query = String(formData.get("query") ?? "").trim();
+  const page = Number(formData.get("page") ?? "1");
+
+  if (!session?.user?.tenantId || !summaryId || !itemId) {
+    return {
+      error: "Unauthorized",
+      query,
+      results: [],
+      pagination: { page: 1, totalPages: 1, totalCount: 0, limit: 8 }
+    };
+  }
+
+  try {
+    const result = await searchBillingSummaryItemCatalogMatches(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      { summaryId, itemId, query, page: Number.isFinite(page) ? page : 1, limit: 8 }
+    );
+
+    return {
+      error: null,
+      query,
+      results: result.results,
+      pagination: result.pagination
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Unable to search products and services.",
+      query,
+      results: [],
+      pagination: { page: 1, totalPages: 1, totalCount: 0, limit: 8 }
+    };
+  }
+}
+
+export async function linkBillingSummaryItemCatalogAction(
+  _: { error: string | null; success: string | null },
+  formData: FormData
+) {
+  const session = await auth();
+  const summaryId = String(formData.get("summaryId") ?? "");
+  const inspectionId = String(formData.get("inspectionId") ?? "");
+  const itemId = String(formData.get("itemId") ?? "");
+  const catalogItemId = String(formData.get("catalogItemId") ?? "");
+  const saveMapping = formData.get("saveMapping") === "on";
+  const alias = String(formData.get("alias") ?? "");
+
+  if (!session?.user?.tenantId || !summaryId || !inspectionId || !itemId || !catalogItemId) {
+    return { error: "Unauthorized", success: null };
+  }
+
+  try {
+    const linked = await linkBillingSummaryItemCatalog(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      { summaryId, itemId, catalogItemId, saveMapping, alias }
+    );
+
+    revalidatePath("/app/admin/billing");
+    revalidatePath(`/app/admin/billing/${inspectionId}`);
+    return { error: null, success: `${linked.catalogItemName} linked.` };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Unable to link billing item.", success: null };
+  }
+}
+
+export async function clearBillingSummaryItemCatalogLinkAction(
+  _: { error: string | null; success: string | null },
+  formData: FormData
+) {
+  const session = await auth();
+  const summaryId = String(formData.get("summaryId") ?? "");
+  const inspectionId = String(formData.get("inspectionId") ?? "");
+  const itemId = String(formData.get("itemId") ?? "");
+
+  if (!session?.user?.tenantId || !summaryId || !inspectionId || !itemId) {
+    return { error: "Unauthorized", success: null };
+  }
+
+  try {
+    await clearBillingSummaryItemCatalogLink(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      { summaryId, itemId }
+    );
+
+    revalidatePath("/app/admin/billing");
+    revalidatePath(`/app/admin/billing/${inspectionId}`);
+    return { error: null, success: "Billing item link cleared." };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Unable to clear billing item link.", success: null };
+  }
 }
 
 export async function syncBillingSummaryToQuickBooksAction(formData: FormData) {

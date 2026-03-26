@@ -29,7 +29,45 @@ export type BillableItem = {
   unitPrice?: number | null;
   amount?: number | null;
   metadata?: Record<string, unknown>;
+  linkedCatalogItemId?: string | null;
+  linkedCatalogItemName?: string | null;
+  linkedQuickBooksItemId?: string | null;
+  linkedMatchMethod?: string | null;
+  linkedMatchConfidence?: number | null;
 };
+
+export type BillingCatalogMatchMethod = "exact" | "normalized" | "alias" | "fuzzy" | "source_mapping" | "manual";
+
+export type BillingCatalogMatchSuggestion = {
+  catalogItemId: string;
+  quickbooksItemId: string;
+  name: string;
+  sku: string | null;
+  itemType: string;
+  unitPrice: number | null;
+  alias: string | null;
+  confidence: number;
+  matchMethod: BillingCatalogMatchMethod;
+  autoMatchEligible: boolean;
+};
+
+type BillingItemCatalogMatchRecord = {
+  sourceKey: string;
+  catalogItemId: string;
+  confidence: number;
+  matchMethod: string;
+  catalogItem: {
+    id: string;
+    quickbooksItemId: string;
+    name: string;
+    sku: string | null;
+    itemType: string;
+    unitPrice: number | null;
+  };
+};
+
+const AUTO_MATCH_CONFIDENCE_THRESHOLD = 0.96;
+const SUGGESTED_MATCH_CONFIDENCE_THRESHOLD = 0.72;
 
 export type BillingSummaryStatus = "draft" | "reviewed" | "invoiced";
 
@@ -111,6 +149,8 @@ type AuthorizedBillingSummaryRow = {
   subtotal: number;
   notes: string | null;
   items: JsonValue;
+  quickbooksSyncStatus: string | null;
+  quickbooksInvoiceId: string | null;
 };
 
 type FinalizedReportRow = {
@@ -137,6 +177,115 @@ function parseActor(actor: ActorContext) {
 
 function isAdminRole(role: string) {
   return ["platform_admin", "tenant_admin", "office_admin"].includes(role);
+}
+
+function normalizeMatchText(value: string | null | undefined) {
+  return (value ?? "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function singularizeToken(token: string) {
+  if (token.endsWith("ies") && token.length > 4) {
+    return `${token.slice(0, -3)}y`;
+  }
+
+  if (token.endsWith("es") && token.length > 3) {
+    return token.slice(0, -2);
+  }
+
+  if (token.endsWith("s") && token.length > 3) {
+    return token.slice(0, -1);
+  }
+
+  return token;
+}
+
+function tokenizeMatchText(value: string | null | undefined) {
+  return normalizeMatchText(value)
+    .split(" ")
+    .map((token) => singularizeToken(token))
+    .filter(Boolean);
+}
+
+function buildNormalizedTokenString(value: string | null | undefined) {
+  return tokenizeMatchText(value).join(" ");
+}
+
+function buildBillingItemSourceKey(item: Pick<BillableItem, "category" | "reportType" | "sourceSection" | "sourceField" | "code" | "description">) {
+  return [
+    item.category,
+    item.reportType,
+    item.sourceSection ?? "unknown_section",
+    item.sourceField ?? "unknown_field",
+    normalizeMatchText(item.code ?? ""),
+    buildNormalizedTokenString(item.description)
+  ].join("|");
+}
+
+function buildBillingItemSearchQuery(item: Pick<BillableItem, "code" | "description">) {
+  return item.code?.trim() || item.description.trim();
+}
+
+function calculateTokenOverlapScore(left: string[], right: string[]) {
+  if (left.length === 0 || right.length === 0) {
+    return 0;
+  }
+
+  const leftSet = new Set(left);
+  const rightSet = new Set(right);
+  let shared = 0;
+  for (const token of leftSet) {
+    if (rightSet.has(token)) {
+      shared += 1;
+    }
+  }
+
+  return (2 * shared) / (leftSet.size + rightSet.size);
+}
+
+function scoreCatalogMatch(input: {
+  item: Pick<BillableItem, "code" | "description">;
+  catalogName: string;
+  alias?: string | null;
+  sku?: string | null;
+}) {
+  const sourceNormalized = buildNormalizedTokenString(input.item.description);
+  const sourceRawNormalized = normalizeMatchText(input.item.description);
+  const candidateNormalized = buildNormalizedTokenString(input.alias ?? input.catalogName);
+  const candidateRawNormalized = normalizeMatchText(input.alias ?? input.catalogName);
+  const sourceTokens = tokenizeMatchText(input.item.description);
+  const candidateTokens = tokenizeMatchText(input.alias ?? input.catalogName);
+  const normalizedCode = normalizeMatchText(input.item.code ?? "");
+  const normalizedSku = normalizeMatchText(input.sku ?? "");
+
+  if (normalizedCode && normalizedSku && normalizedCode === normalizedSku) {
+    return { confidence: 1, matchMethod: "exact" as const };
+  }
+
+  if (sourceRawNormalized && sourceRawNormalized === candidateRawNormalized) {
+    return { confidence: input.alias ? 0.99 : 0.98, matchMethod: input.alias ? "alias" as const : "exact" as const };
+  }
+
+  if (sourceNormalized && sourceNormalized === candidateNormalized) {
+    return { confidence: input.alias ? 0.97 : 0.95, matchMethod: input.alias ? "alias" as const : "normalized" as const };
+  }
+
+  const overlapScore = calculateTokenOverlapScore(sourceTokens, candidateTokens);
+  const sourceContainsCandidate = sourceNormalized.includes(candidateNormalized) && candidateNormalized.length > 0;
+  const candidateContainsSource = candidateNormalized.includes(sourceNormalized) && sourceNormalized.length > 0;
+  const containsBonus = sourceContainsCandidate || candidateContainsSource ? 0.12 : 0;
+  const aliasBonus = input.alias ? 0.08 : 0;
+  const codeBonus = normalizedCode && normalizedSku && normalizedSku.includes(normalizedCode) ? 0.1 : 0;
+  const confidence = Math.min(overlapScore + containsBonus + aliasBonus + codeBonus, 0.94);
+
+  return {
+    confidence,
+    matchMethod: input.alias ? "alias" as const : "fuzzy" as const
+  };
 }
 
 function toNumber(value: unknown) {
@@ -605,6 +754,266 @@ export function groupBillableItems(items: BillableItem[]) {
   };
 }
 
+async function findStoredBillingItemCatalogMatch(tenantId: string, item: BillableItem) {
+  return prisma.billingItemCatalogMatch.findUnique({
+    where: {
+      tenantId_sourceKey: {
+        tenantId,
+        sourceKey: buildBillingItemSourceKey(item)
+      }
+    },
+    select: {
+      sourceKey: true,
+      catalogItemId: true,
+      confidence: true,
+      matchMethod: true,
+      catalogItem: {
+        select: {
+          id: true,
+          quickbooksItemId: true,
+          name: true,
+          sku: true,
+          itemType: true,
+          unitPrice: true
+        }
+      }
+    }
+  }) as Promise<BillingItemCatalogMatchRecord | null>;
+}
+
+async function searchCatalogCandidates(
+  tenantId: string,
+  item: Pick<BillableItem, "code" | "description">,
+  query: string,
+  options?: { page?: number; limit?: number }
+) {
+  const rawQuery = query.trim();
+  const normalizedQuery = normalizeMatchText(rawQuery);
+  const tokenizedQuery = tokenizeMatchText(rawQuery);
+  const page = Math.max(options?.page ?? 1, 1);
+  const limit = Math.min(Math.max(options?.limit ?? 8, 1), 20);
+
+  if (!rawQuery) {
+    return {
+      results: [] as BillingCatalogMatchSuggestion[],
+      pagination: {
+        page: 1,
+        totalPages: 1,
+        totalCount: 0,
+        limit
+      }
+    };
+  }
+
+  const [catalogItems, aliases] = await Promise.all([
+    prisma.quickBooksCatalogItem.findMany({
+      where: {
+        tenantId,
+        active: true,
+        OR: [
+          { name: { contains: rawQuery, mode: "insensitive" } },
+          ...(tokenizedQuery.length > 0
+            ? tokenizedQuery.map((token) => ({
+                name: { contains: token, mode: "insensitive" as const }
+              }))
+            : []),
+          ...(rawQuery ? [{ sku: { contains: rawQuery, mode: "insensitive" as const } }] : [])
+        ]
+      },
+      select: {
+        id: true,
+        quickbooksItemId: true,
+        name: true,
+        sku: true,
+        itemType: true,
+        unitPrice: true
+      },
+      take: 30
+    }),
+    prisma.quickBooksCatalogItemAlias.findMany({
+      where: {
+        tenantId,
+        OR: [
+          { alias: { contains: rawQuery, mode: "insensitive" } },
+          ...(normalizedQuery ? [{ normalizedAlias: { contains: normalizedQuery } }] : [])
+        ]
+      },
+      select: {
+        alias: true,
+        catalogItem: {
+          select: {
+            id: true,
+            quickbooksItemId: true,
+            name: true,
+            sku: true,
+            itemType: true,
+            unitPrice: true
+          }
+        }
+      },
+      take: 30
+    })
+  ]);
+
+  const candidates = new Map<string, BillingCatalogMatchSuggestion>();
+
+  for (const catalogItem of catalogItems) {
+    const scored = scoreCatalogMatch({
+      item,
+      catalogName: catalogItem.name,
+      sku: catalogItem.sku
+    });
+    if (scored.confidence < SUGGESTED_MATCH_CONFIDENCE_THRESHOLD) {
+      continue;
+    }
+
+    const existing = candidates.get(catalogItem.id);
+    if (!existing || scored.confidence > existing.confidence) {
+      candidates.set(catalogItem.id, {
+        catalogItemId: catalogItem.id,
+        quickbooksItemId: catalogItem.quickbooksItemId,
+        name: catalogItem.name,
+        sku: catalogItem.sku,
+        itemType: catalogItem.itemType,
+        unitPrice: catalogItem.unitPrice,
+        alias: null,
+        confidence: scored.confidence,
+        matchMethod: scored.matchMethod,
+        autoMatchEligible: scored.confidence >= AUTO_MATCH_CONFIDENCE_THRESHOLD
+      });
+    }
+  }
+
+  for (const alias of aliases) {
+    const scored = scoreCatalogMatch({
+      item,
+      catalogName: alias.catalogItem.name,
+      alias: alias.alias,
+      sku: alias.catalogItem.sku
+    });
+    if (scored.confidence < SUGGESTED_MATCH_CONFIDENCE_THRESHOLD) {
+      continue;
+    }
+
+    const existing = candidates.get(alias.catalogItem.id);
+    if (!existing || scored.confidence > existing.confidence) {
+      candidates.set(alias.catalogItem.id, {
+        catalogItemId: alias.catalogItem.id,
+        quickbooksItemId: alias.catalogItem.quickbooksItemId,
+        name: alias.catalogItem.name,
+        sku: alias.catalogItem.sku,
+        itemType: alias.catalogItem.itemType,
+        unitPrice: alias.catalogItem.unitPrice,
+        alias: alias.alias,
+        confidence: scored.confidence,
+        matchMethod: scored.matchMethod,
+        autoMatchEligible: scored.confidence >= AUTO_MATCH_CONFIDENCE_THRESHOLD
+      });
+    }
+  }
+
+  const sorted = [...candidates.values()].sort((left, right) => {
+    if (right.confidence !== left.confidence) {
+      return right.confidence - left.confidence;
+    }
+
+    return left.name.localeCompare(right.name);
+  });
+
+  const totalCount = sorted.length;
+  const totalPages = Math.max(Math.ceil(totalCount / limit), 1);
+  const safePage = Math.min(page, totalPages);
+  const results = sorted.slice((safePage - 1) * limit, safePage * limit);
+
+  return {
+    results,
+    pagination: {
+      page: safePage,
+      totalPages,
+      totalCount,
+      limit
+    }
+  };
+}
+
+async function buildBillingItemCatalogState(tenantId: string, item: BillableItem) {
+  const linkedCatalogItemId = item.linkedCatalogItemId ?? null;
+
+  if (linkedCatalogItemId) {
+    const linkedItem = await prisma.quickBooksCatalogItem.findFirst({
+      where: {
+        id: linkedCatalogItemId,
+        tenantId
+      },
+      select: {
+        id: true,
+        quickbooksItemId: true,
+        name: true,
+        sku: true,
+        itemType: true,
+        unitPrice: true
+      }
+    });
+
+    if (linkedItem) {
+      return {
+        currentMatch: {
+          catalogItemId: linkedItem.id,
+          quickbooksItemId: linkedItem.quickbooksItemId,
+          name: linkedItem.name,
+          sku: linkedItem.sku,
+          itemType: linkedItem.itemType,
+          unitPrice: linkedItem.unitPrice,
+          alias: null,
+          confidence: item.linkedMatchConfidence ?? 1,
+          matchMethod: (item.linkedMatchMethod as BillingCatalogMatchMethod | null) ?? "manual",
+          autoMatchEligible: false
+        },
+        suggestedMatches: [] as BillingCatalogMatchSuggestion[]
+      };
+    }
+  }
+
+  const storedMatch = await findStoredBillingItemCatalogMatch(tenantId, item);
+  if (storedMatch) {
+    return {
+      currentMatch: {
+        catalogItemId: storedMatch.catalogItem.id,
+        quickbooksItemId: storedMatch.catalogItem.quickbooksItemId,
+        name: storedMatch.catalogItem.name,
+        sku: storedMatch.catalogItem.sku,
+        itemType: storedMatch.catalogItem.itemType,
+        unitPrice: storedMatch.catalogItem.unitPrice,
+        alias: null,
+        confidence: storedMatch.confidence,
+        matchMethod: "source_mapping" as const,
+        autoMatchEligible: true
+      },
+      suggestedMatches: [] as BillingCatalogMatchSuggestion[]
+    };
+  }
+
+  const suggestions = await searchCatalogCandidates(
+    tenantId,
+    item,
+    buildBillingItemSearchQuery(item),
+    { page: 1, limit: 3 }
+  );
+
+  const highConfidenceSuggestion = suggestions.results[0];
+  if (highConfidenceSuggestion?.autoMatchEligible) {
+    return {
+      currentMatch: highConfidenceSuggestion,
+      suggestedMatches: suggestions.results.slice(1)
+    };
+  }
+
+  return {
+    currentMatch: null,
+    suggestedMatches: suggestions.results
+  };
+}
+
 async function buildInspectionServiceFeeItemTx(tx: TransactionClient, input: {
   tenantId: string;
   inspectionId: string;
@@ -708,7 +1117,28 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
   }
 
   const mergedItems = mergeBillingItems(existing?.items ?? [], extracted);
-  const subtotal = subtotalForItems(mergedItems);
+  const linkedItems = await Promise.all(
+    mergedItems.map(async (item) => {
+      if (item.linkedCatalogItemId) {
+        return item;
+      }
+
+      const storedMatch = await findStoredBillingItemCatalogMatch(input.tenantId, item);
+      if (!storedMatch) {
+        return item;
+      }
+
+      return {
+        ...item,
+        linkedCatalogItemId: storedMatch.catalogItem.id,
+        linkedCatalogItemName: storedMatch.catalogItem.name,
+        linkedQuickBooksItemId: storedMatch.catalogItem.quickbooksItemId,
+        linkedMatchMethod: "source_mapping",
+        linkedMatchConfidence: storedMatch.confidence
+      } satisfies BillableItem;
+    })
+  );
+  const subtotal = subtotalForItems(linkedItems);
 
   const summaryId = existing?.id ?? crypto.randomUUID();
   await db.$executeRaw`
@@ -721,7 +1151,7 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
       ${inspection.customerCompanyId},
       ${inspection.siteId},
       ${existing?.status ?? "draft"},
-      ${JSON.stringify(mergedItems)}::jsonb,
+      ${JSON.stringify(linkedItems)}::jsonb,
       ${subtotal},
       ${existing?.notes ?? null},
       NOW(),
@@ -745,7 +1175,7 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
     customerCompanyId: inspection.customerCompanyId,
     siteId: inspection.siteId,
     status: existing?.status ?? "draft",
-    items: mergedItems,
+    items: linkedItems,
     subtotal,
     notes: existing?.notes ?? null,
     createdAt: existing?.createdAt ?? new Date(),
@@ -856,6 +1286,16 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
   }
 
   const items = normalizeExistingItems(row.items);
+  const itemsWithCatalogState = await Promise.all(
+    items.map(async (item) => {
+      const catalogState = await buildBillingItemCatalogState(tenantId, item);
+      return {
+        ...item,
+        currentCatalogMatch: catalogState.currentMatch,
+        suggestedCatalogMatches: catalogState.suggestedMatches
+      };
+    })
+  );
   return {
     ...row,
     status: row.status as BillingSummaryStatus,
@@ -865,10 +1305,10 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
     quickbooksConnectionMode: row.quickbooksConnectionMode ?? null,
     quickbooksSyncedAt: row.quickbooksSyncedAt ?? null,
     quickbooksSyncError: row.quickbooksSyncError ?? null,
-    items,
-    groupedItems: groupBillableItems(items),
-    reportTypes: [...new Set(items.map((item) => item.reportType).filter((reportType) => reportType !== INSPECTION_LEVEL_REPORT_TYPE))],
-    metrics: buildSummaryMetrics(items)
+    items: itemsWithCatalogState,
+    groupedItems: groupBillableItems(itemsWithCatalogState),
+    reportTypes: [...new Set(itemsWithCatalogState.map((item) => item.reportType).filter((reportType) => reportType !== INSPECTION_LEVEL_REPORT_TYPE))],
+    metrics: buildSummaryMetrics(itemsWithCatalogState)
   };
 }
 
@@ -877,7 +1317,7 @@ async function getAuthorizedBillingSummary(actor: ActorContext, summaryId: strin
   ensureAdmin(parsedActor);
 
   const rows = (await prisma.$queryRaw`
-    SELECT "id", "tenantId", "inspectionId", "status", "subtotal", "notes", "items"
+    SELECT "id", "tenantId", "inspectionId", "status", "subtotal", "notes", "items", "quickbooksSyncStatus", "quickbooksInvoiceId"
     FROM "InspectionBillingSummary"
     WHERE "id" = ${summaryId} AND "tenantId" = ${parsedActor.tenantId as string}
     LIMIT 1
@@ -974,4 +1414,247 @@ export async function updateBillingSummaryItem(actor: ActorContext, summaryId: s
         "updatedAt" = NOW()
     WHERE "id" = ${summary.id}
   `;
+}
+
+export async function searchBillingSummaryItemCatalogMatches(
+  actor: ActorContext,
+  input: {
+    summaryId: string;
+    itemId: string;
+    query: string;
+    page?: number;
+    limit?: number;
+  }
+) {
+  const { parsedActor, summary } = await getAuthorizedBillingSummary(actor, input.summaryId);
+  const item = summary.items.find((candidate) => candidate.id === input.itemId);
+  if (!item) {
+    throw new Error("Billing item not found.");
+  }
+
+  return searchCatalogCandidates(parsedActor.tenantId as string, item, input.query, {
+    page: input.page,
+    limit: input.limit
+  });
+}
+
+export async function linkBillingSummaryItemCatalog(
+  actor: ActorContext,
+  input: {
+    summaryId: string;
+    itemId: string;
+    catalogItemId: string;
+    saveMapping?: boolean;
+    alias?: string | null;
+  }
+) {
+  const { parsedActor, summary } = await getAuthorizedBillingSummary(actor, input.summaryId);
+  if (summary.status === "invoiced") {
+    throw new Error("Invoiced billing summaries must be moved back to review before linking items.");
+  }
+
+  const item = summary.items.find((candidate) => candidate.id === input.itemId);
+  if (!item) {
+    throw new Error("Billing item not found.");
+  }
+
+  const catalogItem = await prisma.quickBooksCatalogItem.findFirst({
+    where: {
+      id: input.catalogItemId,
+      tenantId: parsedActor.tenantId as string
+    },
+    select: {
+      id: true,
+      quickbooksItemId: true,
+      name: true,
+      sku: true,
+      unitPrice: true
+    }
+  });
+
+  if (!catalogItem) {
+    throw new Error("Product or service not found.");
+  }
+
+  const updatedItems = summary.items.map((candidate) =>
+    candidate.id === input.itemId
+      ? {
+          ...candidate,
+          linkedCatalogItemId: catalogItem.id,
+          linkedCatalogItemName: catalogItem.name,
+          linkedQuickBooksItemId: catalogItem.quickbooksItemId,
+          linkedMatchMethod: input.saveMapping ? "manual" : "manual",
+          linkedMatchConfidence: 1
+        }
+      : candidate
+  );
+
+  const subtotal = subtotalForItems(updatedItems);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.inspectionBillingSummary.update({
+      where: { id: summary.id },
+      data: {
+        items: updatedItems as unknown as Prisma.InputJsonValue,
+        subtotal,
+        quickbooksSyncStatus: summary.quickbooksInvoiceId ? "not_synced" : summary.quickbooksSyncStatus ?? "not_synced",
+        quickbooksInvoiceId: null,
+        quickbooksInvoiceNumber: null,
+        quickbooksConnectionMode: null,
+        quickbooksCustomerId: null,
+        quickbooksSyncedAt: null,
+        quickbooksSyncError: null
+      }
+    });
+
+    if (input.saveMapping) {
+      await tx.billingItemCatalogMatch.upsert({
+        where: {
+          tenantId_sourceKey: {
+            tenantId: parsedActor.tenantId as string,
+            sourceKey: buildBillingItemSourceKey(item)
+          }
+        },
+        update: {
+          sourceName: item.description,
+          normalizedSourceName: buildNormalizedTokenString(item.description),
+          sourceCode: item.code ?? null,
+          sourceCategory: item.category,
+          sourceReportType: item.reportType,
+          sourceSection: item.sourceSection ?? null,
+          sourceField: item.sourceField ?? null,
+          catalogItemId: catalogItem.id,
+          confidence: 1,
+          matchMethod: "manual",
+          confirmedByUserId: parsedActor.userId,
+          confirmedAt: new Date()
+        },
+        create: {
+          tenantId: parsedActor.tenantId as string,
+          sourceKey: buildBillingItemSourceKey(item),
+          sourceName: item.description,
+          normalizedSourceName: buildNormalizedTokenString(item.description),
+          sourceCode: item.code ?? null,
+          sourceCategory: item.category,
+          sourceReportType: item.reportType,
+          sourceSection: item.sourceSection ?? null,
+          sourceField: item.sourceField ?? null,
+          catalogItemId: catalogItem.id,
+          confidence: 1,
+          matchMethod: "manual",
+          confirmedByUserId: parsedActor.userId,
+          confirmedAt: new Date()
+        }
+      });
+
+      const aliasValue = (input.alias?.trim() || item.description.trim());
+      const normalizedAlias = buildNormalizedTokenString(aliasValue);
+      if (normalizedAlias) {
+        await tx.quickBooksCatalogItemAlias.upsert({
+          where: {
+            tenantId_normalizedAlias: {
+              tenantId: parsedActor.tenantId as string,
+              normalizedAlias
+            }
+          },
+          update: {
+            alias: aliasValue,
+            catalogItemId: catalogItem.id,
+            createdByUserId: parsedActor.userId
+          },
+          create: {
+            tenantId: parsedActor.tenantId as string,
+            catalogItemId: catalogItem.id,
+            alias: aliasValue,
+            normalizedAlias,
+            createdByUserId: parsedActor.userId
+          }
+        });
+      }
+    }
+
+    await tx.auditLog.create({
+      data: {
+        tenantId: parsedActor.tenantId as string,
+        actorUserId: parsedActor.userId,
+        action: "billing.item_catalog_linked",
+        entityType: "InspectionBillingSummary",
+        entityId: summary.id,
+        metadata: {
+          itemId: item.id,
+          itemDescription: item.description,
+          sourceKey: buildBillingItemSourceKey(item),
+          catalogItemId: catalogItem.id,
+          catalogItemName: catalogItem.name,
+          saveMapping: Boolean(input.saveMapping)
+        }
+      }
+    });
+  });
+
+  return {
+    catalogItemId: catalogItem.id,
+    catalogItemName: catalogItem.name
+  };
+}
+
+export async function clearBillingSummaryItemCatalogLink(
+  actor: ActorContext,
+  input: {
+    summaryId: string;
+    itemId: string;
+  }
+) {
+  const { parsedActor, summary } = await getAuthorizedBillingSummary(actor, input.summaryId);
+  if (summary.status === "invoiced") {
+    throw new Error("Invoiced billing summaries must be moved back to review before clearing links.");
+  }
+
+  const item = summary.items.find((candidate) => candidate.id === input.itemId);
+  if (!item) {
+    throw new Error("Billing item not found.");
+  }
+
+  const updatedItems = summary.items.map((candidate) =>
+    candidate.id === input.itemId
+      ? {
+          ...candidate,
+          linkedCatalogItemId: null,
+          linkedCatalogItemName: null,
+          linkedQuickBooksItemId: null,
+          linkedMatchMethod: null,
+          linkedMatchConfidence: null
+        }
+      : candidate
+  );
+
+  await prisma.inspectionBillingSummary.update({
+    where: { id: summary.id },
+    data: {
+      items: updatedItems as unknown as Prisma.InputJsonValue,
+      subtotal: subtotalForItems(updatedItems),
+      quickbooksSyncStatus: summary.quickbooksInvoiceId ? "not_synced" : summary.quickbooksSyncStatus ?? "not_synced",
+      quickbooksInvoiceId: null,
+      quickbooksInvoiceNumber: null,
+      quickbooksConnectionMode: null,
+      quickbooksCustomerId: null,
+      quickbooksSyncedAt: null,
+      quickbooksSyncError: null
+    }
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      tenantId: parsedActor.tenantId as string,
+      actorUserId: parsedActor.userId,
+      action: "billing.item_catalog_link_cleared",
+      entityType: "InspectionBillingSummary",
+      entityId: summary.id,
+      metadata: {
+        itemId: item.id,
+        itemDescription: item.description,
+        sourceKey: buildBillingItemSourceKey(item)
+      }
+    }
+  });
 }

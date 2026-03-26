@@ -5,10 +5,36 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { buildQuickBooksInvoiceAppUrl, getAdminBillingSummaryDetail, getTenantQuickBooksConnectionStatus } from "@testworx/lib";
 
-import { sendQuickBooksInvoiceAction, syncBillingSummaryToQuickBooksAction, updateBillingSummaryItemAction, updateBillingSummaryNotesAction, updateBillingSummaryStatusAction } from "../../actions";
+import { BillingItemMatchPanel } from "../../billing-item-match-panel";
+import { clearBillingSummaryItemCatalogLinkAction, linkBillingSummaryItemCatalogAction, searchBillingSummaryItemCatalogMatchesAction, sendQuickBooksInvoiceAction, syncBillingSummaryToQuickBooksAction, updateBillingSummaryItemAction, updateBillingSummaryNotesAction, updateBillingSummaryStatusAction } from "../../actions";
 
 type BillingSummaryDetail = NonNullable<Awaited<ReturnType<typeof getAdminBillingSummaryDetail>>>;
-type BillingSummaryLineItem = BillingSummaryDetail["groupedItems"][keyof BillingSummaryDetail["groupedItems"]][number];
+type BillingSummaryLineItem = BillingSummaryDetail["groupedItems"][keyof BillingSummaryDetail["groupedItems"]][number] & {
+  currentCatalogMatch?: {
+    catalogItemId: string;
+    quickbooksItemId: string;
+    name: string;
+    sku: string | null;
+    itemType: string;
+    unitPrice: number | null;
+    alias: string | null;
+    confidence: number;
+    matchMethod: string;
+    autoMatchEligible: boolean;
+  } | null;
+  suggestedCatalogMatches?: Array<{
+    catalogItemId: string;
+    quickbooksItemId: string;
+    name: string;
+    sku: string | null;
+    itemType: string;
+    unitPrice: number | null;
+    alias: string | null;
+    confidence: number;
+    matchMethod: string;
+    autoMatchEligible: boolean;
+  }>;
+};
 
 const categoryLabels = {
   labor: "Labor",
@@ -176,6 +202,17 @@ export default async function BillingSummaryDetailPage({
                           <p key={line} className="text-sm text-slate-500">{line}</p>
                         ))}
                         {item.unitPrice === null || item.unitPrice === undefined ? <p className="text-sm font-semibold text-amber-700">Missing unit price. Review recommended.</p> : null}
+                        <BillingItemMatchPanel
+                          clearAction={clearBillingSummaryItemCatalogLinkAction}
+                          currentMatch={item.currentCatalogMatch ?? null}
+                          inspectionId={summary.inspectionId}
+                          itemDescription={item.description}
+                          itemId={item.id}
+                          linkAction={linkBillingSummaryItemCatalogAction}
+                          searchAction={searchBillingSummaryItemCatalogMatchesAction}
+                          suggestedMatches={item.suggestedCatalogMatches ?? []}
+                          summaryId={summary.id}
+                        />
                       </div>
                       <div className="grid gap-3 sm:grid-cols-3">
                         <label className="text-sm text-slate-600">

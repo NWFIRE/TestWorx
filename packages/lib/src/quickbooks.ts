@@ -967,11 +967,13 @@ async function resolveQuickBooksCustomer(connection: QuickBooksTenantConnection,
   billingEmail: string | null;
   phone: string | null;
   siteName: string;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
+  billingAddressLine1?: string | null;
+  billingAddressLine2?: string | null;
+  billingCity?: string | null;
+  billingState?: string | null;
+  billingPostalCode?: string | null;
+  billingCountry?: string | null;
+  notes?: string | null;
 }) {
   const customerRecord = await prisma.customerCompany.findUnique({
     where: { id: summary.customerCompanyId },
@@ -1405,7 +1407,30 @@ export async function syncQuickBooksCustomers(actor: ActorContext): Promise<Quic
 async function resolveImportedQuickBooksItem(tenantId: string, item: {
   code?: string;
   description: string;
+  linkedCatalogItemId?: string | null;
+  linkedQuickBooksItemId?: string | null;
+  linkedCatalogItemName?: string | null;
 }) {
+  if (item.linkedCatalogItemId || item.linkedQuickBooksItemId) {
+    const linkedItem = await prisma.quickBooksCatalogItem.findFirst({
+      where: {
+        tenantId,
+        OR: [
+          ...(item.linkedCatalogItemId ? [{ id: item.linkedCatalogItemId }] : []),
+          ...(item.linkedQuickBooksItemId ? [{ quickbooksItemId: item.linkedQuickBooksItemId }] : [])
+        ]
+      },
+      select: {
+        quickbooksItemId: true,
+        name: true
+      }
+    });
+
+    if (linkedItem) {
+      return { itemId: linkedItem.quickbooksItemId, itemName: linkedItem.name };
+    }
+  }
+
   const sanitizedCode = sanitizeCatalogMatchValue(item.code);
   const sanitizedName = sanitizeItemName(item.code || item.description);
   const rawCode = item.code?.trim() || null;
@@ -1459,13 +1484,16 @@ async function resolveIncomeAccountId(connection: QuickBooksTenantConnection) {
 async function resolveQuickBooksItem(connection: QuickBooksTenantConnection, incomeAccountId: string, item: {
   code?: string;
   description: string;
+  linkedCatalogItemId?: string | null;
+  linkedQuickBooksItemId?: string | null;
+  linkedCatalogItemName?: string | null;
 }) {
   const importedItem = await resolveImportedQuickBooksItem(connection.id, item);
   if (importedItem) {
     return importedItem;
   }
 
-  const itemName = sanitizeItemName(item.code || item.description);
+  const itemName = sanitizeItemName(item.linkedCatalogItemName || item.code || item.description);
   const itemQuery = await quickBooksApiRequest<{ QueryResponse?: { Item?: Array<{ Id: string }> } }>(connection, {
     path: "/query",
     searchParams: new URLSearchParams({
@@ -2211,11 +2239,13 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
       billingEmail: summary.customerCompany.billingEmail,
       phone: summary.customerCompany.phone,
       siteName: summary.site.name,
-      addressLine1: summary.site.addressLine1,
-      addressLine2: summary.site.addressLine2,
-      city: summary.site.city,
-      state: summary.site.state,
-      postalCode: summary.site.postalCode
+      billingAddressLine1: summary.customerCompany.billingAddressLine1 ?? summary.customerCompany.serviceAddressLine1 ?? summary.site.addressLine1,
+      billingAddressLine2: summary.customerCompany.billingAddressLine2 ?? summary.customerCompany.serviceAddressLine2 ?? summary.site.addressLine2,
+      billingCity: summary.customerCompany.billingCity ?? summary.customerCompany.serviceCity ?? summary.site.city,
+      billingState: summary.customerCompany.billingState ?? summary.customerCompany.serviceState ?? summary.site.state,
+      billingPostalCode: summary.customerCompany.billingPostalCode ?? summary.customerCompany.servicePostalCode ?? summary.site.postalCode,
+      billingCountry: summary.customerCompany.billingCountry ?? summary.customerCompany.serviceCountry ?? null,
+      notes: summary.customerCompany.notes ?? null
     });
 
     const incomeAccountId = await resolveIncomeAccountId(tenant);

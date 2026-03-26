@@ -5,9 +5,15 @@ const { prismaMock, txMock } = vi.hoisted(() => ({
   prismaMock: {
     $queryRaw: vi.fn(),
     $executeRaw: vi.fn(),
+    $transaction: vi.fn(),
     inspection: { findFirst: vi.fn() },
     tenant: { findUnique: vi.fn() },
-    serviceFeeRule: { findMany: vi.fn() }
+    serviceFeeRule: { findMany: vi.fn() },
+    billingItemCatalogMatch: { findUnique: vi.fn(), upsert: vi.fn() },
+    quickBooksCatalogItem: { findFirst: vi.fn(), findMany: vi.fn() },
+    quickBooksCatalogItemAlias: { findMany: vi.fn(), upsert: vi.fn() },
+    inspectionBillingSummary: { update: vi.fn() },
+    auditLog: { create: vi.fn() }
   },
   txMock: {
     $queryRaw: vi.fn(),
@@ -23,13 +29,18 @@ vi.mock("@testworx/db", () => ({
 }));
 
 import {
+  clearBillingSummaryItemCatalogLink,
   extractBillableItemsFromDraft,
   extractBillableItemsFromFinalizedReport,
   getAdminBillingSummaryDetail,
   getAdminBillingSummaries,
   groupBillableItems,
+  linkBillingSummaryItemCatalog,
   mergeBillingItems,
-  syncInspectionBillingSummaryTx
+  searchBillingSummaryItemCatalogMatches,
+  syncInspectionBillingSummaryTx,
+  updateBillingSummaryItem,
+  updateBillingSummaryNotes
 } from "../inspection-billing";
 import { buildInitialReportDraft } from "../report-engine";
 import { resolveInspectionServiceFeeTx } from "../service-fees";
@@ -60,6 +71,7 @@ function buildKitchenDraft() {
   draft.sections["system-details"]!.fields.numberOfCylinders = 2;
   draft.sections["system-details"]!.fields.systemLocation = "Ground floor commercial kitchen";
   draft.sections["system-details"]!.fields.manufacturer = "Ansul";
+  draft.sections["system-details"]!.fields.billingManufacturer = "Ansul";
   draft.sections["tank-and-service"]!.fields.fusibleLinksUsed = [
     { temperature: "286°F", quantity: "6" }
   ];
@@ -174,6 +186,15 @@ describe("inspection billing extraction", () => {
     txMock.inspection.findFirst.mockReset();
     txMock.tenant.findUnique.mockReset();
     txMock.serviceFeeRule.findMany.mockReset();
+    prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
+    prismaMock.quickBooksCatalogItemAlias.findMany.mockResolvedValue([]);
+    prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof prismaMock) => Promise<unknown>) => callback(prismaMock as never));
+    prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
+    prismaMock.auditLog.create.mockResolvedValue(undefined);
+    prismaMock.quickBooksCatalogItemAlias.upsert.mockResolvedValue(undefined);
+    prismaMock.billingItemCatalogMatch.upsert.mockResolvedValue(undefined);
   });
 
   it("extracts kitchen suppression material items from structured fields", () => {
@@ -186,7 +207,7 @@ describe("inspection billing extraction", () => {
     });
 
     expect(items.map((item) => [item.category, item.description, item.quantity, item.code])).toEqual([
-      ["service", "Kitchen Suppression System Inspection", 1, "KS-INSPECTION-GROUP-A"],
+      ["service", "Kitchen Suppression System Inspection", 1, "KS-INSPECTION-OTHER"],
       ["material", "Fusible links used (286°F)", 6, "KS-FUSIBLE-LINK"],
       ["material", "Caps used (Rubber)", 4, "KS-CAP"],
       ["material", "Cartridges used (PK-2 cartridge)", 1, "KS-CARTRIDGE"]
@@ -241,7 +262,7 @@ describe("inspection billing extraction", () => {
     });
 
     expect(items.map((item) => [item.description, item.code, item.quantity])).toEqual([
-      ["Kitchen Suppression System Inspection", "KS-INSPECTION-GROUP-A", 1]
+      ["Kitchen Suppression System Inspection", "KS-INSPECTION-OTHER", 1]
     ]);
   });
 
@@ -292,7 +313,7 @@ describe("inspection billing extraction", () => {
     const grouped = groupBillableItems(merged);
     expect(grouped.fee).toHaveLength(0);
     expect(grouped.material).toHaveLength(3);
-    expect(grouped.service).toHaveLength(0);
+    expect(grouped.service).toHaveLength(1);
     expect(grouped.labor).toHaveLength(0);
   });
 
@@ -428,7 +449,7 @@ describe("inspection billing persistence and admin review", () => {
     });
 
     expect(summary?.inspectionId).toBe("inspection_1");
-    expect(summary?.items).toHaveLength(4);
+    expect(summary?.items).toHaveLength(5);
     expect(summary?.items.find((item) => item.description === "Service Fee")?.unitPrice).toBe(95);
     expect(txMock.$executeRaw).toHaveBeenCalledTimes(1);
   });
@@ -546,6 +567,200 @@ describe("inspection billing persistence and admin review", () => {
     await expect(
       updateBillingSummaryItem({ userId: "office_1", role: "office_admin", tenantId: "tenant_1" }, "summary_1", "line_1", 2, 99)
     ).rejects.toThrow(/moved back to review/i);
+  });
+
+  it("suggests normalized and alias-based catalog matches without forcing manual renames", async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      {
+        id: "summary_1",
+        inspectionId: "inspection_1",
+        customerCompanyId: "customer_1",
+        customerName: "Pinecrest Property Management",
+        siteId: "site_1",
+        siteName: "Pinecrest Tower",
+        inspectionDate: new Date("2026-03-20T15:00:00.000Z"),
+        technicianName: "Alex Turner",
+        status: "draft",
+        quickbooksSyncStatus: null,
+        quickbooksInvoiceId: null,
+        quickbooksInvoiceNumber: null,
+        quickbooksConnectionMode: null,
+        quickbooksSyncedAt: null,
+        quickbooksSyncError: null,
+        subtotal: 0,
+        notes: null,
+        items: [
+          {
+            id: "line_1",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "fire_extinguisher",
+            category: "service",
+            description: "Fire Extinguisher Inspection - Annual",
+            quantity: 1
+          }
+        ]
+      }
+    ]);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([
+      {
+        id: "catalog_exact",
+        quickbooksItemId: "qb_1",
+        name: "Annual Inspection",
+        sku: "FE-ANNUAL",
+        itemType: "Service",
+        unitPrice: 45
+      }
+    ]);
+    prismaMock.quickBooksCatalogItemAlias.findMany.mockResolvedValue([
+      {
+        alias: "Annual extinguisher inspection",
+        catalogItem: {
+          id: "catalog_alias",
+          quickbooksItemId: "qb_2",
+          name: "Annual Inspection",
+          sku: "FE-ANNUAL",
+          itemType: "Service",
+          unitPrice: 45
+        }
+      }
+    ]);
+
+    const detail = await getAdminBillingSummaryDetail(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    expect(detail?.items[0]?.suggestedCatalogMatches[0]?.name).toBe("Annual Inspection");
+  });
+
+  it("returns conservative search results for ambiguous billing item names", async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      {
+        id: "summary_1",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        status: "draft",
+        subtotal: 125,
+        notes: "Review pricing",
+        items: [
+          {
+            id: "line_1",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "fire_extinguisher",
+            category: "service",
+            description: "Inspection",
+            quantity: 1
+          }
+        ]
+      }
+    ]);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([
+      { id: "catalog_1", quickbooksItemId: "qb_1", name: "Annual Inspection", sku: null, itemType: "Service", unitPrice: 45 },
+      { id: "catalog_2", quickbooksItemId: "qb_2", name: "Six Year Inspection", sku: null, itemType: "Service", unitPrice: 95 }
+    ]);
+
+    const result = await searchBillingSummaryItemCatalogMatches(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { summaryId: "summary_1", itemId: "line_1", query: "Inspection" }
+    );
+
+    expect(result.results.length).toBeGreaterThan(0);
+    expect(result.results[0]?.autoMatchEligible).toBe(false);
+  });
+
+  it("persists a manual billing item link and reusable mapping", async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      {
+        id: "summary_1",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        status: "draft",
+        subtotal: 125,
+        notes: "Review pricing",
+        quickbooksSyncStatus: "not_synced",
+        quickbooksInvoiceId: null,
+        items: [
+          {
+            id: "line_1",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "fire_extinguisher",
+            category: "service",
+            sourceSection: "inventory",
+            sourceField: "servicePerformed",
+            description: "Annual Inspection",
+            quantity: 1,
+            unitPrice: 45
+          }
+        ]
+      }
+    ]);
+    prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue({
+      id: "catalog_1",
+      quickbooksItemId: "qb_1",
+      name: "Annual Inspection",
+      sku: "FE-ANNUAL",
+      unitPrice: 45
+    });
+
+    await linkBillingSummaryItemCatalog(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        summaryId: "summary_1",
+        itemId: "line_1",
+        catalogItemId: "catalog_1",
+        saveMapping: true,
+        alias: "Fire Extinguisher Inspection - Annual"
+      }
+    );
+
+    expect(prismaMock.inspectionBillingSummary.update).toHaveBeenCalled();
+    expect(prismaMock.billingItemCatalogMatch.upsert).toHaveBeenCalled();
+    expect(prismaMock.quickBooksCatalogItemAlias.upsert).toHaveBeenCalled();
+  });
+
+  it("clears a manual billing item link without breaking pricing", async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      {
+        id: "summary_1",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        status: "draft",
+        subtotal: 125,
+        notes: "Review pricing",
+        quickbooksSyncStatus: "not_synced",
+        quickbooksInvoiceId: null,
+        items: [
+          {
+            id: "line_1",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "fire_extinguisher",
+            category: "service",
+            description: "Annual Inspection",
+            quantity: 1,
+            unitPrice: 45,
+            linkedCatalogItemId: "catalog_1",
+            linkedCatalogItemName: "Annual Inspection",
+            linkedQuickBooksItemId: "qb_1"
+          }
+        ]
+      }
+    ]);
+
+    await clearBillingSummaryItemCatalogLink(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { summaryId: "summary_1", itemId: "line_1" }
+    );
+
+    expect(prismaMock.inspectionBillingSummary.update).toHaveBeenCalled();
+    expect(prismaMock.auditLog.create).toHaveBeenCalled();
   });
 });
 

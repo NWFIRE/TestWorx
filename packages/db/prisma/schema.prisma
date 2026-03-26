@@ -169,6 +169,8 @@ model Tenant {
   stripeWebhookEvents       StripeWebhookEvent[]
   serviceFeeRules           ServiceFeeRule[]
   quickbooksCatalogItems    QuickBooksCatalogItem[]
+  quickbooksCatalogItemAliases QuickBooksCatalogItemAlias[]
+  billingItemCatalogMatches BillingItemCatalogMatch[]
 }
 
 model User {
@@ -527,11 +529,56 @@ model QuickBooksCatalogItem {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   tenant             Tenant   @relation(fields: [tenantId], references: [id])
+  aliases            QuickBooksCatalogItemAlias[]
+  billingItemMatches BillingItemCatalogMatch[]
 
   @@unique([tenantId, quickbooksItemId])
   @@index([tenantId, active, itemType])
   @@index([tenantId, name])
   @@index([tenantId, sku])
+}
+
+model QuickBooksCatalogItemAlias {
+  id              String   @id @default(cuid())
+  tenantId        String
+  catalogItemId   String
+  alias           String
+  normalizedAlias String
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  catalogItem     QuickBooksCatalogItem @relation(fields: [catalogItemId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, normalizedAlias])
+  @@index([tenantId, catalogItemId])
+  @@index([tenantId, alias])
+}
+
+model BillingItemCatalogMatch {
+  id                   String   @id @default(cuid())
+  tenantId             String
+  sourceKey            String
+  sourceName           String
+  normalizedSourceName String
+  sourceCode           String?
+  sourceCategory       String
+  sourceReportType     String
+  sourceSection        String?
+  sourceField          String?
+  catalogItemId        String
+  confidence           Float
+  matchMethod          String
+  confirmedByUserId    String?
+  confirmedAt          DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  tenant               Tenant   @relation(fields: [tenantId], references: [id])
+  catalogItem          QuickBooksCatalogItem @relation(fields: [catalogItemId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, sourceKey])
+  @@index([tenantId, catalogItemId])
+  @@index([tenantId, normalizedSourceName])
 }
 
 model InspectionDocument {
