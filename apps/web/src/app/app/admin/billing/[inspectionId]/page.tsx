@@ -189,10 +189,7 @@ export default async function BillingSummaryDetailPage({
                 {items.length === 0 ? (
                   <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No {categoryLabels[category].toLowerCase()} extracted from this visit.</p>
                 ) : items.map((item: BillingSummaryLineItem) => (
-                  <form key={item.id} action={updateBillingSummaryItemAction} className="rounded-[1.5rem] border border-slate-200 p-4">
-                    <input name="summaryId" type="hidden" value={summary.id} />
-                    <input name="inspectionId" type="hidden" value={summary.inspectionId} />
-                    <input name="itemId" type="hidden" value={item.id} />
+                  <div key={item.id} className="rounded-[1.5rem] border border-slate-200 p-4">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div className="space-y-2">
                         <p className="text-lg font-semibold text-ink">{item.description}</p>
@@ -214,7 +211,10 @@ export default async function BillingSummaryDetailPage({
                           summaryId={summary.id}
                         />
                       </div>
-                      <div className="grid gap-3 sm:grid-cols-3">
+                      <form action={updateBillingSummaryItemAction} className="grid gap-3 sm:grid-cols-3">
+                        <input name="summaryId" type="hidden" value={summary.id} />
+                        <input name="inspectionId" type="hidden" value={summary.inspectionId} />
+                        <input name="itemId" type="hidden" value={item.id} />
                         <label className="text-sm text-slate-600">
                           Quantity
                           <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={item.quantity} disabled={isInvoiced} name="quantity" step="0.25" type="number" />
@@ -228,9 +228,9 @@ export default async function BillingSummaryDetailPage({
                             {isInvoiced ? "Locked" : "Save line"}
                           </button>
                         </div>
-                      </div>
+                      </form>
                     </div>
-                  </form>
+                  </div>
                 ))}
               </div>
             </div>
