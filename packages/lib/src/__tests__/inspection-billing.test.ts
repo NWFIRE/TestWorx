@@ -727,6 +727,61 @@ describe("inspection billing persistence and admin review", () => {
     );
   });
 
+  it("returns broad manual search matches for short terms like new without weakening automatic suggestions", async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      {
+        id: "summary_1",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        status: "draft",
+        subtotal: 125,
+        notes: "Review pricing",
+        quickbooksSyncStatus: null,
+        quickbooksInvoiceId: null,
+        items: [
+          {
+            id: "line_1",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "fire_extinguisher",
+            category: "material",
+            description: "Annual Inspection",
+            quantity: 1
+          }
+        ]
+      }
+    ]);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([
+      {
+        id: "catalog_new_install",
+        quickbooksItemId: "qb_new_install",
+        name: "New Install - Fire Extinguisher",
+        sku: "NEW-INSTALL-FE",
+        itemType: "Service",
+        unitPrice: 120
+      },
+      {
+        id: "catalog_new_cabinet",
+        quickbooksItemId: "qb_new_cabinet",
+        name: "New Cabinet",
+        sku: "NEW-CAB",
+        itemType: "NonInventory",
+        unitPrice: 35
+      }
+    ]);
+    prismaMock.quickBooksCatalogItemAlias.findMany.mockResolvedValue([]);
+
+    const result = await searchBillingSummaryItemCatalogMatches(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { summaryId: "summary_1", itemId: "line_1", query: "New" }
+    );
+
+    expect(result.results.map((candidate) => candidate.name)).toEqual(
+      expect.arrayContaining(["New Install - Fire Extinguisher", "New Cabinet"])
+    );
+  });
+
   it("persists a manual billing item link and reusable mapping", async () => {
     prismaMock.$queryRaw.mockResolvedValueOnce([
       {

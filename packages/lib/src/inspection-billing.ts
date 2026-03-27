@@ -68,6 +68,7 @@ type BillingItemCatalogMatchRecord = {
 
 const AUTO_MATCH_CONFIDENCE_THRESHOLD = 0.96;
 const SUGGESTED_MATCH_CONFIDENCE_THRESHOLD = 0.72;
+const MANUAL_SEARCH_CONFIDENCE_THRESHOLD = 0;
 
 export type BillingSummaryStatus = "draft" | "reviewed" | "invoiced";
 
@@ -785,7 +786,7 @@ async function searchCatalogCandidates(
   tenantId: string,
   item: Pick<BillableItem, "code" | "description">,
   query: string,
-  options?: { page?: number; limit?: number }
+  options?: { page?: number; limit?: number; mode?: "manual" | "suggestion" }
 ) {
   const rawQuery = query.trim();
   const normalizedQuery = normalizeMatchText(rawQuery);
@@ -796,6 +797,8 @@ async function searchCatalogCandidates(
   };
   const page = Math.max(options?.page ?? 1, 1);
   const limit = Math.min(Math.max(options?.limit ?? 8, 1), 20);
+  const confidenceThreshold =
+    options?.mode === "manual" ? MANUAL_SEARCH_CONFIDENCE_THRESHOLD : SUGGESTED_MATCH_CONFIDENCE_THRESHOLD;
 
   if (!rawQuery) {
     return {
@@ -861,13 +864,13 @@ async function searchCatalogCandidates(
 
   const candidates = new Map<string, BillingCatalogMatchSuggestion>();
 
-    for (const catalogItem of catalogItems) {
-      const scored = scoreCatalogMatch({
-        item: searchTarget,
-        catalogName: catalogItem.name,
-        sku: catalogItem.sku
-      });
-    if (scored.confidence < SUGGESTED_MATCH_CONFIDENCE_THRESHOLD) {
+  for (const catalogItem of catalogItems) {
+    const scored = scoreCatalogMatch({
+      item: searchTarget,
+      catalogName: catalogItem.name,
+      sku: catalogItem.sku
+    });
+    if (scored.confidence < confidenceThreshold) {
       continue;
     }
 
@@ -888,14 +891,14 @@ async function searchCatalogCandidates(
     }
   }
 
-    for (const alias of aliases) {
-      const scored = scoreCatalogMatch({
-        item: searchTarget,
-        catalogName: alias.catalogItem.name,
-        alias: alias.alias,
-        sku: alias.catalogItem.sku
+  for (const alias of aliases) {
+    const scored = scoreCatalogMatch({
+      item: searchTarget,
+      catalogName: alias.catalogItem.name,
+      alias: alias.alias,
+      sku: alias.catalogItem.sku
     });
-    if (scored.confidence < SUGGESTED_MATCH_CONFIDENCE_THRESHOLD) {
+    if (scored.confidence < confidenceThreshold) {
       continue;
     }
 
@@ -1001,7 +1004,7 @@ async function buildBillingItemCatalogState(tenantId: string, item: BillableItem
     tenantId,
     item,
     buildBillingItemSearchQuery(item),
-    { page: 1, limit: 3 }
+    { page: 1, limit: 3, mode: "suggestion" }
   );
 
   const highConfidenceSuggestion = suggestions.results[0];
@@ -1438,7 +1441,8 @@ export async function searchBillingSummaryItemCatalogMatches(
 
   return searchCatalogCandidates(parsedActor.tenantId as string, item, input.query, {
     page: input.page,
-    limit: input.limit
+    limit: input.limit,
+    mode: "manual"
   });
 }
 
