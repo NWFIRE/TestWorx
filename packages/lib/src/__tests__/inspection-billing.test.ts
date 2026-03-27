@@ -672,6 +672,61 @@ describe("inspection billing persistence and admin review", () => {
     expect(result.results[0]?.autoMatchEligible).toBe(false);
   });
 
+  it("matches typed search text against catalog items even when the billing line description is unrelated", async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      {
+        id: "summary_1",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        status: "draft",
+        subtotal: 125,
+        notes: "Review pricing",
+        quickbooksSyncStatus: null,
+        quickbooksInvoiceId: null,
+        items: [
+          {
+            id: "line_1",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "emergency_exit_lighting",
+            category: "material",
+            description: "Emergency Light Annual Inspection",
+            quantity: 1
+          }
+        ]
+      }
+    ]);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([
+      {
+        id: "catalog_cap_metal",
+        quickbooksItemId: "qb_cap_metal",
+        name: "Metal Caps",
+        sku: "CAP-METAL",
+        itemType: "NonInventory",
+        unitPrice: 1.25
+      },
+      {
+        id: "catalog_cap_rubber",
+        quickbooksItemId: "qb_cap_rubber",
+        name: "Rubber Cap",
+        sku: "CAP-RUBBER",
+        itemType: "NonInventory",
+        unitPrice: 0.95
+      }
+    ]);
+    prismaMock.quickBooksCatalogItemAlias.findMany.mockResolvedValue([]);
+
+    const result = await searchBillingSummaryItemCatalogMatches(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { summaryId: "summary_1", itemId: "line_1", query: "cap" }
+    );
+
+    expect(result.results.map((candidate) => candidate.name)).toEqual(
+      expect.arrayContaining(["Metal Caps", "Rubber Cap"])
+    );
+  });
+
   it("persists a manual billing item link and reusable mapping", async () => {
     prismaMock.$queryRaw.mockResolvedValueOnce([
       {

@@ -790,6 +790,10 @@ async function searchCatalogCandidates(
   const rawQuery = query.trim();
   const normalizedQuery = normalizeMatchText(rawQuery);
   const tokenizedQuery = tokenizeMatchText(rawQuery);
+  const searchTarget = {
+    code: rawQuery || item.code,
+    description: rawQuery || item.description
+  };
   const page = Math.max(options?.page ?? 1, 1);
   const limit = Math.min(Math.max(options?.limit ?? 8, 1), 20);
 
@@ -857,12 +861,12 @@ async function searchCatalogCandidates(
 
   const candidates = new Map<string, BillingCatalogMatchSuggestion>();
 
-  for (const catalogItem of catalogItems) {
-    const scored = scoreCatalogMatch({
-      item,
-      catalogName: catalogItem.name,
-      sku: catalogItem.sku
-    });
+    for (const catalogItem of catalogItems) {
+      const scored = scoreCatalogMatch({
+        item: searchTarget,
+        catalogName: catalogItem.name,
+        sku: catalogItem.sku
+      });
     if (scored.confidence < SUGGESTED_MATCH_CONFIDENCE_THRESHOLD) {
       continue;
     }
@@ -884,12 +888,12 @@ async function searchCatalogCandidates(
     }
   }
 
-  for (const alias of aliases) {
-    const scored = scoreCatalogMatch({
-      item,
-      catalogName: alias.catalogItem.name,
-      alias: alias.alias,
-      sku: alias.catalogItem.sku
+    for (const alias of aliases) {
+      const scored = scoreCatalogMatch({
+        item: searchTarget,
+        catalogName: alias.catalogItem.name,
+        alias: alias.alias,
+        sku: alias.catalogItem.sku
     });
     if (scored.confidence < SUGGESTED_MATCH_CONFIDENCE_THRESHOLD) {
       continue;
