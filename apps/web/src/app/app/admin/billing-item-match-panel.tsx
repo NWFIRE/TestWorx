@@ -48,6 +48,56 @@ function confidenceLabel(confidence: number) {
   return "Possible match";
 }
 
+function SearchPaginationControls({
+  summaryId,
+  itemId,
+  query,
+  pagination,
+  searchFormAction
+}: {
+  summaryId: string;
+  itemId: string;
+  query: string;
+  pagination: { page: number; totalPages: number; totalCount: number; limit: number };
+  searchFormAction: (formData: FormData) => void;
+}) {
+  if (pagination.totalPages <= 1) {
+    return null;
+  }
+
+  const pages = Array.from({ length: pagination.totalPages }, (_, index) => index + 1);
+
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-xs text-slate-500">
+        Showing page {pagination.page} of {pagination.totalPages}
+        {" "}
+        ({pagination.totalCount} matches)
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {pages.map((pageNumber) => (
+          <form key={pageNumber} action={searchFormAction}>
+            <input name="summaryId" type="hidden" value={summaryId} />
+            <input name="itemId" type="hidden" value={itemId} />
+            <input name="query" type="hidden" value={query} />
+            <input name="page" type="hidden" value={String(pageNumber)} />
+            <button
+              className={`inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl border px-3 text-sm font-semibold ${
+                pageNumber === pagination.page
+                  ? "border-slateblue bg-slateblue text-white"
+                  : "border-slate-200 bg-white text-slateblue"
+              }`}
+              type="submit"
+            >
+              {pageNumber}
+            </button>
+          </form>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function BillingItemMatchPanel({
   summaryId,
   inspectionId,
@@ -159,6 +209,17 @@ export function BillingItemMatchPanel({
             </p>
           ) : (
             <div className="space-y-3">
+              {searchState.hasSearched ? (
+                <SearchPaginationControls
+                  itemId={itemId}
+                  pagination={searchState.pagination}
+                  query={searchState.query || itemDescription}
+                  searchFormAction={searchFormAction}
+                  summaryId={summaryId}
+                />
+              ) : null}
+
+              <div className="max-h-[28rem] space-y-3 overflow-y-auto pr-1">
               {results.map((candidate) => (
                 <div key={candidate.catalogItemId} className="rounded-2xl border border-slate-200 bg-white p-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -193,6 +254,7 @@ export function BillingItemMatchPanel({
                   </div>
                 </div>
               ))}
+              </div>
             </div>
           )}
 
