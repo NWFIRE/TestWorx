@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type MatchCandidate = {
   catalogItemId: string;
@@ -20,6 +21,7 @@ type SearchState = {
   query: string;
   results: MatchCandidate[];
   pagination: { page: number; totalPages: number; totalCount: number; limit: number };
+  hasSearched: boolean;
 };
 
 type ActionState = { error: string | null; success: string | null };
@@ -28,7 +30,8 @@ const initialSearchState: SearchState = {
   error: null,
   query: "",
   results: [],
-  pagination: { page: 1, totalPages: 1, totalCount: 0, limit: 8 }
+  pagination: { page: 1, totalPages: 1, totalCount: 0, limit: 8 },
+  hasSearched: false
 };
 
 const initialActionState: ActionState = { error: null, success: null };
@@ -66,6 +69,7 @@ export function BillingItemMatchPanel({
   linkAction: (_: ActionState, formData: FormData) => Promise<ActionState>;
   clearAction: (_: ActionState, formData: FormData) => Promise<ActionState>;
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [searchState, searchFormAction] = useActionState(searchAction, {
     ...initialSearchState,
@@ -73,8 +77,21 @@ export function BillingItemMatchPanel({
   });
   const [linkState, linkFormAction] = useActionState(linkAction, initialActionState);
   const [clearState, clearFormAction] = useActionState(clearAction, initialActionState);
+  const [searchNonce, setSearchNonce] = useState(0);
 
-  const results = searchState.results.length > 0 ? searchState.results : suggestedMatches;
+  useEffect(() => {
+    if (linkState.success || clearState.success) {
+      router.refresh();
+    }
+  }, [clearState.success, linkState.success, router]);
+
+  const results = useMemo(() => {
+    if (searchState.hasSearched) {
+      return searchState.results;
+    }
+
+    return suggestedMatches;
+  }, [searchState.hasSearched, searchState.results, suggestedMatches]);
   const activeMatch = currentMatch;
 
   return (
@@ -112,13 +129,18 @@ export function BillingItemMatchPanel({
           <form action={searchFormAction} className="flex flex-col gap-3 sm:flex-row">
             <input name="summaryId" type="hidden" value={summaryId} />
             <input name="itemId" type="hidden" value={itemId} />
+            <input name="searchNonce" type="hidden" value={searchNonce} />
             <input
               className="min-h-11 flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
               defaultValue={searchState.query || itemDescription}
               name="query"
               placeholder="Search products and services"
             />
-            <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" type="submit">
+            <button
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
+              onClick={() => setSearchNonce((value) => value + 1)}
+              type="submit"
+            >
               Search
             </button>
           </form>
@@ -131,7 +153,9 @@ export function BillingItemMatchPanel({
 
           {results.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-500">
-              No suggested matches yet. Search for an existing product or service and confirm the best fit.
+              {searchState.hasSearched
+                ? "No products or services matched that search. Try a broader term or confirm pricing manually."
+                : "No suggested matches yet. Search for an existing product or service and confirm the best fit."}
             </p>
           ) : (
             <div className="space-y-3">

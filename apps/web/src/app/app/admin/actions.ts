@@ -424,6 +424,7 @@ export async function searchBillingSummaryItemCatalogMatchesAction(
       autoMatchEligible: boolean;
     }>;
     pagination: { page: number; totalPages: number; totalCount: number; limit: number };
+    hasSearched: boolean;
   },
   formData: FormData
 ) {
@@ -438,7 +439,8 @@ export async function searchBillingSummaryItemCatalogMatchesAction(
       error: "Unauthorized",
       query,
       results: [],
-      pagination: { page: 1, totalPages: 1, totalCount: 0, limit: 8 }
+      pagination: { page: 1, totalPages: 1, totalCount: 0, limit: 8 },
+      hasSearched: true
     };
   }
 
@@ -452,14 +454,16 @@ export async function searchBillingSummaryItemCatalogMatchesAction(
       error: null,
       query,
       results: result.results,
-      pagination: result.pagination
+      pagination: result.pagination,
+      hasSearched: true
     };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Unable to search products and services.",
       query,
       results: [],
-      pagination: { page: 1, totalPages: 1, totalCount: 0, limit: 8 }
+      pagination: { page: 1, totalPages: 1, totalCount: 0, limit: 8 },
+      hasSearched: true
     };
   }
 }
