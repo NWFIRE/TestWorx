@@ -724,6 +724,101 @@ describe("inspection billing persistence and admin review", () => {
     expect(prismaMock.quickBooksCatalogItemAlias.upsert).toHaveBeenCalled();
   });
 
+  it("fills missing unit price from the linked catalog item without overwriting existing manual pricing", async () => {
+    const summaryRow = [
+      {
+        id: "summary_1",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        status: "draft",
+        subtotal: 125,
+        notes: "Review pricing",
+        quickbooksSyncStatus: "not_synced",
+        quickbooksInvoiceId: null,
+        items: [
+          {
+            id: "line_missing",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "fire_extinguisher",
+            category: "service",
+            description: "Annual Inspection",
+            quantity: 2,
+            unitPrice: null
+          },
+          {
+            id: "line_priced",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "fire_extinguisher",
+            category: "service",
+            description: "Six Year Inspection",
+            quantity: 1,
+            unitPrice: 125
+          }
+        ]
+      }
+    ];
+    prismaMock.$queryRaw.mockImplementation(async () => summaryRow);
+    prismaMock.quickBooksCatalogItem.findFirst
+      .mockResolvedValueOnce({
+        id: "catalog_1",
+        quickbooksItemId: "qb_1",
+        name: "Annual Inspection",
+        sku: "FE-ANNUAL",
+        unitPrice: 45
+      })
+      .mockResolvedValueOnce({
+        id: "catalog_2",
+        quickbooksItemId: "qb_2",
+        name: "Six Year Inspection",
+        sku: "FE-6YR",
+        unitPrice: 65
+      });
+
+    await linkBillingSummaryItemCatalog(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        summaryId: "summary_1",
+        itemId: "line_missing",
+        catalogItemId: "catalog_1",
+        saveMapping: false
+      }
+    );
+
+    await linkBillingSummaryItemCatalog(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        summaryId: "summary_1",
+        itemId: "line_priced",
+        catalogItemId: "catalog_2",
+        saveMapping: false
+      }
+    );
+
+    const firstUpdate = prismaMock.inspectionBillingSummary.update.mock.calls[0]?.[0];
+    const secondUpdate = prismaMock.inspectionBillingSummary.update.mock.calls[1]?.[0];
+    const firstItems = Array.isArray(firstUpdate?.data?.items) ? firstUpdate.data.items : [];
+    const secondItems = Array.isArray(secondUpdate?.data?.items) ? secondUpdate.data.items : [];
+
+    expect(firstItems.find((item) => item.id === "line_missing")).toEqual(
+      expect.objectContaining({
+        unitPrice: 45,
+        amount: 90,
+        linkedCatalogItemId: "catalog_1"
+      })
+    );
+    expect(secondItems.find((item) => item.id === "line_priced")).toEqual(
+      expect.objectContaining({
+        unitPrice: 125,
+        amount: 125,
+        linkedCatalogItemId: "catalog_2"
+      })
+    );
+  });
+
   it("clears a manual billing item link without breaking pricing", async () => {
     prismaMock.$queryRaw.mockResolvedValueOnce([
       {

@@ -1480,6 +1480,8 @@ export async function linkBillingSummaryItemCatalog(
     candidate.id === input.itemId
       ? {
           ...candidate,
+          unitPrice: candidate.unitPrice ?? catalogItem.unitPrice ?? null,
+          amount: calculateAmount(candidate.quantity, candidate.unitPrice ?? catalogItem.unitPrice ?? null),
           linkedCatalogItemId: catalogItem.id,
           linkedCatalogItemName: catalogItem.name,
           linkedQuickBooksItemId: catalogItem.quickbooksItemId,
