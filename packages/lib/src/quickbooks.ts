@@ -111,6 +111,24 @@ type QuickBooksCustomerRecord = {
   billingEmail: string | null;
   phone: string | null;
   contactName: string | null;
+  billingAddressLine1: string | null;
+  billingAddressLine2: string | null;
+  billingCity: string | null;
+  billingState: string | null;
+  billingPostalCode: string | null;
+  billingCountry: string | null;
+  serviceAddressLine1: string | null;
+  serviceAddressLine2: string | null;
+  serviceCity: string | null;
+  serviceState: string | null;
+  servicePostalCode: string | null;
+  serviceCountry: string | null;
+  billingAddressSameAsService: boolean;
+  paymentTermsCode: string;
+  customPaymentTermsLabel: string | null;
+  customPaymentTermsDays: number | null;
+  quickbooksPaymentTermName: string | null;
+  quickbooksPaymentTermId: string | null;
 };
 
 type QuickBooksCustomerSyncResult = {
@@ -730,7 +748,118 @@ function buildQuickBooksContactName(value: unknown) {
   return parts.length > 0 ? parts.join(" ") : null;
 }
 
-function normalizeQuickBooksCustomer(customer: unknown) {
+function readQuickBooksAddress(value: unknown) {
+  return {
+    line1: readQuickBooksStringField(value, "Line1"),
+    line2: readQuickBooksStringField(value, "Line2"),
+    city: readQuickBooksStringField(value, "City"),
+    state: readQuickBooksStringField(value, "CountrySubDivisionCode"),
+    postalCode: readQuickBooksStringField(value, "PostalCode"),
+    country: readQuickBooksStringField(value, "Country")
+  };
+}
+
+function normalizeAddressValue(value: string | null | undefined) {
+  return value?.trim().toLowerCase().replace(/\s+/g, " ") || null;
+}
+
+function addressesMatch(
+  first: ReturnType<typeof readQuickBooksAddress>,
+  second: ReturnType<typeof readQuickBooksAddress>
+) {
+  return normalizeAddressValue(first.line1) === normalizeAddressValue(second.line1)
+    && normalizeAddressValue(first.line2) === normalizeAddressValue(second.line2)
+    && normalizeAddressValue(first.city) === normalizeAddressValue(second.city)
+    && normalizeAddressValue(first.state) === normalizeAddressValue(second.state)
+    && normalizeAddressValue(first.postalCode) === normalizeAddressValue(second.postalCode)
+    && normalizeAddressValue(first.country) === normalizeAddressValue(second.country);
+}
+
+function parseCustomPaymentDays(label: string | null) {
+  if (!label) {
+    return null;
+  }
+
+  const match = label.match(/net\s*(\d{1,3})/i);
+  if (!match?.[1]) {
+    return null;
+  }
+
+  const days = Number.parseInt(match[1], 10);
+  return Number.isFinite(days) ? days : null;
+}
+
+async function resolveQuickBooksPaymentTerms(connection: QuickBooksTenantConnection, customer: unknown) {
+  const salesTermRef = customer && typeof customer === "object"
+    ? ((customer as Record<string, unknown>).SalesTermRef as Record<string, unknown> | undefined)
+    : undefined;
+
+  const quickbooksPaymentTermId = readQuickBooksStringField(salesTermRef, "value");
+  let quickbooksPaymentTermName = readQuickBooksStringField(salesTermRef, "name");
+
+  if (!quickbooksPaymentTermName && quickbooksPaymentTermId) {
+    try {
+      const response = await quickBooksApiRequest<{ Term?: unknown }>(connection, {
+        path: `/term/${encodeURIComponent(quickbooksPaymentTermId)}`
+      });
+      quickbooksPaymentTermName = readQuickBooksStringField(response.Term, "Name");
+    } catch {
+      quickbooksPaymentTermName = null;
+    }
+  }
+
+  const normalizedTermName = quickbooksPaymentTermName?.trim().toLowerCase() || null;
+
+  if (!normalizedTermName || /due\s+on\s+receipt|due\s+upon\s+receipt|due\s+at\s+time\s+of\s+service|due\s+immediately/i.test(normalizedTermName)) {
+    return {
+      paymentTermsCode: "due_on_receipt",
+      customPaymentTermsLabel: null,
+      customPaymentTermsDays: null,
+      quickbooksPaymentTermName,
+      quickbooksPaymentTermId
+    };
+  }
+
+  if (/net\s*15/i.test(normalizedTermName)) {
+    return {
+      paymentTermsCode: "net_15",
+      customPaymentTermsLabel: null,
+      customPaymentTermsDays: null,
+      quickbooksPaymentTermName,
+      quickbooksPaymentTermId
+    };
+  }
+
+  if (/net\s*30/i.test(normalizedTermName)) {
+    return {
+      paymentTermsCode: "net_30",
+      customPaymentTermsLabel: null,
+      customPaymentTermsDays: null,
+      quickbooksPaymentTermName,
+      quickbooksPaymentTermId
+    };
+  }
+
+  if (/net\s*60/i.test(normalizedTermName)) {
+    return {
+      paymentTermsCode: "net_60",
+      customPaymentTermsLabel: null,
+      customPaymentTermsDays: null,
+      quickbooksPaymentTermName,
+      quickbooksPaymentTermId
+    };
+  }
+
+  return {
+    paymentTermsCode: "custom",
+    customPaymentTermsLabel: quickbooksPaymentTermName,
+    customPaymentTermsDays: parseCustomPaymentDays(quickbooksPaymentTermName),
+    quickbooksPaymentTermName,
+    quickbooksPaymentTermId
+  };
+}
+
+async function normalizeQuickBooksCustomer(connection: QuickBooksTenantConnection, customer: unknown) {
   const quickbooksCustomerId = readQuickBooksStringField(customer, "Id");
   const displayName = readQuickBooksStringField(customer, "DisplayName");
 
@@ -744,6 +873,15 @@ function normalizeQuickBooksCustomer(customer: unknown) {
   const primaryPhone = customer && typeof customer === "object"
     ? ((customer as Record<string, unknown>).PrimaryPhone as Record<string, unknown> | undefined)
     : undefined;
+  const billAddr = customer && typeof customer === "object"
+    ? ((customer as Record<string, unknown>).BillAddr as Record<string, unknown> | undefined)
+    : undefined;
+  const shipAddr = customer && typeof customer === "object"
+    ? ((customer as Record<string, unknown>).ShipAddr as Record<string, unknown> | undefined)
+    : undefined;
+  const billingAddress = readQuickBooksAddress(billAddr);
+  const serviceAddress = readQuickBooksAddress(shipAddr);
+  const paymentTerms = await resolveQuickBooksPaymentTerms(connection, customer);
 
   return {
     quickbooksCustomerId,
@@ -752,7 +890,29 @@ function normalizeQuickBooksCustomer(customer: unknown) {
     syncToken: readQuickBooksStringField(customer, "SyncToken"),
     billingEmail: readQuickBooksStringField(primaryEmail, "Address"),
     phone: readQuickBooksStringField(primaryPhone, "FreeFormNumber"),
-    contactName: buildQuickBooksContactName(customer)
+    contactName: buildQuickBooksContactName(customer),
+    billingAddressLine1: billingAddress.line1,
+    billingAddressLine2: billingAddress.line2,
+    billingCity: billingAddress.city,
+    billingState: billingAddress.state,
+    billingPostalCode: billingAddress.postalCode,
+    billingCountry: billingAddress.country,
+    serviceAddressLine1: serviceAddress.line1,
+    serviceAddressLine2: serviceAddress.line2,
+    serviceCity: serviceAddress.city,
+    serviceState: serviceAddress.state,
+    servicePostalCode: serviceAddress.postalCode,
+    serviceCountry: serviceAddress.country,
+    billingAddressSameAsService: Boolean(
+      (billingAddress.line1 || billingAddress.city || billingAddress.state || billingAddress.postalCode || billingAddress.country)
+      && (serviceAddress.line1 || serviceAddress.city || serviceAddress.state || serviceAddress.postalCode || serviceAddress.country)
+      && addressesMatch(billingAddress, serviceAddress)
+    ),
+    paymentTermsCode: paymentTerms.paymentTermsCode,
+    customPaymentTermsLabel: paymentTerms.customPaymentTermsLabel,
+    customPaymentTermsDays: paymentTerms.customPaymentTermsDays,
+    quickbooksPaymentTermName: paymentTerms.quickbooksPaymentTermName,
+    quickbooksPaymentTermId: paymentTerms.quickbooksPaymentTermId
   } satisfies QuickBooksCustomerRecord;
 }
 
@@ -845,7 +1005,7 @@ async function fetchQuickBooksCustomerById(connection: QuickBooksTenantConnectio
     path: `/customer/${quickbooksCustomerId}`
   });
 
-  return normalizeQuickBooksCustomer(response.Customer);
+  return normalizeQuickBooksCustomer(connection, response.Customer);
 }
 
 async function fetchQuickBooksCustomerByDisplayName(connection: QuickBooksTenantConnection, displayName: string) {
@@ -856,7 +1016,7 @@ async function fetchQuickBooksCustomerByDisplayName(connection: QuickBooksTenant
     })
   });
 
-  return normalizeQuickBooksCustomer(response.QueryResponse?.Customer?.[0]);
+  return normalizeQuickBooksCustomer(connection, response.QueryResponse?.Customer?.[0]);
 }
 
 function normalizeCustomerMatchValue(value: string | null | undefined) {
@@ -938,6 +1098,12 @@ function buildQuickBooksCustomerPayload(input: {
   billingState?: string | null;
   billingPostalCode?: string | null;
   billingCountry?: string | null;
+  serviceAddressLine1?: string | null;
+  serviceAddressLine2?: string | null;
+  serviceCity?: string | null;
+  serviceState?: string | null;
+  servicePostalCode?: string | null;
+  serviceCountry?: string | null;
   notes?: string | null;
 }) {
   return {
@@ -954,6 +1120,18 @@ function buildQuickBooksCustomerPayload(input: {
             ...(input.billingState ? { CountrySubDivisionCode: input.billingState } : {}),
             ...(input.billingPostalCode ? { PostalCode: input.billingPostalCode } : {}),
             ...(input.billingCountry ? { Country: input.billingCountry } : {})
+          }
+        }
+      : {}),
+    ...(input.serviceAddressLine1
+      ? {
+          ShipAddr: {
+            Line1: input.serviceAddressLine1,
+            ...(input.serviceAddressLine2 ? { Line2: input.serviceAddressLine2 } : {}),
+            ...(input.serviceCity ? { City: input.serviceCity } : {}),
+            ...(input.serviceState ? { CountrySubDivisionCode: input.serviceState } : {}),
+            ...(input.servicePostalCode ? { PostalCode: input.servicePostalCode } : {}),
+            ...(input.serviceCountry ? { Country: input.serviceCountry } : {})
           }
         }
       : {}),
@@ -995,7 +1173,7 @@ async function resolveQuickBooksCustomer(connection: QuickBooksTenantConnection,
         }
       });
 
-      const updatedCustomer = normalizeQuickBooksCustomer(updated.Customer) ?? existingCustomer;
+      const updatedCustomer = (await normalizeQuickBooksCustomer(connection, updated.Customer)) ?? existingCustomer;
       await prisma.customerCompany.update({
         where: { id: summary.customerCompanyId },
         data: { quickbooksCustomerId: updatedCustomer.quickbooksCustomerId }
@@ -1018,7 +1196,7 @@ async function resolveQuickBooksCustomer(connection: QuickBooksTenantConnection,
       }
     });
 
-    const updatedCustomer = normalizeQuickBooksCustomer(updated.Customer) ?? existingCustomer;
+    const updatedCustomer = (await normalizeQuickBooksCustomer(connection, updated.Customer)) ?? existingCustomer;
     await prisma.customerCompany.update({
       where: { id: summary.customerCompanyId },
       data: { quickbooksCustomerId: updatedCustomer.quickbooksCustomerId }
@@ -1067,9 +1245,9 @@ export async function importQuickBooksCustomers(actor: ActorContext) {
         })
       });
 
-      const pageCustomers = (response.QueryResponse?.Customer ?? [])
-        .map((customer) => normalizeQuickBooksCustomer(customer))
-        .filter((customer): customer is QuickBooksCustomerRecord => Boolean(customer));
+      const pageCustomers = (
+        await Promise.all((response.QueryResponse?.Customer ?? []).map((customer) => normalizeQuickBooksCustomer(tenant, customer)))
+      ).filter((customer): customer is QuickBooksCustomerRecord => Boolean(customer));
 
       importedCustomers.push(...pageCustomers);
 
@@ -1097,7 +1275,23 @@ export async function importQuickBooksCustomers(actor: ActorContext) {
           quickbooksCustomerId: customer.quickbooksCustomerId,
           contactName: customer.contactName ?? existingCustomer.contactName,
           billingEmail: customer.billingEmail ?? existingCustomer.billingEmail,
-          phone: customer.phone ?? existingCustomer.phone
+          phone: customer.phone ?? existingCustomer.phone,
+          serviceAddressLine1: customer.serviceAddressLine1,
+          serviceAddressLine2: customer.serviceAddressLine2,
+          serviceCity: customer.serviceCity,
+          serviceState: customer.serviceState,
+          servicePostalCode: customer.servicePostalCode,
+          serviceCountry: customer.serviceCountry,
+          billingAddressSameAsService: customer.billingAddressSameAsService,
+          billingAddressLine1: customer.billingAddressLine1,
+          billingAddressLine2: customer.billingAddressLine2,
+          billingCity: customer.billingCity,
+          billingState: customer.billingState,
+          billingPostalCode: customer.billingPostalCode,
+          billingCountry: customer.billingCountry,
+          paymentTermsCode: customer.paymentTermsCode,
+          customPaymentTermsLabel: customer.customPaymentTermsLabel,
+          customPaymentTermsDays: customer.customPaymentTermsDays
         }
       });
         customersUpdated += 1;
@@ -1113,7 +1307,11 @@ export async function importQuickBooksCustomers(actor: ActorContext) {
               matchStrategy,
               quickbooksCustomerId: customer.quickbooksCustomerId,
               billingEmail: customer.billingEmail,
-              displayName: customer.displayName
+              displayName: customer.displayName,
+              paymentTermsCode: customer.paymentTermsCode,
+              quickbooksPaymentTermName: customer.quickbooksPaymentTermName,
+              billingAddressLine1: customer.billingAddressLine1,
+              serviceAddressLine1: customer.serviceAddressLine1
             }
           }
         });
@@ -1125,8 +1323,22 @@ export async function importQuickBooksCustomers(actor: ActorContext) {
             contactName: customer.contactName,
             billingEmail: customer.billingEmail,
             phone: customer.phone,
-            billingAddressSameAsService: true,
-            paymentTermsCode: "due_on_receipt",
+            serviceAddressLine1: customer.serviceAddressLine1,
+            serviceAddressLine2: customer.serviceAddressLine2,
+            serviceCity: customer.serviceCity,
+            serviceState: customer.serviceState,
+            servicePostalCode: customer.servicePostalCode,
+            serviceCountry: customer.serviceCountry,
+            billingAddressSameAsService: customer.billingAddressSameAsService,
+            billingAddressLine1: customer.billingAddressLine1,
+            billingAddressLine2: customer.billingAddressLine2,
+            billingCity: customer.billingCity,
+            billingState: customer.billingState,
+            billingPostalCode: customer.billingPostalCode,
+            billingCountry: customer.billingCountry,
+            paymentTermsCode: customer.paymentTermsCode,
+            customPaymentTermsLabel: customer.customPaymentTermsLabel,
+            customPaymentTermsDays: customer.customPaymentTermsDays,
             isActive: true,
             quickbooksCustomerId: customer.quickbooksCustomerId
           }
@@ -1144,7 +1356,11 @@ export async function importQuickBooksCustomers(actor: ActorContext) {
               matchStrategy,
               quickbooksCustomerId: customer.quickbooksCustomerId,
               billingEmail: customer.billingEmail,
-              displayName: customer.displayName
+              displayName: customer.displayName,
+              paymentTermsCode: customer.paymentTermsCode,
+              quickbooksPaymentTermName: customer.quickbooksPaymentTermName,
+              billingAddressLine1: customer.billingAddressLine1,
+              serviceAddressLine1: customer.serviceAddressLine1
             }
           }
         });
@@ -1277,12 +1493,18 @@ export async function syncTradeWorxCustomerCompanyToQuickBooks(actor: ActorConte
             billingState: customer.billingState ?? customer.serviceState ?? primarySite?.state ?? null,
             billingPostalCode: customer.billingPostalCode ?? customer.servicePostalCode ?? primarySite?.postalCode ?? null,
             billingCountry: customer.billingCountry ?? customer.serviceCountry ?? null,
+            serviceAddressLine1: customer.serviceAddressLine1 ?? primarySite?.addressLine1 ?? null,
+            serviceAddressLine2: customer.serviceAddressLine2 ?? primarySite?.addressLine2 ?? null,
+            serviceCity: customer.serviceCity ?? primarySite?.city ?? null,
+            serviceState: customer.serviceState ?? primarySite?.state ?? null,
+            servicePostalCode: customer.servicePostalCode ?? primarySite?.postalCode ?? null,
+            serviceCountry: customer.serviceCountry ?? null,
             notes: customer.notes ?? null
           })
         }
       });
 
-      quickbooksCustomerId = normalizeQuickBooksCustomer(updated.Customer)?.quickbooksCustomerId ?? existingCustomer.quickbooksCustomerId;
+      quickbooksCustomerId = (await normalizeQuickBooksCustomer(tenant, updated.Customer))?.quickbooksCustomerId ?? existingCustomer.quickbooksCustomerId;
     } else {
       syncStrategy = "created";
       const created = await quickBooksApiRequest<{ Customer?: unknown }>(tenant, {
@@ -1299,11 +1521,17 @@ export async function syncTradeWorxCustomerCompanyToQuickBooks(actor: ActorConte
           billingState: customer.billingState ?? customer.serviceState ?? primarySite?.state ?? null,
           billingPostalCode: customer.billingPostalCode ?? customer.servicePostalCode ?? primarySite?.postalCode ?? null,
           billingCountry: customer.billingCountry ?? customer.serviceCountry ?? null,
+          serviceAddressLine1: customer.serviceAddressLine1 ?? primarySite?.addressLine1 ?? null,
+          serviceAddressLine2: customer.serviceAddressLine2 ?? primarySite?.addressLine2 ?? null,
+          serviceCity: customer.serviceCity ?? primarySite?.city ?? null,
+          serviceState: customer.serviceState ?? primarySite?.state ?? null,
+          servicePostalCode: customer.servicePostalCode ?? primarySite?.postalCode ?? null,
+          serviceCountry: customer.serviceCountry ?? null,
           notes: customer.notes ?? null
         })
       });
 
-      quickbooksCustomerId = normalizeQuickBooksCustomer(created.Customer)?.quickbooksCustomerId ?? null;
+      quickbooksCustomerId = (await normalizeQuickBooksCustomer(tenant, created.Customer))?.quickbooksCustomerId ?? null;
     }
 
     if (!quickbooksCustomerId) {

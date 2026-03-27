@@ -642,12 +642,29 @@ describe("quickbooks billing sync hardening", () => {
             DisplayName: "Acme Tower",
             CompanyName: "Acme Tower",
             PrimaryEmailAddr: { Address: "billing@acme.test" },
-            PrimaryPhone: { FreeFormNumber: "312-555-0101" }
+            PrimaryPhone: { FreeFormNumber: "312-555-0101" },
+            SalesTermRef: { value: "3", name: "Net 30" },
+            BillAddr: {
+              Line1: "200 Billing Ave",
+              City: "Chicago",
+              CountrySubDivisionCode: "IL",
+              PostalCode: "60602",
+              Country: "US"
+            },
+            ShipAddr: {
+              Line1: "100 Service St",
+              Line2: "Suite 400",
+              City: "Chicago",
+              CountrySubDivisionCode: "IL",
+              PostalCode: "60601",
+              Country: "US"
+            }
           },
           {
             Id: "qbo_customer_2",
             DisplayName: "Pinecrest Property Management",
-            CompanyName: "Pinecrest Property Management"
+            CompanyName: "Pinecrest Property Management",
+            SalesTermRef: { value: "1", name: "Due on Receipt" }
           }
         ]
       }
@@ -670,6 +687,11 @@ describe("quickbooks billing sync hardening", () => {
         name: "Acme Tower",
         billingEmail: "billing@acme.test",
         phone: "312-555-0101",
+        paymentTermsCode: "net_30",
+        billingAddressLine1: "200 Billing Ave",
+        serviceAddressLine1: "100 Service St",
+        serviceAddressLine2: "Suite 400",
+        billingAddressSameAsService: false,
         quickbooksCustomerId: "qbo_customer_1"
       })
     });
@@ -677,6 +699,7 @@ describe("quickbooks billing sync hardening", () => {
       where: { id: "customer_existing" },
       data: expect.objectContaining({
         name: "Pinecrest Property Management",
+        paymentTermsCode: "due_on_receipt",
         quickbooksCustomerId: "qbo_customer_2"
       })
     });
@@ -715,7 +738,22 @@ describe("quickbooks billing sync hardening", () => {
             DisplayName: "Acme Tower",
             CompanyName: "Acme Tower",
             PrimaryEmailAddr: { Address: "billing@acme.test" },
-            PrimaryPhone: { FreeFormNumber: "312-555-0101" }
+            PrimaryPhone: { FreeFormNumber: "312-555-0101" },
+            SalesTermRef: { value: "9", name: "Net 45" },
+            BillAddr: {
+              Line1: "500 Billing Ave",
+              City: "Tulsa",
+              CountrySubDivisionCode: "OK",
+              PostalCode: "74103",
+              Country: "US"
+            },
+            ShipAddr: {
+              Line1: "500 Billing Ave",
+              City: "Tulsa",
+              CountrySubDivisionCode: "OK",
+              PostalCode: "74103",
+              Country: "US"
+            }
           }
         ]
       }
@@ -737,6 +775,12 @@ describe("quickbooks billing sync hardening", () => {
       data: expect.objectContaining({
         name: "Acme Tower",
         billingEmail: "billing@acme.test",
+        paymentTermsCode: "custom",
+        customPaymentTermsLabel: "Net 45",
+        customPaymentTermsDays: 45,
+        billingAddressSameAsService: true,
+        billingAddressLine1: "500 Billing Ave",
+        serviceAddressLine1: "500 Billing Ave",
         quickbooksCustomerId: "qbo_customer_email"
       })
     });
@@ -761,6 +805,19 @@ describe("quickbooks billing sync hardening", () => {
       contactName: "Alyssa Reed",
       billingEmail: "billing@pinecrest.example",
       phone: "312-555-0110",
+      billingAddressLine1: "200 Billing Ave",
+      billingAddressLine2: "Suite 1200",
+      billingCity: "Chicago",
+      billingState: "IL",
+      billingPostalCode: "60602",
+      billingCountry: "US",
+      serviceAddressLine1: "100 Service St",
+      serviceAddressLine2: "Suite 400",
+      serviceCity: "Chicago",
+      serviceState: "IL",
+      servicePostalCode: "60601",
+      serviceCountry: "US",
+      notes: "Collect certificate copy on site",
       quickbooksCustomerId: null
     });
     prismaMock.site.findFirst.mockResolvedValue({
@@ -793,6 +850,23 @@ describe("quickbooks billing sync hardening", () => {
       where: { id: "customer_1" },
       data: { quickbooksCustomerId: "qbo_customer_9" }
     });
+    const createBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body ?? "{}"));
+    expect(createBody.BillAddr).toEqual(expect.objectContaining({
+      Line1: "200 Billing Ave",
+      Line2: "Suite 1200",
+      City: "Chicago",
+      CountrySubDivisionCode: "IL",
+      PostalCode: "60602",
+      Country: "US"
+    }));
+    expect(createBody.ShipAddr).toEqual(expect.objectContaining({
+      Line1: "100 Service St",
+      Line2: "Suite 400",
+      City: "Chicago",
+      CountrySubDivisionCode: "IL",
+      PostalCode: "60601",
+      Country: "US"
+    }));
     expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         action: "customer.quickbooks_synced",
