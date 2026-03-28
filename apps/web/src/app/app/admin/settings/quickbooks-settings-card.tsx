@@ -1,5 +1,30 @@
 "use client";
 
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
+
+function QuickBooksActionButton({
+  label,
+  pendingLabel,
+  disabled
+}: {
+  label: string;
+  pendingLabel: string;
+  disabled?: boolean;
+}) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-50"
+      disabled={disabled || pending}
+      type="submit"
+    >
+      {pending ? pendingLabel : label}
+    </button>
+  );
+}
+
 export function QuickBooksSettingsCard({
   connected,
   companyName,
@@ -38,7 +63,7 @@ export function QuickBooksSettingsCard({
   guidance: string | null;
   connectAction: () => Promise<void>;
   disconnectAction: () => Promise<void>;
-  syncCustomersAction: () => Promise<void>;
+  syncCustomersAction: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
   importCustomersAction: () => Promise<void>;
   importCatalogAction: () => Promise<void>;
   hasStoredConnection: boolean;
@@ -52,6 +77,7 @@ export function QuickBooksSettingsCard({
 }) {
   const canImportCatalog = connected && !modeMismatch && !reconnectRequired;
   const showDisconnectAction = hasStoredConnection;
+  const [syncState, syncCustomersFormAction] = useActionState(syncCustomersAction, { error: null, success: null });
 
   return (
     <div className="rounded-[2rem] bg-white p-6 shadow-panel">
@@ -114,6 +140,8 @@ export function QuickBooksSettingsCard({
       </div>
 
       {notice ? <p className="mt-4 text-sm text-slateblue">{notice}</p> : null}
+      {syncState.error ? <p className="mt-4 text-sm text-rose-600">{syncState.error}</p> : null}
+      {syncState.success ? <p className="mt-4 text-sm text-emerald-600">{syncState.success}</p> : null}
       {!configured ? <p className="mt-4 text-sm text-amber-700">Set `QUICKBOOKS_CLIENT_ID` and `QUICKBOOKS_CLIENT_SECRET` before connecting.</p> : null}
 
       <div className="mt-4 grid gap-3">
@@ -123,10 +151,8 @@ export function QuickBooksSettingsCard({
           </button>
         </form>
         {connected ? (
-          <form action={syncCustomersAction}>
-            <button className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-50" disabled={!canImportCatalog} type="submit">
-              Sync Customers
-            </button>
+          <form action={syncCustomersFormAction}>
+            <QuickBooksActionButton disabled={!canImportCatalog} label="Sync Customers" pendingLabel="Syncing Customers..." />
           </form>
         ) : null}
         {connected ? (

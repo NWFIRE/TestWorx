@@ -415,27 +415,30 @@ export async function importQuickBooksCustomersAction() {
   }
 }
 
-export async function syncQuickBooksCustomersAction() {
+export async function syncQuickBooksCustomersActionState(
+  previousState: { error: string | null; success: string | null },
+  submittedFormData: FormData
+) {
+  void previousState;
+  void submittedFormData;
   const session = await auth();
   if (!session?.user?.tenantId) {
-    redirect("/login");
+    return { error: "Unauthorized", success: null };
   }
 
   try {
     const result = await syncQuickBooksCustomers({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId });
     revalidatePath("/app/admin");
     revalidatePath("/app/admin/settings");
-    redirect(
-      `/app/admin/settings?quickbooks=${encodeURIComponent(
-        `Synced QuickBooks customers: ${result.importedCustomerCount} imported, ${result.customersCreated} created, ${result.customersUpdated} updated, ${result.customersSynced} reconciled in TradeWorx.`
-      )}`
-    );
+    return {
+      error: null,
+      success: `Synced QuickBooks customers: ${result.importedCustomerCount} imported, ${result.customersCreated} created, ${result.customersUpdated} updated, ${result.customersSynced} reconciled in TradeWorx.`
+    };
   } catch (error) {
-    if (isRedirectError(error)) {
-      throw error;
-    }
-    const message = error instanceof Error ? error.message : "QuickBooks customer sync failed.";
-    redirect(`/app/admin/settings?quickbooks=${encodeURIComponent(message)}`);
+    return {
+      error: error instanceof Error ? error.message : "QuickBooks customer sync failed.",
+      success: null
+    };
   }
 }
 

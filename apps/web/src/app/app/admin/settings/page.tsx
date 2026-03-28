@@ -22,7 +22,7 @@ import {
   disconnectQuickBooksAction,
   importQuickBooksCustomersAction,
   importQuickBooksCatalogItemsAction,
-  syncQuickBooksCustomersAction,
+  syncQuickBooksCustomersActionState,
   openBillingPortalAction,
   startQuickBooksConnectAction,
   startBillingCheckoutAction,
@@ -365,7 +365,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
             reconnectRequired={quickBooksSettings.tenant.reconnectRequired}
             statusLabel={quickBooksSettings.tenant.statusLabel}
             guidance={quickBooksSettings.tenant.guidance}
-            syncCustomersAction={syncQuickBooksCustomersAction}
+            syncCustomersAction={syncQuickBooksCustomersActionState}
             importCustomersAction={importQuickBooksCustomersAction}
             importCatalogAction={importQuickBooksCatalogItemsAction}
             hasStoredConnection={quickBooksSettings.tenant.hasStoredConnection}
