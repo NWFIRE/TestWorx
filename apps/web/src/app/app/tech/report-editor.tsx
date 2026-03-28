@@ -1034,7 +1034,10 @@ export function ReportEditor({ data }: { data: EditorData }) {
       {showBottomBar ? (
         <>
           {(visibleErrorMessage || backupWarning || finalizeReadinessMessage) ? (
-            <div className="fixed inset-x-0 bottom-[5.75rem] z-20 px-4 lg:hidden">
+            <div
+              className="fixed inset-x-0 z-20 px-4 lg:hidden"
+              style={{ bottom: "calc(5.75rem + env(safe-area-inset-bottom))" }}
+            >
               <div className="mx-auto max-w-7xl space-y-2">
                 {visibleErrorMessage ? <p className="rounded-2xl border border-rose-200 bg-white/95 px-4 py-3 text-sm text-rose-700 shadow-xl backdrop-blur">{visibleErrorMessage}</p> : null}
                 {backupWarning ? <p className="rounded-2xl border border-amber-200 bg-white/95 px-4 py-3 text-sm text-amber-700 shadow-xl backdrop-blur">{backupWarning}</p> : null}
@@ -1042,7 +1045,10 @@ export function ReportEditor({ data }: { data: EditorData }) {
               </div>
             </div>
           ) : null}
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur lg:hidden">
+        <div
+          className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur lg:hidden"
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        >
           <div className="mx-auto max-w-7xl">
             <div className="mb-2 flex items-center justify-between gap-3 text-xs font-medium text-slate-600">
               <p>{saveState}</p>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 
 import { getAppNavItemsForRole, getCurrentAppNavItem, isAppNavItemActive, type AppNavItem } from "./app-nav-config";
@@ -99,10 +99,25 @@ export function AppShell({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    const originalTouchAction = document.body.style.touchAction;
+
+    if (mobileNavOpen) {
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+    }
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.touchAction = originalTouchAction;
+    };
+  }, [mobileNavOpen]);
+
   return (
-    <div className="min-h-screen lg:flex">
+    <div className="min-h-[100dvh] bg-paper lg:flex">
       {navItems.length > 0 ? (
-        <aside className={`hidden border-r border-slate-200 bg-slate-50/90 transition-[width] duration-200 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col ${sidebarCollapsed ? "lg:w-[5.75rem]" : "lg:w-72"}`}>
+        <aside className={`hidden border-r border-slate-200 bg-slate-50/90 transition-[width] duration-200 lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col ${sidebarCollapsed ? "lg:w-[5.75rem]" : "lg:w-72"}`}>
           <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4">
             {!sidebarCollapsed ? (
               <div>
@@ -126,10 +141,11 @@ export function AppShell({
       ) : null}
 
       {mobileNavOpen ? (
-        <div className="fixed inset-0 z-40 bg-slate-950/40 lg:hidden" onClick={() => setMobileNavOpen(false)}>
+        <div className="fixed inset-0 z-40 bg-slate-950/40 overscroll-contain lg:hidden" onClick={() => setMobileNavOpen(false)}>
           <aside
-            className="h-full w-[min(20rem,85vw)] border-r border-slate-200 bg-white shadow-xl"
+            className="h-full w-[min(20rem,85vw)] overflow-y-auto border-r border-slate-200 bg-white shadow-xl"
             onClick={(event) => event.stopPropagation()}
+            style={{ paddingTop: "max(0rem, env(safe-area-inset-top))", paddingBottom: "max(0rem, env(safe-area-inset-bottom))" }}
           >
             <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4">
               <div>
@@ -150,9 +166,12 @@ export function AppShell({
         </div>
       ) : null}
 
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+      <div className="flex min-h-[100dvh] min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-          <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <div
+            className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8"
+            style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
+          >
             <div className="flex min-w-0 items-center gap-3">
               {navItems.length > 0 ? (
                 <button
@@ -181,7 +200,10 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main
+          className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8"
+          style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+        >
           <div className="mx-auto w-full max-w-[1700px] min-w-0">{children}</div>
         </main>
       </div>

@@ -157,11 +157,11 @@ export function BillingItemMatchPanel({
           </span>
         )}
         {activeMatch ? (
-          <span className="text-xs text-slate-500">
+          <span className="min-w-0 break-words text-xs text-slate-500">
             {confidenceLabel(activeMatch.confidence)} via {activeMatch.matchMethod.replaceAll("_", " ")}
           </span>
         ) : suggestedMatches[0] ? (
-          <span className="text-xs text-slate-500">
+          <span className="min-w-0 break-words text-xs text-slate-500">
             Suggested: {suggestedMatches[0].name} ({confidenceLabel(suggestedMatches[0].confidence)})
           </span>
         ) : null}
@@ -222,10 +222,10 @@ export function BillingItemMatchPanel({
               <div className="max-h-[28rem] space-y-3 overflow-y-auto pr-1">
               {results.map((candidate) => (
                 <div key={candidate.catalogItemId} className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
+                  <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                    <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-ink">{candidate.name}</p>
+                        <p className="break-words text-sm font-semibold text-ink">{candidate.name}</p>
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-700">
                           {confidenceLabel(candidate.confidence)}
                         </span>
@@ -237,7 +237,7 @@ export function BillingItemMatchPanel({
                       </p>
                       {candidate.alias ? <p className="mt-1 text-xs text-slate-500">Matched via alias: {candidate.alias}</p> : null}
                     </div>
-                    <form action={linkFormAction} className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 lg:min-w-[260px]">
+                    <form action={linkFormAction} className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 xl:min-w-[260px]">
                       <input name="summaryId" type="hidden" value={summaryId} />
                       <input name="inspectionId" type="hidden" value={inspectionId} />
                       <input name="itemId" type="hidden" value={itemId} />

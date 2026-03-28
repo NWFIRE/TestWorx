@@ -120,7 +120,7 @@ export function QuickBooksCatalogManagementCard({
 
         <form className="mt-4 rounded-[1.5rem] border border-slate-200 p-4" method="GET">
           <input name="catalogOpen" type="hidden" value="1" />
-          <div className="grid gap-4 md:grid-cols-[1.3fr_0.9fr_0.8fr_auto]">
+          <div className="grid gap-4 lg:grid-cols-[1.3fr_0.9fr_0.8fr_auto]">
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="qboSearch">Search name, SKU, or QBO item id</label>
               <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={filters.search} id="qboSearch" name="qboSearch" placeholder="FE-ANNUAL or Battery replacement" />
@@ -142,7 +142,7 @@ export function QuickBooksCatalogManagementCard({
                 <option value="inactive">Inactive only</option>
               </select>
             </div>
-            <div className="flex items-end gap-3">
+            <div className="flex flex-wrap items-end gap-3">
               <input name="qboPage" type="hidden" value="1" />
               <button className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white" type="submit">
                 Apply
@@ -211,7 +211,7 @@ export function QuickBooksCatalogManagementCard({
                 <div>
                   <p className="text-lg font-semibold text-ink">{item.name}</p>
                   <p className="mt-1 text-sm text-slate-500">
-                    {item.itemType} · {item.quickbooksItemId}
+                    {item.itemType} | {item.quickbooksItemId}
                   </p>
                 </div>
                 <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${item.active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
@@ -231,7 +231,7 @@ export function QuickBooksCatalogManagementCard({
                   <input name="qboSearch" type="hidden" value={filters.search} />
                   <input name="qboType" type="hidden" value={filters.itemType} />
                   <input name="qboStatus" type="hidden" value={filters.status} />
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-4 lg:grid-cols-2">
                     <div>
                       <label className="mb-2 block text-sm font-medium text-slate-600">Name</label>
                       <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={item.name} name="name" required />
@@ -259,11 +259,11 @@ export function QuickBooksCatalogManagementCard({
         })}
 
         {filteredItemCount > 0 ? (
-          <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600">
+          <div className="flex flex-col gap-3 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
             <p>
               Showing {(filters.page - 1) * filters.limit + 1}-{Math.min(filters.page * filters.limit, filteredItemCount)} of {filteredItemCount}
             </p>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               {filters.page > 1 ? (
                 <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={previousPageHref}>
                   Previous

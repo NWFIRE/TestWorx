@@ -146,7 +146,7 @@ export default async function BillingSummaryDetailPage({
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Labor hours</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.laborHoursTotal}</p></div>
         <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Material items</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.materialItemCount}</p></div>
         <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Missing prices</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.missingPriceCount}</p></div>
@@ -190,8 +190,8 @@ export default async function BillingSummaryDetailPage({
                   <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No {categoryLabels[category].toLowerCase()} extracted from this visit.</p>
                 ) : items.map((item: BillingSummaryLineItem) => (
                   <div key={item.id} className="rounded-[1.5rem] border border-slate-200 p-4">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="space-y-2">
+                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0 space-y-2">
                         <p className="text-lg font-semibold text-ink">{item.description}</p>
                         <p className="text-sm text-slate-500">{item.reportType === "inspection" ? "inspection billing" : item.reportType.replaceAll("_", " ")} / {item.sourceSection?.replaceAll("-", " ") ?? "billables"}</p>
                         <p className="text-sm text-slate-500">Source: {item.sourceField ?? "report mapping"}</p>
@@ -211,7 +211,7 @@ export default async function BillingSummaryDetailPage({
                           summaryId={summary.id}
                         />
                       </div>
-                      <form action={updateBillingSummaryItemAction} className="grid gap-3 sm:grid-cols-3">
+                      <form action={updateBillingSummaryItemAction} className="grid gap-3 sm:grid-cols-2 xl:min-w-[20rem] xl:grid-cols-3">
                         <input name="summaryId" type="hidden" value={summary.id} />
                         <input name="inspectionId" type="hidden" value={summary.inspectionId} />
                         <input name="itemId" type="hidden" value={item.id} />
@@ -223,7 +223,7 @@ export default async function BillingSummaryDetailPage({
                           Unit price
                           <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={item.unitPrice ?? ""} disabled={isInvoiced} name="unitPrice" step="0.01" type="number" />
                         </label>
-                        <div className="flex items-end">
+                        <div className="flex items-end sm:col-span-2 xl:col-span-1">
                           <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-50" disabled={isInvoiced} type="submit">
                             {isInvoiced ? "Locked" : "Save line"}
                           </button>

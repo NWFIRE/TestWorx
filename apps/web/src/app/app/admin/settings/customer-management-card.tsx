@@ -386,9 +386,9 @@ export function CustomerManagementCard({
           ))
         )}
         {pagination.totalCount > 0 ? (
-          <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600">
+          <div className="flex flex-col gap-3 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
             <p>Page {pagination.page} of {pagination.totalPages}</p>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               {pagination.page > 1 ? (
                 <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={previousPageHref}>
                   Previous

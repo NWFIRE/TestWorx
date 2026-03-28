@@ -86,7 +86,7 @@ export function ServiceFeeSettingsCard({
       </div>
 
       <form action={defaultFormAction} className="rounded-[1.5rem] border border-slate-200 p-5">
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="defaultServiceFeeCode">Default fee code</label>
             <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={defaultValues.defaultServiceFeeCode} id="defaultServiceFeeCode" name="defaultServiceFeeCode" />
@@ -114,7 +114,7 @@ export function ServiceFeeSettingsCard({
               Cancel
             </Link>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customerCompanyId">Customer override</label>
               <select className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue="" id="customerCompanyId" name="customerCompanyId">
@@ -130,7 +130,7 @@ export function ServiceFeeSettingsCard({
               </select>
             </div>
           </div>
-          <div className="mt-4 grid gap-4 md:grid-cols-5">
+          <div className="mt-4 grid gap-4 lg:grid-cols-5">
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="city">City</label>
               <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="city" name="city" />
@@ -152,7 +152,7 @@ export function ServiceFeeSettingsCard({
               <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={0} id="priority" min="0" name="priority" type="number" />
             </div>
           </div>
-          <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
+          <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_auto]">
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="unitPrice">Unit price</label>
               <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="unitPrice" min="0" name="unitPrice" placeholder="125.00" required step="0.01" type="number" />
@@ -215,7 +215,7 @@ export function ServiceFeeSettingsCard({
                 <input name="ruleId" type="hidden" value={rule.id} />
                 <input name="feesOpen" type="hidden" value="1" />
                 <input name="feesPage" type="hidden" value={String(pagination.page)} />
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 lg:grid-cols-2">
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-600">Customer</label>
                     <select className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.customerCompanyId ?? ""} name="customerCompanyId">
@@ -231,7 +231,7 @@ export function ServiceFeeSettingsCard({
                     </select>
                   </div>
                 </div>
-                <div className="grid gap-4 md:grid-cols-5">
+                <div className="grid gap-4 lg:grid-cols-5">
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-600">City</label>
                     <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.city ?? ""} name="city" />
@@ -253,7 +253,7 @@ export function ServiceFeeSettingsCard({
                     <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.priority} min="0" name="priority" type="number" />
                   </div>
                 </div>
-                <div className="grid gap-4 md:grid-cols-[1fr_auto_auto]">
+                <div className="grid gap-4 lg:grid-cols-[1fr_auto_auto]">
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-600">Unit price</label>
                     <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.unitPrice} min="0" name="unitPrice" step="0.01" type="number" />
@@ -300,9 +300,9 @@ export function ServiceFeeSettingsCard({
           </div>
         ))}
         {pagination.totalCount > 0 ? (
-          <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600">
+          <div className="flex flex-col gap-3 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
             <p>Page {pagination.page} of {pagination.totalPages}</p>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               {pagination.page > 1 ? (
                 <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={previousPageHref}>
                   Previous
