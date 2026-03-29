@@ -74,7 +74,7 @@ export function MobilePullToRefresh() {
   }, [refreshing]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
       return;
     }
 
@@ -84,7 +84,11 @@ export function MobilePullToRefresh() {
     };
 
     updateEnabled();
-    mediaQuery.addEventListener("change", updateEnabled);
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", updateEnabled);
+    } else if (typeof mediaQuery.addListener === "function") {
+      mediaQuery.addListener(updateEnabled);
+    }
 
     const reset = () => {
       trackingRef.current = false;
@@ -169,7 +173,11 @@ export function MobilePullToRefresh() {
     window.addEventListener("touchcancel", handleTouchEnd, { passive: true });
 
     return () => {
-      mediaQuery.removeEventListener("change", updateEnabled);
+      if (typeof mediaQuery.removeEventListener === "function") {
+        mediaQuery.removeEventListener("change", updateEnabled);
+      } else if (typeof mediaQuery.removeListener === "function") {
+        mediaQuery.removeListener(updateEnabled);
+      }
       window.removeEventListener("touchstart", handleTouchStart);
       window.removeEventListener("touchmove", handleTouchMove);
       window.removeEventListener("touchend", handleTouchEnd);
