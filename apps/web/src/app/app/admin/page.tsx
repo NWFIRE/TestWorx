@@ -6,13 +6,11 @@ import { auth } from "@/auth";
 import {
   formatInspectionStatusLabel,
   getAdminDashboardData,
-  getCustomerSiteImportTemplateCsv,
   isDueAtTimeOfServiceCustomer,
   pickEarliestNextDueAt
 } from "@testworx/lib";
 
-import { createInspectionAction, importCustomerSiteCsvAction } from "./actions";
-import { CustomerSiteImportCard } from "./customer-site-import-card";
+import { createInspectionAction } from "./actions";
 import { InspectionSchedulerForm } from "./inspection-scheduler-form";
 
 type AdminDashboardData = Awaited<ReturnType<typeof getAdminDashboardData>>;
@@ -65,7 +63,6 @@ export default async function AdminPage({
   }
 
   const data = await getAdminDashboardData({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId });
-  const importTemplateHref = `data:text/csv;charset=utf-8,${encodeURIComponent(getCustomerSiteImportTemplateCsv())}`;
   const params = searchParams ? await searchParams : {};
   const inspectionNotice = Array.isArray(params.inspection) ? params.inspection[0] : params.inspection;
 
@@ -190,7 +187,6 @@ export default async function AdminPage({
       </section>
       <section className="space-y-6">
         <InspectionSchedulerForm action={createInspectionAction} title="Create inspection" submitLabel="Create inspection" customers={data.customers} sites={data.sites} technicians={data.technicians} allowDocumentUpload autoSelectGenericSiteOnCustomerChange />
-        <CustomerSiteImportCard action={importCustomerSiteCsvAction} templateHref={importTemplateHref} />
       </section>
     </div>
   );
