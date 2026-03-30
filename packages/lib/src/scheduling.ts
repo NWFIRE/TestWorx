@@ -22,6 +22,8 @@ export const unstartedInspectionStatuses = [InspectionStatus.to_be_completed, In
 export const claimableInspectionStatuses = [InspectionStatus.to_be_completed, InspectionStatus.scheduled] as const;
 export const genericInspectionSiteOptionValue = "__generic_site__";
 export const genericInspectionSiteName = "General / No Fixed Site";
+export const customInspectionSiteOptionValue = "__custom_site__";
+export const customInspectionSiteName = "Create one-time site";
 const genericInspectionSiteAddressLine1 = "No fixed service address";
 const genericInspectionSiteCity = "Unknown";
 const genericInspectionSiteState = "Unknown";
@@ -447,6 +449,58 @@ export async function ensureGenericInspectionSite(
       state: genericInspectionSiteState,
       postalCode: genericInspectionSitePostalCode,
       notes: `Created automatically for customer ${customerCompany.name} when scheduling without a specific site.`
+    },
+    select: {
+      id: true
+    }
+  });
+}
+
+export async function createOneTimeInspectionSite(
+  actor: ActorContext,
+  customerCompanyId: string,
+  input: {
+    name: string;
+    addressLine1: string;
+    addressLine2?: string | null;
+    city: string;
+    state: string;
+    postalCode: string;
+    notes?: string | null;
+  }
+) {
+  const parsed = parseActor(actor);
+  if (!["tenant_admin", "office_admin", "platform_admin"].includes(parsed.role)) {
+    throw new Error("Only administrators can create one-time inspection sites.");
+  }
+
+  const tenantId = parsed.tenantId as string;
+  const customerCompany = await prisma.customerCompany.findFirst({
+    where: {
+      id: customerCompanyId,
+      tenantId
+    },
+    select: {
+      id: true,
+      name: true
+    }
+  });
+
+  if (!customerCompany) {
+    throw new Error("Customer not found.");
+  }
+
+  return prisma.site.create({
+    data: {
+      tenantId,
+      customerCompanyId: customerCompany.id,
+      name: input.name.trim(),
+      addressLine1: input.addressLine1.trim(),
+      addressLine2: input.addressLine2?.trim() || null,
+      city: input.city.trim(),
+      state: input.state.trim(),
+      postalCode: input.postalCode.trim(),
+      notes: input.notes?.trim() || `Created as a one-time inspection site for ${customerCompany.name}.`
     },
     select: {
       id: true

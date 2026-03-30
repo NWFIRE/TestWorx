@@ -3,6 +3,8 @@
 import { useActionState, useMemo, useState } from "react";
 import type { CustomerOption, SiteOption, TechnicianOption } from "@testworx/types";
 import {
+  customInspectionSiteName,
+  customInspectionSiteOptionValue,
   defaultScheduledStartForMonth,
   editableInspectionStatuses,
   formatInspectionStatusLabel,
@@ -50,7 +52,8 @@ export function InspectionSchedulerForm({
   reasonLabel,
   reasonRequired,
   allowDocumentUpload = false,
-  autoSelectGenericSiteOnCustomerChange = false
+  autoSelectGenericSiteOnCustomerChange = false,
+  allowCustomOneTimeSite = false
 }: {
   action: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
   title: string;
@@ -65,6 +68,7 @@ export function InspectionSchedulerForm({
   reasonRequired?: boolean;
   allowDocumentUpload?: boolean;
   autoSelectGenericSiteOnCustomerChange?: boolean;
+  allowCustomOneTimeSite?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const initialTaskSelections = new Map((initialValues?.tasks ?? []).map((task) => [task.inspectionType, task.frequency]));
@@ -97,7 +101,13 @@ export function InspectionSchedulerForm({
     () => sites.filter((site) => !selectedCustomerId || site.customerCompanyId === selectedCustomerId),
     [selectedCustomerId, sites]
   );
-  const resolvedSiteId = filteredSites.some((site) => site.id === selectedSiteId) || selectedSiteId === genericInspectionSiteOptionValue ? selectedSiteId : "";
+  const resolvedSiteId =
+    filteredSites.some((site) => site.id === selectedSiteId) ||
+    selectedSiteId === genericInspectionSiteOptionValue ||
+    selectedSiteId === customInspectionSiteOptionValue
+      ? selectedSiteId
+      : "";
+  const customSiteSelected = resolvedSiteId === customInspectionSiteOptionValue;
 
   return (
     <form action={formAction} className="space-y-6 rounded-[2rem] bg-white p-6 shadow-panel">
@@ -139,17 +149,61 @@ export function InspectionSchedulerForm({
           >
             <option value="">{selectedCustomerId ? "Select site for customer" : "Select customer first"}</option>
             {selectedCustomerId ? <option value={genericInspectionSiteOptionValue}>Use generic site ({genericInspectionSiteName})</option> : null}
+            {selectedCustomerId && allowCustomOneTimeSite ? <option value={customInspectionSiteOptionValue}>{customInspectionSiteName}</option> : null}
             {filteredSites.map((site) => <option key={site.id} value={site.id}>{site.name} - {site.city}</option>)}
           </select>
           <p className="mt-2 text-xs text-slate-500">
             {selectedCustomerId
               ? filteredSites.length
-                ? "Only sites for the selected customer are shown. Choose the generic site option when this visit is not tied to a specific location."
-                : "No sites are available for this customer yet. Use the generic site option to keep scheduling moving safely."
+                ? `Only sites for the selected customer are shown.${allowCustomOneTimeSite ? " You can also create a one-time site for this inspection or use the generic site option when the visit is not tied to a specific location." : " Choose the generic site option when this visit is not tied to a specific location."}`
+                : `No sites are available for this customer yet.${allowCustomOneTimeSite ? " Create a one-time site or use the generic site option to keep scheduling moving safely." : " Use the generic site option to keep scheduling moving safely."}`
               : "Pick a customer to narrow the site list and avoid mismatched scheduling."}
           </p>
         </div>
       </div>
+      {customSiteSelected ? (
+        <div className="space-y-4 rounded-[1.5rem] border border-slate-200 p-4">
+          <div>
+            <p className="text-sm uppercase tracking-[0.2em] text-slate-500">One-time site</p>
+            <h4 className="mt-1 text-lg font-semibold text-ink">Create a site just for this inspection</h4>
+            <p className="mt-2 text-sm text-slate-500">This creates a real site under the selected customer so the inspection, report, billing, and PDF flow stay intact.</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customSiteName">Site name</label>
+              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="customSiteName" name="customSiteName" required={customSiteSelected} />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customSiteAddressLine1">Address line 1</label>
+              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="customSiteAddressLine1" name="customSiteAddressLine1" required={customSiteSelected} />
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customSiteAddressLine2">Address line 2</label>
+              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="customSiteAddressLine2" name="customSiteAddressLine2" />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customSiteCity">City</label>
+              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="customSiteCity" name="customSiteCity" required={customSiteSelected} />
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customSiteState">State / region</label>
+              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="customSiteState" name="customSiteState" required={customSiteSelected} />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customSitePostalCode">Postal code</label>
+              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="customSitePostalCode" name="customSitePostalCode" required={customSiteSelected} />
+            </div>
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customSiteNotes">Site note</label>
+            <textarea className="min-h-20 w-full rounded-2xl border border-slate-200 px-4 py-3" id="customSiteNotes" name="customSiteNotes" placeholder="Optional note for dispatch or site context" />
+          </div>
+        </div>
+      ) : null}
       <div className="grid gap-4 md:grid-cols-2">
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="inspectionMonth">Inspection month</label>

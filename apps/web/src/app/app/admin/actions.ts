@@ -11,6 +11,8 @@ import {
   deleteInspection,
   importCustomerSiteCsv,
   createInspectionAmendment,
+  createOneTimeInspectionSite,
+  customInspectionSiteOptionValue,
   ensureGenericInspectionSite,
   genericInspectionSiteOptionValue,
   getCustomerSiteImportTemplateCsv,
@@ -41,10 +43,42 @@ async function resolveInspectionSiteSelection<T extends {
     role: string;
     tenantId: string;
   },
-  input: T
+  input: T,
+  formData?: FormData
 ): Promise<T> {
-  if (input.siteId !== genericInspectionSiteOptionValue) {
+  if (input.siteId !== genericInspectionSiteOptionValue && input.siteId !== customInspectionSiteOptionValue) {
     return input;
+  }
+
+  if (input.siteId === customInspectionSiteOptionValue) {
+    const customSiteName = String(formData?.get("customSiteName") ?? "").trim();
+    const customSiteAddressLine1 = String(formData?.get("customSiteAddressLine1") ?? "").trim();
+    const customSiteCity = String(formData?.get("customSiteCity") ?? "").trim();
+    const customSiteState = String(formData?.get("customSiteState") ?? "").trim();
+    const customSitePostalCode = String(formData?.get("customSitePostalCode") ?? "").trim();
+
+    if (!customSiteName) {
+      throw new Error("Enter a site name for the one-time site.");
+    }
+
+    if (!customSiteAddressLine1 || !customSiteCity || !customSiteState || !customSitePostalCode) {
+      throw new Error("Complete the one-time site address before creating the inspection.");
+    }
+
+    const customSite = await createOneTimeInspectionSite(actor, input.customerCompanyId, {
+      name: customSiteName,
+      addressLine1: customSiteAddressLine1,
+      addressLine2: String(formData?.get("customSiteAddressLine2") ?? "").trim() || null,
+      city: customSiteCity,
+      state: customSiteState,
+      postalCode: customSitePostalCode,
+      notes: String(formData?.get("customSiteNotes") ?? "").trim() || null
+    });
+
+    return {
+      ...input,
+      siteId: customSite.id
+    };
   }
 
   const genericSite = await ensureGenericInspectionSite(
@@ -77,7 +111,7 @@ export async function createInspectionAction(_: { error: string | null; success:
 
   try {
     const actor = { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId };
-    const resolvedInput = await resolveInspectionSiteSelection(actor, parsed.data);
+    const resolvedInput = await resolveInspectionSiteSelection(actor, parsed.data, formData);
     const inspection = await createInspection(actor, resolvedInput);
     const externalDocumentFiles = readExternalDocumentFiles(formData);
     const requiresSignature = formData.get("externalDocumentsRequireSignature") === "on";
@@ -173,7 +207,7 @@ export async function updateInspectionAction(_: { error: string | null; success:
 
   try {
     const actor = { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId };
-    const resolvedInput = await resolveInspectionSiteSelection(actor, parsed.data);
+    const resolvedInput = await resolveInspectionSiteSelection(actor, parsed.data, formData);
     await updateInspection(actor, inspectionId, resolvedInput);
     revalidatePath("/app/admin");
     revalidatePath("/app/admin/amendments");
@@ -231,7 +265,7 @@ export async function amendInspectionAction(_: { error: string | null; success: 
 
   try {
     const actor = { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId };
-    const resolvedInput = await resolveInspectionSiteSelection(actor, parsed.data);
+    const resolvedInput = await resolveInspectionSiteSelection(actor, parsed.data, formData);
     await createInspectionAmendment(
       actor,
       inspectionId,
