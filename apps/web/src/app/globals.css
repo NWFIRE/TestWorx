@@ -25,7 +25,6 @@ body {
 .ios-picker-field::-webkit-date-and-time-value,
 .ios-picker-field::-webkit-datetime-edit,
 .ios-picker-field::-webkit-datetime-edit-fields-wrapper,
-.ios-picker-field::-webkit-datetime-edit-text,
 .ios-picker-field::-webkit-datetime-edit-month-field,
 .ios-picker-field::-webkit-datetime-edit-day-field,
 .ios-picker-field::-webkit-datetime-edit-year-field,
@@ -50,18 +49,13 @@ body {
   padding: 0;
   margin: 0;
   text-align: left;
-  line-height: 1;
-}
-
-.ios-picker-field::-webkit-datetime-edit-text {
-  opacity: 0.6;
-  padding-inline: 0.1em;
+  line-height: 1.1;
 }
 
 .ios-picker-field::-webkit-calendar-picker-indicator {
   position: absolute;
-  inset: 0;
-  width: 100%;
+  right: 0;
+  width: 3rem;
   height: 100%;
   opacity: 0;
   cursor: pointer;

@@ -40,46 +40,6 @@ type InitialValues = {
   tasks?: InspectionTaskValue[];
 };
 
-const monthFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "long",
-  year: "numeric"
-});
-
-const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-  hour: "numeric",
-  minute: "2-digit"
-});
-
-function formatPickerDisplayValue(type: "month" | "datetime-local", value: string, placeholder?: string) {
-  if (!value) {
-    return placeholder ?? "";
-  }
-
-  if (type === "month") {
-    const [yearText, monthText] = value.split("-");
-    const year = Number(yearText);
-    const month = Number(monthText);
-    if (!Number.isFinite(year) || !Number.isFinite(month)) {
-      return value;
-    }
-
-    return monthFormatter.format(new Date(year, month - 1, 1));
-  }
-
-  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
-  if (!match) {
-    return value;
-  }
-
-  const [, year, month, day, hour, minute] = match;
-  return dateTimeFormatter.format(
-    new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute))
-  );
-}
-
 function PickerField({
   id,
   name,
@@ -99,22 +59,13 @@ function PickerField({
   icon: ReactNode;
   placeholder?: string;
 }) {
-  const displayValue = formatPickerDisplayValue(type, value, placeholder);
-  const hasValue = displayValue.length > 0;
-
   return (
     <div className="relative min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 transition-colors focus-within:border-slateblue/40 focus-within:bg-white">
       <span className="pointer-events-none absolute left-4 top-1/2 z-[1] flex h-4.5 w-4.5 -translate-y-1/2 items-center justify-center text-slate-400">
         {icon}
       </span>
-      <span
-        aria-hidden="true"
-        className={`pointer-events-none absolute inset-y-0 left-[2.7rem] right-11 z-[1] flex items-center text-left text-[15px] font-medium leading-none ${hasValue ? "text-slate-900" : "text-slate-400"}`}
-      >
-        <span className="truncate">{displayValue}</span>
-      </span>
       <input
-        className="ios-picker-field absolute inset-0 block h-11 w-full min-w-0 max-w-full cursor-pointer appearance-none bg-transparent opacity-0 outline-none"
+        className="ios-picker-field block h-11 w-full min-w-0 max-w-full appearance-none bg-transparent pl-[2.7rem] pr-11 text-left text-[15px] font-medium text-slate-900 outline-none"
         id={id}
         name={name}
         onChange={onChange}
