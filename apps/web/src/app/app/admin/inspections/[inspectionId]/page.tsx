@@ -60,16 +60,19 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
   }
 
   const { inspectionId } = await params;
-  const [dashboardData, inspection, attachments, documents] = await Promise.all([
+  const [dashboardData, inspection] = await Promise.all([
     getAdminDashboardData({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }),
-    getInspectionForEdit({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId),
-    getAdminInspectionPdfAttachments({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId),
-    getInspectionDocuments({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId)
+    getInspectionForEdit({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId)
   ]);
 
   if (!inspection) {
     redirect("/app/admin");
   }
+
+  const [attachments, documents] = await Promise.all([
+    getAdminInspectionPdfAttachments({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId),
+    getInspectionDocuments({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId)
+  ]);
 
   const inspectionView = inspection as unknown as typeof inspection & {
     site: { name: string };
