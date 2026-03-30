@@ -59,6 +59,10 @@ function isFieldDisabled(canEdit: boolean, reportStatus: EditorData["reportStatu
   return !canEdit || reportStatus === "finalized" || Boolean(field.readOnly);
 }
 
+function isTechnicianVisibleField(field: ReportFieldDefinition) {
+  return !field.hidden && !field.readOnly;
+}
+
 function fieldShellClassName(readOnly?: boolean) {
   return `w-full rounded-2xl border px-4 py-4 text-base ${readOnly ? "border-slate-200 bg-slate-100 text-slate-700" : "border-slate-200 bg-white"} disabled:bg-slate-50`;
 }
@@ -747,14 +751,12 @@ export function ReportEditor({ data }: { data: EditorData }) {
               </div>
             </div>
             <div className="mt-5 grid gap-4">
-              {activeSection.fields.filter((field) => isFieldVisible(field, draft.sections[activeSection.id]?.fields ?? {})).map((field) => (
+              {activeSection.fields.filter((field) => isTechnicianVisibleField(field) && isFieldVisible(field, draft.sections[activeSection.id]?.fields ?? {})).map((field) => (
                 <div key={field.id} className="space-y-2">
                   <div className="flex items-center gap-2">
                     <label className="block text-sm font-medium text-slate-600">{field.label}</label>
-                    {field.readOnly ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">Auto-calculated</span> : null}
                   </div>
                   {field.description ? <p className="text-sm text-slate-500">{field.description}</p> : null}
-                  {field.readOnly ? <p className="text-sm text-slate-500">This value updates automatically from linked rows or smart report rules.</p> : null}
                   {field.type === "repeater" ? (
                     <div className="space-y-3">
                       {field.bulkActions && field.bulkActions.length > 0 ? (
@@ -794,11 +796,10 @@ export function ReportEditor({ data }: { data: EditorData }) {
                               </div>
                             </div>
                             <div className="grid gap-3 md:grid-cols-2">
-                              {field.rowFields.filter((rowField) => !rowField.hidden && rowField.id !== "assetId" && rowField.id !== "assetTag" && isFieldVisible(rowField, row)).map((rowField) => (
+                              {field.rowFields.filter((rowField) => isTechnicianVisibleField(rowField) && rowField.id !== "assetId" && rowField.id !== "assetTag" && isFieldVisible(rowField, row)).map((rowField) => (
                                 <div key={`${field.id}-${rowIndex}-${rowField.id}`} className="space-y-2">
                                   <div className="flex items-center gap-2">
                                     <label className="block text-sm font-medium text-slate-600">{rowField.label}</label>
-                                    {rowField.readOnly ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">Auto</span> : null}
                                   </div>
                                   {rowField.type === "boolean" ? (
                                     <button className={`min-h-14 w-full rounded-2xl border px-4 py-4 text-left text-base font-medium uppercase ${row[rowField.id] ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-500"}`} disabled={isFieldDisabled(data.canEdit, data.reportStatus, rowField)} onClick={() => updateRepeaterRowField(activeSection.id, field, rowIndex, rowField.id, !(row[rowField.id] as boolean))} type="button">
