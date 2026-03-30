@@ -19,6 +19,91 @@ function getFocusableElements(container: HTMLElement | null) {
   );
 }
 
+function NavIcon({
+  icon,
+  className
+}: {
+  icon: AppNavItem["icon"];
+  className?: string;
+}) {
+  const shared = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    strokeWidth: 1.9
+  };
+
+  switch (icon) {
+    case "calendar":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <rect {...shared} x="3" y="5" width="18" height="16" rx="3" />
+          <path {...shared} d="M16 3v4M8 3v4M3 10h18M8 14h3M8 18h6" />
+        </svg>
+      );
+    case "branch":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <circle {...shared} cx="7" cy="6" r="2.5" />
+          <circle {...shared} cx="17" cy="18" r="2.5" />
+          <circle {...shared} cx="17" cy="6" r="2.5" />
+          <path {...shared} d="M9.5 6H14.5M7 8.5V14a4 4 0 0 0 4 4h3.5" />
+        </svg>
+      );
+    case "alert":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <path {...shared} d="M10.2 4.6 3.8 16a3 3 0 0 0 2.6 4.5h11.2A3 3 0 0 0 20.2 16L13.8 4.6a2 2 0 0 0-3.6 0Z" />
+          <path {...shared} d="M12 9v4.5M12 17h.01" />
+        </svg>
+      );
+    case "invoice":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <path {...shared} d="M7 3h8l4 4v13l-2-1.2L15 20l-3-1.2L9 20l-2-1.2L5 20V5a2 2 0 0 1 2-2Z" />
+          <path {...shared} d="M9 9h6M9 13h6M9 17h4" />
+        </svg>
+      );
+    case "settings":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <path {...shared} d="M12 3v3M12 18v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M3 12h3M18 12h3M4.9 19.1 7 17M17 7l2.1-2.1" />
+          <circle {...shared} cx="12" cy="12" r="4" />
+        </svg>
+      );
+    case "grid":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <rect {...shared} x="4" y="4" width="6" height="6" rx="1.5" />
+          <rect {...shared} x="14" y="4" width="6" height="6" rx="1.5" />
+          <rect {...shared} x="4" y="14" width="6" height="6" rx="1.5" />
+          <rect {...shared} x="14" y="14" width="6" height="6" rx="1.5" />
+        </svg>
+      );
+    case "clipboard":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <rect {...shared} x="6" y="4" width="12" height="17" rx="2.5" />
+          <path {...shared} d="M9 4.5h6a1.5 1.5 0 0 0-1.5-1.5h-3A1.5 1.5 0 0 0 9 4.5ZM9 10h6M9 14h6M9 18h4" />
+        </svg>
+      );
+    case "portal":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <rect {...shared} x="4" y="5" width="16" height="14" rx="3" />
+          <path {...shared} d="M4 10h16M9 15h.01M12 15h3" />
+        </svg>
+      );
+    default:
+      return (
+        <span aria-hidden="true" className={className}>
+          {icon ?? "•"}
+        </span>
+      );
+  }
+}
+
 function NavItem({
   item,
   active,
@@ -32,31 +117,26 @@ function NavItem({
   compact: boolean;
   onNavigate?: () => void;
 }) {
-  const toneClasses: Record<NonNullable<AppNavItem["tone"]>, { idle: string; active: string; ring: string }> = {
+  const toneClasses: Record<NonNullable<AppNavItem["tone"]>, { activeBar: string; activeIcon: string }> = {
     blue: {
-      idle: "bg-sky-100 text-sky-700 group-hover:bg-sky-200",
-      active: "bg-white/18 text-white",
-      ring: "before:bg-sky-400"
+      activeBar: "before:bg-slateblue",
+      activeIcon: "text-slateblue"
     },
     amber: {
-      idle: "bg-amber-100 text-amber-700 group-hover:bg-amber-200",
-      active: "bg-white/18 text-white",
-      ring: "before:bg-amber-400"
+      activeBar: "before:bg-amber-500",
+      activeIcon: "text-amber-600"
     },
     emerald: {
-      idle: "bg-emerald-100 text-emerald-700 group-hover:bg-emerald-200",
-      active: "bg-white/18 text-white",
-      ring: "before:bg-emerald-400"
+      activeBar: "before:bg-emerald-500",
+      activeIcon: "text-emerald-600"
     },
     violet: {
-      idle: "bg-violet-100 text-violet-700 group-hover:bg-violet-200",
-      active: "bg-white/18 text-white",
-      ring: "before:bg-violet-400"
+      activeBar: "before:bg-violet-500",
+      activeIcon: "text-violet-600"
     },
     slate: {
-      idle: "bg-slate-100 text-slate-700 group-hover:bg-slate-200",
-      active: "bg-white/18 text-white",
-      ring: "before:bg-slate-300"
+      activeBar: "before:bg-slate-500",
+      activeIcon: "text-slate-700"
     }
   };
   const tone = toneClasses[item.tone ?? "blue"];
@@ -65,28 +145,26 @@ function NavItem({
     <Link
       aria-current={active ? "page" : undefined}
       aria-label={item.label}
-      className={`group relative flex min-h-12 min-w-0 items-center gap-3 overflow-hidden rounded-2xl border px-3 py-3 text-sm font-semibold outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2 motion-reduce:transition-none before:absolute before:bottom-2 before:left-1.5 before:top-2 before:w-1 before:rounded-full before:opacity-0 ${
+      className={`group relative flex min-h-[44px] min-w-0 items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-sm outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2 motion-reduce:transition-none before:absolute before:bottom-1.5 before:left-0 before:top-1.5 before:w-0.5 before:rounded-full before:opacity-0 ${
         active
-          ? "border-transparent bg-gradient-to-r from-slateblue to-[#3f78cc] text-white shadow-[0_18px_36px_rgba(36,82,146,0.22)] before:opacity-100"
-          : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-white hover:text-ink"
-      } ${tone.ring} ${collapsed ? "justify-center px-2" : ""} ${compact ? "min-h-[48px]" : ""}`}
+          ? "bg-slateblue/8 text-slate-950 before:opacity-100"
+          : "text-slate-600 hover:bg-white hover:text-slate-900"
+      } ${tone.activeBar} ${collapsed ? "justify-center px-2" : ""} ${compact ? "min-h-[48px]" : ""}`}
       href={item.href}
       onClick={onNavigate}
       title={collapsed ? item.label : undefined}
     >
       <span
         aria-hidden="true"
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[11px] font-bold uppercase tracking-[0.16em] ${
-          active ? tone.active : tone.idle
-        }`}
+        className={`flex h-5 w-5 shrink-0 items-center justify-center ${active ? tone.activeIcon : "text-slate-400 group-hover:text-slate-700"}`}
       >
-        <span className="flex h-5 w-5 items-center justify-center">{item.abbreviation}</span>
+        <NavIcon className="h-5 w-5" icon={item.icon} />
       </span>
       {!collapsed ? (
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold">{item.shortLabel}</span>
+          <span className={`block truncate text-sm font-medium ${active ? "font-semibold text-slate-950" : ""}`}>{item.shortLabel}</span>
           {item.description ? (
-            <span className={`mt-0.5 block truncate text-xs font-medium ${active ? "text-white/80" : "text-slate-400 group-hover:text-slate-500"}`}>
+            <span className={`mt-0.5 block truncate text-xs ${active ? "text-slate-600" : "text-slate-400 group-hover:text-slate-500"}`}>
               {item.description}
             </span>
           ) : null}
@@ -97,22 +175,19 @@ function NavItem({
 }
 
 function BrandBlock({
-  currentItem,
   collapsed
 }: {
-  currentItem: AppNavItem | null;
   collapsed: boolean;
 }) {
   return (
     <div className={`flex min-w-0 items-center gap-3 overflow-hidden ${collapsed ? "justify-center" : ""}`}>
-      <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[18px] bg-gradient-to-br from-slateblue via-[#3473c6] to-[#f06d22] text-sm font-bold uppercase tracking-[0.18em] text-white shadow-[0_14px_28px_rgba(39,90,160,0.22)]">
-        <span className="absolute inset-[1px] rounded-[17px] bg-gradient-to-br from-[#1d4677] via-[#2d69b7] to-[#f06d22]/90" />
-        <span className="relative">TW</span>
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-bold uppercase tracking-[0.18em] text-slateblue shadow-[0_6px_20px_rgba(15,23,42,0.05)]">
+        TW
       </div>
       {!collapsed ? (
         <div className="min-w-0 overflow-hidden">
           <p className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">TradeWorx</p>
-          <p className="truncate text-base font-semibold text-slate-950">{currentItem?.label ?? "Workspace"}</p>
+          <p className="truncate text-[15px] font-semibold text-slate-950">Operations workspace</p>
         </div>
       ) : null}
     </div>
@@ -138,10 +213,10 @@ function NavSection({
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className={`min-w-0 px-4 pb-4 pt-5 ${collapsed ? "px-2 text-center" : ""}`}>
         {!collapsed ? (
-          <div className="rounded-[20px] border border-slate-200 bg-white px-4 py-3 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+          <div className="border-b border-slate-200 pb-4">
             <p className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Workspace</p>
             <p className="mt-2 truncate text-sm font-semibold text-slate-900">{currentItem?.label ?? "Workspace"}</p>
-            <p className="mt-1 truncate text-xs text-slate-500">Operational control center</p>
+            <p className="mt-1 truncate text-xs text-slate-500">Dispatch, inspection, billing, and settings workflows</p>
           </div>
         ) : (
           <div className="flex justify-center">
@@ -151,9 +226,9 @@ function NavSection({
       </div>
       <nav aria-label="Primary navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
         {!collapsed ? (
-          <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Operations</p>
+          <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Core workflows</p>
         ) : null}
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {navItems.map((item) => (
             <NavItem
               key={item.href}
@@ -168,9 +243,9 @@ function NavSection({
       </nav>
       <div className={`shrink-0 px-4 pb-5 pt-3 ${collapsed ? "px-2" : ""}`}>
         {!collapsed ? (
-          <div className="rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
-            <p className="font-semibold text-slate-700">Daily flow</p>
-            <p className="mt-1 leading-5">Dispatch work, review issues, close billing, and tune settings from one workspace.</p>
+          <div className="border-t border-slate-200 pt-4 text-xs text-slate-500">
+            <p className="font-semibold uppercase tracking-[0.14em] text-slate-400">Today</p>
+            <p className="mt-2 leading-5">Keep dispatch moving, clear exceptions, and finish billing review without leaving the workspace.</p>
           </div>
         ) : (
           <div className="flex justify-center">
@@ -275,17 +350,17 @@ export function AppShell({
       {navItems.length > 0 ? (
         <aside
           aria-label="Primary navigation"
-          className={`hidden overflow-hidden border-r border-slate-200 bg-[#f8fafc] transition-[width] duration-200 motion-reduce:transition-none lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col ${
+          className={`hidden overflow-hidden border-r border-slate-200 bg-[#f5f7fb] transition-[width] duration-200 motion-reduce:transition-none lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col ${
             sidebarCollapsed ? "lg:w-[72px]" : "lg:w-64"
           }`}
         >
-          <div className={`border-b border-slate-200/90 bg-white/80 backdrop-blur ${sidebarCollapsed ? "px-2 py-3" : "px-4 py-4"}`}>
+          <div className={`border-b border-slate-200 bg-[#f8fafc] ${sidebarCollapsed ? "px-2 py-3" : "px-4 py-4"}`}>
             <div className={`flex items-start ${sidebarCollapsed ? "justify-center" : "justify-between gap-3"}`}>
-              <BrandBlock collapsed={sidebarCollapsed} currentItem={currentItem} />
+              <BrandBlock collapsed={sidebarCollapsed} />
               {!sidebarCollapsed ? (
                 <button
                   aria-label="Collapse sidebar"
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 outline-none transition-colors hover:border-slate-300 hover:text-ink focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 outline-none transition-colors hover:bg-white hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2"
                   onClick={() => setSidebarCollapsed(true)}
                   type="button"
                 >
@@ -297,7 +372,7 @@ export function AppShell({
               <div className="mt-3 flex justify-center">
                 <button
                   aria-label="Expand sidebar"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 outline-none transition-colors hover:border-slate-300 hover:text-ink focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 outline-none transition-colors hover:bg-white hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2"
                   onClick={() => setSidebarCollapsed(false)}
                   type="button"
                 >
@@ -322,7 +397,7 @@ export function AppShell({
           <aside
             aria-label="Primary navigation"
             aria-modal={drawerOpen}
-            className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[min(320px,86vw)] flex-col overflow-hidden border-r border-slate-200 bg-[#f8fafc] shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none lg:hidden ${
+            className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[min(320px,86vw)] flex-col overflow-hidden border-r border-slate-200 bg-[#f5f7fb] shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none lg:hidden ${
               drawerOpen ? "translate-x-0 visible" : "-translate-x-full invisible"
             }`}
             ref={drawerRef}
@@ -332,11 +407,11 @@ export function AppShell({
               paddingBottom: "max(0rem, env(safe-area-inset-bottom))"
             }}
           >
-            <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white/85 px-4 py-4 backdrop-blur">
-              <BrandBlock collapsed={false} currentItem={currentItem} />
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-[#f8fafc] px-4 py-4">
+              <BrandBlock collapsed={false} />
               <button
                 aria-label="Close navigation"
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 outline-none transition-colors hover:border-slate-300 hover:text-ink focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 outline-none transition-colors hover:bg-white hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2"
                 onClick={closeDrawer}
                 type="button"
               >

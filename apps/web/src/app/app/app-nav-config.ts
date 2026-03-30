@@ -3,6 +3,7 @@ export type AppNavItem = {
   label: string;
   shortLabel: string;
   abbreviation: string;
+  icon?: "calendar" | "branch" | "alert" | "invoice" | "settings" | "grid" | "clipboard" | "portal";
   description?: string;
   tone?: "blue" | "amber" | "emerald" | "violet" | "slate";
   matchMode?: "exact" | "prefix";
@@ -15,6 +16,7 @@ const adminNavItems: AppNavItem[] = [
     label: "Scheduling / Dispatch",
     shortLabel: "Scheduling",
     abbreviation: "SD",
+    icon: "calendar",
     description: "Visits, assignment, and active queue",
     tone: "blue",
     matchMode: "exact",
@@ -25,6 +27,7 @@ const adminNavItems: AppNavItem[] = [
     label: "Amendment Center",
     shortLabel: "Amendments",
     abbreviation: "AC",
+    icon: "branch",
     description: "Replacements and superseded visits",
     tone: "violet"
   },
@@ -33,6 +36,7 @@ const adminNavItems: AppNavItem[] = [
     label: "Deficiency Center",
     shortLabel: "Deficiencies",
     abbreviation: "DC",
+    icon: "alert",
     description: "Quotes, approvals, and open issues",
     tone: "amber"
   },
@@ -41,6 +45,7 @@ const adminNavItems: AppNavItem[] = [
     label: "Billing Review",
     shortLabel: "Billing",
     abbreviation: "BR",
+    icon: "invoice",
     description: "Review line items and invoicing",
     tone: "emerald"
   },
@@ -49,6 +54,7 @@ const adminNavItems: AppNavItem[] = [
     label: "Settings / Service Fees",
     shortLabel: "Settings",
     abbreviation: "SF",
+    icon: "settings",
     description: "Catalog, customers, and service fees",
     tone: "slate"
   }
@@ -63,6 +69,7 @@ const navByRole: Record<string, AppNavItem[]> = {
       label: "Platform Admin",
       shortLabel: "Platform",
       abbreviation: "PA",
+      icon: "grid",
       description: "Cross-tenant controls and oversight",
       tone: "slate"
     },
@@ -74,6 +81,7 @@ const navByRole: Record<string, AppNavItem[]> = {
       label: "Field Schedule",
       shortLabel: "Schedule",
       abbreviation: "FS",
+      icon: "clipboard",
       description: "Assigned work, reports, and documents",
       tone: "blue",
       matchMode: "exact",
@@ -86,6 +94,7 @@ const navByRole: Record<string, AppNavItem[]> = {
       label: "Customer Portal",
       shortLabel: "Portal",
       abbreviation: "CP",
+      icon: "portal",
       description: "Reports, documents, and history",
       tone: "emerald",
       matchMode: "exact",
