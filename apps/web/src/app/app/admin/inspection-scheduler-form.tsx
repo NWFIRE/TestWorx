@@ -1,5 +1,6 @@
 "use client";
 
+import type { ChangeEvent, ReactNode } from "react";
 import { useActionState, useMemo, useState } from "react";
 import type { CustomerOption, SiteOption, TechnicianOption } from "@testworx/types";
 import {
@@ -38,6 +39,49 @@ type InitialValues = {
   notes?: string;
   tasks?: InspectionTaskValue[];
 };
+
+function PickerField({
+  id,
+  name,
+  type,
+  value,
+  onChange,
+  required,
+  icon,
+  placeholder
+}: {
+  id: string;
+  name: string;
+  type: "month" | "datetime-local";
+  value: string;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  required?: boolean;
+  icon: ReactNode;
+  placeholder?: string;
+}) {
+  return (
+    <div className="relative min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 transition-colors focus-within:border-slateblue/40 focus-within:bg-white">
+      <span className="pointer-events-none absolute left-4 top-1/2 z-[1] flex h-5 w-5 -translate-y-1/2 items-center justify-center text-slate-400">
+        {icon}
+      </span>
+      <input
+        className="ios-picker-field block h-12 w-full min-w-0 max-w-full appearance-none bg-transparent pl-11 pr-12 text-left text-[15px] font-medium text-slate-900 outline-none"
+        id={id}
+        name={name}
+        onChange={onChange}
+        placeholder={placeholder}
+        required={required}
+        type={type}
+        value={value}
+      />
+      <span className="pointer-events-none absolute right-4 top-1/2 z-[1] flex h-4 w-4 -translate-y-1/2 items-center justify-center text-slate-400">
+        <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 20 20">
+          <path d="m5 7.5 5 5 5-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+        </svg>
+      </span>
+    </div>
+  );
+}
 
 export function InspectionSchedulerForm({
   action,
@@ -207,9 +251,14 @@ export function InspectionSchedulerForm({
       <div className="grid min-w-0 gap-4 md:grid-cols-2">
         <div className="min-w-0">
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="inspectionMonth">Inspection month</label>
-          <input
-            className="w-full rounded-2xl border border-slate-200 px-4 py-3.5"
+          <PickerField
             id="inspectionMonth"
+            icon={
+              <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24">
+                <rect fill="none" height="16" rx="3" ry="3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" width="18" x="3" y="5" />
+                <path d="M8 3v4M16 3v4M3 10h18" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+              </svg>
+            }
             name="inspectionMonth"
             onChange={(event) => {
               const nextMonth = event.target.value;
@@ -226,9 +275,14 @@ export function InspectionSchedulerForm({
         </div>
         <div className="min-w-0">
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="scheduledStart">Scheduled start</label>
-          <input
-            className="w-full rounded-2xl border border-slate-200 px-4 py-3.5"
+          <PickerField
             id="scheduledStart"
+            icon={
+              <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" fill="none" r="8" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+                <path d="M12 7.5v5l3 2" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+              </svg>
+            }
             name="scheduledStart"
             onChange={(event) => {
               setScheduledStart(event.target.value);
@@ -243,9 +297,14 @@ export function InspectionSchedulerForm({
       <div className="grid min-w-0 gap-4 md:grid-cols-2">
         <div className="min-w-0">
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="scheduledEnd">Scheduled end</label>
-          <input
-            className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 px-4 py-3.5"
+          <PickerField
             id="scheduledEnd"
+            icon={
+              <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" fill="none" r="8" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+                <path d="M12 7.5v5l3 2" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+              </svg>
+            }
             name="scheduledEnd"
             onChange={(event) => setScheduledEnd(event.target.value)}
             type="datetime-local"
