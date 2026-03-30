@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 
 const initialState = { error: null as string | null, success: null as string | null };
 
@@ -14,15 +13,13 @@ export function DeleteInspectionCard({
   inspectionId: string;
   disabled?: boolean;
 }) {
-  const router = useRouter();
   const [state, formAction, pending] = useActionState(action, initialState);
 
   useEffect(() => {
     if (state.success) {
-      router.push("/app/admin?inspection=deleted");
-      router.refresh();
+      window.location.replace("/app/admin?inspection=deleted");
     }
-  }, [router, state.success]);
+  }, [state.success]);
 
   return (
     <form
