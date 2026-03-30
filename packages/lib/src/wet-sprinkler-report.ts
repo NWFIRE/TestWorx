@@ -217,16 +217,6 @@ export const wetSprinklerReportTemplate: ReportTemplateDefinition = {
         { id: "controlValvesObserved", label: "Control valves observed", type: "number", calculation: { key: "sumNumberFieldFromRepeater", sourceFieldId: "systemZones", rowFieldId: "controlValveCount" }, readOnly: true }
       ]
     },
-    buildWetSprinklerRequirementSection({
-      id: "riser-room",
-      label: "Weekly inspection items",
-      description: "Work through the weekly wet-pipe checkpoints and document results, deficiencies, corrective actions, comments, and photos.",
-      repeaterId: "weeklyItems",
-      completedFieldId: "weeklyItemsCompleted",
-      deficiencyCountFieldId: "weeklyDeficiencyCount",
-      commentsFieldId: "weeklySectionComments",
-      groupKey: "weekly_inspection"
-    }),
     {
       id: "sprinkler-heads",
       label: "Monthly inspection items and sprinkler heads",
@@ -376,7 +366,6 @@ export const wetSprinklerReportTemplate: ReportTemplateDefinition = {
           calculation: {
             key: "sumFields",
             sourceFields: [
-              { sectionId: "riser-room", fieldId: "weeklyDeficiencyCount" },
               { sectionId: "sprinkler-heads", fieldId: "monthlyDeficiencyCount" },
               { sectionId: "system-checklist", fieldId: "quarterlyInspectionDeficiencyCount" },
               { sectionId: "system-checklist", fieldId: "quarterlyTestDeficiencyCount" },

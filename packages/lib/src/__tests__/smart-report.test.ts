@@ -888,7 +888,7 @@ describe("smart report foundations", () => {
         templateVersion: 1,
         inspectionType: "wet_fire_sprinkler",
         overallNotes: "",
-        sectionOrder: ["service-summary", "riser-room", "sprinkler-heads", "system-checklist", "semi-annual", "annual", "five-year-internal", "five-year-test", "alarm-valves", "valves", "alarm-devices", "system-photos", "comment-sheet"],
+        sectionOrder: ["service-summary", "sprinkler-heads", "system-checklist", "semi-annual", "annual", "five-year-internal", "five-year-test", "alarm-valves", "valves", "alarm-devices", "system-photos", "comment-sheet"],
         activeSectionId: "service-summary",
         sections: {
           "service-summary": {
@@ -905,29 +905,6 @@ describe("smart report foundations", () => {
               inspectorLicense: "LIC-4451",
               buildingArea: "North patient tower",
               serviceSummary: "Patient tower wet systems inspected during the annual route."
-            }
-          },
-          "riser-room": {
-            status: "attention",
-            notes: "",
-            fields: {
-              weeklyItems: [
-                {
-                  requirementKey: "weekly_control_valves_open",
-                  groupKey: "weekly_inspection",
-                  itemLabel: "Verify control valves are in the normal open position and secured, locked, or electronically supervised as required.",
-                  referenceLabel: "NFPA 25 weekly wet-pipe inspection baseline",
-                  frequencyLabel: "Weekly",
-                  requirementProfileKey: "nfpa25_2023_baseline",
-                  requirementEditionLabel: "2023 baseline",
-                  result: "fail",
-                  deficiencySeverity: "high",
-                  deficiencyNotes: "OS&Y valve not fully open on riser A.",
-                  correctiveAction: "Valve tagged and office notified for immediate correction.",
-                  comments: "Tamper switch still indicated normal.",
-                  deficiencyPhoto: ""
-                }
-              ]
             }
           },
           "sprinkler-heads": {
@@ -998,7 +975,6 @@ describe("smart report foundations", () => {
     });
 
     const systemRows = draft.sections["service-summary"]?.fields.systemZones as Array<Record<string, string | number>>;
-    const weeklyRows = draft.sections["riser-room"]?.fields.weeklyItems as Array<Record<string, string>>;
     const monthlyRows = draft.sections["sprinkler-heads"]?.fields.monthlyItems as Array<Record<string, string>>;
     const quarterlyInspectionRows = draft.sections["system-checklist"]?.fields.quarterlyInspectionItems as Array<Record<string, string>>;
     const quarterlyTestRows = draft.sections["system-checklist"]?.fields.quarterlyTestItems as Array<Record<string, string>>;
@@ -1020,7 +996,6 @@ describe("smart report foundations", () => {
     expect(draft.sections["service-summary"]?.fields.clientName).toBe("Harbor View Hospital");
     expect(draft.sections["service-summary"]?.fields.serviceAddress).toBe("123 Harbor Way");
     expect(draft.sections["service-summary"]?.fields.occupancyType).toBe("Hospital");
-    expect(weeklyRows).toHaveLength(3);
     expect(monthlyRows).toHaveLength(5);
     expect(quarterlyInspectionRows).toHaveLength(3);
     expect(quarterlyTestRows).toHaveLength(3);
@@ -1028,8 +1003,6 @@ describe("smart report foundations", () => {
     expect(annualRows).toHaveLength(4);
     expect(fiveYearInternalRows).toHaveLength(3);
     expect(fiveYearTestRows).toHaveLength(3);
-    expect(weeklyRows[0]?.result).toBe("fail");
-    expect(weeklyRows[0]?.deficiencyNotes).toContain("OS&Y valve");
     expect(sprinklerHeadRows).toHaveLength(1);
     expect(sprinklerHeadRows[0]?.headType).toBe("other");
     expect(sprinklerHeadRows[0]?.headTypeOther).toBe("pendent");
@@ -1038,7 +1011,7 @@ describe("smart report foundations", () => {
     expect(draft.sections["comment-sheet"]?.fields.outOfScopeComments).toContain("dry system");
     expect(draft.sections["service-summary"]?.fields.systemsInspected).toBe(1);
     expect(draft.sections["service-summary"]?.fields.controlValvesObserved).toBe(6);
-    expect(draft.sections.valves?.fields.deficiencyCount).toBe(1);
+    expect(draft.sections.valves?.fields.deficiencyCount).toBe(0);
   });
 
   it("auto-populates wet fire sprinkler system and alarm valve rows when linked assets change", () => {
@@ -1114,7 +1087,7 @@ describe("smart report foundations", () => {
       templateVersion: 1,
       inspectionType: "wet_fire_sprinkler",
       overallNotes: "Wet sprinkler visit complete.",
-      sectionOrder: ["service-summary", "riser-room", "sprinkler-heads", "system-checklist", "semi-annual", "annual", "five-year-internal", "five-year-test", "alarm-valves", "valves", "alarm-devices", "system-photos", "comment-sheet"],
+      sectionOrder: ["service-summary", "sprinkler-heads", "system-checklist", "semi-annual", "annual", "five-year-internal", "five-year-test", "alarm-valves", "valves", "alarm-devices", "system-photos", "comment-sheet"],
       activeSectionId: "service-summary",
       sections: {
         "service-summary": {
@@ -1134,20 +1107,6 @@ describe("smart report foundations", () => {
             ],
             systemsInspected: 99,
             controlValvesObserved: 0
-          }
-        },
-        "riser-room": {
-          status: "pass",
-          notes: "",
-          fields: {
-            weeklyItems: [
-              { requirementKey: "weekly_control_valves_open", groupKey: "weekly_inspection", itemLabel: "Check 1", referenceLabel: "Ref", frequencyLabel: "Weekly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "high", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
-              { requirementKey: "weekly_gauges_normal", groupKey: "weekly_inspection", itemLabel: "Check 2", referenceLabel: "Ref", frequencyLabel: "Weekly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "fail", deficiencySeverity: "medium", deficiencyNotes: "Gauge low.", correctiveAction: "", comments: "", deficiencyPhoto: "" },
-              { requirementKey: "weekly_riser_room_condition", groupKey: "weekly_inspection", itemLabel: "Check 3", referenceLabel: "Ref", frequencyLabel: "Weekly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "na", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" }
-            ],
-            weeklyItemsCompleted: 0,
-            weeklyDeficiencyCount: 0,
-            weeklySectionComments: ""
           }
         },
         "sprinkler-heads": {
@@ -1256,7 +1215,7 @@ describe("smart report foundations", () => {
         valves: {
           status: "pass",
           notes: "",
-          fields: { deficiencyCount: 0, impairmentObserved: true, systemOutOfService: false, impairmentSummary: "One weekly and one quarterly deficiency.", notificationsMade: "Owner notified." }
+          fields: { deficiencyCount: 0, impairmentObserved: true, systemOutOfService: false, impairmentSummary: "One quarterly deficiency.", notificationsMade: "Owner notified." }
         },
         "alarm-devices": {
           status: "pass",
@@ -1293,7 +1252,6 @@ describe("smart report foundations", () => {
     expect((normalized.sections["service-summary"]?.fields.systemZones as Array<unknown>).length).toBe(2);
     expect(normalized.sections["service-summary"]?.fields.systemsInspected).toBe(2);
     expect(normalized.sections["service-summary"]?.fields.controlValvesObserved).toBe(7);
-    expect(normalized.sections["riser-room"]?.fields.weeklyItemsCompleted).toBe(3);
     expect(normalized.sections["sprinkler-heads"]?.fields.monthlyItemsCompleted).toBe(5);
     expect(normalized.sections["system-checklist"]?.fields.quarterlyInspectionItemsCompleted).toBe(3);
     expect(normalized.sections["system-checklist"]?.fields.quarterlyTestItemsCompleted).toBe(3);
@@ -1301,9 +1259,8 @@ describe("smart report foundations", () => {
     expect(normalized.sections.annual?.fields.annualInspectionItemsCompleted).toBe(4);
     expect(normalized.sections["five-year-internal"]?.fields.fiveYearInternalInspectionItemsCompleted).toBe(3);
     expect(normalized.sections["five-year-test"]?.fields.fiveYearTestItemsCompleted).toBe(3);
-    expect(normalized.sections["riser-room"]?.fields.weeklyDeficiencyCount).toBe(1);
     expect(normalized.sections["system-checklist"]?.fields.quarterlyTestDeficiencyCount).toBe(1);
-    expect(normalized.sections.valves?.fields.deficiencyCount).toBe(2);
+    expect(normalized.sections.valves?.fields.deficiencyCount).toBe(1);
     expect(normalized.sections["sprinkler-heads"]?.fields.sprinklerHeadRowsReviewed).toBe(1);
     expect(normalized.sections["alarm-valves"]?.fields.alarmValveRowsReviewed).toBe(1);
 
@@ -1311,7 +1268,7 @@ describe("smart report foundations", () => {
       templateVersion: 1,
       inspectionType: "wet_fire_sprinkler",
       overallNotes: "",
-      sectionOrder: ["service-summary", "riser-room", "sprinkler-heads", "system-checklist", "semi-annual", "annual", "five-year-internal", "five-year-test", "alarm-valves", "valves", "alarm-devices", "system-photos", "comment-sheet"],
+      sectionOrder: ["service-summary", "sprinkler-heads", "system-checklist", "semi-annual", "annual", "five-year-internal", "five-year-test", "alarm-valves", "valves", "alarm-devices", "system-photos", "comment-sheet"],
       activeSectionId: "service-summary",
       sections: {
         "service-summary": {
