@@ -110,7 +110,7 @@ export function InspectionSchedulerForm({
   const customSiteSelected = resolvedSiteId === customInspectionSiteOptionValue;
 
   return (
-    <form action={formAction} className="space-y-5 rounded-[1.5rem] bg-white p-4 shadow-panel sm:space-y-6 sm:rounded-[2rem] sm:p-6">
+    <form action={formAction} className="min-w-0 overflow-hidden space-y-5 rounded-[1.5rem] bg-white p-4 shadow-panel sm:space-y-6 sm:rounded-[2rem] sm:p-6">
       {initialValues?.inspectionId ? <input name="inspectionId" type="hidden" value={initialValues.inspectionId} /> : null}
       <div>
         <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500 sm:text-sm sm:tracking-[0.25em]">Scheduling workflow</p>
@@ -118,11 +118,11 @@ export function InspectionSchedulerForm({
         {banner ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-5 text-amber-900">{banner}</p> : null}
         {workflowNote ? <p className="mt-3 text-sm leading-5 text-slate-500">{workflowNote}</p> : null}
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <div>
+      <div className="grid min-w-0 gap-4 md:grid-cols-2">
+        <div className="min-w-0">
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customerCompanyId">Customer</label>
           <select
-            className="w-full rounded-2xl border border-slate-200 px-4 py-3.5"
+            className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 px-4 py-3.5"
             id="customerCompanyId"
             name="customerCompanyId"
             onChange={(event) => {
@@ -136,10 +136,10 @@ export function InspectionSchedulerForm({
             {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
           </select>
         </div>
-        <div>
+        <div className="min-w-0">
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="siteId">Site</label>
           <select
-            className="w-full rounded-2xl border border-slate-200 px-4 py-3.5"
+            className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 px-4 py-3.5"
             disabled={selectedCustomerId === ""}
             id="siteId"
             name="siteId"
@@ -162,38 +162,38 @@ export function InspectionSchedulerForm({
         </div>
       </div>
       {customSiteSelected ? (
-        <div className="space-y-4 rounded-[1.25rem] border border-slate-200 p-4 sm:rounded-[1.5rem]">
+        <div className="min-w-0 space-y-4 rounded-[1.25rem] border border-slate-200 p-4 sm:rounded-[1.5rem]">
           <div>
             <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 sm:text-sm sm:tracking-[0.2em]">One-time site</p>
             <h4 className="mt-1 text-lg font-semibold text-ink">Create a site just for this inspection</h4>
             <p className="mt-2 text-sm leading-5 text-slate-500">This creates a real site under the selected customer so the inspection, report, billing, and PDF flow stay intact.</p>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
+          <div className="grid min-w-0 gap-4 md:grid-cols-2">
+            <div className="min-w-0">
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customSiteName">Site name</label>
               <input className="w-full rounded-2xl border border-slate-200 px-4 py-3.5" id="customSiteName" name="customSiteName" required={customSiteSelected} />
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customSiteAddressLine1">Address line 1</label>
               <input className="w-full rounded-2xl border border-slate-200 px-4 py-3.5" id="customSiteAddressLine1" name="customSiteAddressLine1" required={customSiteSelected} />
             </div>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
+          <div className="grid min-w-0 gap-4 md:grid-cols-2">
+            <div className="min-w-0">
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customSiteAddressLine2">Address line 2</label>
               <input className="w-full rounded-2xl border border-slate-200 px-4 py-3.5" id="customSiteAddressLine2" name="customSiteAddressLine2" />
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customSiteCity">City</label>
               <input className="w-full rounded-2xl border border-slate-200 px-4 py-3.5" id="customSiteCity" name="customSiteCity" required={customSiteSelected} />
             </div>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
+          <div className="grid min-w-0 gap-4 md:grid-cols-2">
+            <div className="min-w-0">
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customSiteState">State / region</label>
               <input className="w-full rounded-2xl border border-slate-200 px-4 py-3.5" id="customSiteState" name="customSiteState" required={customSiteSelected} />
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customSitePostalCode">Postal code</label>
               <input className="w-full rounded-2xl border border-slate-200 px-4 py-3.5" id="customSitePostalCode" name="customSitePostalCode" required={customSiteSelected} />
             </div>
@@ -204,8 +204,8 @@ export function InspectionSchedulerForm({
           </div>
         </div>
       ) : null}
-      <div className="grid gap-4 md:grid-cols-2">
-        <div>
+      <div className="grid min-w-0 gap-4 md:grid-cols-2">
+        <div className="min-w-0">
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="inspectionMonth">Inspection month</label>
           <input
             className="w-full rounded-2xl border border-slate-200 px-4 py-3.5"
@@ -224,7 +224,7 @@ export function InspectionSchedulerForm({
           />
           <p className="mt-2 text-sm leading-5 text-slate-500">Selecting a month defaults the start date to the first day unless you choose a different start date.</p>
         </div>
-        <div>
+        <div className="min-w-0">
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="scheduledStart">Scheduled start</label>
           <input
             className="w-full rounded-2xl border border-slate-200 px-4 py-3.5"
@@ -240,11 +240,11 @@ export function InspectionSchedulerForm({
           />
         </div>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <div>
+      <div className="grid min-w-0 gap-4 md:grid-cols-2">
+        <div className="min-w-0">
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="scheduledEnd">Scheduled end</label>
           <input
-            className="w-full rounded-2xl border border-slate-200 px-4 py-3.5"
+            className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 px-4 py-3.5"
             id="scheduledEnd"
             name="scheduledEnd"
             onChange={(event) => setScheduledEnd(event.target.value)}
@@ -253,10 +253,10 @@ export function InspectionSchedulerForm({
           />
           <p className="mt-2 text-sm leading-5 text-slate-500">Optional. Leave blank unless dispatch needs a specific end time.</p>
         </div>
-        <div>
+        <div className="min-w-0">
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="status">Status</label>
           <select
-            className="w-full rounded-2xl border border-slate-200 px-4 py-3.5"
+            className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 px-4 py-3.5"
             id="status"
             name="status"
             onChange={(event) => setStatus(event.target.value as EditableInspectionStatus)}
@@ -293,7 +293,7 @@ export function InspectionSchedulerForm({
         </div>
         <p className="mt-2 text-sm leading-5 text-slate-500">Leave all unchecked to keep the visit in the shared queue. Select multiple techs for mixed-license visits.</p>
       </div>
-      <div>
+      <div className="min-w-0">
         <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="notes">Dispatch notes</label>
         <textarea
           className="min-h-24 w-full rounded-2xl border border-slate-200 px-4 py-3.5"
@@ -304,13 +304,13 @@ export function InspectionSchedulerForm({
         />
       </div>
       {reasonLabel ? (
-        <div>
+      <div className="min-w-0">
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="reason">{reasonLabel}</label>
           <textarea className="min-h-24 w-full rounded-2xl border border-slate-200 px-4 py-3.5" id="reason" name="reason" placeholder="Explain why this follow-up or amendment is needed" required={reasonRequired} />
         </div>
       ) : null}
       {allowDocumentUpload ? (
-        <div className="space-y-4 rounded-[1.25rem] border border-slate-200 p-4 sm:rounded-[1.5rem]">
+        <div className="min-w-0 space-y-4 rounded-[1.25rem] border border-slate-200 p-4 sm:rounded-[1.5rem]">
           <div>
             <p className="text-sm font-medium text-slate-600">External customer PDFs</p>
             <p className="mt-1 text-sm leading-5 text-slate-500">Optional. Attach customer-provided PDFs while scheduling so they are ready for the field team on day one.</p>
@@ -334,14 +334,14 @@ export function InspectionSchedulerForm({
           </label>
         </div>
       ) : null}
-      <div className="space-y-4">
+      <div className="min-w-0 space-y-4">
         <div>
           <p className="text-sm font-medium text-slate-600">Inspection types and recurrence</p>
           <p className="text-sm leading-5 text-slate-500">Each selected report type gets its own recurring task under the same visit.</p>
         </div>
         <div className="grid gap-3">
           {(Object.entries(inspectionTypeRegistry) as Array<[InspectionType, (typeof inspectionTypeRegistry)[InspectionType]]>).map(([inspectionType, inspectionConfig]) => (
-            <div key={inspectionType} className="grid gap-3 rounded-2xl border border-slate-200 p-4 md:grid-cols-[1.5fr_1fr] md:items-center">
+            <div key={inspectionType} className="grid min-w-0 gap-3 rounded-2xl border border-slate-200 p-4 md:grid-cols-[1.5fr_1fr] md:items-center">
               <label className="flex items-start gap-3">
                 <input
                   className="mt-1 h-5 w-5 rounded border-slate-300"
