@@ -42,7 +42,16 @@ export type ReportOptionProviderKey =
   | "sprinklerComponentTypes"
   | "wetSprinklerRequirementProfiles"
   | "wetSprinklerVisitScopeOptions"
+  | "wetSprinklerServiceTypeOptions"
+  | "wetSprinklerTagStatusOptions"
   | "wetSprinklerOverallResultOptions"
+  | "sprinklerAlarmValveTypes"
+  | "sprinklerHeadTypes"
+  | "sprinklerHeadEscutcheonOptions"
+  | "sprinklerHeadSizeOptions"
+  | "sprinklerHeadTemperatureOptions"
+  | "sprinklerHeadBulbConditionOptions"
+  | "sprinklerManufacturers"
   | "assetSelect";
 
 const passFailOptions: ReportOption[] = [
@@ -316,7 +325,28 @@ const wetSprinklerVisitScopeOptions: ReportOption[] = [
   { label: "Weekly visit", value: "weekly" },
   { label: "Monthly visit", value: "monthly" },
   { label: "Quarterly visit", value: "quarterly" },
+  { label: "Semi-annual visit", value: "semi_annual" },
+  { label: "Annual visit", value: "annual" },
+  { label: "Five-year internal", value: "five_year_internal" },
+  { label: "Five-year test", value: "five_year_test" },
   { label: "Combined visit", value: "combined" }
+];
+
+const wetSprinklerServiceTypeOptions: ReportOption[] = [
+  { label: "Weekly", value: "weekly", metadata: { visitScope: "weekly" } },
+  { label: "Monthly", value: "monthly", metadata: { visitScope: "monthly" } },
+  { label: "Quarterly", value: "quarterly", metadata: { visitScope: "quarterly" } },
+  { label: "Semi-Annual", value: "semi_annual", metadata: { visitScope: "semi_annual" } },
+  { label: "Annual", value: "annual", metadata: { visitScope: "annual" } },
+  { label: "5 Year Internal", value: "five_year_internal", metadata: { visitScope: "five_year_internal" } },
+  { label: "5 Year Test", value: "five_year_test", metadata: { visitScope: "five_year_test" } },
+  { label: "Combined Service", value: "combined", metadata: { visitScope: "combined" } }
+];
+
+const wetSprinklerTagStatusOptions: ReportOption[] = [
+  { label: "Green", value: "green" },
+  { label: "Yellow", value: "yellow" },
+  { label: "Red", value: "red" }
 ];
 
 const wetSprinklerOverallResultOptions: ReportOption[] = [
@@ -325,6 +355,70 @@ const wetSprinklerOverallResultOptions: ReportOption[] = [
   { label: "Impairment noted", value: "impairment_noted" },
   { label: "Out of service", value: "out_of_service" },
   { label: "Follow-up required", value: "follow_up_required" }
+];
+
+const sprinklerAlarmValveTypes: ReportOption[] = [
+  { label: "Alarm check valve", value: "alarm_check_valve" },
+  { label: "Retard chamber trim", value: "retard_chamber_trim" },
+  { label: "Water motor gong", value: "water_motor_gong" },
+  { label: "Pressure switch", value: "pressure_switch" },
+  { label: "Wet alarm valve assembly", value: "wet_alarm_valve_assembly" },
+  { label: "Other", value: "other" }
+];
+
+const sprinklerHeadTypes: ReportOption[] = [
+  { label: "Pendant", value: "pendant" },
+  { label: "Upright", value: "upright" },
+  { label: "Sidewall", value: "sidewall" },
+  { label: "Concealed", value: "concealed" },
+  { label: "Dry pendent", value: "dry_pendent" },
+  { label: "Other", value: "other" }
+];
+
+const sprinklerHeadEscutcheonOptions: ReportOption[] = [
+  { label: "Flush", value: "flush" },
+  { label: "Recessed", value: "recessed" },
+  { label: "Concealed cover plate", value: "concealed_cover_plate" },
+  { label: "None", value: "none" },
+  { label: "Damaged / missing", value: "damaged_or_missing" },
+  { label: "Other", value: "other" }
+];
+
+const sprinklerHeadSizeOptions: ReportOption[] = [
+  { label: "1/2 in", value: "1_2_in" },
+  { label: "3/4 in", value: "3_4_in" },
+  { label: "K5.6", value: "k5_6" },
+  { label: "K8.0", value: "k8_0" },
+  { label: "K11.2", value: "k11_2" },
+  { label: "Other", value: "other" }
+];
+
+const sprinklerHeadTemperatureOptions: ReportOption[] = [
+  { label: "135F", value: "135f" },
+  { label: "155F", value: "155f" },
+  { label: "175F", value: "175f" },
+  { label: "200F", value: "200f" },
+  { label: "286F", value: "286f" },
+  { label: "Other", value: "other" }
+];
+
+const sprinklerHeadBulbConditionOptions: ReportOption[] = [
+  { label: "Normal / clear", value: "normal_clear" },
+  { label: "Loaded", value: "loaded" },
+  { label: "Painted", value: "painted" },
+  { label: "Corroded", value: "corroded" },
+  { label: "Broken / damaged", value: "damaged" },
+  { label: "Other", value: "other" }
+];
+
+const sprinklerManufacturers: ReportOption[] = [
+  { label: "Reliable", value: "reliable" },
+  { label: "Tyco", value: "tyco" },
+  { label: "Viking", value: "viking" },
+  { label: "Globe", value: "globe" },
+  { label: "Victaulic", value: "victaulic" },
+  { label: "Central", value: "central" },
+  { label: "Other", value: "other" }
 ];
 
 export const reportOptionProviders = {
@@ -368,7 +462,16 @@ export const reportOptionProviders = {
   sprinklerComponentTypes,
   wetSprinklerRequirementProfiles: wetSprinklerRequirementProfileOptions,
   wetSprinklerVisitScopeOptions,
-  wetSprinklerOverallResultOptions
+  wetSprinklerServiceTypeOptions,
+  wetSprinklerTagStatusOptions,
+  wetSprinklerOverallResultOptions,
+  sprinklerAlarmValveTypes,
+  sprinklerHeadTypes,
+  sprinklerHeadEscutcheonOptions,
+  sprinklerHeadSizeOptions,
+  sprinklerHeadTemperatureOptions,
+  sprinklerHeadBulbConditionOptions,
+  sprinklerManufacturers
 } satisfies Record<Exclude<ReportOptionProviderKey, "assetSelect">, ReportOption[]>;
 
 function coerceMetadata(value: unknown): ReportPrimitiveValue {
@@ -412,6 +515,12 @@ export function buildAssetOptions(assets: ReportAssetRecord[]) {
         componentType: coerceMetadata(metadata.componentType),
         valveCount: coerceMetadata(metadata.valveCount),
         valveType: coerceMetadata(metadata.valveType),
+        manufacturer: coerceMetadata(metadata.manufacturer),
+        headType: coerceMetadata(metadata.headType),
+        escutcheon: coerceMetadata(metadata.escutcheon),
+        headSize: coerceMetadata(metadata.headSize),
+        temperatureRating: coerceMetadata(metadata.temperatureRating),
+        bulbCondition: coerceMetadata(metadata.bulbCondition),
         compressorType: coerceMetadata(metadata.compressorType),
         quickOpeningDevice: coerceMetadata(metadata.quickOpeningDevice),
         drainCount: coerceMetadata(metadata.drainCount),
@@ -427,7 +536,6 @@ export function buildAssetOptions(assets: ReportAssetRecord[]) {
         fixtureType: coerceMetadata(metadata.fixtureType),
         batteryType: coerceMetadata(metadata.batteryType),
         fixtureCount: coerceMetadata(metadata.fixtureCount),
-        manufacturer: coerceMetadata(metadata.manufacturer),
         ulRating: coerceMetadata(metadata.ulRating),
         sizeType: coerceMetadata(metadata.sizeType),
         serviceType: coerceMetadata(metadata.serviceType),

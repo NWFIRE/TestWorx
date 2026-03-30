@@ -527,6 +527,10 @@ function createRepeaterSeedRows(field: Extract<ReportFieldDefinition, { type: "r
     ? priorRepeater.filter((row) => isRecord(row)) as Array<Record<string, unknown>>
     : [];
 
+  if (field.carryForwardPriorRows && (field.seedRows?.length ?? 0) === 0 && priorRows.length > 0) {
+    return normalizeRepeaterRows(field, priorRows);
+  }
+
   return normalizeRepeaterRows(
     field,
     (field.seedRows ?? []).map((row) => {

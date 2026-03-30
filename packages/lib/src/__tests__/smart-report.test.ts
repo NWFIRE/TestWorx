@@ -868,13 +868,14 @@ describe("smart report foundations", () => {
     expect(preview.sectionSummaries.find((summary) => summary.sectionId === "system-summary")?.status).toBe("pending");
   });
 
-  it("builds the redesigned wet fire sprinkler report with seeded weekly/monthly/quarterly checklists and carry-forward by requirement key", () => {
+  it("builds the redesigned wet fire sprinkler report from current-form coverage with seeded frequency groups and carry-forward details", () => {
     const draft = buildInitialReportDraft({
       inspectionType: "wet_fire_sprinkler",
       siteName: "Harbor Main Campus",
       customerName: "Harbor View Hospital",
       scheduledDate: "2026-03-20T15:00:00.000Z",
       assetCount: 1,
+      siteDefaults: { siteAddress: "123 Harbor Way" },
       assets: [
         {
           id: "asset_1",
@@ -887,7 +888,7 @@ describe("smart report foundations", () => {
         templateVersion: 1,
         inspectionType: "wet_fire_sprinkler",
         overallNotes: "",
-        sectionOrder: ["service-summary", "riser-room", "sprinkler-heads", "system-checklist", "valves", "alarm-devices"],
+        sectionOrder: ["service-summary", "riser-room", "sprinkler-heads", "system-checklist", "semi-annual", "annual", "five-year-internal", "five-year-test", "alarm-valves", "valves", "alarm-devices", "system-photos", "comment-sheet"],
         activeSectionId: "service-summary",
         sections: {
           "service-summary": {
@@ -895,23 +896,28 @@ describe("smart report foundations", () => {
             notes: "",
             fields: {
               requirementProfile: "nfpa25_2023_baseline",
-              visitScope: "combined",
+              typeOfService: "annual",
+              visitScope: "annual",
+              tagStatus: "yellow",
               ownerRepresentative: "Facilities director",
+              occupancyType: "Hospital",
+              inspectorName: "Jeremy O'Brien",
               inspectorLicense: "LIC-4451",
               buildingArea: "North patient tower",
-              serviceSummary: "Patient tower wet systems inspected during the quarterly route."
+              serviceSummary: "Patient tower wet systems inspected during the annual route."
             }
           },
           "riser-room": {
-            status: "pass",
+            status: "attention",
             notes: "",
             fields: {
               weeklyItems: [
                 {
                   requirementKey: "weekly_control_valves_open",
+                  groupKey: "weekly_inspection",
                   itemLabel: "Verify control valves are in the normal open position and secured, locked, or electronically supervised as required.",
                   referenceLabel: "NFPA 25 weekly wet-pipe inspection baseline",
-                  frequency: "weekly",
+                  frequencyLabel: "Weekly",
                   requirementProfileKey: "nfpa25_2023_baseline",
                   requirementEditionLabel: "2023 baseline",
                   result: "fail",
@@ -921,81 +927,60 @@ describe("smart report foundations", () => {
                   comments: "Tamper switch still indicated normal.",
                   deficiencyPhoto: ""
                 }
-              ],
-              weeklyItemsCompleted: 1,
-              weeklyDeficiencyCount: 1,
-              weeklySectionComments: "Weekly checks completed with one control valve exception."
+              ]
             }
           },
           "sprinkler-heads": {
             status: "pass",
             notes: "",
             fields: {
-              monthlyItems: [
+              sprinklerHeadInformation: [
                 {
-                  requirementKey: "monthly_sprinklers_condition",
-                  itemLabel: "Inspect accessible sprinklers for loading, corrosion, paint, damage, or obstruction to discharge patterns.",
-                  referenceLabel: "NFPA 25 monthly wet-pipe inspection baseline",
-                  frequency: "monthly",
-                  requirementProfileKey: "nfpa25_2023_baseline",
-                  requirementEditionLabel: "2023 baseline",
+                  location: "Main corridor",
+                  headType: "pendent",
+                  escutcheon: "flush",
+                  headSize: "1_2_inch",
+                  temperatureRating: "ordinary",
+                  bulbCondition: "normal",
+                  manufacturer: "tyco",
                   result: "pass",
-                  deficiencySeverity: "high",
                   deficiencyNotes: "",
-                  correctiveAction: "",
-                  comments: "Accessible heads clear in sampled corridors.",
+                  comments: "Representative head sample acceptable.",
                   deficiencyPhoto: ""
                 }
               ],
-              monthlyItemsCompleted: 1,
-              monthlyDeficiencyCount: 0,
-              monthlySectionComments: "Monthly visual inspection complete."
+              sprinklerHeadNotes: "Representative head sample taken from patient tower corridors."
             }
           },
-          "system-checklist": {
+          "alarm-valves": {
             status: "pass",
             notes: "",
             fields: {
-              quarterlyItems: [
+              alarmValveInformation: [
                 {
-                  requirementKey: "quarterly_main_drain",
-                  itemLabel: "Conduct the main drain test, compare to prior records when available, and note any adverse change in supply conditions.",
-                  referenceLabel: "NFPA 25 quarterly wet-pipe testing baseline",
-                  frequency: "quarterly",
-                  requirementProfileKey: "nfpa25_2023_baseline",
-                  requirementEditionLabel: "2023 baseline",
-                  result: "pass",
-                  deficiencySeverity: "high",
+                  assetId: "",
+                  assetTag: "",
+                  valveIdentifier: "Alarm valve A",
+                  location: "Central riser room",
+                  valveType: "wet_alarm_valve",
+                  manufacturer: "reliable",
+                  trimCondition: "good",
+                  waterMotorGongTest: "pass",
+                  remoteTransmissionResult: "pass",
                   deficiencyNotes: "",
-                  correctiveAction: "",
-                  comments: "Main drain reading consistent with prior quarter.",
+                  comments: "Trip test restored normally.",
                   deficiencyPhoto: ""
                 }
-              ],
-              quarterlyItemsCompleted: 1,
-              quarterlyDeficiencyCount: 0,
-              quarterlySectionComments: "Quarterly functional items completed."
+              ]
             }
           },
-          valves: {
+          "comment-sheet": {
             status: "pass",
             notes: "",
             fields: {
-              impairmentObserved: true,
-              systemOutOfService: false,
-              impairmentSummary: "One valve supervision deficiency noted.",
-              notificationsMade: "Owner representative notified before departure."
-            }
-          },
-          "alarm-devices": {
-            status: "pass",
-            notes: "",
-            fields: {
-              recommendedRepairs: "Reset valve to full open position and verify tamper after adjustment.",
-              correctiveActionsCompleted: "",
-              followUpRequired: true,
-              overallInspectionResult: "follow_up_required",
-              customerFacingSummary: "Inspection completed with one open item requiring follow-up."
+              outOfScopeComments: "Warehouse dry system not part of this wet-only visit.",
+              customerRequests: "Quote trim replacement during next service window.",
+              inspectorComments: "Annual visit coordinated with facilities."
             }
           }
         },
@@ -1015,29 +1000,48 @@ describe("smart report foundations", () => {
     const systemRows = draft.sections["service-summary"]?.fields.systemZones as Array<Record<string, string | number>>;
     const weeklyRows = draft.sections["riser-room"]?.fields.weeklyItems as Array<Record<string, string>>;
     const monthlyRows = draft.sections["sprinkler-heads"]?.fields.monthlyItems as Array<Record<string, string>>;
-    const quarterlyRows = draft.sections["system-checklist"]?.fields.quarterlyItems as Array<Record<string, string>>;
+    const quarterlyInspectionRows = draft.sections["system-checklist"]?.fields.quarterlyInspectionItems as Array<Record<string, string>>;
+    const quarterlyTestRows = draft.sections["system-checklist"]?.fields.quarterlyTestItems as Array<Record<string, string>>;
+    const semiAnnualRows = draft.sections["semi-annual"]?.fields.semiAnnualTestItems as Array<Record<string, string>>;
+    const annualRows = draft.sections.annual?.fields.annualInspectionItems as Array<Record<string, string>>;
+    const fiveYearInternalRows = draft.sections["five-year-internal"]?.fields.fiveYearInternalInspectionItems as Array<Record<string, string>>;
+    const fiveYearTestRows = draft.sections["five-year-test"]?.fields.fiveYearTestItems as Array<Record<string, string>>;
+    const sprinklerHeadRows = draft.sections["sprinkler-heads"]?.fields.sprinklerHeadInformation as Array<Record<string, string>>;
+    const alarmValveRows = draft.sections["alarm-valves"]?.fields.alarmValveInformation as Array<Record<string, string>>;
 
     expect(systemRows).toHaveLength(1);
     expect(systemRows[0].assetTag).toBe("SPR-200");
     expect(systemRows[0].systemIdentifier).toBe("Wet riser zone A");
     expect(systemRows[0].location).toBe("Central riser room");
     expect(systemRows[0].controlValveCount).toBe(6);
-    expect(draft.sections["service-summary"]?.fields.visitScope).toBe("combined");
-    expect(draft.sections["service-summary"]?.fields.ownerRepresentative).toBe("Facilities director");
+    expect(draft.sections["service-summary"]?.fields.typeOfService).toBe("annual");
+    expect(draft.sections["service-summary"]?.fields.visitScope).toBe("annual");
+    expect(draft.sections["service-summary"]?.fields.tagStatus).toBe("yellow");
+    expect(draft.sections["service-summary"]?.fields.clientName).toBe("Harbor View Hospital");
+    expect(draft.sections["service-summary"]?.fields.serviceAddress).toBe("123 Harbor Way");
+    expect(draft.sections["service-summary"]?.fields.occupancyType).toBe("Hospital");
     expect(weeklyRows).toHaveLength(3);
-    expect(monthlyRows).toHaveLength(4);
-    expect(quarterlyRows).toHaveLength(4);
+    expect(monthlyRows).toHaveLength(5);
+    expect(quarterlyInspectionRows).toHaveLength(3);
+    expect(quarterlyTestRows).toHaveLength(3);
+    expect(semiAnnualRows).toHaveLength(3);
+    expect(annualRows).toHaveLength(4);
+    expect(fiveYearInternalRows).toHaveLength(3);
+    expect(fiveYearTestRows).toHaveLength(3);
     expect(weeklyRows[0]?.result).toBe("fail");
     expect(weeklyRows[0]?.deficiencyNotes).toContain("OS&Y valve");
-    expect(monthlyRows[0]?.result).toBe("pass");
-    expect(quarterlyRows[2]?.result).toBe("pass");
+    expect(sprinklerHeadRows).toHaveLength(1);
+    expect(sprinklerHeadRows[0]?.headType).toBe("other");
+    expect(sprinklerHeadRows[0]?.headTypeOther).toBe("pendent");
+    expect(alarmValveRows).toHaveLength(1);
+    expect(alarmValveRows[0]?.valveIdentifier).toBe("Wet riser zone A");
+    expect(draft.sections["comment-sheet"]?.fields.outOfScopeComments).toContain("dry system");
     expect(draft.sections["service-summary"]?.fields.systemsInspected).toBe(1);
     expect(draft.sections["service-summary"]?.fields.controlValvesObserved).toBe(6);
     expect(draft.sections.valves?.fields.deficiencyCount).toBe(1);
-    expect(draft.sections["alarm-devices"]?.fields.overallInspectionResult).toBe("follow_up_required");
   });
 
-  it("auto-populates wet fire sprinkler system context rows when the linked asset changes", () => {
+  it("auto-populates wet fire sprinkler system and alarm valve rows when linked assets change", () => {
     const template = resolveReportTemplate({
       inspectionType: "wet_fire_sprinkler",
       assets: [
@@ -1046,11 +1050,17 @@ describe("smart report foundations", () => {
           name: "Wet riser zone A",
           assetTag: "SPR-200",
           metadata: { location: "Central riser room", componentType: "riser", valveCount: 6 }
+        },
+        {
+          id: "asset_2",
+          name: "Alarm valve assembly A",
+          assetTag: "VAL-210",
+          metadata: { location: "South riser room", valveType: "wet_alarm_valve", manufacturer: "reliable" }
         }
       ]
     });
 
-    const updatedRow = applyRepeaterRowSmartUpdate(
+    const updatedSystemRow = applyRepeaterRowSmartUpdate(
       template,
       "service-summary",
       "systemZones",
@@ -1065,19 +1075,46 @@ describe("smart report foundations", () => {
       "assetId"
     );
 
-    expect(updatedRow.assetTag).toBe("SPR-200");
-    expect(updatedRow.systemIdentifier).toBe("Wet riser zone A");
-    expect(updatedRow.location).toBe("Central riser room");
-    expect(updatedRow.componentType).toBe("riser");
-    expect(updatedRow.controlValveCount).toBe(6);
+    const updatedAlarmValveRow = applyRepeaterRowSmartUpdate(
+      template,
+      "alarm-valves",
+      "alarmValveInformation",
+      {
+        assetId: "asset_2",
+        assetTag: "",
+        valveIdentifier: "",
+        location: "",
+        valveType: "",
+        manufacturer: "",
+        trimCondition: "good",
+        waterMotorGongTest: "",
+        remoteTransmissionResult: "",
+        deficiencyNotes: "",
+        comments: "",
+        deficiencyPhoto: ""
+      },
+      "assetId"
+    );
+
+    expect(updatedSystemRow.assetTag).toBe("SPR-200");
+    expect(updatedSystemRow.systemIdentifier).toBe("Wet riser zone A");
+    expect(updatedSystemRow.location).toBe("Central riser room");
+    expect(updatedSystemRow.componentType).toBe("riser");
+    expect(updatedSystemRow.controlValveCount).toBe(6);
+    expect(updatedAlarmValveRow.assetTag).toBe("VAL-210");
+    expect(updatedAlarmValveRow.valveIdentifier).toBe("Alarm valve assembly A");
+    expect(updatedAlarmValveRow.location).toBe("South riser room");
+    expect(updatedAlarmValveRow.valveType).toBe("other");
+    expect(updatedAlarmValveRow.valveTypeOther).toBe("wet_alarm_valve");
+    expect(updatedAlarmValveRow.manufacturer).toBe("reliable");
   });
 
-  it("recomputes redesigned wet fire sprinkler summaries and still enforces required system context before finalization", () => {
+  it("recomputes wet fire sprinkler summaries across all preserved frequency groups and still enforces required system context before finalization", () => {
     const normalized = validateDraftForTemplate({
       templateVersion: 1,
       inspectionType: "wet_fire_sprinkler",
       overallNotes: "Wet sprinkler visit complete.",
-      sectionOrder: ["service-summary", "riser-room", "sprinkler-heads", "system-checklist", "valves", "alarm-devices"],
+      sectionOrder: ["service-summary", "riser-room", "sprinkler-heads", "system-checklist", "semi-annual", "annual", "five-year-internal", "five-year-test", "alarm-valves", "valves", "alarm-devices", "system-photos", "comment-sheet"],
       activeSectionId: "service-summary",
       sections: {
         "service-summary": {
@@ -1085,6 +1122,7 @@ describe("smart report foundations", () => {
           notes: "",
           fields: {
             requirementProfile: "nfpa25_2023_baseline",
+            typeOfService: "quarterly",
             visitScope: "quarterly",
             ownerRepresentative: "Facilities lead",
             inspectorLicense: "OK-4451",
@@ -1103,9 +1141,9 @@ describe("smart report foundations", () => {
           notes: "",
           fields: {
             weeklyItems: [
-              { requirementKey: "weekly_control_valves_open", itemLabel: "Check 1", referenceLabel: "Ref", frequency: "weekly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "high", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
-              { requirementKey: "weekly_gauges_normal", itemLabel: "Check 2", referenceLabel: "Ref", frequency: "weekly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "fail", deficiencySeverity: "medium", deficiencyNotes: "Gauge low.", correctiveAction: "", comments: "", deficiencyPhoto: "" },
-              { requirementKey: "weekly_riser_room_condition", itemLabel: "Check 3", referenceLabel: "Ref", frequency: "weekly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "na", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" }
+              { requirementKey: "weekly_control_valves_open", groupKey: "weekly_inspection", itemLabel: "Check 1", referenceLabel: "Ref", frequencyLabel: "Weekly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "high", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "weekly_gauges_normal", groupKey: "weekly_inspection", itemLabel: "Check 2", referenceLabel: "Ref", frequencyLabel: "Weekly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "fail", deficiencySeverity: "medium", deficiencyNotes: "Gauge low.", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "weekly_riser_room_condition", groupKey: "weekly_inspection", itemLabel: "Check 3", referenceLabel: "Ref", frequencyLabel: "Weekly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "na", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" }
             ],
             weeklyItemsCompleted: 0,
             weeklyDeficiencyCount: 0,
@@ -1117,13 +1155,18 @@ describe("smart report foundations", () => {
           notes: "",
           fields: {
             monthlyItems: [
-              { requirementKey: "monthly_sprinklers_condition", itemLabel: "Check 4", referenceLabel: "Ref", frequency: "monthly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "high", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
-              { requirementKey: "monthly_pipe_hangers_condition", itemLabel: "Check 5", referenceLabel: "Ref", frequency: "monthly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "high", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
-              { requirementKey: "monthly_spare_heads", itemLabel: "Check 6", referenceLabel: "Ref", frequency: "monthly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
-              { requirementKey: "monthly_fdc_access", itemLabel: "Check 7", referenceLabel: "Ref", frequency: "monthly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" }
+              { requirementKey: "monthly_sprinklers_condition", groupKey: "monthly_inspection", itemLabel: "Check 4", referenceLabel: "Ref", frequencyLabel: "Monthly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "high", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "monthly_pipe_hangers_condition", groupKey: "monthly_inspection", itemLabel: "Check 5", referenceLabel: "Ref", frequencyLabel: "Monthly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "high", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "monthly_spare_heads", groupKey: "monthly_inspection", itemLabel: "Check 6", referenceLabel: "Ref", frequencyLabel: "Monthly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "monthly_fdc_access", groupKey: "monthly_inspection", itemLabel: "Check 7", referenceLabel: "Ref", frequencyLabel: "Monthly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "monthly_heating_condition", groupKey: "monthly_inspection", itemLabel: "Check 8", referenceLabel: "Ref", frequencyLabel: "Monthly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "na", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" }
+            ],
+            sprinklerHeadInformation: [
+              { location: "Main corridor", headType: "pendent", escutcheon: "flush", headSize: "1_2_inch", temperatureRating: "ordinary", bulbCondition: "normal", manufacturer: "tyco", result: "pass", deficiencyNotes: "", comments: "", deficiencyPhoto: "" }
             ],
             monthlyItemsCompleted: 0,
             monthlyDeficiencyCount: 0,
+            sprinklerHeadRowsReviewed: 0,
             monthlySectionComments: ""
           }
         },
@@ -1131,15 +1174,83 @@ describe("smart report foundations", () => {
           status: "pass",
           notes: "",
           fields: {
-            quarterlyItems: [
-              { requirementKey: "quarterly_waterflow_test", itemLabel: "Check 8", referenceLabel: "Ref", frequency: "quarterly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "high", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
-              { requirementKey: "quarterly_supervisory_test", itemLabel: "Check 9", referenceLabel: "Ref", frequency: "quarterly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "high", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
-              { requirementKey: "quarterly_main_drain", itemLabel: "Check 10", referenceLabel: "Ref", frequency: "quarterly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "fail", deficiencySeverity: "high", deficiencyNotes: "Drain reading dropped significantly.", correctiveAction: "", comments: "", deficiencyPhoto: "" },
-              { requirementKey: "quarterly_valve_housekeeping", itemLabel: "Check 11", referenceLabel: "Ref", frequency: "quarterly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "na", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" }
+            quarterlyInspectionItems: [
+              { requirementKey: "quarterly_waterflow_alarm_devices", groupKey: "quarterly_inspection", itemLabel: "Check 9", referenceLabel: "Ref", frequencyLabel: "Quarterly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "high", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "quarterly_valve_supervisory_signal", groupKey: "quarterly_inspection", itemLabel: "Check 10", referenceLabel: "Ref", frequencyLabel: "Quarterly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "high", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "quarterly_hydraulic_nameplate", groupKey: "quarterly_inspection", itemLabel: "Check 11", referenceLabel: "Ref", frequencyLabel: "Quarterly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "na", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" }
             ],
-            quarterlyItemsCompleted: 0,
-            quarterlyDeficiencyCount: 0,
-            quarterlySectionComments: ""
+            quarterlyTestItems: [
+              { requirementKey: "quarterly_main_drain_test", groupKey: "quarterly_test", itemLabel: "Check 12", referenceLabel: "Ref", frequencyLabel: "Quarterly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "fail", deficiencySeverity: "high", deficiencyNotes: "Drain reading dropped significantly.", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "quarterly_waterflow_alarm_test", groupKey: "quarterly_test", itemLabel: "Check 13", referenceLabel: "Ref", frequencyLabel: "Quarterly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "high", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "quarterly_supervisory_signal_test", groupKey: "quarterly_test", itemLabel: "Check 14", referenceLabel: "Ref", frequencyLabel: "Quarterly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "na", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" }
+            ],
+            quarterlyInspectionItemsCompleted: 0,
+            quarterlyInspectionDeficiencyCount: 0,
+            quarterlyTestItemsCompleted: 0,
+            quarterlyTestDeficiencyCount: 0
+          }
+        },
+        "semi-annual": {
+          status: "pass",
+          notes: "",
+          fields: {
+            semiAnnualTestItems: [
+              { requirementKey: "semi_annual_valve_movement", groupKey: "semi_annual_test", itemLabel: "Check 15", referenceLabel: "Ref", frequencyLabel: "Semi-Annual", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "semi_annual_waterflow_switch", groupKey: "semi_annual_test", itemLabel: "Check 16", referenceLabel: "Ref", frequencyLabel: "Semi-Annual", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "semi_annual_supervisory_switch", groupKey: "semi_annual_test", itemLabel: "Check 17", referenceLabel: "Ref", frequencyLabel: "Semi-Annual", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" }
+            ],
+            semiAnnualTestItemsCompleted: 0,
+            semiAnnualTestDeficiencyCount: 0
+          }
+        },
+        annual: {
+          status: "pass",
+          notes: "",
+          fields: {
+            annualInspectionItems: [
+              { requirementKey: "annual_hangers_and_bracing", groupKey: "annual_inspection", itemLabel: "Check 18", referenceLabel: "Ref", frequencyLabel: "Annual", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "annual_pipe_and_fittings", groupKey: "annual_inspection", itemLabel: "Check 19", referenceLabel: "Ref", frequencyLabel: "Annual", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "annual_alarm_devices", groupKey: "annual_inspection", itemLabel: "Check 20", referenceLabel: "Ref", frequencyLabel: "Annual", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "na", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "annual_valve_room_condition", groupKey: "annual_inspection", itemLabel: "Check 21", referenceLabel: "Ref", frequencyLabel: "Annual", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" }
+            ],
+            annualInspectionItemsCompleted: 0,
+            annualInspectionDeficiencyCount: 0
+          }
+        },
+        "five-year-internal": {
+          status: "pass",
+          notes: "",
+          fields: {
+            fiveYearInternalInspectionItems: [
+              { requirementKey: "five_year_internal_pipe_obstruction", groupKey: "five_year_internal_inspection", itemLabel: "Check 22", referenceLabel: "Ref", frequencyLabel: "5-Year Internal", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "high", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "five_year_internal_check_valves", groupKey: "five_year_internal_inspection", itemLabel: "Check 23", referenceLabel: "Ref", frequencyLabel: "5-Year Internal", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "high", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "five_year_internal_strainers", groupKey: "five_year_internal_inspection", itemLabel: "Check 24", referenceLabel: "Ref", frequencyLabel: "5-Year Internal", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "na", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" }
+            ],
+            fiveYearInternalInspectionItemsCompleted: 0,
+            fiveYearInternalInspectionDeficiencyCount: 0
+          }
+        },
+        "five-year-test": {
+          status: "pass",
+          notes: "",
+          fields: {
+            fiveYearTestItems: [
+              { requirementKey: "five_year_gauge_replacement", groupKey: "five_year_test", itemLabel: "Check 25", referenceLabel: "Ref", frequencyLabel: "5-Year Test", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "five_year_standpipe_flow", groupKey: "five_year_test", itemLabel: "Check 26", referenceLabel: "Ref", frequencyLabel: "5-Year Test", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "na", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" },
+              { requirementKey: "five_year_fdc_check", groupKey: "five_year_test", itemLabel: "Check 27", referenceLabel: "Ref", frequencyLabel: "5-Year Test", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "pass", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" }
+            ],
+            fiveYearTestItemsCompleted: 0,
+            fiveYearTestDeficiencyCount: 0
+          }
+        },
+        "alarm-valves": {
+          status: "pass",
+          notes: "",
+          fields: {
+            alarmValveInformation: [
+              { assetId: "", assetTag: "", valveIdentifier: "Alarm valve A", location: "Central riser room", valveType: "wet_alarm_valve", manufacturer: "reliable", trimCondition: "good", waterMotorGongTest: "pass", remoteTransmissionResult: "pass", deficiencyNotes: "", comments: "", deficiencyPhoto: "" }
+            ],
+            alarmValveRowsReviewed: 0
           }
         },
         valves: {
@@ -1150,7 +1261,21 @@ describe("smart report foundations", () => {
         "alarm-devices": {
           status: "pass",
           notes: "",
-          fields: { recommendedRepairs: "Restore valve position and investigate supply change.", correctiveActionsCompleted: "", followUpRequired: true, overallInspectionResult: "follow_up_required", customerFacingSummary: "Two issues require follow-up." }
+          fields: { maintenancePerformedOnSite: true, maintenanceWorkSummary: "Trim adjustments completed.", recommendedRepairs: "Restore valve position and investigate supply change.", correctiveActionsCompleted: "", followUpRequired: true, overallInspectionResult: "follow_up_required", customerFacingSummary: "Two issues require follow-up." }
+        },
+        "system-photos": {
+          status: "pass",
+          notes: "",
+          fields: {
+            systemPhotos: [
+              { relatedSystem: "Riser A", caption: "Main drain setup", photo: "", comments: "" }
+            ]
+          }
+        },
+        "comment-sheet": {
+          status: "pass",
+          notes: "",
+          fields: { outOfScopeComments: "Dry system excluded.", customerRequests: "Quote trim replacement.", inspectorComments: "Quarterly and annual visit complete." }
         }
       },
       deficiencies: [],
@@ -1169,17 +1294,24 @@ describe("smart report foundations", () => {
     expect(normalized.sections["service-summary"]?.fields.systemsInspected).toBe(2);
     expect(normalized.sections["service-summary"]?.fields.controlValvesObserved).toBe(7);
     expect(normalized.sections["riser-room"]?.fields.weeklyItemsCompleted).toBe(3);
-    expect(normalized.sections["sprinkler-heads"]?.fields.monthlyItemsCompleted).toBe(4);
-    expect(normalized.sections["system-checklist"]?.fields.quarterlyItemsCompleted).toBe(4);
+    expect(normalized.sections["sprinkler-heads"]?.fields.monthlyItemsCompleted).toBe(5);
+    expect(normalized.sections["system-checklist"]?.fields.quarterlyInspectionItemsCompleted).toBe(3);
+    expect(normalized.sections["system-checklist"]?.fields.quarterlyTestItemsCompleted).toBe(3);
+    expect(normalized.sections["semi-annual"]?.fields.semiAnnualTestItemsCompleted).toBe(3);
+    expect(normalized.sections.annual?.fields.annualInspectionItemsCompleted).toBe(4);
+    expect(normalized.sections["five-year-internal"]?.fields.fiveYearInternalInspectionItemsCompleted).toBe(3);
+    expect(normalized.sections["five-year-test"]?.fields.fiveYearTestItemsCompleted).toBe(3);
     expect(normalized.sections["riser-room"]?.fields.weeklyDeficiencyCount).toBe(1);
-    expect(normalized.sections["system-checklist"]?.fields.quarterlyDeficiencyCount).toBe(1);
+    expect(normalized.sections["system-checklist"]?.fields.quarterlyTestDeficiencyCount).toBe(1);
     expect(normalized.sections.valves?.fields.deficiencyCount).toBe(2);
+    expect(normalized.sections["sprinkler-heads"]?.fields.sprinklerHeadRowsReviewed).toBe(1);
+    expect(normalized.sections["alarm-valves"]?.fields.alarmValveRowsReviewed).toBe(1);
 
     const invalidWetSprinklerDraft = validateDraftForTemplate({
       templateVersion: 1,
       inspectionType: "wet_fire_sprinkler",
       overallNotes: "",
-      sectionOrder: ["service-summary", "riser-room", "sprinkler-heads", "system-checklist", "valves", "alarm-devices"],
+      sectionOrder: ["service-summary", "riser-room", "sprinkler-heads", "system-checklist", "semi-annual", "annual", "five-year-internal", "five-year-test", "alarm-valves", "valves", "alarm-devices", "system-photos", "comment-sheet"],
       activeSectionId: "service-summary",
       sections: {
         "service-summary": {
@@ -1196,39 +1328,7 @@ describe("smart report foundations", () => {
             systemsInspected: 0,
             controlValvesObserved: 0
           }
-        },
-        "riser-room": {
-          status: "pending",
-          notes: "",
-          fields: {
-            weeklyItems: [],
-            weeklyItemsCompleted: 0,
-            weeklyDeficiencyCount: 0,
-            weeklySectionComments: ""
-          }
-        },
-        "sprinkler-heads": {
-          status: "pending",
-          notes: "",
-          fields: {
-            monthlyItems: [],
-            monthlyItemsCompleted: 0,
-            monthlyDeficiencyCount: 0,
-            monthlySectionComments: ""
-          }
-        },
-        "system-checklist": {
-          status: "pending",
-          notes: "",
-          fields: {
-            quarterlyItems: [],
-            quarterlyItemsCompleted: 0,
-            quarterlyDeficiencyCount: 0,
-            quarterlySectionComments: ""
-          }
-        },
-        valves: { status: "pending", notes: "", fields: { deficiencyCount: 0, impairmentObserved: false, systemOutOfService: false, impairmentSummary: "", notificationsMade: "" } },
-        "alarm-devices": { status: "pending", notes: "", fields: { recommendedRepairs: "", correctiveActionsCompleted: "", followUpRequired: false, overallInspectionResult: "", customerFacingSummary: "" } }
+        }
       },
       deficiencies: [],
       attachments: [],

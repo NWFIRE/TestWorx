@@ -1,10 +1,19 @@
-export type WetSprinklerRequirementFrequency = "weekly" | "monthly" | "quarterly";
+export type WetSprinklerRequirementGroupKey =
+  | "weekly_inspection"
+  | "monthly_inspection"
+  | "quarterly_inspection"
+  | "quarterly_test"
+  | "semi_annual_test"
+  | "annual_inspection"
+  | "five_year_internal_inspection"
+  | "five_year_test";
 
 export type WetSprinklerRequirementItem = {
   requirementKey: string;
   itemLabel: string;
   referenceLabel: string;
-  frequency: WetSprinklerRequirementFrequency;
+  frequencyLabel: string;
+  groupKey: WetSprinklerRequirementGroupKey;
   defaultSeverity?: "low" | "medium" | "high" | "critical";
 };
 
@@ -13,96 +22,245 @@ export type WetSprinklerRequirementProfile = {
   label: string;
   editionLabel: string;
   description: string;
-  items: Record<WetSprinklerRequirementFrequency, WetSprinklerRequirementItem[]>;
+  items: Record<WetSprinklerRequirementGroupKey, WetSprinklerRequirementItem[]>;
 };
 
 const nfpa25_2023_baseline: WetSprinklerRequirementProfile = {
   key: "nfpa25_2023_baseline",
   label: "NFPA 25 (2023 baseline)",
   editionLabel: "2023 baseline",
-  description: "Baseline weekly, monthly, and quarterly wet-pipe inspection checkpoints aligned to the current TradeWorx wet sprinkler workflow. Extend or swap this profile when a local AHJ adopts a different edition or amendment package.",
+  description: "Baseline wet-pipe inspection, testing, and maintenance checkpoints aligned to the current TradeWorx wet sprinkler workflow and the source inspection form. Extend or swap this profile when a local AHJ adopts a different edition or amendment package.",
   items: {
-    weekly: [
+    weekly_inspection: [
       {
         requirementKey: "weekly_control_valves_open",
-        itemLabel: "Verify control valves are in the normal open position and secured, locked, or electronically supervised as required.",
-        referenceLabel: "NFPA 25 weekly wet-pipe inspection baseline",
-        frequency: "weekly",
+        itemLabel: "Verify control valves are in the normal open position and secured, locked, sealed, or electronically supervised as required.",
+        referenceLabel: "Weekly wet-pipe inspection baseline",
+        frequencyLabel: "Weekly inspection",
+        groupKey: "weekly_inspection",
         defaultSeverity: "high"
       },
       {
         requirementKey: "weekly_gauges_normal",
-        itemLabel: "Confirm gauges indicate normal water supply and system pressure conditions with no abnormal fluctuation observed.",
-        referenceLabel: "NFPA 25 weekly wet-pipe inspection baseline",
-        frequency: "weekly",
+        itemLabel: "Confirm system and supply gauges indicate normal pressure conditions with no unexplained change from expected readings.",
+        referenceLabel: "Weekly wet-pipe inspection baseline",
+        frequencyLabel: "Weekly inspection",
+        groupKey: "weekly_inspection",
         defaultSeverity: "medium"
       },
       {
         requirementKey: "weekly_riser_room_condition",
-        itemLabel: "Inspect riser / valve room for leakage, corrosion, physical damage, freezing exposure, and general accessibility concerns.",
-        referenceLabel: "NFPA 25 weekly wet-pipe inspection baseline",
-        frequency: "weekly",
+        itemLabel: "Inspect the riser / valve room for leakage, corrosion, physical damage, freezing exposure, housekeeping, and access concerns.",
+        referenceLabel: "Weekly wet-pipe inspection baseline",
+        frequencyLabel: "Weekly inspection",
+        groupKey: "weekly_inspection",
         defaultSeverity: "high"
       }
     ],
-    monthly: [
+    monthly_inspection: [
       {
         requirementKey: "monthly_sprinklers_condition",
-        itemLabel: "Inspect accessible sprinklers for loading, corrosion, paint, damage, or obstruction to discharge patterns.",
-        referenceLabel: "NFPA 25 monthly wet-pipe inspection baseline",
-        frequency: "monthly",
+        itemLabel: "Inspect accessible sprinklers for loading, paint, corrosion, damage, missing escutcheons, or obstruction to discharge patterns.",
+        referenceLabel: "Monthly wet-pipe inspection baseline",
+        frequencyLabel: "Monthly inspection",
+        groupKey: "monthly_inspection",
         defaultSeverity: "high"
       },
       {
         requirementKey: "monthly_pipe_hangers_condition",
-        itemLabel: "Inspect visible piping, fittings, hangers, and seismic bracing for leaks, damage, loose supports, and impact concerns.",
-        referenceLabel: "NFPA 25 monthly wet-pipe inspection baseline",
-        frequency: "monthly",
+        itemLabel: "Inspect visible piping, fittings, hangers, and seismic bracing for leaks, impact damage, loose supports, or corrosion.",
+        referenceLabel: "Monthly wet-pipe inspection baseline",
+        frequencyLabel: "Monthly inspection",
+        groupKey: "monthly_inspection",
         defaultSeverity: "high"
       },
       {
         requirementKey: "monthly_spare_heads",
         itemLabel: "Verify spare sprinklers and the proper sprinkler wrench are provided, protected, and available at the site.",
-        referenceLabel: "NFPA 25 monthly wet-pipe inspection baseline",
-        frequency: "monthly",
+        referenceLabel: "Monthly wet-pipe inspection baseline",
+        frequencyLabel: "Monthly inspection",
+        groupKey: "monthly_inspection",
         defaultSeverity: "medium"
       },
       {
         requirementKey: "monthly_fdc_access",
-        itemLabel: "Inspect the fire department connection for accessibility, visible condition, caps / plugs, signage, and protection from damage.",
-        referenceLabel: "NFPA 25 monthly wet-pipe inspection baseline",
-        frequency: "monthly",
+        itemLabel: "Inspect the fire department connection for accessibility, caps / plugs, visible condition, signage, and protection from damage.",
+        referenceLabel: "Monthly wet-pipe inspection baseline",
+        frequencyLabel: "Monthly inspection",
+        groupKey: "monthly_inspection",
+        defaultSeverity: "medium"
+      },
+      {
+        requirementKey: "monthly_alarm_valve_exterior",
+        itemLabel: "Inspect alarm valve trim, drain arrangements, gauges, signage, and exterior condition where present on the wet system.",
+        referenceLabel: "Monthly wet-pipe inspection baseline",
+        frequencyLabel: "Monthly inspection",
+        groupKey: "monthly_inspection",
         defaultSeverity: "medium"
       }
     ],
-    quarterly: [
+    quarterly_inspection: [
+      {
+        requirementKey: "quarterly_valve_supervision_readiness",
+        itemLabel: "Confirm valve supervisory readiness, signage, and access at each wet system control point.",
+        referenceLabel: "Quarterly wet-pipe inspection baseline",
+        frequencyLabel: "Quarterly inspection",
+        groupKey: "quarterly_inspection",
+        defaultSeverity: "high"
+      },
+      {
+        requirementKey: "quarterly_alarm_devices_condition",
+        itemLabel: "Inspect local alarm devices, trim, and associated components for physical condition and readiness before testing.",
+        referenceLabel: "Quarterly wet-pipe inspection baseline",
+        frequencyLabel: "Quarterly inspection",
+        groupKey: "quarterly_inspection",
+        defaultSeverity: "medium"
+      },
+      {
+        requirementKey: "quarterly_hydraulic_nameplate_records",
+        itemLabel: "Verify required hydraulic nameplates, identification, and test record references are present and legible where applicable.",
+        referenceLabel: "Quarterly wet-pipe inspection baseline",
+        frequencyLabel: "Quarterly inspection",
+        groupKey: "quarterly_inspection",
+        defaultSeverity: "medium"
+      }
+    ],
+    quarterly_test: [
       {
         requirementKey: "quarterly_waterflow_test",
         itemLabel: "Perform and document waterflow alarm operation, including local indication and remote signal transmission where applicable.",
-        referenceLabel: "NFPA 25 quarterly wet-pipe testing baseline",
-        frequency: "quarterly",
+        referenceLabel: "Quarterly wet-pipe testing baseline",
+        frequencyLabel: "Quarterly test",
+        groupKey: "quarterly_test",
         defaultSeverity: "high"
       },
       {
         requirementKey: "quarterly_supervisory_test",
-        itemLabel: "Verify valve supervisory or tamper signal operation and confirm transmission to the supervising station when applicable.",
-        referenceLabel: "NFPA 25 quarterly wet-pipe testing baseline",
-        frequency: "quarterly",
+        itemLabel: "Verify valve supervisory / tamper signal operation and confirm transmission to the supervising station when applicable.",
+        referenceLabel: "Quarterly wet-pipe testing baseline",
+        frequencyLabel: "Quarterly test",
+        groupKey: "quarterly_test",
         defaultSeverity: "high"
       },
       {
         requirementKey: "quarterly_main_drain",
-        itemLabel: "Conduct the main drain test, compare to prior records when available, and note any adverse change in supply conditions.",
-        referenceLabel: "NFPA 25 quarterly wet-pipe testing baseline",
-        frequency: "quarterly",
+        itemLabel: "Conduct the main drain test, compare to prior records when available, and document any adverse change in supply conditions.",
+        referenceLabel: "Quarterly wet-pipe testing baseline",
+        frequencyLabel: "Quarterly test",
+        groupKey: "quarterly_test",
+        defaultSeverity: "high"
+      }
+    ],
+    semi_annual_test: [
+      {
+        requirementKey: "semiannual_mechanical_alarm",
+        itemLabel: "Test mechanical alarm devices, water motor gongs, or equivalent local alarm appliances where provided and required by the adopted profile.",
+        referenceLabel: "Semi-annual wet-pipe testing baseline",
+        frequencyLabel: "Semi-annual test",
+        groupKey: "semi_annual_test",
+        defaultSeverity: "medium"
+      },
+      {
+        requirementKey: "semiannual_drain_devices",
+        itemLabel: "Inspect and operate auxiliary or low-point drain arrangements where applicable, documenting drain condition and restoration to service.",
+        referenceLabel: "Semi-annual wet-pipe testing baseline",
+        frequencyLabel: "Semi-annual test",
+        groupKey: "semi_annual_test",
+        defaultSeverity: "medium"
+      },
+      {
+        requirementKey: "semiannual_alarm_valve_function",
+        itemLabel: "Verify alarm valve function, trim readiness, and associated control condition where semi-annual testing applies.",
+        referenceLabel: "Semi-annual wet-pipe testing baseline",
+        frequencyLabel: "Semi-annual test",
+        groupKey: "semi_annual_test",
+        defaultSeverity: "high"
+      }
+    ],
+    annual_inspection: [
+      {
+        requirementKey: "annual_system_walkthrough",
+        itemLabel: "Perform an annual visual system walkthrough for sprinklers, piping, hangers, bracing, signs, valves, and related wet system accessories.",
+        referenceLabel: "Annual wet-pipe inspection baseline",
+        frequencyLabel: "Annual inspection / test",
+        groupKey: "annual_inspection",
         defaultSeverity: "high"
       },
       {
-        requirementKey: "quarterly_valve_housekeeping",
-        itemLabel: "Confirm valve identification, access, signage, and physical readiness at each wet system riser or control valve assembly.",
-        referenceLabel: "NFPA 25 quarterly wet-pipe inspection baseline",
-        frequency: "quarterly",
+        requirementKey: "annual_fdc_components",
+        itemLabel: "Inspect the fire department connection body, clappers, plugs/caps, gaskets, and identification for annual readiness documentation.",
+        referenceLabel: "Annual wet-pipe inspection baseline",
+        frequencyLabel: "Annual inspection / test",
+        groupKey: "annual_inspection",
         defaultSeverity: "medium"
+      },
+      {
+        requirementKey: "annual_alarm_valve_trim",
+        itemLabel: "Inspect alarm valve trim, retard chamber, drains, and associated devices for annual condition and operability documentation.",
+        referenceLabel: "Annual wet-pipe inspection baseline",
+        frequencyLabel: "Annual inspection / test",
+        groupKey: "annual_inspection",
+        defaultSeverity: "medium"
+      },
+      {
+        requirementKey: "annual_spare_sprinkler_cabinet",
+        itemLabel: "Verify spare sprinkler cabinet stock, wrench compatibility, and temperature / listing suitability for the system hazards served.",
+        referenceLabel: "Annual wet-pipe inspection baseline",
+        frequencyLabel: "Annual inspection / test",
+        groupKey: "annual_inspection",
+        defaultSeverity: "medium"
+      }
+    ],
+    five_year_internal_inspection: [
+      {
+        requirementKey: "fiveyear_internal_pipe_obstruction",
+        itemLabel: "Document five-year internal inspection findings for obstruction, microbiologically influenced corrosion, tuberculation, or foreign material in piping.",
+        referenceLabel: "Five-year internal inspection baseline",
+        frequencyLabel: "Five-year internal inspection",
+        groupKey: "five_year_internal_inspection",
+        defaultSeverity: "high"
+      },
+      {
+        requirementKey: "fiveyear_internal_check_alarm_valves",
+        itemLabel: "Inspect check valves / alarm valves internally for corrosion, deposits, damage, and unrestricted movement where applicable.",
+        referenceLabel: "Five-year internal inspection baseline",
+        frequencyLabel: "Five-year internal inspection",
+        groupKey: "five_year_internal_inspection",
+        defaultSeverity: "high"
+      },
+      {
+        requirementKey: "fiveyear_internal_branch_samples",
+        itemLabel: "Record branch-line, drain, or auxiliary sample findings and any recommendation for additional internal investigation or flushing.",
+        referenceLabel: "Five-year internal inspection baseline",
+        frequencyLabel: "Five-year internal inspection",
+        groupKey: "five_year_internal_inspection",
+        defaultSeverity: "medium"
+      }
+    ],
+    five_year_test: [
+      {
+        requirementKey: "fiveyear_gauge_replacement",
+        itemLabel: "Document gauge replacement / calibration interval compliance and any five-year gauge service performed during this visit.",
+        referenceLabel: "Five-year wet-pipe testing baseline",
+        frequencyLabel: "Five-year test",
+        groupKey: "five_year_test",
+        defaultSeverity: "medium"
+      },
+      {
+        requirementKey: "fiveyear_component_testing",
+        itemLabel: "Record additional five-year wet system tests required by the adopted profile, including component-specific testing or investigation results.",
+        referenceLabel: "Five-year wet-pipe testing baseline",
+        frequencyLabel: "Five-year test",
+        groupKey: "five_year_test",
+        defaultSeverity: "high"
+      },
+      {
+        requirementKey: "fiveyear_followup_findings",
+        itemLabel: "Summarize five-year test findings, corrective work recommended, and any impairment, shutdown, or follow-up coordination triggered by the results.",
+        referenceLabel: "Five-year wet-pipe testing baseline",
+        frequencyLabel: "Five-year test",
+        groupKey: "five_year_test",
+        defaultSeverity: "high"
       }
     ]
   }
@@ -117,15 +275,16 @@ export function resolveWetSprinklerRequirementProfile(profileKey?: string | null
 }
 
 export function buildWetSprinklerChecklistSeedRows(
-  frequency: WetSprinklerRequirementFrequency,
+  groupKey: WetSprinklerRequirementGroupKey,
   profileKey?: string | null
 ) {
   const profile = resolveWetSprinklerRequirementProfile(profileKey);
-  return profile.items[frequency].map((item) => ({
+  return profile.items[groupKey].map((item) => ({
     requirementKey: item.requirementKey,
     itemLabel: item.itemLabel,
     referenceLabel: item.referenceLabel,
-    frequency: item.frequency,
+    frequencyLabel: item.frequencyLabel,
+    groupKey: item.groupKey,
     requirementProfileKey: profile.key,
     requirementEditionLabel: profile.editionLabel,
     result: "",
