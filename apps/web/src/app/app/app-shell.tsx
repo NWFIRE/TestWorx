@@ -32,36 +32,66 @@ function NavItem({
   compact: boolean;
   onNavigate?: () => void;
 }) {
+  const toneClasses: Record<NonNullable<AppNavItem["tone"]>, { idle: string; active: string; ring: string }> = {
+    blue: {
+      idle: "bg-sky-100 text-sky-700 group-hover:bg-sky-200",
+      active: "bg-white/18 text-white",
+      ring: "before:bg-sky-400"
+    },
+    amber: {
+      idle: "bg-amber-100 text-amber-700 group-hover:bg-amber-200",
+      active: "bg-white/18 text-white",
+      ring: "before:bg-amber-400"
+    },
+    emerald: {
+      idle: "bg-emerald-100 text-emerald-700 group-hover:bg-emerald-200",
+      active: "bg-white/18 text-white",
+      ring: "before:bg-emerald-400"
+    },
+    violet: {
+      idle: "bg-violet-100 text-violet-700 group-hover:bg-violet-200",
+      active: "bg-white/18 text-white",
+      ring: "before:bg-violet-400"
+    },
+    slate: {
+      idle: "bg-slate-100 text-slate-700 group-hover:bg-slate-200",
+      active: "bg-white/18 text-white",
+      ring: "before:bg-slate-300"
+    }
+  };
+  const tone = toneClasses[item.tone ?? "blue"];
+
   return (
     <Link
       aria-current={active ? "page" : undefined}
       aria-label={item.label}
-      className={`group relative flex min-h-12 min-w-0 items-center gap-3 overflow-hidden rounded-xl border px-3 py-3 text-sm font-semibold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2 motion-reduce:transition-none ${
+      className={`group relative flex min-h-12 min-w-0 items-center gap-3 overflow-hidden rounded-2xl border px-3 py-3 text-sm font-semibold outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2 motion-reduce:transition-none before:absolute before:bottom-2 before:left-1.5 before:top-2 before:w-1 before:rounded-full before:opacity-0 ${
         active
-          ? "border-slateblue bg-slateblue text-white shadow-sm"
+          ? "border-transparent bg-gradient-to-r from-slateblue to-[#3f78cc] text-white shadow-[0_18px_36px_rgba(36,82,146,0.22)] before:opacity-100"
           : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-white hover:text-ink"
-      } ${collapsed ? "justify-center px-2" : ""} ${compact ? "min-h-[48px]" : ""}`}
+      } ${tone.ring} ${collapsed ? "justify-center px-2" : ""} ${compact ? "min-h-[48px]" : ""}`}
       href={item.href}
       onClick={onNavigate}
       title={collapsed ? item.label : undefined}
     >
-      {collapsed ? (
-        <span
-          aria-hidden="true"
-          className={`absolute left-1 top-1/2 h-7 w-1 -translate-y-1/2 rounded-full ${
-            active ? "bg-white/90" : "bg-transparent"
-          }`}
-        />
-      ) : null}
       <span
         aria-hidden="true"
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold uppercase tracking-[0.16em] ${
-          active ? "bg-white/15 text-white" : "bg-slate-100 text-slate-600 group-hover:bg-slate-200"
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[11px] font-bold uppercase tracking-[0.16em] ${
+          active ? tone.active : tone.idle
         }`}
       >
         <span className="flex h-5 w-5 items-center justify-center">{item.abbreviation}</span>
       </span>
-      {!collapsed ? <span className="min-w-0 truncate">{item.shortLabel}</span> : null}
+      {!collapsed ? (
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold">{item.shortLabel}</span>
+          {item.description ? (
+            <span className={`mt-0.5 block truncate text-xs font-medium ${active ? "text-white/80" : "text-slate-400 group-hover:text-slate-500"}`}>
+              {item.description}
+            </span>
+          ) : null}
+        </span>
+      ) : null}
     </Link>
   );
 }
@@ -74,14 +104,15 @@ function BrandBlock({
   collapsed: boolean;
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-3 overflow-hidden">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slateblue text-sm font-bold uppercase tracking-[0.18em] text-white">
-        TW
+    <div className={`flex min-w-0 items-center gap-3 overflow-hidden ${collapsed ? "justify-center" : ""}`}>
+      <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[18px] bg-gradient-to-br from-slateblue via-[#3473c6] to-[#f06d22] text-sm font-bold uppercase tracking-[0.18em] text-white shadow-[0_14px_28px_rgba(39,90,160,0.22)]">
+        <span className="absolute inset-[1px] rounded-[17px] bg-gradient-to-br from-[#1d4677] via-[#2d69b7] to-[#f06d22]/90" />
+        <span className="relative">TW</span>
       </div>
       {!collapsed ? (
         <div className="min-w-0 overflow-hidden">
-          <p className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">TradeWorx</p>
-          <p className="truncate text-sm font-semibold text-ink">{currentItem?.label ?? "Workspace"}</p>
+          <p className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">TradeWorx</p>
+          <p className="truncate text-base font-semibold text-slate-950">{currentItem?.label ?? "Workspace"}</p>
         </div>
       ) : null}
     </div>
@@ -105,17 +136,23 @@ function NavSection({
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className={`min-w-0 border-b border-slate-200 px-4 pb-4 pt-5 ${collapsed ? "px-2 text-center" : ""}`}>
+      <div className={`min-w-0 px-4 pb-4 pt-5 ${collapsed ? "px-2 text-center" : ""}`}>
         {!collapsed ? (
-          <>
-            <p className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Workspace</p>
-            <p className="mt-2 truncate text-sm font-medium text-slate-600">{currentItem?.label ?? "Workspace"}</p>
-          </>
+          <div className="rounded-[20px] border border-slate-200 bg-white px-4 py-3 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+            <p className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Workspace</p>
+            <p className="mt-2 truncate text-sm font-semibold text-slate-900">{currentItem?.label ?? "Workspace"}</p>
+            <p className="mt-1 truncate text-xs text-slate-500">Operational control center</p>
+          </div>
         ) : (
-          <div className="h-6" aria-hidden="true" />
+          <div className="flex justify-center">
+            <div className="h-px w-8 rounded-full bg-slate-200" aria-hidden="true" />
+          </div>
         )}
       </div>
-      <nav aria-label="Primary navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+      <nav aria-label="Primary navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        {!collapsed ? (
+          <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Operations</p>
+        ) : null}
         <div className="space-y-2">
           {navItems.map((item) => (
             <NavItem
@@ -130,7 +167,16 @@ function NavSection({
         </div>
       </nav>
       <div className={`shrink-0 px-4 pb-5 pt-3 ${collapsed ? "px-2" : ""}`}>
-        {!collapsed ? <div className="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-500">Workspace navigation</div> : <div className="h-8" aria-hidden="true" />}
+        {!collapsed ? (
+          <div className="rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+            <p className="font-semibold text-slate-700">Daily flow</p>
+            <p className="mt-1 leading-5">Dispatch work, review issues, close billing, and tune settings from one workspace.</p>
+          </div>
+        ) : (
+          <div className="flex justify-center">
+            <div className="h-px w-8 rounded-full bg-slate-200" aria-hidden="true" />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -229,33 +275,36 @@ export function AppShell({
       {navItems.length > 0 ? (
         <aside
           aria-label="Primary navigation"
-          className={`hidden overflow-hidden border-r border-slate-200 bg-white transition-[width] duration-200 motion-reduce:transition-none lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col ${
+          className={`hidden overflow-hidden border-r border-slate-200 bg-[#f8fafc] transition-[width] duration-200 motion-reduce:transition-none lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col ${
             sidebarCollapsed ? "lg:w-[72px]" : "lg:w-64"
           }`}
         >
-          <div className={`border-b border-slate-200 ${sidebarCollapsed ? "px-2 py-3" : "px-4 py-4"}`}>
-            <BrandBlock collapsed={sidebarCollapsed} currentItem={currentItem} />
-            {!sidebarCollapsed ? (
-              <button
-                aria-label="Collapse sidebar"
-                className="mt-3 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 outline-none transition-colors hover:border-slate-300 hover:text-ink focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2"
-                onClick={() => setSidebarCollapsed(true)}
-                type="button"
-              >
-                <span aria-hidden="true">&lt;</span>
-              </button>
-            ) : (
+          <div className={`border-b border-slate-200/90 bg-white/80 backdrop-blur ${sidebarCollapsed ? "px-2 py-3" : "px-4 py-4"}`}>
+            <div className={`flex items-start ${sidebarCollapsed ? "justify-center" : "justify-between gap-3"}`}>
+              <BrandBlock collapsed={sidebarCollapsed} currentItem={currentItem} />
+              {!sidebarCollapsed ? (
+                <button
+                  aria-label="Collapse sidebar"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 outline-none transition-colors hover:border-slate-300 hover:text-ink focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2"
+                  onClick={() => setSidebarCollapsed(true)}
+                  type="button"
+                >
+                  <span aria-hidden="true">&lt;</span>
+                </button>
+              ) : null}
+            </div>
+            {sidebarCollapsed ? (
               <div className="mt-3 flex justify-center">
                 <button
                   aria-label="Expand sidebar"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 outline-none transition-colors hover:border-slate-300 hover:text-ink focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 outline-none transition-colors hover:border-slate-300 hover:text-ink focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2"
                   onClick={() => setSidebarCollapsed(false)}
                   type="button"
                 >
                   <span aria-hidden="true">&gt;</span>
                 </button>
               </div>
-            )}
+            ) : null}
           </div>
           <NavSection collapsed={sidebarCollapsed} compact={false} currentItem={currentItem} navItems={navItems} pathname={pathname} />
         </aside>
@@ -273,7 +322,7 @@ export function AppShell({
           <aside
             aria-label="Primary navigation"
             aria-modal={drawerOpen}
-            className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[min(320px,86vw)] flex-col overflow-hidden border-r border-slate-200 bg-white shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none lg:hidden ${
+            className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[min(320px,86vw)] flex-col overflow-hidden border-r border-slate-200 bg-[#f8fafc] shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none lg:hidden ${
               drawerOpen ? "translate-x-0 visible" : "-translate-x-full invisible"
             }`}
             ref={drawerRef}
@@ -283,7 +332,7 @@ export function AppShell({
               paddingBottom: "max(0rem, env(safe-area-inset-bottom))"
             }}
           >
-            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-4">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white/85 px-4 py-4 backdrop-blur">
               <BrandBlock collapsed={false} currentItem={currentItem} />
               <button
                 aria-label="Close navigation"
@@ -325,7 +374,7 @@ export function AppShell({
                 </button>
               ) : null}
               <div className="min-w-0">
-                <p className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Workspace</p>
+                <p className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Workspace</p>
                 <h1 className="truncate text-lg font-semibold text-ink">{currentItem?.label ?? user.name ?? "Workspace"}</h1>
               </div>
             </div>

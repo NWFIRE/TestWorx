@@ -3,6 +3,8 @@ export type AppNavItem = {
   label: string;
   shortLabel: string;
   abbreviation: string;
+  description?: string;
+  tone?: "blue" | "amber" | "emerald" | "violet" | "slate";
   matchMode?: "exact" | "prefix";
   matchPrefixes?: string[];
 };
@@ -13,6 +15,8 @@ const adminNavItems: AppNavItem[] = [
     label: "Scheduling / Dispatch",
     shortLabel: "Scheduling",
     abbreviation: "SD",
+    description: "Visits, assignment, and active queue",
+    tone: "blue",
     matchMode: "exact",
     matchPrefixes: ["/app/admin/inspections", "/app/admin/reports"]
   },
@@ -20,25 +24,33 @@ const adminNavItems: AppNavItem[] = [
     href: "/app/admin/amendments",
     label: "Amendment Center",
     shortLabel: "Amendments",
-    abbreviation: "AC"
+    abbreviation: "AC",
+    description: "Replacements and superseded visits",
+    tone: "violet"
   },
   {
     href: "/app/deficiencies",
     label: "Deficiency Center",
     shortLabel: "Deficiencies",
-    abbreviation: "DC"
+    abbreviation: "DC",
+    description: "Quotes, approvals, and open issues",
+    tone: "amber"
   },
   {
     href: "/app/admin/billing",
     label: "Billing Review",
     shortLabel: "Billing",
-    abbreviation: "BR"
+    abbreviation: "BR",
+    description: "Review line items and invoicing",
+    tone: "emerald"
   },
   {
     href: "/app/admin/settings",
     label: "Settings / Service Fees",
     shortLabel: "Settings",
-    abbreviation: "SF"
+    abbreviation: "SF",
+    description: "Catalog, customers, and service fees",
+    tone: "slate"
   }
 ];
 
@@ -50,7 +62,9 @@ const navByRole: Record<string, AppNavItem[]> = {
       href: "/app/platform",
       label: "Platform Admin",
       shortLabel: "Platform",
-      abbreviation: "PA"
+      abbreviation: "PA",
+      description: "Cross-tenant controls and oversight",
+      tone: "slate"
     },
     ...adminNavItems
   ],
@@ -60,6 +74,8 @@ const navByRole: Record<string, AppNavItem[]> = {
       label: "Field Schedule",
       shortLabel: "Schedule",
       abbreviation: "FS",
+      description: "Assigned work, reports, and documents",
+      tone: "blue",
       matchMode: "exact",
       matchPrefixes: ["/app/tech/inspections", "/app/tech/reports"]
     }
@@ -70,6 +86,8 @@ const navByRole: Record<string, AppNavItem[]> = {
       label: "Customer Portal",
       shortLabel: "Portal",
       abbreviation: "CP",
+      description: "Reports, documents, and history",
+      tone: "emerald",
       matchMode: "exact",
       matchPrefixes: ["/app/customer/reports"]
     }
