@@ -505,24 +505,43 @@ function resolvePrefillValue(
 
 function createRepeaterSeedRows(field: Extract<ReportFieldDefinition, { type: "repeater" }>, sectionId: string, context: SmartBuildContext) {
   const assets = field.repeatableSource === "siteAssets" ? filterAssetsForField(context.assets, field.assetFilter) : [];
-  if (assets.length === 0) {
-    return [];
+  if (assets.length > 0) {
+    return assets.map((asset) => {
+      const priorRow = getPriorRowForAsset(context.priorDraft, sectionId, field.id, field.rowIdentityField, asset);
+      const row: ReportRepeaterRow = {};
+      for (const rowField of field.rowFields) {
+        const value = resolvePrefillValue(rowField, { context, sectionId, asset, priorRow }) ?? defaultPrimitiveFieldValue(rowField.type);
+        row[rowField.id] = value;
+      }
+
+      const withIdentity = isEmptyValue(row.assetId) ? { ...row, assetId: asset.id } : row;
+      return applyRepeaterRowEnhancements(
+        field.rowFields,
+        applyFieldMappings(field.rowFields, withIdentity, field.rowFields.map((rowField) => rowField.id))
+      );
+    });
   }
 
-  return assets.map((asset) => {
-    const priorRow = getPriorRowForAsset(context.priorDraft, sectionId, field.id, field.rowIdentityField, asset);
-    const row: ReportRepeaterRow = {};
-    for (const rowField of field.rowFields) {
-      const value = resolvePrefillValue(rowField, { context, sectionId, asset, priorRow }) ?? defaultPrimitiveFieldValue(rowField.type);
-      row[rowField.id] = value;
-    }
+  const priorRepeater = context.priorDraft?.sections?.[sectionId]?.fields?.[field.id];
+  const priorRows = Array.isArray(priorRepeater)
+    ? priorRepeater.filter((row) => isRecord(row)) as Array<Record<string, unknown>>
+    : [];
 
-    const withIdentity = isEmptyValue(row.assetId) ? { ...row, assetId: asset.id } : row;
-    return applyRepeaterRowEnhancements(
-      field.rowFields,
-      applyFieldMappings(field.rowFields, withIdentity, field.rowFields.map((rowField) => rowField.id))
-    );
-  });
+  return normalizeRepeaterRows(
+    field,
+    (field.seedRows ?? []).map((row) => {
+      const priorRow = priorRows.find((candidate) => {
+        const candidateRequirementKey = asPrimitiveValue(candidate.requirementKey);
+        const candidateItemLabel = asPrimitiveValue(candidate.itemLabel);
+        return (
+          (!isEmptyValue(candidateRequirementKey) && candidateRequirementKey === row.requirementKey) ||
+          (!isEmptyValue(candidateItemLabel) && candidateItemLabel === row.itemLabel)
+        );
+      });
+
+      return priorRow ? { ...row, ...priorRow } : row;
+    })
+  );
 }
 
 function buildSectionFields(section: ReportTemplateDefinition["sections"][number], currentSection: DraftSectionState | undefined, context: SmartBuildContext) {
@@ -1090,6 +1109,8 @@ export function canFinalizeReport(actorRole: UserRole | string, reportStatus: Re
 }
 
 export function describeRepeaterRowLabel(row: Record<string, ReportPrimitiveValue>, rowIndex: number) {
+  const itemLabel = typeof row.itemLabel === "string" && row.itemLabel ? row.itemLabel : null;
+  const systemIdentifier = typeof row.systemIdentifier === "string" && row.systemIdentifier ? row.systemIdentifier : null;
   const location = typeof row.location === "string" && row.location ? row.location : null;
   const fixtureType = typeof row.fixtureType === "string" && row.fixtureType ? row.fixtureType : null;
   const appliance = typeof row.appliance === "string" && row.appliance ? row.appliance : null;
@@ -1098,6 +1119,14 @@ export function describeRepeaterRowLabel(row: Record<string, ReportPrimitiveValu
   const componentType = typeof row.componentType === "string" && row.componentType ? row.componentType : null;
   const protectedProcess = typeof row.protectedProcess === "string" && row.protectedProcess ? row.protectedProcess : null;
   const assemblyType = typeof row.assemblyType === "string" && row.assemblyType ? row.assemblyType : null;
+
+  if (itemLabel) {
+    return itemLabel;
+  }
+
+  if (systemIdentifier) {
+    return systemIdentifier;
+  }
 
   if (fixtureType && location) {
     return `${fixtureType} at ${location}`;

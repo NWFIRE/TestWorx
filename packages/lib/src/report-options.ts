@@ -1,4 +1,5 @@
 import type { ReportAssetRecord, ReportOption, ReportPrimitiveValue } from "./report-config";
+import { wetSprinklerRequirementProfiles } from "./report-requirements";
 
 export type ReportOptionProviderKey =
   | "passFail"
@@ -39,8 +40,9 @@ export type ReportOptionProviderKey =
   | "physicalConditionOptions"
   | "fireAlarmOverallStatusOptions"
   | "sprinklerComponentTypes"
-  | "sprinklerServiceTypes"
-  | "inspectionTagStatusOptions"
+  | "wetSprinklerRequirementProfiles"
+  | "wetSprinklerVisitScopeOptions"
+  | "wetSprinklerOverallResultOptions"
   | "assetSelect";
 
 const passFailOptions: ReportOption[] = [
@@ -301,19 +303,28 @@ const sprinklerComponentTypes: ReportOption[] = [
   { label: "Alarm gong", value: "alarm_gong" }
 ];
 
-const sprinklerServiceTypes: ReportOption[] = [
-  { label: "Weekly", value: "weekly" },
-  { label: "Monthly", value: "monthly" },
-  { label: "Quarterly", value: "quarterly" },
-  { label: "Semi-annual", value: "semi_annual" },
-  { label: "Annual", value: "annual" },
-  { label: "5-year internal", value: "five_year_internal" }
+const wetSprinklerRequirementProfileOptions: ReportOption[] = wetSprinklerRequirementProfiles.map((profile) => ({
+  label: profile.label,
+  value: profile.key,
+  metadata: {
+    editionLabel: profile.editionLabel,
+    description: profile.description
+  }
+}));
+
+const wetSprinklerVisitScopeOptions: ReportOption[] = [
+  { label: "Weekly visit", value: "weekly" },
+  { label: "Monthly visit", value: "monthly" },
+  { label: "Quarterly visit", value: "quarterly" },
+  { label: "Combined visit", value: "combined" }
 ];
 
-const inspectionTagStatusOptions: ReportOption[] = [
-  { label: "Green", value: "green" },
-  { label: "Yellow", value: "yellow" },
-  { label: "Red", value: "red" }
+const wetSprinklerOverallResultOptions: ReportOption[] = [
+  { label: "Pass", value: "pass" },
+  { label: "Pass with deficiencies", value: "pass_with_deficiencies" },
+  { label: "Impairment noted", value: "impairment_noted" },
+  { label: "Out of service", value: "out_of_service" },
+  { label: "Follow-up required", value: "follow_up_required" }
 ];
 
 export const reportOptionProviders = {
@@ -355,8 +366,9 @@ export const reportOptionProviders = {
   physicalConditionOptions,
   fireAlarmOverallStatusOptions,
   sprinklerComponentTypes,
-  sprinklerServiceTypes,
-  inspectionTagStatusOptions
+  wetSprinklerRequirementProfiles: wetSprinklerRequirementProfileOptions,
+  wetSprinklerVisitScopeOptions,
+  wetSprinklerOverallResultOptions
 } satisfies Record<Exclude<ReportOptionProviderKey, "assetSelect">, ReportOption[]>;
 
 function coerceMetadata(value: unknown): ReportPrimitiveValue {

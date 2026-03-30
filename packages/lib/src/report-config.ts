@@ -3,6 +3,7 @@ import type { InspectionType } from "@testworx/types";
 import type { ReportCalculationKey } from "./report-calculations";
 import { resolveOptionProvider } from "./report-options";
 import type { ReportOptionProviderKey } from "./report-options";
+import { buildWetSprinklerChecklistSeedRows } from "./report-requirements";
 
 export type ReportPrimitiveValue = string | number | boolean | null;
 
@@ -232,6 +233,7 @@ export type ReportFieldDefinition =
       completionFieldIds?: string[];
       deficiencyFieldId?: string;
       deficiencyFieldIds?: string[];
+      seedRows?: Array<Record<string, ReportPrimitiveValue>>;
       rowFields: Array<Exclude<ReportFieldDefinition, { type: "repeater" }>>;
     });
 
@@ -1008,7 +1010,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
   },
   wet_fire_sprinkler: {
     label: "Wet fire sprinkler",
-    description: "Wet system service metadata, sprinkler heads, risers, valves, alarms, and operational checkpoints.",
+    description: "Frequency-aware wet pipe inspection workflow with contextual system data, weekly/monthly/quarterly checkpoints, impairments, and follow-up documentation.",
     pdf: {
       subtitle: "Wet Fire Sprinkler Inspection Report",
       nfpaReferences: ["NFPA 13", "NFPA 25"]
@@ -1016,27 +1018,27 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
     sections: [
       {
         id: "service-summary",
-        label: "Service summary",
-        description: "Capture the service interval, inspection tag status, and key customer-facing summary details from the sprinkler report.",
+        label: "System context",
+        description: "Capture the adopted requirement profile, visit scope, key customer contact details, and the wet sprinkler systems covered during this visit.",
         fields: [
           {
-            id: "typeOfService",
-            label: "Type of service",
+            id: "requirementProfile",
+            label: "Requirement profile",
             type: "select",
-            optionProvider: "sprinklerServiceTypes",
+            optionProvider: "wetSprinklerRequirementProfiles",
             prefill: [
-              { source: "priorField", sectionId: "service-summary", fieldId: "typeOfService" },
-              { source: "reportDefault", value: "annual" }
+              { source: "priorField", sectionId: "service-summary", fieldId: "requirementProfile" },
+              { source: "reportDefault", value: "nfpa25_2023_baseline" }
             ]
           },
           {
-            id: "tagStatus",
-            label: "Tag status",
+            id: "visitScope",
+            label: "Visit scope",
             type: "select",
-            optionProvider: "inspectionTagStatusOptions",
+            optionProvider: "wetSprinklerVisitScopeOptions",
             prefill: [
-              { source: "priorField", sectionId: "service-summary", fieldId: "tagStatus" },
-              { source: "reportDefault", value: "green" }
+              { source: "priorField", sectionId: "service-summary", fieldId: "visitScope" },
+              { source: "reportDefault", value: "quarterly" }
             ]
           },
           {
@@ -1054,28 +1056,34 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
             prefill: [{ source: "priorField", sectionId: "service-summary", fieldId: "inspectorLicense" }]
           },
           {
-            id: "systemSummary",
-            label: "System summary",
+            id: "buildingArea",
+            label: "Building / area",
             type: "text",
-            placeholder: "Summarize system condition, coverage notes, and major observations from the wet sprinkler inspection.",
-            prefill: [{ source: "priorField", sectionId: "service-summary", fieldId: "systemSummary" }]
-          }
-        ]
-      },
-      {
-        id: "riser-room",
-        label: "Riser room",
-        description: "Inspect riser assembly, gauges, and room condition.",
-        fields: [
+            placeholder: "Warehouse, tower, wing, or protected area",
+            prefill: [
+              { source: "priorField", sectionId: "service-summary", fieldId: "buildingArea" },
+              { source: "siteDefault", key: "siteName" }
+            ]
+          },
           {
-            id: "sprinklerComponents",
-            label: "Sprinkler components",
-            description: "Track risers, valves, and flow devices inspected for this wet system.",
+            id: "serviceSummary",
+            label: "Visit summary",
+            type: "text",
+            placeholder: "Summarize systems covered, access conditions, and any important coordination notes for the inspection record.",
+            prefill: [
+              { source: "priorField", sectionId: "service-summary", fieldId: "serviceSummary" },
+              { source: "priorField", sectionId: "service-summary", fieldId: "systemSummary" }
+            ]
+          },
+          {
+            id: "systemZones",
+            label: "Wet sprinkler systems / risers",
+            description: "Identify each wet sprinkler system, riser, or primary assembly covered during this visit.",
             type: "repeater",
-            addLabel: "Add sprinkler component",
+            addLabel: "Add system / riser",
             repeatableSource: "siteAssets",
             rowIdentityField: "assetId",
-            validation: [{ type: "minRows", value: 1, message: "Add at least one wet sprinkler component before finalizing." }],
+            validation: [{ type: "minRows", value: 1, message: "Add at least one wet sprinkler system or riser before finalizing." }],
             rowFields: [
               {
                 id: "assetId",
@@ -1087,61 +1095,146 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
                     source: "optionMetadata",
                     targets: [
                       { fieldId: "assetTag", sourceKey: "assetTag", mode: "always" },
+                      { fieldId: "systemIdentifier", sourceKey: "assetName", mode: "if_empty" },
                       { fieldId: "location", sourceKey: "location", mode: "always" },
                       { fieldId: "componentType", sourceKey: "componentType", mode: "if_empty" },
-                      { fieldId: "valveCount", sourceKey: "valveCount", mode: "if_empty" }
+                      { fieldId: "controlValveCount", sourceKey: "valveCount", mode: "if_empty" }
                     ]
                   }
                 ]
               },
+              { id: "assetTag", label: "Asset tag", type: "text", placeholder: "SPR-200", prefill: [{ source: "asset", key: "assetTag" }] },
+              { id: "systemIdentifier", label: "System / riser ID", type: "text", placeholder: "Wet riser A", prefill: [{ source: "asset", key: "name" }] },
+              { id: "location", label: "Location", type: "text", placeholder: "Central riser room", prefill: [{ source: "assetMetadata", key: "location" }, { source: "siteDefault", key: "siteName" }] },
+              { id: "componentType", label: "Primary component", type: "select", optionProvider: "sprinklerComponentTypes", prefill: [{ source: "assetMetadata", key: "componentType" }] },
+              { id: "controlValveCount", label: "Control valves", type: "number", placeholder: "0", prefill: [{ source: "assetMetadata", key: "valveCount" }] },
+              { id: "comments", label: "Inspector comments", type: "text", placeholder: "Zone coverage, riser ID notes, access limitations, or coordination details" }
+            ]
+          },
+          {
+            id: "systemsInspected",
+            label: "Systems / risers inspected",
+            type: "number",
+            calculation: { key: "assetCountFromRepeater", sourceFieldId: "systemZones" },
+            readOnly: true
+          },
+          {
+            id: "controlValvesObserved",
+            label: "Control valves observed",
+            type: "number",
+            calculation: { key: "sumNumberFieldFromRepeater", sourceFieldId: "systemZones", rowFieldId: "controlValveCount" },
+            readOnly: true
+          },
+          {
+            id: "systemSummary",
+            label: "Legacy system summary",
+            type: "text",
+            hidden: true,
+            prefill: [{ source: "priorField", sectionId: "service-summary", fieldId: "systemSummary" }]
+          }
+        ]
+      },
+      {
+        id: "riser-room",
+        label: "Weekly inspection items",
+        description: "Work through the weekly wet-pipe checkpoints and record the result, deficiency details, corrective action, comments, and a supporting photo when needed.",
+        fields: [
+          {
+            id: "weeklyItems",
+            label: "Weekly items",
+            type: "repeater",
+            addLabel: "Add weekly item",
+            bulkActions: [
+              { id: "mark_all_pass", label: "Mark All Pass", targets: [{ fieldId: "result", value: "pass" }] },
+              { id: "mark_all_na", label: "Mark All N/A", targets: [{ fieldId: "result", value: "na" }] },
+              { id: "clear_results", label: "Clear Results", targets: [{ fieldId: "result", value: "" }] }
+            ],
+            completionFieldIds: ["result"],
+            deficiencyFieldId: "result",
+            seedRows: buildWetSprinklerChecklistSeedRows("weekly"),
+            rowFields: [
+              { id: "requirementKey", label: "Requirement key", type: "text", hidden: true, readOnly: true },
+              { id: "frequency", label: "Frequency", type: "text", hidden: true, readOnly: true },
+              { id: "requirementProfileKey", label: "Requirement profile", type: "text", hidden: true, readOnly: true },
+              { id: "requirementEditionLabel", label: "Requirement edition", type: "text", hidden: true, readOnly: true },
+              { id: "itemLabel", label: "Inspection item", type: "text", readOnly: true },
+              { id: "referenceLabel", label: "Reference", type: "text", readOnly: true },
               {
-                id: "assetTag",
-                label: "Asset tag",
-                type: "text",
-                placeholder: "SPR-200",
-                prefill: [
-                  { source: "asset", key: "assetTag" },
-                  { source: "priorField", sectionId: "riser-room", fieldId: "assetTag" }
-                ]
-              },
-              {
-                id: "location",
-                label: "Location",
-                type: "text",
-                placeholder: "Central riser room",
-                prefill: [
-                  { source: "assetMetadata", key: "location" },
-                  { source: "priorField", sectionId: "riser-room", fieldId: "location" },
-                  { source: "siteDefault", key: "siteName" }
-                ]
-              },
-              {
-                id: "componentType",
-                label: "Component type",
+                id: "result",
+                label: "Result",
                 type: "select",
-                optionProvider: "sprinklerComponentTypes",
-                prefill: [
-                  { source: "assetMetadata", key: "componentType" },
-                  { source: "priorField", sectionId: "riser-room", fieldId: "componentType" }
-                ]
+                optionProvider: "passFailNA"
               },
               {
-                id: "valveCount",
-                label: "Associated valve count",
-                type: "number",
-                placeholder: "0",
-                prefill: [
-                  { source: "assetMetadata", key: "valveCount" },
-                  { source: "priorField", sectionId: "riser-room", fieldId: "valveCount" }
-                ]
-              }
+                id: "deficiencySeverity",
+                label: "Deficiency severity",
+                type: "select",
+                hidden: true,
+                optionProvider: "deficiencySeverityOptions"
+              },
+              { id: "deficiencyNotes", label: "Deficiency notes", type: "text", placeholder: "Describe the deficiency, impairment, or exception noted for this item" },
+              { id: "correctiveAction", label: "Corrective action notes", type: "text", placeholder: "Document repairs made, interim safeguards, or corrective action recommended" },
+              { id: "comments", label: "Inspector comments", type: "text", placeholder: "Capture readings, observations, access limits, or supporting notes" },
+              { id: "deficiencyPhoto", label: "Item photo", type: "photo" }
+            ]
+          },
+          {
+            id: "weeklyItemsCompleted",
+            label: "Weekly items completed",
+            type: "number",
+            calculation: {
+              key: "countRowsMatchingAnyValues",
+              sourceFieldId: "weeklyItems",
+              rowFieldIds: ["result"],
+              values: ["pass", "fail", "na"]
+            },
+            readOnly: true
+          },
+          {
+            id: "weeklyDeficiencyCount",
+            label: "Weekly deficiencies",
+            type: "number",
+            calculation: {
+              key: "countRowsMatchingAnyValues",
+              sourceFieldId: "weeklyItems",
+              rowFieldIds: ["result"],
+              values: ["fail", "deficiency"]
+            },
+            readOnly: true
+          },
+          {
+            id: "weeklySectionComments",
+            label: "Weekly section comments",
+            type: "text",
+            placeholder: "Summarize the weekly inspection pass, any access limitations, and important observations for the customer record.",
+            prefill: [{ source: "priorField", sectionId: "riser-room", fieldId: "weeklySectionComments" }]
+          },
+          {
+            id: "sprinklerComponents",
+            label: "Legacy sprinkler components",
+            type: "repeater",
+            hidden: true,
+            addLabel: "Add sprinkler component",
+            repeatableSource: "siteAssets",
+            rowIdentityField: "assetId",
+            validation: [{ type: "minRows", value: 1, message: "Add at least one wet sprinkler component before finalizing." }],
+            rowFields: [
+              {
+                id: "assetId",
+                label: "Linked asset",
+                type: "select",
+                optionProvider: "assetSelect"
+              },
+              { id: "assetTag", label: "Asset tag", type: "text", placeholder: "SPR-200" },
+              { id: "location", label: "Location", type: "text", placeholder: "Central riser room" },
+              { id: "componentType", label: "Component type", type: "select", optionProvider: "sprinklerComponentTypes" },
+              { id: "valveCount", label: "Associated valve count", type: "number", placeholder: "0" }
             ]
           },
           {
             id: "componentsInspected",
-            label: "Sprinkler components inspected",
+            label: "Legacy sprinkler components inspected",
             type: "number",
-            placeholder: "0",
             calculation: { key: "assetCountFromRepeater", sourceFieldId: "sprinklerComponents" },
             readOnly: true
           },
@@ -1150,12 +1243,14 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
             label: "Riser condition",
             type: "select",
             optionProvider: "passFail",
+            hidden: true,
             prefill: [{ source: "priorField", sectionId: "riser-room", fieldId: "riserCondition" }]
           },
           {
             id: "gaugesNormal",
             label: "Gauges normal",
             type: "boolean",
+            hidden: true,
             prefill: [{ source: "priorField", sectionId: "riser-room", fieldId: "gaugesNormal" }]
           },
           {
@@ -1163,73 +1258,103 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
             label: "Main drain test completed",
             type: "select",
             optionProvider: "yesNoNA",
+            hidden: true,
             prefill: [{ source: "priorField", sectionId: "riser-room", fieldId: "mainDrainCompleted" }]
           },
           {
             id: "drainTestNotes",
             label: "Drain test notes",
             type: "text",
+            hidden: true,
             placeholder: "Static/residual pressure, drain observations, and restoration notes",
             prefill: [{ source: "priorField", sectionId: "riser-room", fieldId: "drainTestNotes" }]
           },
-          { id: "roomNotes", label: "Riser room notes", type: "text", placeholder: "Leaks, corrosion, clearance, temperature" }
+          { id: "roomNotes", label: "Riser room notes", type: "text", hidden: true, placeholder: "Leaks, corrosion, clearance, temperature" }
         ]
       },
       {
         id: "sprinkler-heads",
-        label: "Sprinkler heads",
-        description: "Record the sprinkler head details shown on the inspection form without changing the shared report style.",
+        label: "Monthly inspection items",
+        description: "Document the monthly visual wet-pipe inspection items with pass/fail/N/A, deficiency notes, corrective action, comments, and supporting photos.",
         fields: [
           {
-            id: "sprinklerHeadInformation",
-            label: "Sprinkler head information",
-            description: "Track head type, escutcheon, size, temperature, bulb condition, and manufacturer for the system inspected.",
+            id: "monthlyItems",
+            label: "Monthly items",
             type: "repeater",
+            addLabel: "Add monthly item",
+            bulkActions: [
+              { id: "mark_all_pass", label: "Mark All Pass", targets: [{ fieldId: "result", value: "pass" }] },
+              { id: "mark_all_na", label: "Mark All N/A", targets: [{ fieldId: "result", value: "na" }] },
+              { id: "clear_results", label: "Clear Results", targets: [{ fieldId: "result", value: "" }] }
+            ],
+            completionFieldIds: ["result"],
+            deficiencyFieldId: "result",
+            seedRows: buildWetSprinklerChecklistSeedRows("monthly"),
+            rowFields: [
+              { id: "requirementKey", label: "Requirement key", type: "text", hidden: true, readOnly: true },
+              { id: "frequency", label: "Frequency", type: "text", hidden: true, readOnly: true },
+              { id: "requirementProfileKey", label: "Requirement profile", type: "text", hidden: true, readOnly: true },
+              { id: "requirementEditionLabel", label: "Requirement edition", type: "text", hidden: true, readOnly: true },
+              { id: "itemLabel", label: "Inspection item", type: "text", readOnly: true },
+              { id: "referenceLabel", label: "Reference", type: "text", readOnly: true },
+              { id: "result", label: "Result", type: "select", optionProvider: "passFailNA" },
+              { id: "deficiencySeverity", label: "Deficiency severity", type: "select", hidden: true, optionProvider: "deficiencySeverityOptions" },
+              { id: "deficiencyNotes", label: "Deficiency notes", type: "text", placeholder: "Describe the deficiency, impairment, or exception noted for this item" },
+              { id: "correctiveAction", label: "Corrective action notes", type: "text", placeholder: "Document repairs made, interim safeguards, or corrective action recommended" },
+              { id: "comments", label: "Inspector comments", type: "text", placeholder: "Capture readings, observations, access limits, or supporting notes" },
+              { id: "deficiencyPhoto", label: "Item photo", type: "photo" }
+            ]
+          },
+          {
+            id: "monthlyItemsCompleted",
+            label: "Monthly items completed",
+            type: "number",
+            calculation: {
+              key: "countRowsMatchingAnyValues",
+              sourceFieldId: "monthlyItems",
+              rowFieldIds: ["result"],
+              values: ["pass", "fail", "na"]
+            },
+            readOnly: true
+          },
+          {
+            id: "monthlyDeficiencyCount",
+            label: "Monthly deficiencies",
+            type: "number",
+            calculation: {
+              key: "countRowsMatchingAnyValues",
+              sourceFieldId: "monthlyItems",
+              rowFieldIds: ["result"],
+              values: ["fail", "deficiency"]
+            },
+            readOnly: true
+          },
+          {
+            id: "monthlySectionComments",
+            label: "Monthly section comments",
+            type: "text",
+            placeholder: "Summarize the monthly inspection pass, any access limitations, and important observations for the customer record.",
+            prefill: [{ source: "priorField", sectionId: "sprinkler-heads", fieldId: "monthlySectionComments" }]
+          },
+          {
+            id: "sprinklerHeadInformation",
+            label: "Legacy sprinkler head information",
+            type: "repeater",
+            hidden: true,
             addLabel: "Add sprinkler head detail",
             rowFields: [
-              {
-                id: "headType",
-                label: "Type",
-                type: "text",
-                placeholder: "Pendant, upright, sidewall"
-              },
-              {
-                id: "escutcheon",
-                label: "Escutcheon",
-                type: "text",
-                placeholder: "Flush, recessed, none"
-              },
-              {
-                id: "headSize",
-                label: "Size",
-                type: "text",
-                placeholder: "1/2 in, K5.6"
-              },
-              {
-                id: "temperatureRating",
-                label: "Temperature",
-                type: "text",
-                placeholder: "155F, 200F"
-              },
-              {
-                id: "bulbCondition",
-                label: "Bulb",
-                type: "text",
-                placeholder: "Clear, loaded, painted, damaged"
-              },
-              {
-                id: "manufacturer",
-                label: "Manufacturer",
-                type: "text",
-                placeholder: "Tyco, Viking, Reliable"
-              }
+              { id: "headType", label: "Type", type: "text", placeholder: "Pendant, upright, sidewall" },
+              { id: "escutcheon", label: "Escutcheon", type: "text", placeholder: "Flush, recessed, none" },
+              { id: "headSize", label: "Size", type: "text", placeholder: "1/2 in, K5.6" },
+              { id: "temperatureRating", label: "Temperature", type: "text", placeholder: "155F, 200F" },
+              { id: "bulbCondition", label: "Bulb", type: "text", placeholder: "Clear, loaded, painted, damaged" },
+              { id: "manufacturer", label: "Manufacturer", type: "text", placeholder: "Tyco, Viking, Reliable" }
             ]
           },
           {
             id: "sprinklerHeadRowsReviewed",
-            label: "Sprinkler head rows reviewed",
+            label: "Legacy sprinkler head rows reviewed",
             type: "number",
-            placeholder: "0",
             calculation: { key: "assetCountFromRepeater", sourceFieldId: "sprinklerHeadInformation" },
             readOnly: true
           },
@@ -1237,6 +1362,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
             id: "sprinklerHeadNotes",
             label: "Sprinkler head notes",
             type: "text",
+            hidden: true,
             placeholder: "Painted heads, loading, escutcheon gaps, corrosion, or replacement notes",
             prefill: [{ source: "priorField", sectionId: "sprinkler-heads", fieldId: "sprinklerHeadNotes" }]
           }
@@ -1244,76 +1370,145 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
       },
       {
         id: "system-checklist",
-        label: "System checklist",
-        description: "Capture the major wet sprinkler checkpoints reflected on the source inspection form.",
+        label: "Quarterly inspection items",
+        description: "Capture quarterly wet-pipe testing and inspection items with structured results, deficiency detail, corrective action, comments, and photos.",
         fields: [
           {
+            id: "quarterlyItems",
+            label: "Quarterly items",
+            type: "repeater",
+            addLabel: "Add quarterly item",
+            bulkActions: [
+              { id: "mark_all_pass", label: "Mark All Pass", targets: [{ fieldId: "result", value: "pass" }] },
+              { id: "mark_all_na", label: "Mark All N/A", targets: [{ fieldId: "result", value: "na" }] },
+              { id: "clear_results", label: "Clear Results", targets: [{ fieldId: "result", value: "" }] }
+            ],
+            completionFieldIds: ["result"],
+            deficiencyFieldId: "result",
+            seedRows: buildWetSprinklerChecklistSeedRows("quarterly"),
+            rowFields: [
+              { id: "requirementKey", label: "Requirement key", type: "text", hidden: true, readOnly: true },
+              { id: "frequency", label: "Frequency", type: "text", hidden: true, readOnly: true },
+              { id: "requirementProfileKey", label: "Requirement profile", type: "text", hidden: true, readOnly: true },
+              { id: "requirementEditionLabel", label: "Requirement edition", type: "text", hidden: true, readOnly: true },
+              { id: "itemLabel", label: "Inspection item", type: "text", readOnly: true },
+              { id: "referenceLabel", label: "Reference", type: "text", readOnly: true },
+              { id: "result", label: "Result", type: "select", optionProvider: "passFailNA" },
+              { id: "deficiencySeverity", label: "Deficiency severity", type: "select", hidden: true, optionProvider: "deficiencySeverityOptions" },
+              { id: "deficiencyNotes", label: "Deficiency notes", type: "text", placeholder: "Describe the deficiency, impairment, or exception noted for this item" },
+              { id: "correctiveAction", label: "Corrective action notes", type: "text", placeholder: "Document repairs made, interim safeguards, or corrective action recommended" },
+              { id: "comments", label: "Inspector comments", type: "text", placeholder: "Capture readings, observations, access limits, or supporting notes" },
+              { id: "deficiencyPhoto", label: "Item photo", type: "photo" }
+            ]
+          },
+          {
+            id: "quarterlyItemsCompleted",
+            label: "Quarterly items completed",
+            type: "number",
+            calculation: {
+              key: "countRowsMatchingAnyValues",
+              sourceFieldId: "quarterlyItems",
+              rowFieldIds: ["result"],
+              values: ["pass", "fail", "na"]
+            },
+            readOnly: true
+          },
+          {
+            id: "quarterlyDeficiencyCount",
+            label: "Quarterly deficiencies",
+            type: "number",
+            calculation: {
+              key: "countRowsMatchingAnyValues",
+              sourceFieldId: "quarterlyItems",
+              rowFieldIds: ["result"],
+              values: ["fail", "deficiency"]
+            },
+            readOnly: true
+          },
+          {
+            id: "quarterlySectionComments",
+            label: "Quarterly section comments",
+            type: "text",
+            placeholder: "Summarize the quarterly testing pass, any access limitations, and the most important customer-facing observations.",
+            prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "quarterlySectionComments" }]
+          },
+          {
             id: "controlValvesOpenAndSecured",
-            label: "Control valves open and secured",
+            label: "Legacy control valves open and secured",
             type: "select",
+            hidden: true,
             optionProvider: "yesNoNA",
             prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "controlValvesOpenAndSecured" }]
           },
           {
             id: "waterflowAlarmOperational",
-            label: "Waterflow alarm operational",
+            label: "Legacy waterflow alarm operational",
             type: "select",
+            hidden: true,
             optionProvider: "yesNoNA",
             prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "waterflowAlarmOperational" }]
           },
           {
             id: "supervisorySignalOperational",
-            label: "Supervisory signal operational",
+            label: "Legacy supervisory signal operational",
             type: "select",
+            hidden: true,
             optionProvider: "yesNoNA",
             prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "supervisorySignalOperational" }]
           },
           {
             id: "mainDrainAcceptable",
-            label: "Main drain test acceptable",
+            label: "Legacy main drain acceptable",
             type: "select",
+            hidden: true,
             optionProvider: "yesNoNA",
             prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "mainDrainAcceptable" }]
           },
           {
             id: "valvesInternallyInspected",
-            label: "Check valves internally inspected and all moving parts operate",
+            label: "Legacy valves internally inspected",
             type: "select",
+            hidden: true,
             optionProvider: "yesNoNA",
             prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "valvesInternallyInspected" }]
           },
           {
             id: "sprinklerHeadsInAcceptableCondition",
-            label: "Sprinkler heads in acceptable condition",
+            label: "Legacy sprinkler heads acceptable",
             type: "select",
+            hidden: true,
             optionProvider: "yesNoNA",
             prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "sprinklerHeadsInAcceptableCondition" }]
           },
           {
             id: "pipingFreeOfLeaks",
-            label: "Piping free of leaks and visible damage",
+            label: "Legacy piping free of leaks",
             type: "select",
+            hidden: true,
             optionProvider: "yesNoNA",
             prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "pipingFreeOfLeaks" }]
           },
           {
             id: "spareHeadsAvailable",
-            label: "Spare heads and wrench available",
+            label: "Legacy spare heads available",
             type: "select",
+            hidden: true,
             optionProvider: "yesNoNA",
             prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "spareHeadsAvailable" }]
           },
           {
             id: "fireDepartmentConnectionAccessible",
-            label: "Fire department connection accessible",
+            label: "Legacy fire department connection accessible",
             type: "select",
+            hidden: true,
             optionProvider: "yesNoNA",
             prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "fireDepartmentConnectionAccessible" }]
           },
           {
             id: "checklistNotes",
-            label: "Checklist notes",
+            label: "Legacy checklist notes",
             type: "text",
+            hidden: true,
             placeholder: "Document any nonconforming conditions, partial tests, or areas requiring follow-up.",
             prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "checklistNotes" }]
           }
@@ -1321,50 +1516,121 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
       },
       {
         id: "valves",
-        label: "Control valves",
-        description: "Verify valve positions, seals, and accessibility.",
+        label: "Deficiencies and impairments",
+        description: "Summarize detected deficiencies, impairment conditions, and any notifications or interim safeguards documented during the visit.",
         fields: [
           {
-            id: "controlValvesInspected",
-            label: "Control valves inspected",
+            id: "deficiencyCount",
+            label: "Detected deficiencies",
             type: "number",
-            placeholder: "0",
             calculation: {
-              key: "sumNumberFieldFromRepeater",
-              sourceSectionId: "riser-room",
-              sourceFieldId: "sprinklerComponents",
-              rowFieldId: "valveCount"
+              key: "sumFields",
+              sourceFields: [
+                { sectionId: "riser-room", fieldId: "weeklyDeficiencyCount" },
+                { sectionId: "sprinkler-heads", fieldId: "monthlyDeficiencyCount" },
+                { sectionId: "system-checklist", fieldId: "quarterlyDeficiencyCount" }
+              ]
             },
             readOnly: true
           },
           {
-            id: "valvesSecured",
-            label: "Valves secured and supervised",
+            id: "impairmentObserved",
+            label: "Impairment observed",
             type: "boolean",
+            prefill: [{ source: "priorField", sectionId: "valves", fieldId: "impairmentObserved" }]
+          },
+          {
+            id: "systemOutOfService",
+            label: "System out of service",
+            type: "boolean",
+            prefill: [{ source: "priorField", sectionId: "valves", fieldId: "systemOutOfService" }]
+          },
+          {
+            id: "impairmentSummary",
+            label: "Impairment / deficiency summary",
+            type: "text",
+            placeholder: "Summarize major deficiencies, impaired areas, and the impact on system readiness.",
+            prefill: [{ source: "priorField", sectionId: "valves", fieldId: "impairmentSummary" }]
+          },
+          {
+            id: "notificationsMade",
+            label: "Notifications / interim safeguards",
+            type: "text",
+            placeholder: "Document notifications to the owner, monitoring station, AHJ, fire watch, or interim safeguards placed in effect.",
+            prefill: [{ source: "priorField", sectionId: "valves", fieldId: "notificationsMade" }]
+          },
+          {
+            id: "controlValvesInspected",
+            label: "Legacy control valves inspected",
+            type: "number",
+            hidden: true,
+            prefill: [{ source: "priorField", sectionId: "valves", fieldId: "controlValvesInspected" }]
+          },
+          {
+            id: "valvesSecured",
+            label: "Legacy valves secured and supervised",
+            type: "boolean",
+            hidden: true,
             prefill: [{ source: "priorField", sectionId: "valves", fieldId: "valvesSecured" }]
           },
-          { id: "valveNotes", label: "Valve notes", type: "text", placeholder: "Tamper, signage, chain, or accessibility notes" }
+          { id: "valveNotes", label: "Legacy valve notes", type: "text", hidden: true, placeholder: "Tamper, signage, chain, or accessibility notes" }
         ]
       },
       {
         id: "alarm-devices",
-        label: "Waterflow and alarms",
-        description: "Capture alarm tests and signal transmission outcomes.",
+        label: "Repairs and follow-up",
+        description: "Capture recommended repairs, corrective action completed on site, overall result, and the customer-facing summary for this inspection.",
         fields: [
           {
-            id: "waterflowTested",
-            label: "Waterflow tested",
+            id: "recommendedRepairs",
+            label: "Recommended repairs",
+            type: "text",
+            placeholder: "List recommended repairs, quoted work, additional testing, or service follow-up still required.",
+            prefill: [{ source: "priorField", sectionId: "alarm-devices", fieldId: "recommendedRepairs" }]
+          },
+          {
+            id: "correctiveActionsCompleted",
+            label: "Corrective actions completed on site",
+            type: "text",
+            placeholder: "Document any corrective action completed during the visit and any restored conditions.",
+            prefill: [{ source: "priorField", sectionId: "alarm-devices", fieldId: "correctiveActionsCompleted" }]
+          },
+          {
+            id: "followUpRequired",
+            label: "Follow-up required",
             type: "boolean",
+            prefill: [{ source: "priorField", sectionId: "alarm-devices", fieldId: "followUpRequired" }]
+          },
+          {
+            id: "overallInspectionResult",
+            label: "Overall inspection result",
+            type: "select",
+            optionProvider: "wetSprinklerOverallResultOptions",
+            prefill: [{ source: "priorField", sectionId: "alarm-devices", fieldId: "overallInspectionResult" }]
+          },
+          {
+            id: "customerFacingSummary",
+            label: "Customer-facing summary",
+            type: "text",
+            placeholder: "Provide a concise inspection summary suitable for the report record and customer review.",
+            prefill: [{ source: "priorField", sectionId: "alarm-devices", fieldId: "customerFacingSummary" }]
+          },
+          {
+            id: "waterflowTested",
+            label: "Legacy waterflow tested",
+            type: "boolean",
+            hidden: true,
             prefill: [{ source: "priorField", sectionId: "alarm-devices", fieldId: "waterflowTested" }]
           },
           {
             id: "alarmTransmission",
-            label: "Alarm transmission result",
+            label: "Legacy alarm transmission result",
             type: "select",
+            hidden: true,
             optionProvider: "passFail",
             prefill: [{ source: "priorField", sectionId: "alarm-devices", fieldId: "alarmTransmission" }]
           },
-          { id: "alarmNotes", label: "Alarm notes", type: "text", placeholder: "Transmission time, bell, gong, or supervisory notes" }
+          { id: "alarmNotes", label: "Legacy alarm notes", type: "text", hidden: true, placeholder: "Transmission time, bell, gong, or supervisory notes" }
         ]
       }
     ]
