@@ -39,6 +39,8 @@ export type ReportOptionProviderKey =
   | "physicalConditionOptions"
   | "fireAlarmOverallStatusOptions"
   | "sprinklerComponentTypes"
+  | "sprinklerServiceTypes"
+  | "inspectionTagStatusOptions"
   | "assetSelect";
 
 const passFailOptions: ReportOption[] = [
@@ -299,6 +301,21 @@ const sprinklerComponentTypes: ReportOption[] = [
   { label: "Alarm gong", value: "alarm_gong" }
 ];
 
+const sprinklerServiceTypes: ReportOption[] = [
+  { label: "Weekly", value: "weekly" },
+  { label: "Monthly", value: "monthly" },
+  { label: "Quarterly", value: "quarterly" },
+  { label: "Semi-annual", value: "semi_annual" },
+  { label: "Annual", value: "annual" },
+  { label: "5-year internal", value: "five_year_internal" }
+];
+
+const inspectionTagStatusOptions: ReportOption[] = [
+  { label: "Green", value: "green" },
+  { label: "Yellow", value: "yellow" },
+  { label: "Red", value: "red" }
+];
+
 export const reportOptionProviders = {
   passFail: passFailOptions,
   pass_fail: passFailStrictOptions,
@@ -337,7 +354,9 @@ export const reportOptionProviders = {
   deviceFunctionalResultOptions,
   physicalConditionOptions,
   fireAlarmOverallStatusOptions,
-  sprinklerComponentTypes
+  sprinklerComponentTypes,
+  sprinklerServiceTypes,
+  inspectionTagStatusOptions
 } satisfies Record<Exclude<ReportOptionProviderKey, "assetSelect">, ReportOption[]>;
 
 function coerceMetadata(value: unknown): ReportPrimitiveValue {

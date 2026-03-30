@@ -887,9 +887,20 @@ describe("smart report foundations", () => {
         templateVersion: 1,
         inspectionType: "wet_fire_sprinkler",
         overallNotes: "",
-        sectionOrder: ["riser-room", "valves", "alarm-devices"],
-        activeSectionId: "riser-room",
+        sectionOrder: ["service-summary", "riser-room", "sprinkler-heads", "system-checklist", "valves", "alarm-devices"],
+        activeSectionId: "service-summary",
         sections: {
+          "service-summary": {
+            status: "pass",
+            notes: "",
+            fields: {
+              typeOfService: "quarterly",
+              tagStatus: "yellow",
+              ownerRepresentative: "Facilities director",
+              inspectorLicense: "LIC-4451",
+              systemSummary: "Older hospital wing riser in service."
+            }
+          },
           "riser-room": {
             status: "pass",
             notes: "",
@@ -907,6 +918,40 @@ describe("smart report foundations", () => {
               riserCondition: "pass",
               gaugesNormal: true,
               roomNotes: ""
+            }
+          },
+          "sprinkler-heads": {
+            status: "pass",
+            notes: "",
+            fields: {
+              sprinklerHeadInformation: [
+                {
+                  headType: "Pendant",
+                  escutcheon: "Flush",
+                  headSize: "1/2 in",
+                  temperatureRating: "155F",
+                  bulbCondition: "Clear",
+                  manufacturer: "Reliable"
+                }
+              ],
+              sprinklerHeadRowsReviewed: 1,
+              sprinklerHeadNotes: "Typical patient wing stock."
+            }
+          },
+          "system-checklist": {
+            status: "pass",
+            notes: "",
+            fields: {
+              controlValvesOpenAndSecured: "yes",
+              waterflowAlarmOperational: "yes",
+              supervisorySignalOperational: "yes",
+              mainDrainAcceptable: "yes",
+              valvesInternallyInspected: "na",
+              sprinklerHeadsInAcceptableCondition: "yes",
+              pipingFreeOfLeaks: "yes",
+              spareHeadsAvailable: "yes",
+              fireDepartmentConnectionAccessible: "yes",
+              checklistNotes: ""
             }
           },
           valves: {
@@ -939,7 +984,13 @@ describe("smart report foundations", () => {
     expect(rows[0].location).toBe("Central riser room");
     expect(rows[0].componentType).toBe("riser");
     expect(rows[0].valveCount).toBe(6);
+    expect(draft.sections["service-summary"]?.fields.typeOfService).toBe("quarterly");
+    expect(draft.sections["service-summary"]?.fields.tagStatus).toBe("yellow");
+    expect(draft.sections["service-summary"]?.fields.ownerRepresentative).toBe("Facilities director");
+    expect(Array.isArray(draft.sections["sprinkler-heads"]?.fields.sprinklerHeadInformation)).toBe(true);
+    expect(draft.sections["system-checklist"]?.fields.controlValvesOpenAndSecured).toBe("yes");
     expect(draft.sections["riser-room"]?.fields.componentsInspected).toBe(1);
+    expect(typeof draft.sections["sprinkler-heads"]?.fields.sprinklerHeadRowsReviewed).toBe("number");
     expect(draft.sections.valves?.fields.controlValvesInspected).toBe(6);
     expect(draft.sections["alarm-devices"]?.fields.alarmTransmission).toBe("pass");
   });
@@ -985,6 +1036,17 @@ describe("smart report foundations", () => {
       sectionOrder: ["riser-room", "valves", "alarm-devices"],
       activeSectionId: "riser-room",
       sections: {
+        "service-summary": {
+          status: "pass",
+          notes: "",
+          fields: {
+            typeOfService: "annual",
+            tagStatus: "green",
+            ownerRepresentative: "Facilities lead",
+            inspectorLicense: "OK-4451",
+            systemSummary: "Wet sprinkler visit complete."
+          }
+        },
         "riser-room": {
           status: "pass",
           notes: "",
@@ -997,6 +1059,34 @@ describe("smart report foundations", () => {
             riserCondition: "pass",
             gaugesNormal: true,
             roomNotes: ""
+          }
+        },
+        "sprinkler-heads": {
+          status: "pass",
+          notes: "",
+          fields: {
+            sprinklerHeadInformation: [
+              { headType: "Pendant", escutcheon: "Flush", headSize: "1/2 in", temperatureRating: "155F", bulbCondition: "Clear", manufacturer: "Reliable" },
+              { headType: "Upright", escutcheon: "None", headSize: "1/2 in", temperatureRating: "200F", bulbCondition: "Clear", manufacturer: "Tyco" }
+            ],
+            sprinklerHeadRowsReviewed: 99,
+            sprinklerHeadNotes: ""
+          }
+        },
+        "system-checklist": {
+          status: "pass",
+          notes: "",
+          fields: {
+            controlValvesOpenAndSecured: "yes",
+            waterflowAlarmOperational: "yes",
+            supervisorySignalOperational: "yes",
+            mainDrainAcceptable: "yes",
+            valvesInternallyInspected: "na",
+            sprinklerHeadsInAcceptableCondition: "yes",
+            pipingFreeOfLeaks: "yes",
+            spareHeadsAvailable: "yes",
+            fireDepartmentConnectionAccessible: "yes",
+            checklistNotes: ""
           }
         },
         valves: {
@@ -1024,15 +1114,28 @@ describe("smart report foundations", () => {
 
     expect((normalized.sections["riser-room"]?.fields.sprinklerComponents as Array<unknown>).length).toBe(2);
     expect(normalized.sections["riser-room"]?.fields.componentsInspected).toBe(2);
+    expect((normalized.sections["sprinkler-heads"]?.fields.sprinklerHeadInformation as Array<unknown>).length).toBe(2);
+    expect(normalized.sections["sprinkler-heads"]?.fields.sprinklerHeadRowsReviewed).toBe(2);
     expect(normalized.sections.valves?.fields.controlValvesInspected).toBe(7);
 
     const invalidWetSprinklerDraft = validateDraftForTemplate({
       templateVersion: 1,
       inspectionType: "wet_fire_sprinkler",
       overallNotes: "",
-      sectionOrder: ["riser-room", "valves", "alarm-devices"],
-      activeSectionId: "riser-room",
+      sectionOrder: ["service-summary", "riser-room", "sprinkler-heads", "system-checklist", "valves", "alarm-devices"],
+      activeSectionId: "service-summary",
       sections: {
+        "service-summary": {
+          status: "pending",
+          notes: "",
+          fields: {
+            typeOfService: "",
+            tagStatus: "",
+            ownerRepresentative: "",
+            inspectorLicense: "",
+            systemSummary: ""
+          }
+        },
         "riser-room": {
           status: "pending",
           notes: "",
@@ -1042,6 +1145,31 @@ describe("smart report foundations", () => {
             riserCondition: "",
             gaugesNormal: false,
             roomNotes: ""
+          }
+        },
+        "sprinkler-heads": {
+          status: "pending",
+          notes: "",
+          fields: {
+            sprinklerHeadInformation: [],
+            sprinklerHeadRowsReviewed: 0,
+            sprinklerHeadNotes: ""
+          }
+        },
+        "system-checklist": {
+          status: "pending",
+          notes: "",
+          fields: {
+            controlValvesOpenAndSecured: "",
+            waterflowAlarmOperational: "",
+            supervisorySignalOperational: "",
+            mainDrainAcceptable: "",
+            valvesInternallyInspected: "",
+            sprinklerHeadsInAcceptableCondition: "",
+            pipingFreeOfLeaks: "",
+            spareHeadsAvailable: "",
+            fireDepartmentConnectionAccessible: "",
+            checklistNotes: ""
           }
         },
         valves: { status: "pending", notes: "", fields: { controlValvesInspected: 0, valvesSecured: false, valveNotes: "" } },

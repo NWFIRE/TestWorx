@@ -1008,12 +1008,60 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
   },
   wet_fire_sprinkler: {
     label: "Wet fire sprinkler",
-    description: "Wet system valves, risers, alarms, and hydraulic readiness.",
+    description: "Wet system service metadata, sprinkler heads, risers, valves, alarms, and operational checkpoints.",
     pdf: {
       subtitle: "Wet Fire Sprinkler Inspection Report",
       nfpaReferences: ["NFPA 13", "NFPA 25"]
     },
     sections: [
+      {
+        id: "service-summary",
+        label: "Service summary",
+        description: "Capture the service interval, inspection tag status, and key customer-facing summary details from the sprinkler report.",
+        fields: [
+          {
+            id: "typeOfService",
+            label: "Type of service",
+            type: "select",
+            optionProvider: "sprinklerServiceTypes",
+            prefill: [
+              { source: "priorField", sectionId: "service-summary", fieldId: "typeOfService" },
+              { source: "reportDefault", value: "annual" }
+            ]
+          },
+          {
+            id: "tagStatus",
+            label: "Tag status",
+            type: "select",
+            optionProvider: "inspectionTagStatusOptions",
+            prefill: [
+              { source: "priorField", sectionId: "service-summary", fieldId: "tagStatus" },
+              { source: "reportDefault", value: "green" }
+            ]
+          },
+          {
+            id: "ownerRepresentative",
+            label: "Owner / representative",
+            type: "text",
+            placeholder: "On-site customer or property representative",
+            prefill: [{ source: "priorField", sectionId: "service-summary", fieldId: "ownerRepresentative" }]
+          },
+          {
+            id: "inspectorLicense",
+            label: "Inspector license",
+            type: "text",
+            placeholder: "State or company license number",
+            prefill: [{ source: "priorField", sectionId: "service-summary", fieldId: "inspectorLicense" }]
+          },
+          {
+            id: "systemSummary",
+            label: "System summary",
+            type: "text",
+            placeholder: "Summarize system condition, coverage notes, and major observations from the wet sprinkler inspection.",
+            prefill: [{ source: "priorField", sectionId: "service-summary", fieldId: "systemSummary" }]
+          }
+        ]
+      },
       {
         id: "riser-room",
         label: "Riser room",
@@ -1110,7 +1158,165 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
             type: "boolean",
             prefill: [{ source: "priorField", sectionId: "riser-room", fieldId: "gaugesNormal" }]
           },
+          {
+            id: "mainDrainCompleted",
+            label: "Main drain test completed",
+            type: "select",
+            optionProvider: "yesNoNA",
+            prefill: [{ source: "priorField", sectionId: "riser-room", fieldId: "mainDrainCompleted" }]
+          },
+          {
+            id: "drainTestNotes",
+            label: "Drain test notes",
+            type: "text",
+            placeholder: "Static/residual pressure, drain observations, and restoration notes",
+            prefill: [{ source: "priorField", sectionId: "riser-room", fieldId: "drainTestNotes" }]
+          },
           { id: "roomNotes", label: "Riser room notes", type: "text", placeholder: "Leaks, corrosion, clearance, temperature" }
+        ]
+      },
+      {
+        id: "sprinkler-heads",
+        label: "Sprinkler heads",
+        description: "Record the sprinkler head details shown on the inspection form without changing the shared report style.",
+        fields: [
+          {
+            id: "sprinklerHeadInformation",
+            label: "Sprinkler head information",
+            description: "Track head type, escutcheon, size, temperature, bulb condition, and manufacturer for the system inspected.",
+            type: "repeater",
+            addLabel: "Add sprinkler head detail",
+            rowFields: [
+              {
+                id: "headType",
+                label: "Type",
+                type: "text",
+                placeholder: "Pendant, upright, sidewall"
+              },
+              {
+                id: "escutcheon",
+                label: "Escutcheon",
+                type: "text",
+                placeholder: "Flush, recessed, none"
+              },
+              {
+                id: "headSize",
+                label: "Size",
+                type: "text",
+                placeholder: "1/2 in, K5.6"
+              },
+              {
+                id: "temperatureRating",
+                label: "Temperature",
+                type: "text",
+                placeholder: "155F, 200F"
+              },
+              {
+                id: "bulbCondition",
+                label: "Bulb",
+                type: "text",
+                placeholder: "Clear, loaded, painted, damaged"
+              },
+              {
+                id: "manufacturer",
+                label: "Manufacturer",
+                type: "text",
+                placeholder: "Tyco, Viking, Reliable"
+              }
+            ]
+          },
+          {
+            id: "sprinklerHeadRowsReviewed",
+            label: "Sprinkler head rows reviewed",
+            type: "number",
+            placeholder: "0",
+            calculation: { key: "assetCountFromRepeater", sourceFieldId: "sprinklerHeadInformation" },
+            readOnly: true
+          },
+          {
+            id: "sprinklerHeadNotes",
+            label: "Sprinkler head notes",
+            type: "text",
+            placeholder: "Painted heads, loading, escutcheon gaps, corrosion, or replacement notes",
+            prefill: [{ source: "priorField", sectionId: "sprinkler-heads", fieldId: "sprinklerHeadNotes" }]
+          }
+        ]
+      },
+      {
+        id: "system-checklist",
+        label: "System checklist",
+        description: "Capture the major wet sprinkler checkpoints reflected on the source inspection form.",
+        fields: [
+          {
+            id: "controlValvesOpenAndSecured",
+            label: "Control valves open and secured",
+            type: "select",
+            optionProvider: "yesNoNA",
+            prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "controlValvesOpenAndSecured" }]
+          },
+          {
+            id: "waterflowAlarmOperational",
+            label: "Waterflow alarm operational",
+            type: "select",
+            optionProvider: "yesNoNA",
+            prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "waterflowAlarmOperational" }]
+          },
+          {
+            id: "supervisorySignalOperational",
+            label: "Supervisory signal operational",
+            type: "select",
+            optionProvider: "yesNoNA",
+            prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "supervisorySignalOperational" }]
+          },
+          {
+            id: "mainDrainAcceptable",
+            label: "Main drain test acceptable",
+            type: "select",
+            optionProvider: "yesNoNA",
+            prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "mainDrainAcceptable" }]
+          },
+          {
+            id: "valvesInternallyInspected",
+            label: "Check valves internally inspected and all moving parts operate",
+            type: "select",
+            optionProvider: "yesNoNA",
+            prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "valvesInternallyInspected" }]
+          },
+          {
+            id: "sprinklerHeadsInAcceptableCondition",
+            label: "Sprinkler heads in acceptable condition",
+            type: "select",
+            optionProvider: "yesNoNA",
+            prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "sprinklerHeadsInAcceptableCondition" }]
+          },
+          {
+            id: "pipingFreeOfLeaks",
+            label: "Piping free of leaks and visible damage",
+            type: "select",
+            optionProvider: "yesNoNA",
+            prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "pipingFreeOfLeaks" }]
+          },
+          {
+            id: "spareHeadsAvailable",
+            label: "Spare heads and wrench available",
+            type: "select",
+            optionProvider: "yesNoNA",
+            prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "spareHeadsAvailable" }]
+          },
+          {
+            id: "fireDepartmentConnectionAccessible",
+            label: "Fire department connection accessible",
+            type: "select",
+            optionProvider: "yesNoNA",
+            prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "fireDepartmentConnectionAccessible" }]
+          },
+          {
+            id: "checklistNotes",
+            label: "Checklist notes",
+            type: "text",
+            placeholder: "Document any nonconforming conditions, partial tests, or areas requiring follow-up.",
+            prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "checklistNotes" }]
+          }
         ]
       },
       {
