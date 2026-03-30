@@ -915,7 +915,7 @@ describe("smart report foundations", () => {
                 {
                   location: "Main corridor",
                   headType: "pendent",
-                  escutcheon: "flush",
+                  manufactureYear: "2018",
                   headSize: "1_2_inch",
                   temperatureRating: "ordinary",
                   bulbCondition: "normal",
@@ -1121,7 +1121,7 @@ describe("smart report foundations", () => {
               { requirementKey: "monthly_heating_condition", groupKey: "monthly_inspection", itemLabel: "Check 8", referenceLabel: "Ref", frequencyLabel: "Monthly", requirementProfileKey: "nfpa25_2023_baseline", requirementEditionLabel: "2023 baseline", result: "na", deficiencySeverity: "medium", deficiencyNotes: "", correctiveAction: "", comments: "", deficiencyPhoto: "" }
             ],
             sprinklerHeadInformation: [
-              { location: "Main corridor", headType: "pendent", escutcheon: "flush", headSize: "1_2_inch", temperatureRating: "ordinary", bulbCondition: "normal", manufacturer: "tyco", result: "pass", deficiencyNotes: "", comments: "", deficiencyPhoto: "" }
+              { location: "Main corridor", headType: "pendent", manufactureYear: "2018", headSize: "1_2_inch", temperatureRating: "ordinary", bulbCondition: "normal", manufacturer: "tyco", result: "pass", deficiencyNotes: "", comments: "", deficiencyPhoto: "" }
             ],
             monthlyItemsCompleted: 0,
             monthlyDeficiencyCount: 0,

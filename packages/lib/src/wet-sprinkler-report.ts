@@ -235,8 +235,7 @@ export const wetSprinklerReportTemplate: ReportTemplateDefinition = {
             { id: "location", label: "Location", type: "text", placeholder: "Corridor, office, canopy, or hazard area", prefill: [{ source: "assetMetadata", key: "location" }] },
             { id: "headType", label: "Type", type: "select", optionProvider: "sprinklerHeadTypes", customValueFieldId: "headTypeOther", customValueTrigger: "other", prefill: [{ source: "assetMetadata", key: "headType" }] },
             { id: "headTypeOther", label: "Type other", type: "text", placeholder: "Describe head type", visibleWhen: { fieldId: "headType", values: ["other"] } },
-            { id: "escutcheon", label: "Escutcheon", type: "select", optionProvider: "sprinklerHeadEscutcheonOptions", customValueFieldId: "escutcheonOther", customValueTrigger: "other", prefill: [{ source: "assetMetadata", key: "escutcheon" }] },
-            { id: "escutcheonOther", label: "Escutcheon other", type: "text", placeholder: "Describe escutcheon", visibleWhen: { fieldId: "escutcheon", values: ["other"] } },
+            { id: "manufactureYear", label: "Manufacture year", type: "text", placeholder: "YYYY", prefill: [{ source: "assetMetadata", key: "manufactureDate" }] },
             { id: "headSize", label: "Size", type: "select", optionProvider: "sprinklerHeadSizeOptions", customValueFieldId: "headSizeOther", customValueTrigger: "other", prefill: [{ source: "assetMetadata", key: "headSize" }] },
             { id: "headSizeOther", label: "Size other", type: "text", placeholder: "Describe head size", visibleWhen: { fieldId: "headSize", values: ["other"] } },
             { id: "temperatureRating", label: "Temp", type: "select", optionProvider: "sprinklerHeadTemperatureOptions", customValueFieldId: "temperatureRatingOther", customValueTrigger: "other", prefill: [{ source: "assetMetadata", key: "temperatureRating" }] },
@@ -246,7 +245,7 @@ export const wetSprinklerReportTemplate: ReportTemplateDefinition = {
             { id: "manufacturer", label: "Manufacturer", type: "select", optionProvider: "sprinklerManufacturers", customValueFieldId: "manufacturerOther", customValueTrigger: "other", prefill: [{ source: "assetMetadata", key: "manufacturer" }] },
             { id: "manufacturerOther", label: "Manufacturer other", type: "text", placeholder: "Describe manufacturer", visibleWhen: { fieldId: "manufacturer", values: ["other"] } },
             { id: "result", label: "Result", type: "select", optionProvider: "passFailNA" },
-            { id: "deficiencyNotes", label: "Deficiency notes", type: "text", placeholder: "Loading, corrosion, paint, obstruction, missing escutcheon, or replacement need" },
+            { id: "deficiencyNotes", label: "Deficiency notes", type: "text", placeholder: "Loading, corrosion, paint, obstruction, age concern, or replacement need" },
             { id: "comments", label: "Inspector comments", type: "text", placeholder: "Additional head details, orientation, quantity, or replacement notes" },
             { id: "deficiencyPhoto", label: "Head photo", type: "photo" }
           ]
