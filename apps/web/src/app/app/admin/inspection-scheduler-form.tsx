@@ -61,11 +61,11 @@ function PickerField({
 }) {
   return (
     <div className="relative min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 transition-colors focus-within:border-slateblue/40 focus-within:bg-white">
-      <span className="pointer-events-none absolute left-4 top-1/2 z-[1] flex h-5 w-5 -translate-y-1/2 items-center justify-center text-slate-400">
+      <span className="pointer-events-none absolute left-4 top-1/2 z-[1] flex h-4.5 w-4.5 -translate-y-1/2 items-center justify-center text-slate-400">
         {icon}
       </span>
       <input
-        className="ios-picker-field block h-12 w-full min-w-0 max-w-full appearance-none bg-transparent pl-11 pr-12 text-left text-[15px] font-medium text-slate-900 outline-none"
+        className="ios-picker-field block h-11 w-full min-w-0 max-w-full appearance-none bg-transparent pl-[2.7rem] pr-11 text-left text-[15px] font-medium leading-none text-slate-900 outline-none"
         id={id}
         name={name}
         onChange={onChange}
