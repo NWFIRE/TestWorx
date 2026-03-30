@@ -68,7 +68,7 @@ export default async function AdminPage({
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1.2fr_0.95fr]">
-      <section className="space-y-6">
+      <section className="order-2 space-y-6 xl:order-1">
         {inspectionNotice === "deleted" ? (
           <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-800 shadow-panel">
             Inspection deleted successfully.
@@ -185,7 +185,7 @@ export default async function AdminPage({
           </div>
         </div>
       </section>
-      <section className="space-y-6">
+      <section className="order-1 space-y-6 xl:order-2">
         <InspectionSchedulerForm action={createInspectionAction} title="Create inspection" submitLabel="Create inspection" customers={data.customers} sites={data.sites} technicians={data.technicians} allowDocumentUpload autoSelectGenericSiteOnCustomerChange allowCustomOneTimeSite />
       </section>
     </div>
