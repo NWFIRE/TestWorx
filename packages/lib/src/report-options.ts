@@ -1,5 +1,5 @@
 import type { ReportAssetRecord, ReportOption, ReportPrimitiveValue } from "./report-config";
-import { backflowRequirementProfiles, wetSprinklerRequirementProfiles } from "./report-requirements";
+import { backflowRequirementProfiles, jointCommissionSprinklerRequirementProfiles, wetSprinklerRequirementProfiles } from "./report-requirements";
 
 export type ReportOptionProviderKey =
   | "passFail"
@@ -51,6 +51,22 @@ export type ReportOptionProviderKey =
   | "backflowPhotoCategoryOptions"
   | "backflowFinalResultOptions"
   | "backflowFollowUpRecommendationOptions"
+  | "jointCommissionSprinklerRequirementProfiles"
+  | "jointCommissionInspectionTypeOptions"
+  | "jointCommissionCodeEditionOptions"
+  | "jointCommissionOccupancyOptions"
+  | "jointCommissionImpairmentStatusOptions"
+  | "jointCommissionSystemTypeOptions"
+  | "jointCommissionWaterSupplyTypeOptions"
+  | "jointCommissionRiserTypeOptions"
+  | "jointCommissionInspectionModeOptions"
+  | "jointCommissionStatusOptions"
+  | "jointCommissionSeverityOptions"
+  | "jointCommissionValveStateOptions"
+  | "jointCommissionRecommendationOptions"
+  | "jointCommissionRequiredTimelineOptions"
+  | "jointCommissionOverallResultOptions"
+  | "jointCommissionPhotoCategoryOptions"
   | "alarmDeviceTypes"
   | "alarmNotificationApplianceTypes"
   | "communicationPathTypes"
@@ -489,6 +505,129 @@ const backflowFollowUpRecommendationOptions: ReportOption[] = [
   { label: "Other", value: "other" }
 ];
 
+const jointCommissionRequirementProfileOptions: ReportOption[] = jointCommissionSprinklerRequirementProfiles.map((profile) => ({
+  label: profile.label,
+  value: profile.key,
+  metadata: {
+    editionLabel: profile.editionLabel,
+    description: profile.description
+  }
+}));
+
+const jointCommissionInspectionTypeOptions: ReportOption[] = [
+  { label: "Quarterly inspection", value: "quarterly_inspection", metadata: { inspectionMode: "quarterly" } },
+  { label: "Annual inspection", value: "annual_inspection", metadata: { inspectionMode: "annual" } },
+  { label: "Combined quarterly + annual", value: "combined_quarterly_annual", metadata: { inspectionMode: "combined" } },
+  { label: "Follow-up / reinspection", value: "follow_up_reinspection", metadata: { inspectionMode: "follow_up" } }
+];
+
+const jointCommissionCodeEditionOptions: ReportOption[] = [
+  { label: "NFPA 25 2026", value: "nfpa25_2026" },
+  { label: "NFPA 25 2023", value: "nfpa25_2023" },
+  { label: "NFPA 25 2020", value: "nfpa25_2020" },
+  { label: "NFPA 25 2017", value: "nfpa25_2017" },
+  { label: "AHJ-specific", value: "ahj_specific" }
+];
+
+const jointCommissionOccupancyOptions: ReportOption[] = [
+  { label: "Healthcare", value: "healthcare" },
+  { label: "Hospital", value: "hospital" },
+  { label: "Outpatient", value: "outpatient" },
+  { label: "Medical office", value: "medical_office" },
+  { label: "Behavioral health", value: "behavioral_health" },
+  { label: "Skilled nursing", value: "skilled_nursing" },
+  { label: "Other", value: "other" }
+];
+
+const jointCommissionImpairmentStatusOptions: ReportOption[] = [
+  { label: "No impairment", value: "no_impairment" },
+  { label: "Partial impairment", value: "partial_impairment" },
+  { label: "Full impairment", value: "full_impairment" },
+  { label: "Unknown", value: "unknown" }
+];
+
+const jointCommissionSystemTypeOptions: ReportOption[] = [
+  { label: "Wet", value: "wet" },
+  { label: "Dry", value: "dry" },
+  { label: "Preaction", value: "preaction" },
+  { label: "Deluge", value: "deluge" }
+];
+
+const jointCommissionWaterSupplyTypeOptions: ReportOption[] = [
+  { label: "Municipal", value: "municipal" },
+  { label: "Municipal + fire pump", value: "municipal_fire_pump" },
+  { label: "Tank + fire pump", value: "tank_fire_pump" },
+  { label: "Other", value: "other" }
+];
+
+const jointCommissionRiserTypeOptions: ReportOption[] = [
+  { label: "Wet riser", value: "wet_riser" },
+  { label: "Floor control assembly", value: "floor_control_assembly" },
+  { label: "Combination standpipe / sprinkler", value: "combination" },
+  { label: "Other", value: "other" }
+];
+
+const jointCommissionInspectionModeOptions: ReportOption[] = [
+  { label: "Quarterly", value: "quarterly" },
+  { label: "Annual", value: "annual" },
+  { label: "Combined", value: "combined" },
+  { label: "Follow-up", value: "follow_up" }
+];
+
+const jointCommissionStatusOptions: ReportOption[] = [
+  { label: "Pass", value: "pass" },
+  { label: "Fail", value: "fail" },
+  { label: "N/A", value: "na" }
+];
+
+const jointCommissionSeverityOptions: ReportOption[] = [
+  { label: "Minor", value: "minor" },
+  { label: "Deficiency", value: "deficiency" },
+  { label: "Critical impairment", value: "critical_impairment" }
+];
+
+const jointCommissionValveStateOptions: ReportOption[] = [
+  { label: "Open", value: "open" },
+  { label: "Closed", value: "closed" },
+  { label: "Supervised open", value: "supervised_open" },
+  { label: "Locked open", value: "locked_open" },
+  { label: "Tampered", value: "tampered" }
+];
+
+const jointCommissionRecommendationOptions: ReportOption[] = [
+  { label: "Monitor", value: "monitor" },
+  { label: "Repair", value: "repair" },
+  { label: "Replace", value: "replace" },
+  { label: "Further evaluation", value: "further_evaluation" },
+  { label: "Immediate action required", value: "immediate_action_required" }
+];
+
+const jointCommissionRequiredTimelineOptions: ReportOption[] = [
+  { label: "Immediate", value: "immediate" },
+  { label: "24hr", value: "24hr" },
+  { label: "7-day", value: "7_day" },
+  { label: "Routine", value: "routine" }
+];
+
+const jointCommissionOverallResultOptions: ReportOption[] = [
+  { label: "Pass", value: "pass" },
+  { label: "Pass with deficiencies", value: "pass_with_deficiencies" },
+  { label: "Fail", value: "fail" },
+  { label: "Impaired", value: "impaired" }
+];
+
+const jointCommissionPhotoCategoryOptions: ReportOption[] = [
+  { label: "System overview", value: "system_overview" },
+  { label: "Riser", value: "riser" },
+  { label: "Valves", value: "valves" },
+  { label: "Gauges", value: "gauges" },
+  { label: "Deficiencies", value: "deficiencies" },
+  { label: "Repairs", value: "repairs" },
+  { label: "Tags", value: "tags" },
+  { label: "FDC", value: "fdc" },
+  { label: "Obstruction issues", value: "obstruction_issues" }
+];
+
 const alarmDeviceTypes: ReportOption[] = [
   { label: "Control panel", value: "control_panel" },
   { label: "Smoke detector", value: "smoke_detector" },
@@ -800,6 +939,22 @@ export const reportOptionProviders = {
   backflowPhotoCategoryOptions,
   backflowFinalResultOptions,
   backflowFollowUpRecommendationOptions,
+  jointCommissionSprinklerRequirementProfiles: jointCommissionRequirementProfileOptions,
+  jointCommissionInspectionTypeOptions,
+  jointCommissionCodeEditionOptions,
+  jointCommissionOccupancyOptions,
+  jointCommissionImpairmentStatusOptions,
+  jointCommissionSystemTypeOptions,
+  jointCommissionWaterSupplyTypeOptions,
+  jointCommissionRiserTypeOptions,
+  jointCommissionInspectionModeOptions,
+  jointCommissionStatusOptions,
+  jointCommissionSeverityOptions,
+  jointCommissionValveStateOptions,
+  jointCommissionRecommendationOptions,
+  jointCommissionRequiredTimelineOptions,
+  jointCommissionOverallResultOptions,
+  jointCommissionPhotoCategoryOptions,
   alarmDeviceTypes,
   alarmNotificationApplianceTypes,
   communicationPathTypes,

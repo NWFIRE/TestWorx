@@ -4,6 +4,7 @@ import type { ReportCalculationKey } from "./report-calculations";
 import { resolveOptionProvider } from "./report-options";
 import type { ReportOptionProviderKey } from "./report-options";
 import { backflowReportTemplate } from "./backflow-report";
+import { jointCommissionFireSprinklerReportTemplate } from "./joint-commission-fire-sprinkler-report";
 import { wetSprinklerReportTemplate } from "./wet-sprinkler-report";
 
 export type ReportPrimitiveValue = string | number | boolean | null;
@@ -197,6 +198,7 @@ type BaseFieldDefinition = {
   placeholder?: string;
   description?: string;
   hidden?: boolean;
+  customerVisible?: boolean;
   visibleWhen?: {
     fieldId: string;
     values: ReportPrimitiveValue[];
@@ -1011,6 +1013,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
     ]
   },
   wet_fire_sprinkler: wetSprinklerReportTemplate,
+  joint_commission_fire_sprinkler: jointCommissionFireSprinklerReportTemplate,
   backflow: backflowReportTemplate,
   fire_pump: {
     label: "Fire pump",

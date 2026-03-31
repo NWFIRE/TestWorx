@@ -151,6 +151,10 @@ export function isFieldVisible(field: ReportFieldDefinition, values: Record<stri
   return field.visibleWhen.values.includes(candidate ?? null);
 }
 
+export function isCustomerVisibleField(field: ReportFieldDefinition, values: Record<string, unknown>) {
+  return field.customerVisible !== false && isFieldVisible(field, values);
+}
+
 function defaultPrimitiveFieldValue(type: "boolean" | "text" | "number" | "date" | "select" | "photo") {
   return type === "boolean" ? false : "";
 }
@@ -1187,7 +1191,8 @@ export function describeRepeaterRowLabel(row: Record<string, ReportPrimitiveValu
 
 export function describeRepeaterValueLines(
   field: Extract<ReportFieldDefinition, { type: "repeater" }>,
-  value: unknown
+  value: unknown,
+  visibility: "all" | "customer" = "customer"
 ) {
   const rows = Array.isArray(value)
     ? value.filter((row) => typeof row === "object" && row !== null) as Array<Record<string, ReportPrimitiveValue>>
@@ -1199,7 +1204,7 @@ export function describeRepeaterValueLines(
   return rows.flatMap((row, rowIndex) => {
     const rowLabel = describeRepeaterRowLabel(row, rowIndex);
     const lines = [`${field.label} ${rowIndex + 1}: ${rowLabel}`];
-    for (const rowField of field.rowFields.filter((item) => isFieldVisible(item, row))) {
+    for (const rowField of field.rowFields.filter((item) => visibility === "customer" ? isCustomerVisibleField(item, row) : isFieldVisible(item, row))) {
       if (rowField.id === "assetId" || rowField.id === "assetTag") {
         continue;
       }

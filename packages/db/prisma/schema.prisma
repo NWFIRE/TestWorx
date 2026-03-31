@@ -25,6 +25,7 @@ enum InspectionType {
   fire_extinguisher
   fire_alarm
   wet_fire_sprinkler
+  joint_commission_fire_sprinkler
   backflow
   fire_pump
   dry_fire_sprinkler

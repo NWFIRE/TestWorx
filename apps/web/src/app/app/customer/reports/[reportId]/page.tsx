@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { buildReportPreview, describeRepeaterValueLines, getCustomerReportDetail, isFieldVisible, type ReportFieldDefinition } from "@testworx/lib";
+import { buildReportPreview, describeRepeaterValueLines, getCustomerReportDetail, isCustomerVisibleField, type ReportFieldDefinition } from "@testworx/lib";
 
 type CustomerReportView = {
   updatedAt: Date;
@@ -116,7 +116,7 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
                 </div>
                 <p className="mt-2 text-sm text-slate-500">{section.description}</p>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  {section.fields.filter((field) => isFieldVisible(field, sectionState?.fields ?? {})).map((field) => (
+                  {section.fields.filter((field) => isCustomerVisibleField(field, sectionState?.fields ?? {})).map((field) => (
                     <div key={field.id} className="rounded-2xl bg-slate-50 px-4 py-3">
                       <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{field.label}</p>
                       {isRepeaterField(field) ? (

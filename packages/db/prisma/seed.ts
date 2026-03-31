@@ -90,7 +90,7 @@ async function createSeedInspection(input: {
   notes: string;
   claimable: boolean;
   tasks: Array<{
-    inspectionType: "fire_extinguisher" | "fire_alarm" | "wet_fire_sprinkler" | "backflow" | "fire_pump" | "dry_fire_sprinkler" | "kitchen_suppression" | "industrial_suppression" | "emergency_exit_lighting";
+    inspectionType: "fire_extinguisher" | "fire_alarm" | "wet_fire_sprinkler" | "joint_commission_fire_sprinkler" | "backflow" | "fire_pump" | "dry_fire_sprinkler" | "kitchen_suppression" | "industrial_suppression" | "emergency_exit_lighting";
     frequency: RecurrenceFrequency;
     report: {
       technicianId: string | null;

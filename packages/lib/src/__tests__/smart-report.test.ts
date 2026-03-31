@@ -1879,6 +1879,25 @@ describe("smart report foundations", () => {
     expect(() => validateFinalizationDraft(invalidBackflowDraft)).toThrow("Add at least one backflow assembly before finalizing.");
   });
 
+  it("builds the joint commission fire sprinkler report with quarterly and annual seeded sections and customer-safe internal notes", () => {
+    const draft = buildInitialReportDraft({
+      inspectionType: "joint_commission_fire_sprinkler",
+      siteName: "Harbor Main Campus",
+      customerName: "Harbor View Hospital",
+      scheduledDate: "2026-04-01T08:00:00.000Z",
+      assetCount: 0,
+      siteDefaults: { siteAddress: "123 Harbor Way" }
+    });
+
+    expect(draft.sectionOrder).toContain("quarterly-inspection");
+    expect(draft.sectionOrder).toContain("annual-inspection");
+    expect(draft.sections.header?.fields.facilityName).toBe("Harbor View Hospital");
+    expect(draft.sections.header?.fields.siteName).toBe("Harbor Main Campus");
+    expect((draft.sections["quarterly-inspection"]?.fields.quarterlyItems as Array<Record<string, string>>)[0]?.epLabel).toBe("LS.02.01.35 EP 1");
+    expect((draft.sections["annual-inspection"]?.fields.annualItems as Array<Record<string, string>>)[0]?.epLabel).toBe("LS.02.01.35 EP 2");
+    expect((draft.sections.deficiencies?.fields.deficiencyItems as Array<Record<string, string>> | undefined) ?? []).toHaveLength(0);
+  });
+
   it("prefills fire pump assets and carries forward operational defaults", () => {
     const draft = buildInitialReportDraft({
       inspectionType: "fire_pump",

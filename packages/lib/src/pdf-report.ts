@@ -2,7 +2,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFP
 import type { InspectionType } from "@testworx/types";
 
 import { resolveTenantBranding } from "./branding";
-import { buildReportPreview, describeRepeaterValueLines, isFieldVisible, type ReportDraft } from "./report-engine";
+import { buildReportPreview, describeRepeaterValueLines, isCustomerVisibleField, type ReportDraft } from "./report-engine";
 import { getReportPdfMetadata, resolveReportTemplate, type ReportFieldDefinition, type ReportPrimitiveValue } from "./report-config";
 import { decodeStoredFile } from "./storage";
 
@@ -426,7 +426,7 @@ function measureSectionCardHeight(
   boldFont: PDFFont
 ) {
   const lineItems = sectionTemplate.fields
-    .filter((field) => isFieldVisible(field, section.fields))
+    .filter((field) => isCustomerVisibleField(field, section.fields))
     .flatMap((field) => getSectionLines(field, section.fields));
 
   let height = 62;
@@ -462,7 +462,7 @@ function renderSectionCard(
   }
 
   const lineItems = sectionTemplate.fields
-    .filter((field) => isFieldVisible(field, section.fields))
+    .filter((field) => isCustomerVisibleField(field, section.fields))
     .flatMap((field) => getSectionLines(field, section.fields));
 
   for (const item of lineItems) {

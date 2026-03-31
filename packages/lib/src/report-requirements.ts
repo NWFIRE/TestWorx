@@ -41,6 +41,26 @@ export type BackflowRequirementProfile = {
   visualInspectionItems: BackflowRequirementItem[];
 };
 
+export type JointCommissionSprinklerFrequency = "quarterly" | "annual";
+
+export type JointCommissionSprinklerRequirementItem = {
+  requirementKey: string;
+  itemLabel: string;
+  epLabel: string;
+  codeLabel: string;
+  frequencyLabel: string;
+  frequency: JointCommissionSprinklerFrequency;
+  photoRequiredWhenFailed?: boolean;
+};
+
+export type JointCommissionSprinklerRequirementProfile = {
+  key: string;
+  label: string;
+  editionLabel: string;
+  description: string;
+  items: Record<JointCommissionSprinklerFrequency, JointCommissionSprinklerRequirementItem[]>;
+};
+
 const nfpa25_2023_baseline: WetSprinklerRequirementProfile = {
   key: "nfpa25_2023_baseline",
   label: "NFPA 25 (2023 baseline)",
@@ -418,6 +438,271 @@ export function buildBackflowChecklistSeedRows(profileKey = "nfpa25_2023_backflo
     condition: "",
     comments: "",
     customerComment: "",
+    correctiveAction: "",
+    photo: ""
+  }));
+}
+
+const tjc_nfpa25_2023_sprinkler: JointCommissionSprinklerRequirementProfile = {
+  key: "tjc_nfpa25_2023_sprinkler",
+  label: "Joint Commission / NFPA 25 (2023 baseline)",
+  editionLabel: "2023 baseline",
+  description: "Healthcare-focused quarterly and annual sprinkler documentation baseline aligned to NFPA 25 inspection/testing expectations and TJC-style traceability needs.",
+  items: {
+    quarterly: [
+      {
+        requirementKey: "control_valves_in_correct_position",
+        itemLabel: "Control valves in correct position",
+        epLabel: "LS.02.01.35 EP 1",
+        codeLabel: "NFPA 25 quarterly inspection baseline",
+        frequencyLabel: "Quarterly",
+        frequency: "quarterly"
+      },
+      {
+        requirementKey: "valves_locked_or_supervised",
+        itemLabel: "Valves locked or supervised",
+        epLabel: "LS.02.01.35 EP 1",
+        codeLabel: "NFPA 25 quarterly inspection baseline",
+        frequencyLabel: "Quarterly",
+        frequency: "quarterly"
+      },
+      {
+        requirementKey: "alarm_devices_free_of_damage",
+        itemLabel: "Alarm devices free of damage",
+        epLabel: "LS.02.01.35 EP 1",
+        codeLabel: "NFPA 25 quarterly inspection baseline",
+        frequencyLabel: "Quarterly",
+        frequency: "quarterly"
+      },
+      {
+        requirementKey: "fdc_condition",
+        itemLabel: "Fire department connection condition acceptable",
+        epLabel: "LS.02.01.35 EP 1",
+        codeLabel: "NFPA 25 quarterly inspection baseline",
+        frequencyLabel: "Quarterly",
+        frequency: "quarterly",
+        photoRequiredWhenFailed: true
+      },
+      {
+        requirementKey: "hydraulic_placard_legible",
+        itemLabel: "Hydraulic placard present and legible",
+        epLabel: "LS.02.01.35 EP 1",
+        codeLabel: "NFPA 25 quarterly inspection baseline",
+        frequencyLabel: "Quarterly",
+        frequency: "quarterly"
+      },
+      {
+        requirementKey: "main_drain_test_performed",
+        itemLabel: "Main drain test performed",
+        epLabel: "LS.02.01.35 EP 1",
+        codeLabel: "NFPA 25 quarterly test baseline",
+        frequencyLabel: "Quarterly",
+        frequency: "quarterly"
+      },
+      {
+        requirementKey: "static_pressure_recorded",
+        itemLabel: "Static pressure recorded",
+        epLabel: "LS.02.01.35 EP 1",
+        codeLabel: "NFPA 25 quarterly test baseline",
+        frequencyLabel: "Quarterly",
+        frequency: "quarterly"
+      },
+      {
+        requirementKey: "residual_pressure_recorded",
+        itemLabel: "Residual pressure recorded",
+        epLabel: "LS.02.01.35 EP 1",
+        codeLabel: "NFPA 25 quarterly test baseline",
+        frequencyLabel: "Quarterly",
+        frequency: "quarterly"
+      },
+      {
+        requirementKey: "results_comparable_to_previous",
+        itemLabel: "Results comparable to previous test",
+        epLabel: "LS.02.01.35 EP 1",
+        codeLabel: "NFPA 25 quarterly test baseline",
+        frequencyLabel: "Quarterly",
+        frequency: "quarterly"
+      },
+      {
+        requirementKey: "waterflow_alarm_tested",
+        itemLabel: "Waterflow alarm tested",
+        epLabel: "LS.02.01.35 EP 1",
+        codeLabel: "NFPA 25 quarterly test baseline",
+        frequencyLabel: "Quarterly",
+        frequency: "quarterly"
+      },
+      {
+        requirementKey: "alarm_operates_with_inspectors_test",
+        itemLabel: "Alarm operates from inspector's test",
+        epLabel: "LS.02.01.35 EP 1",
+        codeLabel: "NFPA 25 quarterly test baseline",
+        frequencyLabel: "Quarterly",
+        frequency: "quarterly",
+        photoRequiredWhenFailed: true
+      },
+      {
+        requirementKey: "alarm_operates_with_bypass",
+        itemLabel: "Alarm operates from bypass",
+        epLabel: "LS.02.01.35 EP 1",
+        codeLabel: "NFPA 25 quarterly test baseline",
+        frequencyLabel: "Quarterly",
+        frequency: "quarterly"
+      },
+      {
+        requirementKey: "full_flow_observed",
+        itemLabel: "Full flow observed",
+        epLabel: "LS.02.01.35 EP 1",
+        codeLabel: "NFPA 25 quarterly test baseline",
+        frequencyLabel: "Quarterly",
+        frequency: "quarterly"
+      }
+    ],
+    annual: [
+      {
+        requirementKey: "sprinklers_free_of_corrosion_paint_damage",
+        itemLabel: "Sprinklers free of corrosion, paint, and damage",
+        epLabel: "LS.02.01.35 EP 2",
+        codeLabel: "NFPA 25 annual inspection baseline",
+        frequencyLabel: "Annual",
+        frequency: "annual"
+      },
+      {
+        requirementKey: "no_obstructions_to_sprinklers",
+        itemLabel: "No obstructions to sprinklers",
+        epLabel: "LS.02.01.35 EP 2",
+        codeLabel: "NFPA 25 annual inspection baseline",
+        frequencyLabel: "Annual",
+        frequency: "annual"
+      },
+      {
+        requirementKey: "proper_clearance_maintained",
+        itemLabel: "Required clearance maintained",
+        epLabel: "LS.02.01.35 EP 2",
+        codeLabel: "NFPA 25 annual inspection baseline",
+        frequencyLabel: "Annual",
+        frequency: "annual",
+        photoRequiredWhenFailed: true
+      },
+      {
+        requirementKey: "piping_free_of_corrosion",
+        itemLabel: "Visible piping free of corrosion",
+        epLabel: "LS.02.01.35 EP 2",
+        codeLabel: "NFPA 25 annual inspection baseline",
+        frequencyLabel: "Annual",
+        frequency: "annual"
+      },
+      {
+        requirementKey: "piping_properly_aligned",
+        itemLabel: "Piping properly aligned and supported",
+        epLabel: "LS.02.01.35 EP 2",
+        codeLabel: "NFPA 25 annual inspection baseline",
+        frequencyLabel: "Annual",
+        frequency: "annual"
+      },
+      {
+        requirementKey: "pipe_hangers_in_good_condition",
+        itemLabel: "Pipe hangers in good condition",
+        epLabel: "LS.02.01.35 EP 2",
+        codeLabel: "NFPA 25 annual inspection baseline",
+        frequencyLabel: "Annual",
+        frequency: "annual"
+      },
+      {
+        requirementKey: "no_leaks_observed",
+        itemLabel: "No leaks observed",
+        epLabel: "LS.02.01.35 EP 2",
+        codeLabel: "NFPA 25 annual inspection baseline",
+        frequencyLabel: "Annual",
+        frequency: "annual"
+      },
+      {
+        requirementKey: "gauges_accurate_or_replaced",
+        itemLabel: "Gauges accurate or replaced as needed",
+        epLabel: "LS.02.01.35 EP 2",
+        codeLabel: "NFPA 25 annual inspection baseline",
+        frequencyLabel: "Annual",
+        frequency: "annual"
+      },
+      {
+        requirementKey: "control_valves_operate_properly",
+        itemLabel: "Control valves operate properly",
+        epLabel: "LS.02.01.35 EP 2",
+        codeLabel: "NFPA 25 annual inspection baseline",
+        frequencyLabel: "Annual",
+        frequency: "annual"
+      },
+      {
+        requirementKey: "supervisory_switches_operational",
+        itemLabel: "Supervisory switches operational",
+        epLabel: "LS.02.01.35 EP 2",
+        codeLabel: "NFPA 25 annual inspection baseline",
+        frequencyLabel: "Annual",
+        frequency: "annual"
+      },
+      {
+        requirementKey: "waterflow_devices_pass_test",
+        itemLabel: "Waterflow devices pass test",
+        epLabel: "LS.02.01.35 EP 2",
+        codeLabel: "NFPA 25 annual inspection baseline",
+        frequencyLabel: "Annual",
+        frequency: "annual",
+        photoRequiredWhenFailed: true
+      },
+      {
+        requirementKey: "spare_heads_present_correct_type_quantity",
+        itemLabel: "Spare heads present in correct quantity/type",
+        epLabel: "LS.02.01.35 EP 2",
+        codeLabel: "NFPA 25 annual inspection baseline",
+        frequencyLabel: "Annual",
+        frequency: "annual"
+      },
+      {
+        requirementKey: "wrench_and_cabinet_present",
+        itemLabel: "Wrench and cabinet present",
+        epLabel: "LS.02.01.35 EP 2",
+        codeLabel: "NFPA 25 annual inspection baseline",
+        frequencyLabel: "Annual",
+        frequency: "annual"
+      },
+      {
+        requirementKey: "system_tag_present_and_updated",
+        itemLabel: "System tag present and updated",
+        epLabel: "LS.02.01.35 EP 2",
+        codeLabel: "NFPA 25 annual inspection baseline",
+        frequencyLabel: "Annual",
+        frequency: "annual",
+        photoRequiredWhenFailed: true
+      },
+      {
+        requirementKey: "system_remains_in_service",
+        itemLabel: "System remains in service",
+        epLabel: "LS.02.01.35 EP 2",
+        codeLabel: "NFPA 25 annual inspection baseline",
+        frequencyLabel: "Annual",
+        frequency: "annual"
+      }
+    ]
+  }
+};
+
+export const jointCommissionSprinklerRequirementProfiles: JointCommissionSprinklerRequirementProfile[] = [tjc_nfpa25_2023_sprinkler];
+
+export function buildJointCommissionSprinklerSeedRows(
+  frequency: JointCommissionSprinklerFrequency,
+  profileKey = "tjc_nfpa25_2023_sprinkler"
+) {
+  const profile = jointCommissionSprinklerRequirementProfiles.find((candidate) => candidate.key === profileKey) ?? tjc_nfpa25_2023_sprinkler;
+  return profile.items[frequency].map((item) => ({
+    requirementKey: item.requirementKey,
+    requirementProfileKey: profile.key,
+    requirementEditionLabel: profile.editionLabel,
+    itemLabel: item.itemLabel,
+    epLabel: item.epLabel,
+    codeLabel: item.codeLabel,
+    frequencyLabel: item.frequencyLabel,
+    photoRequiredWhenFailed: item.photoRequiredWhenFailed ? "yes" : "no",
+    result: "",
+    comments: "",
     correctiveAction: "",
     photo: ""
   }));
