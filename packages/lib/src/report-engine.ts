@@ -828,6 +828,28 @@ export function applyRepeaterRowSmartUpdate(
   return applyRepeaterRowEnhancements(repeaterField.rowFields, applyFieldMappings(repeaterField.rowFields, row, changedFieldId));
 }
 
+export function applySectionFieldSmartUpdate(
+  template: ReportTemplateDefinition,
+  sectionId: string,
+  fields: Record<string, ReportPrimitiveValue>,
+  changedFieldId: string
+) {
+  const section = template.sections.find((item) => item.id === sectionId);
+  if (!section) {
+    return fields;
+  }
+
+  const fieldDefinitions = section.fields.filter((field): field is Exclude<ReportFieldDefinition, { type: "repeater" }> => field.type !== "repeater");
+  const nextValues = applyFieldMappings(fieldDefinitions, fields, changedFieldId);
+  const normalizedValues = { ...nextValues };
+
+  for (const field of fieldDefinitions) {
+    normalizedValues[field.id] = normalizePrimitiveField(field, normalizedValues[field.id]);
+  }
+
+  return applyCustomValueSupport(fieldDefinitions, normalizedValues);
+}
+
 export function duplicateRepeaterRows(
   rows: Array<Record<string, ReportPrimitiveValue>>,
   rowIndex: number

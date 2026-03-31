@@ -25,6 +25,22 @@ export type WetSprinklerRequirementProfile = {
   items: Record<WetSprinklerRequirementGroupKey, WetSprinklerRequirementItem[]>;
 };
 
+export type BackflowRequirementItem = {
+  requirementKey: string;
+  displayLabel: string;
+  codeRef: string;
+  frequencyLabel: string;
+  defaultSeverity?: "low" | "medium" | "high" | "critical";
+};
+
+export type BackflowRequirementProfile = {
+  key: string;
+  label: string;
+  editionLabel: string;
+  description: string;
+  visualInspectionItems: BackflowRequirementItem[];
+};
+
 const nfpa25_2023_baseline: WetSprinklerRequirementProfile = {
   key: "nfpa25_2023_baseline",
   label: "NFPA 25 (2023 baseline)",
@@ -265,6 +281,147 @@ const nfpa25_2023_baseline: WetSprinklerRequirementProfile = {
     ]
   }
 };
+
+const nfpa25_2023_backflow: BackflowRequirementProfile = {
+  key: "nfpa25_2023_backflow",
+  label: "NFPA 25 (2023 baseline)",
+  editionLabel: "2023 baseline",
+  description: "Baseline backflow prevention inspection and testing checkpoints for fire protection service, structured so adopted edition or AHJ-specific profiles can be swapped later.",
+  visualInspectionItems: [
+    {
+      requirementKey: "assembly_accessible",
+      displayLabel: "Assembly is accessible for inspection, testing, and service.",
+      codeRef: "NFPA 25 backflow visual inspection baseline",
+      frequencyLabel: "Annual inspection / test",
+      defaultSeverity: "high"
+    },
+    {
+      requirementKey: "protected_from_damage",
+      displayLabel: "Assembly is protected from physical damage and environmental exposure.",
+      codeRef: "NFPA 25 backflow visual inspection baseline",
+      frequencyLabel: "Annual inspection / test",
+      defaultSeverity: "high"
+    },
+    {
+      requirementKey: "no_external_leakage",
+      displayLabel: "No visible external leakage is present at the assembly or trim.",
+      codeRef: "NFPA 25 backflow visual inspection baseline",
+      frequencyLabel: "Annual inspection / test",
+      defaultSeverity: "high"
+    },
+    {
+      requirementKey: "caps_and_plugs_present",
+      displayLabel: "Required caps, plugs, and protective fittings are present and in acceptable condition.",
+      codeRef: "NFPA 25 backflow visual inspection baseline",
+      frequencyLabel: "Annual inspection / test",
+      defaultSeverity: "medium"
+    },
+    {
+      requirementKey: "test_cocks_acceptable",
+      displayLabel: "Test cocks are intact, accessible, and in acceptable condition.",
+      codeRef: "NFPA 25 backflow visual inspection baseline",
+      frequencyLabel: "Annual inspection / test",
+      defaultSeverity: "medium"
+    },
+    {
+      requirementKey: "shutoff_valves_accessible",
+      displayLabel: "Required shutoff valves are accessible and operable.",
+      codeRef: "NFPA 25 backflow visual inspection baseline",
+      frequencyLabel: "Annual inspection / test",
+      defaultSeverity: "high"
+    },
+    {
+      requirementKey: "shutoff_valves_position",
+      displayLabel: "Shutoff valves are in the required position and indicate normal service readiness.",
+      codeRef: "NFPA 25 backflow visual inspection baseline",
+      frequencyLabel: "Annual inspection / test",
+      defaultSeverity: "high"
+    },
+    {
+      requirementKey: "supervisory_condition",
+      displayLabel: "Supervisory / tamper condition is acceptable where provided.",
+      codeRef: "NFPA 25 backflow visual inspection baseline",
+      frequencyLabel: "Annual inspection / test",
+      defaultSeverity: "high"
+    },
+    {
+      requirementKey: "gauges_legible",
+      displayLabel: "Gauges are present, legible, and suitable for inspection/testing.",
+      codeRef: "NFPA 25 backflow visual inspection baseline",
+      frequencyLabel: "Annual inspection / test",
+      defaultSeverity: "medium"
+    },
+    {
+      requirementKey: "no_visible_corrosion",
+      displayLabel: "No visible corrosion, scaling, or abnormal deterioration is present.",
+      codeRef: "NFPA 25 backflow visual inspection baseline",
+      frequencyLabel: "Annual inspection / test",
+      defaultSeverity: "medium"
+    },
+    {
+      requirementKey: "no_freeze_damage",
+      displayLabel: "No evidence of freeze damage or thermal exposure is observed.",
+      codeRef: "NFPA 25 backflow visual inspection baseline",
+      frequencyLabel: "Annual inspection / test",
+      defaultSeverity: "high"
+    },
+    {
+      requirementKey: "relief_discharge_acceptable",
+      displayLabel: "Relief discharge arrangement is acceptable where applicable.",
+      codeRef: "NFPA 25 backflow visual inspection baseline",
+      frequencyLabel: "Annual inspection / test",
+      defaultSeverity: "high"
+    },
+    {
+      requirementKey: "identification_present",
+      displayLabel: "Required identification tag, label, or assembly markings are present and legible.",
+      codeRef: "NFPA 25 backflow visual inspection baseline",
+      frequencyLabel: "Annual inspection / test",
+      defaultSeverity: "medium"
+    },
+    {
+      requirementKey: "support_mounting_acceptable",
+      displayLabel: "Assembly support, bracing, or mounting condition is acceptable.",
+      codeRef: "NFPA 25 backflow visual inspection baseline",
+      frequencyLabel: "Annual inspection / test",
+      defaultSeverity: "medium"
+    },
+    {
+      requirementKey: "room_or_vault_acceptable",
+      displayLabel: "Vault, room, or enclosure condition is acceptable for the assembly.",
+      codeRef: "NFPA 25 backflow visual inspection baseline",
+      frequencyLabel: "Annual inspection / test",
+      defaultSeverity: "medium"
+    },
+    {
+      requirementKey: "drainage_adequate",
+      displayLabel: "Drainage is adequate where applicable for testing, relief discharge, and service conditions.",
+      codeRef: "NFPA 25 backflow visual inspection baseline",
+      frequencyLabel: "Annual inspection / test",
+      defaultSeverity: "high"
+    }
+  ]
+};
+
+export const backflowRequirementProfiles: BackflowRequirementProfile[] = [nfpa25_2023_backflow];
+
+export function buildBackflowChecklistSeedRows(profileKey = "nfpa25_2023_backflow") {
+  const profile = backflowRequirementProfiles.find((candidate) => candidate.key === profileKey) ?? nfpa25_2023_backflow;
+  return profile.visualInspectionItems.map((item) => ({
+    requirementKey: item.requirementKey,
+    requirementProfileKey: profile.key,
+    requirementEditionLabel: profile.editionLabel,
+    frequencyLabel: item.frequencyLabel,
+    displayLabel: item.displayLabel,
+    codeRef: item.codeRef,
+    result: "",
+    condition: "",
+    comments: "",
+    customerComment: "",
+    correctiveAction: "",
+    photo: ""
+  }));
+}
 
 export const wetSprinklerRequirementProfiles: WetSprinklerRequirementProfile[] = [
   nfpa25_2023_baseline

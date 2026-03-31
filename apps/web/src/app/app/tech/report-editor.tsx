@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { applyRepeaterBulkAction, applyRepeaterRowSmartUpdate, buildRepeaterRowDefaults, buildReportPreview, describeRepeaterRowLabel, duplicateRepeaterRows, getReportPhotoValidationError, isFieldVisible, prepareReportPhotoForDraft, reportPhotoPreparationConfig, shouldAutosaveDraft } from "@testworx/lib";
+import { applyRepeaterBulkAction, applyRepeaterRowSmartUpdate, applySectionFieldSmartUpdate, buildRepeaterRowDefaults, buildReportPreview, describeRepeaterRowLabel, duplicateRepeaterRows, getReportPhotoValidationError, isFieldVisible, prepareReportPhotoForDraft, reportPhotoPreparationConfig, shouldAutosaveDraft } from "@testworx/lib";
 import type { ReportDraft } from "@testworx/lib";
 import type { ReportFieldDefinition, ReportPrimitiveValue, ReportTemplateDefinition } from "@testworx/lib";
 
@@ -302,16 +302,22 @@ export function ReportEditor({ data }: { data: EditorData }) {
 
   function updateSectionField(sectionId: string, fieldId: string, value: string | boolean | number) {
     const currentSection = sectionState(sectionId);
+    const nextFields = applySectionFieldSmartUpdate(
+      data.template,
+      sectionId,
+      {
+        ...(currentSection.fields as Record<string, ReportPrimitiveValue>),
+        [fieldId]: value
+      },
+      fieldId
+    );
     updateDraft({
       ...draft,
       sections: {
         ...draft.sections,
         [sectionId]: {
           ...currentSection,
-          fields: {
-            ...currentSection.fields,
-            [fieldId]: value
-          }
+          fields: nextFields
         }
       }
     });

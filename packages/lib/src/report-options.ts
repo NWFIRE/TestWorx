@@ -1,5 +1,5 @@
 import type { ReportAssetRecord, ReportOption, ReportPrimitiveValue } from "./report-config";
-import { wetSprinklerRequirementProfiles } from "./report-requirements";
+import { backflowRequirementProfiles, wetSprinklerRequirementProfiles } from "./report-requirements";
 
 export type ReportOptionProviderKey =
   | "passFail"
@@ -17,6 +17,40 @@ export type ReportOptionProviderKey =
   | "extinguisher_service_performed"
   | "extinguisherStatus"
   | "backflowAssemblyTypes"
+  | "backflowRequirementProfiles"
+  | "backflowManufacturers"
+  | "backflowInspectionTypeOptions"
+  | "backflowTagStatusOptions"
+  | "backflowCodeEditionOptions"
+  | "backflowSystemServedOptions"
+  | "backflowSprinklerSystemTypeOptions"
+  | "backflowWaterSupplyTypeOptions"
+  | "backflowOccupancyTypeOptions"
+  | "backflowSystemStatusOptions"
+  | "backflowMonitoringStatusOptions"
+  | "backflowAssemblySizeOptions"
+  | "backflowOrientationOptions"
+  | "backflowDetectorMeterOptions"
+  | "backflowFireLineTypeOptions"
+  | "backflowTestReasonOptions"
+  | "backflowStatusOptions"
+  | "backflowConditionOptions"
+  | "backflowTestPerformedOptions"
+  | "backflowInitialTestResultOptions"
+  | "backflowReliefDischargeOptions"
+  | "backflowYesNoOptions"
+  | "backflowYesNoNAOptions"
+  | "backflowUnknownYesNoOptions"
+  | "backflowDeficiencyCategoryOptions"
+  | "backflowSeverityOptions"
+  | "backflowRecommendationOptions"
+  | "backflowRepairPriorityOptions"
+  | "backflowSystemLeftInServiceOptions"
+  | "backflowFireWatchOptions"
+  | "backflowRepairsPerformedOptions"
+  | "backflowPhotoCategoryOptions"
+  | "backflowFinalResultOptions"
+  | "backflowFollowUpRecommendationOptions"
   | "alarmDeviceTypes"
   | "alarmNotificationApplianceTypes"
   | "communicationPathTypes"
@@ -153,11 +187,306 @@ const extinguisherStatus: ReportOption[] = [
 ];
 
 const backflowAssemblyTypes: ReportOption[] = [
-  { label: "RPZ", value: "rpz" },
-  { label: "DCDA", value: "dcda" },
-  { label: "PVB", value: "pvb" },
-  { label: "SVB", value: "svb" },
-  { label: "Double check", value: "double_check" }
+  { label: "RPZ", value: "rpz", metadata: { workflow: "RP workflow" } },
+  { label: "DCDA", value: "dcda", metadata: { workflow: "DC workflow" } },
+  { label: "DCVA", value: "dcva", metadata: { workflow: "DC workflow" } },
+  { label: "RPDA", value: "rpda", metadata: { workflow: "RP workflow" } },
+  { label: "RPZA", value: "rpza", metadata: { workflow: "RP workflow" } },
+  { label: "Detector check", value: "detector_check", metadata: { workflow: "Detector check workflow" } },
+  { label: "PVB", value: "pvb", metadata: { workflow: "Other backflow workflow" } },
+  { label: "SVB", value: "svb", metadata: { workflow: "Other backflow workflow" } },
+  { label: "Double check", value: "double_check", metadata: { workflow: "DC workflow" } },
+  { label: "Reduced pressure", value: "reduced_pressure", metadata: { workflow: "RP workflow" } },
+  { label: "Other", value: "other", metadata: { workflow: "Custom workflow" } }
+];
+
+const backflowRequirementProfileOptions: ReportOption[] = backflowRequirementProfiles.map((profile) => ({
+  label: profile.label,
+  value: profile.key,
+  metadata: {
+    editionLabel: profile.editionLabel,
+    description: profile.description
+  }
+}));
+
+const backflowManufacturers: ReportOption[] = [
+  { label: "Ames", value: "ames" },
+  { label: "Apollo", value: "apollo" },
+  { label: "Cla-Val", value: "cla_val" },
+  { label: "Conbraco", value: "conbraco" },
+  { label: "Febco", value: "febco" },
+  { label: "Watts", value: "watts" },
+  { label: "Wilkins", value: "wilkins" },
+  { label: "Other", value: "other" }
+];
+
+const backflowInspectionTypeOptions: ReportOption[] = [
+  { label: "Annual test", value: "annual_test" },
+  { label: "Initial acceptance support", value: "initial_acceptance_support" },
+  { label: "Re-test", value: "re_test" },
+  { label: "Deficiency follow-up", value: "deficiency_follow_up" },
+  { label: "Repair verification", value: "repair_verification" },
+  { label: "Inspection only", value: "inspection_only" },
+  { label: "Other", value: "other" }
+];
+
+const backflowTagStatusOptions: ReportOption[] = [
+  { label: "New tag installed", value: "new_tag_installed" },
+  { label: "Existing tag updated", value: "existing_tag_updated" },
+  { label: "No tag installed", value: "no_tag_installed" },
+  { label: "Tag missing", value: "tag_missing" },
+  { label: "Tag not applicable", value: "tag_not_applicable" }
+];
+
+const backflowCodeEditionOptions: ReportOption[] = [
+  { label: "NFPA 25 2026", value: "nfpa25_2026" },
+  { label: "NFPA 25 2023", value: "nfpa25_2023" },
+  { label: "NFPA 25 2020", value: "nfpa25_2020" },
+  { label: "NFPA 25 2017", value: "nfpa25_2017" },
+  { label: "AHJ-specific requirement set", value: "ahj_specific" },
+  { label: "Other", value: "other" }
+];
+
+const backflowSystemServedOptions: ReportOption[] = [
+  { label: "Fire sprinkler system", value: "fire_sprinkler_system" },
+  { label: "Standpipe system", value: "standpipe_system" },
+  { label: "Combined fire sprinkler / standpipe", value: "combined_fire_sprinkler_standpipe" },
+  { label: "Combined fire / domestic", value: "combined_fire_domestic" },
+  { label: "Private fire service main", value: "private_fire_service_main" },
+  { label: "Other", value: "other" }
+];
+
+const backflowSprinklerSystemTypeOptions: ReportOption[] = [
+  { label: "Wet pipe", value: "wet_pipe" },
+  { label: "Dry pipe", value: "dry_pipe" },
+  { label: "Preaction", value: "preaction" },
+  { label: "Deluge", value: "deluge" },
+  { label: "Antifreeze", value: "antifreeze" },
+  { label: "Mixed / multiple", value: "mixed_multiple" },
+  { label: "Not applicable", value: "not_applicable" }
+];
+
+const backflowWaterSupplyTypeOptions: ReportOption[] = [
+  { label: "Municipal", value: "municipal" },
+  { label: "Private main", value: "private_main" },
+  { label: "Tank supplied", value: "tank_supplied" },
+  { label: "Pump supplied", value: "pump_supplied" },
+  { label: "Combined sources", value: "combined_sources" },
+  { label: "Other", value: "other" }
+];
+
+const backflowOccupancyTypeOptions: ReportOption[] = [
+  { label: "Office", value: "office" },
+  { label: "Retail", value: "retail" },
+  { label: "Industrial", value: "industrial" },
+  { label: "Warehouse", value: "warehouse" },
+  { label: "Multifamily", value: "multifamily" },
+  { label: "Healthcare", value: "healthcare" },
+  { label: "Educational", value: "educational" },
+  { label: "Mixed use", value: "mixed_use" },
+  { label: "Other", value: "other" }
+];
+
+const backflowSystemStatusOptions: ReportOption[] = [
+  { label: "In service", value: "in_service" },
+  { label: "Out of service", value: "out_of_service" },
+  { label: "Partially impaired", value: "partially_impaired" },
+  { label: "Fully impaired", value: "fully_impaired" }
+];
+
+const backflowMonitoringStatusOptions: ReportOption[] = [
+  { label: "Monitored", value: "monitored" },
+  { label: "Not monitored", value: "not_monitored" },
+  { label: "Supervisory only", value: "supervisory_only" },
+  { label: "Unknown", value: "unknown" }
+];
+
+const backflowAssemblySizeOptions: ReportOption[] = [
+  { label: "3/4 in", value: "0.75" },
+  { label: "1 in", value: "1" },
+  { label: "1 1/4 in", value: "1.25" },
+  { label: "1 1/2 in", value: "1.5" },
+  { label: "2 in", value: "2" },
+  { label: "2 1/2 in", value: "2.5" },
+  { label: "3 in", value: "3" },
+  { label: "4 in", value: "4" },
+  { label: "6 in", value: "6" },
+  { label: "8 in", value: "8" },
+  { label: "10 in", value: "10" },
+  { label: "12 in", value: "12" },
+  { label: "Other", value: "other" }
+];
+
+const backflowOrientationOptions: ReportOption[] = [
+  { label: "Horizontal", value: "horizontal" },
+  { label: "Vertical", value: "vertical" },
+  { label: "Unknown", value: "unknown" },
+  { label: "Other", value: "other" }
+];
+
+const backflowDetectorMeterOptions: ReportOption[] = [
+  { label: "Yes", value: "yes" },
+  { label: "No", value: "no" },
+  { label: "Not applicable", value: "not_applicable" }
+];
+
+const backflowFireLineTypeOptions: ReportOption[] = [
+  { label: "Dedicated fire line", value: "dedicated_fire_line" },
+  { label: "Combined fire / domestic", value: "combined_fire_domestic" },
+  { label: "Detector line", value: "detector_line" },
+  { label: "Other", value: "other" }
+];
+
+const backflowTestReasonOptions: ReportOption[] = [
+  { label: "Scheduled annual test", value: "scheduled_annual_test" },
+  { label: "New install / acceptance support", value: "new_install_acceptance_support" },
+  { label: "Re-test after failure", value: "re_test_after_failure" },
+  { label: "Post-repair verification", value: "post_repair_verification" },
+  { label: "Complaint / service call", value: "complaint_service_call" },
+  { label: "AHJ request", value: "ahj_request" },
+  { label: "Other", value: "other" }
+];
+
+const backflowStatusOptions: ReportOption[] = [
+  { label: "Pass", value: "pass" },
+  { label: "Fail", value: "fail" },
+  { label: "N/A", value: "na" }
+];
+
+const backflowConditionOptions: ReportOption[] = [
+  { label: "Good", value: "good" },
+  { label: "Fair", value: "fair" },
+  { label: "Poor", value: "poor" }
+];
+
+const backflowTestPerformedOptions: ReportOption[] = [
+  { label: "Yes", value: "yes" },
+  { label: "No", value: "no" },
+  { label: "Partial", value: "partial" },
+  { label: "Could not complete", value: "could_not_complete" }
+];
+
+const backflowInitialTestResultOptions: ReportOption[] = [
+  { label: "Pass", value: "pass" },
+  { label: "Fail", value: "fail" },
+  { label: "Unable to complete", value: "unable_to_complete" },
+  { label: "Not tested", value: "not_tested" }
+];
+
+const backflowReliefDischargeOptions: ReportOption[] = [
+  { label: "Yes", value: "yes" },
+  { label: "No", value: "no" },
+  { label: "Intermittent", value: "intermittent" },
+  { label: "N/A", value: "na" }
+];
+
+const backflowYesNoOptions: ReportOption[] = [
+  { label: "Yes", value: "yes" },
+  { label: "No", value: "no" }
+];
+
+const backflowYesNoNAOptions: ReportOption[] = [
+  { label: "Yes", value: "yes" },
+  { label: "No", value: "no" },
+  { label: "Not applicable", value: "not_applicable" }
+];
+
+const backflowUnknownYesNoOptions: ReportOption[] = [
+  { label: "Yes", value: "yes" },
+  { label: "No", value: "no" },
+  { label: "Unknown", value: "unknown" }
+];
+
+const backflowDeficiencyCategoryOptions: ReportOption[] = [
+  { label: "Leakage", value: "leakage" },
+  { label: "Failed test", value: "failed_test" },
+  { label: "Corrosion", value: "corrosion" },
+  { label: "Mechanical damage", value: "mechanical_damage" },
+  { label: "Improper valve position", value: "improper_valve_position" },
+  { label: "Missing identification", value: "missing_identification" },
+  { label: "Accessibility issue", value: "accessibility_issue" },
+  { label: "Environmental exposure", value: "environmental_exposure" },
+  { label: "Monitoring / tamper issue", value: "monitoring_tamper_issue" },
+  { label: "Code documentation issue", value: "code_documentation_issue" },
+  { label: "Other", value: "other" }
+];
+
+const backflowSeverityOptions: ReportOption[] = [
+  { label: "None", value: "none" },
+  { label: "Minor deficiency", value: "minor_deficiency" },
+  { label: "Deficiency", value: "deficiency" },
+  { label: "Critical impairment", value: "critical_impairment" }
+];
+
+const backflowRecommendationOptions: ReportOption[] = [
+  { label: "Monitor", value: "monitor" },
+  { label: "Repair", value: "repair" },
+  { label: "Replace", value: "replace" },
+  { label: "Re-test", value: "re_test" },
+  { label: "Further evaluation", value: "further_evaluation" },
+  { label: "Contact AHJ", value: "contact_ahj" },
+  { label: "Contact water purveyor", value: "contact_water_purveyor" },
+  { label: "Other", value: "other" }
+];
+
+const backflowRepairPriorityOptions: ReportOption[] = [
+  { label: "Immediate", value: "immediate" },
+  { label: "Prompt", value: "prompt" },
+  { label: "Routine", value: "routine" },
+  { label: "At next service", value: "at_next_service" }
+];
+
+const backflowSystemLeftInServiceOptions: ReportOption[] = [
+  { label: "Yes", value: "yes" },
+  { label: "No", value: "no" },
+  { label: "Partially", value: "partially" }
+];
+
+const backflowFireWatchOptions: ReportOption[] = [
+  { label: "Yes", value: "yes" },
+  { label: "No", value: "no" },
+  { label: "Not applicable", value: "not_applicable" }
+];
+
+const backflowRepairsPerformedOptions: ReportOption[] = [
+  { label: "None", value: "none" },
+  { label: "Minor adjustment", value: "minor_adjustment" },
+  { label: "Cleaning", value: "cleaning" },
+  { label: "Part replacement", value: "part_replacement" },
+  { label: "Rebuild / internal repair", value: "rebuild_internal_repair" },
+  { label: "Other", value: "other" }
+];
+
+const backflowPhotoCategoryOptions: ReportOption[] = [
+  { label: "Assembly overview", value: "assembly_overview" },
+  { label: "Nameplate / manufacturer tag", value: "nameplate_manufacturer_tag" },
+  { label: "Serial / model identification", value: "serial_model_identification" },
+  { label: "Test setup", value: "test_setup" },
+  { label: "Gauge / reading evidence", value: "gauge_reading_evidence" },
+  { label: "Relief discharge evidence", value: "relief_discharge_evidence" },
+  { label: "Shutoff valves", value: "shutoff_valves" },
+  { label: "Leakage / corrosion", value: "leakage_corrosion" },
+  { label: "Deficiency detail", value: "deficiency_detail" },
+  { label: "Repair completed", value: "repair_completed" },
+  { label: "Final condition", value: "final_condition" }
+];
+
+const backflowFinalResultOptions: ReportOption[] = [
+  { label: "Passed", value: "passed" },
+  { label: "Failed", value: "failed" },
+  { label: "Passed after repair", value: "passed_after_repair" },
+  { label: "Incomplete", value: "incomplete" },
+  { label: "Not tested", value: "not_tested" }
+];
+
+const backflowFollowUpRecommendationOptions: ReportOption[] = [
+  { label: "No further action", value: "no_further_action" },
+  { label: "Repair deficiency", value: "repair_deficiency" },
+  { label: "Replace assembly", value: "replace_assembly" },
+  { label: "Re-test assembly", value: "re_test_assembly" },
+  { label: "Additional evaluation", value: "additional_evaluation" },
+  { label: "Coordinate with AHJ / water purveyor", value: "coordinate_with_ahj_or_water_purveyor" },
+  { label: "Other", value: "other" }
 ];
 
 const alarmDeviceTypes: ReportOption[] = [
@@ -437,6 +766,40 @@ export const reportOptionProviders = {
   extinguisher_service_performed: extinguisherServicePerformedOptions,
   extinguisherStatus,
   backflowAssemblyTypes,
+  backflowRequirementProfiles: backflowRequirementProfileOptions,
+  backflowManufacturers,
+  backflowInspectionTypeOptions,
+  backflowTagStatusOptions,
+  backflowCodeEditionOptions,
+  backflowSystemServedOptions,
+  backflowSprinklerSystemTypeOptions,
+  backflowWaterSupplyTypeOptions,
+  backflowOccupancyTypeOptions,
+  backflowSystemStatusOptions,
+  backflowMonitoringStatusOptions,
+  backflowAssemblySizeOptions,
+  backflowOrientationOptions,
+  backflowDetectorMeterOptions,
+  backflowFireLineTypeOptions,
+  backflowTestReasonOptions,
+  backflowStatusOptions,
+  backflowConditionOptions,
+  backflowTestPerformedOptions,
+  backflowInitialTestResultOptions,
+  backflowReliefDischargeOptions,
+  backflowYesNoOptions,
+  backflowYesNoNAOptions,
+  backflowUnknownYesNoOptions,
+  backflowDeficiencyCategoryOptions,
+  backflowSeverityOptions,
+  backflowRecommendationOptions,
+  backflowRepairPriorityOptions,
+  backflowSystemLeftInServiceOptions,
+  backflowFireWatchOptions,
+  backflowRepairsPerformedOptions,
+  backflowPhotoCategoryOptions,
+  backflowFinalResultOptions,
+  backflowFollowUpRecommendationOptions,
   alarmDeviceTypes,
   alarmNotificationApplianceTypes,
   communicationPathTypes,
@@ -501,8 +864,12 @@ export function buildAssetOptions(assets: ReportAssetRecord[]) {
         batterySize: coerceMetadata(metadata.batterySize),
         batteryQuantity: coerceMetadata(metadata.batteryQuantity),
         assemblyType: coerceMetadata(metadata.assemblyType),
-        sizeInches: coerceMetadata(metadata.sizeInches),
+        sizeInches: typeof metadata.sizeInches === "number" ? String(metadata.sizeInches) : coerceMetadata(metadata.sizeInches),
         serialNumber: coerceMetadata(metadata.serialNumber),
+        installationOrientation: coerceMetadata(metadata.installationOrientation),
+        detectorMeterPresent: coerceMetadata(metadata.detectorMeterPresent),
+        fireLineType: coerceMetadata(metadata.fireLineType),
+        installYear: coerceMetadata(metadata.installYear),
         controller: coerceMetadata(metadata.controller),
         driverType: coerceMetadata(metadata.driverType),
         panelModel: coerceMetadata(metadata.panelModel),

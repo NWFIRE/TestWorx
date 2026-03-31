@@ -1321,37 +1321,169 @@ describe("smart report foundations", () => {
         templateVersion: 1,
         inspectionType: "backflow",
         overallNotes: "",
-        sectionOrder: ["assembly", "test-results", "certification"],
-        activeSectionId: "assembly",
+        sectionOrder: ["header", "site-context", "assembly-identification", "inspection-scope", "visual-inspection", "test-results", "deficiencies", "corrective-actions", "photos", "final-disposition", "signatures"],
+        activeSectionId: "assembly-identification",
         sections: {
-          assembly: {
+          header: {
+            status: "pass",
+            notes: "",
+            fields: {
+              customerName: "Harbor View Hospital",
+              siteName: "Harbor Main Campus",
+              buildingArea: "",
+              siteAddress: "123 Harbor Way",
+              workOrderNumber: "",
+              jobNumber: "",
+              inspectionDate: "2025-03-20T15:00:00.000Z",
+              inspectionStartTime: "9:00 AM",
+              inspectionEndTime: "10:00 AM",
+              technician: "Alex Tester",
+              technicianLicenseOrCertification: "T-100",
+              inspectionType: "annual_test",
+              tagStatus: "existing_tag_updated",
+              ahjName: "",
+              adoptedCodeEdition: "nfpa25_2023"
+            }
+          },
+          "site-context": {
+            status: "pass",
+            notes: "",
+            fields: {
+              requirementProfile: "nfpa25_2023_backflow",
+              fireProtectionSystemServed: "fire_sprinkler_system",
+              sprinklerSystemType: "wet_pipe",
+              waterSupplyType: "municipal",
+              occupancyType: "healthcare",
+              systemStatusAtArrival: "in_service",
+              monitoringStatus: "monitored",
+              notesOnOccupancyOrHazard: ""
+            }
+          },
+          "assembly-identification": {
             status: "pass",
             notes: "",
             fields: {
               assemblies: [
                 {
                   assetId: "asset_1",
-                  assetTag: "BF-210",
-                  location: "Loading dock mechanical",
                   assemblyType: "dcda",
-                  sizeInches: 3,
+                  assemblyManufacturer: "watts",
+                  assemblyManufacturerOther: "",
+                  assemblyModel: "009M3",
+                  assemblySize: "3",
                   serialNumber: "OLDER-SERIAL",
-                  serialVerified: false
+                  assemblyLocation: "Loading dock mechanical",
+                  installationOrientation: "horizontal",
+                  detectorMeterPresent: "yes",
+                  fireLineType: "dedicated_fire_line",
+                  installYear: "2016",
+                  deviceTagNumber: "BF-210"
                 }
               ],
-              assembliesInspected: 1,
-              allSerialsVerified: false
+              assembliesDocumented: 1,
+              detectorAssembliesCount: 1
+            }
+          },
+          "inspection-scope": {
+            status: "pass",
+            notes: "",
+            fields: {
+              assemblyType: "dcda",
+              testReason: "scheduled_annual_test",
+              assemblyConfigurationDetected: "DC workflow",
+              detectorAssemblyNotes: ""
+            }
+          },
+          "visual-inspection": {
+            status: "pass",
+            notes: "",
+            fields: {
+              visualInspectionItems: [],
+              visualInspectionCompleted: 0,
+              visualInspectionDeficiencyCount: 0
             }
           },
           "test-results": {
             status: "pass",
             notes: "",
-            fields: { checkValveOnePsi: 7.4, checkValveTwoPsi: 4.2, reliefValveOpened: true }
+            fields: {
+              testPerformed: "yes",
+              noTestReason: "",
+              testKitIdentifier: "KIT-1",
+              testKitCalibrationDate: "2025-01-10",
+              initialTestOverallResult: "pass",
+              testerComments: "",
+              dcCheck1Reading: 7.4,
+              dcCheck1Result: "pass",
+              dcCheck2Reading: 4.2,
+              dcCheck2Result: "pass",
+              dcShutoffValveCondition: "pass",
+              dcOverallResult: "pass",
+              rpCheck1Reading: "",
+              rpCheck1Result: "",
+              rpReliefValveOpeningPoint: "",
+              rpReliefValveDischargeObserved: "",
+              rpCheck2Reading: "",
+              rpCheck2Result: "",
+              rpOverallResult: "",
+              detectorMeterCondition: "pass",
+              detectorLineNotes: "",
+              repairsPerformedBeforeRetest: "",
+              retestPerformed: "",
+              retestDateTime: "",
+              retestCheck1Reading: "",
+              retestCheck2Reading: "",
+              retestReliefReading: "",
+              retestOverallResult: "",
+              retestComments: ""
+            }
           },
-          certification: {
+          deficiencies: {
             status: "pass",
             notes: "",
-            fields: { testOutcome: "pass", repairRecommended: false, certificationNotes: "" }
+            fields: { deficiencyItems: [], deficiencyCount: 0 }
+          },
+          "corrective-actions": {
+            status: "pass",
+            notes: "",
+            fields: {
+              repairsPerformedOnSite: "none",
+              partsReplaced: [],
+              adjustmentsMade: "",
+              postRepairTestingCompleted: "not_applicable",
+              unresolvedIssuesRemain: "no",
+              unresolvedIssueSummary: ""
+            }
+          },
+          photos: {
+            status: "pass",
+            notes: "",
+            fields: {
+              photoSet: [{ category: "assembly_overview", caption: "Overview", photo: "", comments: "" }]
+            }
+          },
+          "final-disposition": {
+            status: "pass",
+            notes: "",
+            fields: {
+              finalResult: "passed",
+              deviceLeftInService: "yes",
+              followUpRequired: "no",
+              followUpRecommendation: "no_further_action",
+              nextServiceDue: "",
+              impairmentNotes: "",
+              customerFacingSummary: "Assembly passed."
+            }
+          },
+          signatures: {
+            status: "pass",
+            notes: "",
+            fields: {
+              technicianPrintedName: "Alex Tester",
+              customerRepresentativeName: "",
+              customerRepresentativeTitle: "",
+              completedDateTime: "2025-03-20 10:00"
+            }
           }
         },
         deficiencies: [],
@@ -1367,17 +1499,17 @@ describe("smart report foundations", () => {
       }
     });
 
-    const rows = draft.sections.assembly?.fields.assemblies as Array<Record<string, string | number | boolean>>;
+    const rows = draft.sections["assembly-identification"]?.fields.assemblies as Array<Record<string, string | number | boolean>>;
     expect(rows).toHaveLength(1);
-    expect(rows[0].assetTag).toBe("BF-210");
-    expect(rows[0].location).toBe("Loading dock mechanical");
+    expect(rows[0].deviceTagNumber).toBe("BF-210");
+    expect(rows[0].assemblyLocation).toBe("Loading dock mechanical");
     expect(rows[0].assemblyType).toBe("rpz");
-    expect(rows[0].sizeInches).toBe(4);
+    expect(rows[0].assemblySize).toBe("4");
     expect(rows[0].serialNumber).toBe("BF-RPZ-4421");
-    expect(draft.sections.assembly?.fields.assembliesInspected).toBe(1);
-    expect(draft.sections.assembly?.fields.allSerialsVerified).toBe(true);
-    expect(draft.sections["test-results"]?.fields.checkValveOnePsi).toBe(7.4);
-    expect(draft.sections.certification?.fields.testOutcome).toBe("pass");
+    expect(draft.sections["assembly-identification"]?.fields.assembliesDocumented).toBe(1);
+    expect(draft.sections["assembly-identification"]?.fields.detectorAssembliesCount).toBe(0);
+    expect((draft.sections["visual-inspection"]?.fields.visualInspectionItems as Array<Record<string, string>>)[0]?.displayLabel).toMatch(/Assembly is accessible/i);
+    expect(draft.sections["test-results"]?.fields.dcCheck1Reading).toBe(7.4);
   });
 
   it("auto-populates backflow assembly rows when the linked asset changes", () => {
@@ -1395,24 +1527,30 @@ describe("smart report foundations", () => {
 
     const updatedRow = applyRepeaterRowSmartUpdate(
       template,
-      "assembly",
+      "assembly-identification",
       "assemblies",
       {
         assetId: "asset_1",
-        assetTag: "",
-        location: "",
+        assemblyManufacturer: "",
+        assemblyManufacturerOther: "",
+        assemblyModel: "",
+        assemblySize: "",
         assemblyType: "",
-        sizeInches: "",
         serialNumber: "",
-        serialVerified: false
+        assemblyLocation: "",
+        installationOrientation: "",
+        detectorMeterPresent: "",
+        fireLineType: "",
+        installYear: "",
+        deviceTagNumber: ""
       },
       "assetId"
     );
 
-    expect(updatedRow.assetTag).toBe("BF-210");
-    expect(updatedRow.location).toBe("Loading dock mechanical");
+    expect(updatedRow.deviceTagNumber).toBe("BF-210");
+    expect(updatedRow.assemblyLocation).toBe("Loading dock mechanical");
     expect(updatedRow.assemblyType).toBe("rpz");
-    expect(updatedRow.sizeInches).toBe(4);
+    expect(updatedRow.assemblySize).toBe("4");
     expect(updatedRow.serialNumber).toBe("BF-RPZ-4421");
   });
 
@@ -1421,46 +1559,197 @@ describe("smart report foundations", () => {
       templateVersion: 1,
       inspectionType: "backflow",
       overallNotes: "Backflow visit complete.",
-      sectionOrder: ["assembly", "test-results", "certification"],
-      activeSectionId: "assembly",
+      sectionOrder: ["header", "site-context", "assembly-identification", "inspection-scope", "visual-inspection", "test-results", "deficiencies", "corrective-actions", "photos", "final-disposition", "signatures"],
+      activeSectionId: "assembly-identification",
       sections: {
-        assembly: {
+        header: {
+          status: "pass",
+          notes: "",
+          fields: {
+            customerName: "Harbor View Hospital",
+            siteName: "Harbor Main Campus",
+            buildingArea: "",
+            siteAddress: "123 Harbor Way",
+            workOrderNumber: "",
+            jobNumber: "",
+            inspectionDate: "2026-03-20T15:00:00.000Z",
+            inspectionStartTime: "9:00 AM",
+            inspectionEndTime: "10:00 AM",
+            technician: "Alex Tester",
+            technicianLicenseOrCertification: "T-100",
+            inspectionType: "annual_test",
+            tagStatus: "existing_tag_updated",
+            ahjName: "",
+            adoptedCodeEdition: "nfpa25_2023"
+          }
+        },
+        "site-context": {
+          status: "pass",
+          notes: "",
+          fields: {
+            requirementProfile: "nfpa25_2023_backflow",
+            fireProtectionSystemServed: "fire_sprinkler_system",
+            sprinklerSystemType: "wet_pipe",
+            waterSupplyType: "municipal",
+            occupancyType: "healthcare",
+            systemStatusAtArrival: "in_service",
+            monitoringStatus: "monitored",
+            notesOnOccupancyOrHazard: ""
+          }
+        },
+        "assembly-identification": {
           status: "pass",
           notes: "",
           fields: {
             assemblies: [
               {
                 assetId: "asset_1",
-                assetTag: "BF-210",
-                location: "Loading dock mechanical",
                 assemblyType: "rpz",
-                sizeInches: 4,
+                assemblyManufacturer: "watts",
+                assemblyManufacturerOther: "",
+                assemblyModel: "909",
+                assemblySize: 4,
                 serialNumber: "BF-RPZ-4421",
-                serialVerified: true
+                assemblyLocation: "Loading dock mechanical",
+                installationOrientation: "horizontal",
+                detectorMeterPresent: "yes",
+                fireLineType: "detector_line",
+                installYear: "2019",
+                deviceTagNumber: "BF-210"
               },
               {
                 assetId: "asset_2",
-                assetTag: "BF-211",
-                location: "Boiler room",
                 assemblyType: "dcda",
-                sizeInches: 6,
+                assemblyManufacturer: "watts",
+                assemblyManufacturerOther: "",
+                assemblyModel: "007",
+                assemblySize: 6,
                 serialNumber: "BF-DCDA-7711",
-                serialVerified: false
+                assemblyLocation: "Boiler room",
+                installationOrientation: "horizontal",
+                detectorMeterPresent: "yes",
+                fireLineType: "dedicated_fire_line",
+                installYear: "2013",
+                deviceTagNumber: "BF-211"
               }
             ],
-            assembliesInspected: 99,
-            allSerialsVerified: true
+            assembliesDocumented: 99,
+            detectorAssembliesCount: 99
+          }
+        },
+        "inspection-scope": {
+          status: "pass",
+          notes: "",
+          fields: {
+            assemblyType: "rpz",
+            testReason: "scheduled_annual_test",
+            assemblyConfigurationDetected: "RP workflow",
+            detectorAssemblyNotes: ""
+          }
+        },
+        "visual-inspection": {
+          status: "pass",
+          notes: "",
+          fields: {
+            visualInspectionItems: [
+              {
+                requirementKey: "assembly_accessible",
+                requirementProfileKey: "nfpa25_2023_backflow",
+                requirementEditionLabel: "2023 baseline",
+                frequencyLabel: "Annual inspection / test",
+                displayLabel: "Assembly is accessible for inspection, testing, and service.",
+                codeRef: "NFPA 25 backflow visual inspection baseline",
+                result: "pass",
+                condition: "good",
+                comments: "",
+                customerComment: "",
+                correctiveAction: "",
+                photo: ""
+              }
+            ],
+            visualInspectionCompleted: 99,
+            visualInspectionDeficiencyCount: 99
           }
         },
         "test-results": {
           status: "pass",
           notes: "",
-          fields: { checkValveOnePsi: 7.4, checkValveTwoPsi: 4.2, reliefValveOpened: true }
+          fields: {
+            testPerformed: "yes",
+            noTestReason: "",
+            testKitIdentifier: "KIT-1",
+            testKitCalibrationDate: "2026-01-10",
+            initialTestOverallResult: "pass",
+            testerComments: "",
+            dcCheck1Reading: "",
+            dcCheck1Result: "",
+            dcCheck2Reading: "",
+            dcCheck2Result: "",
+            dcShutoffValveCondition: "",
+            dcOverallResult: "",
+            rpCheck1Reading: 7.4,
+            rpCheck1Result: "pass",
+            rpReliefValveOpeningPoint: 3.1,
+            rpReliefValveDischargeObserved: "yes",
+            rpCheck2Reading: 5.6,
+            rpCheck2Result: "pass",
+            rpOverallResult: "pass",
+            detectorMeterCondition: "",
+            detectorLineNotes: "",
+            repairsPerformedBeforeRetest: "",
+            retestPerformed: "",
+            retestDateTime: "",
+            retestCheck1Reading: "",
+            retestCheck2Reading: "",
+            retestReliefReading: "",
+            retestOverallResult: "",
+            retestComments: ""
+          }
         },
-        certification: {
+        deficiencies: {
           status: "pass",
           notes: "",
-          fields: { testOutcome: "pass", repairRecommended: false, certificationNotes: "" }
+          fields: { deficiencyItems: [], deficiencyCount: 99 }
+        },
+        "corrective-actions": {
+          status: "pass",
+          notes: "",
+          fields: {
+            repairsPerformedOnSite: "none",
+            partsReplaced: [],
+            adjustmentsMade: "",
+            postRepairTestingCompleted: "not_applicable",
+            unresolvedIssuesRemain: "no",
+            unresolvedIssueSummary: ""
+          }
+        },
+        photos: {
+          status: "pass",
+          notes: "",
+          fields: { photoSet: [{ category: "assembly_overview", caption: "Overview", photo: "", comments: "" }] }
+        },
+        "final-disposition": {
+          status: "pass",
+          notes: "",
+          fields: {
+            finalResult: "passed",
+            deviceLeftInService: "yes",
+            followUpRequired: "no",
+            followUpRecommendation: "no_further_action",
+            nextServiceDue: "",
+            impairmentNotes: "",
+            customerFacingSummary: "Assembly passed."
+          }
+        },
+        signatures: {
+          status: "pass",
+          notes: "",
+          fields: {
+            technicianPrintedName: "Alex Tester",
+            customerRepresentativeName: "",
+            customerRepresentativeTitle: "",
+            completedDateTime: "2026-03-20 10:00"
+          }
         }
       },
       deficiencies: [],
@@ -1475,28 +1764,105 @@ describe("smart report foundations", () => {
       }
     }, "backflow");
 
-    expect((normalized.sections.assembly?.fields.assemblies as Array<unknown>).length).toBe(2);
-    expect(normalized.sections.assembly?.fields.assembliesInspected).toBe(2);
-    expect(normalized.sections.assembly?.fields.allSerialsVerified).toBe(false);
+    expect((normalized.sections["assembly-identification"]?.fields.assemblies as Array<unknown>).length).toBe(2);
+    expect(normalized.sections["assembly-identification"]?.fields.assembliesDocumented).toBe(2);
+    expect(normalized.sections["assembly-identification"]?.fields.detectorAssembliesCount).toBe(1);
+    expect(normalized.sections["visual-inspection"]?.fields.visualInspectionCompleted).toBe(1);
+    expect(normalized.sections["visual-inspection"]?.fields.visualInspectionDeficiencyCount).toBe(0);
 
     const invalidBackflowDraft = validateDraftForTemplate({
       templateVersion: 1,
       inspectionType: "backflow",
       overallNotes: "",
-      sectionOrder: ["assembly", "test-results", "certification"],
-      activeSectionId: "assembly",
+      sectionOrder: ["header", "site-context", "assembly-identification", "inspection-scope", "visual-inspection", "test-results", "deficiencies", "corrective-actions", "photos", "final-disposition", "signatures"],
+      activeSectionId: "assembly-identification",
       sections: {
-        assembly: {
+        header: {
+          status: "pending",
+          notes: "",
+          fields: {
+            customerName: "Harbor View Hospital",
+            siteName: "Harbor Main Campus",
+            buildingArea: "",
+            siteAddress: "123 Harbor Way",
+            workOrderNumber: "",
+            jobNumber: "",
+            inspectionDate: "2026-03-20T15:00:00.000Z",
+            inspectionStartTime: "",
+            inspectionEndTime: "",
+            technician: "",
+            technicianLicenseOrCertification: "",
+            inspectionType: "",
+            tagStatus: "",
+            ahjName: "",
+            adoptedCodeEdition: ""
+          }
+        },
+        "site-context": {
+          status: "pending",
+          notes: "",
+          fields: {
+            requirementProfile: "nfpa25_2023_backflow",
+            fireProtectionSystemServed: "",
+            sprinklerSystemType: "",
+            waterSupplyType: "",
+            occupancyType: "",
+            systemStatusAtArrival: "",
+            monitoringStatus: "",
+            notesOnOccupancyOrHazard: ""
+          }
+        },
+        "assembly-identification": {
           status: "pending",
           notes: "",
           fields: {
             assemblies: [],
-            assembliesInspected: 0,
-            allSerialsVerified: false
+            assembliesDocumented: 0,
+            detectorAssembliesCount: 0
           }
         },
-        "test-results": { status: "pending", notes: "", fields: { checkValveOnePsi: "", checkValveTwoPsi: "", reliefValveOpened: false } },
-        certification: { status: "pending", notes: "", fields: { testOutcome: "", repairRecommended: false, certificationNotes: "" } }
+        "inspection-scope": { status: "pending", notes: "", fields: { assemblyType: "", testReason: "", assemblyConfigurationDetected: "", detectorAssemblyNotes: "" } },
+        "visual-inspection": { status: "pending", notes: "", fields: { visualInspectionItems: [], visualInspectionCompleted: 0, visualInspectionDeficiencyCount: 0 } },
+        "test-results": {
+          status: "pending",
+          notes: "",
+          fields: {
+            testPerformed: "",
+            noTestReason: "",
+            testKitIdentifier: "",
+            testKitCalibrationDate: "",
+            initialTestOverallResult: "",
+            testerComments: "",
+            dcCheck1Reading: "",
+            dcCheck1Result: "",
+            dcCheck2Reading: "",
+            dcCheck2Result: "",
+            dcShutoffValveCondition: "",
+            dcOverallResult: "",
+            rpCheck1Reading: "",
+            rpCheck1Result: "",
+            rpReliefValveOpeningPoint: "",
+            rpReliefValveDischargeObserved: "",
+            rpCheck2Reading: "",
+            rpCheck2Result: "",
+            rpOverallResult: "",
+            detectorMeterCondition: "",
+            detectorLineNotes: "",
+            repairsPerformedBeforeRetest: "",
+            retestPerformed: "",
+            retestDateTime: "",
+            retestCheck1Reading: "",
+            retestCheck2Reading: "",
+            retestReliefReading: "",
+            retestOverallResult: "",
+            retestComments: ""
+          }
+        },
+        deficiencies: { status: "pending", notes: "", fields: { deficiencyItems: [], deficiencyCount: 0 } },
+        "corrective-actions": { status: "pending", notes: "", fields: { repairsPerformedOnSite: "", partsReplaced: [], adjustmentsMade: "", postRepairTestingCompleted: "", unresolvedIssuesRemain: "", unresolvedIssueSummary: "" } },
+        photos: { status: "pending", notes: "", fields: { photoSet: [] } },
+        "final-disposition": { status: "pending", notes: "", fields: { finalResult: "", deviceLeftInService: "", followUpRequired: "", followUpRecommendation: "", nextServiceDue: "", impairmentNotes: "", customerFacingSummary: "" } },
+        signatures: { status: "pending", notes: "", fields: { technicianPrintedName: "", customerRepresentativeName: "", customerRepresentativeTitle: "", completedDateTime: "" } }
       },
       deficiencies: [],
       attachments: [],
