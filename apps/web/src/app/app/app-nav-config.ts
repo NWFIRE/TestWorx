@@ -3,7 +3,7 @@ export type AppNavItem = {
   label: string;
   shortLabel: string;
   abbreviation: string;
-  icon?: "calendar" | "branch" | "alert" | "invoice" | "settings" | "grid" | "clipboard" | "portal";
+  icon?: "calendar" | "branch" | "alert" | "invoice" | "settings" | "grid" | "clipboard" | "portal" | "team";
   description?: string;
   tone?: "blue" | "amber" | "emerald" | "violet" | "slate";
   matchMode?: "exact" | "prefix";
@@ -48,6 +48,15 @@ const adminNavItems: AppNavItem[] = [
     icon: "invoice",
     description: "Review line items and invoicing",
     tone: "emerald"
+  },
+  {
+    href: "/app/admin/team",
+    label: "Team and Portal Access",
+    shortLabel: "Team",
+    abbreviation: "TM",
+    icon: "team",
+    description: "Invites, access, and account controls",
+    tone: "slate"
   },
   {
     href: "/app/admin/settings",

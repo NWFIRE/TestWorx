@@ -95,6 +95,15 @@ function NavIcon({
           <path {...shared} d="M4 10h16M9 15h.01M12 15h3" />
         </svg>
       );
+    case "team":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <path {...shared} d="M16 19a4 4 0 0 0-8 0" />
+          <circle {...shared} cx="12" cy="11" r="3" />
+          <path {...shared} d="M20 19a3 3 0 0 0-2.6-2.97M4 19a3 3 0 0 1 2.6-2.97" />
+          <path {...shared} d="M17.5 8.5a2.5 2.5 0 1 1 0 5M6.5 13.5a2.5 2.5 0 1 1 0-5" />
+        </svg>
+      );
     default:
       return (
         <span aria-hidden="true" className={className}>

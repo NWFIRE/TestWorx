@@ -172,6 +172,8 @@ model Tenant {
   quickbooksCatalogItems    QuickBooksCatalogItem[]
   quickbooksCatalogItemAliases QuickBooksCatalogItemAlias[]
   billingItemCatalogMatches BillingItemCatalogMatch[]
+  accountInvitations        AccountInvitation[]
+  passwordResetTokens       PasswordResetToken[]
 }
 
 model User {
@@ -183,6 +185,8 @@ model User {
   passwordHash        String
   role                UserRole
   isActive            Boolean                 @default(true)
+  allowances          Json?
+  lastLoginAt         DateTime?
   createdAt           DateTime                @default(now())
   updatedAt           DateTime                @updatedAt
   tenant              Tenant?                 @relation(fields: [tenantId], references: [id])
@@ -196,6 +200,10 @@ model User {
   reportCorrectionEvents ReportCorrectionEvent[] @relation("ReportCorrectionEventActor")
   createdAmendments   InspectionAmendment[]   @relation("InspectionAmendmentCreatedBy")
   inspectionAssignments InspectionTechnicianAssignment[]
+  sentAccountInvitations AccountInvitation[]  @relation("AccountInvitationInvitedBy")
+  acceptedAccountInvitations AccountInvitation[] @relation("AccountInvitationAcceptedBy")
+  requestedPasswordResets PasswordResetToken[] @relation("PasswordResetRequestedBy")
+  passwordResetTokens PasswordResetToken[]     @relation("PasswordResetUser")
 }
 
 model CustomerCompany {
@@ -232,6 +240,7 @@ model CustomerCompany {
   inspections               Inspection[]
   billingSummaries          InspectionBillingSummary[]
   serviceFeeRules           ServiceFeeRule[]
+  accountInvitations        AccountInvitation[]
 }
 
 model Site {
@@ -658,4 +667,50 @@ model StripeWebhookEvent {
   processedAt   DateTime?
   createdAt     DateTime                 @default(now())
   tenant        Tenant?                  @relation(fields: [tenantId], references: [id])
+}
+
+model AccountInvitation {
+  id                String          @id @default(cuid())
+  tenantId          String
+  customerCompanyId String?
+  invitedByUserId   String
+  acceptedByUserId  String?
+  email             String
+  name              String?
+  role              UserRole
+  allowances        Json?
+  tokenHash         String          @unique
+  status            String          @default("pending")
+  sentAt            DateTime        @default(now())
+  acceptedAt        DateTime?
+  revokedAt         DateTime?
+  expiresAt         DateTime
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  tenant            Tenant          @relation(fields: [tenantId], references: [id])
+  customerCompany   CustomerCompany? @relation(fields: [customerCompanyId], references: [id])
+  invitedBy         User            @relation("AccountInvitationInvitedBy", fields: [invitedByUserId], references: [id])
+  acceptedBy        User?           @relation("AccountInvitationAcceptedBy", fields: [acceptedByUserId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([tenantId, email])
+  @@index([tenantId, customerCompanyId])
+}
+
+model PasswordResetToken {
+  id                String    @id @default(cuid())
+  tenantId          String
+  userId            String
+  requestedByUserId String
+  tokenHash         String    @unique
+  expiresAt         DateTime
+  usedAt            DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  tenant            Tenant    @relation(fields: [tenantId], references: [id])
+  user              User      @relation("PasswordResetUser", fields: [userId], references: [id])
+  requestedBy       User      @relation("PasswordResetRequestedBy", fields: [requestedByUserId], references: [id])
+
+  @@index([tenantId, userId])
+  @@index([tenantId, expiresAt])
 }
