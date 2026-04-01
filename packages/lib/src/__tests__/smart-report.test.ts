@@ -1895,6 +1895,11 @@ describe("smart report foundations", () => {
     expect(draft.sections.header?.fields.siteName).toBe("Harbor Main Campus");
     expect((draft.sections["quarterly-inspection"]?.fields.quarterlyItems as Array<Record<string, string>>)[0]?.epLabel).toBe("LS.02.01.35 EP 1");
     expect((draft.sections["annual-inspection"]?.fields.annualItems as Array<Record<string, string>>)[0]?.epLabel).toBe("LS.02.01.35 EP 2");
+    expect(draft.sections.header?.fields).toHaveProperty("tagStatus");
+    expect(draft.sections["test-results"]?.fields).toHaveProperty("waterflowSwitches");
+    expect(draft.sections["test-results"]?.fields).toHaveProperty("tamperSwitches");
+    expect((draft.sections.photos?.fields.photoItems as Array<Record<string, string>>)[0]?.category).toBe("system_overview");
+    expect((draft.sections.photos?.fields.photoItems as Array<Record<string, string>>)[5]?.category).toBe("tags");
     expect((draft.sections.deficiencies?.fields.deficiencyItems as Array<Record<string, string>> | undefined) ?? []).toHaveLength(0);
   });
 

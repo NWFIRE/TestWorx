@@ -56,9 +56,13 @@ export type ReportOptionProviderKey =
   | "jointCommissionCodeEditionOptions"
   | "jointCommissionOccupancyOptions"
   | "jointCommissionImpairmentStatusOptions"
+  | "jointCommissionMonitoringStatusOptions"
   | "jointCommissionSystemTypeOptions"
   | "jointCommissionWaterSupplyTypeOptions"
   | "jointCommissionRiserTypeOptions"
+  | "jointCommissionTagStatusOptions"
+  | "jointCommissionAlarmValveTypeOptions"
+  | "jointCommissionSurveySensitivityOptions"
   | "jointCommissionInspectionModeOptions"
   | "jointCommissionStatusOptions"
   | "jointCommissionSeverityOptions"
@@ -546,6 +550,13 @@ const jointCommissionImpairmentStatusOptions: ReportOption[] = [
   { label: "Unknown", value: "unknown" }
 ];
 
+const jointCommissionMonitoringStatusOptions: ReportOption[] = [
+  { label: "Monitored", value: "monitored" },
+  { label: "Not monitored", value: "not_monitored" },
+  { label: "Supervisory only", value: "supervisory_only" },
+  { label: "Unknown", value: "unknown" }
+];
+
 const jointCommissionSystemTypeOptions: ReportOption[] = [
   { label: "Wet", value: "wet" },
   { label: "Dry", value: "dry" },
@@ -564,6 +575,31 @@ const jointCommissionRiserTypeOptions: ReportOption[] = [
   { label: "Wet riser", value: "wet_riser" },
   { label: "Floor control assembly", value: "floor_control_assembly" },
   { label: "Combination standpipe / sprinkler", value: "combination" },
+  { label: "Other", value: "other" }
+];
+
+const jointCommissionTagStatusOptions: ReportOption[] = [
+  { label: "Existing tag updated", value: "existing_tag_updated" },
+  { label: "New tag installed", value: "new_tag_installed" },
+  { label: "No tag installed", value: "no_tag_installed" },
+  { label: "Tag missing", value: "tag_missing" },
+  { label: "Tag not applicable", value: "tag_not_applicable" }
+];
+
+const jointCommissionAlarmValveTypeOptions: ReportOption[] = [
+  { label: "Wet alarm valve", value: "wet_alarm_valve" },
+  { label: "Retard chamber trim", value: "retard_chamber_trim" },
+  { label: "Floor control assembly", value: "floor_control_assembly" },
+  { label: "Check valve trim", value: "check_valve_trim" },
+  { label: "Other", value: "other" }
+];
+
+const jointCommissionSurveySensitivityOptions: ReportOption[] = [
+  { label: "Standard clinical area", value: "standard_clinical_area" },
+  { label: "High-acuity patient care area", value: "high_acuity_patient_care_area" },
+  { label: "Surgery / procedure area", value: "surgery_procedure_area" },
+  { label: "Life safety survey-sensitive area", value: "life_safety_survey_sensitive_area" },
+  { label: "Construction / interim conditions", value: "construction_interim_conditions" },
   { label: "Other", value: "other" }
 ];
 
@@ -944,9 +980,13 @@ export const reportOptionProviders = {
   jointCommissionCodeEditionOptions,
   jointCommissionOccupancyOptions,
   jointCommissionImpairmentStatusOptions,
+  jointCommissionMonitoringStatusOptions,
   jointCommissionSystemTypeOptions,
   jointCommissionWaterSupplyTypeOptions,
   jointCommissionRiserTypeOptions,
+  jointCommissionTagStatusOptions,
+  jointCommissionAlarmValveTypeOptions,
+  jointCommissionSurveySensitivityOptions,
   jointCommissionInspectionModeOptions,
   jointCommissionStatusOptions,
   jointCommissionSeverityOptions,
