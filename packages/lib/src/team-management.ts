@@ -335,8 +335,12 @@ export async function getTeamWorkspaceData(
 
   const matcher = (value: string | null | undefined) => value?.toLowerCase().includes(query) ?? false;
   const roleMatches = (role: string) => requestedRole === "all" || role === requestedRole;
+  const inviteStatusFilter =
+    requestedStatus === "pending" || requestedStatus === "expired" || requestedStatus === "revoked"
+      ? requestedStatus
+      : "all";
   const inviteStatusMatches = (invite: { derivedStatus: string }) =>
-    requestedStatus === "all" || requestedStatus === invite.derivedStatus;
+    inviteStatusFilter === "all" || inviteStatusFilter === invite.derivedStatus;
 
   const internalInvites = formattedInvites.filter((invite) =>
     invite.kind === "internal"

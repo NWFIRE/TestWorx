@@ -17,6 +17,7 @@ const prismaMock = {
     findMany: vi.fn()
   },
   accountInvitation: {
+    count: vi.fn(),
     findFirst: vi.fn(),
     findMany: vi.fn(),
     create: vi.fn(),
@@ -371,7 +372,7 @@ describe("team management", () => {
     expect(prismaMock.user.findMany).toHaveBeenCalledWith({
       where: expect.objectContaining({
         tenantId: "tenant_1",
-        role: { in: ["tenant_admin", "office_admin", "technician"] },
+        role: { not: "customer_user" },
         OR: expect.any(Array)
       }),
       orderBy: [{ isActive: "desc" }, { name: "asc" }, { email: "asc" }],
@@ -423,5 +424,50 @@ describe("team management", () => {
     });
     expect(result.items).toHaveLength(1);
     expect(result.items[0]?.customerCompany?.name).toBe("North Campus");
+  });
+
+  it("keeps pending invites visible when the workspace is filtered to active users", async () => {
+    prismaMock.user.findFirst.mockResolvedValue(makeAdminUser());
+    prismaMock.$transaction.mockResolvedValue([7, 2, 1, 2]);
+    prismaMock.accountInvitation.findMany.mockResolvedValue([
+      {
+        id: "invite_internal_1",
+        email: "tech@example.com",
+        name: "Tech User",
+        role: "technician",
+        allowances: { reportReviewAccess: true },
+        status: "pending",
+        sentAt: new Date("2026-04-02T08:00:00.000Z"),
+        acceptedAt: null,
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 86_400_000),
+        customerCompany: null,
+        invitedBy: { id: "user_admin", name: "Admin User" }
+      },
+      {
+        id: "invite_customer_1",
+        email: "portal@example.com",
+        name: "Portal User",
+        role: "customer_user",
+        allowances: { reportDownload: true },
+        status: "pending",
+        sentAt: new Date("2026-04-02T08:05:00.000Z"),
+        acceptedAt: null,
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 86_400_000),
+        customerCompany: { id: "customer_1", name: "Acme Hospital" },
+        invitedBy: { id: "user_admin", name: "Admin User" }
+      }
+    ]);
+    prismaMock.customerCompany.findMany.mockResolvedValue([{ id: "customer_1", name: "Acme Hospital" }]);
+
+    const { getTeamWorkspaceData } = await import("../team-management");
+
+    const result = await getTeamWorkspaceData(makeActor(), { status: "active" });
+
+    expect(result.teamInvites).toHaveLength(1);
+    expect(result.customerInvites).toHaveLength(1);
+    expect(result.teamInvites[0]?.derivedStatus).toBe("pending");
+    expect(result.customerInvites[0]?.derivedStatus).toBe("pending");
   });
 });

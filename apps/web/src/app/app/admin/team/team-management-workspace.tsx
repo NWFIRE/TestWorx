@@ -696,6 +696,11 @@ export function TeamManagementWorkspace({
   teamInvites: WorkspaceInvite[];
   customerInvites: WorkspaceInvite[];
 }) {
+  const pendingTeamInvites = teamInvites.filter((invite) => invite.derivedStatus === "pending");
+  const historicalTeamInvites = teamInvites.filter((invite) => invite.derivedStatus !== "pending");
+  const pendingCustomerInvites = customerInvites.filter((invite) => invite.derivedStatus === "pending");
+  const historicalCustomerInvites = customerInvites.filter((invite) => invite.derivedStatus !== "pending");
+
   return (
     <div className="space-y-6">
       <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
@@ -758,13 +763,28 @@ export function TeamManagementWorkspace({
             statusFilter={filters.status === "active" || filters.status === "inactive" ? filters.status : "all"}
             title="Internal members"
           />
-          {teamInvites.length > 0 ? (
+          <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
+            <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Internal invite queue</p>
+            <h2 className="mt-2 text-2xl font-semibold text-ink">Pending team invites</h2>
+            <p className="mt-2 text-sm text-slate-500">Pending internal invites stay visible here even when the member lookup is filtered to active or inactive users.</p>
+          </div>
+          {pendingTeamInvites.length > 0 ? (
+            <>
+              {pendingTeamInvites.map((invite) => <InviteRow key={invite.id} invite={invite} />)}
+            </>
+          ) : (
+            <EmptyState
+              description="New internal invites will appear here until they are accepted, revoked, or expire."
+              title="No pending internal invites"
+            />
+          )}
+          {historicalTeamInvites.length > 0 ? (
             <>
               <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
-                <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Pending and historical</p>
-                <h2 className="mt-2 text-2xl font-semibold text-ink">Team invites</h2>
+                <p className="text-sm uppercase tracking-[0.24em] text-slate-400">History</p>
+                <h2 className="mt-2 text-2xl font-semibold text-ink">Internal invite history</h2>
               </div>
-              {teamInvites.map((invite) => <InviteRow key={invite.id} invite={invite} />)}
+              {historicalTeamInvites.map((invite) => <InviteRow key={invite.id} invite={invite} />)}
             </>
           ) : null}
         </div>
@@ -776,13 +796,28 @@ export function TeamManagementWorkspace({
             statusFilter={filters.status === "active" || filters.status === "inactive" ? filters.status : "all"}
             title="Portal access"
           />
-          {customerInvites.length > 0 ? (
+          <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
+            <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Customer invite queue</p>
+            <h2 className="mt-2 text-2xl font-semibold text-ink">Pending portal invites</h2>
+            <p className="mt-2 text-sm text-slate-500">Customer portal invites stay visible here with company context while the portal user lookup remains async and lightweight.</p>
+          </div>
+          {pendingCustomerInvites.length > 0 ? (
+            <>
+              {pendingCustomerInvites.map((invite) => <InviteRow key={invite.id} customerMode invite={invite} />)}
+            </>
+          ) : (
+            <EmptyState
+              description="New customer portal invites will appear here until the recipient completes setup or the invite is revoked."
+              title="No pending portal invites"
+            />
+          )}
+          {historicalCustomerInvites.length > 0 ? (
             <>
               <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
-                <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Pending and historical</p>
-                <h2 className="mt-2 text-2xl font-semibold text-ink">Portal invites</h2>
+                <p className="text-sm uppercase tracking-[0.24em] text-slate-400">History</p>
+                <h2 className="mt-2 text-2xl font-semibold text-ink">Portal invite history</h2>
               </div>
-              {customerInvites.map((invite) => <InviteRow key={invite.id} customerMode invite={invite} />)}
+              {historicalCustomerInvites.map((invite) => <InviteRow key={invite.id} customerMode invite={invite} />)}
             </>
           ) : null}
         </div>
