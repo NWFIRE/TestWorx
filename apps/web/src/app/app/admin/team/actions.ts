@@ -45,7 +45,14 @@ export async function createTeamInviteAction(_: TeamActionState, formData: FormD
       allowances: readAllowanceValues(formData)
     });
     revalidatePath("/app/admin/team");
-    return { error: null, success: "Invite created.", inviteUrl: result.inviteUrl, resetUrl: null };
+    return result.emailDelivery.sent
+      ? { error: null, success: "Invite sent.", inviteUrl: null, resetUrl: null }
+      : {
+          error: null,
+          success: `Invite created, but email could not be sent. ${result.emailDelivery.error ?? "Use the fallback link below."}`,
+          inviteUrl: result.inviteUrl,
+          resetUrl: null
+        };
   } catch (error) {
     return { ...initialTeamActionState, error: error instanceof Error ? error.message : "Unable to create invite." };
   }
@@ -62,7 +69,14 @@ export async function createCustomerInviteAction(_: TeamActionState, formData: F
       allowances: readAllowanceValues(formData)
     });
     revalidatePath("/app/admin/team");
-    return { error: null, success: "Customer portal invite created.", inviteUrl: result.inviteUrl, resetUrl: null };
+    return result.emailDelivery.sent
+      ? { error: null, success: "Customer portal invite sent.", inviteUrl: null, resetUrl: null }
+      : {
+          error: null,
+          success: `Customer portal invite created, but email could not be sent. ${result.emailDelivery.error ?? "Use the fallback link below."}`,
+          inviteUrl: result.inviteUrl,
+          resetUrl: null
+        };
   } catch (error) {
     return { ...initialTeamActionState, error: error instanceof Error ? error.message : "Unable to create portal invite." };
   }
@@ -73,7 +87,14 @@ export async function resendInviteAction(_: TeamActionState, formData: FormData)
     const actor = await requireActor();
     const result = await resendAccountInvitation(actor, String(formData.get("inviteId") ?? ""));
     revalidatePath("/app/admin/team");
-    return { error: null, success: "Invite resent.", inviteUrl: result.inviteUrl, resetUrl: null };
+    return result.emailDelivery.sent
+      ? { error: null, success: "Invite email resent.", inviteUrl: null, resetUrl: null }
+      : {
+          error: null,
+          success: `Invite refreshed, but email could not be sent. ${result.emailDelivery.error ?? "Use the fallback link below."}`,
+          inviteUrl: result.inviteUrl,
+          resetUrl: null
+        };
   } catch (error) {
     return { ...initialTeamActionState, error: error instanceof Error ? error.message : "Unable to resend invite." };
   }
@@ -149,7 +170,14 @@ export async function issuePasswordResetAction(_: TeamActionState, formData: For
     const actor = await requireActor();
     const result = await createPasswordResetRequest(actor, String(formData.get("userId") ?? ""));
     revalidatePath("/app/admin/team");
-    return { error: null, success: "Password reset link created.", inviteUrl: null, resetUrl: result.resetUrl };
+    return result.emailDelivery.sent
+      ? { error: null, success: "Password reset email sent.", inviteUrl: null, resetUrl: null }
+      : {
+          error: null,
+          success: `Password reset created, but email could not be sent. ${result.emailDelivery.error ?? "Use the fallback reset link below."}`,
+          inviteUrl: null,
+          resetUrl: result.resetUrl
+        };
   } catch (error) {
     return { ...initialTeamActionState, error: error instanceof Error ? error.message : "Unable to issue reset." };
   }

@@ -270,11 +270,11 @@ function InviteFormCard({
           <button className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-5 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={pending} type="submit">
             {pending ? "Creating invite..." : customerMode ? "Create portal invite" : "Create team invite"}
           </button>
-          <p className="text-sm text-slate-500">The system will generate a secure onboarding link you can send or copy immediately.</p>
+          <p className="text-sm text-slate-500">The system will send a secure email invite automatically. A fallback link appears only if delivery fails.</p>
         </div>
       </form>
       <div className="mt-4">
-        <ResultCallout error={state.error} success={state.success} url={state.inviteUrl} urlLabel="Copy invite link" />
+        <ResultCallout error={state.error} success={state.success} url={state.inviteUrl} urlLabel="Copy fallback invite link" />
       </div>
     </div>
   );
@@ -348,7 +348,7 @@ function UserRow({ user, customerMode = false }: { user: WorkspaceUser; customer
       <div className="mt-4 space-y-3">
         <ResultCallout error={allowanceState.error} success={allowanceState.success} />
         <ResultCallout error={statusState.error} success={statusState.success} />
-        <ResultCallout error={resetState.error} success={resetState.success} url={resetState.resetUrl} urlLabel="Copy reset link" />
+        <ResultCallout error={resetState.error} success={resetState.success} url={resetState.resetUrl} urlLabel="Copy fallback reset link" />
         <ResultCallout error={removeState.error} success={removeState.success} />
       </div>
     </div>
@@ -390,7 +390,7 @@ function InviteRow({ invite, customerMode = false }: { invite: WorkspaceInvite; 
           <form action={resendFormAction}>
             <input name="inviteId" type="hidden" value={invite.id} />
             <button className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 disabled:opacity-60" disabled={resendPending || invite.derivedStatus !== "pending"} type="submit">
-              Resend invite
+              Resend email
             </button>
           </form>
           <form action={revokeFormAction}>
@@ -416,7 +416,7 @@ function InviteRow({ invite, customerMode = false }: { invite: WorkspaceInvite; 
       </form>
 
       <div className="mt-4 space-y-3">
-        <ResultCallout error={resendState.error} success={resendState.success} url={resendState.inviteUrl} urlLabel="Copy invite link" />
+        <ResultCallout error={resendState.error} success={resendState.success} url={resendState.inviteUrl} urlLabel="Copy fallback invite link" />
         <ResultCallout error={revokeState.error} success={revokeState.success} />
         <ResultCallout error={allowanceState.error} success={allowanceState.success} />
       </div>

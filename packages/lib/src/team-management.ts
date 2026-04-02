@@ -7,6 +7,11 @@ import type { ActorContext } from "@testworx/types";
 import { actorContextSchema } from "@testworx/types";
 
 import { hashPassword } from "./auth";
+import {
+  sendWorkspaceInviteEmail,
+  sendWorkspacePasswordResetEmail,
+  type TransactionalEmailDeliveryResult
+} from "./account-email";
 import { assertTenantContext } from "./permissions";
 import {
   allowanceKeys,
@@ -195,8 +200,10 @@ async function getActorWithAllowances(parsedActor: ReturnType<typeof parseActor>
     },
     select: {
       id: true,
+      name: true,
       role: true,
-      allowances: true
+      allowances: true,
+      tenant: { select: { name: true } }
     }
   });
 
@@ -237,6 +244,34 @@ function buildInviteUrl(token: string) {
 function buildPasswordResetUrl(token: string) {
   const baseUrl = process.env.APP_URL || process.env.NEXTAUTH_URL || "http://localhost:3000";
   return `${baseUrl}/reset-password?token=${encodeURIComponent(token)}`;
+}
+
+async function createEmailAuditLog(input: {
+  tenantId: string;
+  actorUserId: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  delivery: TransactionalEmailDeliveryResult;
+  recipientEmail: string;
+}) {
+  await prisma.auditLog.create({
+    data: {
+      tenantId: input.tenantId,
+      actorUserId: input.actorUserId,
+      action: input.action,
+      entityType: input.entityType,
+      entityId: input.entityId,
+      metadata: {
+        provider: input.delivery.provider,
+        sent: input.delivery.sent,
+        messageId: input.delivery.messageId,
+        reason: input.delivery.reason,
+        error: input.delivery.error,
+        recipientEmail: input.recipientEmail
+      }
+    }
+  });
 }
 
 function deriveInviteStatus(invite: { status: string; expiresAt: Date }) {
@@ -461,6 +496,7 @@ export async function createAccountInvitation(
   const actorUser = await getActorWithAllowances(parsedActor);
   ensureTeamManagementAccess(actorUser);
   const input = inviteInputSchema.parse({ ...rawInput, email: normalizeEmail(rawInput.email) });
+  let customerName: string | null = null;
 
   const existingUser = await prisma.user.findUnique({ where: { email: input.email }, select: { id: true, tenantId: true } });
   if (existingUser) {
@@ -484,12 +520,14 @@ export async function createAccountInvitation(
   if (input.customerCompanyId) {
     const customer = await prisma.customerCompany.findFirst({
       where: { id: input.customerCompanyId, tenantId },
-      select: { id: true }
+      select: { id: true, name: true }
     });
 
     if (!customer) {
       throw new Error("Customer company not found.");
     }
+
+    customerName = customer.name;
   }
 
   const token = createOneTimeToken();
@@ -530,9 +568,42 @@ export async function createAccountInvitation(
     return created;
   });
 
+  const inviteUrl = buildInviteUrl(token);
+  const roleLabel =
+    input.role === "customer_user"
+      ? "Customer portal user"
+      : input.role === "tenant_admin"
+        ? "Tenant admin"
+        : input.role === "office_admin"
+          ? "Office admin"
+          : "Technician";
+  const emailDelivery = await sendWorkspaceInviteEmail({
+    recipientEmail: input.email,
+    recipientName: input.name,
+    tenantName: actorUser.tenant?.name ?? "TradeWorx",
+    inviterName: actorUser.name,
+    roleLabel,
+    customerCompanyName: customerName,
+    portalInvite: input.role === "customer_user",
+    inviteUrl
+  });
+
+  await createEmailAuditLog({
+    tenantId,
+    actorUserId: parsedActor.userId,
+    action: input.role === "customer_user"
+      ? (emailDelivery.sent ? "customer.portal_invite_email_sent" : "customer.portal_invite_email_failed")
+      : (emailDelivery.sent ? "team.invite_email_sent" : "team.invite_email_failed"),
+    entityType: "AccountInvitation",
+    entityId: invite.id,
+    delivery: emailDelivery,
+    recipientEmail: input.email
+  });
+
   return {
     invite,
-    inviteUrl: buildInviteUrl(token)
+    inviteUrl,
+    emailDelivery
   };
 }
 
@@ -544,7 +615,14 @@ export async function resendAccountInvitation(actor: ActorContext, inviteId: str
 
   const invite = await prisma.accountInvitation.findFirst({
     where: { id: inviteId, tenantId },
-    select: { id: true, role: true, status: true }
+    select: {
+      id: true,
+      role: true,
+      status: true,
+      email: true,
+      name: true,
+      customerCompany: { select: { name: true } }
+    }
   });
 
   if (!invite) {
@@ -578,7 +656,39 @@ export async function resendAccountInvitation(actor: ActorContext, inviteId: str
     });
   });
 
-  return { inviteUrl: buildInviteUrl(token) };
+  const inviteUrl = buildInviteUrl(token);
+  const roleLabel =
+    invite.role === "customer_user"
+      ? "Customer portal user"
+      : invite.role === "tenant_admin"
+        ? "Tenant admin"
+        : invite.role === "office_admin"
+          ? "Office admin"
+          : "Technician";
+  const emailDelivery = await sendWorkspaceInviteEmail({
+    recipientEmail: invite.email,
+    recipientName: invite.name ?? invite.email,
+    tenantName: actorUser.tenant?.name ?? "TradeWorx",
+    inviterName: actorUser.name,
+    roleLabel,
+    customerCompanyName: invite.customerCompany?.name ?? null,
+    portalInvite: invite.role === "customer_user",
+    inviteUrl
+  });
+
+  await createEmailAuditLog({
+    tenantId,
+    actorUserId: parsedActor.userId,
+    action: invite.role === "customer_user"
+      ? (emailDelivery.sent ? "customer.portal_invite_email_resent" : "customer.portal_invite_email_resend_failed")
+      : (emailDelivery.sent ? "team.invite_email_resent" : "team.invite_email_resend_failed"),
+    entityType: "AccountInvitation",
+    entityId: invite.id,
+    delivery: emailDelivery,
+    recipientEmail: invite.email
+  });
+
+  return { inviteUrl, emailDelivery };
 }
 
 export async function revokeAccountInvitation(actor: ActorContext, inviteId: string) {
@@ -790,7 +900,7 @@ export async function createPasswordResetRequest(actor: ActorContext, userId: st
 
   const user = await prisma.user.findFirst({
     where: { id: userId, tenantId },
-    select: { id: true, role: true }
+    select: { id: true, role: true, email: true, name: true }
   });
 
   if (!user) {
@@ -826,7 +936,27 @@ export async function createPasswordResetRequest(actor: ActorContext, userId: st
     });
   });
 
-  return { resetUrl: buildPasswordResetUrl(token) };
+  const resetUrl = buildPasswordResetUrl(token);
+  const emailDelivery = await sendWorkspacePasswordResetEmail({
+    recipientEmail: user.email,
+    recipientName: user.name,
+    tenantName: actorUser.tenant?.name ?? "TradeWorx",
+    resetUrl
+  });
+
+  await createEmailAuditLog({
+    tenantId,
+    actorUserId: parsedActor.userId,
+    action: user.role === "customer_user"
+      ? (emailDelivery.sent ? "customer.portal_password_reset_email_sent" : "customer.portal_password_reset_email_failed")
+      : (emailDelivery.sent ? "team.password_reset_email_sent" : "team.password_reset_email_failed"),
+    entityType: "User",
+    entityId: user.id,
+    delivery: emailDelivery,
+    recipientEmail: user.email
+  });
+
+  return { resetUrl, emailDelivery };
 }
 
 export async function getInvitationAcceptanceDetails(token: string) {

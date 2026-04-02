@@ -17,7 +17,9 @@ const baseServerEnvSchema = z.object({
   STRIPE_PRICE_ENTERPRISE: z.string().optional(),
   QUICKBOOKS_CLIENT_ID: z.string().optional(),
   QUICKBOOKS_CLIENT_SECRET: z.string().optional(),
-  QUICKBOOKS_SANDBOX: z.string().optional()
+  QUICKBOOKS_SANDBOX: z.string().optional(),
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM_EMAIL: z.string().email().or(z.literal("")).optional()
 });
 
 export type ServerEnv = z.infer<typeof baseServerEnvSchema>;
@@ -44,7 +46,9 @@ function parseServerEnv(raw: NodeJS.ProcessEnv) {
     STRIPE_PRICE_ENTERPRISE: raw.STRIPE_PRICE_ENTERPRISE,
     QUICKBOOKS_CLIENT_ID: raw.QUICKBOOKS_CLIENT_ID,
     QUICKBOOKS_CLIENT_SECRET: raw.QUICKBOOKS_CLIENT_SECRET,
-    QUICKBOOKS_SANDBOX: raw.QUICKBOOKS_SANDBOX
+    QUICKBOOKS_SANDBOX: raw.QUICKBOOKS_SANDBOX,
+    RESEND_API_KEY: raw.RESEND_API_KEY,
+    RESEND_FROM_EMAIL: raw.RESEND_FROM_EMAIL
   });
 
   if (!parsed.success) {
@@ -154,6 +158,14 @@ export function getOptionalQuickBooksEnv() {
     QUICKBOOKS_CLIENT_ID: env.QUICKBOOKS_CLIENT_ID ?? null,
     QUICKBOOKS_CLIENT_SECRET: env.QUICKBOOKS_CLIENT_SECRET ?? null,
     QUICKBOOKS_SANDBOX: (env.QUICKBOOKS_SANDBOX ?? "true").toLowerCase() !== "false"
+  };
+}
+
+export function getOptionalEmailEnv() {
+  const env = getServerEnv();
+  return {
+    RESEND_API_KEY: env.RESEND_API_KEY || null,
+    RESEND_FROM_EMAIL: env.RESEND_FROM_EMAIL || null
   };
 }
 

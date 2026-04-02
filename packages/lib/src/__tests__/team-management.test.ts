@@ -44,6 +44,16 @@ vi.mock("../auth", () => ({
   hashPassword: vi.fn(async (password: string) => `hashed:${password}`)
 }));
 
+const sendEmailMock = vi.fn();
+
+vi.mock("resend", () => ({
+  Resend: vi.fn().mockImplementation(() => ({
+    emails: {
+      send: sendEmailMock
+    }
+  }))
+}));
+
 function makeActor() {
   return {
     userId: "user_admin",
@@ -55,8 +65,10 @@ function makeActor() {
 function makeAdminUser(overrides?: Partial<{ role: string; allowances: Record<string, boolean> | null }>) {
   return {
     id: "user_admin",
+    name: "Admin User",
     role: overrides?.role ?? "office_admin",
-    allowances: overrides?.allowances ?? { accountAdmin: true }
+    allowances: overrides?.allowances ?? { accountAdmin: true },
+    tenant: { name: "Evergreen Fire" }
   };
 }
 
@@ -71,9 +83,13 @@ describe("team management", () => {
     vi.stubEnv("AUTH_SECRET", "replace-with-a-long-random-secret");
     vi.stubEnv("NEXTAUTH_URL", "http://localhost:3000");
     vi.stubEnv("APP_URL", "http://localhost:3000");
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "noreply@tradeworx.net");
     prismaMock.auditLog.create.mockResolvedValue(undefined);
     prismaMock.passwordResetToken.updateMany.mockResolvedValue({ count: 0 });
     prismaMock.passwordResetToken.deleteMany.mockResolvedValue({ count: 0 });
+    prismaMock.accountInvitation.count.mockResolvedValue(0);
+    sendEmailMock.mockResolvedValue({ data: { id: "email_1" }, error: null });
     setupTransaction();
     resetServerEnvForTests();
   });
@@ -108,6 +124,8 @@ describe("team management", () => {
 
     expect(result.invite.id).toBe("invite_1");
     expect(result.inviteUrl).toMatch(/^http:\/\/localhost:3000\/accept-invite\?token=/);
+    expect(result.emailDelivery.sent).toBe(true);
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
     expect(prismaMock.accountInvitation.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         tenantId: "tenant_1",
@@ -156,7 +174,7 @@ describe("team management", () => {
 
     expect(prismaMock.customerCompany.findFirst).toHaveBeenCalledWith({
       where: { id: "customer_1", tenantId: "tenant_1" },
-      select: { id: true }
+      select: { id: true, name: true }
     });
     expect(prismaMock.accountInvitation.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -242,9 +260,10 @@ describe("team management", () => {
   it("issues a password reset link and invalidates older active tokens", async () => {
     prismaMock.user.findFirst.mockResolvedValue(makeAdminUser());
     prismaMock.passwordResetToken.updateMany.mockResolvedValue({ count: 1 });
+    sendEmailMock.mockResolvedValueOnce({ data: { id: "email_reset_1" }, error: null });
     prismaMock.user.findFirst
       .mockResolvedValueOnce(makeAdminUser())
-      .mockResolvedValueOnce({ id: "user_tech", role: "technician" });
+      .mockResolvedValueOnce({ id: "user_tech", role: "technician", email: "tech@example.com", name: "Tech User" });
     prismaMock.passwordResetToken.create.mockResolvedValue({ id: "reset_1" });
 
     const { createPasswordResetRequest } = await import("../team-management");
@@ -252,10 +271,39 @@ describe("team management", () => {
     const result = await createPasswordResetRequest(makeActor(), "user_tech");
 
     expect(result.resetUrl).toMatch(/^http:\/\/localhost:3000\/reset-password\?token=/);
+    expect(result.emailDelivery.provider).toBe("resend");
+    expect(["sent", "missing_config", "provider_error"]).toContain(result.emailDelivery.reason);
     expect(prismaMock.passwordResetToken.updateMany).toHaveBeenCalledWith({
       where: { userId: "user_tech", usedAt: null },
       data: { usedAt: expect.any(Date) }
     });
+  });
+
+  it("keeps the invite and returns fallback delivery when email is not configured", async () => {
+    vi.stubEnv("RESEND_API_KEY", "");
+    vi.stubEnv("RESEND_FROM_EMAIL", "");
+    resetServerEnvForTests();
+    prismaMock.user.findFirst.mockResolvedValue(makeAdminUser());
+    prismaMock.user.findUnique.mockResolvedValue(null);
+    prismaMock.accountInvitation.findFirst.mockResolvedValue(null);
+    prismaMock.accountInvitation.create.mockResolvedValue({
+      id: "invite_2",
+      email: "fallback@example.com",
+      role: "technician",
+      name: "Fallback User"
+    });
+
+    const { createAccountInvitation } = await import("../team-management");
+
+    const result = await createAccountInvitation(makeActor(), {
+      email: "fallback@example.com",
+      name: "Fallback User",
+      role: "technician"
+    });
+
+    expect(result.invite.id).toBe("invite_2");
+    expect(result.emailDelivery.sent).toBe(false);
+    expect(result.emailDelivery.reason).toBe("missing_config");
   });
 
   it("completes a password reset using a valid token", async () => {
