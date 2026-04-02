@@ -75,6 +75,7 @@ export async function signInspectionDocumentAction(_: FormActionResult, formData
   const documentId = String(formData.get("documentId") ?? "");
   const signerName = String(formData.get("signerName") ?? "");
   const signatureDataUrl = String(formData.get("signatureDataUrl") ?? "");
+  const annotationData = String(formData.get("annotationData") ?? "");
 
   if (!session?.user?.tenantId || !inspectionId || !documentId) {
     return { error: "Your session has expired. Please sign in again.", success: null };
@@ -83,15 +84,15 @@ export async function signInspectionDocumentAction(_: FormActionResult, formData
   try {
     await signInspectionDocument(
       { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-      { documentId, signerName, signatureDataUrl }
+      { documentId, signerName, signatureDataUrl, annotationData }
     );
 
     revalidatePath("/app/tech");
     revalidatePath(`/app/tech/inspections/${inspectionId}/documents/${documentId}`);
     revalidatePath(`/app/admin/inspections/${inspectionId}`);
     revalidatePath("/app/customer");
-    return { error: null, success: "Signed PDF saved to this inspection." };
+    return { error: null, success: "Annotated PDF saved to this inspection." };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Unable to sign inspection document.", success: null };
+    return { error: error instanceof Error ? error.message : "Unable to save annotated inspection document.", success: null };
   }
 }

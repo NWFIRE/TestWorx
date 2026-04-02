@@ -1,5 +1,6 @@
 import { InspectionDocumentStatus, InspectionDocumentType, InspectionStatus } from "@prisma/client";
 import { prisma } from "@testworx/db";
+import { z } from "zod";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 import type { ActorContext } from "@testworx/types";
@@ -19,6 +20,18 @@ import {
 } from "./storage";
 
 const MAX_INSPECTION_DOCUMENT_BYTES = 12 * 1024 * 1024;
+const documentAnnotationSchema = z.object({
+  version: z.literal(1),
+  strokes: z.array(z.object({
+    pageIndex: z.number().int().min(0),
+    color: z.string().regex(/^#([0-9a-f]{6})$/i),
+    width: z.number().min(0.5).max(24),
+    points: z.array(z.object({
+      x: z.number().min(0).max(1),
+      y: z.number().min(0).max(1)
+    })).min(1)
+  })).default([])
+});
 
 function parseActor(actor: ActorContext) {
   const parsed = actorContextSchema.parse(actor);
@@ -199,6 +212,107 @@ async function buildSignedInspectionDocumentPdf(input: {
   return pdf.save();
 }
 
+function hexToRgbTuple(hex: string) {
+  const normalized = hex.replace("#", "");
+  const red = Number.parseInt(normalized.slice(0, 2), 16) / 255;
+  const green = Number.parseInt(normalized.slice(2, 4), 16) / 255;
+  const blue = Number.parseInt(normalized.slice(4, 6), 16) / 255;
+
+  return rgb(red, green, blue);
+}
+
+async function buildAnnotatedInspectionDocumentPdf(input: {
+  originalBytes: Uint8Array;
+  signerName: string;
+  signedAt: Date;
+  label: string;
+  annotations: z.infer<typeof documentAnnotationSchema>;
+}) {
+  const pdf = await PDFDocument.load(input.originalBytes);
+  const regular = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const pages = pdf.getPages();
+
+  for (const stroke of input.annotations.strokes) {
+    const page = pages[stroke.pageIndex];
+    if (!page) {
+      continue;
+    }
+
+    const { width, height } = page.getSize();
+    const strokeColor = hexToRgbTuple(stroke.color);
+
+    if (stroke.points.length === 1) {
+      const point = stroke.points[0]!;
+      page.drawCircle({
+        x: point.x * width,
+        y: height - point.y * height,
+        size: stroke.width / 2,
+        color: strokeColor
+      });
+      continue;
+    }
+
+    for (let index = 1; index < stroke.points.length; index += 1) {
+      const start = stroke.points[index - 1]!;
+      const end = stroke.points[index]!;
+      page.drawLine({
+        start: { x: start.x * width, y: height - start.y * height },
+        end: { x: end.x * width, y: height - end.y * height },
+        thickness: stroke.width,
+        color: strokeColor,
+        opacity: 1
+      });
+    }
+  }
+
+  const summaryPage = pdf.addPage([612, 792]);
+  summaryPage.drawText("Annotated External Inspection Document", {
+    x: 48,
+    y: 736,
+    size: 20,
+    font: bold,
+    color: rgb(0.06, 0.1, 0.16)
+  });
+  summaryPage.drawText(`Document: ${input.label}`, {
+    x: 48,
+    y: 700,
+    size: 12,
+    font: regular,
+    color: rgb(0.2, 0.27, 0.37)
+  });
+  summaryPage.drawText(`Annotated by technician: ${input.signerName}`, {
+    x: 48,
+    y: 676,
+    size: 12,
+    font: regular,
+    color: rgb(0.2, 0.27, 0.37)
+  });
+  summaryPage.drawText(`Saved at: ${input.signedAt.toISOString()}`, {
+    x: 48,
+    y: 652,
+    size: 12,
+    font: regular,
+    color: rgb(0.2, 0.27, 0.37)
+  });
+  summaryPage.drawText(`Markup strokes captured: ${input.annotations.strokes.length}`, {
+    x: 48,
+    y: 628,
+    size: 12,
+    font: regular,
+    color: rgb(0.2, 0.27, 0.37)
+  });
+  summaryPage.drawText("The original uploaded PDF remains preserved separately in TradeWorx.", {
+    x: 48,
+    y: 592,
+    size: 11,
+    font: regular,
+    color: rgb(0.2, 0.27, 0.37)
+  });
+
+  return pdf.save();
+}
+
 async function assertInspectionDocumentAccess(actor: ActorContext, inspectionId: string) {
   const parsedActor = parseActor(actor);
   const inspection = await prisma.inspection.findFirst({
@@ -361,7 +475,8 @@ export async function getTechnicianInspectionDocumentDetail(actor: ActorContext,
 export async function signInspectionDocument(actor: ActorContext, input: {
   documentId: string;
   signerName: string;
-  signatureDataUrl: string;
+  signatureDataUrl?: string;
+  annotationData?: string;
 }) {
   const parsedActor = parseActor(actor);
   if (!["technician", "tenant_admin", "office_admin", "platform_admin"].includes(parsedActor.role)) {
@@ -403,19 +518,33 @@ export async function signInspectionDocument(actor: ActorContext, input: {
     throw new Error("Signer name is required.");
   }
 
-  const [originalPdf, signatureImage] = await Promise.all([
-    decodeStoredFile(document.originalStorageKey),
-    decodeStoredFile(input.signatureDataUrl)
-  ]);
-
   const signedAt = new Date();
-  const signedBytes = await buildSignedInspectionDocumentPdf({
-    originalBytes: originalPdf.bytes,
-    signatureBytes: signatureImage.bytes,
-    signerName: input.signerName.trim(),
-    signedAt,
-    label: document.label ?? document.fileName
-  });
+  const originalPdf = await decodeStoredFile(document.originalStorageKey);
+  const annotations = input.annotationData
+    ? documentAnnotationSchema.parse(JSON.parse(input.annotationData))
+    : null;
+
+  let signedBytes: Uint8Array;
+  if (annotations && annotations.strokes.length > 0) {
+    signedBytes = await buildAnnotatedInspectionDocumentPdf({
+      originalBytes: originalPdf.bytes,
+      signerName: input.signerName.trim(),
+      signedAt,
+      label: document.label ?? document.fileName,
+      annotations
+    });
+  } else if (input.signatureDataUrl) {
+    const signatureImage = await decodeStoredFile(input.signatureDataUrl);
+    signedBytes = await buildSignedInspectionDocumentPdf({
+      originalBytes: originalPdf.bytes,
+      signatureBytes: signatureImage.bytes,
+      signerName: input.signerName.trim(),
+      signedAt,
+      label: document.label ?? document.fileName
+    });
+  } else {
+    throw new Error("Add markup or a signature before saving this document.");
+  }
 
   const payload = await buildStoredFilePayload({
     tenantId: parsedActor.tenantId as string,
@@ -444,7 +573,8 @@ export async function signInspectionDocument(actor: ActorContext, input: {
     inspectionId: document.inspectionId,
     metadata: {
       signedAt: signedAt.toISOString(),
-      signerName: input.signerName.trim()
+      signerName: input.signerName.trim(),
+      annotated: Boolean(annotations && annotations.strokes.length > 0)
     }
   });
 

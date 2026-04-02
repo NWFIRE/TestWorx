@@ -219,6 +219,72 @@ describe("inspection external documents", () => {
     expect(deleteStoredFile).toHaveBeenCalledWith("blob:tenant_1/inspection-document-signed/old.pdf");
   });
 
+  it("creates an annotated signed PDF when markup data is provided", async () => {
+    const { buildStoredFilePayload, decodeStoredFile, deleteStoredFile } = await import("../storage");
+    vi.mocked(decodeStoredFile).mockResolvedValueOnce({ mimeType: "application/pdf", bytes: minimalPdfBytes() });
+    vi.mocked(buildStoredFilePayload).mockResolvedValue({
+      fileName: "customer-form-signed.pdf",
+      mimeType: "application/pdf",
+      storageKey: "blob:tenant_1/inspection-document-signed/customer-form-signed.pdf",
+      sizeBytes: 4096
+    });
+
+    prismaMock.inspectionDocument.findFirst.mockResolvedValue({
+      id: "doc_annotated",
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1",
+      fileName: "customer-form.pdf",
+      label: "Customer form",
+      requiresSignature: true,
+      status: InspectionDocumentStatus.READY_FOR_SIGNATURE,
+      originalStorageKey: "blob:tenant_1/inspection-document-original/customer-form.pdf",
+      signedStorageKey: "blob:tenant_1/inspection-document-signed/old.pdf",
+      inspection: {
+        id: "inspection_1",
+        tenantId: "tenant_1",
+        customerCompanyId: "customer_1",
+        assignedTechnicianId: "tech_1",
+        status: InspectionStatus.in_progress,
+        technicianAssignments: [{ technicianId: "tech_1" }]
+      }
+    });
+    prismaMock.inspectionDocument.update.mockResolvedValue({ id: "doc_annotated", status: InspectionDocumentStatus.SIGNED });
+
+    const { signInspectionDocument } = await import("../inspection-documents");
+    await signInspectionDocument(
+      { userId: "tech_1", role: "technician", tenantId: "tenant_1" },
+      {
+        documentId: "doc_annotated",
+        signerName: "Alex Turner",
+        annotationData: JSON.stringify({
+          version: 1,
+          strokes: [
+            {
+              pageIndex: 0,
+              color: "#2563eb",
+              width: 3,
+              points: [
+                { x: 0.2, y: 0.2 },
+                { x: 0.4, y: 0.4 }
+              ]
+            }
+          ]
+        })
+      }
+    );
+
+    expect(decodeStoredFile).toHaveBeenCalledTimes(1);
+    expect(prismaMock.inspectionDocument.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: InspectionDocumentStatus.SIGNED,
+          signedStorageKey: "blob:tenant_1/inspection-document-signed/customer-form-signed.pdf"
+        })
+      })
+    );
+    expect(deleteStoredFile).toHaveBeenCalledWith("blob:tenant_1/inspection-document-signed/old.pdf");
+  });
+
   it("only exposes signed customer-visible documents to customer users when signature is required", async () => {
     prismaMock.user.findFirst.mockResolvedValue({ customerCompanyId: "customer_1" });
     prismaMock.inspection.findFirst.mockResolvedValue({
