@@ -35,11 +35,13 @@ import {
   getAdminBillingSummaryDetail,
   getAdminBillingSummaries,
   groupBillableItems,
+  groupBillingReviewItems,
   linkBillingSummaryItemCatalog,
   mergeBillingItems,
   searchBillingSummaryItemCatalogMatches,
   syncInspectionBillingSummaryTx,
   updateBillingSummaryItem,
+  updateBillingSummaryItemGroup,
   updateBillingSummaryNotes
 } from "../inspection-billing";
 import { buildInitialReportDraft } from "../report-engine";
@@ -343,6 +345,49 @@ describe("inspection billing extraction", () => {
     expect(grouped.labor[0]?.quantity).toBe(4);
     expect(grouped.labor[0]?.unitPrice).toBe(125);
   });
+
+  it("groups identical review rows into one consolidated billing line", () => {
+    const grouped = groupBillingReviewItems([
+      {
+        id: "line_1",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        reportId: "report_1",
+        reportType: "fire_extinguisher",
+        category: "service",
+        description: "Annual Inspection",
+        quantity: 1,
+        unitPrice: 45,
+        linkedCatalogItemId: "catalog_1",
+        linkedCatalogItemName: "Annual Inspection - Fire Extinguisher",
+        linkedQuickBooksItemId: "qb_1"
+      },
+      {
+        id: "line_2",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        reportId: "report_2",
+        reportType: "fire_extinguisher",
+        category: "service",
+        description: "Annual Inspection",
+        quantity: 1,
+        unitPrice: 45,
+        linkedCatalogItemId: "catalog_1",
+        linkedCatalogItemName: "Annual Inspection - Fire Extinguisher",
+        linkedQuickBooksItemId: "qb_1"
+      }
+    ]);
+
+    expect(grouped.service).toHaveLength(1);
+    expect(grouped.service[0]).toEqual(
+      expect.objectContaining({
+        quantity: 2,
+        sourceItemCount: 2,
+        itemIds: ["line_1", "line_2"],
+        subtotal: 90
+      })
+    );
+  });
 });
 
 describe("inspection billing persistence and admin review", () => {
@@ -567,6 +612,67 @@ describe("inspection billing persistence and admin review", () => {
     await expect(
       updateBillingSummaryItem({ userId: "office_1", role: "office_admin", tenantId: "tenant_1" }, "summary_1", "line_1", 2, 99)
     ).rejects.toThrow(/moved back to review/i);
+  });
+
+  it("updates grouped billing rows while preserving underlying items", async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      {
+        id: "summary_1",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        status: "draft",
+        subtotal: 90,
+        notes: null,
+        quickbooksSyncStatus: "not_synced",
+        quickbooksInvoiceId: null,
+        items: [
+          {
+            id: "line_1",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "fire_extinguisher",
+            category: "service",
+            description: "Annual Inspection",
+            quantity: 1,
+            unitPrice: 45,
+            linkedCatalogItemId: "catalog_1",
+            linkedCatalogItemName: "Annual Inspection - Fire Extinguisher",
+            linkedQuickBooksItemId: "qb_1"
+          },
+          {
+            id: "line_2",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_2",
+            reportType: "fire_extinguisher",
+            category: "service",
+            description: "Annual Inspection",
+            quantity: 1,
+            unitPrice: 45,
+            linkedCatalogItemId: "catalog_1",
+            linkedCatalogItemName: "Annual Inspection - Fire Extinguisher",
+            linkedQuickBooksItemId: "qb_1"
+          }
+        ]
+      }
+    ]);
+
+    await updateBillingSummaryItemGroup(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "summary_1",
+      ["line_1", "line_2"],
+      7,
+      50
+    );
+
+    const executeRawText = prismaMock.$executeRaw.mock.calls
+      .flat()
+      .find((entry) => typeof entry === "string" && entry.includes("\"line_1\""));
+
+    expect(executeRawText).toContain("\"unitPrice\":50");
+    expect(executeRawText).toContain("\"id\":\"line_1\"");
+    expect(executeRawText).toContain("\"id\":\"line_2\"");
   });
 
   it("suggests normalized and alias-based catalog matches without forcing manual renames", async () => {

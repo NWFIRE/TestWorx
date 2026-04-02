@@ -102,6 +102,7 @@ export function BillingItemMatchPanel({
   summaryId,
   inspectionId,
   itemId,
+  itemIds,
   itemDescription,
   currentMatch,
   suggestedMatches,
@@ -112,6 +113,7 @@ export function BillingItemMatchPanel({
   summaryId: string;
   inspectionId: string;
   itemId: string;
+  itemIds?: string[];
   itemDescription: string;
   currentMatch: MatchCandidate | null;
   suggestedMatches: MatchCandidate[];
@@ -179,6 +181,9 @@ export function BillingItemMatchPanel({
           <form action={searchFormAction} className="flex flex-col gap-3 sm:flex-row">
             <input name="summaryId" type="hidden" value={summaryId} />
             <input name="itemId" type="hidden" value={itemId} />
+            {(itemIds ?? []).map((candidateId) => (
+              <input key={candidateId} name="itemIds" type="hidden" value={candidateId} />
+            ))}
             <input name="searchNonce" type="hidden" value={searchNonce} />
             <input
               className="min-h-11 flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
@@ -241,6 +246,9 @@ export function BillingItemMatchPanel({
                       <input name="summaryId" type="hidden" value={summaryId} />
                       <input name="inspectionId" type="hidden" value={inspectionId} />
                       <input name="itemId" type="hidden" value={itemId} />
+                      {(itemIds ?? []).map((candidateId) => (
+                        <input key={candidateId} name="itemIds" type="hidden" value={candidateId} />
+                      ))}
                       <input name="catalogItemId" type="hidden" value={candidate.catalogItemId} />
                       <input name="alias" type="hidden" value={itemDescription} />
                       <label className="flex items-center gap-2 text-xs text-slate-600">
@@ -263,6 +271,9 @@ export function BillingItemMatchPanel({
               <input name="summaryId" type="hidden" value={summaryId} />
               <input name="inspectionId" type="hidden" value={inspectionId} />
               <input name="itemId" type="hidden" value={itemId} />
+              {(itemIds ?? []).map((candidateId) => (
+                <input key={candidateId} name="itemIds" type="hidden" value={candidateId} />
+              ))}
               <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700" type="submit">
                 Clear match
               </button>

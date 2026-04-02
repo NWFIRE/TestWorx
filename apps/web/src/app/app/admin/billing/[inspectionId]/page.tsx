@@ -6,10 +6,10 @@ import { auth } from "@/auth";
 import { buildQuickBooksInvoiceAppUrl, getAdminBillingSummaryDetail, getTenantQuickBooksConnectionStatus } from "@testworx/lib";
 
 import { BillingItemMatchPanel } from "../../billing-item-match-panel";
-import { clearBillingSummaryItemCatalogLinkAction, linkBillingSummaryItemCatalogAction, searchBillingSummaryItemCatalogMatchesAction, sendQuickBooksInvoiceAction, syncBillingSummaryToQuickBooksAction, updateBillingSummaryItemAction, updateBillingSummaryNotesAction, updateBillingSummaryStatusAction } from "../../actions";
+import { clearBillingSummaryItemCatalogLinkAction, linkBillingSummaryItemCatalogAction, searchBillingSummaryItemCatalogMatchesAction, sendQuickBooksInvoiceAction, syncBillingSummaryToQuickBooksAction, updateBillingSummaryItemGroupAction, updateBillingSummaryNotesAction, updateBillingSummaryStatusAction } from "../../actions";
 
 type BillingSummaryDetail = NonNullable<Awaited<ReturnType<typeof getAdminBillingSummaryDetail>>>;
-type BillingSummaryLineItem = BillingSummaryDetail["groupedItems"][keyof BillingSummaryDetail["groupedItems"]][number] & {
+type BillingSummaryLineItem = BillingSummaryDetail["reviewGroupedItems"][keyof BillingSummaryDetail["reviewGroupedItems"]][number] & {
   currentCatalogMatch?: {
     catalogItemId: string;
     quickbooksItemId: string;
@@ -105,7 +105,7 @@ export default async function BillingSummaryDetailPage({
     notFound();
   }
 
-  const groupedEntries = Object.entries(summary.groupedItems) as Array<[keyof typeof categoryLabels, typeof summary.groupedItems[keyof typeof summary.groupedItems]]>;
+  const groupedEntries = Object.entries(summary.reviewGroupedItems) as Array<[keyof typeof categoryLabels, typeof summary.reviewGroupedItems[keyof typeof summary.reviewGroupedItems]]>;
   const isInvoiced = summary.status === "invoiced";
   const verifiedQuickBooksInvoiceId = summary.quickbooksInvoiceId && ["synced", "sent"].includes(summary.quickbooksSyncStatus ?? "")
     ? summary.quickbooksInvoiceId
@@ -181,7 +181,10 @@ export default async function BillingSummaryDetailPage({
               <div className="mb-4 flex items-center justify-between">
                 <div>
                   <p className="text-sm uppercase tracking-[0.25em] text-slate-500">{categoryLabels[category]}</p>
-                  <h3 className="mt-1 text-2xl font-semibold text-ink">{items.length} item{items.length === 1 ? "" : "s"}</h3>
+                  <h3 className="mt-1 text-2xl font-semibold text-ink">{items.length} grouped row{items.length === 1 ? "" : "s"}</h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {items.reduce((sum, item) => sum + item.sourceItemCount, 0)} original item{items.reduce((sum, item) => sum + item.sourceItemCount, 0) === 1 ? "" : "s"}
+                  </p>
                 </div>
               </div>
 
@@ -198,6 +201,25 @@ export default async function BillingSummaryDetailPage({
                         {buildBillingItemContext(item).map((line) => (
                           <p key={line} className="text-sm text-slate-500">{line}</p>
                         ))}
+                        {item.sourceItemCount > 1 ? (
+                          <details className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                            <summary className="cursor-pointer font-medium text-slate-700">
+                              {item.sourceItemCount} underlying records grouped into this line
+                            </summary>
+                            <div className="mt-3 space-y-2">
+                              {item.sourceItems.map((sourceItem) => (
+                                <div key={sourceItem.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
+                                  <p className="font-semibold text-slate-700">{sourceItem.description}</p>
+                                  <p className="mt-1">
+                                    Qty {sourceItem.quantity}
+                                    {sourceItem.sourceSection ? ` | ${sourceItem.sourceSection.replaceAll("-", " ")}` : ""}
+                                    {sourceItem.sourceField ? ` | ${sourceItem.sourceField}` : ""}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        ) : null}
                         {item.unitPrice === null || item.unitPrice === undefined ? <p className="text-sm font-semibold text-amber-700">Missing unit price. Review recommended.</p> : null}
                         <BillingItemMatchPanel
                           clearAction={clearBillingSummaryItemCatalogLinkAction}
@@ -205,16 +227,19 @@ export default async function BillingSummaryDetailPage({
                           inspectionId={summary.inspectionId}
                           itemDescription={item.description}
                           itemId={item.id}
+                          itemIds={item.itemIds}
                           linkAction={linkBillingSummaryItemCatalogAction}
                           searchAction={searchBillingSummaryItemCatalogMatchesAction}
                           suggestedMatches={item.suggestedCatalogMatches ?? []}
                           summaryId={summary.id}
                         />
                       </div>
-                      <form action={updateBillingSummaryItemAction} className="grid gap-3 sm:grid-cols-2 xl:min-w-[20rem] xl:grid-cols-3">
+                      <form action={updateBillingSummaryItemGroupAction} className="grid gap-3 sm:grid-cols-2 xl:min-w-[20rem] xl:grid-cols-3">
                         <input name="summaryId" type="hidden" value={summary.id} />
                         <input name="inspectionId" type="hidden" value={summary.inspectionId} />
-                        <input name="itemId" type="hidden" value={item.id} />
+                        {item.itemIds.map((sourceItemId) => (
+                          <input key={sourceItemId} name="itemIds" type="hidden" value={sourceItemId} />
+                        ))}
                         <label className="text-sm text-slate-600">
                           Quantity
                           <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={item.quantity} disabled={isInvoiced} name="quantity" step="0.25" type="number" />
@@ -228,6 +253,9 @@ export default async function BillingSummaryDetailPage({
                             {isInvoiced ? "Locked" : "Save line"}
                           </button>
                         </div>
+                        <p className="sm:col-span-2 xl:col-span-3 text-xs text-slate-500">
+                          Subtotal: {item.unitPrice !== null && item.unitPrice !== undefined ? `$${(item.quantity * item.unitPrice).toFixed(2)}` : "Pending price"}
+                        </p>
                       </form>
                     </div>
                   </div>

@@ -36,6 +36,13 @@ export type BillableItem = {
   linkedMatchConfidence?: number | null;
 };
 
+export type BillingReviewGroup<T extends BillableItem = BillableItem> = T & {
+  itemIds: string[];
+  sourceItemCount: number;
+  sourceItems: T[];
+  subtotal: number;
+};
+
 export type BillingCatalogMatchMethod = "exact" | "normalized" | "alias" | "fuzzy" | "source_mapping" | "manual";
 
 export type BillingCatalogMatchSuggestion = {
@@ -224,6 +231,22 @@ function buildBillingItemSourceKey(item: Pick<BillableItem, "category" | "report
     item.sourceField ?? "unknown_field",
     normalizeMatchText(item.code ?? ""),
     buildNormalizedTokenString(item.description)
+  ].join("|");
+}
+
+function buildBillingReviewGroupKey(item: Pick<
+  BillableItem,
+  "category" | "description" | "linkedCatalogItemId" | "linkedQuickBooksItemId" | "linkedCatalogItemName" | "unitPrice" | "unit" | "code"
+>) {
+  return [
+    item.category,
+    normalizeMatchText(item.description),
+    normalizeMatchText(item.code ?? ""),
+    item.linkedCatalogItemId ?? "no_catalog",
+    item.linkedQuickBooksItemId ?? "no_qb",
+    normalizeMatchText(item.linkedCatalogItemName ?? ""),
+    item.unit ?? "no_unit",
+    item.unitPrice === null || item.unitPrice === undefined ? "no_price" : item.unitPrice.toFixed(2)
   ].join("|");
 }
 
@@ -753,6 +776,91 @@ export function groupBillableItems(items: BillableItem[]) {
     service: items.filter((item) => item.category === "service"),
     fee: items.filter((item) => item.category === "fee")
   };
+}
+
+export function groupBillingReviewItems<T extends BillableItem>(items: T[]) {
+  const categories = groupBillableItems(items);
+
+  const buildGroups = (categoryItems: T[]) => {
+    const grouped = new Map<string, BillingReviewGroup<T>>();
+
+    for (const item of categoryItems) {
+      const key = buildBillingReviewGroupKey(item);
+      const existing = grouped.get(key);
+
+      if (!existing) {
+        grouped.set(key, {
+          ...item,
+          quantity: Number(item.quantity.toFixed(2)),
+          amount: calculateAmount(item.quantity, item.unitPrice ?? null),
+          subtotal: Number((item.amount ?? calculateAmount(item.quantity, item.unitPrice ?? null) ?? 0).toFixed(2)),
+          itemIds: [item.id],
+          sourceItemCount: 1,
+          sourceItems: [item]
+        });
+        continue;
+      }
+
+      const combinedQuantity = Number((existing.quantity + item.quantity).toFixed(2));
+      const nextSourceItems = [...existing.sourceItems, item];
+      grouped.set(key, {
+        ...existing,
+        quantity: combinedQuantity,
+        amount: calculateAmount(combinedQuantity, existing.unitPrice ?? null),
+        subtotal: Number((existing.subtotal + (item.amount ?? calculateAmount(item.quantity, item.unitPrice ?? null) ?? 0)).toFixed(2)),
+        itemIds: [...existing.itemIds, item.id],
+        sourceItemCount: existing.sourceItemCount + 1,
+        sourceItems: nextSourceItems
+      });
+    }
+
+    return Array.from(grouped.values());
+  };
+
+  return {
+    labor: buildGroups(categories.labor as T[]),
+    material: buildGroups(categories.material as T[]),
+    service: buildGroups(categories.service as T[]),
+    fee: buildGroups(categories.fee as T[])
+  };
+}
+
+function distributeGroupedQuantity(items: BillableItem[], totalQuantity: number) {
+  if (items.length === 0) {
+    return new Map<string, number>();
+  }
+
+  const roundedTotal = Number(totalQuantity.toFixed(2));
+  if (items.length === 1) {
+    return new Map([[items[0]!.id, roundedTotal]]);
+  }
+
+  const currentTotal = items.reduce((sum, item) => sum + item.quantity, 0);
+  const nextAssignments = new Map<string, number>();
+
+  if (currentTotal <= 0) {
+    const evenQuantity = Number((roundedTotal / items.length).toFixed(2));
+    let runningTotal = 0;
+    items.forEach((item, index) => {
+      const quantity = index === items.length - 1
+        ? Number((roundedTotal - runningTotal).toFixed(2))
+        : evenQuantity;
+      nextAssignments.set(item.id, quantity);
+      runningTotal += quantity;
+    });
+    return nextAssignments;
+  }
+
+  let assignedTotal = 0;
+  items.forEach((item, index) => {
+    const quantity = index === items.length - 1
+      ? Number((roundedTotal - assignedTotal).toFixed(2))
+      : Number(((item.quantity / currentTotal) * roundedTotal).toFixed(2));
+    nextAssignments.set(item.id, quantity);
+    assignedTotal += quantity;
+  });
+
+  return nextAssignments;
 }
 
 async function findStoredBillingItemCatalogMatch(tenantId: string, item: BillableItem) {
@@ -1314,6 +1422,7 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
     quickbooksSyncError: row.quickbooksSyncError ?? null,
     items: itemsWithCatalogState,
     groupedItems: groupBillableItems(itemsWithCatalogState),
+    reviewGroupedItems: groupBillingReviewItems(itemsWithCatalogState),
     reportTypes: [...new Set(itemsWithCatalogState.map((item) => item.reportType).filter((reportType) => reportType !== INSPECTION_LEVEL_REPORT_TYPE))],
     metrics: buildSummaryMetrics(itemsWithCatalogState)
   };
@@ -1410,6 +1519,65 @@ export async function updateBillingSummaryItem(actor: ActorContext, summaryId: s
   await prisma.$executeRaw`
     UPDATE "InspectionBillingSummary"
     SET "items" = ${JSON.stringify(items)}::jsonb,
+        "subtotal" = ${subtotal},
+        "quickbooksSyncStatus" = CASE WHEN "quickbooksInvoiceId" IS NULL THEN COALESCE("quickbooksSyncStatus", 'not_synced') ELSE 'not_synced' END,
+        "quickbooksInvoiceId" = CASE WHEN "quickbooksInvoiceId" IS NULL THEN "quickbooksInvoiceId" ELSE NULL END,
+        "quickbooksInvoiceNumber" = CASE WHEN "quickbooksInvoiceNumber" IS NULL THEN "quickbooksInvoiceNumber" ELSE NULL END,
+        "quickbooksConnectionMode" = CASE WHEN "quickbooksInvoiceId" IS NULL THEN "quickbooksConnectionMode" ELSE NULL END,
+        "quickbooksCustomerId" = CASE WHEN "quickbooksCustomerId" IS NULL THEN "quickbooksCustomerId" ELSE NULL END,
+        "quickbooksSyncedAt" = CASE WHEN "quickbooksSyncedAt" IS NULL THEN "quickbooksSyncedAt" ELSE NULL END,
+        "quickbooksSyncError" = NULL,
+        "updatedAt" = NOW()
+    WHERE "id" = ${summary.id}
+  `;
+}
+
+export async function updateBillingSummaryItemGroup(
+  actor: ActorContext,
+  summaryId: string,
+  itemIds: string[],
+  quantity: number,
+  unitPrice: number | null
+) {
+  const { summary } = await getAuthorizedBillingSummary(actor, summaryId);
+  if (summary.status === "invoiced") {
+    throw new Error("Invoiced billing summaries must be moved back to review before editing line items.");
+  }
+
+  const uniqueItemIds = [...new Set(itemIds.filter(Boolean))];
+  if (!uniqueItemIds.length) {
+    throw new Error("Billing item group not found.");
+  }
+
+  const groupedItems = summary.items.filter((item) => uniqueItemIds.includes(item.id));
+  if (groupedItems.length !== uniqueItemIds.length) {
+    throw new Error("Billing item group not found.");
+  }
+
+  const firstKey = buildBillingReviewGroupKey(groupedItems[0]!);
+  if (groupedItems.some((item) => buildBillingReviewGroupKey(item) !== firstKey)) {
+    throw new Error("Only identical billing items can be updated as a grouped row.");
+  }
+
+  const quantityAssignments = distributeGroupedQuantity(groupedItems, quantity);
+  const updatedItems = summary.items.map((item) => {
+    if (!quantityAssignments.has(item.id)) {
+      return item;
+    }
+
+    const nextQuantity = quantityAssignments.get(item.id) ?? 0;
+    return {
+      ...item,
+      quantity: nextQuantity,
+      unitPrice,
+      amount: calculateAmount(nextQuantity, unitPrice)
+    };
+  });
+  const subtotal = subtotalForItems(updatedItems);
+
+  await prisma.$executeRaw`
+    UPDATE "InspectionBillingSummary"
+    SET "items" = ${JSON.stringify(updatedItems)}::jsonb,
         "subtotal" = ${subtotal},
         "quickbooksSyncStatus" = CASE WHEN "quickbooksInvoiceId" IS NULL THEN COALESCE("quickbooksSyncStatus", 'not_synced') ELSE 'not_synced' END,
         "quickbooksInvoiceId" = CASE WHEN "quickbooksInvoiceId" IS NULL THEN "quickbooksInvoiceId" ELSE NULL END,
@@ -1608,6 +1776,176 @@ export async function linkBillingSummaryItemCatalog(
   };
 }
 
+export async function linkBillingSummaryItemGroupCatalog(
+  actor: ActorContext,
+  input: {
+    summaryId: string;
+    itemIds: string[];
+    catalogItemId: string;
+    saveMapping?: boolean;
+    alias?: string | null;
+  }
+) {
+  const { parsedActor, summary } = await getAuthorizedBillingSummary(actor, input.summaryId);
+  if (summary.status === "invoiced") {
+    throw new Error("Invoiced billing summaries must be moved back to review before linking items.");
+  }
+
+  const uniqueItemIds = [...new Set(input.itemIds.filter(Boolean))];
+  const groupedItems = summary.items.filter((candidate) => uniqueItemIds.includes(candidate.id));
+  if (!groupedItems.length || groupedItems.length !== uniqueItemIds.length) {
+    throw new Error("Billing item group not found.");
+  }
+
+  const representativeItem = groupedItems[0]!;
+  const firstKey = buildBillingReviewGroupKey(representativeItem);
+  if (groupedItems.some((item) => buildBillingReviewGroupKey(item) !== firstKey)) {
+    throw new Error("Only identical billing items can be linked as a grouped row.");
+  }
+
+  const catalogItem = await prisma.quickBooksCatalogItem.findFirst({
+    where: {
+      id: input.catalogItemId,
+      tenantId: parsedActor.tenantId as string
+    },
+    select: {
+      id: true,
+      quickbooksItemId: true,
+      name: true,
+      sku: true,
+      unitPrice: true
+    }
+  });
+
+  if (!catalogItem) {
+    throw new Error("Product or service not found.");
+  }
+
+  const groupedItemSet = new Set(uniqueItemIds);
+  const updatedItems = summary.items.map((candidate) =>
+    groupedItemSet.has(candidate.id)
+      ? {
+          ...candidate,
+          unitPrice: candidate.unitPrice ?? catalogItem.unitPrice ?? null,
+          amount: calculateAmount(candidate.quantity, candidate.unitPrice ?? catalogItem.unitPrice ?? null),
+          linkedCatalogItemId: catalogItem.id,
+          linkedCatalogItemName: catalogItem.name,
+          linkedQuickBooksItemId: catalogItem.quickbooksItemId,
+          linkedMatchMethod: "manual",
+          linkedMatchConfidence: 1
+        }
+      : candidate
+  );
+
+  const subtotal = subtotalForItems(updatedItems);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.inspectionBillingSummary.update({
+      where: { id: summary.id },
+      data: {
+        items: updatedItems as unknown as Prisma.InputJsonValue,
+        subtotal,
+        quickbooksSyncStatus: summary.quickbooksInvoiceId ? "not_synced" : summary.quickbooksSyncStatus ?? "not_synced",
+        quickbooksInvoiceId: null,
+        quickbooksInvoiceNumber: null,
+        quickbooksConnectionMode: null,
+        quickbooksCustomerId: null,
+        quickbooksSyncedAt: null,
+        quickbooksSyncError: null
+      }
+    });
+
+    if (input.saveMapping) {
+      await tx.billingItemCatalogMatch.upsert({
+        where: {
+          tenantId_sourceKey: {
+            tenantId: parsedActor.tenantId as string,
+            sourceKey: buildBillingItemSourceKey(representativeItem)
+          }
+        },
+        update: {
+          sourceName: representativeItem.description,
+          normalizedSourceName: buildNormalizedTokenString(representativeItem.description),
+          sourceCode: representativeItem.code ?? null,
+          sourceCategory: representativeItem.category,
+          sourceReportType: representativeItem.reportType,
+          sourceSection: representativeItem.sourceSection ?? null,
+          sourceField: representativeItem.sourceField ?? null,
+          catalogItemId: catalogItem.id,
+          confidence: 1,
+          matchMethod: "manual",
+          confirmedByUserId: parsedActor.userId,
+          confirmedAt: new Date()
+        },
+        create: {
+          tenantId: parsedActor.tenantId as string,
+          sourceKey: buildBillingItemSourceKey(representativeItem),
+          sourceName: representativeItem.description,
+          normalizedSourceName: buildNormalizedTokenString(representativeItem.description),
+          sourceCode: representativeItem.code ?? null,
+          sourceCategory: representativeItem.category,
+          sourceReportType: representativeItem.reportType,
+          sourceSection: representativeItem.sourceSection ?? null,
+          sourceField: representativeItem.sourceField ?? null,
+          catalogItemId: catalogItem.id,
+          confidence: 1,
+          matchMethod: "manual",
+          confirmedByUserId: parsedActor.userId,
+          confirmedAt: new Date()
+        }
+      });
+
+      const aliasValue = (input.alias?.trim() || representativeItem.description.trim());
+      const normalizedAlias = buildNormalizedTokenString(aliasValue);
+      if (normalizedAlias) {
+        await tx.quickBooksCatalogItemAlias.upsert({
+          where: {
+            tenantId_normalizedAlias: {
+              tenantId: parsedActor.tenantId as string,
+              normalizedAlias
+            }
+          },
+          update: {
+            alias: aliasValue,
+            catalogItemId: catalogItem.id,
+            createdByUserId: parsedActor.userId
+          },
+          create: {
+            tenantId: parsedActor.tenantId as string,
+            catalogItemId: catalogItem.id,
+            alias: aliasValue,
+            normalizedAlias,
+            createdByUserId: parsedActor.userId
+          }
+        });
+      }
+    }
+
+    await tx.auditLog.create({
+      data: {
+        tenantId: parsedActor.tenantId as string,
+        actorUserId: parsedActor.userId,
+        action: "billing.item_group_catalog_linked",
+        entityType: "InspectionBillingSummary",
+        entityId: summary.id,
+        metadata: {
+          itemIds: uniqueItemIds,
+          itemDescription: representativeItem.description,
+          sourceKey: buildBillingItemSourceKey(representativeItem),
+          catalogItemId: catalogItem.id,
+          catalogItemName: catalogItem.name,
+          saveMapping: Boolean(input.saveMapping)
+        }
+      }
+    });
+  });
+
+  return {
+    catalogItemId: catalogItem.id,
+    catalogItemName: catalogItem.name
+  };
+}
+
 export async function clearBillingSummaryItemCatalogLink(
   actor: ActorContext,
   input: {
@@ -1664,6 +2002,70 @@ export async function clearBillingSummaryItemCatalogLink(
         itemId: item.id,
         itemDescription: item.description,
         sourceKey: buildBillingItemSourceKey(item)
+      }
+    }
+  });
+}
+
+export async function clearBillingSummaryItemGroupCatalogLink(
+  actor: ActorContext,
+  input: {
+    summaryId: string;
+    itemIds: string[];
+  }
+) {
+  const { parsedActor, summary } = await getAuthorizedBillingSummary(actor, input.summaryId);
+  if (summary.status === "invoiced") {
+    throw new Error("Invoiced billing summaries must be moved back to review before clearing links.");
+  }
+
+  const uniqueItemIds = [...new Set(input.itemIds.filter(Boolean))];
+  const groupedItems = summary.items.filter((candidate) => uniqueItemIds.includes(candidate.id));
+  if (!groupedItems.length || groupedItems.length !== uniqueItemIds.length) {
+    throw new Error("Billing item group not found.");
+  }
+
+  const representativeItem = groupedItems[0]!;
+  const groupedItemSet = new Set(uniqueItemIds);
+  const updatedItems = summary.items.map((candidate) =>
+    groupedItemSet.has(candidate.id)
+      ? {
+          ...candidate,
+          linkedCatalogItemId: null,
+          linkedCatalogItemName: null,
+          linkedQuickBooksItemId: null,
+          linkedMatchMethod: null,
+          linkedMatchConfidence: null
+        }
+      : candidate
+  );
+
+  await prisma.inspectionBillingSummary.update({
+    where: { id: summary.id },
+    data: {
+      items: updatedItems as unknown as Prisma.InputJsonValue,
+      subtotal: subtotalForItems(updatedItems),
+      quickbooksSyncStatus: summary.quickbooksInvoiceId ? "not_synced" : summary.quickbooksSyncStatus ?? "not_synced",
+      quickbooksInvoiceId: null,
+      quickbooksInvoiceNumber: null,
+      quickbooksConnectionMode: null,
+      quickbooksCustomerId: null,
+      quickbooksSyncedAt: null,
+      quickbooksSyncError: null
+    }
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      tenantId: parsedActor.tenantId as string,
+      actorUserId: parsedActor.userId,
+      action: "billing.item_group_catalog_link_cleared",
+      entityType: "InspectionBillingSummary",
+      entityId: summary.id,
+      metadata: {
+        itemIds: uniqueItemIds,
+        itemDescription: representativeItem.description,
+        sourceKey: buildBillingItemSourceKey(representativeItem)
       }
     }
   });

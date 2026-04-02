@@ -8,6 +8,7 @@ import { auth } from "@/auth";
 import {
   createInspection,
   clearBillingSummaryItemCatalogLink,
+  clearBillingSummaryItemGroupCatalogLink,
   deleteInspection,
   importCustomerSiteCsv,
   createInspectionAmendment,
@@ -23,7 +24,9 @@ import {
   searchBillingSummaryItemCatalogMatches,
   syncBillingSummaryToQuickBooks,
   linkBillingSummaryItemCatalog,
+  linkBillingSummaryItemGroupCatalog,
   updateBillingSummaryItem,
+  updateBillingSummaryItemGroup,
   updateBillingSummaryNotes,
   updateBillingSummaryStatus,
   updateDeficiencyStatus,
@@ -441,6 +444,30 @@ export async function updateBillingSummaryItemAction(formData: FormData) {
   revalidatePath(`/app/admin/billing/${inspectionId}`);
 }
 
+export async function updateBillingSummaryItemGroupAction(formData: FormData) {
+  const session = await auth();
+  const summaryId = String(formData.get("summaryId") ?? "");
+  const inspectionId = String(formData.get("inspectionId") ?? "");
+  const itemIds = formData.getAll("itemIds").map((value) => String(value)).filter(Boolean);
+  const quantity = Number(formData.get("quantity") ?? "0");
+  const unitPriceRaw = String(formData.get("unitPrice") ?? "");
+  const unitPrice = unitPriceRaw.trim().length > 0 ? Number(unitPriceRaw) : null;
+  if (!session?.user?.tenantId || !summaryId || !inspectionId || itemIds.length === 0) {
+    return;
+  }
+
+  await updateBillingSummaryItemGroup(
+    { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+    summaryId,
+    itemIds,
+    Number.isFinite(quantity) ? quantity : 0,
+    unitPrice !== null && Number.isFinite(unitPrice) ? unitPrice : null
+  );
+
+  revalidatePath("/app/admin/billing");
+  revalidatePath(`/app/admin/billing/${inspectionId}`);
+}
+
 export async function searchBillingSummaryItemCatalogMatchesAction(
   _: {
     error: string | null;
@@ -510,19 +537,25 @@ export async function linkBillingSummaryItemCatalogAction(
   const summaryId = String(formData.get("summaryId") ?? "");
   const inspectionId = String(formData.get("inspectionId") ?? "");
   const itemId = String(formData.get("itemId") ?? "");
+  const itemIds = formData.getAll("itemIds").map((value) => String(value)).filter(Boolean);
   const catalogItemId = String(formData.get("catalogItemId") ?? "");
   const saveMapping = formData.get("saveMapping") === "on";
   const alias = String(formData.get("alias") ?? "");
 
-  if (!session?.user?.tenantId || !summaryId || !inspectionId || !itemId || !catalogItemId) {
+  if (!session?.user?.tenantId || !summaryId || !inspectionId || (!itemId && itemIds.length === 0) || !catalogItemId) {
     return { error: "Unauthorized", success: null };
   }
 
   try {
-    const linked = await linkBillingSummaryItemCatalog(
-      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-      { summaryId, itemId, catalogItemId, saveMapping, alias }
-    );
+    const linked = itemIds.length > 1
+      ? await linkBillingSummaryItemGroupCatalog(
+          { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+          { summaryId, itemIds, catalogItemId, saveMapping, alias }
+        )
+      : await linkBillingSummaryItemCatalog(
+          { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+          { summaryId, itemId, catalogItemId, saveMapping, alias }
+        );
 
     revalidatePath("/app/admin/billing");
     revalidatePath(`/app/admin/billing/${inspectionId}`);
@@ -540,16 +573,24 @@ export async function clearBillingSummaryItemCatalogLinkAction(
   const summaryId = String(formData.get("summaryId") ?? "");
   const inspectionId = String(formData.get("inspectionId") ?? "");
   const itemId = String(formData.get("itemId") ?? "");
+  const itemIds = formData.getAll("itemIds").map((value) => String(value)).filter(Boolean);
 
-  if (!session?.user?.tenantId || !summaryId || !inspectionId || !itemId) {
+  if (!session?.user?.tenantId || !summaryId || !inspectionId || (!itemId && itemIds.length === 0)) {
     return { error: "Unauthorized", success: null };
   }
 
   try {
-    await clearBillingSummaryItemCatalogLink(
-      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-      { summaryId, itemId }
-    );
+    if (itemIds.length > 1) {
+      await clearBillingSummaryItemGroupCatalogLink(
+        { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+        { summaryId, itemIds }
+      );
+    } else {
+      await clearBillingSummaryItemCatalogLink(
+        { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+        { summaryId, itemId }
+      );
+    }
 
     revalidatePath("/app/admin/billing");
     revalidatePath(`/app/admin/billing/${inspectionId}`);
