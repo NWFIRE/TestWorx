@@ -774,6 +774,7 @@ async function writeInspectionTasks(tx: Prisma.TransactionClient, inspectionId: 
         scheduledStart,
         taskStatus: InspectionStatus.to_be_completed,
         technicianId: assignedTechnicianId,
+        addedByUserId: null,
         sortOrder: index
       })
     )
@@ -789,6 +790,7 @@ async function createInspectionTaskWithReport(input: {
   scheduledStart: Date;
   taskStatus: InspectionStatus;
   technicianId: string | null;
+  addedByUserId?: string | null;
   sortOrder: number;
 }) {
   const createdTask = await input.tx.inspectionTask.create({
@@ -797,6 +799,7 @@ async function createInspectionTaskWithReport(input: {
       inspectionId: input.inspectionId,
       inspectionType: input.inspectionType,
       status: input.taskStatus,
+      addedByUserId: input.addedByUserId ?? null,
       sortOrder: input.sortOrder
     }
   });
@@ -1131,6 +1134,7 @@ export async function addInspectionTask(actor: ActorContext, input: {
       scheduledStart: inspection.scheduledStart,
       taskStatus: inspection.status === InspectionStatus.in_progress ? InspectionStatus.in_progress : InspectionStatus.to_be_completed,
       technicianId: defaultTechnicianId,
+      addedByUserId: parsedActor.userId,
       sortOrder: nextSortOrder
     });
 
@@ -1146,6 +1150,212 @@ export async function addInspectionTask(actor: ActorContext, input: {
     });
 
     return createdTask;
+  });
+}
+
+export async function removeInspectionTask(actor: ActorContext, input: {
+  inspectionId: string;
+  inspectionTaskId: string;
+}) {
+  const parsedActor = parseActor(actor);
+  const tenantId = parsedActor.tenantId as string;
+
+  return prisma.$transaction(async (tx) => {
+    const inspection = await tx.inspection.findFirst({
+      where: { id: input.inspectionId, tenantId },
+      include: {
+        technicianAssignments: { select: { technicianId: true } }
+      }
+    });
+
+    if (!inspection) {
+      throw new Error("Inspection not found.");
+    }
+
+    const canManageTask =
+      ["tenant_admin", "office_admin"].includes(parsedActor.role) ||
+      (parsedActor.role === "technician" &&
+        isTechnicianAssignedToInspection({
+          userId: parsedActor.userId,
+          assignedTechnicianId: inspection.assignedTechnicianId,
+          technicianAssignments: readTechnicianAssignments(inspection)
+        }));
+
+    if (!canManageTask) {
+      throw new Error("You do not have access to remove report types from this inspection.");
+    }
+
+    if (inspection.status === InspectionStatus.completed || inspection.status === InspectionStatus.cancelled) {
+      throw new Error("Report types can only be removed from active inspections.");
+    }
+
+    const task = await tx.inspectionTask.findFirst({
+      where: {
+        id: input.inspectionTaskId,
+        tenantId,
+        inspectionId: inspection.id
+      },
+      include: {
+        report: {
+          include: {
+            attachments: {
+              select: {
+                storageKey: true
+              }
+            },
+            signatures: {
+              select: {
+                imageDataUrl: true
+              }
+            },
+            deficiencies: {
+              select: {
+                photoStorageKey: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!task) {
+      throw new Error("Report type not found.");
+    }
+
+    if (parsedActor.role === "technician" && task.addedByUserId !== parsedActor.userId) {
+      throw new Error("Technicians can only remove report types they added themselves.");
+    }
+
+    const reportActivityCount = task.report
+      ? await tx.inspectionReport.count({
+          where: {
+            tenantId,
+            id: task.report.id,
+            OR: [
+              { autosaveVersion: { gt: 1 } },
+              { status: reportStatuses.finalized },
+              { attachments: { some: {} } },
+              { signatures: { some: {} } },
+              { deficiencies: { some: {} } }
+            ]
+          }
+        })
+      : 0;
+
+    if (reportActivityCount > 0) {
+      throw new Error("This report type already has report activity and cannot be removed.");
+    }
+
+    const storageKeys = task.report
+      ? [
+          ...task.report.attachments.map((attachment) => attachment.storageKey),
+          ...task.report.signatures.map((signature) => signature.imageDataUrl),
+          ...task.report.deficiencies.map((deficiency) => deficiency.photoStorageKey).filter((key): key is string => Boolean(key))
+        ]
+      : [];
+
+    if (task.report) {
+      await tx.reportCorrectionEvent.deleteMany({
+        where: {
+          tenantId,
+          reportId: task.report.id
+        }
+      });
+
+      await tx.attachment.deleteMany({
+        where: {
+          tenantId,
+          inspectionReportId: task.report.id
+        }
+      });
+      await tx.signature.deleteMany({
+        where: {
+          tenantId,
+          inspectionReportId: task.report.id
+        }
+      });
+      await tx.deficiency.deleteMany({
+        where: {
+          tenantId,
+          inspectionReportId: task.report.id
+        }
+      });
+      await tx.inspectionReport.delete({
+        where: {
+          id: task.report.id
+        }
+      });
+    }
+
+    await tx.inspectionRecurrence.deleteMany({
+      where: {
+        tenantId,
+        inspectionTaskId: task.id
+      }
+    });
+    await tx.inspectionTask.delete({
+      where: {
+        id: task.id
+      }
+    });
+
+    const remainingTasks = await tx.inspectionTask.findMany({
+      where: {
+        tenantId,
+        inspectionId: inspection.id
+      },
+      select: {
+        id: true
+      },
+      orderBy: [
+        { sortOrder: "asc" },
+        { createdAt: "asc" }
+      ]
+    });
+
+    await Promise.all(
+      remainingTasks.map((remainingTask, index) =>
+        tx.inspectionTask.update({
+          where: { id: remainingTask.id },
+          data: { sortOrder: index }
+        })
+      )
+    );
+
+    await createAuditLog(tx, {
+      tenantId,
+      actorUserId: parsedActor.userId,
+      action: "inspection.task_removed",
+      entityId: inspection.id,
+      metadata: {
+        inspectionTaskId: task.id,
+        inspectionType: task.inspectionType,
+        removedByUserId: parsedActor.userId
+      }
+    });
+
+    const cleanupResults = await Promise.allSettled(
+      [...new Set(storageKeys)].map((storageKey) => deleteStoredFile(storageKey))
+    );
+    const failedCleanupCount = cleanupResults.filter((result) => result.status === "rejected").length;
+
+    if (failedCleanupCount > 0) {
+      await prisma.auditLog.create({
+        data: {
+          tenantId,
+          actorUserId: parsedActor.userId,
+          action: "inspection.task_remove_storage_cleanup_failed",
+          entityType: "Inspection",
+          entityId: inspection.id,
+          metadata: {
+            inspectionTaskId: task.id,
+            failedCleanupCount
+          } as JsonObject
+        }
+      });
+    }
+
+    return { id: task.id };
   });
 }
 

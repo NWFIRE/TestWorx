@@ -8,6 +8,7 @@ import {
   claimInspection,
   editableInspectionStatuses,
   inspectionTypeRegistry,
+  removeInspectionTask,
   signInspectionDocument,
   updateInspectionStatus
 } from "@testworx/lib";
@@ -66,6 +67,26 @@ export async function addInspectionTaskAction(inspectionId: string, inspectionTy
     return { ok: true, error: null };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unable to add this report type." };
+  }
+}
+
+export async function removeInspectionTaskAction(inspectionId: string, inspectionTaskId: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { ok: false, error: "Your session has expired. Please sign in again." };
+  }
+
+  try {
+    await removeInspectionTask(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      { inspectionId, inspectionTaskId }
+    );
+    revalidatePath("/app/tech");
+    revalidatePath("/app/admin");
+    revalidatePath(`/app/admin/inspections/${inspectionId}`);
+    return { ok: true, error: null };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to remove this report type." };
   }
 }
 

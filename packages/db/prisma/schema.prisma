@@ -204,6 +204,7 @@ model User {
   acceptedAccountInvitations AccountInvitation[] @relation("AccountInvitationAcceptedBy")
   requestedPasswordResets PasswordResetToken[] @relation("PasswordResetRequestedBy")
   passwordResetTokens PasswordResetToken[]     @relation("PasswordResetUser")
+  addedInspectionTasks InspectionTask[]        @relation("InspectionTaskAddedBy")
 }
 
 model CustomerCompany {
@@ -330,12 +331,14 @@ model InspectionTask {
   tenantId       String
   inspectionId   String
   inspectionType InspectionType
+  addedByUserId  String?
   status         InspectionStatus @default(to_be_completed)
   sortOrder      Int              @default(0)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   tenant         Tenant           @relation(fields: [tenantId], references: [id])
   inspection     Inspection       @relation(fields: [inspectionId], references: [id])
+  addedBy        User?            @relation("InspectionTaskAddedBy", fields: [addedByUserId], references: [id])
   recurrence     InspectionRecurrence?
   report         InspectionReport?
   

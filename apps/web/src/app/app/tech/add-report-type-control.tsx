@@ -37,6 +37,12 @@ export function AddReportTypeControl({ inspectionId }: { inspectionId: string })
           className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-60"
           disabled={isPending}
           onClick={() => {
+            const selectedLabel = inspectionTypeRegistry[selectedType].label;
+            const confirmed = window.confirm(`Add ${selectedLabel} to this inspection? This creates another report task for the current visit.`);
+            if (!confirmed) {
+              return;
+            }
+
             startTransition(async () => {
               setMessage(null);
               const result = await addInspectionTaskAction(inspectionId, selectedType);

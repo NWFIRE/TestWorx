@@ -7,6 +7,7 @@ import { formatInspectionStatusLabel, getTechnicianDashboardData, isDueAtTimeOfS
 
 import { AddReportTypeControl } from "./add-report-type-control";
 import { ClaimButton } from "./claim-button";
+import { RemoveReportTypeButton } from "./remove-report-type-button";
 import { StatusButton } from "./status-button";
 
 type TechnicianDashboardData = Awaited<ReturnType<typeof getTechnicianDashboardData>>;
@@ -191,6 +192,13 @@ export default async function TechnicianPage({
                               <Link className="inline-flex min-h-12 w-full items-center justify-center rounded-[1.25rem] bg-white px-4 py-3 text-center text-sm font-semibold text-slateblue ring-1 ring-slate-200" href={`/app/tech/reports/${inspection.id}/${task.id}`}>
                                 {taskActionLabel(task)}
                               </Link>
+                              {task.addedByUserId === session.user.id ? (
+                                <RemoveReportTypeButton
+                                  inspectionId={inspection.id}
+                                  inspectionTaskId={task.id}
+                                  taskLabel={task.displayLabel ?? task.inspectionType.replaceAll("_", " ")}
+                                />
+                              ) : null}
                             </div>
                           ))}
                         </div>
