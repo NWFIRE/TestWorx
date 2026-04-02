@@ -74,6 +74,22 @@ function PaymentCollectionBadge({ visible }: { visible: boolean }) {
   );
 }
 
+function DispatchNotes({ notes }: { notes: string | null | undefined }) {
+  const trimmedNotes = notes?.trim();
+  if (!trimmedNotes) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 rounded-[1.25rem] border border-amber-200 bg-amber-50/80 px-4 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-900">Dispatch notes</p>
+      <p className="mt-1 text-sm leading-6 text-amber-950 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] overflow-hidden">
+        {trimmedNotes}
+      </p>
+    </div>
+  );
+}
+
 export default async function TechnicianPage({
   searchParams
 }: {
@@ -176,6 +192,7 @@ export default async function TechnicianPage({
                         ) : null}
                         <p className="mt-1 text-sm text-slate-500">Report types: {inspection.tasks.map((task: DashboardTask) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
                         <p className="mt-1 text-sm text-slate-500">{finalizedTaskCount} of {inspection.tasks.length} report task{inspection.tasks.length === 1 ? "" : "s"} finalized</p>
+                        <DispatchNotes notes={inspection.notes} />
                         <div className="mt-3 grid gap-2 sm:grid-cols-2">
                           {inspection.tasks.map((task: DashboardTask) => (
                             <div key={task.id} className="space-y-2 rounded-[1.25rem] bg-slate-50 p-3">
@@ -280,6 +297,7 @@ export default async function TechnicianPage({
                           <p className="mt-1 text-sm font-semibold text-amber-800">Collect payment before leaving the site.</p>
                         ) : null}
                         <p className="mt-1 text-sm text-slate-500">{inspection.tasks.length} report task{inspection.tasks.length === 1 ? "" : "s"} ready to claim</p>
+                        <DispatchNotes notes={inspection.notes} />
                       </div>
                       <ClaimButton inspectionId={inspection.id} />
                     </div>
