@@ -395,11 +395,19 @@ describe("inspection billing persistence and admin review", () => {
     vi.clearAllMocks();
     prismaMock.$queryRaw.mockReset();
     prismaMock.$executeRaw.mockReset();
+    prismaMock.billingItemCatalogMatch.findUnique.mockReset();
+    prismaMock.quickBooksCatalogItem.findFirst.mockReset();
+    prismaMock.quickBooksCatalogItem.findMany.mockReset();
+    prismaMock.quickBooksCatalogItemAlias.findMany.mockReset();
     txMock.$queryRaw.mockReset();
     txMock.$executeRaw.mockReset();
     txMock.inspection.findFirst.mockReset();
     txMock.tenant.findUnique.mockReset();
     txMock.serviceFeeRule.findMany.mockReset();
+    prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
+    prismaMock.quickBooksCatalogItemAlias.findMany.mockResolvedValue([]);
   });
 
   it("resolves site and zip service fee rules ahead of the tenant default", async () => {
@@ -497,6 +505,68 @@ describe("inspection billing persistence and admin review", () => {
     expect(summary?.items).toHaveLength(5);
     expect(summary?.items.find((item) => item.description === "Service Fee")?.unitPrice).toBe(95);
     expect(txMock.$executeRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it("hydrates missing unit price from a stored catalog mapping during billing summary sync", async () => {
+    const extinguisherDraft = buildFireExtinguisherDraft();
+
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      site: {
+        city: "Chicago",
+        state: "IL",
+        postalCode: "60601"
+      }
+    });
+    txMock.tenant.findUnique.mockResolvedValue({
+      defaultServiceFeeCode: null,
+      defaultServiceFeeUnitPrice: null
+    });
+    txMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue({
+      sourceKey: "service|fire_extinguisher|inventory|servicePerformed||annual inspection",
+      catalogItemId: "catalog_annual",
+      confidence: 1,
+      matchMethod: "source_mapping",
+      catalogItem: {
+        id: "catalog_annual",
+        quickbooksItemId: "qb_annual",
+        name: "Annual Inspection - Fire Extinguisher",
+        sku: "FE-ANNUAL",
+        itemType: "Service",
+        unitPrice: 45
+      }
+    });
+
+    txMock.$queryRaw
+      .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }])
+      .mockResolvedValueOnce([
+        {
+          id: "report_1",
+          inspectionId: "inspection_1",
+          tenantId: "tenant_1",
+          contentJson: extinguisherDraft,
+          inspectionType: "fire_extinguisher"
+        }
+      ])
+      .mockResolvedValueOnce([]);
+
+    const summary = await syncInspectionBillingSummaryTx(txMock as never, {
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1"
+    });
+
+    const annualInspectionLine = summary?.items.find((item) => item.description === "Annual Inspection");
+    expect(annualInspectionLine).toEqual(
+      expect.objectContaining({
+        unitPrice: 45,
+        amount: 45,
+        linkedCatalogItemId: "catalog_annual",
+        linkedQuickBooksItemId: "qb_annual"
+      })
+    );
   });
 
   it("returns billing summaries and detail views only for admin roles", async () => {
@@ -738,7 +808,13 @@ describe("inspection billing persistence and admin review", () => {
       "inspection_1"
     );
 
-    expect(detail?.items[0]?.suggestedCatalogMatches[0]?.name).toBe("Annual Inspection");
+    expect(detail?.items[0]?.currentCatalogMatch).toBeNull();
+    expect(detail?.items[0]?.suggestedCatalogMatches[0]).toEqual(
+      expect.objectContaining({
+        name: "Annual Inspection",
+        unitPrice: 45
+      })
+    );
   });
 
   it("returns conservative search results for ambiguous billing item names", async () => {

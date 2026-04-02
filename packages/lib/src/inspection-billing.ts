@@ -1245,6 +1245,8 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
 
       return {
         ...item,
+        unitPrice: item.unitPrice ?? storedMatch.catalogItem.unitPrice ?? null,
+        amount: calculateAmount(item.quantity, item.unitPrice ?? storedMatch.catalogItem.unitPrice ?? null),
         linkedCatalogItemId: storedMatch.catalogItem.id,
         linkedCatalogItemName: storedMatch.catalogItem.name,
         linkedQuickBooksItemId: storedMatch.catalogItem.quickbooksItemId,
