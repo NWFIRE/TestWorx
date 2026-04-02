@@ -694,41 +694,44 @@ export function ReportEditor({ data }: { data: EditorData }) {
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[0.95fr_1.4fr] xl:gap-6">
-        <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
-          <div className="overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel sm:rounded-[2rem]">
-            <h3 className="text-lg font-semibold text-ink">Sections</h3>
-            <div className="mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 xl:grid xl:overflow-visible xl:pb-0">
-              {data.template.sections.map((section) => (
-                <button
-                  key={section.id}
-                  className={`min-h-16 min-w-[13.5rem] snap-start rounded-2xl border px-4 py-4 text-left xl:min-w-0 ${activeSectionId === section.id ? "border-slateblue bg-slateblue text-white" : "border-slate-200 bg-white text-ink"}`}
-                  onClick={() => { void handleSectionChange(section.id); }}
-                  type="button"
-                >
-                  <p className="font-semibold">{sectionStatusLabel(preview.sectionSummaries.find((summary) => summary.sectionId === section.id) ?? { sectionId: section.id, sectionLabel: section.label, status: "pending", notes: "", completionState: "not_started", completedRows: 0, totalRows: 0, deficiencyCount: 0 })}</p>
-                  <p className={`mt-1 text-sm ${activeSectionId === section.id ? "text-white/80" : "text-slate-500"}`}>{draft.sections[section.id]?.status ?? "pending"}</p>
+      <div className="space-y-4 sm:space-y-6">
+        <div className="overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel sm:rounded-[2rem]">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="min-w-0">
+              <h3 className="text-lg font-semibold text-ink">Sections</h3>
+              <p className="mt-1 text-sm text-slate-500">Move between sections from the top while keeping the report content full width below.</p>
+            </div>
+            <div className="hidden min-w-[20rem] rounded-[1.5rem] bg-slate-50 p-4 lg:block">
+              <div className="flex gap-3">
+                <button className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-ink" onClick={() => setShowPreview((current) => !current)} type="button">
+                  {showPreview ? "Hide preview" : "Preview"}
                 </button>
-              ))}
+                <button className="flex-1 rounded-2xl bg-ember px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={!data.canEdit || data.reportStatus === "finalized" || saveInFlightRef.current} onClick={() => { void saveDraft(draft, "manual"); }} type="button">
+                  Save now
+                </button>
+              </div>
+              <button className="mt-3 w-full rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={!canFinalizeNow} onClick={() => { void finalizeReport(); }} type="button">
+                Finalize report
+              </button>
+              {finalizeReadinessMessage ? <p className="mt-3 text-sm text-amber-700">{finalizeReadinessMessage}</p> : null}
+              {visibleErrorMessage ? <p className="mt-3 text-sm text-rose-600">{visibleErrorMessage}</p> : null}
+              {backupWarning ? <p className="mt-3 text-sm text-amber-700">{backupWarning}</p> : null}
             </div>
           </div>
-          <div className="hidden overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel lg:block sm:rounded-[2rem]">
-            <div className="flex gap-3">
-              <button className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-ink" onClick={() => setShowPreview((current) => !current)} type="button">
-                {showPreview ? "Hide preview" : "Preview"}
+          <div className="mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1">
+            {data.template.sections.map((section) => (
+              <button
+                key={section.id}
+                className={`min-h-16 min-w-[13.5rem] snap-start rounded-2xl border px-4 py-4 text-left md:min-w-[15rem] xl:min-w-[16rem] ${activeSectionId === section.id ? "border-slateblue bg-slateblue text-white" : "border-slate-200 bg-white text-ink"}`}
+                onClick={() => { void handleSectionChange(section.id); }}
+                type="button"
+              >
+                <p className="font-semibold">{sectionStatusLabel(preview.sectionSummaries.find((summary) => summary.sectionId === section.id) ?? { sectionId: section.id, sectionLabel: section.label, status: "pending", notes: "", completionState: "not_started", completedRows: 0, totalRows: 0, deficiencyCount: 0 })}</p>
+                <p className={`mt-1 text-sm ${activeSectionId === section.id ? "text-white/80" : "text-slate-500"}`}>{draft.sections[section.id]?.status ?? "pending"}</p>
               </button>
-              <button className="flex-1 rounded-2xl bg-ember px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={!data.canEdit || data.reportStatus === "finalized" || saveInFlightRef.current} onClick={() => { void saveDraft(draft, "manual"); }} type="button">
-                Save now
-              </button>
-            </div>
-            <button className="mt-3 w-full rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={!canFinalizeNow} onClick={() => { void finalizeReport(); }} type="button">
-              Finalize report
-            </button>
-            {finalizeReadinessMessage ? <p className="mt-3 text-sm text-amber-700">{finalizeReadinessMessage}</p> : null}
-            {visibleErrorMessage ? <p className="mt-3 text-sm text-rose-600">{visibleErrorMessage}</p> : null}
-            {backupWarning ? <p className="mt-3 text-sm text-amber-700">{backupWarning}</p> : null}
+            ))}
           </div>
-        </aside>
+        </div>
 
         <div className="min-w-0 space-y-4 sm:space-y-6">
           <div className="overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel sm:rounded-[2rem] sm:p-5">
