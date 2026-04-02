@@ -76,6 +76,23 @@ const customerAllowanceLabelMap: Record<(typeof customerAllowanceKeys)[number], 
   portalAdmin: "Portal admin"
 };
 
+function getRoleDefaultAllowances(role: "tenant_admin" | "office_admin" | "technician" | "customer_user"): TeamAllowanceMap {
+  return {
+    accountAdmin: role === "tenant_admin" || role === "office_admin",
+    schedulingAccess: role === "tenant_admin" || role === "office_admin",
+    billingAccess: role === "tenant_admin" || role === "office_admin",
+    settingsAccess: role === "tenant_admin" || role === "office_admin",
+    reportReviewAccess: role === "tenant_admin" || role === "office_admin" || role === "technician",
+    deficiencyAccess: role === "tenant_admin" || role === "office_admin",
+    amendmentAccess: role === "tenant_admin" || role === "office_admin",
+    customerPortalAdmin: role === "tenant_admin" || role === "office_admin",
+    reportDownload: role === "customer_user",
+    documentDownload: role === "customer_user",
+    deficiencyVisibility: role === "customer_user",
+    portalAdmin: false
+  };
+}
+
 function formatDateTime(value: string | Date | null | undefined) {
   if (!value) {
     return "Never";
@@ -190,20 +207,10 @@ function InviteFormCard({
   customerMode?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(customerMode ? createCustomerInviteAction : createTeamInviteAction, initialActionState);
-  const defaultAllowances = useMemo<TeamAllowanceMap>(() => ({
-    accountAdmin: false,
-    schedulingAccess: true,
-    billingAccess: !customerMode,
-    settingsAccess: !customerMode,
-    reportReviewAccess: !customerMode,
-    deficiencyAccess: true,
-    amendmentAccess: !customerMode,
-    customerPortalAdmin: !customerMode,
-    reportDownload: customerMode,
-    documentDownload: customerMode,
-    deficiencyVisibility: customerMode,
-    portalAdmin: false
-  }), [customerMode]);
+  const [selectedRole, setSelectedRole] = useState<"tenant_admin" | "office_admin" | "technician" | "customer_user">(
+    customerMode ? "customer_user" : "technician"
+  );
+  const defaultAllowances = useMemo<TeamAllowanceMap>(() => getRoleDefaultAllowances(selectedRole), [selectedRole]);
 
   return (
     <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
@@ -235,7 +242,12 @@ function InviteFormCard({
           ) : (
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-600">Role</label>
-              <select className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slateblue" defaultValue="technician" name="role">
+              <select
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slateblue"
+                name="role"
+                onChange={(event) => setSelectedRole(event.target.value as "tenant_admin" | "office_admin" | "technician")}
+                value={selectedRole}
+              >
                 <option value="tenant_admin">Tenant admin</option>
                 <option value="office_admin">Office admin</option>
                 <option value="technician">Technician</option>
@@ -247,6 +259,7 @@ function InviteFormCard({
         <div>
           <p className="mb-2 text-sm font-medium text-slate-600">Allowances</p>
           <AllowanceFieldset
+            key={`${customerMode ? "customer" : "internal"}-${selectedRole}`}
             allowanceKeys={customerMode ? customerAllowanceKeys : internalAllowanceKeys}
             labelMap={customerMode ? customerAllowanceLabelMap : internalAllowanceLabelMap}
             values={defaultAllowances}
