@@ -159,7 +159,9 @@ async function createInspectionFixture(input: {
             recurrence: {
               create: {
                 tenantId: input.tenantId,
+                seriesId: `series_${inspectionType}`,
                 frequency: RecurrenceFrequency.ANNUAL,
+                anchorScheduledStart: scheduledStart,
                 nextDueAt: new Date(scheduledStart.getTime() + 365 * 24 * 60 * 60 * 1000)
               }
             },

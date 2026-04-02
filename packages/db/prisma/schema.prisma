@@ -351,11 +351,15 @@ model InspectionRecurrence {
   inspectionTaskId String              @unique
   frequency        RecurrenceFrequency
   intervalCount    Int                 @default(1)
+  seriesId         String
+  anchorScheduledStart DateTime?
   nextDueAt        DateTime?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
   tenant           Tenant              @relation(fields: [tenantId], references: [id])
   inspectionTask   InspectionTask      @relation(fields: [inspectionTaskId], references: [id])
+
+  @@index([tenantId, seriesId])
 }
 
 model InspectionReport {

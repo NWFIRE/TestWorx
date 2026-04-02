@@ -176,6 +176,59 @@ function mergeExistingDuplicateTasks(
   });
 }
 
+type ScheduledInspectionTaskInput = z.infer<typeof scheduleInspectionSchema>["tasks"][number] & {
+  recurrenceSeriesId?: string | null;
+  recurrenceAnchorScheduledStart?: Date | null;
+  recurrenceNextDueAt?: Date | null;
+};
+
+function mapRecurringTaskDefinitions(input: {
+  existingTasks: Array<{
+    id: string;
+    inspectionType: keyof typeof inspectionTypeRegistry;
+    recurrence?: {
+      id: string;
+      frequency: RecurrenceFrequency;
+      seriesId?: string | null;
+      anchorScheduledStart?: Date | null;
+      nextDueAt?: Date | null;
+    } | null;
+  }>;
+  nextTasks: z.infer<typeof scheduleInspectionSchema>["tasks"];
+  scheduledStart: Date;
+  mode: "reset_anchor" | "preserve_anchor";
+  fallbackAnchorScheduledStart?: Date;
+}) {
+  const taskQueues = new Map<keyof typeof inspectionTypeRegistry, typeof input.existingTasks>();
+  for (const task of input.existingTasks) {
+    const queue = taskQueues.get(task.inspectionType) ?? [];
+    queue.push(task);
+    taskQueues.set(task.inspectionType, queue);
+  }
+
+  return input.nextTasks.map((task) => {
+    const queue = taskQueues.get(task.inspectionType) ?? [];
+    const existingTask = queue.shift();
+    if (!existingTask?.recurrence) {
+      return task;
+    }
+
+    const anchorScheduledStart = input.mode === "preserve_anchor"
+      ? existingTask.recurrence.anchorScheduledStart ?? input.fallbackAnchorScheduledStart ?? input.scheduledStart
+      : input.scheduledStart;
+    const recurrenceNextDueAt = input.mode === "preserve_anchor" && existingTask.recurrence.frequency === task.frequency
+      ? existingTask.recurrence.nextDueAt ?? nextDueFrom(anchorScheduledStart, task.frequency)
+      : nextDueFrom(anchorScheduledStart, task.frequency);
+
+    return {
+      ...task,
+      recurrenceSeriesId: existingTask.recurrence.seriesId ?? existingTask.recurrence.id ?? existingTask.id,
+      recurrenceAnchorScheduledStart: anchorScheduledStart,
+      recurrenceNextDueAt
+    } satisfies ScheduledInspectionTaskInput;
+  });
+}
+
 export function getInspectionAssignedTechnicianIds(input: {
   assignedTechnicianId?: string | null;
   technicianAssignments?: Array<{ technicianId: string }>;
@@ -762,7 +815,14 @@ async function syncInspectionTechnicianAssignments(
   });
 }
 
-async function writeInspectionTasks(tx: Prisma.TransactionClient, inspectionId: string, tenantId: string, assignedTechnicianId: string | null, scheduledStart: Date, tasks: z.infer<typeof scheduleInspectionSchema>["tasks"]) {
+async function writeInspectionTasks(
+  tx: Prisma.TransactionClient,
+  inspectionId: string,
+  tenantId: string,
+  assignedTechnicianId: string | null,
+  scheduledStart: Date,
+  tasks: ScheduledInspectionTaskInput[]
+) {
   await Promise.all(
     tasks.map((task, index) =>
       createInspectionTaskWithReport({
@@ -775,7 +835,10 @@ async function writeInspectionTasks(tx: Prisma.TransactionClient, inspectionId: 
         taskStatus: InspectionStatus.to_be_completed,
         technicianId: assignedTechnicianId,
         addedByUserId: null,
-        sortOrder: index
+        sortOrder: index,
+        recurrenceSeriesId: task.recurrenceSeriesId,
+        recurrenceAnchorScheduledStart: task.recurrenceAnchorScheduledStart,
+        recurrenceNextDueAt: task.recurrenceNextDueAt
       })
     )
   );
@@ -792,6 +855,9 @@ async function createInspectionTaskWithReport(input: {
   technicianId: string | null;
   addedByUserId?: string | null;
   sortOrder: number;
+  recurrenceSeriesId?: string | null;
+  recurrenceAnchorScheduledStart?: Date | null;
+  recurrenceNextDueAt?: Date | null;
 }) {
   const createdTask = await input.tx.inspectionTask.create({
     data: {
@@ -809,8 +875,10 @@ async function createInspectionTaskWithReport(input: {
       data: {
         tenantId: input.tenantId,
         inspectionTaskId: createdTask.id,
+        seriesId: input.recurrenceSeriesId ?? crypto.randomUUID(),
         frequency: input.frequency,
-        nextDueAt: nextDueFrom(input.scheduledStart, input.frequency)
+        anchorScheduledStart: input.recurrenceAnchorScheduledStart ?? input.scheduledStart,
+        nextDueAt: input.recurrenceNextDueAt ?? nextDueFrom(input.scheduledStart, input.frequency)
       }
     }),
     input.tx.inspectionReport.create({
@@ -825,6 +893,152 @@ async function createInspectionTaskWithReport(input: {
   ]);
 
   return createdTask;
+}
+
+async function createRecurringFollowUpInspectionsTx(tx: Prisma.TransactionClient, input: {
+  tenantId: string;
+  actorUserId: string;
+  inspection: {
+    id: string;
+    customerCompanyId: string;
+    siteId: string;
+    assignedTechnicianId: string | null;
+    createdByUserId: string;
+    scheduledStart: Date;
+    scheduledEnd: Date | null;
+    notes: string | null;
+    claimable: boolean;
+    amendments?: Array<{ id: string }>;
+    technicianAssignments?: Array<{ technicianId: string }>;
+    tasks: Array<{
+      id: string;
+      inspectionType: keyof typeof inspectionTypeRegistry;
+      recurrence?: {
+        id: string;
+        frequency: RecurrenceFrequency;
+        seriesId?: string | null;
+        anchorScheduledStart?: Date | null;
+        nextDueAt?: Date | null;
+      } | null;
+    }>;
+  };
+}) {
+  if ((input.inspection.amendments?.length ?? 0) > 0) {
+    return [];
+  }
+
+  const recurringTasks = input.inspection.tasks.filter((task) => (
+    task.recurrence &&
+    task.recurrence.frequency !== RecurrenceFrequency.ONCE &&
+    task.recurrence.nextDueAt instanceof Date &&
+    !Number.isNaN(task.recurrence.nextDueAt.getTime())
+  ));
+  if (!recurringTasks.length) {
+    return [];
+  }
+
+  const recurringSeriesIds = recurringTasks
+    .map((task) => task.recurrence?.seriesId)
+    .filter((seriesId): seriesId is string => typeof seriesId === "string" && seriesId.length > 0);
+  const existingFutureTasks = recurringSeriesIds.length > 0
+    ? await tx.inspectionTask.findMany({
+      where: {
+        tenantId: input.tenantId,
+        inspectionId: { not: input.inspection.id },
+        recurrence: {
+          is: {
+            seriesId: { in: recurringSeriesIds }
+          }
+        }
+      },
+      select: {
+        recurrence: {
+          select: {
+            seriesId: true
+          }
+        }
+      }
+    })
+    : [];
+  const existingSeriesIds = new Set(
+    existingFutureTasks
+      .map((task) => task.recurrence?.seriesId)
+      .filter((seriesId): seriesId is string => typeof seriesId === "string" && seriesId.length > 0)
+  );
+
+  const tasksToRollForward = recurringTasks.filter((task) => {
+    const seriesId = task.recurrence?.seriesId ?? task.recurrence?.id ?? task.id;
+    return !existingSeriesIds.has(seriesId);
+  });
+  if (!tasksToRollForward.length) {
+    return [];
+  }
+
+  const durationMs = input.inspection.scheduledEnd
+    ? Math.max(input.inspection.scheduledEnd.getTime() - input.inspection.scheduledStart.getTime(), 0)
+    : null;
+  const assignedTechnicianIds = getInspectionAssignedTechnicianIds({
+    assignedTechnicianId: input.inspection.assignedTechnicianId,
+    technicianAssignments: input.inspection.technicianAssignments
+  });
+
+  const groupedTasks = new Map<string, { scheduledStart: Date; tasks: ScheduledInspectionTaskInput[] }>();
+  for (const task of tasksToRollForward) {
+    const nextScheduledStart = task.recurrence?.nextDueAt;
+    if (!nextScheduledStart) {
+      continue;
+    }
+
+    const group = groupedTasks.get(nextScheduledStart.toISOString()) ?? {
+      scheduledStart: nextScheduledStart,
+      tasks: []
+    };
+    group.tasks.push({
+      inspectionType: task.inspectionType,
+      frequency: task.recurrence?.frequency ?? getDefaultInspectionRecurrenceFrequency(task.inspectionType),
+      recurrenceSeriesId: task.recurrence?.seriesId ?? task.recurrence?.id ?? task.id,
+      recurrenceAnchorScheduledStart: task.recurrence?.anchorScheduledStart ?? input.inspection.scheduledStart,
+      recurrenceNextDueAt: nextDueFrom(nextScheduledStart, task.recurrence?.frequency ?? getDefaultInspectionRecurrenceFrequency(task.inspectionType))
+    });
+    groupedTasks.set(nextScheduledStart.toISOString(), group);
+  }
+
+  const createdInspections = [];
+  for (const group of [...groupedTasks.values()].sort((left, right) => left.scheduledStart.getTime() - right.scheduledStart.getTime())) {
+    const createdInspection = await tx.inspection.create({
+      data: {
+        tenantId: input.tenantId,
+        customerCompanyId: input.inspection.customerCompanyId,
+        siteId: input.inspection.siteId,
+        assignedTechnicianId: input.inspection.assignedTechnicianId,
+        createdByUserId: input.actorUserId,
+        scheduledStart: group.scheduledStart,
+        scheduledEnd: durationMs === null ? null : new Date(group.scheduledStart.getTime() + durationMs),
+        status: InspectionStatus.to_be_completed,
+        notes: input.inspection.notes,
+        claimable: assignedTechnicianIds.length === 0
+      }
+    });
+
+    await syncInspectionTechnicianAssignments(tx, createdInspection.id, input.tenantId, assignedTechnicianIds);
+    await writeInspectionTasks(tx, createdInspection.id, input.tenantId, input.inspection.assignedTechnicianId, group.scheduledStart, group.tasks);
+
+    await createAuditLog(tx, {
+      tenantId: input.tenantId,
+      actorUserId: input.actorUserId,
+      action: "inspection.recurrence_created",
+      entityId: createdInspection.id,
+      metadata: {
+        sourceInspectionId: input.inspection.id,
+        taskCount: group.tasks.length,
+        scheduledStart: group.scheduledStart.toISOString()
+      }
+    });
+
+    createdInspections.push(createdInspection);
+  }
+
+  return createdInspections;
 }
 
 async function createAuditLog(tx: Prisma.TransactionClient, input: {
@@ -931,7 +1145,7 @@ export async function updateInspection(actor: ActorContext, inspectionId: string
   return prisma.$transaction(async (tx) => {
     const existing = await tx.inspection.findFirst({
       where: { id: inspectionId, tenantId },
-      include: { tasks: true, technicianAssignments: { select: { technicianId: true } } }
+      include: { tasks: { include: { recurrence: true } }, technicianAssignments: { select: { technicianId: true } } }
     });
 
     if (!existing) {
@@ -958,6 +1172,12 @@ export async function updateInspection(actor: ActorContext, inspectionId: string
 
     const { customerCompany, site, assignedTechnicianIds, primaryAssignedTechnicianId } = await validateSchedulingReferences(tx, tenantId, input);
     const effectiveTasks = mergeExistingDuplicateTasks(existing.tasks, input.tasks);
+    const taskDefinitions = mapRecurringTaskDefinitions({
+      existingTasks: existing.tasks,
+      nextTasks: effectiveTasks,
+      scheduledStart: input.scheduledStart,
+      mode: "reset_anchor"
+    });
     const previousAssignedTechnicianIds = getInspectionAssignedTechnicianIds({
       assignedTechnicianId: existing.assignedTechnicianId,
       technicianAssignments: readTechnicianAssignments(existing)
@@ -985,7 +1205,7 @@ export async function updateInspection(actor: ActorContext, inspectionId: string
     });
 
     await syncInspectionTechnicianAssignments(tx, inspectionId, tenantId, assignedTechnicianIds);
-    await writeInspectionTasks(tx, inspectionId, tenantId, primaryAssignedTechnicianId, input.scheduledStart, effectiveTasks);
+    await writeInspectionTasks(tx, inspectionId, tenantId, primaryAssignedTechnicianId, input.scheduledStart, taskDefinitions);
 
     const assignmentAction = getAssignmentAuditAction(previousAssignedTechnicianIds[0] ?? null, primaryAssignedTechnicianId);
     if (assignmentAction) {
@@ -1020,7 +1240,11 @@ export async function updateInspectionStatus(actor: ActorContext, inspectionId: 
 
   const inspection = await prisma.inspection.findFirst({
     where: { id: inspectionId, tenantId },
-    include: { technicianAssignments: { select: { technicianId: true } } }
+    include: {
+      technicianAssignments: { select: { technicianId: true } },
+      amendments: { select: { id: true } },
+      tasks: { include: { recurrence: true } }
+    }
   });
   if (!inspection) {
     throw new Error("Inspection not found.");
@@ -1053,6 +1277,10 @@ export async function updateInspectionStatus(actor: ActorContext, inspectionId: 
   }
 
   return prisma.$transaction(async (tx) => {
+    if (inspection.status === status) {
+      return inspection;
+    }
+
     const updated = await tx.inspection.update({
       where: { id: inspectionId },
       data: { status }
@@ -1065,12 +1293,25 @@ export async function updateInspectionStatus(actor: ActorContext, inspectionId: 
       });
     }
 
+    let generatedInspectionsCount = 0;
+    if (status === InspectionStatus.completed) {
+      const generatedInspections = await createRecurringFollowUpInspectionsTx(tx, {
+        tenantId,
+        actorUserId: parsedActor.userId,
+        inspection
+      });
+      generatedInspectionsCount = generatedInspections.length;
+    }
+
     await createAuditLog(tx, {
       tenantId,
       actorUserId: parsedActor.userId,
       action: "inspection.status_updated",
       entityId: inspectionId,
-      metadata: { status }
+      metadata: {
+        status,
+        generatedInspectionsCount
+      }
     });
 
     return updated;
@@ -1135,7 +1376,8 @@ export async function addInspectionTask(actor: ActorContext, input: {
       taskStatus: inspection.status === InspectionStatus.in_progress ? InspectionStatus.in_progress : InspectionStatus.to_be_completed,
       technicianId: defaultTechnicianId,
       addedByUserId: parsedActor.userId,
-      sortOrder: nextSortOrder
+      sortOrder: nextSortOrder,
+      recurrenceAnchorScheduledStart: inspection.scheduledStart
     });
 
     await createAuditLog(tx, {
@@ -1477,6 +1719,13 @@ export async function createInspectionAmendment(actor: ActorContext, inspectionI
 
     const { customerCompany, site, assignedTechnicianIds, primaryAssignedTechnicianId } = await validateSchedulingReferences(tx, tenantId, input);
     const effectiveTasks = mergeExistingDuplicateTasks(existing.tasks, input.tasks);
+    const taskDefinitions = mapRecurringTaskDefinitions({
+      existingTasks: existing.tasks,
+      nextTasks: effectiveTasks,
+      scheduledStart: input.scheduledStart,
+      mode: "preserve_anchor",
+      fallbackAnchorScheduledStart: existing.scheduledStart
+    });
     const previousSnapshot = buildInspectionSnapshot({
       id: existing.id,
       customerCompanyId: existing.customerCompanyId,
@@ -1523,7 +1772,7 @@ export async function createInspectionAmendment(actor: ActorContext, inspectionI
     });
 
     await syncInspectionTechnicianAssignments(tx, replacementInspection.id, tenantId, assignedTechnicianIds);
-    await writeInspectionTasks(tx, replacementInspection.id, tenantId, primaryAssignedTechnicianId, input.scheduledStart, effectiveTasks);
+    await writeInspectionTasks(tx, replacementInspection.id, tenantId, primaryAssignedTechnicianId, input.scheduledStart, taskDefinitions);
 
     const amendmentType = JSON.stringify(previousSnapshot.assignedTechnicianIds) !== JSON.stringify(assignedTechnicianIds)
       ? "reassignment"

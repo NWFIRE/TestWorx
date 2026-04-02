@@ -140,7 +140,9 @@ async function createSeedInspection(input: {
       data: {
         tenantId: input.tenantId,
         inspectionTaskId: createdTask.id,
+        seriesId: createdTask.id,
         frequency: task.frequency,
+        anchorScheduledStart: input.scheduledStart,
         nextDueAt: task.frequency === RecurrenceFrequency.ONCE ? null : new Date(input.scheduledStart.getTime() + 86_400_000)
       }
     });
