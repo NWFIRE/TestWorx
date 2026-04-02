@@ -61,6 +61,14 @@ const completePasswordResetSchema = z.object({
   password: z.string().min(8)
 });
 
+const userLookupSchema = z.object({
+  kind: z.enum(["internal", "customer"]),
+  query: z.string().trim().optional(),
+  page: z.number().int().min(0).default(0),
+  limit: z.number().int().min(1).max(25).default(8),
+  status: z.enum(["all", "active", "inactive"]).default("all")
+});
+
 function hashOneTimeToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
@@ -256,22 +264,34 @@ export async function getTeamWorkspaceData(
   const requestedStatus = input?.status?.trim() || "all";
   const requestedRole = input?.role?.trim() || "all";
 
-  const [users, invites, customers] = await Promise.all([
-    prisma.user.findMany({
-      where: { tenantId },
-      orderBy: [{ role: "asc" }, { name: "asc" }],
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        isActive: true,
-        allowances: true,
-        lastLoginAt: true,
-        createdAt: true,
-        customerCompany: { select: { id: true, name: true } }
-      }
-    }),
+  const [summaryCounts, invites, customers] = await Promise.all([
+    prisma.$transaction([
+      prisma.user.count({
+        where: {
+          tenantId,
+          role: { not: "customer_user" }
+        }
+      }),
+      prisma.user.count({
+        where: {
+          tenantId,
+          role: "customer_user"
+        }
+      }),
+      prisma.user.count({
+        where: {
+          tenantId,
+          isActive: false
+        }
+      }),
+      prisma.accountInvitation.count({
+        where: {
+          tenantId,
+          status: "pending",
+          expiresAt: { gt: new Date() }
+        }
+      })
+    ]),
     prisma.accountInvitation.findMany({
       where: { tenantId },
       orderBy: [{ sentAt: "desc" }],
@@ -297,21 +317,6 @@ export async function getTeamWorkspaceData(
     })
   ]);
 
-  const formattedUsers = users.map((user) => {
-    const typedRole = user.role as (typeof userRoleOptions)[number];
-    const allowances = sanitizeAllowancesForRole(
-      typedRole,
-      allowanceMapSchema.safeParse(user.allowances ?? {}).success ? allowanceMapSchema.parse(user.allowances ?? {}) : null
-    );
-
-    return {
-      ...user,
-      allowances,
-      allowanceLabels: getAllowanceLabels(typedRole, allowances),
-      kind: typedRole === "customer_user" ? "customer" : "internal"
-    };
-  });
-
   const formattedInvites = invites.map((invite) => {
     const typedRole = invite.role as (typeof userRoleOptions)[number];
     const allowances = sanitizeAllowancesForRole(
@@ -330,26 +335,8 @@ export async function getTeamWorkspaceData(
 
   const matcher = (value: string | null | undefined) => value?.toLowerCase().includes(query) ?? false;
   const roleMatches = (role: string) => requestedRole === "all" || role === requestedRole;
-  const userStatusMatches = (user: { isActive: boolean }) =>
-    requestedStatus === "all"
-    || (requestedStatus === "active" && user.isActive)
-    || (requestedStatus === "inactive" && !user.isActive);
   const inviteStatusMatches = (invite: { derivedStatus: string }) =>
     requestedStatus === "all" || requestedStatus === invite.derivedStatus;
-
-  const internalUsers = formattedUsers.filter((user) =>
-    user.kind === "internal"
-    && roleMatches(user.role)
-    && userStatusMatches(user)
-    && (!query || matcher(user.name) || matcher(user.email))
-  );
-
-  const customerUsers = formattedUsers.filter((user) =>
-    user.kind === "customer"
-    && roleMatches(user.role)
-    && userStatusMatches(user)
-    && (!query || matcher(user.name) || matcher(user.email) || matcher(user.customerCompany?.name))
-  );
 
   const internalInvites = formattedInvites.filter((invite) =>
     invite.kind === "internal"
@@ -372,16 +359,92 @@ export async function getTeamWorkspaceData(
       role: requestedRole
     },
     summary: {
-      teamMembers: formattedUsers.filter((user) => user.kind === "internal").length,
-      customerPortalUsers: formattedUsers.filter((user) => user.kind === "customer").length,
-      pendingInvites: formattedInvites.filter((invite) => invite.derivedStatus === "pending").length,
-      inactiveUsers: formattedUsers.filter((user) => !user.isActive).length
+      teamMembers: summaryCounts[0],
+      customerPortalUsers: summaryCounts[1],
+      pendingInvites: summaryCounts[3],
+      inactiveUsers: summaryCounts[2]
     },
     customerCompanies: customers,
-    teamMembers: internalUsers,
-    customerPortalUsers: customerUsers,
     teamInvites: internalInvites,
     customerInvites
+  };
+}
+
+export async function searchTeamWorkspaceUsers(
+  actor: ActorContext,
+  rawInput: z.input<typeof userLookupSchema>
+) {
+  const parsedActor = parseActor(actor);
+  const tenantId = requireTenantId(parsedActor);
+  const actorUser = await getActorWithAllowances(parsedActor);
+  ensureTeamManagementAccess(actorUser);
+  const input = userLookupSchema.parse(rawInput);
+
+  const query = input.query?.trim() ?? "";
+  const statusWhere =
+    input.status === "active"
+      ? { isActive: true }
+      : input.status === "inactive"
+        ? { isActive: false }
+        : {};
+
+  const roleWhere =
+    input.kind === "customer"
+      ? { role: "customer_user" as const }
+      : { role: { not: "customer_user" as const } };
+
+  const searchWhere = query
+    ? {
+        OR: [
+          { name: { contains: query, mode: "insensitive" as const } },
+          { email: { contains: query, mode: "insensitive" as const } },
+          { customerCompany: { name: { contains: query, mode: "insensitive" as const } } }
+        ]
+      }
+    : {};
+
+  const users = await prisma.user.findMany({
+    where: {
+      tenantId,
+      ...roleWhere,
+      ...statusWhere,
+      ...searchWhere
+    },
+    orderBy: [{ isActive: "desc" }, { name: "asc" }, { email: "asc" }],
+    skip: input.page * input.limit,
+    take: input.limit + 1,
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      isActive: true,
+      allowances: true,
+      lastLoginAt: true,
+      createdAt: true,
+      customerCompany: { select: { id: true, name: true } }
+    }
+  });
+
+  const hasMore = users.length > input.limit;
+  const pageItems = users.slice(0, input.limit).map((user) => {
+    const typedRole = user.role as (typeof userRoleOptions)[number];
+    const allowances = sanitizeAllowancesForRole(
+      typedRole,
+      allowanceMapSchema.safeParse(user.allowances ?? {}).success ? allowanceMapSchema.parse(user.allowances ?? {}) : null
+    );
+
+    return {
+      ...user,
+      allowances,
+      allowanceLabels: getAllowanceLabels(typedRole, allowances)
+    };
+  });
+
+  return {
+    items: pageItems,
+    page: input.page,
+    hasMore
   };
 }
 

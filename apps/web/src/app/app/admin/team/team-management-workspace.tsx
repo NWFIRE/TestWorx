@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 import { customerAllowanceKeys, internalAllowanceKeys, type TeamAllowanceMap } from "@testworx/lib";
 
@@ -44,6 +44,11 @@ type WorkspaceInvite = {
   customerCompany?: { id: string; name: string } | null;
   allowances: TeamAllowanceMap;
   allowanceLabels: AllowanceLabel[];
+};
+type UserLookupResponse = {
+  items: WorkspaceUser[];
+  page: number;
+  hasMore: boolean;
 };
 
 const roleLabels: Record<string, string> = {
@@ -415,21 +420,267 @@ function EmptyState({ title, description }: { title: string; description: string
   );
 }
 
+const userLookupCache = new Map<string, UserLookupResponse>();
+
+function buildUserLookupCacheKey(kind: "internal" | "customer", query: string, page: number, status: "all" | "active" | "inactive") {
+  return `team-user-lookup:${kind}:${status}:${page}:${query.trim().toLowerCase()}`;
+}
+
+function AsyncUserLookupSection({
+  kind,
+  title,
+  description,
+  statusFilter = "all"
+}: {
+  kind: "internal" | "customer";
+  title: string;
+  description: string;
+  statusFilter?: "all" | "active" | "inactive";
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const [items, setItems] = useState<WorkspaceUser[]>([]);
+  const [selectedUser, setSelectedUser] = useState<WorkspaceUser | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedQuery(query);
+      setPage(0);
+    }, 200);
+
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  async function loadUsers(nextPage: number, replace = false) {
+    const cacheKey = buildUserLookupCacheKey(kind, debouncedQuery, nextPage, statusFilter);
+    const cached =
+      userLookupCache.get(cacheKey)
+      ?? (() => {
+        if (typeof window === "undefined") {
+          return null;
+        }
+
+        const raw = window.sessionStorage.getItem(cacheKey);
+        if (!raw) {
+          return null;
+        }
+
+        try {
+          const parsed = JSON.parse(raw) as UserLookupResponse;
+          userLookupCache.set(cacheKey, parsed);
+          return parsed;
+        } catch {
+          return null;
+        }
+      })();
+
+    const applyPayload = (payload: UserLookupResponse) => {
+      setItems((current) => (replace ? payload.items : [...current, ...payload.items]));
+      setHasMore(payload.hasMore);
+      setError(null);
+      setHasLoaded(true);
+    };
+
+    if (cached) {
+      applyPayload(cached);
+      return;
+    }
+
+    const requestId = ++requestIdRef.current;
+    setLoading(true);
+    setError(null);
+
+    try {
+      const params = new URLSearchParams({
+        kind,
+        q: debouncedQuery,
+        page: String(nextPage),
+        limit: "8",
+        status: statusFilter
+      });
+      const response = await fetch(`/api/team/users?${params.toString()}`, {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store"
+      });
+
+      const payload = (await response.json()) as UserLookupResponse & { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error || "Unable to load users.");
+      }
+
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      userLookupCache.set(cacheKey, payload);
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(cacheKey, JSON.stringify(payload));
+      }
+      applyPayload(payload);
+    } catch (loadError) {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      setError(loadError instanceof Error ? loadError.message : "Unable to load users.");
+      if (replace) {
+        setItems([]);
+      }
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    void loadUsers(0, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, debouncedQuery, statusFilter]);
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
+        <p className="text-sm uppercase tracking-[0.24em] text-slate-400">{kind === "internal" ? "Team" : "Customer portal"}</p>
+        <h2 className="mt-2 text-2xl font-semibold text-ink">{title}</h2>
+        <p className="mt-2 text-sm text-slate-500">{description}</p>
+
+        <div className="mt-5 space-y-3">
+          <button
+            className="flex min-h-12 w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm text-slate-700"
+            onClick={() => setOpen((current) => !current)}
+            type="button"
+          >
+            <span className="truncate">
+              {selectedUser
+                ? `${selectedUser.name} • ${selectedUser.email}`
+                : kind === "internal"
+                  ? "Browse or search internal members"
+                  : "Browse or search portal users"}
+            </span>
+            <span className="ml-4 shrink-0 text-slate-400">{open ? "Close" : "Open"}</span>
+          </button>
+
+          {open ? (
+            <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm">
+              <label className="mb-2 block text-sm font-medium text-slate-600">
+                {kind === "internal" ? "Internal Members" : "Portal Users"}
+              </label>
+              <input
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slateblue"
+                onChange={(event) => setQuery(event.target.value)}
+                onFocus={() => {
+                  setOpen(true);
+                  if (!hasLoaded && !loading) {
+                    void loadUsers(0, true);
+                  }
+                }}
+                placeholder={kind === "internal" ? "Search name or email" : "Search name, email, or customer"}
+                value={query}
+              />
+
+              <div className="mt-3 max-h-80 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50">
+                {loading && items.length === 0 ? (
+                  <div className="px-4 py-4 text-sm text-slate-500">Loading users…</div>
+                ) : error ? (
+                  <div className="space-y-3 px-4 py-4 text-sm text-rose-600">
+                    <p>{error}</p>
+                    <button
+                      className="inline-flex rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700"
+                      onClick={() => void loadUsers(0, true)}
+                      type="button"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                ) : items.length === 0 ? (
+                  <div className="px-4 py-4 text-sm text-slate-500">No users matched that search.</div>
+                ) : (
+                  <div className="divide-y divide-slate-200">
+                    {items.map((user) => (
+                      <button
+                        key={user.id}
+                        className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left hover:bg-white"
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setOpen(false);
+                        }}
+                        type="button"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-slate-900">{user.name}</span>
+                          <span className="mt-1 block truncate text-xs text-slate-500">{user.email}</span>
+                          {user.customerCompany ? (
+                            <span className="mt-1 block truncate text-xs text-slate-400">{user.customerCompany.name}</span>
+                          ) : null}
+                        </span>
+                        <span className="shrink-0 text-xs text-slate-400">{user.isActive ? "Active" : "Inactive"}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {hasMore ? (
+                <div className="mt-3">
+                  <button
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 disabled:opacity-60"
+                    disabled={loading}
+                    onClick={() => {
+                      const nextPage = page + 1;
+                      setPage(nextPage);
+                      void loadUsers(nextPage, false);
+                    }}
+                    type="button"
+                  >
+                    {loading && items.length > 0 ? "Loading more…" : "Load more"}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {selectedUser ? (
+        <UserRow customerMode={kind === "customer"} user={selectedUser} />
+      ) : (
+        <EmptyState
+          description={
+            kind === "internal"
+              ? "Open the member lookup to search and manage a specific internal account without loading the entire team list."
+              : "Open the portal lookup to search and manage a specific customer-facing account without loading the full portal user list."
+          }
+          title={kind === "internal" ? "Select an internal member" : "Select a portal user"}
+        />
+      )}
+    </div>
+  );
+}
+
 export function TeamManagementWorkspace({
   summary,
   customerCompanies,
   filters,
-  teamMembers,
   teamInvites,
-  customerPortalUsers,
   customerInvites
 }: {
   summary: { teamMembers: number; customerPortalUsers: number; pendingInvites: number; inactiveUsers: number };
   customerCompanies: CustomerOption[];
   filters: { query: string; status: string; role: string };
-  teamMembers: WorkspaceUser[];
   teamInvites: WorkspaceInvite[];
-  customerPortalUsers: WorkspaceUser[];
   customerInvites: WorkspaceInvite[];
 }) {
   return (
@@ -488,14 +739,12 @@ export function TeamManagementWorkspace({
 
       <section className="grid gap-6 xl:grid-cols-2">
         <div className="space-y-4">
-          <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
-            <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Team</p>
-            <h2 className="mt-2 text-2xl font-semibold text-ink">Internal members</h2>
-            <p className="mt-2 text-sm text-slate-500">Manage admins and technicians without leaving the operational workspace.</p>
-          </div>
-          {teamMembers.length > 0 ? teamMembers.map((user) => <UserRow key={user.id} user={user} />) : (
-            <EmptyState description="No internal team members matched these filters. Try broadening the filter or create a new invite above." title="No team members found" />
-          )}
+          <AsyncUserLookupSection
+            description="Search and load internal accounts only when needed, with async lookup and pagination for larger workspaces."
+            kind="internal"
+            statusFilter={filters.status === "active" || filters.status === "inactive" ? filters.status : "all"}
+            title="Internal members"
+          />
           {teamInvites.length > 0 ? (
             <>
               <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
@@ -508,14 +757,12 @@ export function TeamManagementWorkspace({
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
-            <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Customer portal</p>
-            <h2 className="mt-2 text-2xl font-semibold text-ink">Portal access</h2>
-            <p className="mt-2 text-sm text-slate-500">Give customers access to reports, documents, and deficiency visibility with clear customer-company context.</p>
-          </div>
-          {customerPortalUsers.length > 0 ? customerPortalUsers.map((user) => <UserRow key={user.id} customerMode user={user} />) : (
-            <EmptyState description="No customer portal users matched these filters. Invite a portal contact above to get started." title="No portal users found" />
-          )}
+          <AsyncUserLookupSection
+            description="Search and load customer-facing accounts on demand so the portal section stays fast even with large customer user lists."
+            kind="customer"
+            statusFilter={filters.status === "active" || filters.status === "inactive" ? filters.status : "all"}
+            title="Portal access"
+          />
           {customerInvites.length > 0 ? (
             <>
               <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">

@@ -86,6 +86,13 @@ export async function createPasswordResetRequest(
   return mod.createPasswordResetRequest(...args);
 }
 
+export async function searchTeamWorkspaceUsers(
+  ...args: Parameters<TeamManagementModule["searchTeamWorkspaceUsers"]>
+): ReturnType<TeamManagementModule["searchTeamWorkspaceUsers"]> {
+  const mod = await import("./team-management");
+  return mod.searchTeamWorkspaceUsers(...args);
+}
+
 export async function getInvitationAcceptanceDetails(
   ...args: Parameters<TeamManagementModule["getInvitationAcceptanceDetails"]>
 ): ReturnType<TeamManagementModule["getInvitationAcceptanceDetails"]> {

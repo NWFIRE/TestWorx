@@ -75,11 +75,9 @@ export default async function AdminTeamPage({
       <TeamManagementWorkspace
         customerCompanies={workspace.customerCompanies}
         customerInvites={workspace.customerInvites}
-        customerPortalUsers={workspace.customerPortalUsers}
         filters={workspace.filters}
         summary={workspace.summary}
         teamInvites={workspace.teamInvites}
-        teamMembers={workspace.teamMembers}
       />
     </main>
   );

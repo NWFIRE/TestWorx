@@ -6,6 +6,7 @@ const prismaMock = {
   user: {
     findFirst: vi.fn(),
     findUnique: vi.fn(),
+    findMany: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
@@ -317,5 +318,110 @@ describe("team management", () => {
     await expect(removeUserFromWorkspace(makeActor(), "user_history")).rejects.toThrow(
       "This account has operational history and cannot be removed. Deactivate it instead."
     );
+  });
+
+  it("searches internal users lazily with pagination", async () => {
+    prismaMock.user.findFirst.mockResolvedValue(makeAdminUser());
+    prismaMock.user.findMany.mockResolvedValue([
+      {
+        id: "user_1",
+        email: "alpha@example.com",
+        name: "Alpha Admin",
+        role: "office_admin",
+        isActive: true,
+        allowances: { accountAdmin: true },
+        lastLoginAt: null,
+        createdAt: new Date("2026-04-01T10:00:00.000Z"),
+        customerCompany: null
+      },
+      {
+        id: "user_2",
+        email: "bravo@example.com",
+        name: "Bravo Tech",
+        role: "technician",
+        isActive: true,
+        allowances: { reportReviewAccess: true },
+        lastLoginAt: null,
+        createdAt: new Date("2026-04-01T11:00:00.000Z"),
+        customerCompany: null
+      },
+      {
+        id: "user_3",
+        email: "charlie@example.com",
+        name: "Charlie Tech",
+        role: "technician",
+        isActive: false,
+        allowances: { reportReviewAccess: true },
+        lastLoginAt: null,
+        createdAt: new Date("2026-04-01T12:00:00.000Z"),
+        customerCompany: null
+      }
+    ]);
+
+    const { searchTeamWorkspaceUsers } = await import("../team-management");
+
+    const result = await searchTeamWorkspaceUsers(makeActor(), {
+      kind: "internal",
+      query: "a",
+      page: 0,
+      limit: 2,
+      status: "all"
+    });
+
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        tenantId: "tenant_1",
+        role: { in: ["tenant_admin", "office_admin", "technician"] },
+        OR: expect.any(Array)
+      }),
+      orderBy: [{ isActive: "desc" }, { name: "asc" }, { email: "asc" }],
+      skip: 0,
+      take: 3,
+      select: expect.any(Object)
+    });
+    expect(result.items).toHaveLength(2);
+    expect(result.hasMore).toBe(true);
+  });
+
+  it("searches customer portal users only within the customer role", async () => {
+    prismaMock.user.findFirst.mockResolvedValue(makeAdminUser());
+    prismaMock.user.findMany.mockResolvedValue([
+      {
+        id: "portal_1",
+        email: "portal@example.com",
+        name: "Portal Contact",
+        role: "customer_user",
+        isActive: true,
+        allowances: { reportDownload: true },
+        lastLoginAt: null,
+        createdAt: new Date("2026-04-01T10:00:00.000Z"),
+        customerCompany: { id: "customer_1", name: "North Campus" }
+      }
+    ]);
+
+    const { searchTeamWorkspaceUsers } = await import("../team-management");
+
+    const result = await searchTeamWorkspaceUsers(makeActor(), {
+      kind: "customer",
+      query: "north",
+      page: 0,
+      limit: 8,
+      status: "active"
+    });
+
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        tenantId: "tenant_1",
+        role: "customer_user",
+        isActive: true,
+        OR: expect.any(Array)
+      }),
+      orderBy: [{ isActive: "desc" }, { name: "asc" }, { email: "asc" }],
+      skip: 0,
+      take: 9,
+      select: expect.any(Object)
+    });
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.customerCompany?.name).toBe("North Campus");
   });
 });
