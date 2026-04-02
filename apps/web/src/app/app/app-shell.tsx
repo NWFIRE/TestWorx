@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -190,8 +191,15 @@ function BrandBlock({
 }) {
   return (
     <div className={`flex min-w-0 items-center gap-3 overflow-hidden ${collapsed ? "justify-center" : ""}`}>
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-bold uppercase tracking-[0.18em] text-slateblue shadow-[0_6px_20px_rgba(15,23,42,0.05)]">
-        TW
+      <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_6px_20px_rgba(15,23,42,0.05)]">
+        <Image
+          alt="TradeWorx"
+          className="object-contain p-1"
+          fill
+          priority
+          sizes="40px"
+          src="/icon.png"
+        />
       </div>
       {!collapsed ? (
         <div className="min-w-0 overflow-hidden">
