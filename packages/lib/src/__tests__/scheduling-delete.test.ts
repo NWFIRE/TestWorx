@@ -1,22 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const deleteStoredFileMock = vi.fn();
-const inspectionFindFirstMock = vi.fn();
-const auditLogCreateMock = vi.fn();
-const transactionMock = {
-  reportCorrectionEvent: { deleteMany: vi.fn() },
-  attachment: { deleteMany: vi.fn() },
-  signature: { deleteMany: vi.fn() },
-  deficiency: { deleteMany: vi.fn() },
-  inspectionDocument: { deleteMany: vi.fn() },
-  inspectionReport: { deleteMany: vi.fn() },
-  inspectionRecurrence: { deleteMany: vi.fn() },
-  inspectionTask: { deleteMany: vi.fn() },
-  inspectionTechnicianAssignment: { deleteMany: vi.fn() },
-  inspectionBillingSummary: { deleteMany: vi.fn() },
-  inspection: { delete: vi.fn() },
-  auditLog: { create: vi.fn() }
-};
+const {
+  deleteStoredFileMock,
+  inspectionFindFirstMock,
+  auditLogCreateMock,
+  transactionMock
+} = vi.hoisted(() => ({
+  deleteStoredFileMock: vi.fn(),
+  inspectionFindFirstMock: vi.fn(),
+  auditLogCreateMock: vi.fn(),
+  transactionMock: {
+    reportCorrectionEvent: { deleteMany: vi.fn() },
+    attachment: { deleteMany: vi.fn() },
+    signature: { deleteMany: vi.fn() },
+    deficiency: { deleteMany: vi.fn() },
+    inspectionDocument: { deleteMany: vi.fn() },
+    inspectionReport: { deleteMany: vi.fn() },
+    inspectionRecurrence: { deleteMany: vi.fn() },
+    inspectionTask: { deleteMany: vi.fn() },
+    inspectionTechnicianAssignment: { deleteMany: vi.fn() },
+    inspectionBillingSummary: { deleteMany: vi.fn() },
+    inspection: { delete: vi.fn() },
+    auditLog: { create: vi.fn() }
+  }
+}));
 
 vi.mock("@testworx/db", () => ({
   prisma: {
@@ -34,9 +41,10 @@ vi.mock("../storage", () => ({
   deleteStoredFile: deleteStoredFileMock
 }));
 
+import { deleteInspection } from "../scheduling";
+
 describe("inspection deletion", () => {
   beforeEach(() => {
-    vi.resetModules();
     vi.clearAllMocks();
   });
 
@@ -52,8 +60,6 @@ describe("inspection deletion", () => {
       reports: [],
       documents: []
     });
-
-    const { deleteInspection } = await import("../scheduling");
 
     await expect(
       deleteInspection(
@@ -96,8 +102,6 @@ describe("inspection deletion", () => {
       ]
     });
 
-    const { deleteInspection } = await import("../scheduling");
-
     await deleteInspection(
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
       "inspection_1"
@@ -127,8 +131,6 @@ describe("inspection deletion", () => {
       reports: [],
       documents: []
     });
-
-    const { deleteInspection } = await import("../scheduling");
 
     await expect(
       deleteInspection(
