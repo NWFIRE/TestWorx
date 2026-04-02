@@ -221,6 +221,40 @@ describe("inspection task addition", () => {
     expect(txMock.inspectionTask.delete).not.toHaveBeenCalled();
   });
 
+  it("allows office admins to remove a technician-added report type", async () => {
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      tenantId: "tenant_1",
+      assignedTechnicianId: "tech_1",
+      technicianAssignments: [{ technicianId: "tech_1" }],
+      status: InspectionStatus.in_progress
+    });
+    txMock.inspectionTask.findFirst.mockResolvedValue({
+      id: "task_added",
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1",
+      inspectionType: "fire_alarm",
+      addedByUserId: "tech_1",
+      report: {
+        id: "report_added",
+        attachments: [],
+        signatures: [],
+        deficiencies: []
+      }
+    });
+    txMock.inspectionTask.findMany.mockResolvedValue([{ id: "task_existing" }]);
+
+    const removedTask = await removeInspectionTask(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { inspectionId: "inspection_1", inspectionTaskId: "task_added" }
+    );
+
+    expect(txMock.inspectionTask.delete).toHaveBeenCalledWith({
+      where: { id: "task_added" }
+    });
+    expect(removedTask).toEqual({ id: "task_added" });
+  });
+
   it("blocks removing a report type once report activity exists", async () => {
     txMock.inspection.findFirst.mockResolvedValue({
       id: "inspection_1",

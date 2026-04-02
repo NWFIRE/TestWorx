@@ -19,6 +19,7 @@ import { InspectionExternalDocumentsCard } from "../../inspection-external-docum
 import { InspectionPdfUploadCard } from "../../inspection-pdf-upload-card";
 import { InspectionReportCorrectionsCard } from "../../inspection-report-corrections-card";
 import { InspectionSchedulerForm } from "../../inspection-scheduler-form";
+import { RemoveReportTypeButton } from "../../../tech/remove-report-type-button";
 
 type InspectionType = Parameters<typeof getDefaultInspectionRecurrenceFrequency>[0];
 type RecurrenceFrequency = ReturnType<typeof getDefaultInspectionRecurrenceFrequency>;
@@ -79,6 +80,7 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
     tasks: Array<{
       id: string;
       inspectionType: InspectionType;
+      addedByUserId: string | null;
       recurrence: { frequency: RecurrenceFrequency } | null;
       report: {
         id: string;
@@ -323,6 +325,46 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
               } : null
             }))}
           />
+          <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Report type management</p>
+            <div className="mt-4 space-y-3">
+              {inspectionView.tasks.map((task: InspectionTask) => {
+                const isAddedTask = Boolean(task.addedByUserId);
+                const hasReportActivity = Boolean(
+                  task.report && (
+                    task.report.status === "finalized" ||
+                    task.report.correctionEvents.length > 0 ||
+                    task.report.finalizedAt ||
+                    task.report.correctionRequestedAt ||
+                    task.report.correctionResolvedAt
+                  )
+                );
+
+                return (
+                  <div key={task.id} className="rounded-2xl border border-slate-200 p-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-ink">{task.inspectionType.replaceAll("_", " ")}</p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {isAddedTask
+                            ? "Added after the original inspection was scheduled."
+                            : "Original scheduled report type."}
+                        </p>
+                        {hasReportActivity ? <p className="mt-1 text-sm text-amber-700">This report type already has report activity and cannot be removed.</p> : null}
+                      </div>
+                      {isAddedTask ? (
+                        <RemoveReportTypeButton
+                          inspectionId={inspection.id}
+                          inspectionTaskId={task.id}
+                          taskLabel={task.inspectionType.replaceAll("_", " ")}
+                        />
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
           <InspectionPdfUploadCard action={uploadInspectionPdfAction} attachments={attachmentView} inspectionId={inspection.id} />
           <DeleteInspectionCard action={deleteInspectionAction} inspectionId={inspection.id} />
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
