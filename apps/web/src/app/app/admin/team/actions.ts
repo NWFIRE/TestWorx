@@ -16,20 +16,7 @@ import {
   updateInviteAllowances,
   updateUserAllowances
 } from "@testworx/lib";
-
-type ActionState = {
-  error: string | null;
-  success: string | null;
-  inviteUrl?: string | null;
-  resetUrl?: string | null;
-};
-
-const initialActionState: ActionState = {
-  error: null,
-  success: null,
-  inviteUrl: null,
-  resetUrl: null
-};
+import { initialTeamActionState, type TeamActionState } from "./action-state";
 
 function readAllowanceValues(formData: FormData) {
   return Object.fromEntries(allowanceKeys.map((key) => [key, formData.get(key) === "on"]));
@@ -48,7 +35,7 @@ async function requireActor() {
   };
 }
 
-export async function createTeamInviteAction(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function createTeamInviteAction(_: TeamActionState, formData: FormData): Promise<TeamActionState> {
   try {
     const actor = await requireActor();
     const result = await createAccountInvitation(actor, {
@@ -60,11 +47,11 @@ export async function createTeamInviteAction(_: ActionState, formData: FormData)
     revalidatePath("/app/admin/team");
     return { error: null, success: "Invite created.", inviteUrl: result.inviteUrl, resetUrl: null };
   } catch (error) {
-    return { ...initialActionState, error: error instanceof Error ? error.message : "Unable to create invite." };
+    return { ...initialTeamActionState, error: error instanceof Error ? error.message : "Unable to create invite." };
   }
 }
 
-export async function createCustomerInviteAction(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function createCustomerInviteAction(_: TeamActionState, formData: FormData): Promise<TeamActionState> {
   try {
     const actor = await requireActor();
     const result = await createAccountInvitation(actor, {
@@ -77,33 +64,33 @@ export async function createCustomerInviteAction(_: ActionState, formData: FormD
     revalidatePath("/app/admin/team");
     return { error: null, success: "Customer portal invite created.", inviteUrl: result.inviteUrl, resetUrl: null };
   } catch (error) {
-    return { ...initialActionState, error: error instanceof Error ? error.message : "Unable to create portal invite." };
+    return { ...initialTeamActionState, error: error instanceof Error ? error.message : "Unable to create portal invite." };
   }
 }
 
-export async function resendInviteAction(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function resendInviteAction(_: TeamActionState, formData: FormData): Promise<TeamActionState> {
   try {
     const actor = await requireActor();
     const result = await resendAccountInvitation(actor, String(formData.get("inviteId") ?? ""));
     revalidatePath("/app/admin/team");
     return { error: null, success: "Invite resent.", inviteUrl: result.inviteUrl, resetUrl: null };
   } catch (error) {
-    return { ...initialActionState, error: error instanceof Error ? error.message : "Unable to resend invite." };
+    return { ...initialTeamActionState, error: error instanceof Error ? error.message : "Unable to resend invite." };
   }
 }
 
-export async function revokeInviteAction(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function revokeInviteAction(_: TeamActionState, formData: FormData): Promise<TeamActionState> {
   try {
     const actor = await requireActor();
     await revokeAccountInvitation(actor, String(formData.get("inviteId") ?? ""));
     revalidatePath("/app/admin/team");
-    return { ...initialActionState, success: "Invite revoked." };
+    return { ...initialTeamActionState, success: "Invite revoked." };
   } catch (error) {
-    return { ...initialActionState, error: error instanceof Error ? error.message : "Unable to revoke invite." };
+    return { ...initialTeamActionState, error: error instanceof Error ? error.message : "Unable to revoke invite." };
   }
 }
 
-export async function updateUserAllowancesAction(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function updateUserAllowancesAction(_: TeamActionState, formData: FormData): Promise<TeamActionState> {
   try {
     const actor = await requireActor();
     await updateUserAllowances(actor, {
@@ -111,13 +98,13 @@ export async function updateUserAllowancesAction(_: ActionState, formData: FormD
       allowances: readAllowanceValues(formData)
     });
     revalidatePath("/app/admin/team");
-    return { ...initialActionState, success: "Allowances updated." };
+    return { ...initialTeamActionState, success: "Allowances updated." };
   } catch (error) {
-    return { ...initialActionState, error: error instanceof Error ? error.message : "Unable to update allowances." };
+    return { ...initialTeamActionState, error: error instanceof Error ? error.message : "Unable to update allowances." };
   }
 }
 
-export async function updateInviteAllowancesAction(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function updateInviteAllowancesAction(_: TeamActionState, formData: FormData): Promise<TeamActionState> {
   try {
     const actor = await requireActor();
     await updateInviteAllowances(actor, {
@@ -125,13 +112,13 @@ export async function updateInviteAllowancesAction(_: ActionState, formData: For
       allowances: readAllowanceValues(formData)
     });
     revalidatePath("/app/admin/team");
-    return { ...initialActionState, success: "Invite allowances updated." };
+    return { ...initialTeamActionState, success: "Invite allowances updated." };
   } catch (error) {
-    return { ...initialActionState, error: error instanceof Error ? error.message : "Unable to update invite allowances." };
+    return { ...initialTeamActionState, error: error instanceof Error ? error.message : "Unable to update invite allowances." };
   }
 }
 
-export async function setUserActiveStateAction(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function setUserActiveStateAction(_: TeamActionState, formData: FormData): Promise<TeamActionState> {
   try {
     const actor = await requireActor();
     await setUserActiveState(
@@ -140,35 +127,35 @@ export async function setUserActiveStateAction(_: ActionState, formData: FormDat
       String(formData.get("nextState") ?? "") === "active"
     );
     revalidatePath("/app/admin/team");
-    return { ...initialActionState, success: "Account status updated." };
+    return { ...initialTeamActionState, success: "Account status updated." };
   } catch (error) {
-    return { ...initialActionState, error: error instanceof Error ? error.message : "Unable to update account status." };
+    return { ...initialTeamActionState, error: error instanceof Error ? error.message : "Unable to update account status." };
   }
 }
 
-export async function removeUserAction(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function removeUserAction(_: TeamActionState, formData: FormData): Promise<TeamActionState> {
   try {
     const actor = await requireActor();
     await removeUserFromWorkspace(actor, String(formData.get("userId") ?? ""));
     revalidatePath("/app/admin/team");
-    return { ...initialActionState, success: "Account removed." };
+    return { ...initialTeamActionState, success: "Account removed." };
   } catch (error) {
-    return { ...initialActionState, error: error instanceof Error ? error.message : "Unable to remove account." };
+    return { ...initialTeamActionState, error: error instanceof Error ? error.message : "Unable to remove account." };
   }
 }
 
-export async function issuePasswordResetAction(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function issuePasswordResetAction(_: TeamActionState, formData: FormData): Promise<TeamActionState> {
   try {
     const actor = await requireActor();
     const result = await createPasswordResetRequest(actor, String(formData.get("userId") ?? ""));
     revalidatePath("/app/admin/team");
     return { error: null, success: "Password reset link created.", inviteUrl: null, resetUrl: result.resetUrl };
   } catch (error) {
-    return { ...initialActionState, error: error instanceof Error ? error.message : "Unable to issue reset." };
+    return { ...initialTeamActionState, error: error instanceof Error ? error.message : "Unable to issue reset." };
   }
 }
 
-export async function acceptInvitePasswordAction(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function acceptInvitePasswordAction(_: TeamActionState, formData: FormData): Promise<TeamActionState> {
   try {
     await acceptAccountInvitation({
       token: String(formData.get("token") ?? ""),
@@ -176,23 +163,21 @@ export async function acceptInvitePasswordAction(_: ActionState, formData: FormD
       password: String(formData.get("password") ?? "")
     });
 
-    return { ...initialActionState, success: "Your account is ready. You can sign in now." };
+    return { ...initialTeamActionState, success: "Your account is ready. You can sign in now." };
   } catch (error) {
-    return { ...initialActionState, error: error instanceof Error ? error.message : "Unable to accept invite." };
+    return { ...initialTeamActionState, error: error instanceof Error ? error.message : "Unable to accept invite." };
   }
 }
 
-export async function completePasswordResetAction(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function completePasswordResetAction(_: TeamActionState, formData: FormData): Promise<TeamActionState> {
   try {
     await completePasswordReset({
       token: String(formData.get("token") ?? ""),
       password: String(formData.get("password") ?? "")
     });
 
-    return { ...initialActionState, success: "Password updated. You can sign in now." };
+    return { ...initialTeamActionState, success: "Password updated. You can sign in now." };
   } catch (error) {
-    return { ...initialActionState, error: error instanceof Error ? error.message : "Unable to reset password." };
+    return { ...initialTeamActionState, error: error instanceof Error ? error.message : "Unable to reset password." };
   }
 }
-
-export { initialActionState };

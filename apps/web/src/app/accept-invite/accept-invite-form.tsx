@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
 
-import { acceptInvitePasswordAction, initialActionState } from "@/app/app/admin/team/actions";
+import { acceptInvitePasswordAction } from "@/app/app/admin/team/actions";
+import { initialTeamActionState } from "@/app/app/admin/team/action-state";
 
 type AcceptInviteDetails = {
   email: string;
@@ -27,7 +28,7 @@ export function AcceptInviteForm({
   token: string;
   invite: AcceptInviteDetails;
 }) {
-  const [state, formAction, pending] = useActionState(acceptInvitePasswordAction, initialActionState);
+  const [state, formAction, pending] = useActionState(acceptInvitePasswordAction, initialTeamActionState);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const passwordMismatch = useMemo(

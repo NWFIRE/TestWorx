@@ -7,7 +7,6 @@ import { customerAllowanceKeys, internalAllowanceKeys, type TeamAllowanceMap } f
 import {
   createCustomerInviteAction,
   createTeamInviteAction,
-  initialActionState,
   issuePasswordResetAction,
   removeUserAction,
   resendInviteAction,
@@ -16,6 +15,7 @@ import {
   updateInviteAllowancesAction,
   updateUserAllowancesAction
 } from "./actions";
+import { initialTeamActionState } from "./action-state";
 
 type AllowanceLabel = { key: string; label: string };
 type CustomerOption = { id: string; name: string };
@@ -206,7 +206,7 @@ function InviteFormCard({
   customerCompanies: CustomerOption[];
   customerMode?: boolean;
 }) {
-  const [state, formAction, pending] = useActionState(customerMode ? createCustomerInviteAction : createTeamInviteAction, initialActionState);
+  const [state, formAction, pending] = useActionState(customerMode ? createCustomerInviteAction : createTeamInviteAction, initialTeamActionState);
   const [selectedRole, setSelectedRole] = useState<"tenant_admin" | "office_admin" | "technician" | "customer_user">(
     customerMode ? "customer_user" : "technician"
   );
@@ -281,10 +281,10 @@ function InviteFormCard({
 }
 
 function UserRow({ user, customerMode = false }: { user: WorkspaceUser; customerMode?: boolean }) {
-  const [allowanceState, allowanceFormAction, allowancePending] = useActionState(updateUserAllowancesAction, initialActionState);
-  const [statusState, statusFormAction, statusPending] = useActionState(setUserActiveStateAction, initialActionState);
-  const [resetState, resetFormAction, resetPending] = useActionState(issuePasswordResetAction, initialActionState);
-  const [removeState, removeFormAction, removePending] = useActionState(removeUserAction, initialActionState);
+  const [allowanceState, allowanceFormAction, allowancePending] = useActionState(updateUserAllowancesAction, initialTeamActionState);
+  const [statusState, statusFormAction, statusPending] = useActionState(setUserActiveStateAction, initialTeamActionState);
+  const [resetState, resetFormAction, resetPending] = useActionState(issuePasswordResetAction, initialTeamActionState);
+  const [removeState, removeFormAction, removePending] = useActionState(removeUserAction, initialTeamActionState);
 
   return (
     <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-panel">
@@ -356,9 +356,9 @@ function UserRow({ user, customerMode = false }: { user: WorkspaceUser; customer
 }
 
 function InviteRow({ invite, customerMode = false }: { invite: WorkspaceInvite; customerMode?: boolean }) {
-  const [resendState, resendFormAction, resendPending] = useActionState(resendInviteAction, initialActionState);
-  const [revokeState, revokeFormAction, revokePending] = useActionState(revokeInviteAction, initialActionState);
-  const [allowanceState, allowanceFormAction, allowancePending] = useActionState(updateInviteAllowancesAction, initialActionState);
+  const [resendState, resendFormAction, resendPending] = useActionState(resendInviteAction, initialTeamActionState);
+  const [revokeState, revokeFormAction, revokePending] = useActionState(revokeInviteAction, initialTeamActionState);
+  const [allowanceState, allowanceFormAction, allowancePending] = useActionState(updateInviteAllowancesAction, initialTeamActionState);
 
   const tone = invite.derivedStatus === "pending" ? "pending" : invite.derivedStatus === "revoked" ? "revoked" : "expired";
 

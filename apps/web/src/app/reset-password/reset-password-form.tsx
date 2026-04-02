@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
 
-import { completePasswordResetAction, initialActionState } from "@/app/app/admin/team/actions";
+import { initialTeamActionState } from "@/app/app/admin/team/action-state";
+import { completePasswordResetAction } from "@/app/app/admin/team/actions";
 
 type ResetDetails = {
   user: {
@@ -20,7 +21,7 @@ export function ResetPasswordForm({
   token: string;
   reset: ResetDetails;
 }) {
-  const [state, formAction, pending] = useActionState(completePasswordResetAction, initialActionState);
+  const [state, formAction, pending] = useActionState(completePasswordResetAction, initialTeamActionState);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const passwordMismatch = useMemo(
