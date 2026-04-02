@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import {
+  formatInspectionTaskTypeLabel,
   getAdminDashboardData,
   getAdminInspectionPdfAttachments,
   getDefaultInspectionRecurrenceFrequency,
@@ -162,7 +163,6 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
         customerName: inspectionView.outgoingAmendment.replacementInspection.customerCompany.name
       })
     : null;
-
   return (
     <section className="space-y-6">
       <div className="rounded-[2rem] bg-white p-6 shadow-panel">
@@ -307,7 +307,7 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
             reports={inspectionView.tasks.map((task: InspectionTask) => ({
               taskId: task.id,
               inspectionType: task.inspectionType,
-              displayLabel: task.inspectionType.replaceAll("_", " "),
+              displayLabel: formatInspectionTaskTypeLabel(task.inspectionType),
               report: task.report ? {
                 id: task.report.id,
                 status: task.report.status,
@@ -328,7 +328,7 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Report type management</p>
             <div className="mt-4 space-y-3">
-              {inspectionView.tasks.map((task: InspectionTask) => {
+              {inspectionView.tasks.length ? inspectionView.tasks.map((task: InspectionTask) => {
                 const isAddedTask = Boolean(task.addedByUserId);
                 const hasReportActivity = Boolean(
                   task.report && (
@@ -344,7 +344,7 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
                   <div key={task.id} className="rounded-2xl border border-slate-200 p-4">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-ink">{task.inspectionType.replaceAll("_", " ")}</p>
+                        <p className="text-sm font-semibold text-ink">{formatInspectionTaskTypeLabel(task.inspectionType)}</p>
                         <p className="mt-1 text-sm text-slate-500">
                           {isAddedTask
                             ? "Added after the original inspection was scheduled."
@@ -352,17 +352,20 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
                         </p>
                         {hasReportActivity ? <p className="mt-1 text-sm text-amber-700">This report type already has report activity and cannot be removed.</p> : null}
                       </div>
-                      {isAddedTask ? (
-                        <RemoveReportTypeButton
-                          inspectionId={inspection.id}
-                          inspectionTaskId={task.id}
-                          taskLabel={task.inspectionType.replaceAll("_", " ")}
-                        />
-                      ) : null}
+                      <RemoveReportTypeButton
+                        inspectionId={inspection.id}
+                        inspectionTaskId={task.id}
+                        taskLabel={formatInspectionTaskTypeLabel(task.inspectionType)}
+                      />
                     </div>
                   </div>
                 );
-              })}
+              }) : (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-medium text-slate-700">No report types on this inspection.</p>
+                  <p className="mt-1 text-sm text-slate-500">Report types will appear here when they are attached to the visit.</p>
+                </div>
+              )}
             </div>
           </div>
           <InspectionPdfUploadCard action={uploadInspectionPdfAction} attachments={attachmentView} inspectionId={inspection.id} />
