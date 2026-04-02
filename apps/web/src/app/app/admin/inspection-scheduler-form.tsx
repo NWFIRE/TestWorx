@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChangeEvent, ReactNode } from "react";
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useMemo, useRef, useState } from "react";
 import type { CustomerOption, SiteOption, TechnicianOption } from "@testworx/types";
 import {
   customInspectionSiteName,
@@ -39,6 +39,19 @@ type InitialValues = {
   notes?: string;
   tasks?: InspectionTaskValue[];
 };
+
+function buildTaskSelectionState(initialValues?: InitialValues) {
+  const initialTaskSelections = new Map((initialValues?.tasks ?? []).map((task) => [task.inspectionType, task.frequency]));
+  return Object.fromEntries(
+    (Object.keys(inspectionTypeRegistry) as InspectionType[]).map((inspectionType) => [
+      inspectionType,
+      {
+        selected: (initialValues?.tasks ?? []).some((task) => task.inspectionType === inspectionType),
+        frequency: initialTaskSelections.get(inspectionType) ?? getDefaultInspectionRecurrenceFrequency(inspectionType)
+      }
+    ])
+  ) as Record<InspectionType, { selected: boolean; frequency: RecurrenceFrequency }>;
+}
 
 function PickerField({
   id,
@@ -114,8 +127,8 @@ export function InspectionSchedulerForm({
   autoSelectGenericSiteOnCustomerChange?: boolean;
   allowCustomOneTimeSite?: boolean;
 }) {
-  const [state, formAction, pending] = useActionState(action, initialState);
-  const initialTaskSelections = new Map((initialValues?.tasks ?? []).map((task) => [task.inspectionType, task.frequency]));
+  const formRef = useRef<HTMLFormElement>(null);
+  const isCreateWorkflow = !initialValues?.inspectionId && !reasonLabel;
   const [selectedCustomerId, setSelectedCustomerId] = useState(initialValues?.customerCompanyId ?? "");
   const [selectedSiteId, setSelectedSiteId] = useState(initialValues?.siteId ?? "");
   const [inspectionMonth, setInspectionMonth] = useState(
@@ -130,16 +143,7 @@ export function InspectionSchedulerForm({
   const [startManuallyEdited, setStartManuallyEdited] = useState(Boolean(initialValues?.scheduledStart));
   const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<string[]>(initialValues?.assignedTechnicianIds ?? []);
   const [selectedTasks, setSelectedTasks] = useState<Record<InspectionType, { selected: boolean; frequency: RecurrenceFrequency }>>(
-    () =>
-      Object.fromEntries(
-        (Object.keys(inspectionTypeRegistry) as InspectionType[]).map((inspectionType) => [
-          inspectionType,
-          {
-            selected: (initialValues?.tasks ?? []).some((task) => task.inspectionType === inspectionType),
-            frequency: initialTaskSelections.get(inspectionType) ?? getDefaultInspectionRecurrenceFrequency(inspectionType)
-          }
-        ])
-      ) as Record<InspectionType, { selected: boolean; frequency: RecurrenceFrequency }>
+    () => buildTaskSelectionState(initialValues)
   );
   const filteredSites = useMemo(
     () => sites.filter((site) => !selectedCustomerId || site.customerCompanyId === selectedCustomerId),
@@ -153,8 +157,31 @@ export function InspectionSchedulerForm({
       : "";
   const customSiteSelected = resolvedSiteId === customInspectionSiteOptionValue;
 
+  const resetCreateWorkflow = () => {
+    const defaultMonth = new Date().toISOString().slice(0, 7);
+    formRef.current?.reset();
+    setSelectedCustomerId("");
+    setSelectedSiteId("");
+    setInspectionMonth(defaultMonth);
+    setScheduledStart(defaultScheduledStartForMonth(defaultMonth));
+    setScheduledEnd("");
+    setStatus("to_be_completed");
+    setNotes("");
+    setStartManuallyEdited(false);
+    setSelectedTechnicianIds([]);
+    setSelectedTasks(buildTaskSelectionState());
+  };
+
+  const [state, formAction, pending] = useActionState(async (previousState: typeof initialState, formData: FormData) => {
+    const result = await action(previousState, formData);
+    if (isCreateWorkflow && !result.error && result.success) {
+      resetCreateWorkflow();
+    }
+    return result;
+  }, initialState);
+
   return (
-    <form action={formAction} className="min-w-0 overflow-hidden space-y-5 rounded-[1.5rem] bg-white p-4 shadow-panel sm:space-y-6 sm:rounded-[2rem] sm:p-6">
+    <form action={formAction} className="min-w-0 overflow-hidden space-y-5 rounded-[1.5rem] bg-white p-4 shadow-panel sm:space-y-6 sm:rounded-[2rem] sm:p-6" ref={formRef}>
       {initialValues?.inspectionId ? <input name="inspectionId" type="hidden" value={initialValues.inspectionId} /> : null}
       <div>
         <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500 sm:text-sm sm:tracking-[0.25em]">Scheduling workflow</p>
