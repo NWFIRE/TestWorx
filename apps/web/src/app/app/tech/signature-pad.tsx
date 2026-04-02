@@ -113,17 +113,18 @@ export function SignaturePad({
   }
 
   return (
-    <div className="space-y-3 rounded-[1.5rem] border border-slate-200 p-4">
-      <div className="flex items-center justify-between gap-3">
+    <div className="space-y-3 rounded-[1.5rem] border border-slate-200 p-4 sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h4 className="text-base font-semibold text-ink">{label}</h4>
-        <button className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 disabled:opacity-50" disabled={disabled} onClick={clearSignature} type="button">
+        <button className="min-h-11 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 disabled:opacity-50 sm:min-h-0 sm:w-auto" disabled={disabled} onClick={clearSignature} type="button">
           Clear
         </button>
       </div>
-      <input className="w-full rounded-2xl border border-slate-200 px-4 py-3 uppercase" disabled={disabled} onChange={(event) => onSignerNameChange(event.target.value)} placeholder="Signer name" value={signerName} />
+      <p className="text-sm text-slate-500">Sign with your finger or Apple Pencil directly in the box below.</p>
+      <input className="min-h-12 w-full rounded-2xl border border-slate-200 px-4 py-3 uppercase" disabled={disabled} onChange={(event) => onSignerNameChange(event.target.value)} placeholder="Signer name" value={signerName} />
       <canvas
         ref={canvasRef}
-        className="h-40 w-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 touch-none"
+        className="h-36 w-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 touch-none select-none sm:h-40 md:h-44"
         height={180}
         onPointerDown={startDrawing}
         onPointerLeave={finishDrawing}

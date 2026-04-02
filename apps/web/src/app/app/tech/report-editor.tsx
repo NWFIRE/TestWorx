@@ -656,8 +656,8 @@ export function ReportEditor({ data }: { data: EditorData }) {
   const canFinalizeNow = data.canFinalize && data.reportStatus !== "finalized" && !saveInFlightRef.current && !finalizeReadinessMessage;
 
   return (
-    <div className="space-y-6 pb-28 lg:pb-8">
-      <div className="rounded-[2rem] bg-white p-5 shadow-panel">
+    <div className="space-y-4 pb-36 sm:space-y-6 md:pb-32 lg:pb-8">
+      <div className="overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel sm:rounded-[2rem] sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">{data.inspectionTypeLabel}</p>
@@ -677,7 +677,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
           {data.paymentCollectionNotice ? <p className="mt-2 font-semibold text-amber-900">{data.paymentCollectionNotice}</p> : null}
           {data.correctionNotice ? <p className="mt-2 font-medium text-amber-900">{data.correctionNotice}</p> : null}
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
           {[
             ["Sections complete", `${completedSectionCount}/${data.template.sections.length}`],
             ["Inspection progress", `${Math.round(preview.reportCompletion * 100)}% complete`],
@@ -694,15 +694,15 @@ export function ReportEditor({ data }: { data: EditorData }) {
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[0.95fr_1.4fr]">
+      <div className="grid gap-4 xl:grid-cols-[0.95fr_1.4fr] xl:gap-6">
         <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
-          <div className="rounded-[2rem] bg-white p-4 shadow-panel">
+          <div className="overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel sm:rounded-[2rem]">
             <h3 className="text-lg font-semibold text-ink">Sections</h3>
             <div className="mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 xl:grid xl:overflow-visible xl:pb-0">
               {data.template.sections.map((section) => (
                 <button
                   key={section.id}
-                  className={`min-h-16 min-w-[15rem] snap-start rounded-2xl border px-4 py-4 text-left xl:min-w-0 ${activeSectionId === section.id ? "border-slateblue bg-slateblue text-white" : "border-slate-200 bg-white text-ink"}`}
+                  className={`min-h-16 min-w-[13.5rem] snap-start rounded-2xl border px-4 py-4 text-left xl:min-w-0 ${activeSectionId === section.id ? "border-slateblue bg-slateblue text-white" : "border-slate-200 bg-white text-ink"}`}
                   onClick={() => { void handleSectionChange(section.id); }}
                   type="button"
                 >
@@ -712,7 +712,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
               ))}
             </div>
           </div>
-          <div className="hidden rounded-[2rem] bg-white p-4 shadow-panel lg:block">
+          <div className="hidden overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel lg:block sm:rounded-[2rem]">
             <div className="flex gap-3">
               <button className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-ink" onClick={() => setShowPreview((current) => !current)} type="button">
                 {showPreview ? "Hide preview" : "Preview"}
@@ -730,8 +730,8 @@ export function ReportEditor({ data }: { data: EditorData }) {
           </div>
         </aside>
 
-        <div className="space-y-6">
-          <div className="rounded-[2rem] bg-white p-5 shadow-panel">
+        <div className="min-w-0 space-y-4 sm:space-y-6">
+          <div className="overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel sm:rounded-[2rem] sm:p-5">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <h3 className="text-2xl font-semibold text-ink">{activeSection.label}</h3>
@@ -745,9 +745,9 @@ export function ReportEditor({ data }: { data: EditorData }) {
                 <option value="fail">{normalizeOptionLabel("Fail")}</option>
               </select>
             </div>
-            <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            <div className="mt-4 flex flex-col gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
               <p>Section {activeSectionIndex + 1} of {data.template.sections.length}</p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button className="min-h-10 rounded-2xl border border-slate-200 bg-white px-3 py-2 font-semibold text-ink disabled:opacity-50" disabled={!previousSectionId} onClick={() => { if (previousSectionId) { void handleSectionChange(previousSectionId); } }} type="button">
                   Previous
                 </button>
@@ -785,12 +785,12 @@ export function ReportEditor({ data }: { data: EditorData }) {
 
                           return (
                           <div key={String(row.__rowId ?? `${field.id}-${rowIndex}`)} className="space-y-3 rounded-[1.5rem] border border-slate-200 p-4">
-                            <div className="flex items-center justify-between gap-3">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                               <div>
                                 <p className="text-sm font-semibold text-ink">{describeRepeaterRowLabel(row, rowIndex)}</p>
                                 {detectedDeficiency ? <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">Warning: Deficiency created</p> : null}
                               </div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex flex-wrap items-center gap-2">
                                 {field.allowDuplicate ? (
                                   <button className="min-h-10 rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-ink disabled:opacity-50" disabled={!data.canEdit || data.reportStatus === "finalized"} onClick={() => duplicateRepeaterRow(activeSection.id, field.id, rowIndex)} type="button">
                                     {field.duplicateLabel ?? "Duplicate"}
@@ -895,7 +895,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
                     </select>
                   ) : field.type === "photo" ? (
                     <div className="space-y-3 rounded-[1.5rem] border border-slate-200 p-3">
-                      {draft.sections[activeSection.id]?.fields?.[field.id] ? <Image alt={field.label} className="h-40 w-full rounded-2xl object-cover" height={160} src={resolveStoredMediaSrc(data.reportId, String(draft.sections[activeSection.id]?.fields?.[field.id] ?? "")) ?? String(draft.sections[activeSection.id]?.fields?.[field.id] ?? "")} unoptimized width={320} /> : <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No photo attached.</p>}
+                      {draft.sections[activeSection.id]?.fields?.[field.id] ? <Image alt={field.label} className="aspect-[4/3] w-full rounded-2xl object-cover" height={240} src={resolveStoredMediaSrc(data.reportId, String(draft.sections[activeSection.id]?.fields?.[field.id] ?? "")) ?? String(draft.sections[activeSection.id]?.fields?.[field.id] ?? "")} unoptimized width={320} /> : <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No photo attached.</p>}
                       <div className="flex flex-wrap gap-2">
                         <label className="inline-flex min-h-11 cursor-pointer items-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-ink">
                           {draft.sections[activeSection.id]?.fields?.[field.id] ? "Replace photo" : "Add photo"}
@@ -920,13 +920,13 @@ export function ReportEditor({ data }: { data: EditorData }) {
             </div>
           </div>
 
-          <div className="rounded-[2rem] bg-white p-5 shadow-panel">
+          <div className="overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel sm:rounded-[2rem] sm:p-5">
             <h3 className="text-xl font-semibold text-ink">Technician notes</h3>
             <textarea className="mt-4 min-h-32 w-full rounded-[1.5rem] border border-slate-200 px-4 py-4 text-base uppercase" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateDraft({ ...draft, overallNotes: normalizeEditorText(event.target.value) })} value={draft.overallNotes} />
           </div>
 
-          <div className="rounded-[2rem] bg-white p-5 shadow-panel">
-            <div className="flex items-center justify-between">
+          <div className="overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel sm:rounded-[2rem] sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="text-xl font-semibold text-ink">Deficiencies</h3>
               <button className="min-h-12 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-ink disabled:opacity-50" disabled={!data.canEdit || data.reportStatus === "finalized"} onClick={addDeficiency} type="button">
                 Add deficiency
@@ -961,8 +961,8 @@ export function ReportEditor({ data }: { data: EditorData }) {
             </div>
           </div>
 
-          <div className="rounded-[2rem] bg-white p-5 shadow-panel">
-            <div className="flex items-center justify-between gap-4">
+          <div className="overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel sm:rounded-[2rem] sm:p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h3 className="text-xl font-semibold text-ink">Photo attachments</h3>
                 <p className="mt-1 text-sm text-slate-500">Image files only. Photos are automatically compressed for faster saving and capped at about {(reportPhotoPreparationConfig.preparedMaxBytes / (1024 * 1024)).toFixed(0)} MB each after preparation.</p>
@@ -972,15 +972,15 @@ export function ReportEditor({ data }: { data: EditorData }) {
                 <input accept="image/*" className="hidden" disabled={!data.canEdit || data.reportStatus === "finalized"} multiple onChange={(event) => { void handleFilesSelected(event.target.files); event.target.value = ""; }} type="file" />
               </label>
             </div>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-4 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
               {draft.attachments.length === 0 ? <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No photos attached.</p> : draft.attachments.map((attachment) => (
                 <div key={attachment.id} className="space-y-3 rounded-[1.5rem] border border-slate-200 p-3">
-                  <Image alt={attachment.fileName} className="h-40 w-full rounded-2xl object-cover" height={160} src={resolveStoredMediaSrc(data.reportId, attachment.storageKey) ?? attachment.storageKey} unoptimized width={320} />
+                  <Image alt={attachment.fileName} className="aspect-[4/3] w-full rounded-2xl object-cover" height={240} src={resolveStoredMediaSrc(data.reportId, attachment.storageKey) ?? attachment.storageKey} unoptimized width={320} />
                   <div>
-                    <p className="font-medium text-ink">{attachment.fileName}</p>
+                    <p className="break-all font-medium text-ink">{attachment.fileName}</p>
                     <p className="text-sm text-slate-500">{attachment.mimeType}</p>
                   </div>
-                  <button className="min-h-12 rounded-2xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700 disabled:opacity-50" disabled={!data.canEdit || data.reportStatus === "finalized"} onClick={() => removeAttachment(attachment.id)} type="button">
+                  <button className="min-h-12 w-full rounded-2xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700 disabled:opacity-50" disabled={!data.canEdit || data.reportStatus === "finalized"} onClick={() => removeAttachment(attachment.id)} type="button">
                     Remove photo
                   </button>
                 </div>
@@ -988,7 +988,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
             </div>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
             <SignaturePad
               disabled={!data.canEdit || data.reportStatus === "finalized"}
               label="Technician signature"
@@ -1043,7 +1043,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
           {(visibleErrorMessage || backupWarning || finalizeReadinessMessage) ? (
             <div
               className="fixed inset-x-0 z-20 px-4 lg:hidden"
-              style={{ bottom: "calc(5.75rem + env(safe-area-inset-bottom))" }}
+              style={{ bottom: "calc(7.5rem + env(safe-area-inset-bottom))" }}
             >
               <div className="mx-auto max-w-7xl space-y-2">
                 {visibleErrorMessage ? <p className="rounded-2xl border border-rose-200 bg-white/95 px-4 py-3 text-sm text-rose-700 shadow-xl backdrop-blur">{visibleErrorMessage}</p> : null}
@@ -1062,20 +1062,20 @@ export function ReportEditor({ data }: { data: EditorData }) {
               <p>{Math.round(preview.reportCompletion * 100)}% complete</p>
             </div>
           </div>
-          <div className="mx-auto flex max-w-7xl gap-3">
-            <button className="rounded-2xl border border-slate-200 px-3 py-3 text-sm font-semibold text-ink disabled:opacity-50" disabled={!previousSectionId} onClick={() => { if (previousSectionId) { void handleSectionChange(previousSectionId); } }} type="button">
+          <div className="mx-auto grid max-w-7xl grid-cols-2 gap-3 sm:flex">
+            <button className="rounded-2xl border border-slate-200 px-3 py-3 text-sm font-semibold text-ink disabled:opacity-50 sm:w-auto" disabled={!previousSectionId} onClick={() => { if (previousSectionId) { void handleSectionChange(previousSectionId); } }} type="button">
               Prev
             </button>
-            <button className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-ink" onClick={() => setShowPreview((current) => !current)} type="button">
+            <button className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-ink sm:flex-1" onClick={() => setShowPreview((current) => !current)} type="button">
               {showPreview ? "Hide preview" : "Preview"}
             </button>
-            <button className="flex-1 rounded-2xl bg-ember px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={saveInFlightRef.current} onClick={() => { void saveDraft(draft, "manual"); }} type="button">
+            <button className="rounded-2xl bg-ember px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 sm:flex-1" disabled={saveInFlightRef.current} onClick={() => { void saveDraft(draft, "manual"); }} type="button">
               Save now
             </button>
-            <button className="flex-1 rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={!canFinalizeNow} onClick={() => { void finalizeReport(); }} type="button">
+            <button className="rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 sm:flex-1" disabled={!canFinalizeNow} onClick={() => { void finalizeReport(); }} type="button">
               Finalize
             </button>
-            <button className="rounded-2xl border border-slate-200 px-3 py-3 text-sm font-semibold text-ink disabled:opacity-50" disabled={!nextSectionId} onClick={() => { if (nextSectionId) { void handleSectionChange(nextSectionId); } }} type="button">
+            <button className="rounded-2xl border border-slate-200 px-3 py-3 text-sm font-semibold text-ink disabled:opacity-50 sm:w-auto" disabled={!nextSectionId} onClick={() => { if (nextSectionId) { void handleSectionChange(nextSectionId); } }} type="button">
               Next
             </button>
           </div>
