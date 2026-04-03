@@ -9,6 +9,7 @@ import type { BillableCategory, BillableFieldMapping, BillableRepeaterMapping } 
 import { resolveReportTemplate } from "./report-config";
 import { assertTenantContext } from "./permissions";
 import { reportDraftSchema, type ReportDraft, type ReportPrimitiveValue } from "./report-engine";
+import { runCalculation } from "./report-calculations";
 import { resolveInspectionServiceFeeTx } from "./service-fees";
 
 type TransactionClient = Prisma.TransactionClient;
@@ -494,6 +495,81 @@ function calculateAmount(quantity: number, unitPrice?: number | null) {
   return typeof unitPrice === "number" ? Number((quantity * unitPrice).toFixed(2)) : null;
 }
 
+function resolveCalculatedSectionFieldValue(
+  draft: ReportDraft,
+  sourceSectionId: string | undefined,
+  fieldId: string | undefined,
+  reportType: InspectionType
+) {
+  if (!sourceSectionId || !fieldId) {
+    return undefined;
+  }
+
+  const template = resolveReportTemplate({ inspectionType: reportType, assets: [] });
+  const section = template.sections.find((entry) => entry.id === sourceSectionId);
+  const field = section?.fields.find((entry) => entry.id === fieldId);
+  const calculation = field?.calculation;
+  if (!calculation || field?.type === "repeater") {
+    return undefined;
+  }
+
+  const sourceSection = ("sourceSectionId" in calculation && calculation.sourceSectionId
+    ? draft.sections[calculation.sourceSectionId]
+    : draft.sections[sourceSectionId]) ?? null;
+  const sourceFields = sourceSection?.fields as Record<string, ReportPrimitiveValue> | undefined;
+  const sourceValue = "sourceFieldId" in calculation ? sourceFields?.[calculation.sourceFieldId] : undefined;
+  const sourceValues = "sourceFieldIds" in calculation
+    ? calculation.sourceFieldIds.map((sourceFieldId) => sourceFields?.[sourceFieldId] ?? null)
+    : "sourceFields" in calculation
+      ? calculation.sourceFields.map((source) => {
+        const sourceSectionFields = draft.sections[source.sectionId ?? sourceSectionId]?.fields as Record<string, ReportPrimitiveValue> | undefined;
+        return sourceSectionFields?.[source.fieldId] ?? null;
+      })
+      : undefined;
+
+  return runCalculation(calculation.key, {
+    sourceValue,
+    sourceValues,
+    rowFieldId: "rowFieldId" in calculation ? calculation.rowFieldId : undefined,
+    rowFieldIds: "rowFieldIds" in calculation ? calculation.rowFieldIds : undefined,
+    equals: "equals" in calculation ? calculation.equals : undefined,
+    emptyValue: "emptyValue" in calculation ? calculation.emptyValue : undefined,
+    values: "values" in calculation ? calculation.values : undefined,
+    passAtOrAbove: "passAtOrAbove" in calculation ? calculation.passAtOrAbove : undefined,
+    attentionAtOrAbove: "attentionAtOrAbove" in calculation ? calculation.attentionAtOrAbove : undefined,
+    atOrAbove: "atOrAbove" in calculation ? calculation.atOrAbove : undefined
+  });
+}
+
+function resolveMappedCodeValue(input: {
+  mapping: Pick<BillableFieldMapping | BillableRepeaterMapping, "code" | "codeField">;
+  sourceSectionId: string | undefined;
+  reportType: InspectionType;
+  fields: Record<string, ReportPrimitiveValue>;
+  draft: ReportDraft;
+}) {
+  if (!input.mapping.codeField) {
+    return input.mapping.code;
+  }
+
+  const calculatedValue = resolveCalculatedSectionFieldValue(
+    input.draft,
+    input.sourceSectionId,
+    input.mapping.codeField,
+    input.reportType
+  );
+  if (calculatedValue !== null && calculatedValue !== undefined && calculatedValue !== "") {
+    return String(calculatedValue);
+  }
+
+  const directValue = input.fields[input.mapping.codeField];
+  if (directValue !== null && directValue !== undefined && directValue !== "") {
+    return String(directValue);
+  }
+
+  return input.mapping.code;
+}
+
 function normalizeExistingItems(input: unknown): BillableItem[] {
   if (!Array.isArray(input)) {
     return [];
@@ -542,11 +618,13 @@ export function extractBillableItemsFromDraft(input: {
       sourceSection,
       sourceField: mapping.field,
       category: mapping.category,
-      code: mapping.codeField
-        ? (descriptionFields[mapping.codeField] !== null && descriptionFields[mapping.codeField] !== undefined && descriptionFields[mapping.codeField] !== ""
-          ? String(descriptionFields[mapping.codeField])
-          : mapping.code)
-        : mapping.code,
+      code: resolveMappedCodeValue({
+        mapping,
+        sourceSectionId: sourceSection,
+        reportType: input.reportType,
+        fields: descriptionFields,
+        draft: input.draft
+      }),
       description: mapping.descriptionTemplate
         ? interpolateDescription(mapping.descriptionTemplate, descriptionFields)
         : mapping.description,
@@ -601,11 +679,13 @@ export function extractBillableItemsFromDraft(input: {
           sourceSection,
           sourceField: mapping.field,
           category: mapping.category,
-          code: mapping.codeField
-            ? (typedRow[mapping.codeField] !== null && typedRow[mapping.codeField] !== undefined && typedRow[mapping.codeField] !== ""
-              ? String(typedRow[mapping.codeField])
-              : mapping.code ?? (mapping.codeTemplate ? interpolateCodeTemplate(mapping.codeTemplate, typedRow) : undefined))
-            : mapping.code ?? (mapping.codeTemplate ? interpolateCodeTemplate(mapping.codeTemplate, typedRow) : undefined),
+          code: resolveMappedCodeValue({
+            mapping,
+            sourceSectionId: sourceSection,
+            reportType: input.reportType,
+            fields: typedRow,
+            draft: input.draft
+          }) ?? (mapping.codeTemplate ? interpolateCodeTemplate(mapping.codeTemplate, typedRow) : undefined),
           description: interpolateDescription(mapping.descriptionTemplate, {
             ...typedRow,
             billingExtinguisherType: resolveBillableExtinguisherType(typedRow)
@@ -657,9 +737,13 @@ export function extractBillableItemsFromDraft(input: {
             sourceField: mapping.field,
             category: mapping.category,
             code: mapping.codeField
-              ? (interpolationRow[mapping.codeField] !== null && interpolationRow[mapping.codeField] !== undefined && interpolationRow[mapping.codeField] !== ""
-                ? String(interpolationRow[mapping.codeField])
-                : mapping.staticCodeByValue?.[selectedValue] ?? mapping.code ?? (mapping.codeTemplate ? interpolateCodeTemplate(mapping.codeTemplate, interpolationRow) : undefined))
+              ? resolveMappedCodeValue({
+                mapping,
+                sourceSectionId: sourceSection,
+                reportType: input.reportType,
+                fields: interpolationRow,
+                draft: input.draft
+              }) ?? mapping.staticCodeByValue?.[selectedValue] ?? (mapping.codeTemplate ? interpolateCodeTemplate(mapping.codeTemplate, interpolationRow) : undefined)
               : mapping.staticCodeByValue?.[selectedValue] ?? mapping.code ?? (mapping.codeTemplate ? interpolateCodeTemplate(mapping.codeTemplate, interpolationRow) : undefined),
             description: interpolateDescription(mapping.descriptionTemplate, interpolationRow),
             quantity,
@@ -699,11 +783,13 @@ export function extractBillableItemsFromDraft(input: {
         sourceSection,
         sourceField: mapping.field,
         category: mapping.category,
-        code: mapping.codeField
-          ? (typedRow[mapping.codeField] !== null && typedRow[mapping.codeField] !== undefined && typedRow[mapping.codeField] !== ""
-            ? String(typedRow[mapping.codeField])
-            : mapping.code ?? (mapping.codeTemplate ? interpolateCodeTemplate(mapping.codeTemplate, typedRow) : undefined))
-          : mapping.code ?? (mapping.codeTemplate ? interpolateCodeTemplate(mapping.codeTemplate, typedRow) : undefined),
+        code: resolveMappedCodeValue({
+          mapping,
+          sourceSectionId: sourceSection,
+          reportType: input.reportType,
+          fields: typedRow,
+          draft: input.draft
+        }) ?? (mapping.codeTemplate ? interpolateCodeTemplate(mapping.codeTemplate, typedRow) : undefined),
         description: interpolateDescription(mapping.descriptionTemplate, typedRow),
         quantity,
         unit: mapping.unit,

@@ -24,6 +24,18 @@ describe("report definition pattern", () => {
     expect(runCalculation("inspectionIntervalFromServiceType", {
       sourceValue: "hydro"
     })).toBe("12 years");
+
+    expect(runCalculation("kitchenSuppressionInspectionCodeFromManufacturer", {
+      sourceValues: ["guardian", ""]
+    })).toBe("KS-INSPECTION-LOW-RATE");
+
+    expect(runCalculation("kitchenSuppressionInspectionCodeFromManufacturer", {
+      sourceValues: ["captiveaire", ""]
+    })).toBe("KS-INSPECTION-HIGH-RATE");
+
+    expect(runCalculation("kitchenSuppressionInspectionCodeFromManufacturer", {
+      sourceValues: ["ansul", ""]
+    })).toBe("KS-INSPECTION-STANDARD");
   });
 
   it("defines fire extinguisher smart fields entirely through flat configuration keys", () => {

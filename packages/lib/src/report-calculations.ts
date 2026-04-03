@@ -253,19 +253,15 @@ export const reportCalculationHelpers = {
     const [manufacturer, manufacturerOther] = sourceValues ?? [];
     const normalized = normalizeKitchenSuppressionManufacturer(manufacturerOther) || normalizeKitchenSuppressionManufacturer(manufacturer);
 
-    if (["ansul", "amerex", "range guard", "badger", "kidde", "pyro-chem", "pyro chem", "protex", "buckeye"].includes(normalized)) {
-      return "KS-INSPECTION-GROUP-A";
-    }
-
-    if (["guardian", "denlar", "greenheck"].includes(normalized)) {
-      return "KS-INSPECTION-GROUP-B";
+    if (["guardian", "denlar"].includes(normalized)) {
+      return "KS-INSPECTION-LOW-RATE";
     }
 
     if (normalized === "captiveaire") {
-      return "KS-INSPECTION-CAPTIVEAIRE";
+      return "KS-INSPECTION-HIGH-RATE";
     }
 
-    return "KS-INSPECTION-OTHER";
+    return "KS-INSPECTION-STANDARD";
   }
 } satisfies Record<ReportCalculationKey, (input: ReportCalculationContext) => ReportPrimitiveValue>;
 

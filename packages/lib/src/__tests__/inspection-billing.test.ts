@@ -47,7 +47,7 @@ import {
 import { buildInitialReportDraft } from "../report-engine";
 import { resolveInspectionServiceFeeTx } from "../service-fees";
 
-function buildKitchenDraft() {
+function buildKitchenDraftForManufacturer(manufacturer: string) {
   const draft = buildInitialReportDraft({
     inspectionType: "kitchen_suppression",
     siteName: "Pinecrest Tower",
@@ -72,8 +72,8 @@ function buildKitchenDraft() {
 
   draft.sections["system-details"]!.fields.numberOfCylinders = 2;
   draft.sections["system-details"]!.fields.systemLocation = "Ground floor commercial kitchen";
-  draft.sections["system-details"]!.fields.manufacturer = "Ansul";
-  draft.sections["system-details"]!.fields.billingManufacturer = "Ansul";
+  draft.sections["system-details"]!.fields.manufacturer = manufacturer;
+  draft.sections["system-details"]!.fields.billingManufacturer = manufacturer;
   draft.sections["tank-and-service"]!.fields.fusibleLinksUsed = [
     { temperature: "286°F", quantity: "6" }
   ];
@@ -85,6 +85,10 @@ function buildKitchenDraft() {
   ];
 
   return draft;
+}
+
+function buildKitchenDraft() {
+  return buildKitchenDraftForManufacturer("Ansul");
 }
 
 function buildFireAlarmDraft() {
@@ -209,7 +213,7 @@ describe("inspection billing extraction", () => {
     });
 
     expect(items.map((item) => [item.category, item.description, item.quantity, item.code])).toEqual([
-      ["service", "Kitchen Suppression System Inspection", 1, "KS-INSPECTION-OTHER"],
+      ["service", "Kitchen Suppression System Inspection", 1, "KS-INSPECTION-STANDARD"],
       ["material", "Fusible links used (286°F)", 6, "KS-FUSIBLE-LINK"],
       ["material", "Caps used (Rubber)", 4, "KS-CAP"],
       ["material", "Cartridges used (PK-2 cartridge)", 1, "KS-CARTRIDGE"]
@@ -264,8 +268,47 @@ describe("inspection billing extraction", () => {
     });
 
     expect(items.map((item) => [item.description, item.code, item.quantity])).toEqual([
-      ["Kitchen Suppression System Inspection", "KS-INSPECTION-OTHER", 1]
+      ["Kitchen Suppression System Inspection", "KS-INSPECTION-STANDARD", 1]
     ]);
+  });
+
+  it("uses the lower-rate inspection code for Guardian kitchen systems", () => {
+    const items = extractBillableItemsFromDraft({
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1",
+      reportId: "report_1",
+      reportType: "kitchen_suppression",
+      draft: buildKitchenDraftForManufacturer("Guardian")
+    });
+
+    expect(items[0]?.code).toBe("KS-INSPECTION-LOW-RATE");
+    expect(items[0]?.metadata?.billingManufacturer).toBe("Guardian");
+  });
+
+  it("uses the lower-rate inspection code for Denlar kitchen systems", () => {
+    const items = extractBillableItemsFromDraft({
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1",
+      reportId: "report_1",
+      reportType: "kitchen_suppression",
+      draft: buildKitchenDraftForManufacturer("Denlar")
+    });
+
+    expect(items[0]?.code).toBe("KS-INSPECTION-LOW-RATE");
+    expect(items[0]?.metadata?.billingManufacturer).toBe("Denlar");
+  });
+
+  it("uses the higher-rate inspection code for CaptiveAire kitchen systems", () => {
+    const items = extractBillableItemsFromDraft({
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1",
+      reportId: "report_1",
+      reportType: "kitchen_suppression",
+      draft: buildKitchenDraftForManufacturer("CaptiveAire")
+    });
+
+    expect(items[0]?.code).toBe("KS-INSPECTION-HIGH-RATE");
+    expect(items[0]?.metadata?.billingManufacturer).toBe("CaptiveAire");
   });
 
   it("extracts fire extinguisher annual and size-dependent services into billing review", () => {

@@ -44,6 +44,7 @@ const categoryLabels = {
 } as const;
 
 function buildBillingItemContext(item: {
+  code?: string | null;
   metadata?: Record<string, unknown> | null;
 }) {
   const context: string[] = [];
@@ -66,6 +67,17 @@ function buildBillingItemContext(item: {
   const billingManufacturer = typeof item.metadata?.billingManufacturer === "string" ? item.metadata.billingManufacturer.trim() : "";
   if (billingManufacturer) {
     context.push(`Manufacturer: ${billingManufacturer}`);
+  }
+
+  const billingTier = item.code === "KS-INSPECTION-LOW-RATE"
+    ? "Lower-rate hood system"
+    : item.code === "KS-INSPECTION-HIGH-RATE"
+      ? "Higher-rate hood system"
+      : item.code === "KS-INSPECTION-STANDARD"
+        ? "Standard hood system"
+        : "";
+  if (billingTier) {
+    context.push(`Tier: ${billingTier}`);
   }
 
   return context;
