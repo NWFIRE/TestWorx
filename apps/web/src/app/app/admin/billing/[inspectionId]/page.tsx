@@ -69,11 +69,11 @@ function buildBillingItemContext(item: {
     context.push(`Manufacturer: ${billingManufacturer}`);
   }
 
-  const billingTier = item.code === "KS-INSPECTION-LOW-RATE"
+  const billingTier = item.code === "KS-INSPECTION-GUARDIAN/DENLAR"
     ? "Lower-rate hood system"
-    : item.code === "KS-INSPECTION-HIGH-RATE"
+    : item.code === "KS-INSPECTION-CAPTIVEAIRE"
       ? "Higher-rate hood system"
-      : item.code === "KS-INSPECTION-STANDARD"
+      : item.code === "KS-INSPECTION"
         ? "Standard hood system"
         : "";
   if (billingTier) {

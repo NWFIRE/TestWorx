@@ -213,7 +213,7 @@ describe("inspection billing extraction", () => {
     });
 
     expect(items.map((item) => [item.category, item.description, item.quantity, item.code])).toEqual([
-      ["service", "Kitchen Suppression System Inspection", 1, "KS-INSPECTION-STANDARD"],
+      ["service", "Kitchen Suppression System Inspection", 1, "KS-INSPECTION"],
       ["material", "Fusible links used (286°F)", 6, "KS-FUSIBLE-LINK"],
       ["material", "Caps used (Rubber)", 4, "KS-CAP"],
       ["material", "Cartridges used (PK-2 cartridge)", 1, "KS-CARTRIDGE"]
@@ -268,7 +268,7 @@ describe("inspection billing extraction", () => {
     });
 
     expect(items.map((item) => [item.description, item.code, item.quantity])).toEqual([
-      ["Kitchen Suppression System Inspection", "KS-INSPECTION-STANDARD", 1]
+      ["Kitchen Suppression System Inspection", "KS-INSPECTION", 1]
     ]);
   });
 
@@ -281,7 +281,7 @@ describe("inspection billing extraction", () => {
       draft: buildKitchenDraftForManufacturer("Guardian")
     });
 
-    expect(items[0]?.code).toBe("KS-INSPECTION-LOW-RATE");
+    expect(items[0]?.code).toBe("KS-INSPECTION-GUARDIAN/DENLAR");
     expect(items[0]?.metadata?.billingManufacturer).toBe("Guardian");
   });
 
@@ -294,7 +294,7 @@ describe("inspection billing extraction", () => {
       draft: buildKitchenDraftForManufacturer("Denlar")
     });
 
-    expect(items[0]?.code).toBe("KS-INSPECTION-LOW-RATE");
+    expect(items[0]?.code).toBe("KS-INSPECTION-GUARDIAN/DENLAR");
     expect(items[0]?.metadata?.billingManufacturer).toBe("Denlar");
   });
 
@@ -307,7 +307,7 @@ describe("inspection billing extraction", () => {
       draft: buildKitchenDraftForManufacturer("CaptiveAire")
     });
 
-    expect(items[0]?.code).toBe("KS-INSPECTION-HIGH-RATE");
+    expect(items[0]?.code).toBe("KS-INSPECTION-CAPTIVEAIRE");
     expect(items[0]?.metadata?.billingManufacturer).toBe("CaptiveAire");
   });
 

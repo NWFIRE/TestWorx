@@ -254,14 +254,14 @@ export const reportCalculationHelpers = {
     const normalized = normalizeKitchenSuppressionManufacturer(manufacturerOther) || normalizeKitchenSuppressionManufacturer(manufacturer);
 
     if (["guardian", "denlar"].includes(normalized)) {
-      return "KS-INSPECTION-LOW-RATE";
+      return "KS-INSPECTION-GUARDIAN/DENLAR";
     }
 
     if (normalized === "captiveaire") {
-      return "KS-INSPECTION-HIGH-RATE";
+      return "KS-INSPECTION-CAPTIVEAIRE";
     }
 
-    return "KS-INSPECTION-STANDARD";
+    return "KS-INSPECTION";
   }
 } satisfies Record<ReportCalculationKey, (input: ReportCalculationContext) => ReportPrimitiveValue>;
 
