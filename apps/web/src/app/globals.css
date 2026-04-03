@@ -22,6 +22,40 @@ body {
   overflow-x: hidden;
 }
 
+@keyframes login-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.login-fade-up {
+  opacity: 0;
+  animation: login-fade-up 320ms ease-out forwards;
+}
+
+.login-fade-up-delay-1 {
+  animation-delay: 60ms;
+}
+
+.login-fade-up-delay-2 {
+  animation-delay: 120ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-fade-up,
+  .login-fade-up-delay-1,
+  .login-fade-up-delay-2 {
+    opacity: 1;
+    animation: none;
+  }
+}
+
 .ios-picker-field::-webkit-date-and-time-value,
 .ios-picker-field::-webkit-datetime-edit,
 .ios-picker-field::-webkit-datetime-edit-fields-wrapper,
