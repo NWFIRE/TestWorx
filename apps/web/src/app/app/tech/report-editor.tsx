@@ -113,6 +113,22 @@ function sectionStatusLabel(summary: ReturnType<typeof buildReportPreview>["sect
   return `○ ${summary.sectionLabel}`;
 }
 
+function formatSectionStatusText(value: string | null | undefined) {
+  return (value ?? "pending").replaceAll("_", " ");
+}
+
+function formatSectionNavMeta(
+  summary: ReturnType<typeof buildReportPreview>["sectionSummaries"][number] | undefined,
+  status: string | null | undefined
+) {
+  const statusText = formatSectionStatusText(status);
+  if (!summary?.totalRows) {
+    return statusText;
+  }
+
+  return `${summary.completedRows}/${summary.totalRows} rows • ${statusText}`;
+}
+
 function toTechnicianFacingSaveMessage(message: string | null | undefined, action: "save" | "finalize") {
   const normalized = (message ?? "").trim();
   if (!normalized) {
@@ -654,6 +670,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
       ? "Technician and customer signatures are required before finalizing."
       : null;
   const canFinalizeNow = data.canFinalize && data.reportStatus !== "finalized" && !saveInFlightRef.current && !finalizeReadinessMessage;
+  const footerStatus = `${saveState} • ${Math.round(preview.reportCompletion * 100)}% complete`;
 
   return (
     <div className="space-y-4 pb-36 sm:space-y-6 md:pb-32 lg:pb-8">
@@ -696,67 +713,132 @@ export function ReportEditor({ data }: { data: EditorData }) {
 
       <div className="space-y-4 sm:space-y-6">
         <div className="overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel sm:rounded-[2rem]">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0">
               <h3 className="text-lg font-semibold text-ink">Sections</h3>
-              <p className="mt-1 text-sm text-slate-500">Move between sections from the top while keeping the report content full width below.</p>
+              <p className="mt-1 text-sm text-slate-500">Move through the report from the top without shrinking the editing canvas below.</p>
             </div>
-            <div className="hidden min-w-[20rem] rounded-[1.5rem] bg-slate-50 p-4 lg:block">
-              <div className="flex gap-3">
-                <button className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-ink" onClick={() => setShowPreview((current) => !current)} type="button">
-                  {showPreview ? "Hide preview" : "Preview"}
-                </button>
-                <button className="flex-1 rounded-2xl bg-ember px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={!data.canEdit || data.reportStatus === "finalized" || saveInFlightRef.current} onClick={() => { void saveDraft(draft, "manual"); }} type="button">
-                  Save now
-                </button>
-              </div>
-              <button className="mt-3 w-full rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={!canFinalizeNow} onClick={() => { void finalizeReport(); }} type="button">
-                Finalize report
+            <div className="flex items-center gap-2 md:self-start">
+              <button className="min-h-11 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-ink" onClick={() => setShowPreview((current) => !current)} type="button">
+                {showPreview ? "Hide preview" : "Preview"}
               </button>
-              {finalizeReadinessMessage ? <p className="mt-3 text-sm text-amber-700">{finalizeReadinessMessage}</p> : null}
-              {visibleErrorMessage ? <p className="mt-3 text-sm text-rose-600">{visibleErrorMessage}</p> : null}
-              {backupWarning ? <p className="mt-3 text-sm text-amber-700">{backupWarning}</p> : null}
             </div>
           </div>
-          <div className="mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1">
-            {data.template.sections.map((section) => (
-              <button
-                key={section.id}
-                className={`min-h-16 min-w-[13.5rem] snap-start rounded-2xl border px-4 py-4 text-left md:min-w-[15rem] xl:min-w-[16rem] ${activeSectionId === section.id ? "border-slateblue bg-slateblue text-white" : "border-slate-200 bg-white text-ink"}`}
-                onClick={() => { void handleSectionChange(section.id); }}
-                type="button"
-              >
-                <p className="font-semibold">{sectionStatusLabel(preview.sectionSummaries.find((summary) => summary.sectionId === section.id) ?? { sectionId: section.id, sectionLabel: section.label, status: "pending", notes: "", completionState: "not_started", completedRows: 0, totalRows: 0, deficiencyCount: 0 })}</p>
-                <p className={`mt-1 text-sm ${activeSectionId === section.id ? "text-white/80" : "text-slate-500"}`}>{draft.sections[section.id]?.status ?? "pending"}</p>
-              </button>
-            ))}
+          <div className="mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 md:hidden">
+            {data.template.sections.map((section) => {
+              const summary = preview.sectionSummaries.find((entry) => entry.sectionId === section.id);
+              const status = draft.sections[section.id]?.status ?? "pending";
+              const summaryLabel = sectionStatusLabel(summary ?? {
+                sectionId: section.id,
+                sectionLabel: section.label,
+                status: "pending",
+                notes: "",
+                completionState: "not_started",
+                completedRows: 0,
+                totalRows: 0,
+                deficiencyCount: 0
+              });
+              return (
+                <button
+                  key={section.id}
+                  className={`min-h-[5.5rem] min-w-[13.5rem] snap-start rounded-2xl border px-4 py-4 text-left ${activeSectionId === section.id ? "border-slateblue bg-slateblue text-white" : "border-slate-200 bg-white text-ink"}`}
+                  onClick={() => { void handleSectionChange(section.id); }}
+                  title={summaryLabel}
+                  type="button"
+                >
+                  <p className="text-sm font-semibold leading-5">{section.label}</p>
+                  <p className={`mt-2 text-xs ${activeSectionId === section.id ? "text-white/80" : "text-slate-500"}`}>
+                    {formatSectionNavMeta(summary, status)}
+                  </p>
+                </button>
+              );
+            })}
           </div>
+          <div className="mt-4 hidden gap-3 md:grid md:grid-cols-2 xl:grid-cols-4">
+            {data.template.sections.map((section) => {
+              const summary = preview.sectionSummaries.find((entry) => entry.sectionId === section.id);
+              const status = draft.sections[section.id]?.status ?? "pending";
+              const summaryLabel = sectionStatusLabel(summary ?? {
+                sectionId: section.id,
+                sectionLabel: section.label,
+                status: "pending",
+                notes: "",
+                completionState: "not_started",
+                completedRows: 0,
+                totalRows: 0,
+                deficiencyCount: 0
+              });
+              return (
+                <button
+                  key={section.id}
+                  className={`min-h-[5.5rem] rounded-2xl border px-4 py-4 text-left ${activeSectionId === section.id ? "border-slateblue bg-slateblue text-white" : "border-slate-200 bg-white text-ink"}`}
+                  onClick={() => { void handleSectionChange(section.id); }}
+                  title={summaryLabel}
+                  type="button"
+                >
+                  <p className="text-sm font-semibold leading-5">{section.label}</p>
+                  <p className={`mt-2 text-xs ${activeSectionId === section.id ? "text-white/80" : "text-slate-500"}`}>
+                    {formatSectionNavMeta(summary, status)}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-4 hidden items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 md:flex">
+            <p className="text-sm font-medium text-slate-600">{footerStatus}</p>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button className="min-h-10 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 disabled:opacity-50" disabled={!previousSectionId} onClick={() => { if (previousSectionId) { void handleSectionChange(previousSectionId); } }} type="button">
+                Prev
+              </button>
+              <button className="min-h-10 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-ink disabled:opacity-50" disabled={!data.canEdit || data.reportStatus === "finalized" || saveInFlightRef.current} onClick={() => { void saveDraft(draft, "manual"); }} type="button">
+                Save
+              </button>
+              <button className="min-h-10 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-ink" onClick={() => setShowPreview((current) => !current)} type="button">
+                {showPreview ? "Hide preview" : "Preview"}
+              </button>
+              <button className="min-h-10 rounded-2xl bg-slateblue px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={!nextSectionId} onClick={() => { if (nextSectionId) { void handleSectionChange(nextSectionId); } }} type="button">
+                Next
+              </button>
+              {canFinalizeNow ? (
+                <button className="min-h-10 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900" onClick={() => { void finalizeReport(); }} type="button">
+                  Finalize
+                </button>
+              ) : null}
+            </div>
+          </div>
+          {(visibleErrorMessage || backupWarning || finalizeReadinessMessage) ? (
+            <div className="mt-4 hidden space-y-2 md:block">
+              {visibleErrorMessage ? <p className="text-sm text-rose-600">{visibleErrorMessage}</p> : null}
+              {backupWarning ? <p className="text-sm text-amber-700">{backupWarning}</p> : null}
+              {!canFinalizeNow && finalizeReadinessMessage ? <p className="text-sm text-amber-700">{finalizeReadinessMessage}</p> : null}
+            </div>
+          ) : null}
         </div>
 
         <div className="min-w-0 space-y-4 sm:space-y-6">
           <div className="overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel sm:rounded-[2rem] sm:p-5">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div>
                 <h3 className="text-2xl font-semibold text-ink">{activeSection.label}</h3>
+                <p className="mt-1 text-sm font-medium text-slate-500">
+                  Section {activeSectionIndex + 1} of {data.template.sections.length}
+                  {activeSectionSummary?.totalRows ? ` • ${activeSectionSummary.completedRows} of ${activeSectionSummary.totalRows} rows complete` : ""}
+                </p>
                 <p className="mt-2 text-sm text-slate-500">{activeSection.description}</p>
-                {activeSectionSummary?.totalRows ? <p className="mt-2 text-sm font-medium text-slate-600">{activeSectionSummary.completedRows} of {activeSectionSummary.totalRows} rows complete</p> : null}
+                {previousSectionId ? (
+                  <button className="mt-3 inline-flex min-h-10 items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 md:hidden" disabled={!previousSectionId} onClick={() => { if (previousSectionId) { void handleSectionChange(previousSectionId); } }} type="button">
+                    Prev
+                  </button>
+                ) : null}
               </div>
-              <select className="min-h-12 rounded-2xl border border-slate-200 px-4 py-3 text-base uppercase" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateSectionMeta(activeSection.id, "status", event.target.value)} value={draft.sections[activeSection.id]?.status ?? "pending"}>
-                <option value="pending">{normalizeOptionLabel("Pending")}</option>
-                <option value="pass">{normalizeOptionLabel("Pass")}</option>
-                <option value="attention">{normalizeOptionLabel("Attention")}</option>
-                <option value="fail">{normalizeOptionLabel("Fail")}</option>
-              </select>
-            </div>
-            <div className="mt-4 flex flex-col gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-              <p>Section {activeSectionIndex + 1} of {data.template.sections.length}</p>
-              <div className="flex flex-wrap gap-2">
-                <button className="min-h-10 rounded-2xl border border-slate-200 bg-white px-3 py-2 font-semibold text-ink disabled:opacity-50" disabled={!previousSectionId} onClick={() => { if (previousSectionId) { void handleSectionChange(previousSectionId); } }} type="button">
-                  Previous
-                </button>
-                <button className="min-h-10 rounded-2xl border border-slate-200 bg-white px-3 py-2 font-semibold text-ink disabled:opacity-50" disabled={!nextSectionId} onClick={() => { if (nextSectionId) { void handleSectionChange(nextSectionId); } }} type="button">
-                  Next
-                </button>
+              <div className="w-full md:w-auto md:min-w-[13rem]">
+                <label className="mb-2 block text-sm font-medium text-slate-600">Section Status</label>
+                <select className="min-h-12 w-full rounded-2xl border border-slate-200 px-4 py-3 text-base uppercase" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateSectionMeta(activeSection.id, "status", event.target.value)} value={draft.sections[activeSection.id]?.status ?? "pending"}>
+                  <option value="pending">{normalizeOptionLabel("Pending")}</option>
+                  <option value="pass">{normalizeOptionLabel("Pass")}</option>
+                  <option value="attention">{normalizeOptionLabel("Attention")}</option>
+                  <option value="fail">{normalizeOptionLabel("Fail")}</option>
+                </select>
               </div>
             </div>
             <div className="mt-5 grid gap-4">
@@ -1043,15 +1125,14 @@ export function ReportEditor({ data }: { data: EditorData }) {
 
       {showBottomBar ? (
         <>
-          {(visibleErrorMessage || backupWarning || finalizeReadinessMessage) ? (
+          {(visibleErrorMessage || backupWarning) ? (
             <div
               className="fixed inset-x-0 z-20 px-4 lg:hidden"
-              style={{ bottom: "calc(7.5rem + env(safe-area-inset-bottom))" }}
+              style={{ bottom: "calc(5.5rem + env(safe-area-inset-bottom))" }}
             >
               <div className="mx-auto max-w-7xl space-y-2">
                 {visibleErrorMessage ? <p className="rounded-2xl border border-rose-200 bg-white/95 px-4 py-3 text-sm text-rose-700 shadow-xl backdrop-blur">{visibleErrorMessage}</p> : null}
                 {backupWarning ? <p className="rounded-2xl border border-amber-200 bg-white/95 px-4 py-3 text-sm text-amber-700 shadow-xl backdrop-blur">{backupWarning}</p> : null}
-                {finalizeReadinessMessage ? <p className="rounded-2xl border border-amber-200 bg-white/95 px-4 py-3 text-sm text-amber-700 shadow-xl backdrop-blur">{finalizeReadinessMessage}</p> : null}
               </div>
             </div>
           ) : null}
@@ -1060,28 +1141,25 @@ export function ReportEditor({ data }: { data: EditorData }) {
           style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
         >
           <div className="mx-auto max-w-7xl">
-            <div className="mb-2 flex items-center justify-between gap-3 text-xs font-medium text-slate-600">
-              <p>{saveState}</p>
-              <p>{Math.round(preview.reportCompletion * 100)}% complete</p>
+            <div className="mb-3 text-xs font-medium text-slate-600">
+              <p>{footerStatus}</p>
             </div>
           </div>
-          <div className="mx-auto grid max-w-7xl grid-cols-2 gap-3 sm:flex">
-            <button className="rounded-2xl border border-slate-200 px-3 py-3 text-sm font-semibold text-ink disabled:opacity-50 sm:w-auto" disabled={!previousSectionId} onClick={() => { if (previousSectionId) { void handleSectionChange(previousSectionId); } }} type="button">
-              Prev
+          <div className="mx-auto grid max-w-7xl grid-cols-2 gap-3">
+            <button className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-ink disabled:opacity-50" disabled={saveInFlightRef.current} onClick={() => { void saveDraft(draft, "manual"); }} type="button">
+              Save
             </button>
-            <button className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-ink sm:flex-1" onClick={() => setShowPreview((current) => !current)} type="button">
-              {showPreview ? "Hide preview" : "Preview"}
-            </button>
-            <button className="rounded-2xl bg-ember px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 sm:flex-1" disabled={saveInFlightRef.current} onClick={() => { void saveDraft(draft, "manual"); }} type="button">
-              Save now
-            </button>
-            <button className="rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 sm:flex-1" disabled={!canFinalizeNow} onClick={() => { void finalizeReport(); }} type="button">
-              Finalize
-            </button>
-            <button className="rounded-2xl border border-slate-200 px-3 py-3 text-sm font-semibold text-ink disabled:opacity-50 sm:w-auto" disabled={!nextSectionId} onClick={() => { if (nextSectionId) { void handleSectionChange(nextSectionId); } }} type="button">
-              Next
-            </button>
+            {canFinalizeNow && !nextSectionId ? (
+              <button className="rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={!canFinalizeNow} onClick={() => { void finalizeReport(); }} type="button">
+                Finalize
+              </button>
+            ) : (
+              <button className="rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={!nextSectionId} onClick={() => { if (nextSectionId) { void handleSectionChange(nextSectionId); } }} type="button">
+                Next
+              </button>
+            )}
           </div>
+          {finalizeReadinessMessage && !canFinalizeNow ? <p className="mx-auto mt-2 max-w-7xl text-xs text-slate-500">{finalizeReadinessMessage}</p> : null}
         </div>
         </>
       ) : null}
