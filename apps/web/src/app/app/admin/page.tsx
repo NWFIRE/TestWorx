@@ -75,7 +75,7 @@ function formatScheduleDetail(inspection: DashboardInspection) {
 function buildActivityItems(
   inspections: CompletedDashboardInspection[]
 ): Array<{ title: string; meta: string; tag: string; href: string }> {
-  return inspections.slice(0, 4).map((inspection) => ({
+  return inspections.slice(0, 3).map((inspection) => ({
     title: `${inspection.primaryTitle ?? inspection.site.name} finalized`,
     meta: `${inspection.secondaryTitle ?? inspection.customerCompany.name} • ${format(
       inspection.scheduledStart,
@@ -135,9 +135,15 @@ function calculateBillingPipeline(
   inspections: CompletedDashboardInspection[]
 ): Array<{ label: string; value: number; tone: string }> {
   const total = inspections.length || 1;
-  const draft = inspections.filter((inspection) => !inspection.billingStatus || inspection.billingStatus === "draft").length;
-  const reviewed = inspections.filter((inspection) => inspection.billingStatus === "reviewed").length;
-  const invoiced = inspections.filter((inspection) => inspection.billingStatus === "invoiced").length;
+  const draft = inspections.filter(
+    (inspection) => !inspection.billingStatus || inspection.billingStatus === "draft"
+  ).length;
+  const reviewed = inspections.filter(
+    (inspection) => inspection.billingStatus === "reviewed"
+  ).length;
+  const invoiced = inspections.filter(
+    (inspection) => inspection.billingStatus === "invoiced"
+  ).length;
 
   return [
     {
@@ -158,8 +164,11 @@ function calculateBillingPipeline(
   ];
 }
 
-function formatMoneyDueCount(inspections: CompletedDashboardInspection[]) {
-  const reviewedCount = inspections.filter((inspection) => inspection.billingStatus === "reviewed").length;
+function formatBillingReady(inspections: CompletedDashboardInspection[]) {
+  const reviewedCount = inspections.filter(
+    (inspection) => inspection.billingStatus === "reviewed"
+  ).length;
+
   return {
     value: reviewedCount.toString(),
     change: reviewedCount ? "Ready for invoice review" : "No billing items queued"
@@ -180,9 +189,11 @@ function InspectionListCard({
   ctaLabel: string;
 }) {
   return (
-    <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.04)]">
+    <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_12px_36px_rgba(15,23,42,0.04)] lg:p-6">
       <div>
-        <h3 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">{title}</h3>
+        <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
+          {title}
+        </h3>
         <p className="mt-1 text-sm text-slate-500">{description}</p>
       </div>
 
@@ -207,15 +218,17 @@ function InspectionListCard({
                     <div className="text-sm font-semibold text-slate-900">
                       {inspection.primaryTitle ?? inspection.site.name}
                     </div>
-                    <div className="mt-1 text-sm text-slate-500">
+                    <div className="mt-1 text-sm leading-6 text-slate-500">
                       {inspection.secondaryTitle ?? inspection.customerCompany.name} •{" "}
                       {format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}
                     </div>
-                    <div className="mt-1 text-sm text-slate-500">
-                      {inspection.tasks.map((task) => taskDisplayLabel(task)).join(", ") || "Inspection workflow"}
+                    <div className="mt-1 text-sm leading-6 text-slate-500">
+                      {inspection.tasks.map((task) => taskDisplayLabel(task)).join(", ") ||
+                        "Inspection workflow"}
                     </div>
-                    <div className="mt-1 text-sm text-slate-500">
-                      Next due: {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}
+                    <div className="mt-1 text-sm leading-6 text-slate-500">
+                      Next due:{" "}
+                      {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}
                     </div>
                   </div>
                   <Link
@@ -259,28 +272,29 @@ export default async function AdminPage({
 
   const greeting = getGreetingByHour(new Date());
   const firstName = getGreetingName(session.user.name);
-  const openInspections = data.summary.upcomingInspections;
   const reportsAwaitingReview = data.completedInspections.filter(
     (inspection) => inspection.billingStatus !== "invoiced"
   ).length;
-  const billingReady = formatMoneyDueCount(data.completedInspections);
-  const complianceFlags = buildAlertItems(data, inspectionNotice).length;
+  const billingReady = formatBillingReady(data.completedInspections);
+  const alerts = buildAlertItems(data, inspectionNotice);
+  const complianceFlags = alerts.length;
   const todayItems = data.activeInspections.slice(0, 3);
   const activityItems = buildActivityItems(data.completedInspections);
-  const alerts = buildAlertItems(data, inspectionNotice);
   const billingPipeline = calculateBillingPipeline(data.completedInspections);
 
   const statCards = [
     {
       label: "Open inspections",
-      value: openInspections.toString(),
+      value: data.summary.upcomingInspections.toString(),
       change: `${data.activeInspections.length} on the live board`,
       icon: ClipboardList
     },
     {
       label: "Reports awaiting review",
       value: reportsAwaitingReview.toString(),
-      change: reportsAwaitingReview ? "Completed work still needs office review" : "Review queue is clear",
+      change: reportsAwaitingReview
+        ? "Completed work still needs office review"
+        : "Review queue is clear",
       icon: FileText
     },
     {
@@ -299,119 +313,169 @@ export default async function AdminPage({
 
   return (
     <div className="min-h-screen bg-[#f4f7fb] text-slate-900">
-      <div className="mx-auto max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
-        <div className="rounded-[28px] border border-white/80 bg-white/70 shadow-[0_18px_60px_rgba(15,23,42,0.06)] backdrop-blur">
-          <div className="flex flex-col gap-6 border-b border-slate-200/80 px-5 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-            <div className="flex items-center gap-4">
-              <div className="inline-flex h-11 items-center rounded-full border border-slate-200 bg-white px-4 text-[11px] font-semibold tracking-[0.24em] text-slate-500 shadow-sm">
-                TRADEWORX
-              </div>
+      <div className="mx-auto max-w-md px-4 py-5 lg:max-w-7xl lg:px-8 lg:py-8">
+        <div className="space-y-4 lg:rounded-[28px] lg:border lg:border-white/80 lg:bg-white/70 lg:shadow-[0_18px_60px_rgba(15,23,42,0.06)] lg:backdrop-blur">
+          <header className="rounded-[28px] border border-white/80 bg-white/75 p-4 shadow-[0_14px_40px_rgba(15,23,42,0.06)] backdrop-blur lg:rounded-none lg:border-0 lg:border-b lg:border-slate-200/80 lg:bg-transparent lg:px-8 lg:py-5 lg:shadow-none">
+            <div className="flex items-start justify-between gap-3 lg:hidden">
               <div>
-                <div className="text-sm font-medium text-slate-500">Operations dashboard</div>
-                <h1 className="text-2xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-[30px]">
+                <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-semibold tracking-[0.24em] text-slate-500 shadow-sm">
+                  TRADEWORX
+                </div>
+                <div className="mt-3 text-sm font-medium text-slate-500">
+                  Operations dashboard
+                </div>
+                <h1 className="mt-1 text-[28px] font-semibold tracking-[-0.05em] text-slate-950">
                   {greeting}, {firstName}.
                 </h1>
               </div>
+              <Link
+                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
+                href="/app/deficiencies"
+              >
+                <Bell className="h-4 w-4" />
+              </Link>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="relative min-w-[260px] flex-1 sm:min-w-[320px]">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  placeholder="Search inspections, reports, customers"
-                  className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-11 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-[#1f4678] focus:ring-4 focus:ring-[#1f4678]/10"
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <Link
-                  className="inline-flex h-12 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                  href="/app/deficiencies"
-                >
-                  <Bell className="h-4 w-4" />
-                  Alerts
-                </Link>
-                <a
-                  className="inline-flex h-12 items-center rounded-2xl bg-[#1f4678] px-5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(31,70,120,0.20)] transition duration-150 hover:brightness-110 active:scale-[0.99]"
-                  href="#create-inspection"
-                >
-                  New inspection
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-6 px-5 py-6 sm:px-6 lg:grid-cols-[1.35fr_0.95fr] lg:px-8 lg:py-8">
-            <div className="space-y-6">
-              <section className="relative overflow-hidden rounded-[28px] bg-[#1f4678] px-6 py-6 text-white shadow-[0_22px_60px_rgba(31,70,120,0.18)]">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(0,0,0,0.14),transparent_42%)]" />
-                <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                  <div className="max-w-2xl">
-                    <div className="text-[11px] font-semibold tracking-[0.24em] text-white/70">
-                      TODAY&apos;S OPERATIONS
-                    </div>
-                    <h2 className="mt-3 max-w-[14ch] text-3xl font-semibold tracking-[-0.05em] sm:text-[42px] sm:leading-[1.02]">
-                      Keep field work moving without losing billing and reporting.
-                    </h2>
-                    <p className="mt-4 max-w-2xl text-base leading-7 text-white/80">
-                      Review inspections, follow up on deficiencies, and finalize revenue-ready work from one calm workspace.
-                    </p>
+            <div className="hidden items-center justify-between gap-6 lg:flex">
+              <div className="flex items-center gap-4">
+                <div className="inline-flex h-11 items-center rounded-full border border-slate-200 bg-white px-4 text-[11px] font-semibold tracking-[0.24em] text-slate-500 shadow-sm">
+                  TRADEWORX
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-slate-500">
+                    Operations dashboard
                   </div>
-                  <div className="grid grid-cols-2 gap-3 sm:w-[320px]">
+                  <h1 className="text-2xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-[30px]">
+                    {greeting}, {firstName}.
+                  </h1>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="relative min-w-[260px] flex-1 sm:min-w-[320px]">
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    placeholder="Search inspections, reports, customers"
+                    className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-11 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-[#1f4678] focus:ring-4 focus:ring-[#1f4678]/10"
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <Link
+                    className="inline-flex h-12 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                    href="/app/deficiencies"
+                  >
+                    <Bell className="h-4 w-4" />
+                    Alerts
+                  </Link>
+                  <a
+                    className="inline-flex h-12 items-center rounded-2xl bg-[#1f4678] px-5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(31,70,120,0.20)] transition duration-150 hover:brightness-110 active:scale-[0.99]"
+                    href="#create-inspection"
+                  >
+                    New inspection
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div className="relative mt-4 lg:hidden">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                placeholder="Search inspections, reports, customers"
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-11 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-[#1f4678] focus:ring-4 focus:ring-[#1f4678]/10"
+              />
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3 lg:hidden">
+              <Link
+                className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                href="/app/deficiencies"
+              >
+                Alerts
+              </Link>
+              <a
+                className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#1f4678] text-sm font-semibold text-white shadow-[0_12px_24px_rgba(31,70,120,0.18)] transition hover:brightness-110 active:scale-[0.99]"
+                href="#create-inspection"
+              >
+                New inspection
+              </a>
+            </div>
+          </header>
+
+          <div className="grid gap-4 lg:grid-cols-[1.35fr_0.95fr] lg:gap-6 lg:px-8 lg:py-8">
+            <div className="space-y-4 lg:space-y-6">
+              <section className="relative overflow-hidden rounded-[28px] bg-[#1f4678] p-5 text-white shadow-[0_20px_50px_rgba(31,70,120,0.18)] lg:px-6 lg:py-6 lg:shadow-[0_22px_60px_rgba(31,70,120,0.18)]">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(0,0,0,0.14),transparent_42%)]" />
+                <div className="relative">
+                  <div className="text-[10px] font-semibold tracking-[0.24em] text-white/70 lg:text-[11px]">
+                    TODAY&apos;S OPERATIONS
+                  </div>
+                  <h2 className="mt-3 max-w-[12ch] text-[32px] font-semibold leading-[1] tracking-[-0.05em] lg:max-w-[14ch] lg:text-[42px] lg:leading-[1.02]">
+                    Keep field work moving.
+                  </h2>
+                  <p className="mt-3 text-sm leading-7 text-white/80 lg:mt-4 lg:max-w-2xl lg:text-base">
+                    Review inspections, finalize reports, and keep billing close to done.
+                  </p>
+
+                  <div className="mt-5 grid grid-cols-2 gap-3 lg:max-w-[320px]">
                     <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-                      <div className="text-sm text-white/70">Techs active</div>
+                      <div className="text-xs text-white/70">Techs active</div>
                       <div className="mt-1 text-2xl font-semibold">{data.technicians.length}</div>
                     </div>
                     <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-                      <div className="text-sm text-white/70">Jobs today</div>
+                      <div className="text-xs text-white/70">Jobs today</div>
                       <div className="mt-1 text-2xl font-semibold">{todayItems.length}</div>
                     </div>
                   </div>
                 </div>
               </section>
 
-              <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <section className="grid grid-cols-2 gap-3 lg:gap-4 xl:grid-cols-4">
                 {statCards.map(({ label, value, change, icon: Icon }) => (
                   <div
                     key={label}
-                    className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(15,23,42,0.06)]"
+                    className="rounded-[24px] border border-slate-200/80 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(15,23,42,0.06)] lg:p-5"
                   >
-                    <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-medium text-slate-500">{label}</div>
-                        <div className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+                        <div className="text-xs font-medium leading-5 text-slate-500 lg:text-sm">
+                          {label}
+                        </div>
+                        <div className="mt-2 text-[28px] font-semibold tracking-[-0.05em] text-slate-950 lg:mt-3 lg:text-3xl lg:tracking-[-0.04em]">
                           {value}
                         </div>
                       </div>
-                      <div className="rounded-2xl bg-slate-100 p-2.5 text-slate-700">
-                        <Icon className="h-5 w-5" />
+                      <div className="rounded-2xl bg-slate-100 p-2 text-slate-700 lg:p-2.5">
+                        <Icon className="h-4 w-4 lg:h-5 lg:w-5" />
                       </div>
                     </div>
-                    <div className="mt-4 text-sm text-slate-500">{change}</div>
+                    <div className="mt-3 text-xs leading-5 text-slate-500 lg:mt-4 lg:text-sm">
+                      {change}
+                    </div>
                   </div>
                 ))}
               </section>
 
-              <section className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
-                <div className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.04)]">
-                  <div className="flex items-center justify-between gap-4">
+              <section className="grid gap-4 lg:gap-6 xl:grid-cols-[1fr_0.9fr]">
+                <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_12px_36px_rgba(15,23,42,0.04)] lg:p-6">
+                  <div className="flex items-center justify-between gap-3">
                     <div>
-                      <h3 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                      <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
                         Today&apos;s field schedule
                       </h3>
                       <p className="mt-1 text-sm text-slate-500">
-                        Live view of inspections and service work assigned today.
+                        Assigned inspections and service work.
                       </p>
                     </div>
                     <Link
-                      className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 px-3.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 text-slate-700 transition hover:bg-slate-50 lg:h-10 lg:w-auto lg:gap-2 lg:px-3.5 lg:text-sm lg:font-medium"
                       href="/app/admin/amendments"
                     >
                       <CalendarDays className="h-4 w-4" />
-                      Calendar
+                      <span className="hidden lg:inline">Calendar</span>
                     </Link>
                   </div>
 
-                  <div className="mt-5 space-y-3">
+                  <div className="mt-4 space-y-3">
                     {todayItems.length === 0 ? (
                       <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-500">
                         No active inspections are scheduled right now.
@@ -421,66 +485,74 @@ export default async function AdminPage({
                         <Link
                           key={item.id}
                           href={`/app/admin/inspections/${item.id}`}
-                          className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 transition hover:border-slate-300 hover:bg-white sm:flex-row sm:items-center sm:justify-between"
+                          className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 transition hover:border-slate-300 hover:bg-white block"
                         >
-                          <div className="min-w-0">
-                            <div className="text-sm font-semibold text-slate-900">
-                              {item.primaryTitle ?? item.site.name}
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-semibold text-slate-900">
+                                {item.primaryTitle ?? item.site.name}
+                              </div>
+                              <div className="mt-1 text-sm leading-6 text-slate-500">
+                                {formatScheduleDetail(item)}
+                              </div>
                             </div>
-                            <div className="mt-1 text-sm text-slate-500">
-                              {formatScheduleDetail(item)}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3 sm:flex-col sm:items-end">
-                            <div className="text-sm font-medium text-slate-700">
+                            <div className="text-xs font-medium text-slate-700">
                               {format(item.scheduledStart, "h:mm a")}
                             </div>
-                            <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
-                              {inspectionStatusLabel(item.displayStatus)}
-                            </div>
+                          </div>
+                          <div className="mt-3 inline-flex rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
+                            {inspectionStatusLabel(item.displayStatus)}
                           </div>
                         </Link>
                       ))
                     )}
                   </div>
-                </div>
+                </section>
 
-                <div className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.04)]">
-                  <h3 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_12px_36px_rgba(15,23,42,0.04)] lg:p-6">
+                  <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
                     Recent activity
                   </h3>
                   <p className="mt-1 text-sm text-slate-500">
-                    Important actions across reporting, billing, and customer delivery.
+                    Important movement across reporting and billing.
                   </p>
 
-                  <div className="mt-5 space-y-4">
+                  <div className="mt-4 space-y-4">
                     {activityItems.length === 0 ? (
                       <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-500">
                         No completed activity has been recorded yet.
                       </div>
                     ) : (
                       activityItems.map((item) => (
-                        <Link key={item.title} href={item.href} className="flex gap-3 transition hover:opacity-80">
+                        <Link
+                          key={item.title}
+                          href={item.href}
+                          className="flex gap-3 transition hover:opacity-80"
+                        >
                           <div className="mt-1 rounded-full bg-slate-100 p-2 text-slate-700">
                             <Wrench className="h-4 w-4" />
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-start justify-between gap-3">
-                              <div className="text-sm font-semibold text-slate-900">{item.title}</div>
+                              <div className="text-sm font-semibold leading-6 text-slate-900">
+                                {item.title}
+                              </div>
                               <div className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-slate-600">
                                 {item.tag}
                               </div>
                             </div>
-                            <div className="mt-1 text-sm text-slate-500">{item.meta}</div>
+                            <div className="mt-1 text-sm leading-6 text-slate-500">
+                              {item.meta}
+                            </div>
                           </div>
                         </Link>
                       ))
                     )}
                   </div>
-                </div>
+                </section>
               </section>
 
-              <section className="grid gap-6 xl:grid-cols-2">
+              <section className="grid gap-4 lg:gap-6 xl:grid-cols-2">
                 <InspectionListCard
                   title="Active inspections"
                   description={`Operational schedule view with ${data.activeInspections.length} inspection${data.activeInspections.length === 1 ? "" : "s"} loaded right now.`}
@@ -498,8 +570,8 @@ export default async function AdminPage({
               </section>
             </div>
 
-            <div className="space-y-6">
-              <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.04)]">
+            <div className="space-y-4 lg:space-y-6">
+              <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_12px_36px_rgba(15,23,42,0.04)] lg:p-6">
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                   <CircleAlert className="h-4 w-4 text-amber-500" />
                   Needs attention
@@ -522,10 +594,10 @@ export default async function AdminPage({
                 </div>
               </section>
 
-              <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.04)]">
+              <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_12px_36px_rgba(15,23,42,0.04)] lg:p-6">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <h3 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                    <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
                       Revenue pipeline
                     </h3>
                     <p className="mt-1 text-sm text-slate-500">
@@ -533,7 +605,9 @@ export default async function AdminPage({
                     </p>
                   </div>
                   <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                    {data.completedInspections.some((inspection) => inspection.billingStatus === "reviewed")
+                    {data.completedInspections.some(
+                      (inspection) => inspection.billingStatus === "reviewed"
+                    )
                       ? "Active"
                       : "Healthy"}
                   </div>
@@ -557,15 +631,15 @@ export default async function AdminPage({
                 </div>
               </section>
 
-              <section className="rounded-[28px] border border-slate-200/80 bg-[#0f172a] p-6 text-white shadow-[0_16px_44px_rgba(15,23,42,0.14)]">
-                <div className="text-[11px] font-semibold tracking-[0.24em] text-white/60">
+              <section className="rounded-[28px] border border-slate-200/80 bg-[#0f172a] p-5 text-white shadow-[0_16px_44px_rgba(15,23,42,0.14)] lg:p-6">
+                <div className="text-[10px] font-semibold tracking-[0.24em] text-white/60">
                   QUICK ACTIONS
                 </div>
                 <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">
                   Move the work forward.
                 </h3>
                 <p className="mt-2 text-sm leading-7 text-white/72">
-                  Open the tasks that most directly affect customer delivery and collected revenue.
+                  Open the tasks that most directly affect delivery and collected revenue.
                 </p>
 
                 <div className="mt-5 space-y-3">
