@@ -718,13 +718,13 @@ export function ReportEditor({ data }: { data: EditorData }) {
               <h3 className="text-lg font-semibold text-ink">Sections</h3>
               <p className="mt-1 text-sm text-slate-500">Move through the report from the top without shrinking the editing canvas below.</p>
             </div>
-            <div className="flex items-center gap-2 md:self-start">
+            <div className="flex items-center gap-2 self-start md:self-start">
               <button className="min-h-11 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-ink" onClick={() => setShowPreview((current) => !current)} type="button">
                 {showPreview ? "Hide preview" : "Preview"}
               </button>
             </div>
           </div>
-          <div className="mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 md:hidden">
+          <div className="mt-4 -mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 pr-5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden md:hidden">
             {data.template.sections.map((section) => {
               const summary = preview.sectionSummaries.find((entry) => entry.sectionId === section.id);
               const status = draft.sections[section.id]?.status ?? "pending";
@@ -741,12 +741,12 @@ export function ReportEditor({ data }: { data: EditorData }) {
               return (
                 <button
                   key={section.id}
-                  className={`min-h-[5.5rem] min-w-[13.5rem] snap-start rounded-2xl border px-4 py-4 text-left ${activeSectionId === section.id ? "border-slateblue bg-slateblue text-white" : "border-slate-200 bg-white text-ink"}`}
+                  className={`min-h-[5.5rem] w-[14rem] shrink-0 snap-start rounded-2xl border px-4 py-4 text-left ${activeSectionId === section.id ? "border-slateblue bg-slateblue text-white" : "border-slate-200 bg-white text-ink"}`}
                   onClick={() => { void handleSectionChange(section.id); }}
                   title={summaryLabel}
                   type="button"
                 >
-                  <p className="text-sm font-semibold leading-5">{section.label}</p>
+                  <p className="text-sm font-semibold leading-5 break-words">{section.label}</p>
                   <p className={`mt-2 text-xs ${activeSectionId === section.id ? "text-white/80" : "text-slate-500"}`}>
                     {formatSectionNavMeta(summary, status)}
                   </p>
