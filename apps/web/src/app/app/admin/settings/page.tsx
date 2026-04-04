@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import {
-  buildTenantBrandingCss,
   canManageBilling,
   getPaginatedTenantCustomerCompanySettings,
   getPaginatedTenantQuickBooksCatalogSettings,
@@ -14,6 +13,8 @@ import {
   getTenantBrandingSettings,
   getTenantQuickBooksConnectionSettings
 } from "@testworx/lib";
+
+import { AppPageShell, KPIStatCard, PageHeader, SectionCard } from "../operations-ui";
 
 import {
   createCustomerCompanyAction,
@@ -336,7 +337,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
     getTenantBrandingSettings(actor),
     getTenantQuickBooksConnectionSettings(actor)
   ]);
-  const theme = buildTenantBrandingCss(brandingSettings.branding);
   const canManageSubscription = canManageBilling(session.user.role);
   const quickBooksNotice = Array.isArray(params.quickbooks)
     ? params.quickbooks[0]
@@ -360,12 +360,38 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   const mappingsOpen = isSectionOpen(params, "mappingsOpen", quickBooksNotice);
 
   return (
-    <section className="space-y-6">
-      <div className="rounded-[2rem] p-6 text-white shadow-panel" style={{ background: `linear-gradient(135deg, ${theme["--tenant-primary"]} 0%, ${theme["--tenant-accent"]} 100%)` }}>
-        <p className="text-sm uppercase tracking-[0.25em] text-white/70">Tenant settings</p>
-        <h2 className="mt-2 text-3xl font-semibold">Billing and branding</h2>
-        <p className="mt-3 max-w-2xl text-white/80">Manage subscription readiness, billing contacts, and the brand details that appear in the customer portal and report packets.</p>
-      </div>
+    <AppPageShell>
+      <PageHeader
+        description="Manage subscription readiness, billing contacts, branding, catalog mappings, and service fee rules from one quieter settings workspace."
+        eyebrow="Tenant settings"
+        title="Billing and branding"
+      />
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <KPIStatCard
+          label="Subscription"
+          note={billingSettings.tenant.subscriptionPlan?.name ?? "Not assigned"}
+          tone="blue"
+          value={billingSettings.tenant.stripeSubscriptionStatus ?? "Not connected"}
+        />
+        <KPIStatCard
+          label="QuickBooks"
+          note={quickBooksSettings.tenant.quickbooksCompanyName ?? "No company connected"}
+          tone={quickBooksSettings.tenant.connected ? "emerald" : "amber"}
+          value={quickBooksSettings.tenant.connected ? "Connected" : "Pending"}
+        />
+        <KPIStatCard
+          label="Branding"
+          note={brandingSettings.billingEmail ?? "Billing email not set"}
+          tone="slate"
+          value={brandingSettings.branding.legalBusinessName || "TradeWorx"}
+        />
+        <KPIStatCard
+          label="Service fees"
+          note="Rule and default fee controls stay available below."
+          tone="violet"
+          value={feesOpen ? "Open" : "Ready"}
+        />
+      </section>
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
           <TenantBrandingForm action={updateTenantBrandingAction} values={{ ...brandingSettings.branding, billingEmail: brandingSettings.billingEmail }} />
@@ -502,7 +528,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
           )}
         </div>
         <div className="space-y-6">
-          <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+          <SectionCard>
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing settings</p>
             <h3 className="mt-2 text-2xl font-semibold text-ink">Current subscription</h3>
             <p className="mt-3 text-sm text-slate-500">Plan: {billingSettings.tenant.subscriptionPlan?.name ?? "Not assigned"}</p>
@@ -524,8 +550,8 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
                 </button>
               </form>
             ) : null}
-          </div>
-          <div className="space-y-4 rounded-[2rem] bg-white p-6 shadow-panel">
+          </SectionCard>
+          <SectionCard className="space-y-4">
             <div>
               <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Plans</p>
               <h3 className="mt-2 text-2xl font-semibold text-ink">Available subscriptions</h3>
@@ -553,9 +579,9 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
                 ) : null}
               </div>
             ))}
-          </div>
+          </SectionCard>
         </div>
       </div>
-    </section>
+    </AppPageShell>
   );
 }

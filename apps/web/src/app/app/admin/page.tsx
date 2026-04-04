@@ -23,12 +23,30 @@ import {
 
 import { createInspectionAction } from "./actions";
 import { InspectionSchedulerForm } from "./inspection-scheduler-form";
+import {
+  AppPageShell,
+  EmptyState,
+  FilterBar,
+  FilterChipLink,
+  KPIStatCard,
+  PageHeader,
+  SectionCard,
+  StatusBadge
+} from "./operations-ui";
 
 type AdminDashboardData = Awaited<ReturnType<typeof getAdminDashboardData>>;
 type CompletedDashboardInspection = AdminDashboardData["completedInspections"][number];
 type ActiveDashboardInspection = AdminDashboardData["activeInspections"][number];
 type DashboardInspection = CompletedDashboardInspection | ActiveDashboardInspection;
 type DashboardTask = DashboardInspection["tasks"][number];
+
+const queueOptions = [
+  { value: "all", label: "All work" },
+  { value: "open", label: "Open inspections" },
+  { value: "review", label: "Awaiting review" },
+  { value: "billing", label: "Billing ready" },
+  { value: "flags", label: "Compliance flags" }
+] as const;
 
 function inspectionStatusLabel(status: string) {
   return formatInspectionStatusLabel(
@@ -180,16 +198,18 @@ function InspectionListCard({
   description,
   inspections,
   emptyText,
-  ctaLabel
+  ctaLabel,
+  emptyTitle = "Nothing is queued here"
 }: {
   title: string;
   description: string;
   inspections: DashboardInspection[];
   emptyText: string;
   ctaLabel: string;
+  emptyTitle?: string;
 }) {
   return (
-    <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_12px_36px_rgba(15,23,42,0.04)] lg:p-6">
+    <SectionCard>
       <div>
         <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
           {title}
@@ -199,9 +219,7 @@ function InspectionListCard({
 
       <div className="mt-5 space-y-3">
         {inspections.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-500">
-            {emptyText}
-          </div>
+          <EmptyState description={emptyText} title={emptyTitle} />
         ) : (
           inspections.map((inspection) => {
             const nextDue = pickEarliestNextDueAt(
@@ -211,7 +229,7 @@ function InspectionListCard({
             return (
               <div
                 key={inspection.id}
-                className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4"
+                className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 transition hover:border-slate-300 hover:bg-white"
               >
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
@@ -243,7 +261,7 @@ function InspectionListCard({
           })
         )}
       </div>
-    </section>
+    </SectionCard>
   );
 }
 
@@ -269,6 +287,9 @@ export default async function AdminPage({
   const inspectionNotice = Array.isArray(params.inspection)
     ? params.inspection[0]
     : params.inspection;
+  const queue = typeof params.queue === "string" && queueOptions.some((option) => option.value === params.queue)
+    ? params.queue
+    : "all";
 
   const greeting = getGreetingByHour(new Date());
   const firstName = getGreetingName(session.user.name);
@@ -281,13 +302,25 @@ export default async function AdminPage({
   const todayItems = data.activeInspections.slice(0, 3);
   const activityItems = buildActivityItems(data.completedInspections);
   const billingPipeline = calculateBillingPipeline(data.completedInspections);
+  const openInspections = data.activeInspections.filter((inspection) =>
+    ["scheduled", "to_be_completed", "past_due", "in_progress"].includes(inspection.displayStatus)
+  );
+  const flaggedInspections = data.activeInspections.filter(
+    (inspection) =>
+      isDueAtTimeOfServiceCustomer(inspection.customerCompany)
+      || inspection.lifecycle === "replacement"
+      || inspection.lifecycle === "amended"
+      || !inspection.assignedTechnicianNames.length
+  );
 
   const statCards = [
     {
       label: "Open inspections",
       value: data.summary.upcomingInspections.toString(),
       change: `${data.activeInspections.length} on the live board`,
-      icon: ClipboardList
+      icon: ClipboardList,
+      href: "/app/admin?queue=open",
+      tone: "blue" as const
     },
     {
       label: "Reports awaiting review",
@@ -295,71 +328,96 @@ export default async function AdminPage({
       change: reportsAwaitingReview
         ? "Completed work still needs office review"
         : "Review queue is clear",
-      icon: FileText
+      icon: FileText,
+      href: "/app/admin?queue=review",
+      tone: "violet" as const
     },
     {
       label: "Billing ready",
       value: billingReady.value,
       change: billingReady.change,
-      icon: CreditCard
+      icon: CreditCard,
+      href: "/app/admin/billing?status=reviewed",
+      tone: "emerald" as const
     },
     {
       label: "Compliance flags",
       value: complianceFlags.toString(),
       change: complianceFlags ? "Needs follow-up today" : "No urgent flags surfaced",
-      icon: ShieldCheck
+      icon: ShieldCheck,
+      href: "/app/deficiencies?status=open&severity=high",
+      tone: "amber" as const
     }
   ];
 
+  const queueHeadline =
+    queue === "open"
+      ? "Open inspections queue"
+      : queue === "review"
+        ? "Reports awaiting office review"
+        : queue === "billing"
+          ? "Billing-ready inspections"
+          : queue === "flags"
+            ? "Compliance follow-up"
+            : "Today’s operations";
+  const queueDescription =
+    queue === "open"
+      ? "Active dispatch work prioritized by live inspection status."
+      : queue === "review"
+        ? "Completed work that still needs office review before customer delivery or billing."
+        : queue === "billing"
+          ? "Completed summaries already close to invoice creation."
+        : queue === "flags"
+          ? "Operational exceptions that deserve same-day attention."
+          : "Review inspections, finalize reports, and keep billing close to done.";
+
+  const activeInspectionList = queue === "billing"
+    ? data.completedInspections.filter((inspection) => inspection.billingStatus === "reviewed")
+    : queue === "review"
+      ? data.completedInspections.filter((inspection) => inspection.billingStatus !== "invoiced")
+      : queue === "flags"
+        ? flaggedInspections
+        : queue === "open"
+          ? openInspections
+          : data.activeInspections;
+
+  const archiveInspectionList = queue === "review"
+    ? data.completedInspections.filter((inspection) => inspection.billingStatus !== "invoiced")
+    : queue === "billing"
+      ? data.completedInspections.filter((inspection) => inspection.billingStatus === "reviewed")
+      : data.completedInspections.slice(0, 6);
+
   return (
     <div className="min-h-screen bg-[#f4f7fb] text-slate-900">
-      <div className="mx-auto max-w-md px-4 py-5 lg:max-w-7xl lg:px-8 lg:py-8">
-        <div className="space-y-4 lg:rounded-[28px] lg:border lg:border-white/80 lg:bg-white/70 lg:shadow-[0_18px_60px_rgba(15,23,42,0.06)] lg:backdrop-blur">
-          <header className="rounded-[28px] border border-white/80 bg-white/75 p-4 shadow-[0_14px_40px_rgba(15,23,42,0.06)] backdrop-blur lg:rounded-none lg:border-0 lg:border-b lg:border-slate-200/80 lg:bg-transparent lg:px-8 lg:py-5 lg:shadow-none">
-            <div className="flex items-start justify-between gap-3 lg:hidden">
-              <div>
-                <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-semibold tracking-[0.24em] text-slate-500 shadow-sm">
-                  TRADEWORX
-                </div>
-                <div className="mt-3 text-sm font-medium text-slate-500">
-                  Operations dashboard
-                </div>
-                <h1 className="mt-1 text-[28px] font-semibold tracking-[-0.05em] text-slate-950">
-                  {greeting}, {firstName}.
-                </h1>
-              </div>
-              <Link
-                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
-                href="/app/deficiencies"
-              >
-                <Bell className="h-4 w-4" />
-              </Link>
-            </div>
+      <div className="py-5 lg:py-6">
+        <AppPageShell>
+          <div className="lg:hidden">
+            <PageHeader
+              actions={
+                <Link
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
+                  href="/app/deficiencies"
+                >
+                  <Bell className="h-4 w-4" />
+                </Link>
+              }
+              description="Scheduling, review, and billing readiness from one operations workspace."
+              eyebrow="Operations dashboard"
+              title={`${greeting}, ${firstName}.`}
+            />
+          </div>
 
-            <div className="hidden items-center justify-between gap-6 lg:flex">
-              <div className="flex items-center gap-4">
-                <div className="inline-flex h-11 items-center rounded-full border border-slate-200 bg-white px-4 text-[11px] font-semibold tracking-[0.24em] text-slate-500 shadow-sm">
-                  TRADEWORX
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-slate-500">
-                    Operations dashboard
+          <div className="hidden lg:block">
+            <PageHeader
+              actions={
+                <>
+                  <div className="relative min-w-[280px] flex-1">
+                    <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      placeholder="Search inspections, reports, customers"
+                      className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-11 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-[#1f4678] focus:ring-4 focus:ring-[#1f4678]/10"
+                    />
                   </div>
-                  <h1 className="text-2xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-[30px]">
-                    {greeting}, {firstName}.
-                  </h1>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="relative min-w-[260px] flex-1 sm:min-w-[320px]">
-                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    placeholder="Search inspections, reports, customers"
-                    className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-11 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-[#1f4678] focus:ring-4 focus:ring-[#1f4678]/10"
-                  />
-                </div>
-                <div className="flex items-center gap-3">
                   <Link
                     className="inline-flex h-12 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                     href="/app/deficiencies"
@@ -373,50 +431,94 @@ export default async function AdminPage({
                   >
                     New inspection
                   </a>
-                </div>
+                </>
+              }
+              description="Scheduling, review, and billing readiness from one calm operational workspace."
+              eyebrow="Operations dashboard"
+              title={`${greeting}, ${firstName}.`}
+            />
+          </div>
+
+          <div className="lg:hidden">
+            <SectionCard className="space-y-4">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  placeholder="Search inspections, reports, customers"
+                  className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-11 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-[#1f4678] focus:ring-4 focus:ring-[#1f4678]/10"
+                />
               </div>
-            </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Link
+                  className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  href="/app/deficiencies"
+                >
+                  Alerts
+                </Link>
+                <a
+                  className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#1f4678] text-sm font-semibold text-white shadow-[0_12px_24px_rgba(31,70,120,0.18)] transition hover:brightness-110 active:scale-[0.99]"
+                  href="#create-inspection"
+                >
+                  New inspection
+                </a>
+              </div>
+            </SectionCard>
+          </div>
 
-            <div className="relative mt-4 lg:hidden">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                placeholder="Search inspections, reports, customers"
-                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-11 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-[#1f4678] focus:ring-4 focus:ring-[#1f4678]/10"
+          <section className="grid gap-3 lg:grid-cols-4 lg:gap-4">
+            {statCards.map(({ label, value, change, icon: Icon, href, tone }) => (
+              <KPIStatCard
+                href={href}
+                icon={<Icon className="h-4 w-4 lg:h-5 lg:w-5" />}
+                key={label}
+                label={label}
+                note={change}
+                tone={tone}
+                value={value}
               />
-            </div>
+            ))}
+          </section>
 
-            <div className="mt-4 grid grid-cols-2 gap-3 lg:hidden">
-              <Link
-                className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                href="/app/deficiencies"
-              >
-                Alerts
-              </Link>
-              <a
-                className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#1f4678] text-sm font-semibold text-white shadow-[0_12px_24px_rgba(31,70,120,0.18)] transition hover:brightness-110 active:scale-[0.99]"
-                href="#create-inspection"
-              >
-                New inspection
-              </a>
-            </div>
-          </header>
+          <FilterBar
+            description="Carry queue context forward without leaving the main scheduling workspace."
+            title="Work queue"
+          >
+            {queueOptions.map((option) => (
+              <FilterChipLink
+                active={queue === option.value}
+                href={option.value === "all" ? "/app/admin" : `/app/admin?queue=${option.value}`}
+                key={option.value}
+                label={option.label}
+                tone="blue"
+              />
+            ))}
+          </FilterBar>
 
-          <div className="grid gap-4 lg:grid-cols-[1.35fr_0.95fr] lg:gap-6 lg:px-8 lg:py-8">
-            <div className="space-y-4 lg:space-y-6">
+          <div className="grid gap-5 xl:grid-cols-[1.45fr_0.95fr]">
+            <div className="space-y-5 lg:space-y-6">
               <section className="relative overflow-hidden rounded-[28px] bg-[#1f4678] p-5 text-white shadow-[0_20px_50px_rgba(31,70,120,0.18)] lg:px-6 lg:py-6 lg:shadow-[0_22px_60px_rgba(31,70,120,0.18)]">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(0,0,0,0.14),transparent_42%)]" />
-                <div className="relative">
-                  <div className="text-[10px] font-semibold tracking-[0.24em] text-white/70 lg:text-[11px]">
-                    TODAY&apos;S OPERATIONS
+                <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                  <div className="max-w-2xl">
+                    <div className="text-[10px] font-semibold tracking-[0.24em] text-white/70 lg:text-[11px]">
+                      {queueHeadline.toUpperCase()}
+                    </div>
+                    <h2 className="mt-3 max-w-[14ch] text-[32px] font-semibold leading-[1] tracking-[-0.05em] lg:text-[42px] lg:leading-[1.02]">
+                      {queue === "open"
+                        ? "Keep dispatch moving."
+                        : queue === "review"
+                          ? "Close the review loop."
+                          : queue === "billing"
+                            ? "Turn finished work into revenue."
+                            : queue === "flags"
+                              ? "Resolve the items that could slip."
+                              : "Keep field work moving."}
+                    </h2>
+                    <p className="mt-3 text-sm leading-7 text-white/80 lg:mt-4 lg:max-w-2xl lg:text-base">
+                      {queueDescription}
+                    </p>
                   </div>
-                  <h2 className="mt-3 max-w-[12ch] text-[32px] font-semibold leading-[1] tracking-[-0.05em] lg:max-w-[14ch] lg:text-[42px] lg:leading-[1.02]">
-                    Keep field work moving.
-                  </h2>
-                  <p className="mt-3 text-sm leading-7 text-white/80 lg:mt-4 lg:max-w-2xl lg:text-base">
-                    Review inspections, finalize reports, and keep billing close to done.
-                  </p>
-
-                  <div className="mt-5 grid grid-cols-2 gap-3 lg:max-w-[320px]">
+                  <div className="grid grid-cols-2 gap-3 lg:w-[360px]">
                     <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
                       <div className="text-xs text-white/70">Techs active</div>
                       <div className="mt-1 text-2xl font-semibold">{data.technicians.length}</div>
@@ -429,41 +531,15 @@ export default async function AdminPage({
                 </div>
               </section>
 
-              <section className="grid grid-cols-2 gap-3 lg:gap-4 xl:grid-cols-4">
-                {statCards.map(({ label, value, change, icon: Icon }) => (
-                  <div
-                    key={label}
-                    className="rounded-[24px] border border-slate-200/80 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(15,23,42,0.06)] lg:p-5"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-xs font-medium leading-5 text-slate-500 lg:text-sm">
-                          {label}
-                        </div>
-                        <div className="mt-2 text-[28px] font-semibold tracking-[-0.05em] text-slate-950 lg:mt-3 lg:text-3xl lg:tracking-[-0.04em]">
-                          {value}
-                        </div>
-                      </div>
-                      <div className="rounded-2xl bg-slate-100 p-2 text-slate-700 lg:p-2.5">
-                        <Icon className="h-4 w-4 lg:h-5 lg:w-5" />
-                      </div>
-                    </div>
-                    <div className="mt-3 text-xs leading-5 text-slate-500 lg:mt-4 lg:text-sm">
-                      {change}
-                    </div>
-                  </div>
-                ))}
-              </section>
-
-              <section className="grid gap-4 lg:gap-6 xl:grid-cols-[1fr_0.9fr]">
-                <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_12px_36px_rgba(15,23,42,0.04)] lg:p-6">
+              <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+                <SectionCard>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
                         Today&apos;s field schedule
                       </h3>
                       <p className="mt-1 text-sm text-slate-500">
-                        Assigned inspections and service work.
+                        Live operational work ordered for quick scanning and action.
                       </p>
                     </div>
                     <Link
@@ -471,21 +547,22 @@ export default async function AdminPage({
                       href="/app/admin/amendments"
                     >
                       <CalendarDays className="h-4 w-4" />
-                      <span className="hidden lg:inline">Calendar</span>
+                      <span className="hidden lg:inline">Amendments</span>
                     </Link>
                   </div>
 
                   <div className="mt-4 space-y-3">
                     {todayItems.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-500">
-                        No active inspections are scheduled right now.
-                      </div>
+                      <EmptyState
+                        description="No active inspections are scheduled right now."
+                        title="Nothing is currently on deck"
+                      />
                     ) : (
                       todayItems.map((item) => (
                         <Link
                           key={item.id}
                           href={`/app/admin/inspections/${item.id}`}
-                          className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 transition hover:border-slate-300 hover:bg-white block"
+                          className="block rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 transition hover:border-slate-300 hover:bg-white"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div>
@@ -500,34 +577,35 @@ export default async function AdminPage({
                               {format(item.scheduledStart, "h:mm a")}
                             </div>
                           </div>
-                          <div className="mt-3 inline-flex rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
-                            {inspectionStatusLabel(item.displayStatus)}
+                          <div className="mt-3">
+                            <StatusBadge label={inspectionStatusLabel(item.displayStatus)} tone="blue" />
                           </div>
                         </Link>
                       ))
                     )}
                   </div>
-                </section>
+                </SectionCard>
 
-                <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_12px_36px_rgba(15,23,42,0.04)] lg:p-6">
+                <SectionCard>
                   <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
                     Recent activity
                   </h3>
                   <p className="mt-1 text-sm text-slate-500">
-                    Important movement across reporting and billing.
+                    Important movement across reporting, billing, and customer delivery.
                   </p>
 
                   <div className="mt-4 space-y-4">
                     {activityItems.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-500">
-                        No completed activity has been recorded yet.
-                      </div>
+                      <EmptyState
+                        description="No completed activity has been recorded yet."
+                        title="No recent activity"
+                      />
                     ) : (
                       activityItems.map((item) => (
                         <Link
                           key={item.title}
                           href={item.href}
-                          className="flex gap-3 transition hover:opacity-80"
+                          className="flex gap-3 rounded-2xl p-1 transition hover:bg-slate-50"
                         >
                           <div className="mt-1 rounded-full bg-slate-100 p-2 text-slate-700">
                             <Wrench className="h-4 w-4" />
@@ -537,9 +615,7 @@ export default async function AdminPage({
                               <div className="text-sm font-semibold leading-6 text-slate-900">
                                 {item.title}
                               </div>
-                              <div className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-slate-600">
-                                {item.tag}
-                              </div>
+                              <StatusBadge label={item.tag} tone="slate" />
                             </div>
                             <div className="mt-1 text-sm leading-6 text-slate-500">
                               {item.meta}
@@ -549,29 +625,55 @@ export default async function AdminPage({
                       ))
                     )}
                   </div>
-                </section>
+                </SectionCard>
               </section>
 
-              <section className="grid gap-4 lg:gap-6 xl:grid-cols-2">
+              <section className="grid gap-5 xl:grid-cols-2">
                 <InspectionListCard
-                  title="Active inspections"
-                  description={`Operational schedule view with ${data.activeInspections.length} inspection${data.activeInspections.length === 1 ? "" : "s"} loaded right now.`}
-                  inspections={data.activeInspections}
-                  emptyText="No active inspections are on the board right now."
-                  ctaLabel="Open inspection"
+                  title={queue === "review" ? "Reports awaiting review" : queue === "billing" ? "Billing-ready work" : queue === "flags" ? "Flagged inspections" : "Active inspections"}
+                  description={
+                    queue === "review"
+                      ? "Completed visits that still need office review before delivery or billing."
+                      : queue === "billing"
+                        ? "Completed visits already marked reviewed and ready for billing follow-through."
+                        : queue === "flags"
+                          ? "Inspections with dispatch, lifecycle, or payment-collection attention points."
+                          : `Operational schedule view with ${activeInspectionList.length} inspection${activeInspectionList.length === 1 ? "" : "s"} loaded right now.`
+                  }
+                  inspections={activeInspectionList}
+                  emptyText={
+                    queue === "review"
+                      ? "No completed inspections are waiting on office review."
+                      : queue === "billing"
+                        ? "No completed inspections are sitting in the billing-ready queue."
+                        : queue === "flags"
+                          ? "No active inspections currently match the highest-priority follow-up conditions."
+                          : "No active inspections are on the board right now."
+                  }
+                  emptyTitle={
+                    queue === "review"
+                      ? "Review queue is clear"
+                      : queue === "billing"
+                        ? "Billing queue is clear"
+                        : queue === "flags"
+                          ? "No compliance flags are active"
+                          : "No active inspections"
+                  }
+                  ctaLabel={queue === "billing" ? "Open billing detail" : "Open inspection"}
                 />
                 <InspectionListCard
                   title="Completed archive"
                   description="Recently completed visits that are ready for office follow-up, billing, or customer delivery."
-                  inspections={data.completedInspections.slice(0, 6)}
-                  emptyText="No completed inspections yet."
+                  inspections={archiveInspectionList}
+                  emptyText="No completed inspections match the current context."
+                  emptyTitle="No completed archive items"
                   ctaLabel="View inspection"
                 />
               </section>
             </div>
 
-            <div className="space-y-4 lg:space-y-6">
-              <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_12px_36px_rgba(15,23,42,0.04)] lg:p-6">
+            <div className="space-y-5 lg:space-y-6">
+              <SectionCard>
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                   <CircleAlert className="h-4 w-4 text-amber-500" />
                   Needs attention
@@ -592,9 +694,9 @@ export default async function AdminPage({
                     ))
                   )}
                 </div>
-              </section>
+              </SectionCard>
 
-              <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_12px_36px_rgba(15,23,42,0.04)] lg:p-6">
+              <SectionCard>
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
@@ -629,7 +731,7 @@ export default async function AdminPage({
                     </div>
                   ))}
                 </div>
-              </section>
+              </SectionCard>
 
               <section className="rounded-[28px] border border-slate-200/80 bg-[#0f172a] p-5 text-white shadow-[0_16px_44px_rgba(15,23,42,0.14)] lg:p-6">
                 <div className="text-[10px] font-semibold tracking-[0.24em] text-white/60">
@@ -644,9 +746,9 @@ export default async function AdminPage({
 
                 <div className="mt-5 space-y-3">
                   {[
-                    { label: "Finalize pending reports", href: "/app/admin/billing" },
-                    { label: "Review auto-generated billing", href: "/app/admin/billing" },
-                    { label: "Follow up on open deficiencies", href: "/app/deficiencies" }
+                    { label: "Finalize pending reports", href: "/app/admin?queue=review" },
+                    { label: "Review auto-generated billing", href: "/app/admin/billing?status=reviewed" },
+                    { label: "Follow up on open deficiencies", href: "/app/deficiencies?status=open" }
                   ].map((item) => (
                     <Link
                       key={item.label}
@@ -675,7 +777,7 @@ export default async function AdminPage({
               </section>
             </div>
           </div>
-        </div>
+        </AppPageShell>
       </div>
     </div>
   );

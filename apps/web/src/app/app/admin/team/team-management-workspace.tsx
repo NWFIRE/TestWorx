@@ -5,6 +5,16 @@ import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { customerAllowanceKeys, internalAllowanceKeys, type TeamAllowanceMap } from "@testworx/lib";
 
 import {
+  AppPageShell,
+  EmptyState as SharedEmptyState,
+  FilterBar,
+  KPIStatCard,
+  PageHeader,
+  SectionCard,
+  StatusBadge as SharedStatusBadge
+} from "../operations-ui";
+
+import {
   createCustomerInviteAction,
   createTeamInviteAction,
   issuePasswordResetAction,
@@ -113,18 +123,12 @@ function formatDateTime(value: string | Date | null | undefined) {
 }
 
 function StatusBadge({ label, tone }: { label: string; tone: "active" | "pending" | "inactive" | "revoked" | "expired" }) {
-  const toneClass =
-    tone === "active"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-      : tone === "pending"
-        ? "border-blue-200 bg-blue-50 text-blue-700"
-        : tone === "revoked"
-          ? "border-rose-200 bg-rose-50 text-rose-700"
-          : tone === "expired"
-            ? "border-amber-200 bg-amber-50 text-amber-700"
-            : "border-slate-200 bg-slate-50 text-slate-600";
-
-  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${toneClass}`}>{label}</span>;
+  return (
+    <SharedStatusBadge
+      label={label}
+      tone={tone === "active" ? "emerald" : tone === "pending" ? "blue" : tone === "revoked" ? "rose" : tone === "expired" ? "amber" : "slate"}
+    />
+  );
 }
 
 function ResultCallout({ error, success, url, urlLabel }: { error?: string | null; success?: string | null; url?: string | null; urlLabel?: string }) {
@@ -166,11 +170,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
 
 function SummaryCard({ label, value, note }: { label: string; value: string | number; note: string }) {
   return (
-    <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-panel">
-      <p className="text-sm uppercase tracking-[0.22em] text-slate-400">{label}</p>
-      <p className="mt-3 text-3xl font-semibold text-ink">{value}</p>
-      <p className="mt-2 text-sm text-slate-500">{note}</p>
-    </div>
+    <KPIStatCard label={label} note={note} value={value} />
   );
 }
 
@@ -425,12 +425,7 @@ function InviteRow({ invite, customerMode = false }: { invite: WorkspaceInvite; 
 }
 
 function EmptyState({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
-      <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-      <p className="mx-auto mt-2 max-w-xl text-sm text-slate-500">{description}</p>
-    </div>
-  );
+  return <SharedEmptyState description={description} title={title} />;
 }
 
 const userLookupCache = new Map<string, UserLookupResponse>();
@@ -702,37 +697,39 @@ export function TeamManagementWorkspace({
   const historicalCustomerInvites = customerInvites.filter((invite) => invite.derivedStatus !== "pending");
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-sm uppercase tracking-[0.28em] text-slate-400">Account workspace</p>
-            <h1 className="mt-2 text-3xl font-semibold text-ink md:text-4xl">Team and customer portal access</h1>
-            <p className="mt-3 text-sm text-slate-500 md:text-base">Invite internal users, grant portal access, adjust allowances, and handle account resets from one polished operations workspace.</p>
-          </div>
-          <form className="grid gap-3 sm:grid-cols-3" method="get">
-            <input className="rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slateblue" defaultValue={filters.query} name="q" placeholder="Search people, email, customer" />
-            <select className="rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slateblue" defaultValue={filters.status} name="status">
-              <option value="all">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="pending">Pending invites</option>
-              <option value="expired">Expired invites</option>
-              <option value="revoked">Revoked invites</option>
-            </select>
-            <select className="rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slateblue" defaultValue={filters.role} name="role">
-              <option value="all">All roles</option>
-              <option value="tenant_admin">Tenant admin</option>
-              <option value="office_admin">Office admin</option>
-              <option value="technician">Technician</option>
-              <option value="customer_user">Customer portal</option>
-            </select>
-            <button className="sm:col-span-3 inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-5 py-3 text-sm font-semibold text-white" type="submit">
-              Apply filters
-            </button>
-          </form>
-        </div>
-      </section>
+    <AppPageShell>
+      <PageHeader
+        description="Invite internal users, grant portal access, adjust allowances, and handle account resets from one polished operations workspace."
+        eyebrow="Account workspace"
+        title="Team and customer portal access"
+      />
+
+      <FilterBar
+        description="Use lightweight workspace filters while keeping internal team and customer portal access clearly separated."
+        title="Filters"
+      >
+        <form className="grid w-full gap-3 lg:grid-cols-[1.5fr_1fr_1fr_auto]" method="get">
+          <input className="rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slateblue" defaultValue={filters.query} name="q" placeholder="Search people, email, customer" />
+          <select className="rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slateblue" defaultValue={filters.status} name="status">
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="pending">Pending invites</option>
+            <option value="expired">Expired invites</option>
+            <option value="revoked">Revoked invites</option>
+          </select>
+          <select className="rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slateblue" defaultValue={filters.role} name="role">
+            <option value="all">All roles</option>
+            <option value="tenant_admin">Tenant admin</option>
+            <option value="office_admin">Office admin</option>
+            <option value="technician">Technician</option>
+            <option value="customer_user">Customer portal</option>
+          </select>
+          <button className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-5 py-3 text-sm font-semibold text-white" type="submit">
+            Apply filters
+          </button>
+        </form>
+      </FilterBar>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard label="Internal team" note="Active and inactive staff accounts in this workspace." value={summary.teamMembers} />
@@ -763,11 +760,11 @@ export function TeamManagementWorkspace({
             statusFilter={filters.status === "active" || filters.status === "inactive" ? filters.status : "all"}
             title="Internal members"
           />
-          <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
+          <SectionCard>
             <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Internal invite queue</p>
             <h2 className="mt-2 text-2xl font-semibold text-ink">Pending team invites</h2>
             <p className="mt-2 text-sm text-slate-500">Pending internal invites stay visible here even when the member lookup is filtered to active or inactive users.</p>
-          </div>
+          </SectionCard>
           {pendingTeamInvites.length > 0 ? (
             <>
               {pendingTeamInvites.map((invite) => <InviteRow key={invite.id} invite={invite} />)}
@@ -780,10 +777,10 @@ export function TeamManagementWorkspace({
           )}
           {historicalTeamInvites.length > 0 ? (
             <>
-              <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
+              <SectionCard>
                 <p className="text-sm uppercase tracking-[0.24em] text-slate-400">History</p>
                 <h2 className="mt-2 text-2xl font-semibold text-ink">Internal invite history</h2>
-              </div>
+              </SectionCard>
               {historicalTeamInvites.map((invite) => <InviteRow key={invite.id} invite={invite} />)}
             </>
           ) : null}
@@ -796,11 +793,11 @@ export function TeamManagementWorkspace({
             statusFilter={filters.status === "active" || filters.status === "inactive" ? filters.status : "all"}
             title="Portal access"
           />
-          <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
+          <SectionCard>
             <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Customer invite queue</p>
             <h2 className="mt-2 text-2xl font-semibold text-ink">Pending portal invites</h2>
             <p className="mt-2 text-sm text-slate-500">Customer portal invites stay visible here with company context while the portal user lookup remains async and lightweight.</p>
-          </div>
+          </SectionCard>
           {pendingCustomerInvites.length > 0 ? (
             <>
               {pendingCustomerInvites.map((invite) => <InviteRow key={invite.id} customerMode invite={invite} />)}
@@ -813,15 +810,15 @@ export function TeamManagementWorkspace({
           )}
           {historicalCustomerInvites.length > 0 ? (
             <>
-              <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
+              <SectionCard>
                 <p className="text-sm uppercase tracking-[0.24em] text-slate-400">History</p>
                 <h2 className="mt-2 text-2xl font-semibold text-ink">Portal invite history</h2>
-              </div>
+              </SectionCard>
               {historicalCustomerInvites.map((invite) => <InviteRow key={invite.id} customerMode invite={invite} />)}
             </>
           ) : null}
         </div>
       </section>
-    </div>
+    </AppPageShell>
   );
 }

@@ -5,15 +5,139 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getAdminBillingSummaries } from "@testworx/lib";
 
+import {
+  AppPageShell,
+  EmptyState,
+  FilterBar,
+  FilterChipLink,
+  KPIStatCard,
+  PageHeader,
+  SectionCard,
+  StatusBadge
+} from "../operations-ui";
+
 type AdminBillingSummary = Awaited<ReturnType<typeof getAdminBillingSummaries>>[number];
 
-const statusClasses: Record<string, string> = {
-  draft: "bg-amber-50 text-amber-700",
-  reviewed: "bg-blue-50 text-blue-700",
-  invoiced: "bg-emerald-50 text-emerald-700"
-};
+const statusTones = {
+  draft: "amber",
+  reviewed: "blue",
+  invoiced: "emerald"
+} as const;
 
-export default async function AdminBillingPage() {
+const statusOptions = [
+  { value: "all", label: "All summaries" },
+  { value: "draft", label: "Draft billing" },
+  { value: "reviewed", label: "Ready for review" },
+  { value: "invoiced", label: "Invoiced" }
+] as const;
+
+function buildBillingHref(status?: string) {
+  return status && status !== "all" ? `/app/admin/billing?status=${status}` : "/app/admin/billing";
+}
+
+function SummaryQueueSection({
+  title,
+  description,
+  emptyTitle,
+  emptyText,
+  summaries,
+  ctaLabel
+}: {
+  title: string;
+  description: string;
+  emptyTitle: string;
+  emptyText: string;
+  summaries: AdminBillingSummary[];
+  ctaLabel: string;
+}) {
+  return (
+    <SectionCard>
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">{title}</h2>
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
+        </div>
+        <p className="text-sm text-slate-500">
+          {summaries.length} {summaries.length === 1 ? "summary" : "summaries"}
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        {summaries.length === 0 ? (
+          <EmptyState description={emptyText} title={emptyTitle} />
+        ) : (
+          summaries.map((summary) => (
+            <div
+              key={summary.id}
+              className="rounded-[24px] border border-slate-200/80 bg-slate-50/70 p-5 transition hover:border-slate-300 hover:bg-white"
+            >
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-lg font-semibold text-slate-950">{summary.customerName}</p>
+                    <StatusBadge
+                      label={summary.status}
+                      tone={statusTones[summary.status as keyof typeof statusTones] ?? "slate"}
+                    />
+                  </div>
+                  <p className="text-sm text-slate-500">
+                    {summary.siteName} • {format(summary.inspectionDate, "MMM d, yyyy h:mm a")}
+                  </p>
+                  <p className="text-sm text-slate-500">
+                    Reports:{" "}
+                    {summary.reportTypes.length > 0
+                      ? summary.reportTypes
+                          .map((type: AdminBillingSummary["reportTypes"][number]) =>
+                            type.replaceAll("_", " ")
+                          )
+                          .join(", ")
+                      : "Inspection-level billing only"}
+                  </p>
+                  <div className="grid gap-3 pt-1 md:grid-cols-4">
+                    <p className="text-sm text-slate-600">
+                      Labor hours:{" "}
+                      <span className="font-semibold text-slate-950">
+                        {summary.metrics.laborHoursTotal}
+                      </span>
+                    </p>
+                    <p className="text-sm text-slate-600">
+                      Materials:{" "}
+                      <span className="font-semibold text-slate-950">
+                        {summary.metrics.materialItemCount}
+                      </span>
+                    </p>
+                    <p className="text-sm text-slate-600">
+                      Fees:{" "}
+                      <span className="font-semibold text-slate-950">{summary.metrics.feeCount}</span>
+                    </p>
+                    <p className="text-sm text-slate-600">
+                      Subtotal:{" "}
+                      <span className="font-semibold text-slate-950">
+                        {summary.subtotal > 0 ? `$${summary.subtotal.toFixed(2)}` : "Pending pricing"}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  className="inline-flex rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                  href={`/app/admin/billing/${summary.inspectionId}`}
+                >
+                  {ctaLabel}
+                </Link>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
+export default async function AdminBillingPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ status?: string }>;
+}) {
   const session = await auth();
   if (!session?.user?.tenantId) {
     redirect("/login");
@@ -22,6 +146,11 @@ export default async function AdminBillingPage() {
     redirect("/app");
   }
 
+  const params = searchParams ? await searchParams : {};
+  const selectedStatus = typeof params.status === "string" && statusOptions.some((option) => option.value === params.status)
+    ? params.status
+    : "all";
+
   const summaries = await getAdminBillingSummaries({
     userId: session.user.id,
     role: session.user.role,
@@ -29,97 +158,89 @@ export default async function AdminBillingPage() {
   });
   const openSummaries = summaries.filter((summary: AdminBillingSummary) => summary.status !== "invoiced");
   const invoicedSummaries = summaries.filter((summary: AdminBillingSummary) => summary.status === "invoiced");
+  const filteredSummaries = selectedStatus === "all"
+    ? summaries
+    : summaries.filter((summary) => summary.status === selectedStatus);
 
   return (
-    <section className="space-y-6">
-      <div className="rounded-[2rem] bg-white p-6 shadow-panel">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing review</p>
-            <h2 className="mt-2 text-3xl font-semibold text-ink">Inspection billing summaries</h2>
-            <p className="mt-3 max-w-3xl text-slate-500">Review visit-level labor, materials, services, and fees extracted from finalized inspection reports before invoicing.</p>
-          </div>
-          <Link className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href="/app/admin">
+    <AppPageShell>
+      <PageHeader
+        actions={
+          <Link
+            className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            href="/app/admin"
+          >
             Back to scheduling
           </Link>
-        </div>
-      </div>
+        }
+        description="Review visit-level labor, materials, services, and fees extracted from finalized inspection reports before invoicing."
+        eyebrow="Billing review"
+        title="Inspection billing summaries"
+      />
 
-      <div className="rounded-[2rem] bg-white p-6 shadow-panel">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Review queue</p>
-            <h3 className="mt-1 text-2xl font-semibold text-ink">Ready for billing review</h3>
-          </div>
-          <p className="text-sm text-slate-500">{openSummaries.length} {openSummaries.length === 1 ? "summary" : "summaries"}</p>
-        </div>
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <KPIStatCard
+          href={buildBillingHref("draft")}
+          label="Draft billing"
+          note="Summaries still missing final pricing or review decisions."
+          tone="amber"
+          value={summaries.filter((summary) => summary.status === "draft").length}
+        />
+        <KPIStatCard
+          href={buildBillingHref("reviewed")}
+          label="Ready to invoice"
+          note="Completed billing summaries ready for invoice follow-through."
+          tone="blue"
+          value={summaries.filter((summary) => summary.status === "reviewed").length}
+        />
+        <KPIStatCard
+          label="Invoiced"
+          note="Archived summaries already moved through invoicing."
+          tone="emerald"
+          value={invoicedSummaries.length}
+        />
+        <KPIStatCard
+          label="Open queue"
+          note="All summaries that still need billing work or confirmation."
+          tone="slate"
+          value={openSummaries.length}
+        />
+      </section>
 
-        <div className="space-y-4">
-          {openSummaries.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No billing summaries are ready yet. Finalize an inspection report with billable mappings to populate this queue.</p>
-          ) : openSummaries.map((summary: AdminBillingSummary) => (
-            <div key={summary.id} className="rounded-[1.5rem] border border-slate-200 p-5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-lg font-semibold text-ink">{summary.customerName}</p>
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[summary.status] ?? "bg-slate-100 text-slate-700"}`}>{summary.status}</span>
-                  </div>
-                  <p className="text-sm text-slate-500">{summary.siteName} | {format(summary.inspectionDate, "MMM d, yyyy h:mm a")}</p>
-                  <p className="text-sm text-slate-500">Reports: {summary.reportTypes.length > 0 ? summary.reportTypes.map((type: AdminBillingSummary["reportTypes"][number]) => type.replaceAll("_", " ")).join(", ") : "Inspection-level billing only"}</p>
-                  <div className="grid gap-3 pt-1 md:grid-cols-4">
-                    <p className="text-sm text-slate-600">Labor hours: <span className="font-semibold text-ink">{summary.metrics.laborHoursTotal}</span></p>
-                    <p className="text-sm text-slate-600">Materials: <span className="font-semibold text-ink">{summary.metrics.materialItemCount}</span></p>
-                    <p className="text-sm text-slate-600">Fees: <span className="font-semibold text-ink">{summary.metrics.feeCount}</span></p>
-                    <p className="text-sm text-slate-600">Subtotal: <span className="font-semibold text-ink">{summary.subtotal > 0 ? `$${summary.subtotal.toFixed(2)}` : "Pending pricing"}</span></p>
-                  </div>
-                </div>
-                <Link className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={`/app/admin/billing/${summary.inspectionId}`}>
-                  Review billing
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <FilterBar
+        description="Move between draft, ready, and invoiced billing queues without losing context."
+        title="Queue filters"
+      >
+        {statusOptions.map((option) => (
+          <FilterChipLink
+            active={selectedStatus === option.value}
+            href={buildBillingHref(option.value)}
+            key={option.value}
+            label={option.label}
+            tone="emerald"
+          />
+        ))}
+      </FilterBar>
 
-      <div className="rounded-[2rem] bg-white p-6 shadow-panel">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Invoiced archive</p>
-            <h3 className="mt-1 text-2xl font-semibold text-ink">Already invoiced</h3>
-          </div>
-          <p className="text-sm text-slate-500">{invoicedSummaries.length} {invoicedSummaries.length === 1 ? "summary" : "summaries"}</p>
-        </div>
+      <SummaryQueueSection
+        ctaLabel={selectedStatus === "invoiced" ? "View invoice detail" : "Review billing"}
+        description="Operational billing work that still needs review, pricing, or invoice completion."
+        emptyText="No billing summaries match the current queue filter."
+        emptyTitle="No billing summaries in this queue"
+        summaries={filteredSummaries}
+        title={selectedStatus === "all" ? "Billing queue" : `${selectedStatus.replaceAll("_", " ")} queue`}
+      />
 
-        <div className="space-y-4">
-          {invoicedSummaries.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No inspections have been marked invoiced yet.</p>
-          ) : invoicedSummaries.map((summary: AdminBillingSummary) => (
-            <div key={summary.id} className="rounded-[1.5rem] border border-slate-200 p-5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-lg font-semibold text-ink">{summary.customerName}</p>
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[summary.status] ?? "bg-slate-100 text-slate-700"}`}>{summary.status}</span>
-                  </div>
-                  <p className="text-sm text-slate-500">{summary.siteName} | {format(summary.inspectionDate, "MMM d, yyyy h:mm a")}</p>
-                  <p className="text-sm text-slate-500">Reports: {summary.reportTypes.length > 0 ? summary.reportTypes.map((type: AdminBillingSummary["reportTypes"][number]) => type.replaceAll("_", " ")).join(", ") : "Inspection-level billing only"}</p>
-                  <div className="grid gap-3 pt-1 md:grid-cols-4">
-                    <p className="text-sm text-slate-600">Labor hours: <span className="font-semibold text-ink">{summary.metrics.laborHoursTotal}</span></p>
-                    <p className="text-sm text-slate-600">Materials: <span className="font-semibold text-ink">{summary.metrics.materialItemCount}</span></p>
-                    <p className="text-sm text-slate-600">Fees: <span className="font-semibold text-ink">{summary.metrics.feeCount}</span></p>
-                    <p className="text-sm text-slate-600">Subtotal: <span className="font-semibold text-ink">{summary.subtotal > 0 ? `$${summary.subtotal.toFixed(2)}` : "Pending pricing"}</span></p>
-                  </div>
-                </div>
-                <Link className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={`/app/admin/billing/${summary.inspectionId}`}>
-                  View invoice detail
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
+      {selectedStatus === "all" ? (
+        <SummaryQueueSection
+          ctaLabel="View invoice detail"
+          description="Completed billing summaries already marked invoiced."
+          emptyText="No inspections have been marked invoiced yet."
+          emptyTitle="No invoiced summaries yet"
+          summaries={invoicedSummaries}
+          title="Invoiced archive"
+        />
+      ) : null}
+    </AppPageShell>
   );
 }
