@@ -8,6 +8,7 @@ import {
   canManageBilling,
   getPaginatedTenantCustomerCompanySettings,
   getPaginatedTenantQuickBooksCatalogSettings,
+  getQuickBooksItemMappingSettings,
   getPaginatedTenantServiceFeeSettings,
   getTenantBillingSettings,
   getTenantBrandingSettings,
@@ -22,6 +23,8 @@ import {
   disconnectQuickBooksAction,
   importQuickBooksCustomersAction,
   importQuickBooksCatalogItemsAction,
+  saveQuickBooksItemMappingAction,
+  clearQuickBooksItemMappingAction,
   syncQuickBooksCustomersActionState,
   openBillingPortalAction,
   startQuickBooksConnectAction,
@@ -34,6 +37,7 @@ import {
 } from "./actions";
 import { CustomerManagementCard } from "./customer-management-card";
 import { QuickBooksCatalogManagementCard } from "./quickbooks-catalog-management-card";
+import { QuickBooksItemMappingCard } from "./quickbooks-item-mapping-card";
 import { ServiceFeeSettingsCard } from "./service-fee-settings-card";
 import { QuickBooksSettingsCard } from "./quickbooks-settings-card";
 import { TenantBrandingForm } from "./tenant-branding-form";
@@ -267,6 +271,45 @@ async function ServiceFeesSection({
   );
 }
 
+async function QuickBooksMappingsSection({
+  actor,
+  notice
+}: {
+  actor: { userId: string; role: string; tenantId: string };
+  notice?: string | null;
+}) {
+  let data: Awaited<ReturnType<typeof getQuickBooksItemMappingSettings>>;
+
+  try {
+    data = await getQuickBooksItemMappingSettings(actor);
+  } catch (error) {
+    return (
+      <LazySectionCard
+        actionHref={buildSettingsHref({ mappingsOpen: "1" }, { mappingsOpen: 1 })}
+        actionLabel="Try again"
+        description={error instanceof Error ? error.message : "Unable to load QuickBooks item mappings right now."}
+        eyebrow="QuickBooks item mappings"
+        title="Map billable codes to QuickBooks items"
+        tone="error"
+      />
+    );
+  }
+
+  return (
+    <QuickBooksItemMappingCard
+      clearMappingAction={clearQuickBooksItemMappingAction}
+      configured={data.configured}
+      connected={data.connected}
+      modeMismatch={data.modeMismatch}
+      notice={notice}
+      reconnectRequired={data.reconnectRequired}
+      resyncAction={importQuickBooksCatalogItemsAction}
+      rows={data.rows}
+      saveMappingAction={saveQuickBooksItemMappingAction}
+    />
+  );
+}
+
 export default async function TenantSettingsPage({ searchParams }: { searchParams?: Promise<SettingsSearchParams> }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -314,6 +357,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   const customersOpen = isSectionOpen(params, "customersOpen", customerNotice);
   const catalogOpen = isSectionOpen(params, "catalogOpen", catalogNotice);
   const feesOpen = isSectionOpen(params, "feesOpen");
+  const mappingsOpen = isSectionOpen(params, "mappingsOpen", quickBooksNotice);
 
   return (
     <section className="space-y-6">
@@ -404,6 +448,31 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
               description="Load the QuickBooks catalog only when needed, with paginated results, filters, and independent loading and error states."
               eyebrow="QuickBooks products and services"
               title="Create and edit billing catalog items"
+            />
+          )}
+          {mappingsOpen ? (
+            <Suspense
+              key="quickbooks-mappings"
+              fallback={
+                <LazySectionCard
+                  actionHref={buildSettingsHref(params, { mappingsOpen: null })}
+                  actionLabel="Hide section"
+                  description="Loading stored QuickBooks mappings and suggested matches..."
+                  eyebrow="QuickBooks item mappings"
+                  title="Map billable codes to QuickBooks items"
+                  tone="loading"
+                />
+              }
+            >
+              <QuickBooksMappingsSection actor={actor} notice={quickBooksNotice} />
+            </Suspense>
+          ) : (
+            <LazySectionCard
+              actionHref={buildSettingsHref(params, { mappingsOpen: 1 })}
+              actionLabel="Open item mappings"
+              description="Review stored QuickBooks item ids for each internal billing code, fix inactive references, and confirm suggested matches without loading the full section until you need it."
+              eyebrow="QuickBooks item mappings"
+              title="Map billable codes to QuickBooks items"
             />
           )}
           {feesOpen ? (

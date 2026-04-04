@@ -103,6 +103,40 @@ type QuickBooksCatalogListItem = {
   importedAt: Date;
 };
 
+type QuickBooksItemSuggestion = {
+  qbItemId: string;
+  qbItemName: string;
+  score: number;
+};
+
+type ResolvedQbItem =
+  | {
+      status: "mapped";
+      qbItemId: string;
+      qbItemName: string;
+    }
+  | {
+      status: "needs_mapping";
+      suggestions: QuickBooksItemSuggestion[];
+      reason?: "missing_mapping" | "missing_item" | "inactive_item";
+    };
+
+type QuickBooksItemMappingStatus = "mapped" | "unmapped" | "inactive_in_quickbooks";
+
+type QuickBooksItemMappingRow = {
+  internalCode: string;
+  internalName: string;
+  currentMapping: {
+    qbItemId: string;
+    qbItemName: string;
+    qbItemType: string | null;
+    matchSource: string;
+    qbActive: boolean;
+  } | null;
+  status: QuickBooksItemMappingStatus;
+  suggestions: QuickBooksItemSuggestion[];
+};
+
 type QuickBooksCustomerRecord = {
   quickbooksCustomerId: string;
   displayName: string;
@@ -443,6 +477,57 @@ function sanitizeItemName(value: string) {
 
 function sanitizeCatalogMatchValue(value: string | null | undefined) {
   return value ? sanitizeItemName(value) : null;
+}
+
+export function normalizeQbName(input: string) {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/&/g, "and")
+    .replace(/\b(service|services|inspection|inspections|system|systems)\b/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function scoreQbItemMatch(term: string, candidate: string) {
+  const a = normalizeQbName(term);
+  const b = normalizeQbName(candidate);
+
+  if (!a || !b) {
+    return 0;
+  }
+
+  if (a === b) {
+    return 100;
+  }
+
+  if (b.startsWith(a) || a.startsWith(b)) {
+    return 90;
+  }
+
+  const aTokens = new Set(a.split(" "));
+  const bTokens = new Set(b.split(" "));
+  const overlap = [...aTokens].filter((token) => bTokens.has(token)).length;
+  return Math.round((overlap / Math.max(aTokens.size, bTokens.size)) * 70);
+}
+
+function getQuickBooksIntegrationId(connection: Pick<QuickBooksTenantConnection, "quickbooksRealmId">) {
+  if (!connection.quickbooksRealmId) {
+    throw new Error("QuickBooks integration is not connected for this tenant.");
+  }
+
+  return connection.quickbooksRealmId;
+}
+
+function getQuickBooksRuleLabelForBillingCode(billingCode: string) {
+  const ruleKeys: Record<string, string> = {
+    "KS-INSPECTION": "Standard Hood Inspection",
+    "KS-INSPECTION-GUARDIAN/DENLAR": "Guardian Denlar Hood Inspection",
+    "KS-INSPECTION-CAPTIVEAIRE": "CaptiveAire Hood Inspection"
+  };
+
+  return ruleKeys[billingCode] ?? null;
 }
 
 async function exchangeQuickBooksToken(grant: Record<string, string>) {
@@ -935,6 +1020,7 @@ function normalizeQuickBooksCatalogItem(item: unknown) {
     sku: readQuickBooksStringField(item, "Sku"),
     itemType,
     active: readQuickBooksBooleanField(item, "Active") ?? true,
+    syncToken: readQuickBooksStringField(item, "SyncToken"),
     unitPrice: readQuickBooksNumberField(item, "UnitPrice"),
     incomeAccountId: readQuickBooksStringField(incomeAccountRef, "value"),
     incomeAccountName: readQuickBooksStringField(incomeAccountRef, "name"),
@@ -952,6 +1038,7 @@ async function fetchQuickBooksCatalogItemById(connection: QuickBooksTenantConnec
 
 async function upsertTenantQuickBooksCatalogItem(input: {
   tenantId: string;
+  integrationId: string;
   item: unknown;
 }) {
   const normalizedItem = normalizeQuickBooksCatalogItem(input.item);
@@ -973,6 +1060,37 @@ async function upsertTenantQuickBooksCatalogItem(input: {
     importedAt: new Date()
   };
 
+  await prisma.quickBooksItemCache.upsert({
+    where: {
+      tenantId_integrationId_qbItemId: {
+        tenantId: input.tenantId,
+        integrationId: input.integrationId,
+        qbItemId: normalizedItem.quickbooksItemId
+      }
+    },
+    update: {
+      qbItemName: normalizedItem.name,
+      normalizedName: normalizeQbName(normalizedItem.name),
+      qbItemType: normalizedItem.itemType,
+      qbActive: normalizedItem.active,
+      qbSyncToken: normalizedItem.syncToken ?? null,
+      rawJson: normalizedItem.rawJson,
+      lastSyncedAt: new Date()
+    },
+    create: {
+      tenantId: input.tenantId,
+      integrationId: input.integrationId,
+      qbItemId: normalizedItem.quickbooksItemId,
+      qbItemName: normalizedItem.name,
+      normalizedName: normalizeQbName(normalizedItem.name),
+      qbItemType: normalizedItem.itemType,
+      qbActive: normalizedItem.active,
+      qbSyncToken: normalizedItem.syncToken ?? null,
+      rawJson: normalizedItem.rawJson,
+      lastSyncedAt: new Date()
+    }
+  });
+
   const existing = await prisma.quickBooksCatalogItem.findFirst({
     where: {
       tenantId: input.tenantId,
@@ -991,6 +1109,249 @@ async function upsertTenantQuickBooksCatalogItem(input: {
   return prisma.quickBooksCatalogItem.create({
     data
   });
+}
+
+async function findQuickBooksItemSuggestions(input: {
+  tenantId: string;
+  integrationId: string;
+  term: string;
+  limit?: number;
+}) {
+  const candidates = await prisma.quickBooksItemCache.findMany({
+    where: {
+      tenantId: input.tenantId,
+      integrationId: input.integrationId,
+      qbActive: true
+    },
+    select: {
+      qbItemId: true,
+      qbItemName: true
+    },
+    take: 500
+  });
+
+  return candidates
+    .map((candidate) => ({
+      qbItemId: candidate.qbItemId,
+      qbItemName: candidate.qbItemName,
+      score: scoreQbItemMatch(input.term, candidate.qbItemName)
+    }))
+    .filter((candidate) => candidate.score >= 60)
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+
+      return left.qbItemName.localeCompare(right.qbItemName);
+    })
+    .slice(0, input.limit ?? 10);
+}
+
+async function saveQuickBooksItemMapping(input: {
+  tenantId: string;
+  integrationId: string;
+  internalCode: string;
+  internalName: string;
+  qbItemId: string;
+  matchSource?: "manual" | "auto" | "rule";
+}) {
+  const cached = await prisma.quickBooksItemCache.findUnique({
+    where: {
+      tenantId_integrationId_qbItemId: {
+        tenantId: input.tenantId,
+        integrationId: input.integrationId,
+        qbItemId: input.qbItemId
+      }
+    }
+  });
+
+  if (!cached) {
+    throw new Error("QuickBooks item not found in cache.");
+  }
+
+  return prisma.quickBooksItemMap.upsert({
+    where: {
+      tenantId_integrationId_internalCode: {
+        tenantId: input.tenantId,
+        integrationId: input.integrationId,
+        internalCode: input.internalCode
+      }
+    },
+    update: {
+      internalName: input.internalName,
+      qbItemId: cached.qbItemId,
+      qbItemName: cached.qbItemName,
+      qbItemType: cached.qbItemType,
+      qbSyncToken: cached.qbSyncToken,
+      qbActive: cached.qbActive,
+      matchSource: input.matchSource ?? "manual"
+    },
+    create: {
+      tenantId: input.tenantId,
+      integrationId: input.integrationId,
+      internalCode: input.internalCode,
+      internalName: input.internalName,
+      qbItemId: cached.qbItemId,
+      qbItemName: cached.qbItemName,
+      qbItemType: cached.qbItemType,
+      qbSyncToken: cached.qbSyncToken,
+      qbActive: cached.qbActive,
+      matchSource: input.matchSource ?? "manual"
+    }
+  });
+}
+
+async function clearQuickBooksItemMapping(input: {
+  tenantId: string;
+  integrationId: string;
+  internalCode: string;
+}) {
+  await prisma.quickBooksItemMap.deleteMany({
+    where: {
+      tenantId: input.tenantId,
+      integrationId: input.integrationId,
+      internalCode: input.internalCode
+    }
+  });
+}
+
+export async function validateMappedQbItem(input: {
+  tenantId: string;
+  integrationId: string;
+  internalCode: string;
+}) {
+  const mapping = await prisma.quickBooksItemMap.findUnique({
+    where: {
+      tenantId_integrationId_internalCode: {
+        tenantId: input.tenantId,
+        integrationId: input.integrationId,
+        internalCode: input.internalCode
+      }
+    }
+  });
+
+  if (!mapping) {
+    return { ok: false, reason: "missing_mapping" as const };
+  }
+
+  const cached = await prisma.quickBooksItemCache.findUnique({
+    where: {
+      tenantId_integrationId_qbItemId: {
+        tenantId: input.tenantId,
+        integrationId: input.integrationId,
+        qbItemId: mapping.qbItemId
+      }
+    }
+  });
+
+  if (!cached) {
+    return { ok: false, reason: "missing_item" as const };
+  }
+
+  if (!cached.qbActive) {
+    return { ok: false, reason: "inactive_item" as const };
+  }
+
+  return { ok: true as const, item: cached };
+}
+
+async function tryResolveRuleBasedQuickBooksMapping(input: {
+  tenantId: string;
+  integrationId: string;
+  billingCode: string;
+  displayName: string;
+}) {
+  const ruleLabel = getQuickBooksRuleLabelForBillingCode(input.billingCode);
+  if (!ruleLabel) {
+    return null;
+  }
+
+  const exactMatch = await prisma.quickBooksItemCache.findFirst({
+    where: {
+      tenantId: input.tenantId,
+      integrationId: input.integrationId,
+      qbActive: true,
+      normalizedName: normalizeQbName(ruleLabel)
+    }
+  });
+
+  if (!exactMatch) {
+    return null;
+  }
+
+  await saveQuickBooksItemMapping({
+    tenantId: input.tenantId,
+    integrationId: input.integrationId,
+    internalCode: input.billingCode,
+    internalName: input.displayName,
+    qbItemId: exactMatch.qbItemId,
+    matchSource: "rule"
+  });
+
+  return {
+    status: "mapped" as const,
+    qbItemId: exactMatch.qbItemId,
+    qbItemName: exactMatch.qbItemName
+  };
+}
+
+export async function resolveQuickBooksItemForBilling(input: {
+  tenantId: string;
+  integrationId: string;
+  billingCode: string;
+  displayName: string;
+}): Promise<ResolvedQbItem> {
+  const existingMap = await prisma.quickBooksItemMap.findUnique({
+    where: {
+      tenantId_integrationId_internalCode: {
+        tenantId: input.tenantId,
+        integrationId: input.integrationId,
+        internalCode: input.billingCode
+      }
+    }
+  });
+
+  if (existingMap) {
+    const validation = await validateMappedQbItem({
+      tenantId: input.tenantId,
+      integrationId: input.integrationId,
+      internalCode: input.billingCode
+    });
+
+    if (validation.ok && "item" in validation) {
+      const validatedItem = validation.item!;
+      return {
+        status: "mapped",
+        qbItemId: validatedItem.qbItemId,
+        qbItemName: validatedItem.qbItemName
+      };
+    }
+
+    return {
+      status: "needs_mapping",
+      reason: validation.reason,
+      suggestions: await findQuickBooksItemSuggestions({
+        tenantId: input.tenantId,
+        integrationId: input.integrationId,
+        term: input.displayName
+      })
+    };
+  }
+
+  const ruleResolved = await tryResolveRuleBasedQuickBooksMapping(input);
+  if (ruleResolved) {
+    return ruleResolved;
+  }
+
+  return {
+    status: "needs_mapping",
+    reason: "missing_mapping",
+    suggestions: await findQuickBooksItemSuggestions({
+      tenantId: input.tenantId,
+      integrationId: input.integrationId,
+      term: input.displayName
+    })
+  };
 }
 
 async function fetchQuickBooksCompanyName(connection: QuickBooksTenantConnection) {
@@ -1761,6 +2122,29 @@ function requirePrice(item: QuickBooksBillingSummary["items"][number]) {
   return item.unitPrice;
 }
 
+function toQuickBooksInvoiceLine(input: {
+  amount: number;
+  description: string;
+  quantity?: number;
+  unitPrice: number;
+  qbItemId: string;
+  qbItemName?: string;
+}) {
+  return {
+    Amount: input.amount,
+    Description: input.description,
+    DetailType: "SalesItemLineDetail",
+    SalesItemLineDetail: {
+      Qty: input.quantity ?? 1,
+      UnitPrice: input.unitPrice,
+      ItemRef: {
+        value: input.qbItemId,
+        ...(input.qbItemName ? { name: input.qbItemName } : {})
+      }
+    }
+  };
+}
+
 export async function getTenantQuickBooksSettings(actor: ActorContext, filters?: QuickBooksCatalogFilterInput) {
   const [connection, catalog] = await Promise.all([
     getTenantQuickBooksConnectionSettings(actor),
@@ -1945,6 +2329,185 @@ export async function getPaginatedTenantQuickBooksCatalogSettings(actor: ActorCo
   };
 }
 
+export async function getQuickBooksItemMappingSettings(actor: ActorContext) {
+  const parsedActor = parseActor(actor);
+  if (!canManageQuickBooksSync(parsedActor.role)) {
+    throw new Error("Only administrators can access QuickBooks item mappings.");
+  }
+
+  const tenant = await getTenantQuickBooksConnection(parsedActor.tenantId as string);
+  const validatedConnection = await validateQuickBooksConnectionStatus(tenant);
+  const integrationId = tenant.quickbooksRealmId;
+
+  const summaries = await prisma.inspectionBillingSummary.findMany({
+    where: { tenantId: parsedActor.tenantId as string },
+    select: { items: true }
+  });
+
+  const latestByCode = new Map<string, { internalCode: string; internalName: string }>();
+  for (const summary of summaries) {
+    const items = Array.isArray(summary.items) ? summary.items as QuickBooksBillingSummary["items"] : [];
+    for (const item of items) {
+      const code = item.code?.trim();
+      if (!code || latestByCode.has(code)) {
+        continue;
+      }
+
+      latestByCode.set(code, {
+        internalCode: code,
+        internalName: item.description.trim()
+      });
+    }
+  }
+
+  const [mappings, cacheRows] = integrationId
+    ? await Promise.all([
+        prisma.quickBooksItemMap.findMany({
+          where: {
+            tenantId: parsedActor.tenantId as string,
+            integrationId
+          }
+        }),
+        prisma.quickBooksItemCache.findMany({
+          where: {
+            tenantId: parsedActor.tenantId as string,
+            integrationId
+          },
+          select: {
+            qbItemId: true,
+            qbItemName: true,
+            normalizedName: true,
+            qbItemType: true,
+            qbActive: true,
+            qbSyncToken: true
+          }
+        })
+      ])
+    : [[], []];
+
+  const mappingByCode = new Map(mappings.map((mapping) => [mapping.internalCode, mapping] as const));
+  const cacheByItemId = new Map(cacheRows.map((row) => [row.qbItemId, row] as const));
+
+  const rows = await Promise.all(
+    [...latestByCode.values()]
+      .sort((left, right) => left.internalName.localeCompare(right.internalName))
+      .map(async (entry) => {
+        const mapping = mappingByCode.get(entry.internalCode) ?? null;
+        const cached = mapping ? cacheByItemId.get(mapping.qbItemId) ?? null : null;
+        const status: QuickBooksItemMappingStatus = !mapping
+          ? "unmapped"
+          : cached && !cached.qbActive
+            ? "inactive_in_quickbooks"
+            : "mapped";
+
+        const suggestions = integrationId
+          ? await findQuickBooksItemSuggestions({
+              tenantId: parsedActor.tenantId as string,
+              integrationId,
+              term: entry.internalName,
+              limit: 5
+            })
+          : [];
+
+        return {
+          internalCode: entry.internalCode,
+          internalName: entry.internalName,
+          currentMapping: mapping
+            ? {
+                qbItemId: mapping.qbItemId,
+                qbItemName: mapping.qbItemName,
+                qbItemType: mapping.qbItemType,
+                matchSource: mapping.matchSource,
+                qbActive: cached?.qbActive ?? mapping.qbActive
+              }
+            : null,
+          status,
+          suggestions
+        } satisfies QuickBooksItemMappingRow;
+      })
+  );
+
+  return {
+    configured: getQuickBooksConfiguration().enabled,
+    connected: validatedConnection.status.connected,
+    reconnectRequired: validatedConnection.status.reconnectRequired,
+    modeMismatch: validatedConnection.status.modeMismatch,
+    integrationId,
+    rows
+  };
+}
+
+export async function saveQuickBooksItemMappingForCode(actor: ActorContext, input: {
+  internalCode: string;
+  internalName: string;
+  qbItemId: string;
+}) {
+  const parsedActor = parseActor(actor);
+  if (!canManageQuickBooksSync(parsedActor.role)) {
+    throw new Error("Only administrators can manage QuickBooks item mappings.");
+  }
+
+  const tenant = await getTenantQuickBooksConnection(parsedActor.tenantId as string);
+  assertQuickBooksConnectionUsable(tenant, "saving QuickBooks item mappings");
+  const integrationId = getQuickBooksIntegrationId(tenant);
+
+  const mapping = await saveQuickBooksItemMapping({
+    tenantId: parsedActor.tenantId as string,
+    integrationId,
+    internalCode: input.internalCode.trim(),
+    internalName: input.internalName.trim(),
+    qbItemId: input.qbItemId.trim(),
+    matchSource: "manual"
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      tenantId: parsedActor.tenantId as string,
+      actorUserId: parsedActor.userId,
+      action: "quickbooks.item_mapping_saved",
+      entityType: "QuickBooksItemMap",
+      entityId: mapping.id,
+      metadata: {
+        internalCode: mapping.internalCode,
+        qbItemId: mapping.qbItemId,
+        qbItemName: mapping.qbItemName
+      }
+    }
+  });
+
+  return mapping;
+}
+
+export async function clearQuickBooksItemMappingForCode(actor: ActorContext, internalCode: string) {
+  const parsedActor = parseActor(actor);
+  if (!canManageQuickBooksSync(parsedActor.role)) {
+    throw new Error("Only administrators can manage QuickBooks item mappings.");
+  }
+
+  const tenant = await getTenantQuickBooksConnection(parsedActor.tenantId as string);
+  assertQuickBooksConnectionUsable(tenant, "clearing QuickBooks item mappings");
+  const integrationId = getQuickBooksIntegrationId(tenant);
+
+  await clearQuickBooksItemMapping({
+    tenantId: parsedActor.tenantId as string,
+    integrationId,
+    internalCode: internalCode.trim()
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      tenantId: parsedActor.tenantId as string,
+      actorUserId: parsedActor.userId,
+      action: "quickbooks.item_mapping_cleared",
+      entityType: "Tenant",
+      entityId: parsedActor.tenantId as string,
+      metadata: {
+        internalCode: internalCode.trim()
+      }
+    }
+  });
+}
+
 export function buildQuickBooksConnectUrl(state: string) {
   const env = assertEnvForFeature("quickbooks") as {
     QUICKBOOKS_CLIENT_ID: string;
@@ -2098,6 +2661,14 @@ export async function disconnectQuickBooks(actor: ActorContext) {
       where: { tenantId: parsedActor.tenantId as string }
     });
 
+    await tx.quickBooksItemCache.deleteMany({
+      where: { tenantId: parsedActor.tenantId as string }
+    });
+
+    await tx.quickBooksItemMap.deleteMany({
+      where: { tenantId: parsedActor.tenantId as string }
+    });
+
     await tx.inspectionBillingSummary.updateMany({
       where: { tenantId: parsedActor.tenantId as string },
       data: {
@@ -2131,6 +2702,7 @@ export async function importQuickBooksCatalogItems(actor: ActorContext) {
 
   const tenant = await getTenantQuickBooksConnection(parsedActor.tenantId as string);
   assertQuickBooksConnectionUsable(tenant, "importing products and services");
+  const integrationId = getQuickBooksIntegrationId(tenant);
 
   const importedItems: Array<{
     quickbooksItemId: string;
@@ -2174,6 +2746,13 @@ export async function importQuickBooksCatalogItems(actor: ActorContext) {
         where: { tenantId: parsedActor.tenantId as string }
       });
 
+      await tx.quickBooksItemCache.deleteMany({
+        where: {
+          tenantId: parsedActor.tenantId as string,
+          integrationId
+        }
+      });
+
       if (importedItems.length > 0) {
         await tx.quickBooksCatalogItem.createMany({
           data: importedItems.map((item) => ({
@@ -2188,6 +2767,21 @@ export async function importQuickBooksCatalogItems(actor: ActorContext) {
             incomeAccountName: item.incomeAccountName,
             rawJson: item.rawJson,
             importedAt: new Date()
+          }))
+        });
+
+        await tx.quickBooksItemCache.createMany({
+          data: importedItems.map((item) => ({
+            tenantId: parsedActor.tenantId as string,
+            integrationId,
+            qbItemId: item.quickbooksItemId,
+            qbItemName: item.name,
+            normalizedName: normalizeQbName(item.name),
+            qbItemType: item.itemType,
+            qbActive: item.active,
+            qbSyncToken: typeof item.rawJson.SyncToken === "string" ? item.rawJson.SyncToken : null,
+            rawJson: item.rawJson,
+            lastSyncedAt: new Date()
           }))
         });
       }
@@ -2247,6 +2841,7 @@ export async function createQuickBooksCatalogItem(actor: ActorContext, input: z.
 
   const tenant = await getTenantQuickBooksConnection(parsedActor.tenantId as string);
   assertQuickBooksConnectionUsable(tenant, "creating products and services");
+  const integrationId = getQuickBooksIntegrationId(tenant);
 
   try {
     const incomeAccountId = await resolveIncomeAccountId(tenant);
@@ -2265,6 +2860,7 @@ export async function createQuickBooksCatalogItem(actor: ActorContext, input: z.
 
     const localItem = await upsertTenantQuickBooksCatalogItem({
       tenantId: parsedActor.tenantId as string,
+      integrationId,
       item: created.Item
     });
 
@@ -2341,6 +2937,7 @@ export async function updateQuickBooksCatalogItem(actor: ActorContext, input: z.
 
   const tenant = await getTenantQuickBooksConnection(parsedActor.tenantId as string);
   assertQuickBooksConnectionUsable(tenant, "updating products and services");
+  const integrationId = getQuickBooksIntegrationId(tenant);
 
   try {
     const currentItem = await fetchQuickBooksCatalogItemById(tenant, localItem.quickbooksItemId);
@@ -2372,6 +2969,7 @@ export async function updateQuickBooksCatalogItem(actor: ActorContext, input: z.
 
     const updatedLocalItem = await upsertTenantQuickBooksCatalogItem({
       tenantId: parsedActor.tenantId as string,
+      integrationId,
       item: updated.Item
     });
 
@@ -2425,6 +3023,7 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
 
   const tenant = await getTenantQuickBooksConnection(parsedActor.tenantId as string);
   const connectionStatus = assertQuickBooksConnectionUsable(tenant, "syncing invoices");
+  const integrationId = getQuickBooksIntegrationId(tenant);
 
   const summary = await prisma.inspectionBillingSummary.findUnique({
     where: { inspectionId },
@@ -2476,26 +3075,53 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
       notes: summary.customerCompany.notes ?? null
     });
 
-    const incomeAccountId = await resolveIncomeAccountId(tenant);
-    const itemRefCache = new Map<string, { itemId: string; itemName: string }>();
+    const itemRefCache = new Map<string, { qbItemId: string; qbItemName: string }>();
     const invoiceLines = [] as Array<Record<string, unknown>>;
 
     for (const item of normalizedSummary.items) {
       const unitPrice = requirePrice(item);
-      const cacheKey = sanitizeItemName(item.code || item.description);
-      const resolvedItem = itemRefCache.get(cacheKey) ?? await resolveQuickBooksItem(tenant, incomeAccountId, item);
-      itemRefCache.set(cacheKey, resolvedItem);
+      const billingCode = item.code?.trim();
+      if (!billingCode) {
+        throw new Error(`Billing item "${item.description}" is missing a stable billing code. Add a billing code before syncing to QuickBooks.`);
+      }
 
-      invoiceLines.push({
-        Amount: Number(((item.quantity ?? 0) * unitPrice).toFixed(2)),
-        Description: item.description,
-        DetailType: "SalesItemLineDetail",
-        SalesItemLineDetail: {
-          ItemRef: { value: resolvedItem.itemId, name: resolvedItem.itemName },
-          Qty: item.quantity,
-          UnitPrice: unitPrice
+      const cacheKey = billingCode;
+      let resolvedItem = itemRefCache.get(cacheKey);
+      if (!resolvedItem) {
+        const resolved = await resolveQuickBooksItemForBilling({
+          tenantId: parsedActor.tenantId as string,
+          integrationId,
+          billingCode,
+          displayName: item.description
+        });
+
+        if (resolved.status !== "mapped") {
+          const suggestionText = resolved.suggestions.length > 0
+            ? ` Suggested items: ${resolved.suggestions.map((suggestion) => suggestion.qbItemName).join(", ")}.`
+            : "";
+          const reasonText = resolved.reason === "inactive_item"
+            ? " The mapped QuickBooks item is inactive."
+            : resolved.reason === "missing_item"
+              ? " The mapped QuickBooks item is missing from the local cache."
+              : " No QuickBooks item is mapped yet.";
+          throw new Error(`QuickBooks item not mapped for billing code "${billingCode}".${reasonText}${suggestionText}`);
         }
-      });
+
+        resolvedItem = {
+          qbItemId: resolved.qbItemId,
+          qbItemName: resolved.qbItemName
+        };
+        itemRefCache.set(cacheKey, resolvedItem);
+      }
+
+      invoiceLines.push(toQuickBooksInvoiceLine({
+        amount: Number(((item.quantity ?? 0) * unitPrice).toFixed(2)),
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice,
+        qbItemId: resolvedItem.qbItemId,
+        qbItemName: resolvedItem.qbItemName
+      }));
     }
 
     const docNumber = `TW-${summary.inspectionId.slice(-8).toUpperCase()}`;

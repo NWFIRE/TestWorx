@@ -28,6 +28,10 @@ vi.mock("@testworx/db", () => ({
   prisma: prismaMock
 }));
 
+vi.mock("../quickbooks", () => ({
+  saveQuickBooksItemMappingForCode: vi.fn().mockResolvedValue(undefined)
+}));
+
 import {
   clearBillingSummaryItemCatalogLink,
   extractBillableItemsFromDraft,

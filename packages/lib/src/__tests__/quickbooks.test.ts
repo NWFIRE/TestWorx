@@ -28,6 +28,19 @@ const prismaMock = {
     create: vi.fn(),
     update: vi.fn()
   },
+  quickBooksItemMap: {
+    findUnique: vi.fn(),
+    findMany: vi.fn(),
+    upsert: vi.fn(),
+    deleteMany: vi.fn()
+  },
+  quickBooksItemCache: {
+    findUnique: vi.fn(),
+    findMany: vi.fn(),
+    createMany: vi.fn(),
+    upsert: vi.fn(),
+    deleteMany: vi.fn()
+  },
   inspectionBillingSummary: {
     findUnique: vi.fn(),
     update: vi.fn(),
@@ -142,6 +155,37 @@ describe("quickbooks billing sync hardening", () => {
     vi.stubEnv("QUICKBOOKS_SANDBOX", "false");
     prismaMock.auditLog.create.mockResolvedValue(undefined);
     prismaMock.auditLog.findFirst.mockResolvedValue(null);
+    prismaMock.quickBooksItemMap.findUnique.mockResolvedValue({
+      id: "mapping_1",
+      tenantId: "tenant_1",
+      integrationId: "realm_1",
+      internalCode: "FE-ANNUAL",
+      internalName: "Annual Inspection",
+      qbItemId: "mapped_item_1",
+      qbItemName: "Annual Inspection",
+      qbItemType: "Service",
+      qbSyncToken: "1",
+      qbActive: true,
+      matchSource: "manual"
+    });
+    prismaMock.quickBooksItemCache.findUnique.mockResolvedValue({
+      id: "cache_1",
+      tenantId: "tenant_1",
+      integrationId: "realm_1",
+      qbItemId: "mapped_item_1",
+      qbItemName: "Annual Inspection",
+      normalizedName: "annual",
+      qbItemType: "Service",
+      qbActive: true,
+      qbSyncToken: "1",
+      rawJson: {}
+    });
+    prismaMock.quickBooksItemCache.findMany.mockResolvedValue([]);
+    prismaMock.quickBooksItemCache.upsert.mockResolvedValue(undefined);
+    prismaMock.quickBooksItemCache.createMany.mockResolvedValue({ count: 0 });
+    prismaMock.quickBooksItemCache.deleteMany.mockResolvedValue({ count: 0 });
+    prismaMock.quickBooksItemMap.upsert.mockResolvedValue(undefined);
+    prismaMock.quickBooksItemMap.deleteMany.mockResolvedValue({ count: 0 });
     resetServerEnvForTests();
   });
 
@@ -165,9 +209,6 @@ describe("quickbooks billing sync hardening", () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1" } }))
-      .mockResolvedValueOnce(jsonResponse({ QueryResponse: { Account: [{ Id: "income_1" }] } }))
-      .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
-      .mockResolvedValueOnce(jsonResponse({ Item: { Id: "item_1" } }))
       .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
       .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }));
 
@@ -209,9 +250,6 @@ describe("quickbooks billing sync hardening", () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management", SyncToken: "0" } }))
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management" } }))
-      .mockResolvedValueOnce(jsonResponse({ QueryResponse: { Account: [{ Id: "income_1" }] } }))
-      .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
-      .mockResolvedValueOnce(jsonResponse({ Item: { Id: "item_1" } }))
       .mockResolvedValueOnce(jsonResponse({ Invoice: {} }));
 
     const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
@@ -246,9 +284,6 @@ describe("quickbooks billing sync hardening", () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management", SyncToken: "0" } }))
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management" } }))
-      .mockResolvedValueOnce(jsonResponse({ QueryResponse: { Account: [{ Id: "income_1" }] } }))
-      .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
-      .mockResolvedValueOnce(jsonResponse({ Item: { Id: "item_1" } }))
       .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_missing", DocNumber: "TW-TION_1" } }))
       .mockResolvedValueOnce(new Response("Not found", { status: 404 }));
 
@@ -269,7 +304,7 @@ describe("quickbooks billing sync hardening", () => {
         quickbooksInvoiceNumber: null
       })
     });
-    expect(fetchMock).toHaveBeenCalledTimes(7);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
   it("requires a verified synced invoice before sending to QuickBooks", async () => {
@@ -567,13 +602,10 @@ describe("quickbooks billing sync hardening", () => {
     ).rejects.toThrow(/saved before environment tracking was added/i);
   });
 
-  it("prefers imported QuickBooks catalog items before creating new service items", async () => {
+  it("uses stored QuickBooks item mappings instead of live name matching during invoice sync", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
     prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: "qbo_customer_1" });
     prismaMock.customerCompany.update.mockResolvedValue(undefined);
-    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([
-      { quickbooksItemId: "imported_item_1", name: "FE-ANNUAL" }
-    ]);
     prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue(buildBillingSummary());
     prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
     prismaMock.auditLog.create.mockResolvedValue(undefined);
@@ -581,7 +613,6 @@ describe("quickbooks billing sync hardening", () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management", SyncToken: "0" } }))
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management" } }))
-      .mockResolvedValueOnce(jsonResponse({ QueryResponse: { Account: [{ Id: "income_1" }] } }))
       .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
       .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }));
 
@@ -592,7 +623,12 @@ describe("quickbooks billing sync hardening", () => {
       "inspection_1"
     );
 
-    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    const invoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    expect(invoiceBody.Line?.[0]?.SalesItemLineDetail?.ItemRef).toEqual({
+      value: "mapped_item_1",
+      name: "Annual Inspection"
+    });
   });
 
   it("returns the latest QuickBooks support reference in tenant settings", async () => {

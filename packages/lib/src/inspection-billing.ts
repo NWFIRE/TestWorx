@@ -11,6 +11,7 @@ import { assertTenantContext } from "./permissions";
 import { reportDraftSchema, type ReportDraft, type ReportPrimitiveValue } from "./report-engine";
 import { runCalculation } from "./report-calculations";
 import { resolveInspectionServiceFeeTx } from "./service-fees";
+import { saveQuickBooksItemMappingForCode } from "./quickbooks";
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -976,6 +977,65 @@ async function findStoredBillingItemCatalogMatch(tenantId: string, item: Billabl
   }) as Promise<BillingItemCatalogMatchRecord | null>;
 }
 
+async function findStoredQuickBooksCodeMapping(tenantId: string, item: BillableItem) {
+  const billingCode = item.code?.trim();
+  if (!billingCode) {
+    return null;
+  }
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { quickbooksRealmId: true }
+  });
+
+  if (!tenant?.quickbooksRealmId) {
+    return null;
+  }
+
+  const mapping = await prisma.quickBooksItemMap.findUnique({
+    where: {
+      tenantId_integrationId_internalCode: {
+        tenantId,
+        integrationId: tenant.quickbooksRealmId,
+        internalCode: billingCode
+      }
+    },
+    select: {
+      qbItemId: true,
+      qbItemName: true,
+      matchSource: true
+    }
+  });
+
+  if (!mapping) {
+    return null;
+  }
+
+  const catalogItem = await prisma.quickBooksCatalogItem.findFirst({
+    where: {
+      tenantId,
+      quickbooksItemId: mapping.qbItemId
+    },
+    select: {
+      id: true,
+      quickbooksItemId: true,
+      name: true,
+      sku: true,
+      itemType: true,
+      unitPrice: true
+    }
+  });
+
+  if (!catalogItem) {
+    return null;
+  }
+
+  return {
+    catalogItem,
+    matchSource: mapping.matchSource
+  };
+}
+
 async function searchCatalogCandidates(
   tenantId: string,
   item: Pick<BillableItem, "code" | "description">,
@@ -1189,6 +1249,25 @@ async function buildBillingItemCatalogState(tenantId: string, item: BillableItem
         confidence: storedMatch.confidence,
         matchMethod: "source_mapping" as const,
         autoMatchEligible: true
+      },
+      suggestedMatches: [] as BillingCatalogMatchSuggestion[]
+    };
+  }
+
+  const storedCodeMapping = await findStoredQuickBooksCodeMapping(tenantId, item);
+  if (storedCodeMapping) {
+    return {
+      currentMatch: {
+        catalogItemId: storedCodeMapping.catalogItem.id,
+        quickbooksItemId: storedCodeMapping.catalogItem.quickbooksItemId,
+        name: storedCodeMapping.catalogItem.name,
+        sku: storedCodeMapping.catalogItem.sku,
+        itemType: storedCodeMapping.catalogItem.itemType,
+        unitPrice: storedCodeMapping.catalogItem.unitPrice,
+        alias: null,
+        confidence: 1,
+        matchMethod: storedCodeMapping.matchSource === "rule" ? "source_mapping" as const : "manual" as const,
+        autoMatchEligible: storedCodeMapping.matchSource === "rule"
       },
       suggestedMatches: [] as BillingCatalogMatchSuggestion[]
     };
@@ -1858,6 +1937,14 @@ export async function linkBillingSummaryItemCatalog(
     });
   });
 
+  if (input.saveMapping && item.code) {
+    await saveQuickBooksItemMappingForCode(actor, {
+      internalCode: item.code,
+      internalName: item.description,
+      qbItemId: catalogItem.quickbooksItemId
+    });
+  }
+
   return {
     catalogItemId: catalogItem.id,
     catalogItemName: catalogItem.name
@@ -2027,6 +2114,14 @@ export async function linkBillingSummaryItemGroupCatalog(
       }
     });
   });
+
+  if (input.saveMapping && representativeItem.code) {
+    await saveQuickBooksItemMappingForCode(actor, {
+      internalCode: representativeItem.code,
+      internalName: representativeItem.description,
+      qbItemId: catalogItem.quickbooksItemId
+    });
+  }
 
   return {
     catalogItemId: catalogItem.id,

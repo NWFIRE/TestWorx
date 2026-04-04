@@ -19,6 +19,8 @@ import {
   customerCompanyInputSchema,
   importQuickBooksCatalogItems,
   quickBooksCatalogItemInputSchema,
+  saveQuickBooksItemMappingForCode,
+  clearQuickBooksItemMappingForCode,
   syncQuickBooksCustomers,
   updateCustomerCompany,
   getTenantBrandingSettings,
@@ -412,6 +414,83 @@ export async function importQuickBooksCustomersAction() {
     }
     const message = error instanceof Error ? error.message : "QuickBooks customer import failed.";
     redirect(`/app/admin/settings?quickbooks=${encodeURIComponent(message)}`);
+  }
+}
+
+export async function saveQuickBooksItemMappingAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    redirect("/login");
+  }
+
+  const internalCode = String(formData.get("internalCode") ?? "").trim();
+  const internalName = String(formData.get("internalName") ?? "").trim();
+  const qbItemId = String(formData.get("qbItemId") ?? "").trim();
+
+  if (!internalCode || !internalName || !qbItemId) {
+    redirect(buildSettingsRedirectWithParams({
+      mappingsOpen: "1",
+      quickbooks: "QuickBooks item mapping is missing required values."
+    }));
+  }
+
+  try {
+    await saveQuickBooksItemMappingForCode(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      { internalCode, internalName, qbItemId }
+    );
+    revalidatePath("/app/admin/settings");
+    revalidatePath("/app/admin/billing");
+    redirect(buildSettingsRedirectWithParams({
+      mappingsOpen: "1",
+      quickbooks: `${internalName} mapped successfully.`
+    }));
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
+    redirect(buildSettingsRedirectWithParams({
+      mappingsOpen: "1",
+      quickbooks: error instanceof Error ? error.message : "Unable to save QuickBooks item mapping."
+    }));
+  }
+}
+
+export async function clearQuickBooksItemMappingAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    redirect("/login");
+  }
+
+  const internalCode = String(formData.get("internalCode") ?? "").trim();
+  if (!internalCode) {
+    redirect(buildSettingsRedirectWithParams({
+      mappingsOpen: "1",
+      quickbooks: "QuickBooks item mapping code is missing."
+    }));
+  }
+
+  try {
+    await clearQuickBooksItemMappingForCode(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      internalCode
+    );
+    revalidatePath("/app/admin/settings");
+    revalidatePath("/app/admin/billing");
+    redirect(buildSettingsRedirectWithParams({
+      mappingsOpen: "1",
+      quickbooks: `${internalCode} mapping cleared.`
+    }));
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
+    redirect(buildSettingsRedirectWithParams({
+      mappingsOpen: "1",
+      quickbooks: error instanceof Error ? error.message : "Unable to clear QuickBooks item mapping."
+    }));
   }
 }
 

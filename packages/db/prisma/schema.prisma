@@ -170,6 +170,8 @@ model Tenant {
   stripeWebhookEvents       StripeWebhookEvent[]
   serviceFeeRules           ServiceFeeRule[]
   quickbooksCatalogItems    QuickBooksCatalogItem[]
+  quickBooksItemMaps        QuickBooksItemMap[]
+  quickBooksItemCache       QuickBooksItemCache[]
   quickbooksCatalogItemAliases QuickBooksCatalogItemAlias[]
   billingItemCatalogMatches BillingItemCatalogMatch[]
   accountInvitations        AccountInvitation[]
@@ -553,6 +555,47 @@ model QuickBooksCatalogItem {
   @@index([tenantId, active, itemType])
   @@index([tenantId, name])
   @@index([tenantId, sku])
+}
+
+model QuickBooksItemMap {
+  id            String   @id @default(cuid())
+  tenantId      String
+  integrationId String
+  internalCode  String
+  internalName  String
+  qbItemId      String
+  qbItemName    String
+  qbItemType    String?
+  qbSyncToken   String?
+  qbActive      Boolean  @default(true)
+  matchSource   String   @default("manual")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, integrationId, internalCode])
+  @@index([tenantId, integrationId, qbItemId])
+}
+
+model QuickBooksItemCache {
+  id             String   @id @default(cuid())
+  tenantId       String
+  integrationId  String
+  qbItemId       String
+  qbItemName     String
+  normalizedName String
+  qbItemType     String?
+  qbActive       Boolean  @default(true)
+  qbSyncToken    String?
+  rawJson        Json?
+  lastSyncedAt   DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, integrationId, qbItemId])
+  @@index([tenantId, integrationId, normalizedName])
+  @@index([tenantId, integrationId, qbActive])
 }
 
 model QuickBooksCatalogItemAlias {
