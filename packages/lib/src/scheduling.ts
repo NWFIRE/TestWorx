@@ -2089,6 +2089,154 @@ export async function getAdminDashboardData(actor: ActorContext) {
   };
 }
 
+export async function getAdminSchedulingQueueData(
+  actor: ActorContext,
+  input?: { statuses?: string[] }
+) {
+  const parsedActor = parseActor(actor);
+  if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
+    throw new Error("Only tenant and office administrators can access the scheduling queue.");
+  }
+
+  const tenantId = parsedActor.tenantId as string;
+  const requestedStatuses = (input?.statuses ?? [])
+    .map((status) => status.trim().toLowerCase())
+    .filter(Boolean);
+  const includeOpen = requestedStatuses.length === 0 || requestedStatuses.includes("open");
+  const includeInProgress = requestedStatuses.length === 0 || requestedStatuses.includes("in_progress");
+
+  const inspections = await prisma.inspection.findMany({
+    where: { tenantId, status: { not: InspectionStatus.completed } },
+    include: {
+      site: true,
+      customerCompany: true,
+      assignedTechnician: true,
+      technicianAssignments: { include: { technician: true } },
+      tasks: { include: { recurrence: true, report: true } }
+    },
+    orderBy: [{ scheduledStart: "asc" }],
+    take: 40
+  });
+
+  const mapped = inspections.map((inspection) => ({
+    ...inspection,
+    tasks: withInspectionTaskDisplayLabels(inspection.tasks),
+    ...getInspectionDisplayLabels({
+      siteName: inspection.site.name,
+      customerName: inspection.customerCompany.name
+    }),
+    displayStatus: getInspectionDisplayStatus({
+      status: inspection.status,
+      scheduledStart: inspection.scheduledStart
+    }),
+    assignedTechnicianNames: formatAssignedTechnicianNames({
+      assignedTechnician: inspection.assignedTechnician,
+      technicianAssignments: readTechnicianNameAssignments(inspection)
+    })
+  }));
+
+  const queue = mapped.filter((inspection) => {
+    if (inspection.displayStatus === "in_progress") {
+      return includeInProgress;
+    }
+
+    if (["scheduled", "to_be_completed", "past_due"].includes(inspection.displayStatus)) {
+      return includeOpen;
+    }
+
+    return requestedStatuses.length === 0;
+  });
+
+  return {
+    filters: {
+      statuses: requestedStatuses
+    },
+    counts: {
+      open: mapped.filter((inspection) =>
+        ["scheduled", "to_be_completed", "past_due"].includes(inspection.displayStatus)
+      ).length,
+      inProgress: mapped.filter((inspection) => inspection.displayStatus === "in_progress").length,
+      sharedQueue: mapped.filter((inspection) => !inspection.assignedTechnicianNames.length).length
+    },
+    inspections: queue
+  };
+}
+
+export async function getAdminReportReviewQueueData(
+  actor: ActorContext,
+  input?: { status?: string }
+) {
+  const parsedActor = parseActor(actor);
+  if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
+    throw new Error("Only tenant and office administrators can access the report review queue.");
+  }
+
+  const tenantId = parsedActor.tenantId as string;
+  const requestedStatus = (input?.status ?? "awaiting-review").trim().toLowerCase();
+
+  const inspections = await prisma.inspection.findMany({
+    where: { tenantId, status: InspectionStatus.completed },
+    include: {
+      site: true,
+      customerCompany: true,
+      assignedTechnician: true,
+      technicianAssignments: { include: { technician: true } },
+      billingSummary: {
+        select: {
+          status: true
+        }
+      },
+      tasks: {
+        include: {
+          recurrence: true,
+          report: true
+        }
+      }
+    },
+    orderBy: [{ scheduledStart: "desc" }],
+    take: 40
+  });
+
+  const mapped = inspections
+    .map((inspection) => {
+      const tasks = withInspectionTaskDisplayLabels(inspection.tasks);
+      const reviewTasks = tasks.filter(
+        (task) => task.report && task.report.status === reportStatuses.finalized
+      );
+
+      return {
+        ...inspection,
+        tasks,
+        reviewTasks,
+        billingStatus: inspection.billingSummary?.status ?? null,
+        ...getInspectionDisplayLabels({
+          siteName: inspection.site.name,
+          customerName: inspection.customerCompany.name
+        }),
+        assignedTechnicianNames: formatAssignedTechnicianNames({
+          assignedTechnician: inspection.assignedTechnician,
+          technicianAssignments: readTechnicianNameAssignments(inspection)
+        })
+      };
+    })
+    .filter((inspection) => inspection.reviewTasks.length > 0);
+
+  const queue = requestedStatus === "awaiting-review"
+    ? mapped.filter((inspection) => inspection.billingStatus !== "invoiced")
+    : mapped;
+
+  return {
+    filters: {
+      status: requestedStatus
+    },
+    counts: {
+      awaitingReview: mapped.filter((inspection) => inspection.billingStatus !== "invoiced").length,
+      completed: mapped.length
+    },
+    inspections: queue
+  };
+}
+
 export async function getAdminAmendmentManagementData(
   actor: ActorContext,
   input?: { lifecycle?: "all" | AdminInspectionLifecycle }

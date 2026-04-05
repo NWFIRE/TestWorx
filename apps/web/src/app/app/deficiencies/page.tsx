@@ -68,6 +68,17 @@ const statusTones = {
   ignored: "slate"
 } as const;
 
+function parseFilterValues(value?: string) {
+  if (!value || value === "all") {
+    return [];
+  }
+
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 function buildFilterHref(
   status: string | undefined,
   severity: string | undefined,
@@ -102,15 +113,27 @@ export default async function DeficienciesPage({
   }
 
   const params = await searchParams;
+  const requestedStatuses = parseFilterValues(params.status);
+  const requestedSeverities = parseFilterValues(params.severity);
   const data = await getAdminDeficiencyDashboardData(
     { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
     {
       siteId: params.siteId,
-      status: params.status && params.status !== "all" ? params.status : undefined,
-      severity: params.severity && params.severity !== "all" ? params.severity : undefined
+      status: requestedStatuses.length === 1 ? requestedStatuses[0] : undefined,
+      severity: requestedSeverities.length === 1 ? requestedSeverities[0] : undefined
     }
   );
-  const deficiencies = data.deficiencies as unknown as DeficiencyListItem[];
+  const deficiencies = (data.deficiencies as unknown as DeficiencyListItem[]).filter((deficiency) => {
+    const matchesStatus =
+      requestedStatuses.length === 0 || requestedStatuses.includes(deficiency.status);
+    const matchesSeverity =
+      requestedSeverities.length === 0 || requestedSeverities.includes(deficiency.severity);
+
+    return matchesStatus && matchesSeverity;
+  });
+  const activeStatusFilter = requestedStatuses.length > 0 ? requestedStatuses.join(",") : undefined;
+  const activeSeverityFilter =
+    requestedSeverities.length > 0 ? requestedSeverities.join(",") : undefined;
 
   return (
     <AppPageShell>
@@ -153,10 +176,10 @@ export default async function DeficienciesPage({
       >
         {statusOptions.map((option) => (
           <FilterChipLink
-            active={data.filters.status === (option.value === "all" ? undefined : option.value)}
+            active={activeStatusFilter === (option.value === "all" ? undefined : option.value)}
             href={buildFilterHref(
               option.value === "all" ? undefined : option.value,
-              data.filters.severity,
+              activeSeverityFilter,
               data.filters.siteId
             )}
             key={option.value}
@@ -166,9 +189,9 @@ export default async function DeficienciesPage({
         ))}
         {severityOptions.map((option) => (
           <FilterChipLink
-            active={data.filters.severity === (option.value === "all" ? undefined : option.value)}
+            active={activeSeverityFilter === (option.value === "all" ? undefined : option.value)}
             href={buildFilterHref(
-              data.filters.status,
+              activeStatusFilter,
               option.value === "all" ? undefined : option.value,
               data.filters.siteId
             )}

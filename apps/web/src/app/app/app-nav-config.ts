@@ -20,7 +20,7 @@ const adminNavItems: AppNavItem[] = [
     description: "Visits, assignment, and active queue",
     tone: "blue",
     matchMode: "exact",
-    matchPrefixes: ["/app/admin/inspections", "/app/admin/reports"]
+    matchPrefixes: ["/app/admin/scheduling", "/app/admin/inspections", "/app/admin/reports"]
   },
   {
     href: "/app/admin/amendments",

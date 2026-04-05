@@ -156,6 +156,53 @@ export function FilterBar({
   );
 }
 
+const workQueueItems = [
+  { key: "all", label: "All work", href: "/app/admin", tone: "slate" as const },
+  {
+    key: "open",
+    label: "Open inspections",
+    href: "/app/admin/scheduling?status=open,in_progress",
+    tone: "blue" as const
+  },
+  {
+    key: "review",
+    label: "Awaiting review",
+    href: "/app/admin/reports?status=awaiting-review",
+    tone: "violet" as const
+  },
+  {
+    key: "billing",
+    label: "Billing ready",
+    href: "/app/admin/billing?status=ready",
+    tone: "emerald" as const
+  },
+  {
+    key: "flags",
+    label: "Compliance flags",
+    href: "/app/deficiencies?status=open&severity=high,critical",
+    tone: "amber" as const
+  }
+];
+
+export function WorkQueueNav({ activeKey }: { activeKey: "all" | "open" | "review" | "billing" | "flags" }) {
+  return (
+    <FilterBar
+      description="Move directly into the live operational queue that matches the work you need to push forward."
+      title="Work queue"
+    >
+      {workQueueItems.map((item) => (
+        <FilterChipLink
+          active={activeKey === item.key}
+          href={item.href}
+          key={item.key}
+          label={item.label}
+          tone={item.tone}
+        />
+      ))}
+    </FilterBar>
+  );
+}
+
 export function FilterChipLink({
   href,
   label,

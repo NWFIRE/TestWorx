@@ -26,12 +26,11 @@ import { InspectionSchedulerForm } from "./inspection-scheduler-form";
 import {
   AppPageShell,
   EmptyState,
-  FilterBar,
-  FilterChipLink,
   KPIStatCard,
   PageHeader,
   SectionCard,
-  StatusBadge
+  StatusBadge,
+  WorkQueueNav
 } from "./operations-ui";
 
 type AdminDashboardData = Awaited<ReturnType<typeof getAdminDashboardData>>;
@@ -39,14 +38,6 @@ type CompletedDashboardInspection = AdminDashboardData["completedInspections"][n
 type ActiveDashboardInspection = AdminDashboardData["activeInspections"][number];
 type DashboardInspection = CompletedDashboardInspection | ActiveDashboardInspection;
 type DashboardTask = DashboardInspection["tasks"][number];
-
-const queueOptions = [
-  { value: "all", label: "All work" },
-  { value: "open", label: "Open inspections" },
-  { value: "review", label: "Awaiting review" },
-  { value: "billing", label: "Billing ready" },
-  { value: "flags", label: "Compliance flags" }
-] as const;
 
 function inspectionStatusLabel(status: string) {
   return formatInspectionStatusLabel(
@@ -99,9 +90,7 @@ function buildActivityItems(
       inspection.scheduledStart,
       "MMM d, yyyy h:mm a"
     )}`,
-    tag: inspection.billingStatus
-      ? inspection.billingStatus.replaceAll("_", " ")
-      : "Completed",
+    tag: inspection.billingStatus ? inspection.billingStatus.replaceAll("_", " ") : "Completed",
     href: `/app/admin/inspections/${inspection.id}`
   }));
 }
@@ -164,21 +153,9 @@ function calculateBillingPipeline(
   ).length;
 
   return [
-    {
-      label: "Draft billing",
-      value: Math.round((draft / total) * 100),
-      tone: "bg-slate-900"
-    },
-    {
-      label: "Awaiting approval",
-      value: Math.round((reviewed / total) * 100),
-      tone: "bg-[#1f4678]"
-    },
-    {
-      label: "Ready to invoice",
-      value: Math.round((invoiced / total) * 100),
-      tone: "bg-emerald-500"
-    }
+    { label: "Draft billing", value: Math.round((draft / total) * 100), tone: "bg-slate-900" },
+    { label: "Awaiting approval", value: Math.round((reviewed / total) * 100), tone: "bg-[#1f4678]" },
+    { label: "Ready to invoice", value: Math.round((invoiced / total) * 100), tone: "bg-emerald-500" }
   ];
 }
 
@@ -245,8 +222,7 @@ function InspectionListCard({
                         "Inspection workflow"}
                     </div>
                     <div className="mt-1 text-sm leading-6 text-slate-500">
-                      Next due:{" "}
-                      {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}
+                      Next due: {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}
                     </div>
                   </div>
                   <Link
@@ -287,9 +263,6 @@ export default async function AdminPage({
   const inspectionNotice = Array.isArray(params.inspection)
     ? params.inspection[0]
     : params.inspection;
-  const queue = typeof params.queue === "string" && queueOptions.some((option) => option.value === params.queue)
-    ? params.queue
-    : "all";
 
   const greeting = getGreetingByHour(new Date());
   const firstName = getGreetingName(session.user.name);
@@ -302,16 +275,6 @@ export default async function AdminPage({
   const todayItems = data.activeInspections.slice(0, 3);
   const activityItems = buildActivityItems(data.completedInspections);
   const billingPipeline = calculateBillingPipeline(data.completedInspections);
-  const openInspections = data.activeInspections.filter((inspection) =>
-    ["scheduled", "to_be_completed", "past_due", "in_progress"].includes(inspection.displayStatus)
-  );
-  const flaggedInspections = data.activeInspections.filter(
-    (inspection) =>
-      isDueAtTimeOfServiceCustomer(inspection.customerCompany)
-      || inspection.lifecycle === "replacement"
-      || inspection.lifecycle === "amended"
-      || !inspection.assignedTechnicianNames.length
-  );
 
   const statCards = [
     {
@@ -319,7 +282,7 @@ export default async function AdminPage({
       value: data.summary.upcomingInspections.toString(),
       change: `${data.activeInspections.length} on the live board`,
       icon: ClipboardList,
-      href: "/app/admin?queue=open",
+      href: "/app/admin/scheduling?status=open,in_progress",
       tone: "blue" as const
     },
     {
@@ -329,7 +292,7 @@ export default async function AdminPage({
         ? "Completed work still needs office review"
         : "Review queue is clear",
       icon: FileText,
-      href: "/app/admin?queue=review",
+      href: "/app/admin/reports?status=awaiting-review",
       tone: "violet" as const
     },
     {
@@ -337,7 +300,7 @@ export default async function AdminPage({
       value: billingReady.value,
       change: billingReady.change,
       icon: CreditCard,
-      href: "/app/admin/billing?status=reviewed",
+      href: "/app/admin/billing?status=ready",
       tone: "emerald" as const
     },
     {
@@ -345,47 +308,10 @@ export default async function AdminPage({
       value: complianceFlags.toString(),
       change: complianceFlags ? "Needs follow-up today" : "No urgent flags surfaced",
       icon: ShieldCheck,
-      href: "/app/deficiencies?status=open&severity=high",
+      href: "/app/deficiencies?status=open&severity=high,critical",
       tone: "amber" as const
     }
   ];
-
-  const queueHeadline =
-    queue === "open"
-      ? "Open inspections queue"
-      : queue === "review"
-        ? "Reports awaiting office review"
-        : queue === "billing"
-          ? "Billing-ready inspections"
-          : queue === "flags"
-            ? "Compliance follow-up"
-            : "Today’s operations";
-  const queueDescription =
-    queue === "open"
-      ? "Active dispatch work prioritized by live inspection status."
-      : queue === "review"
-        ? "Completed work that still needs office review before customer delivery or billing."
-        : queue === "billing"
-          ? "Completed summaries already close to invoice creation."
-        : queue === "flags"
-          ? "Operational exceptions that deserve same-day attention."
-          : "Review inspections, finalize reports, and keep billing close to done.";
-
-  const activeInspectionList = queue === "billing"
-    ? data.completedInspections.filter((inspection) => inspection.billingStatus === "reviewed")
-    : queue === "review"
-      ? data.completedInspections.filter((inspection) => inspection.billingStatus !== "invoiced")
-      : queue === "flags"
-        ? flaggedInspections
-        : queue === "open"
-          ? openInspections
-          : data.activeInspections;
-
-  const archiveInspectionList = queue === "review"
-    ? data.completedInspections.filter((inspection) => inspection.billingStatus !== "invoiced")
-    : queue === "billing"
-      ? data.completedInspections.filter((inspection) => inspection.billingStatus === "reviewed")
-      : data.completedInspections.slice(0, 6);
 
   return (
     <div className="min-h-screen bg-[#f4f7fb] text-slate-900">
@@ -479,20 +405,7 @@ export default async function AdminPage({
             ))}
           </section>
 
-          <FilterBar
-            description="Carry queue context forward without leaving the main scheduling workspace."
-            title="Work queue"
-          >
-            {queueOptions.map((option) => (
-              <FilterChipLink
-                active={queue === option.value}
-                href={option.value === "all" ? "/app/admin" : `/app/admin?queue=${option.value}`}
-                key={option.value}
-                label={option.label}
-                tone="blue"
-              />
-            ))}
-          </FilterBar>
+          <WorkQueueNav activeKey="all" />
 
           <div className="grid gap-5 xl:grid-cols-[1.45fr_0.95fr]">
             <div className="space-y-5 lg:space-y-6">
@@ -501,21 +414,13 @@ export default async function AdminPage({
                 <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                   <div className="max-w-2xl">
                     <div className="text-[10px] font-semibold tracking-[0.24em] text-white/70 lg:text-[11px]">
-                      {queueHeadline.toUpperCase()}
+                      TODAY&apos;S OPERATIONS
                     </div>
                     <h2 className="mt-3 max-w-[14ch] text-[32px] font-semibold leading-[1] tracking-[-0.05em] lg:text-[42px] lg:leading-[1.02]">
-                      {queue === "open"
-                        ? "Keep dispatch moving."
-                        : queue === "review"
-                          ? "Close the review loop."
-                          : queue === "billing"
-                            ? "Turn finished work into revenue."
-                            : queue === "flags"
-                              ? "Resolve the items that could slip."
-                              : "Keep field work moving."}
+                      Keep field work moving.
                     </h2>
                     <p className="mt-3 text-sm leading-7 text-white/80 lg:mt-4 lg:max-w-2xl lg:text-base">
-                      {queueDescription}
+                      Review inspections, finalize reports, and keep billing close to done.
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-3 lg:w-[360px]">
@@ -617,9 +522,7 @@ export default async function AdminPage({
                               </div>
                               <StatusBadge label={item.tag} tone="slate" />
                             </div>
-                            <div className="mt-1 text-sm leading-6 text-slate-500">
-                              {item.meta}
-                            </div>
+                            <div className="mt-1 text-sm leading-6 text-slate-500">{item.meta}</div>
                           </div>
                         </Link>
                       ))
@@ -630,42 +533,18 @@ export default async function AdminPage({
 
               <section className="grid gap-5 xl:grid-cols-2">
                 <InspectionListCard
-                  title={queue === "review" ? "Reports awaiting review" : queue === "billing" ? "Billing-ready work" : queue === "flags" ? "Flagged inspections" : "Active inspections"}
-                  description={
-                    queue === "review"
-                      ? "Completed visits that still need office review before delivery or billing."
-                      : queue === "billing"
-                        ? "Completed visits already marked reviewed and ready for billing follow-through."
-                        : queue === "flags"
-                          ? "Inspections with dispatch, lifecycle, or payment-collection attention points."
-                          : `Operational schedule view with ${activeInspectionList.length} inspection${activeInspectionList.length === 1 ? "" : "s"} loaded right now.`
-                  }
-                  inspections={activeInspectionList}
-                  emptyText={
-                    queue === "review"
-                      ? "No completed inspections are waiting on office review."
-                      : queue === "billing"
-                        ? "No completed inspections are sitting in the billing-ready queue."
-                        : queue === "flags"
-                          ? "No active inspections currently match the highest-priority follow-up conditions."
-                          : "No active inspections are on the board right now."
-                  }
-                  emptyTitle={
-                    queue === "review"
-                      ? "Review queue is clear"
-                      : queue === "billing"
-                        ? "Billing queue is clear"
-                        : queue === "flags"
-                          ? "No compliance flags are active"
-                          : "No active inspections"
-                  }
-                  ctaLabel={queue === "billing" ? "Open billing detail" : "Open inspection"}
+                  title="Active inspections"
+                  description={`Operational schedule view with ${data.activeInspections.length} inspection${data.activeInspections.length === 1 ? "" : "s"} loaded right now.`}
+                  inspections={data.activeInspections}
+                  emptyText="No active inspections are on the board right now."
+                  emptyTitle="No active inspections"
+                  ctaLabel="Open inspection"
                 />
                 <InspectionListCard
                   title="Completed archive"
                   description="Recently completed visits that are ready for office follow-up, billing, or customer delivery."
-                  inspections={archiveInspectionList}
-                  emptyText="No completed inspections match the current context."
+                  inspections={data.completedInspections.slice(0, 6)}
+                  emptyText="No completed inspections yet."
                   emptyTitle="No completed archive items"
                   ctaLabel="View inspection"
                 />
@@ -746,8 +625,8 @@ export default async function AdminPage({
 
                 <div className="mt-5 space-y-3">
                   {[
-                    { label: "Finalize pending reports", href: "/app/admin?queue=review" },
-                    { label: "Review auto-generated billing", href: "/app/admin/billing?status=reviewed" },
+                    { label: "Finalize pending reports", href: "/app/admin/reports?status=awaiting-review" },
+                    { label: "Review auto-generated billing", href: "/app/admin/billing?status=ready" },
                     { label: "Follow up on open deficiencies", href: "/app/deficiencies?status=open" }
                   ].map((item) => (
                     <Link

@@ -31,6 +31,13 @@ const statusOptions = [
   { value: "invoiced", label: "Invoiced" }
 ] as const;
 
+function normalizeBillingStatus(status?: string) {
+  if (status === "ready") {
+    return "reviewed";
+  }
+  return status;
+}
+
 function buildBillingHref(status?: string) {
   return status && status !== "all" ? `/app/admin/billing?status=${status}` : "/app/admin/billing";
 }
@@ -147,9 +154,11 @@ export default async function AdminBillingPage({
   }
 
   const params = searchParams ? await searchParams : {};
-  const selectedStatus = typeof params.status === "string" && statusOptions.some((option) => option.value === params.status)
-    ? params.status
-    : "all";
+  const requestedStatus = typeof params.status === "string" ? normalizeBillingStatus(params.status) : undefined;
+  const selectedStatus =
+    requestedStatus && statusOptions.some((option) => option.value === requestedStatus)
+      ? requestedStatus
+      : "all";
 
   const summaries = await getAdminBillingSummaries({
     userId: session.user.id,
