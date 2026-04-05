@@ -17,6 +17,7 @@ import { auth } from "@/auth";
 import {
   formatInspectionStatusLabel,
   getAdminDashboardData,
+  getAdminDeficiencyDashboardData,
   isDueAtTimeOfServiceCustomer,
   pickEarliestNextDueAt
 } from "@testworx/lib";
@@ -254,11 +255,21 @@ export default async function AdminPage({
     redirect("/app");
   }
 
-  const data = await getAdminDashboardData({
-    userId: session.user.id,
-    role: session.user.role,
-    tenantId: session.user.tenantId
-  });
+  const [data, deficiencyData] = await Promise.all([
+    getAdminDashboardData({
+      userId: session.user.id,
+      role: session.user.role,
+      tenantId: session.user.tenantId
+    }),
+    getAdminDeficiencyDashboardData(
+      {
+        userId: session.user.id,
+        role: session.user.role,
+        tenantId: session.user.tenantId
+      },
+      { status: "open" }
+    )
+  ]);
   const params = searchParams ? await searchParams : {};
   const inspectionNotice = Array.isArray(params.inspection)
     ? params.inspection[0]
@@ -271,7 +282,9 @@ export default async function AdminPage({
   ).length;
   const billingReady = formatBillingReady(data.completedInspections);
   const alerts = buildAlertItems(data, inspectionNotice);
-  const complianceFlags = alerts.length;
+  const complianceFlags = deficiencyData.deficiencies.filter(
+    (deficiency) => deficiency.severity === "high" || deficiency.severity === "critical"
+  ).length;
   const todayItems = data.activeInspections.slice(0, 3);
   const activityItems = buildActivityItems(data.completedInspections);
   const billingPipeline = calculateBillingPipeline(data.completedInspections);
@@ -306,7 +319,7 @@ export default async function AdminPage({
     {
       label: "Compliance flags",
       value: complianceFlags.toString(),
-      change: complianceFlags ? "Needs follow-up today" : "No urgent flags surfaced",
+      change: complianceFlags ? "Open high-priority issues need follow-up" : "No open high-priority flags",
       icon: ShieldCheck,
       href: "/app/deficiencies?status=open&severity=high,critical",
       tone: "amber" as const
