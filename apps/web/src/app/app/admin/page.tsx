@@ -17,6 +17,8 @@ import { auth } from "@/auth";
 import {
   formatInspectionStatusLabel,
   getAdminDashboardData,
+  getAdminReportReviewQueueData,
+  getAdminSchedulingQueueData,
   getAdminDeficiencyDashboardData,
   isDueAtTimeOfServiceCustomer,
   pickEarliestNextDueAt
@@ -255,18 +257,22 @@ export default async function AdminPage({
     redirect("/app");
   }
 
-  const [data, deficiencyData] = await Promise.all([
+  const actor = {
+    userId: session.user.id,
+    role: session.user.role,
+    tenantId: session.user.tenantId
+  };
+
+  const [data, schedulingQueueData, reportReviewData, deficiencyData] = await Promise.all([
     getAdminDashboardData({
       userId: session.user.id,
       role: session.user.role,
       tenantId: session.user.tenantId
     }),
+    getAdminSchedulingQueueData(actor, { statuses: ["open", "in_progress"] }),
+    getAdminReportReviewQueueData(actor, { status: "awaiting-review" }),
     getAdminDeficiencyDashboardData(
-      {
-        userId: session.user.id,
-        role: session.user.role,
-        tenantId: session.user.tenantId
-      },
+      actor,
       { status: "open" }
     )
   ]);
@@ -277,9 +283,8 @@ export default async function AdminPage({
 
   const greeting = getGreetingByHour(new Date());
   const firstName = getGreetingName(session.user.name);
-  const reportsAwaitingReview = data.completedInspections.filter(
-    (inspection) => inspection.billingStatus !== "invoiced"
-  ).length;
+  const openInspectionCount = schedulingQueueData.inspections.length;
+  const reportsAwaitingReview = reportReviewData.counts.awaitingReview;
   const billingReady = formatBillingReady(data.completedInspections);
   const alerts = buildAlertItems(data, inspectionNotice);
   const complianceFlags = deficiencyData.deficiencies.filter(
@@ -292,8 +297,10 @@ export default async function AdminPage({
   const statCards = [
     {
       label: "Open inspections",
-      value: data.summary.upcomingInspections.toString(),
-      change: `${data.activeInspections.length} on the live board`,
+      value: openInspectionCount.toString(),
+      change: openInspectionCount
+        ? `${schedulingQueueData.counts.inProgress} currently in progress`
+        : "Dispatch queue is clear",
       icon: ClipboardList,
       href: "/app/admin/scheduling?status=open,in_progress",
       tone: "blue" as const
