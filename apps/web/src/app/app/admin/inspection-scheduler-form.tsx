@@ -9,22 +9,51 @@ import {
   defaultScheduledStartForMonth,
   editableInspectionStatuses,
   formatInspectionStatusLabel,
+  formatInspectionTaskSchedulingStatusLabel,
+  formatInspectionTaskTypeLabel,
   genericInspectionSiteName,
   genericInspectionSiteOptionValue,
   getDefaultInspectionRecurrenceFrequency,
+  inspectionTaskSchedulingStatuses,
   inspectionTypeRegistry
 } from "@testworx/lib";
 
 type InspectionType = keyof typeof inspectionTypeRegistry;
 type RecurrenceFrequency = "ONCE" | "MONTHLY" | "QUARTERLY" | "SEMI_ANNUAL" | "ANNUAL";
+type InspectionTaskSchedulingStatus = (typeof inspectionTaskSchedulingStatuses)[number];
 const recurrenceOptions: RecurrenceFrequency[] = ["ONCE", "MONTHLY", "QUARTERLY", "SEMI_ANNUAL", "ANNUAL"];
 type EditableInspectionStatus = (typeof editableInspectionStatuses)[number];
 const statusOptions = editableInspectionStatuses;
 const initialState = { error: null as string | null, success: null as string | null };
+const inspectionTypeOptions = Object.keys(inspectionTypeRegistry) as InspectionType[];
+const serviceSchedulingOptions: InspectionTaskSchedulingStatus[] = [
+  "due_now",
+  "scheduled_now",
+  "scheduled_future",
+  "not_scheduled",
+  "completed",
+  "deferred"
+];
 
 type InspectionTaskValue = {
   inspectionType: InspectionType;
   frequency: RecurrenceFrequency;
+  assignedTechnicianId?: string | null;
+  dueMonth?: string;
+  dueDate?: string;
+  schedulingStatus?: InspectionTaskSchedulingStatus;
+  notes?: string;
+};
+
+type ServiceLineDraft = {
+  id: string;
+  inspectionType: InspectionType;
+  frequency: RecurrenceFrequency;
+  assignedTechnicianId: string;
+  dueMonth: string;
+  dueDate: string;
+  schedulingStatus: InspectionTaskSchedulingStatus;
+  notes: string;
 };
 
 type InitialValues = {
@@ -40,17 +69,38 @@ type InitialValues = {
   tasks?: InspectionTaskValue[];
 };
 
-function buildTaskSelectionState(initialValues?: InitialValues) {
-  const initialTaskSelections = new Map((initialValues?.tasks ?? []).map((task) => [task.inspectionType, task.frequency]));
-  return Object.fromEntries(
-    (Object.keys(inspectionTypeRegistry) as InspectionType[]).map((inspectionType) => [
-      inspectionType,
-      {
-        selected: (initialValues?.tasks ?? []).some((task) => task.inspectionType === inspectionType),
-        frequency: initialTaskSelections.get(inspectionType) ?? getDefaultInspectionRecurrenceFrequency(inspectionType)
-      }
-    ])
-  ) as Record<InspectionType, { selected: boolean; frequency: RecurrenceFrequency }>;
+function createServiceLineDraft(
+  inspectionMonth: string,
+  scheduledStart?: string,
+  initialValue?: InspectionTaskValue
+): ServiceLineDraft {
+  const inspectionType = initialValue?.inspectionType ?? inspectionTypeOptions[0] ?? "fire_extinguisher";
+  return {
+    id: crypto.randomUUID(),
+    inspectionType,
+    frequency: initialValue?.frequency ?? getDefaultInspectionRecurrenceFrequency(inspectionType),
+    assignedTechnicianId: initialValue?.assignedTechnicianId ?? "",
+    dueMonth: initialValue?.dueMonth ?? inspectionMonth,
+    dueDate: initialValue?.dueDate ?? scheduledStart?.slice(0, 10) ?? "",
+    schedulingStatus: initialValue?.schedulingStatus ?? "scheduled_now",
+    notes: initialValue?.notes ?? ""
+  };
+}
+
+function buildInitialServiceLines(initialValues?: InitialValues) {
+  const inspectionMonth =
+    initialValues?.inspectionMonth ??
+    (initialValues?.scheduledStart ? initialValues.scheduledStart.slice(0, 7) : new Date().toISOString().slice(0, 7));
+  const scheduledStart =
+    initialValues?.scheduledStart ?? defaultScheduledStartForMonth(inspectionMonth);
+
+  if (initialValues?.tasks?.length) {
+    return initialValues.tasks.map((task) =>
+      createServiceLineDraft(inspectionMonth, scheduledStart, task)
+    );
+  }
+
+  return [createServiceLineDraft(inspectionMonth, scheduledStart)];
 }
 
 function PickerField({
@@ -65,7 +115,7 @@ function PickerField({
 }: {
   id: string;
   name: string;
-  type: "month" | "datetime-local";
+  type: "month" | "datetime-local" | "date";
   value: string;
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
   required?: boolean;
@@ -141,10 +191,7 @@ export function InspectionSchedulerForm({
   const [status, setStatus] = useState<EditableInspectionStatus>(initialValues?.status ?? "to_be_completed");
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
   const [startManuallyEdited, setStartManuallyEdited] = useState(Boolean(initialValues?.scheduledStart));
-  const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<string[]>(initialValues?.assignedTechnicianIds ?? []);
-  const [selectedTasks, setSelectedTasks] = useState<Record<InspectionType, { selected: boolean; frequency: RecurrenceFrequency }>>(
-    () => buildTaskSelectionState(initialValues)
-  );
+  const [serviceLines, setServiceLines] = useState<ServiceLineDraft[]>(() => buildInitialServiceLines(initialValues));
   const filteredSites = useMemo(
     () => sites.filter((site) => !selectedCustomerId || site.customerCompanyId === selectedCustomerId),
     [selectedCustomerId, sites]
@@ -156,20 +203,45 @@ export function InspectionSchedulerForm({
       ? selectedSiteId
       : "";
   const customSiteSelected = resolvedSiteId === customInspectionSiteOptionValue;
+  const serviceLinesJson = JSON.stringify(
+    serviceLines.map((line) => ({
+      inspectionType: line.inspectionType,
+      frequency: line.frequency,
+      assignedTechnicianId: line.assignedTechnicianId || null,
+      dueMonth: line.dueMonth || null,
+      dueDate: line.dueDate ? `${line.dueDate}T00:00` : null,
+      schedulingStatus: line.schedulingStatus,
+      notes: line.notes.trim() || null
+    }))
+  );
+
+  const updateServiceLine = (lineId: string, patch: Partial<ServiceLineDraft>) => {
+    setServiceLines((current) =>
+      current.map((line) => (line.id === lineId ? { ...line, ...patch } : line))
+    );
+  };
+
+  const addServiceLine = () => {
+    setServiceLines((current) => [...current, createServiceLineDraft(inspectionMonth, scheduledStart)]);
+  };
+
+  const removeServiceLine = (lineId: string) => {
+    setServiceLines((current) => (current.length === 1 ? current : current.filter((line) => line.id !== lineId)));
+  };
 
   const resetCreateWorkflow = () => {
     const defaultMonth = new Date().toISOString().slice(0, 7);
+    const defaultStart = defaultScheduledStartForMonth(defaultMonth);
     formRef.current?.reset();
     setSelectedCustomerId("");
     setSelectedSiteId("");
     setInspectionMonth(defaultMonth);
-    setScheduledStart(defaultScheduledStartForMonth(defaultMonth));
+    setScheduledStart(defaultStart);
     setScheduledEnd("");
     setStatus("to_be_completed");
     setNotes("");
     setStartManuallyEdited(false);
-    setSelectedTechnicianIds([]);
-    setSelectedTasks(buildTaskSelectionState());
+    setServiceLines([createServiceLineDraft(defaultMonth, defaultStart)]);
   };
 
   const [state, formAction, pending] = useActionState(async (previousState: typeof initialState, formData: FormData) => {
@@ -183,6 +255,7 @@ export function InspectionSchedulerForm({
   return (
     <form action={formAction} className="min-w-0 overflow-hidden space-y-5 rounded-[1.5rem] bg-white p-4 shadow-panel sm:space-y-6 sm:rounded-[2rem] sm:p-6" ref={formRef}>
       {initialValues?.inspectionId ? <input name="inspectionId" type="hidden" value={initialValues.inspectionId} /> : null}
+      <input name="serviceLinesJson" type="hidden" value={serviceLinesJson} />
       <div>
         <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500 sm:text-sm sm:tracking-[0.25em]">Scheduling workflow</p>
         <h3 className="mt-2 text-xl font-semibold text-ink sm:text-2xl">{title}</h3>
@@ -277,7 +350,7 @@ export function InspectionSchedulerForm({
       ) : null}
       <div className="grid min-w-0 gap-4 md:grid-cols-2">
         <div className="min-w-0">
-          <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="inspectionMonth">Inspection month</label>
+          <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="inspectionMonth">Visit month</label>
           <PickerField
             id="inspectionMonth"
             icon={
@@ -293,15 +366,18 @@ export function InspectionSchedulerForm({
               if (!startManuallyEdited) {
                 setScheduledStart((current) => defaultScheduledStartForMonth(nextMonth, current));
               }
+              setServiceLines((current) =>
+                current.map((line) => (line.dueMonth ? line : { ...line, dueMonth: nextMonth }))
+              );
             }}
             required
             type="month"
             value={inspectionMonth}
           />
-          <p className="mt-2 text-sm leading-5 text-slate-500">Selecting a month defaults the start date to the first day unless you choose a different start date.</p>
+          <p className="mt-2 text-sm leading-5 text-slate-500">This is the visit month. Each service line below can still carry its own due month or exact due date.</p>
         </div>
         <div className="min-w-0">
-          <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="scheduledStart">Scheduled start</label>
+          <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="scheduledStart">Visit start</label>
           <PickerField
             id="scheduledStart"
             icon={
@@ -323,7 +399,7 @@ export function InspectionSchedulerForm({
       </div>
       <div className="grid min-w-0 gap-4 md:grid-cols-2">
         <div className="min-w-0">
-          <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="scheduledEnd">Scheduled end</label>
+          <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="scheduledEnd">Visit end</label>
           <PickerField
             id="scheduledEnd"
             icon={
@@ -337,10 +413,10 @@ export function InspectionSchedulerForm({
             type="datetime-local"
             value={scheduledEnd}
           />
-          <p className="mt-2 text-sm leading-5 text-slate-500">Optional. Leave blank unless dispatch needs a specific end time.</p>
+          <p className="mt-2 text-sm leading-5 text-slate-500">Optional. Leave blank unless dispatch needs a specific visit end time.</p>
         </div>
         <div className="min-w-0">
-          <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="status">Status</label>
+          <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="status">Visit status</label>
           <select
             className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 px-4 py-3.5"
             id="status"
@@ -352,32 +428,176 @@ export function InspectionSchedulerForm({
           </select>
         </div>
       </div>
-      <div>
-        <p className="mb-2 block text-sm font-medium text-slate-600">Assigned technicians</p>
-        <div className="grid gap-3 rounded-2xl border border-slate-200 p-3 sm:p-4 md:grid-cols-2">
-          {technicians.length === 0 ? (
-            <p className="text-sm text-slate-500">No technicians are available for this tenant yet.</p>
-          ) : technicians.map((tech) => (
-            <label key={tech.id} className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3.5">
-              <input
-                className="h-5 w-5 rounded border-slate-300"
-                checked={selectedTechnicianIds.includes(tech.id)}
-                name="assignedTechnicianIds"
-                onChange={(event) =>
-                  setSelectedTechnicianIds((current) =>
-                    event.target.checked
-                      ? [...current, tech.id]
-                      : current.filter((technicianId) => technicianId !== tech.id)
-                  )
-                }
-                type="checkbox"
-                value={tech.id}
-              />
-              <span className="text-sm font-medium text-ink">{tech.name}</span>
-            </label>
-          ))}
+      <div className="min-w-0 space-y-4 rounded-[1.25rem] border border-slate-200 p-4 sm:rounded-[1.5rem]">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 sm:text-sm sm:tracking-[0.2em]">Services on this visit</p>
+            <h4 className="mt-1 text-lg font-semibold text-ink">Schedule for this visit and track future due work</h4>
+            <p className="mt-2 text-sm leading-5 text-slate-500">Each service line can have its own technician, due month, due date, and scheduling status.</p>
+          </div>
+          <button
+            className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            onClick={(event) => {
+              event.preventDefault();
+              addServiceLine();
+            }}
+            type="button"
+          >
+            Add service line
+          </button>
         </div>
-        <p className="mt-2 text-sm leading-5 text-slate-500">Leave all unchecked to keep the visit in the shared queue. Select multiple techs for mixed-license visits.</p>
+        <div className="space-y-4">
+          {serviceLines.map((line, index) => {
+            const isCurrentVisitLine = line.schedulingStatus === "due_now" || line.schedulingStatus === "scheduled_now";
+            const isFutureLine = line.schedulingStatus === "scheduled_future" || line.schedulingStatus === "not_scheduled";
+
+            return (
+              <div key={line.id} className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-ink">Service line {index + 1}</p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {isCurrentVisitLine
+                        ? "Included in this visit and expected to move through dispatch now."
+                        : isFutureLine
+                          ? "Captured for future planning so the service is not lost."
+                          : "Use this line to track the current scheduling intent for the service."}
+                    </p>
+                  </div>
+                  <button
+                    className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+                    disabled={serviceLines.length === 1}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      removeServiceLine(line.id);
+                    }}
+                    type="button"
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                  <div className="min-w-0">
+                    <label className="mb-2 block text-sm font-medium text-slate-600">Service type</label>
+                    <select
+                      className="block w-full rounded-2xl border border-slate-200 px-4 py-3.5"
+                      onChange={(event) =>
+                        updateServiceLine(line.id, {
+                          inspectionType: event.target.value as InspectionType,
+                          frequency: getDefaultInspectionRecurrenceFrequency(event.target.value as InspectionType)
+                        })
+                      }
+                      value={line.inspectionType}
+                    >
+                      {inspectionTypeOptions.map((inspectionType) => (
+                        <option key={inspectionType} value={inspectionType}>
+                          {formatInspectionTaskTypeLabel(inspectionType)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="min-w-0">
+                    <label className="mb-2 block text-sm font-medium text-slate-600">Assigned technician</label>
+                    <select
+                      className="block w-full rounded-2xl border border-slate-200 px-4 py-3.5"
+                      onChange={(event) => updateServiceLine(line.id, { assignedTechnicianId: event.target.value })}
+                      value={line.assignedTechnicianId}
+                    >
+                      <option value="">{isCurrentVisitLine ? "Select technician" : "Leave unassigned for now"}</option>
+                      {technicians.map((technician) => (
+                        <option key={technician.id} value={technician.id}>
+                          {technician.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                  <div className="min-w-0">
+                    <label className="mb-2 block text-sm font-medium text-slate-600">Recurrence</label>
+                    <select
+                      className="block w-full rounded-2xl border border-slate-200 px-4 py-3.5"
+                      onChange={(event) => updateServiceLine(line.id, { frequency: event.target.value as RecurrenceFrequency })}
+                      value={line.frequency}
+                    >
+                      {recurrenceOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option.replaceAll("_", " ")}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="min-w-0">
+                    <label className="mb-2 block text-sm font-medium text-slate-600">Scheduling status</label>
+                    <select
+                      className="block w-full rounded-2xl border border-slate-200 px-4 py-3.5"
+                      onChange={(event) =>
+                        updateServiceLine(line.id, {
+                          schedulingStatus: event.target.value as InspectionTaskSchedulingStatus
+                        })
+                      }
+                      value={line.schedulingStatus}
+                    >
+                      {serviceSchedulingOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {formatInspectionTaskSchedulingStatusLabel(option)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                  <div className="min-w-0">
+                    <label className="mb-2 block text-sm font-medium text-slate-600">Due month</label>
+                    <PickerField
+                      id={`serviceLineDueMonth-${line.id}`}
+                      icon={
+                        <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24">
+                          <rect fill="none" height="16" rx="3" ry="3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" width="18" x="3" y="5" />
+                          <path d="M8 3v4M16 3v4M3 10h18" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+                        </svg>
+                      }
+                      name={`serviceLineDueMonth-${line.id}`}
+                      onChange={(event) => updateServiceLine(line.id, { dueMonth: event.target.value })}
+                      required
+                      type="month"
+                      value={line.dueMonth}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <label className="mb-2 block text-sm font-medium text-slate-600">Due date</label>
+                    <PickerField
+                      id={`serviceLineDueDate-${line.id}`}
+                      icon={
+                        <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24">
+                          <rect fill="none" height="16" rx="3" ry="3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" width="18" x="3" y="5" />
+                          <path d="M8 3v4M16 3v4M3 10h18" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+                        </svg>
+                      }
+                      name={`serviceLineDueDate-${line.id}`}
+                      onChange={(event) => updateServiceLine(line.id, { dueDate: event.target.value })}
+                      type="date"
+                      value={line.dueDate}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="mb-2 block text-sm font-medium text-slate-600">Service notes</label>
+                  <textarea
+                    className="min-h-20 w-full rounded-2xl border border-slate-200 px-4 py-3.5"
+                    onChange={(event) => updateServiceLine(line.id, { notes: event.target.value })}
+                    placeholder="Optional notes for this service line"
+                    value={line.notes}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
       <div className="min-w-0">
         <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="notes">Dispatch notes</label>
@@ -420,56 +640,6 @@ export function InspectionSchedulerForm({
           </label>
         </div>
       ) : null}
-      <div className="min-w-0 space-y-4">
-        <div>
-          <p className="text-sm font-medium text-slate-600">Inspection types and recurrence</p>
-          <p className="text-sm leading-5 text-slate-500">Each selected report type gets its own recurring task under the same visit.</p>
-        </div>
-        <div className="grid gap-3">
-          {(Object.entries(inspectionTypeRegistry) as Array<[InspectionType, (typeof inspectionTypeRegistry)[InspectionType]]>).map(([inspectionType, inspectionConfig]) => (
-            <div key={inspectionType} className="grid min-w-0 gap-3 rounded-2xl border border-slate-200 p-4 md:grid-cols-[1.5fr_1fr] md:items-center">
-              <label className="flex items-start gap-3">
-                <input
-                  className="mt-1 h-5 w-5 rounded border-slate-300"
-                  checked={selectedTasks[inspectionType]?.selected ?? false}
-                  onChange={(event) =>
-                    setSelectedTasks((current) => ({
-                      ...current,
-                      [inspectionType]: {
-                        ...(current[inspectionType] ?? { frequency: getDefaultInspectionRecurrenceFrequency(inspectionType) }),
-                        selected: event.target.checked
-                      }
-                    }))
-                  }
-                  type="checkbox"
-                  name={`type:${inspectionType}`}
-                  value="true"
-                />
-                <span>
-                  <span className="block font-medium text-ink">{inspectionConfig.label}</span>
-                  <span className="mt-1 block text-sm leading-5 text-slate-500">{inspectionConfig.description}</span>
-                </span>
-              </label>
-              <select
-                className="rounded-2xl border border-slate-200 px-4 py-3.5"
-                name={`frequency:${inspectionType}`}
-                onChange={(event) =>
-                  setSelectedTasks((current) => ({
-                    ...current,
-                    [inspectionType]: {
-                      selected: current[inspectionType]?.selected ?? false,
-                      frequency: event.target.value as RecurrenceFrequency
-                    }
-                  }))
-                }
-                value={selectedTasks[inspectionType]?.frequency ?? getDefaultInspectionRecurrenceFrequency(inspectionType)}
-              >
-                {recurrenceOptions.map((option) => <option key={option} value={option}>{option.replaceAll("_", " ")}</option>)}
-              </select>
-            </div>
-          ))}
-        </div>
-      </div>
       {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
       {state.success ? <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{state.success}</p> : null}
       <button className="w-full rounded-2xl bg-ember px-5 py-3 text-base font-semibold text-white disabled:opacity-60" disabled={pending} type="submit">

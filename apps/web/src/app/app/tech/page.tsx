@@ -49,6 +49,16 @@ function nextDueLabel(nextDueAt: Date | null | undefined, scheduledStart: Date) 
   return nextDueAt ? format(nextDueAt, "MMM d, yyyy") : format(scheduledStart, "MMM d, yyyy");
 }
 
+function serviceLineDueLabel(task: { dueDate?: Date | null; dueMonth?: string | null }, scheduledStart: Date) {
+  if (task.dueDate) {
+    return format(task.dueDate, "MMM d, yyyy");
+  }
+  if (task.dueMonth) {
+    return task.dueMonth;
+  }
+  return format(scheduledStart, "MMM d, yyyy");
+}
+
 function taskActionLabel(task: { inspectionType: string; displayLabel?: string; report?: { status: string } | null }) {
   const label = task.displayLabel ?? task.inspectionType.replaceAll("_", " ");
   if (task.report?.status === "finalized") {
@@ -206,6 +216,7 @@ export default async function TechnicianPage({
                                   {task.report.correctionReason ? <p className="mt-1 normal-case">{task.report.correctionReason}</p> : null}
                                 </div>
                               ) : null}
+                              <p className="text-xs text-slate-500">Due: {serviceLineDueLabel(task, inspection.scheduledStart)}</p>
                               <Link className="inline-flex min-h-12 w-full items-center justify-center rounded-[1.25rem] bg-white px-4 py-3 text-center text-sm font-semibold text-slateblue ring-1 ring-slate-200" href={`/app/tech/reports/${inspection.id}/${task.id}`}>
                                 {taskActionLabel(task)}
                               </Link>

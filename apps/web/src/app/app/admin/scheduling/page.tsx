@@ -21,6 +21,16 @@ function taskDisplayLabel(task: { inspectionType: string; displayLabel?: string 
   return task.displayLabel ?? task.inspectionType.replaceAll("_", " ");
 }
 
+function taskDueLabel(task: { dueDate?: Date | null; dueMonth?: string | null; schedulingStatus?: string | null }) {
+  if (task.dueDate) {
+    return format(task.dueDate, "MMM d, yyyy");
+  }
+  if (task.dueMonth) {
+    return task.dueMonth;
+  }
+  return "No due date";
+}
+
 export default async function AdminSchedulingQueuePage({
   searchParams
 }: {
@@ -137,9 +147,16 @@ export default async function AdminSchedulingQueuePage({
                         {inspection.secondaryTitle ?? inspection.customerCompany.name} •{" "}
                         {format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}
                       </p>
-                      <p className="text-sm text-slate-500">
-                        {inspection.tasks.map((task) => taskDisplayLabel(task)).join(", ") || "Inspection workflow"}
-                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {inspection.tasks.map((task) => (
+                          <span
+                            key={task.id}
+                            className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600"
+                          >
+                            {taskDisplayLabel(task)} - {task.assignedTechnician?.name ?? "Unassigned"} - {taskDueLabel(task)}
+                          </span>
+                        ))}
+                      </div>
                       <div className="grid gap-3 md:grid-cols-3">
                         <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
                           <p>Assigned: {inspection.assignedTechnicianNames.join(", ") || "Shared queue"}</p>

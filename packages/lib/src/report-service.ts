@@ -243,13 +243,27 @@ async function getAuthorizedReport(actor: ActorContext, inspectionId: string, ta
 
   if (
     parsedActor.role === "technician" &&
-    !isTechnicianAssignedToInspection({
-      userId: parsedActor.userId,
-      assignedTechnicianId: report.inspection.assignedTechnicianId,
-      technicianAssignments: readTechnicianAssignments(report.inspection)
-    })
+    !(
+      report.task.assignedTechnicianId === parsedActor.userId ||
+      (
+        !report.task.assignedTechnicianId &&
+        isTechnicianAssignedToInspection({
+          userId: parsedActor.userId,
+          assignedTechnicianId: report.inspection.assignedTechnicianId,
+          technicianAssignments: readTechnicianAssignments(report.inspection)
+        })
+      )
+    )
   ) {
     throw new Error("Technician does not have access to this report.");
+  }
+
+  if (
+    parsedActor.role === "technician" &&
+    report.task.schedulingStatus &&
+    !["due_now", "scheduled_now", "completed", "deferred"].includes(report.task.schedulingStatus)
+  ) {
+    throw new Error("This service line is being tracked for a future visit and is not available in the technician app yet.");
   }
 
   if (

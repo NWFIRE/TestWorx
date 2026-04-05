@@ -194,6 +194,7 @@ model User {
   tenant              Tenant?                 @relation(fields: [tenantId], references: [id])
   customerCompany     CustomerCompany?        @relation(fields: [customerCompanyId], references: [id])
   assignedInspections Inspection[]            @relation("InspectionAssignedTechnician")
+  assignedInspectionTasks InspectionTask[]    @relation("InspectionTaskAssignedTechnician")
   createdInspections  Inspection[]            @relation("InspectionCreatedBy")
   inspectionReports   InspectionReport[]      @relation("InspectionReportTechnician")
   requestedReportCorrections InspectionReport[] @relation("ReportCorrectionRequestedBy")
@@ -334,6 +335,11 @@ model InspectionTask {
   inspectionId   String
   inspectionType InspectionType
   addedByUserId  String?
+  assignedTechnicianId String?
+  dueMonth       String?
+  dueDate        DateTime?
+  schedulingStatus String        @default("scheduled_now")
+  notes          String?
   status         InspectionStatus @default(to_be_completed)
   sortOrder      Int              @default(0)
   createdAt      DateTime         @default(now())
@@ -341,10 +347,14 @@ model InspectionTask {
   tenant         Tenant           @relation(fields: [tenantId], references: [id])
   inspection     Inspection       @relation(fields: [inspectionId], references: [id])
   addedBy        User?            @relation("InspectionTaskAddedBy", fields: [addedByUserId], references: [id])
+  assignedTechnician User?        @relation("InspectionTaskAssignedTechnician", fields: [assignedTechnicianId], references: [id])
   recurrence     InspectionRecurrence?
   report         InspectionReport?
   
   @@index([inspectionId, inspectionType])
+  @@index([tenantId, assignedTechnicianId])
+  @@index([tenantId, dueMonth])
+  @@index([tenantId, schedulingStatus])
 }
 
 model InspectionRecurrence {

@@ -24,6 +24,13 @@ import { RemoveReportTypeButton } from "../../../tech/remove-report-type-button"
 
 type InspectionType = Parameters<typeof getDefaultInspectionRecurrenceFrequency>[0];
 type RecurrenceFrequency = ReturnType<typeof getDefaultInspectionRecurrenceFrequency>;
+type SchedulingStatus =
+  | "completed"
+  | "due_now"
+  | "scheduled_now"
+  | "scheduled_future"
+  | "not_scheduled"
+  | "deferred";
 
 const lifecycleBadgeStyles: Record<string, string> = {
   original: "bg-slate-100 text-slate-700",
@@ -82,6 +89,11 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
       id: string;
       inspectionType: InspectionType;
       addedByUserId: string | null;
+      assignedTechnicianId?: string | null;
+      dueMonth?: string | null;
+      dueDate?: Date | null;
+      schedulingStatus?: string | null;
+      notes?: string | null;
       recurrence: { frequency: RecurrenceFrequency } | null;
       report: {
         id: string;
@@ -141,7 +153,6 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
     signedAt: Date | null;
     signedStorageKey: string | null;
   }>;
-  type TechnicianAssignment = NonNullable<typeof inspectionView.technicianAssignments>[number];
   type InspectionTask = typeof inspectionView.tasks[number];
   type CorrectionEvent = NonNullable<NonNullable<InspectionTask["report"]>["correctionEvents"]>[number];
   type AuditTrailEntry = { id: string; action: string; createdAt: Date; metadata: unknown };
@@ -248,10 +259,17 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
             inspectionMonth: format(inspection.scheduledStart, "yyyy-MM"),
             scheduledStart: toDateTimeLocal(inspection.scheduledStart),
             scheduledEnd: toDateTimeLocal(inspection.scheduledEnd),
-            assignedTechnicianIds: inspectionView.technicianAssignments?.map((assignment: TechnicianAssignment) => assignment.technicianId) ?? (inspection.assignedTechnicianId ? [inspection.assignedTechnicianId] : []),
             status: inspection.status,
             notes: inspection.notes ?? "",
-            tasks: inspectionView.tasks.map((task: InspectionTask) => ({ inspectionType: task.inspectionType, frequency: task.recurrence?.frequency ?? getDefaultInspectionRecurrenceFrequency(task.inspectionType) }))
+            tasks: inspectionView.tasks.map((task: InspectionTask) => ({
+              inspectionType: task.inspectionType,
+              frequency: task.recurrence?.frequency ?? getDefaultInspectionRecurrenceFrequency(task.inspectionType),
+              assignedTechnicianId: task.assignedTechnicianId ?? inspection.assignedTechnicianId ?? "",
+              dueMonth: task.dueMonth ?? format(inspection.scheduledStart, "yyyy-MM"),
+              dueDate: task.dueDate ? format(task.dueDate, "yyyy-MM-dd") : "",
+              schedulingStatus: (task.schedulingStatus as SchedulingStatus | null) ?? "scheduled_now",
+              notes: task.notes ?? ""
+            }))
           }}
         />
         <div className="space-y-6">
@@ -349,6 +367,12 @@ export default async function EditInspectionPage({ params }: { params: Promise<{
                           {isAddedTask
                             ? "Added after the original inspection was scheduled."
                             : "Original scheduled report type."}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Assigned technician: {task.assignedTechnicianId ? dashboardData.technicians.find((technician) => technician.id === task.assignedTechnicianId)?.name ?? "Assigned" : "Unassigned"}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Due: {task.dueDate ? format(task.dueDate, "MMM d, yyyy") : task.dueMonth ?? "Not recorded"} | Status: {String(task.schedulingStatus ?? "scheduled_now").replaceAll("_", " ")}
                         </p>
                         {hasReportActivity ? <p className="mt-1 text-sm text-amber-700">This report type already has report activity and cannot be removed.</p> : null}
                       </div>

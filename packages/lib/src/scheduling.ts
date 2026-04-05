@@ -15,6 +15,16 @@ import { deleteStoredFile } from "./storage";
 const inspectionTypeEnum = z.enum(Object.keys(inspectionTypeRegistry) as [keyof typeof inspectionTypeRegistry, ...(keyof typeof inspectionTypeRegistry)[]]);
 export const editableInspectionStatuses = ["to_be_completed", "scheduled", "in_progress", "completed", "cancelled"] as const;
 const editableInspectionStatusSchema = z.enum(editableInspectionStatuses);
+export const inspectionTaskSchedulingStatuses = [
+  "due_now",
+  "scheduled_now",
+  "scheduled_future",
+  "not_scheduled",
+  "completed",
+  "deferred"
+] as const;
+export type InspectionTaskSchedulingStatus = (typeof inspectionTaskSchedulingStatuses)[number];
+const inspectionTaskSchedulingStatusSchema = z.enum(inspectionTaskSchedulingStatuses);
 export const adminInspectionLifecycleValues = ["original", "amended", "replacement", "superseded"] as const;
 export type AdminInspectionLifecycle = (typeof adminInspectionLifecycleValues)[number];
 const adminInspectionLifecycleFilterSchema = z.enum(["all", ...adminInspectionLifecycleValues]);
@@ -37,6 +47,13 @@ export const inspectionStatusLabels: Record<InspectionStatus | "past_due", strin
   past_due: "Past Due"
 };
 
+const currentVisitTaskSchedulingStatuses = new Set<InspectionTaskSchedulingStatus>([
+  "due_now",
+  "scheduled_now",
+  "completed",
+  "deferred"
+]);
+
 export const scheduleInspectionSchema = z.object({
   customerCompanyId: z.string().min(1, "Select a customer before creating the inspection."),
   siteId: z.string().min(1, "Select a site before creating the inspection."),
@@ -49,13 +66,59 @@ export const scheduleInspectionSchema = z.object({
   tasks: z.array(
     z.object({
       inspectionType: inspectionTypeEnum,
-      frequency: z.nativeEnum(RecurrenceFrequency)
+      frequency: z.nativeEnum(RecurrenceFrequency),
+      assignedTechnicianId: z.string().optional().nullable(),
+      dueMonth: z.string().regex(/^\d{4}-\d{2}$/).optional().nullable(),
+      dueDate: z.union([z.null(), z.coerce.date()]).optional(),
+      schedulingStatus: inspectionTaskSchedulingStatusSchema.default("scheduled_now"),
+      notes: z.string().max(1000).optional()
     })
   ).min(1, "Select at least one inspection type.")
 }).superRefine((input, context) => {
   if (input.scheduledEnd && input.scheduledEnd <= input.scheduledStart) {
     context.addIssue({ code: z.ZodIssueCode.custom, message: "Scheduled end must be after the scheduled start.", path: ["scheduledEnd"] });
   }
+
+  const currentVisitStatuses: InspectionTaskSchedulingStatus[] = ["due_now", "scheduled_now"];
+  const seen = new Set<string>();
+  input.tasks.forEach((task, index) => {
+    const normalizedDueMonth =
+      task.dueMonth ||
+      (task.dueDate instanceof Date && !Number.isNaN(task.dueDate.getTime())
+        ? `${task.dueDate.getFullYear()}-${String(task.dueDate.getMonth() + 1).padStart(2, "0")}`
+        : "");
+
+    if (!normalizedDueMonth && !(task.dueDate instanceof Date && !Number.isNaN(task.dueDate.getTime()))) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Each service line needs a due month or due date.",
+        path: ["tasks", index, "dueMonth"]
+      });
+    }
+
+    if (currentVisitStatuses.includes(task.schedulingStatus) && !task.assignedTechnicianId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Assign a technician to any service scheduled for this visit.",
+        path: ["tasks", index, "assignedTechnicianId"]
+      });
+    }
+
+    const duplicateKey = [
+      task.inspectionType,
+      normalizedDueMonth,
+      task.dueDate instanceof Date && !Number.isNaN(task.dueDate.getTime()) ? task.dueDate.toISOString() : "",
+      task.schedulingStatus
+    ].join("|");
+    if (seen.has(duplicateKey)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Duplicate service lines on the same visit need different due timing or status.",
+        path: ["tasks", index, "inspectionType"]
+      });
+    }
+    seen.add(duplicateKey);
+  });
 });
 
 export function nextDueFrom(start: Date, frequency: RecurrenceFrequency) {
@@ -100,6 +163,39 @@ export { getDefaultInspectionRecurrenceFrequency } from "./report-config";
 
 export function formatInspectionTaskTypeLabel(inspectionType: keyof typeof inspectionTypeRegistry) {
   return inspectionTypeRegistry[inspectionType].label;
+}
+
+export function formatInspectionTaskSchedulingStatusLabel(status: InspectionTaskSchedulingStatus) {
+  switch (status) {
+    case "due_now":
+      return "Due now";
+    case "scheduled_now":
+      return "Schedule for this visit";
+    case "scheduled_future":
+      return "Scheduled for future";
+    case "not_scheduled":
+      return "Track for later";
+    case "completed":
+      return "Completed";
+    case "deferred":
+      return "Deferred";
+    default:
+      return String(status).replaceAll("_", " ");
+  }
+}
+
+export function isCurrentVisitTaskSchedulingStatus(status?: string | null) {
+  return Boolean(status && currentVisitTaskSchedulingStatuses.has(status as InspectionTaskSchedulingStatus));
+}
+
+function normalizeTaskDueMonth(input: { dueMonth?: string | null; dueDate?: Date | null; fallbackMonth?: string | null }) {
+  if (input.dueMonth) {
+    return input.dueMonth;
+  }
+  if (input.dueDate instanceof Date && !Number.isNaN(input.dueDate.getTime())) {
+    return `${input.dueDate.getFullYear()}-${String(input.dueDate.getMonth() + 1).padStart(2, "0")}`;
+  }
+  return input.fallbackMonth ?? null;
 }
 
 export function isGenericInspectionSiteName(siteName: string | null | undefined) {
@@ -160,7 +256,14 @@ export function withInspectionTaskDisplayLabels<T extends { id: string; inspecti
 function mergeExistingDuplicateTasks(
   existingTasks: Array<{ inspectionType: keyof typeof inspectionTypeRegistry }>,
   nextTasks: z.infer<typeof scheduleInspectionSchema>["tasks"]
-) {
+): ScheduledInspectionTaskInput[] {
+  if (nextTasks.some((task) => task.dueMonth || task.dueDate || task.assignedTechnicianId || task.notes || task.schedulingStatus)) {
+    return nextTasks.map((task) => ({
+      ...task,
+      schedulingStatus: task.schedulingStatus ?? "scheduled_now"
+    }));
+  }
+
   const existingCounts = new Map<keyof typeof inspectionTypeRegistry, number>();
   for (const task of existingTasks) {
     existingCounts.set(task.inspectionType, (existingCounts.get(task.inspectionType) ?? 0) + 1);
@@ -171,7 +274,12 @@ function mergeExistingDuplicateTasks(
     const desiredCount = Math.max(existingCount, 1);
     return Array.from({ length: desiredCount }, () => ({
       inspectionType: task.inspectionType,
-      frequency: task.frequency
+      frequency: task.frequency,
+      assignedTechnicianId: task.assignedTechnicianId ?? null,
+      dueMonth: task.dueMonth ?? null,
+      dueDate: task.dueDate ?? null,
+      schedulingStatus: task.schedulingStatus ?? "scheduled_now",
+      notes: task.notes
     }));
   });
 }
@@ -421,12 +529,35 @@ function parseInspectionFormData(formData: FormData) {
     assignedTechnicianIds: formData.getAll("assignedTechnicianIds").map((value) => String(value)).filter(Boolean),
     assignedTechnicianId: String(formData.get("assignedTechnicianId") ?? "") || null
   });
-  const tasks = (Object.keys(inspectionTypeRegistry) as Array<keyof typeof inspectionTypeRegistry>)
-    .filter((inspectionType) => formData.get(`type:${inspectionType}`) === "true")
-    .map((inspectionType) => ({
-      inspectionType,
-      frequency: String(formData.get(`frequency:${inspectionType}`) ?? getDefaultInspectionRecurrenceFrequency(inspectionType))
-    }));
+  const rawServiceLines = String(formData.get("serviceLinesJson") ?? "").trim();
+  const tasks = rawServiceLines
+    ? (() => {
+        try {
+          const parsed = JSON.parse(rawServiceLines) as Array<Record<string, unknown>>;
+          return parsed.map((task) => ({
+            inspectionType: String(task.inspectionType ?? ""),
+            frequency: String(task.frequency ?? ""),
+            assignedTechnicianId: String(task.assignedTechnicianId ?? "").trim() || null,
+            dueMonth: String(task.dueMonth ?? "").trim() || undefined,
+            dueDate: parseDateTimeInput(String(task.dueDate ?? "").trim()),
+            schedulingStatus: String(task.schedulingStatus ?? "scheduled_now"),
+            notes: String(task.notes ?? "").trim() || undefined
+          }));
+        } catch {
+          return [];
+        }
+      })()
+    : (Object.keys(inspectionTypeRegistry) as Array<keyof typeof inspectionTypeRegistry>)
+        .filter((inspectionType) => formData.get(`type:${inspectionType}`) === "true")
+        .map((inspectionType) => ({
+          inspectionType,
+          frequency: String(formData.get(`frequency:${inspectionType}`) ?? getDefaultInspectionRecurrenceFrequency(inspectionType)),
+          assignedTechnicianId: assignedTechnicianIds[0] ?? null,
+          dueMonth: inspectionMonth || scheduledStart.slice(0, 7),
+          dueDate: parseDateTimeInput(scheduledStart),
+          schedulingStatus: "scheduled_now",
+          notes: undefined
+        }));
 
   return scheduleInspectionSchema.safeParse({
     customerCompanyId,
@@ -754,7 +885,12 @@ export async function deleteInspection(actor: ActorContext, inspectionId: string
 }
 
 async function validateSchedulingReferences(tx: Prisma.TransactionClient, tenantId: string, input: z.infer<typeof scheduleInspectionSchema>) {
-  const uniqueAssignedTechnicianIds = normalizeAssignedTechnicianIds(input as { assignedTechnicianIds?: string[] | null; assignedTechnicianId?: string | null });
+  const uniqueAssignedTechnicianIds = normalizeAssignedTechnicianIds({
+    assignedTechnicianIds: [
+      ...(input.assignedTechnicianIds ?? []),
+      ...input.tasks.map((task) => task.assignedTechnicianId).filter((value): value is string => Boolean(value))
+    ]
+  });
   const assignedTechnicianQuery = uniqueAssignedTechnicianIds.length
     ? "findMany" in tx.user && typeof tx.user.findMany === "function"
       ? tx.user.findMany({ where: { id: { in: uniqueAssignedTechnicianIds }, tenantId, role: "technician" } })
@@ -784,7 +920,10 @@ async function validateSchedulingReferences(tx: Prisma.TransactionClient, tenant
     customerCompany,
     site,
     assignedTechnicianIds,
-    primaryAssignedTechnicianId: assignedTechnicianIds[0] ?? null
+    primaryAssignedTechnicianId:
+      input.tasks.find((task) => isCurrentVisitTaskSchedulingStatus(task.schedulingStatus) && task.assignedTechnicianId)?.assignedTechnicianId ??
+      assignedTechnicianIds[0] ??
+      null
   };
 }
 
@@ -819,7 +958,7 @@ async function writeInspectionTasks(
   tx: Prisma.TransactionClient,
   inspectionId: string,
   tenantId: string,
-  assignedTechnicianId: string | null,
+  inspectionScheduledStart: Date,
   scheduledStart: Date,
   tasks: ScheduledInspectionTaskInput[]
 ) {
@@ -833,9 +972,17 @@ async function writeInspectionTasks(
         frequency: task.frequency,
         scheduledStart,
         taskStatus: InspectionStatus.to_be_completed,
-        technicianId: assignedTechnicianId,
+        technicianId: task.assignedTechnicianId ?? null,
         addedByUserId: null,
         sortOrder: index,
+        dueMonth: normalizeTaskDueMonth({
+          dueMonth: task.dueMonth,
+          dueDate: task.dueDate ?? null,
+          fallbackMonth: format(inspectionScheduledStart, "yyyy-MM")
+        }),
+        dueDate: task.dueDate ?? null,
+        schedulingStatus: task.schedulingStatus,
+        notes: task.notes,
         recurrenceSeriesId: task.recurrenceSeriesId,
         recurrenceAnchorScheduledStart: task.recurrenceAnchorScheduledStart,
         recurrenceNextDueAt: task.recurrenceNextDueAt
@@ -855,6 +1002,10 @@ async function createInspectionTaskWithReport(input: {
   technicianId: string | null;
   addedByUserId?: string | null;
   sortOrder: number;
+  dueMonth?: string | null;
+  dueDate?: Date | null;
+  schedulingStatus?: string;
+  notes?: string | null;
   recurrenceSeriesId?: string | null;
   recurrenceAnchorScheduledStart?: Date | null;
   recurrenceNextDueAt?: Date | null;
@@ -866,6 +1017,11 @@ async function createInspectionTaskWithReport(input: {
       inspectionType: input.inspectionType,
       status: input.taskStatus,
       addedByUserId: input.addedByUserId ?? null,
+      assignedTechnicianId: input.technicianId,
+      dueMonth: input.dueMonth ?? null,
+      dueDate: input.dueDate ?? null,
+      schedulingStatus: input.schedulingStatus ?? "scheduled_now",
+      notes: input.notes ?? null,
       sortOrder: input.sortOrder
     }
   });
@@ -913,6 +1069,11 @@ async function createRecurringFollowUpInspectionsTx(tx: Prisma.TransactionClient
     tasks: Array<{
       id: string;
       inspectionType: keyof typeof inspectionTypeRegistry;
+      assignedTechnicianId?: string | null;
+      dueMonth?: string | null;
+      dueDate?: Date | null;
+      schedulingStatus?: string | null;
+      notes?: string | null;
       recurrence?: {
         id: string;
         frequency: RecurrenceFrequency;
@@ -931,7 +1092,8 @@ async function createRecurringFollowUpInspectionsTx(tx: Prisma.TransactionClient
     task.recurrence &&
     task.recurrence.frequency !== RecurrenceFrequency.ONCE &&
     task.recurrence.nextDueAt instanceof Date &&
-    !Number.isNaN(task.recurrence.nextDueAt.getTime())
+    !Number.isNaN(task.recurrence.nextDueAt.getTime()) &&
+    isCurrentVisitTaskSchedulingStatus(task.schedulingStatus ?? null)
   ));
   if (!recurringTasks.length) {
     return [];
@@ -996,6 +1158,15 @@ async function createRecurringFollowUpInspectionsTx(tx: Prisma.TransactionClient
     group.tasks.push({
       inspectionType: task.inspectionType,
       frequency: task.recurrence?.frequency ?? getDefaultInspectionRecurrenceFrequency(task.inspectionType),
+      assignedTechnicianId: task.assignedTechnicianId ?? null,
+      dueMonth: normalizeTaskDueMonth({
+        dueMonth: task.dueMonth ?? null,
+        dueDate: task.recurrence?.nextDueAt ?? task.dueDate ?? null,
+        fallbackMonth: format(nextScheduledStart, "yyyy-MM")
+      }),
+      dueDate: task.recurrence?.nextDueAt ?? task.dueDate ?? null,
+      schedulingStatus: "scheduled_now",
+      notes: task.notes ?? undefined,
       recurrenceSeriesId: task.recurrence?.seriesId ?? task.recurrence?.id ?? task.id,
       recurrenceAnchorScheduledStart: task.recurrence?.anchorScheduledStart ?? input.inspection.scheduledStart,
       recurrenceNextDueAt: nextDueFrom(nextScheduledStart, task.recurrence?.frequency ?? getDefaultInspectionRecurrenceFrequency(task.inspectionType))
@@ -1021,7 +1192,14 @@ async function createRecurringFollowUpInspectionsTx(tx: Prisma.TransactionClient
     });
 
     await syncInspectionTechnicianAssignments(tx, createdInspection.id, input.tenantId, assignedTechnicianIds);
-    await writeInspectionTasks(tx, createdInspection.id, input.tenantId, input.inspection.assignedTechnicianId, group.scheduledStart, group.tasks);
+    await writeInspectionTasks(
+      tx,
+      createdInspection.id,
+      input.tenantId,
+      input.inspection.scheduledStart,
+      group.scheduledStart,
+      group.tasks
+    );
 
     await createAuditLog(tx, {
       tenantId: input.tenantId,
@@ -1091,7 +1269,7 @@ export async function createInspection(actor: ActorContext, input: z.infer<typeo
     });
 
     await syncInspectionTechnicianAssignments(tx, inspection.id, tenantId, assignedTechnicianIds);
-    await writeInspectionTasks(tx, inspection.id, tenantId, primaryAssignedTechnicianId, input.scheduledStart, input.tasks);
+    await writeInspectionTasks(tx, inspection.id, tenantId, input.scheduledStart, input.scheduledStart, input.tasks);
     await createAuditLog(tx, {
       tenantId,
       actorUserId: parsedActor.userId,
@@ -1205,7 +1383,7 @@ export async function updateInspection(actor: ActorContext, inspectionId: string
     });
 
     await syncInspectionTechnicianAssignments(tx, inspectionId, tenantId, assignedTechnicianIds);
-    await writeInspectionTasks(tx, inspectionId, tenantId, primaryAssignedTechnicianId, input.scheduledStart, taskDefinitions);
+    await writeInspectionTasks(tx, inspectionId, tenantId, input.scheduledStart, input.scheduledStart, taskDefinitions);
 
     const assignmentAction = getAssignmentAuditAction(previousAssignedTechnicianIds[0] ?? null, primaryAssignedTechnicianId);
     if (assignmentAction) {
@@ -1267,7 +1445,15 @@ export async function updateInspectionStatus(actor: ActorContext, inspectionId: 
       where: {
         tenantId,
         inspectionId,
-        status: { not: reportStatuses.finalized }
+        status: { not: reportStatuses.finalized },
+        task: {
+          OR: [
+            { schedulingStatus: "due_now" },
+            { schedulingStatus: "scheduled_now" },
+            { schedulingStatus: "completed" },
+            { schedulingStatus: "deferred" }
+          ]
+        }
       }
     });
 
@@ -1288,7 +1474,17 @@ export async function updateInspectionStatus(actor: ActorContext, inspectionId: 
 
     if (status !== InspectionStatus.completed) {
       await tx.inspectionTask.updateMany({
-        where: { tenantId, inspectionId, status: { not: InspectionStatus.completed } },
+        where: {
+          tenantId,
+          inspectionId,
+          status: { not: InspectionStatus.completed },
+          OR: [
+            { schedulingStatus: "due_now" },
+            { schedulingStatus: "scheduled_now" },
+            { schedulingStatus: "completed" },
+            { schedulingStatus: "deferred" }
+          ]
+        },
         data: { status }
       });
     }
@@ -1377,6 +1573,9 @@ export async function addInspectionTask(actor: ActorContext, input: {
       technicianId: defaultTechnicianId,
       addedByUserId: parsedActor.userId,
       sortOrder: nextSortOrder,
+      dueMonth: format(inspection.scheduledStart, "yyyy-MM"),
+      dueDate: inspection.scheduledStart,
+      schedulingStatus: "scheduled_now",
       recurrenceAnchorScheduledStart: inspection.scheduledStart
     });
 
@@ -1652,7 +1851,16 @@ function buildInspectionSnapshot(input: {
   scheduledStart: Date;
   scheduledEnd: Date | null;
   notes: string | null | undefined;
-  tasks: Array<{ inspectionType: string; recurrence?: { frequency: RecurrenceFrequency | null } | null; frequency?: RecurrenceFrequency }>;
+  tasks: Array<{
+    inspectionType: string;
+    assignedTechnicianId?: string | null;
+    dueMonth?: string | null;
+    dueDate?: Date | null;
+    schedulingStatus?: string | null;
+    notes?: string | null;
+    recurrence?: { frequency: RecurrenceFrequency | null } | null;
+    frequency?: RecurrenceFrequency;
+  }>;
 }) {
   return {
     inspectionId: input.id ?? null,
@@ -1665,7 +1873,12 @@ function buildInspectionSnapshot(input: {
     notes: input.notes ?? null,
     tasks: input.tasks.map((task) => ({
       inspectionType: task.inspectionType,
-      frequency: task.frequency ?? task.recurrence?.frequency ?? getDefaultInspectionRecurrenceFrequency(task.inspectionType as keyof typeof inspectionTypeRegistry)
+      frequency: task.frequency ?? task.recurrence?.frequency ?? getDefaultInspectionRecurrenceFrequency(task.inspectionType as keyof typeof inspectionTypeRegistry),
+      assignedTechnicianId: task.assignedTechnicianId ?? null,
+      dueMonth: task.dueMonth ?? null,
+      dueDate: task.dueDate?.toISOString() ?? null,
+      schedulingStatus: task.schedulingStatus ?? "scheduled_now",
+      notes: task.notes ?? null
     }))
   };
 }
@@ -1772,7 +1985,14 @@ export async function createInspectionAmendment(actor: ActorContext, inspectionI
     });
 
     await syncInspectionTechnicianAssignments(tx, replacementInspection.id, tenantId, assignedTechnicianIds);
-    await writeInspectionTasks(tx, replacementInspection.id, tenantId, primaryAssignedTechnicianId, input.scheduledStart, taskDefinitions);
+    await writeInspectionTasks(
+      tx,
+      replacementInspection.id,
+      tenantId,
+      input.scheduledStart,
+      input.scheduledStart,
+      taskDefinitions
+    );
 
     const amendmentType = JSON.stringify(previousSnapshot.assignedTechnicianIds) !== JSON.stringify(assignedTechnicianIds)
       ? "reassignment"
@@ -2112,15 +2332,20 @@ export async function getAdminSchedulingQueueData(
       customerCompany: true,
       assignedTechnician: true,
       technicianAssignments: { include: { technician: true } },
-      tasks: { include: { recurrence: true, report: true } }
+      tasks: { include: { recurrence: true, report: true, assignedTechnician: true } }
     },
     orderBy: [{ scheduledStart: "asc" }],
     take: 40
   });
 
-  const mapped = inspections.map((inspection) => ({
-    ...inspection,
-    tasks: withInspectionTaskDisplayLabels(inspection.tasks),
+  const mapped = inspections.map((inspection) => {
+    const currentTasks = withInspectionTaskDisplayLabels(
+      inspection.tasks.filter((task) => isCurrentVisitTaskSchedulingStatus(task.schedulingStatus ?? "scheduled_now"))
+    );
+
+    return {
+      ...inspection,
+      tasks: currentTasks,
     ...getInspectionDisplayLabels({
       siteName: inspection.site.name,
       customerName: inspection.customerCompany.name
@@ -2129,11 +2354,12 @@ export async function getAdminSchedulingQueueData(
       status: inspection.status,
       scheduledStart: inspection.scheduledStart
     }),
-    assignedTechnicianNames: formatAssignedTechnicianNames({
-      assignedTechnician: inspection.assignedTechnician,
-      technicianAssignments: readTechnicianNameAssignments(inspection)
-    })
-  }));
+      assignedTechnicianNames: formatAssignedTechnicianNames({
+        assignedTechnician: inspection.assignedTechnician,
+        technicianAssignments: readTechnicianNameAssignments(inspection)
+      })
+    };
+  }).filter((inspection) => inspection.tasks.length > 0);
 
   const queue = mapped.filter((inspection) => {
     if (inspection.displayStatus === "in_progress") {
@@ -2156,7 +2382,7 @@ export async function getAdminSchedulingQueueData(
         ["scheduled", "to_be_completed", "past_due"].includes(inspection.displayStatus)
       ).length,
       inProgress: mapped.filter((inspection) => inspection.displayStatus === "in_progress").length,
-      sharedQueue: mapped.filter((inspection) => !inspection.assignedTechnicianNames.length).length
+      sharedQueue: mapped.filter((inspection) => inspection.tasks.every((task) => !task.assignedTechnicianId)).length
     },
     inspections: queue
   };
@@ -2367,6 +2593,16 @@ function buildMonthCalendar(inspections: Array<{ scheduledStart: Date; status: I
   }));
 }
 
+function filterTasksForTechnician<T extends {
+  assignedTechnicianId?: string | null;
+  schedulingStatus?: string | null;
+}>(tasks: T[], technicianId: string) {
+  return tasks.filter((task) => {
+    const matchesAssignment = !task.assignedTechnicianId || task.assignedTechnicianId === technicianId;
+    return matchesAssignment && isCurrentVisitTaskSchedulingStatus(task.schedulingStatus ?? "scheduled_now");
+  });
+}
+
 export async function getTechnicianDashboardData(actor: ActorContext) {
   const parsedActor = parseActor(actor);
   if (parsedActor.role !== "technician") {
@@ -2395,7 +2631,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
         customerCompany: true,
         assignedTechnician: true,
         technicianAssignments: { include: { technician: true } },
-        tasks: { include: { recurrence: true, report: true } },
+        tasks: { include: { recurrence: true, report: true, assignedTechnician: true } },
         documents: {
           orderBy: [{ createdAt: "desc" }],
           select: {
@@ -2412,20 +2648,25 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
     }),
     prisma.inspection.findMany({
       where: { tenantId, assignedTechnicianId: null, technicianAssignments: { none: {} }, claimable: true, status: { in: [...claimableInspectionStatuses] } },
-      include: { site: true, customerCompany: true, assignedTechnician: true, technicianAssignments: { include: { technician: true } }, tasks: { include: { recurrence: true, report: true } } },
+      include: { site: true, customerCompany: true, assignedTechnician: true, technicianAssignments: { include: { technician: true } }, tasks: { include: { recurrence: true, report: true, assignedTechnician: true } } },
       orderBy: [{ scheduledStart: "asc" }]
     })
   ]);
 
-  const monthAssigned = assignedInspections.filter((inspection) => inspection.scheduledStart >= monthStart && inspection.scheduledStart <= monthEnd);
+  const assignedQueue = assignedInspections
+    .map((inspection) => ({
+      ...inspection,
+      tasks: withInspectionTaskDisplayLabels(filterTasksForTechnician(inspection.tasks, parsedActor.userId))
+    }))
+    .filter((inspection) => inspection.tasks.length > 0);
+  const monthAssigned = assignedQueue.filter((inspection) => inspection.scheduledStart >= monthStart && inspection.scheduledStart <= monthEnd);
 
   return {
-    today: assignedInspections.filter((inspection) => isSameDay(inspection.scheduledStart, now)),
-    thisWeek: assignedInspections.filter((inspection) => inspection.scheduledStart >= dayStart && inspection.scheduledStart <= weekEnd),
+    today: assignedQueue.filter((inspection) => isSameDay(inspection.scheduledStart, now)),
+    thisWeek: assignedQueue.filter((inspection) => inspection.scheduledStart >= dayStart && inspection.scheduledStart <= weekEnd),
     thisMonth: monthAssigned,
-    assigned: assignedInspections.map((inspection) => ({
+    assigned: assignedQueue.map((inspection) => ({
       ...inspection,
-      tasks: withInspectionTaskDisplayLabels(inspection.tasks),
       ...getInspectionDisplayLabels({
         siteName: inspection.site.name,
         customerName: inspection.customerCompany.name
@@ -2436,19 +2677,23 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
         technicianAssignments: readTechnicianNameAssignments(inspection)
       })
     })),
-    unassigned: unassignedInspections.map((inspection) => ({
-      ...inspection,
-      tasks: withInspectionTaskDisplayLabels(inspection.tasks),
-      ...getInspectionDisplayLabels({
-        siteName: inspection.site.name,
-        customerName: inspection.customerCompany.name
-      }),
-      displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
-      assignedTechnicianNames: formatAssignedTechnicianNames({
-        assignedTechnician: inspection.assignedTechnician,
-        technicianAssignments: readTechnicianNameAssignments(inspection)
-      })
-    })),
+    unassigned: unassignedInspections
+      .map((inspection) => ({
+        ...inspection,
+        tasks: withInspectionTaskDisplayLabels(
+          inspection.tasks.filter((task) => isCurrentVisitTaskSchedulingStatus(task.schedulingStatus ?? "scheduled_now"))
+        ),
+        ...getInspectionDisplayLabels({
+          siteName: inspection.site.name,
+          customerName: inspection.customerCompany.name
+        }),
+        displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
+        assignedTechnicianNames: formatAssignedTechnicianNames({
+          assignedTechnician: inspection.assignedTechnician,
+          technicianAssignments: readTechnicianNameAssignments(inspection)
+        })
+      }))
+      .filter((inspection) => inspection.tasks.length > 0),
     monthCalendar: buildMonthCalendar(monthAssigned)
   };
 }
