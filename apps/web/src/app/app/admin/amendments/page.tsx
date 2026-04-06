@@ -80,6 +80,9 @@ export default async function AdminAmendmentsPage({
 
   const params = await searchParams;
   const lifecycle = lifecycleOptions.some((option) => option.value === params.lifecycle) ? params.lifecycle : "all";
+  const currentPath = lifecycle === "all"
+    ? "/app/admin/amendments"
+    : `/app/admin/amendments?lifecycle=${lifecycle}`;
   const data = await getAdminAmendmentManagementData(
     { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
     { lifecycle: lifecycle as "all" | "original" | "amended" | "replacement" | "superseded" }
@@ -256,14 +259,14 @@ export default async function AdminAmendmentsPage({
                     <div className="flex min-w-56 flex-col gap-3">
                       <Link
                         className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#1f4678] px-4 py-3 text-sm font-semibold text-white"
-                        href={`/app/admin/inspections/${inspection.id}`}
+                        href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`}
                       >
                         Open inspection
                       </Link>
                       {relationship ? (
                         <Link
                           className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
-                          href={relationship.href}
+                          href={`${relationship.href}?from=${encodeURIComponent(currentPath)}`}
                         >
                           Open linked inspection
                         </Link>

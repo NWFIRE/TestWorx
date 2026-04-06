@@ -30,12 +30,30 @@ import {
   updateBillingSummaryNotes,
   updateBillingSummaryStatus,
   updateDeficiencyStatus,
+  editableInspectionStatuses,
   updateInspection,
+  updateInspectionStatus,
   reopenCompletedReportForCorrection,
   uploadInspectionPdfAttachment
 } from "@testworx/lib";
 
 export { getCustomerSiteImportTemplateCsv };
+
+function resolveInspectionDeleteRedirectTarget(input: string | null | undefined) {
+  const fallback = "/app/admin?inspection=deleted";
+  const candidate = (input ?? "").trim();
+  if (!candidate.startsWith("/app/")) {
+    return fallback;
+  }
+
+  if (candidate.startsWith("/app/admin/inspections/")) {
+    return fallback;
+  }
+
+  return candidate.includes("?")
+    ? `${candidate}&inspection=deleted`
+    : `${candidate}?inspection=deleted`;
+}
 
 async function resolveInspectionSiteSelection<T extends {
   customerCompanyId: string;
@@ -146,12 +164,16 @@ export async function createInspectionAction(_: { error: string | null; success:
   }
 }
 
-export async function deleteInspectionAction(_: { error: string | null; success: string | null }, formData: FormData) {
+export async function deleteInspectionAction(
+  _: { error: string | null; success: string | null; redirectTo: string | null },
+  formData: FormData
+) {
   const session = await auth();
   const inspectionId = String(formData.get("inspectionId") ?? "");
+  const redirectTo = resolveInspectionDeleteRedirectTarget(String(formData.get("redirectTo") ?? ""));
 
   if (!session?.user?.tenantId || !inspectionId) {
-    return { error: "Unauthorized", success: null };
+    return { error: "Unauthorized", success: null, redirectTo: null };
   }
 
   try {
@@ -166,9 +188,13 @@ export async function deleteInspectionAction(_: { error: string | null; success:
     revalidatePath("/app/tech");
     revalidatePath("/app/customer");
 
-    return { error: null, success: "Inspection deleted successfully." };
+    return { error: null, success: "Inspection deleted successfully.", redirectTo };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Unable to delete inspection.", success: null };
+    return {
+      error: error instanceof Error ? error.message : "Unable to delete inspection.",
+      success: null,
+      redirectTo: null
+    };
   }
 }
 
@@ -219,6 +245,50 @@ export async function updateInspectionAction(_: { error: string | null; success:
     return { error: null, success: "Inspection updated successfully." };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unable to update inspection.", success: null };
+  }
+}
+
+export async function updateInspectionStatusAdminAction(
+  _: { error: string | null; success: string | null },
+  formData: FormData
+) {
+  const session = await auth();
+  const inspectionId = String(formData.get("inspectionId") ?? "");
+  const nextStatus = String(formData.get("status") ?? "");
+  const note = String(formData.get("note") ?? "").trim();
+
+  if (!session?.user?.tenantId || !inspectionId) {
+    return { error: "Unauthorized", success: null };
+  }
+
+  if (!["tenant_admin", "office_admin"].includes(session.user.role)) {
+    return { error: "Only administrators can update inspection status.", success: null };
+  }
+
+  if (!editableInspectionStatuses.includes(nextStatus as (typeof editableInspectionStatuses)[number])) {
+    return { error: "Select a valid inspection status.", success: null };
+  }
+
+  try {
+    await updateInspectionStatus(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      inspectionId,
+      nextStatus as (typeof editableInspectionStatuses)[number],
+      { note: note || null }
+    );
+
+    revalidatePath("/app/admin");
+    revalidatePath("/app/admin/scheduling");
+    revalidatePath("/app/admin/reports");
+    revalidatePath("/app/admin/amendments");
+    revalidatePath("/app/admin/billing");
+    revalidatePath("/app/deficiencies");
+    revalidatePath("/app/tech");
+    revalidatePath(`/app/admin/inspections/${inspectionId}`);
+
+    return { error: null, success: "Inspection status updated successfully." };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Unable to update inspection status.", success: null };
   }
 }
 

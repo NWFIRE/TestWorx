@@ -3,11 +3,20 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { formatInspectionStatusLabel, getAdminSchedulingQueueData, pickEarliestNextDueAt } from "@testworx/lib";
+import {
+  formatInspectionStatusLabel,
+  getAdminSchedulingQueueData,
+  getInspectionStatusTone,
+  inspectionFilterStatuses,
+  normalizeInspectionStatusFilters,
+  pickEarliestNextDueAt
+} from "@testworx/lib";
 
 import {
   AppPageShell,
   EmptyState,
+  FilterBar,
+  FilterChipLink,
   KPIStatCard,
   PageHeader,
   SectionCard,
@@ -15,7 +24,11 @@ import {
   WorkQueueNav
 } from "../operations-ui";
 
-const statusOptions = ["open", "in_progress"] as const;
+const statusOptions = inspectionFilterStatuses.map((status) => ({
+  value: status,
+  label: formatInspectionStatusLabel(status),
+  tone: getInspectionStatusTone(status)
+}));
 
 function taskDisplayLabel(task: { inspectionType: string; displayLabel?: string }) {
   return task.displayLabel ?? task.inspectionType.replaceAll("_", " ");
@@ -45,12 +58,11 @@ export default async function AdminSchedulingQueuePage({
   }
 
   const params = searchParams ? await searchParams : {};
-  const requestedStatuses = typeof params.status === "string"
-    ? params.status
-        .split(",")
-        .map((status) => status.trim())
-        .filter((status): status is (typeof statusOptions)[number] => statusOptions.includes(status as (typeof statusOptions)[number]))
-    : ["open", "in_progress"];
+  const requestedStatuses = normalizeInspectionStatusFilters(typeof params.status === "string" ? params.status : null);
+  const activeStatusParam = requestedStatuses.length ? requestedStatuses.join(",") : "all";
+  const currentPath = requestedStatuses.length
+    ? `/app/admin/scheduling?status=${requestedStatuses.join(",")}`
+    : "/app/admin/scheduling";
 
   const data = await getAdminSchedulingQueueData(
     {
@@ -72,42 +84,63 @@ export default async function AdminSchedulingQueuePage({
             Back to dashboard
           </Link>
         }
-        description="Focus the dispatch board on open and in-progress field work instead of scanning the broader dashboard."
+        description="Filter the inspection workflow by status so dispatch, follow-up, completed, invoiced, and cancelled work can be reviewed without losing context."
         eyebrow="Scheduling / dispatch"
-        title="Open inspections queue"
+        title="Inspection management"
       />
 
       <WorkQueueNav activeKey="open" />
 
       <section className="grid gap-3 md:grid-cols-3">
         <KPIStatCard
-          label="Open inspections"
-          note="Scheduled, due, and past-due work still waiting to be finished."
+          label="To Be Completed"
+          note="Newly created or not-yet-started inspections that still need scheduling follow-through."
           tone="blue"
-          value={data.counts.open}
+          value={data.counts.toBeCompleted}
         />
         <KPIStatCard
-          label="In progress"
+          label="Scheduled"
+          note="Inspections committed to the board and ready for dispatch execution."
+          tone="slate"
+          value={data.counts.scheduled}
+        />
+        <KPIStatCard
+          label="In Progress"
           note="Inspections where technicians have already started work."
           tone="amber"
           value={data.counts.inProgress}
         />
-        <KPIStatCard
-          label="Shared queue"
-          note="Claimable work that still needs a technician assignment."
-          tone="slate"
-          value={data.counts.sharedQueue}
-        />
       </section>
+
+      <FilterBar
+        description="Filter the inspection board by canonical workflow status. Shareable URLs keep the same status view when you send someone this page."
+        title="Inspection status"
+      >
+        <FilterChipLink
+          active={requestedStatuses.length === 0}
+          href="/app/admin/scheduling"
+          label="All statuses"
+          tone="slate"
+        />
+        {statusOptions.map((option) => (
+          <FilterChipLink
+            active={requestedStatuses.length > 0 && activeStatusParam === option.value}
+            href={`/app/admin/scheduling?status=${option.value}`}
+            key={option.value}
+            label={option.label}
+            tone={option.tone}
+          />
+        ))}
+      </FilterBar>
 
       <SectionCard>
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-              Dispatch board
+              Inspection queue
             </p>
             <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-              Current field work
+              Status-filtered inspection workflow
             </h2>
           </div>
           <p className="text-sm text-slate-500">
@@ -118,8 +151,8 @@ export default async function AdminSchedulingQueuePage({
         <div className="mt-5 space-y-4">
           {data.inspections.length === 0 ? (
             <EmptyState
-              description="No inspections match the current open or in-progress scheduling filters."
-              title="No active dispatch work in this queue"
+              description="No inspections match the current status filters. Clear the filter to return to the full inspection board."
+              title="No inspections match this status view"
             />
           ) : (
             data.inspections.map((inspection) => {
@@ -140,7 +173,7 @@ export default async function AdminSchedulingQueuePage({
                         </p>
                         <StatusBadge
                           label={formatInspectionStatusLabel(inspection.displayStatus as Parameters<typeof formatInspectionStatusLabel>[0])}
-                          tone={inspection.displayStatus === "in_progress" ? "amber" : "blue"}
+                          tone={getInspectionStatusTone(inspection.displayStatus as Parameters<typeof getInspectionStatusTone>[0])}
                         />
                       </div>
                       <p className="text-sm text-slate-500">
@@ -175,7 +208,7 @@ export default async function AdminSchedulingQueuePage({
                     <div className="flex min-w-56 flex-col gap-3">
                       <Link
                         className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#1f4678] px-4 py-3 text-sm font-semibold text-white"
-                        href={`/app/admin/inspections/${inspection.id}`}
+                        href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`}
                       >
                         Open inspection
                       </Link>

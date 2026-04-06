@@ -13,7 +13,25 @@ import { getDefaultInspectionRecurrenceFrequency, inspectionTypeRegistry } from 
 import { deleteStoredFile } from "./storage";
 
 const inspectionTypeEnum = z.enum(Object.keys(inspectionTypeRegistry) as [keyof typeof inspectionTypeRegistry, ...(keyof typeof inspectionTypeRegistry)[]]);
-export const editableInspectionStatuses = ["to_be_completed", "scheduled", "in_progress", "completed", "cancelled"] as const;
+export const inspectionFilterStatuses = [
+  "to_be_completed",
+  "scheduled",
+  "in_progress",
+  "completed",
+  "invoiced",
+  "cancelled",
+  "follow_up_required"
+] as const;
+export type InspectionFilterStatus = (typeof inspectionFilterStatuses)[number];
+export const editableInspectionStatuses = [
+  "to_be_completed",
+  "scheduled",
+  "in_progress",
+  "completed",
+  "invoiced",
+  "cancelled",
+  "follow_up_required"
+] as const;
 const editableInspectionStatusSchema = z.enum(editableInspectionStatuses);
 export const inspectionTaskSchedulingStatuses = [
   "due_now",
@@ -30,6 +48,21 @@ export type AdminInspectionLifecycle = (typeof adminInspectionLifecycleValues)[n
 const adminInspectionLifecycleFilterSchema = z.enum(["all", ...adminInspectionLifecycleValues]);
 export const unstartedInspectionStatuses = [InspectionStatus.to_be_completed, InspectionStatus.scheduled] as const;
 export const claimableInspectionStatuses = [InspectionStatus.to_be_completed, InspectionStatus.scheduled] as const;
+export const activeOperationalInspectionStatuses = [
+  InspectionStatus.to_be_completed,
+  InspectionStatus.scheduled,
+  InspectionStatus.in_progress,
+  InspectionStatus.follow_up_required
+] as const;
+export const completedOperationalInspectionStatuses = [
+  InspectionStatus.completed,
+  InspectionStatus.invoiced
+] as const;
+export const terminalInspectionStatuses = [
+  InspectionStatus.completed,
+  InspectionStatus.invoiced,
+  InspectionStatus.cancelled
+] as const;
 export const genericInspectionSiteOptionValue = "__generic_site__";
 export const genericInspectionSiteName = "General / No Fixed Site";
 export const customInspectionSiteOptionValue = "__custom_site__";
@@ -43,7 +76,9 @@ export const inspectionStatusLabels: Record<InspectionStatus | "past_due", strin
   scheduled: "Scheduled",
   in_progress: "In Progress",
   completed: "Completed",
+  invoiced: "Invoiced",
   cancelled: "Cancelled",
+  follow_up_required: "Follow-Up Required",
   past_due: "Past Due"
 };
 
@@ -396,7 +431,7 @@ export function isInspectionPastDue(input: {
   scheduledStart: Date;
   now?: Date;
 }) {
-  if (input.status === InspectionStatus.completed || input.status === InspectionStatus.cancelled) {
+  if (isTerminalInspectionStatus(input.status)) {
     return false;
   }
 
@@ -415,8 +450,69 @@ export function isInspectionInUnstartedState(status: InspectionStatus) {
   return status === InspectionStatus.to_be_completed || status === InspectionStatus.scheduled;
 }
 
+export function isActiveOperationalInspectionStatus(status: InspectionStatus) {
+  return activeOperationalInspectionStatuses.includes(status as (typeof activeOperationalInspectionStatuses)[number]);
+}
+
+export function isTerminalInspectionStatus(status: InspectionStatus) {
+  return terminalInspectionStatuses.includes(status as (typeof terminalInspectionStatuses)[number]);
+}
+
 export function formatInspectionStatusLabel(status: InspectionStatus | "past_due") {
   return inspectionStatusLabels[status];
+}
+
+export function getInspectionStatusTone(status: InspectionStatus | "past_due") {
+  switch (status) {
+    case "scheduled":
+      return "blue" as const;
+    case "in_progress":
+    case "follow_up_required":
+      return "amber" as const;
+    case "completed":
+      return "emerald" as const;
+    case "invoiced":
+      return "violet" as const;
+    case "cancelled":
+    case "past_due":
+      return "rose" as const;
+    case "to_be_completed":
+    default:
+      return "slate" as const;
+  }
+}
+
+function inspectionStatusFromFilterValue(value: string): InspectionFilterStatus[] {
+  switch (value.trim().toLowerCase()) {
+    case "":
+    case "all":
+      return [];
+    case "open":
+      return [...activeOperationalInspectionStatuses];
+    default:
+      return inspectionFilterStatuses.includes(value.trim().toLowerCase() as InspectionFilterStatus)
+        ? [value.trim().toLowerCase() as InspectionFilterStatus]
+        : [];
+  }
+}
+
+export function normalizeInspectionStatusFilters(
+  input?: string | string[] | null
+): InspectionFilterStatus[] {
+  const values = Array.isArray(input)
+    ? input
+    : typeof input === "string"
+      ? input.split(",")
+      : [];
+
+  const normalized = new Set<InspectionFilterStatus>();
+  for (const value of values) {
+    for (const resolved of inspectionStatusFromFilterValue(value)) {
+      normalized.add(resolved);
+    }
+  }
+
+  return [...normalized];
 }
 
 function deriveInspectionLifecycle(input: {
@@ -1412,9 +1508,15 @@ export async function updateInspection(actor: ActorContext, inspectionId: string
   });
 }
 
-export async function updateInspectionStatus(actor: ActorContext, inspectionId: string, status: InspectionStatus) {
+export async function updateInspectionStatus(
+  actor: ActorContext,
+  inspectionId: string,
+  status: InspectionStatus,
+  options?: { note?: string | null }
+) {
   const parsedActor = parseActor(actor);
   const tenantId = parsedActor.tenantId as string;
+  const trimmedNote = options?.note?.trim() ? options.note.trim() : null;
 
   const inspection = await prisma.inspection.findFirst({
     where: { id: inspectionId, tenantId },
@@ -1505,7 +1607,10 @@ export async function updateInspectionStatus(actor: ActorContext, inspectionId: 
       action: "inspection.status_updated",
       entityId: inspectionId,
       metadata: {
+        previousStatus: inspection.status,
         status,
+        nextStatus: status,
+        note: trimmedNote,
         generatedInspectionsCount
       }
     });
@@ -1547,7 +1652,7 @@ export async function addInspectionTask(actor: ActorContext, input: {
       throw new Error("You do not have access to add report types to this inspection.");
     }
 
-    if (inspection.status === InspectionStatus.completed || inspection.status === InspectionStatus.cancelled) {
+    if (isTerminalInspectionStatus(inspection.status)) {
       throw new Error("Report types can only be added to active inspections.");
     }
 
@@ -1626,7 +1731,7 @@ export async function removeInspectionTask(actor: ActorContext, input: {
       throw new Error("You do not have access to remove report types from this inspection.");
     }
 
-    if (inspection.status === InspectionStatus.completed || inspection.status === InspectionStatus.cancelled) {
+    if (isTerminalInspectionStatus(inspection.status)) {
       throw new Error("Report types can only be removed from active inspections.");
     }
 
@@ -2152,6 +2257,9 @@ export async function getInspectionForEdit(actor: ActorContext, inspectionId: st
         { entityType: "InspectionDocument", metadata: { path: ["inspectionId"], equals: inspectionId } }
       ]
     },
+    include: {
+      actor: { select: { id: true, name: true } }
+    },
     orderBy: { createdAt: "desc" },
     take: 12
   });
@@ -2203,7 +2311,7 @@ export async function getAdminDashboardData(actor: ActorContext) {
     prisma.site.findMany({ where: { tenantId }, orderBy: { name: "asc" } }),
     prisma.user.findMany({ where: { tenantId, role: "technician" }, orderBy: { name: "asc" } }),
     prisma.inspection.findMany({
-      where: { tenantId, status: { not: InspectionStatus.completed } },
+      where: { tenantId, status: { in: [...activeOperationalInspectionStatuses] } },
       include: {
         site: true,
         customerCompany: true,
@@ -2227,7 +2335,7 @@ export async function getAdminDashboardData(actor: ActorContext) {
       take: 12
     }),
     prisma.inspection.findMany({
-      where: { tenantId, status: InspectionStatus.completed },
+      where: { tenantId, status: { in: [...completedOperationalInspectionStatuses] } },
       include: {
         site: true,
         customerCompany: true,
@@ -2258,7 +2366,7 @@ export async function getAdminDashboardData(actor: ActorContext) {
     prisma.site.count({ where: { tenantId } }),
     prisma.inspection.count({ where: { tenantId, assignedTechnicianId: null, technicianAssignments: { none: {} }, claimable: true, status: { in: [...claimableInspectionStatuses] } } }),
     prisma.inspection.count({ where: { tenantId } }),
-    prisma.inspection.count({ where: { tenantId, status: InspectionStatus.completed } })
+    prisma.inspection.count({ where: { tenantId, status: { in: [...completedOperationalInspectionStatuses] } } })
   ]);
 
   const inspections = [...activeInspections, ...completedInspections];
@@ -2311,7 +2419,7 @@ export async function getAdminDashboardData(actor: ActorContext) {
 
 export async function getAdminSchedulingQueueData(
   actor: ActorContext,
-  input?: { statuses?: string[] }
+  input?: { statuses?: string[] | InspectionFilterStatus[] }
 ) {
   const parsedActor = parseActor(actor);
   if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
@@ -2319,14 +2427,16 @@ export async function getAdminSchedulingQueueData(
   }
 
   const tenantId = parsedActor.tenantId as string;
-  const requestedStatuses = (input?.statuses ?? [])
-    .map((status) => status.trim().toLowerCase())
-    .filter(Boolean);
-  const includeOpen = requestedStatuses.length === 0 || requestedStatuses.includes("open");
-  const includeInProgress = requestedStatuses.length === 0 || requestedStatuses.includes("in_progress");
+  const requestedStatuses = normalizeInspectionStatusFilters(input?.statuses ?? []);
+  const statusFilter = requestedStatuses.length
+    ? { in: requestedStatuses as InspectionStatus[] }
+    : undefined;
 
   const inspections = await prisma.inspection.findMany({
-    where: { tenantId, status: { not: InspectionStatus.completed } },
+    where: {
+      tenantId,
+      ...(statusFilter ? { status: statusFilter } : {})
+    },
     include: {
       site: true,
       customerCompany: true,
@@ -2361,30 +2471,22 @@ export async function getAdminSchedulingQueueData(
     };
   }).filter((inspection) => inspection.tasks.length > 0);
 
-  const queue = mapped.filter((inspection) => {
-    if (inspection.displayStatus === "in_progress") {
-      return includeInProgress;
-    }
-
-    if (["scheduled", "to_be_completed", "past_due"].includes(inspection.displayStatus)) {
-      return includeOpen;
-    }
-
-    return requestedStatuses.length === 0;
-  });
-
   return {
     filters: {
       statuses: requestedStatuses
     },
     counts: {
-      open: mapped.filter((inspection) =>
-        ["scheduled", "to_be_completed", "past_due"].includes(inspection.displayStatus)
-      ).length,
-      inProgress: mapped.filter((inspection) => inspection.displayStatus === "in_progress").length,
+      toBeCompleted: mapped.filter((inspection) => inspection.status === InspectionStatus.to_be_completed).length,
+      scheduled: mapped.filter((inspection) => inspection.status === InspectionStatus.scheduled).length,
+      inProgress: mapped.filter((inspection) => inspection.status === InspectionStatus.in_progress).length,
+      completed: mapped.filter((inspection) => inspection.status === InspectionStatus.completed).length,
+      invoiced: mapped.filter((inspection) => inspection.status === InspectionStatus.invoiced).length,
+      cancelled: mapped.filter((inspection) => inspection.status === InspectionStatus.cancelled).length,
+      followUpRequired: mapped.filter((inspection) => inspection.status === InspectionStatus.follow_up_required).length,
+      open: mapped.filter((inspection) => isActiveOperationalInspectionStatus(inspection.status)).length,
       sharedQueue: mapped.filter((inspection) => inspection.tasks.every((task) => !task.assignedTechnicianId)).length
     },
-    inspections: queue
+    inspections: mapped
   };
 }
 
@@ -2401,7 +2503,7 @@ export async function getAdminReportReviewQueueData(
   const requestedStatus = (input?.status ?? "awaiting-review").trim().toLowerCase();
 
   const inspections = await prisma.inspection.findMany({
-    where: { tenantId, status: InspectionStatus.completed },
+    where: { tenantId, status: { in: [...completedOperationalInspectionStatuses] } },
     include: {
       site: true,
       customerCompany: true,
@@ -2620,7 +2722,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
     prisma.inspection.findMany({
       where: {
         tenantId,
-        status: { not: InspectionStatus.completed },
+        status: { in: [...activeOperationalInspectionStatuses] },
         OR: [
           { assignedTechnicianId: parsedActor.userId },
           { technicianAssignments: { some: { technicianId: parsedActor.userId } } }

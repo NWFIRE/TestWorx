@@ -17,6 +17,7 @@ import { auth } from "@/auth";
 import {
   formatInspectionStatusLabel,
   getAdminDashboardData,
+  getInspectionStatusTone,
   getAdminReportReviewQueueData,
   getAdminSchedulingQueueData,
   getAdminDeficiencyDashboardData,
@@ -50,7 +51,9 @@ function inspectionStatusLabel(status: string) {
       | "scheduled"
       | "in_progress"
       | "completed"
+      | "invoiced"
       | "cancelled"
+      | "follow_up_required"
   );
 }
 
@@ -94,7 +97,7 @@ function buildActivityItems(
       "MMM d, yyyy h:mm a"
     )}`,
     tag: inspection.billingStatus ? inspection.billingStatus.replaceAll("_", " ") : "Completed",
-    href: `/app/admin/inspections/${inspection.id}`
+    href: `/app/admin/inspections/${inspection.id}?from=${encodeURIComponent("/app/admin")}`
   }));
 }
 
@@ -179,6 +182,7 @@ function InspectionListCard({
   inspections,
   emptyText,
   ctaLabel,
+  detailHrefBase,
   emptyTitle = "Nothing is queued here"
 }: {
   title: string;
@@ -186,6 +190,7 @@ function InspectionListCard({
   inspections: DashboardInspection[];
   emptyText: string;
   ctaLabel: string;
+  detailHrefBase: string;
   emptyTitle?: string;
 }) {
   return (
@@ -230,7 +235,7 @@ function InspectionListCard({
                   </div>
                   <Link
                     className="inline-flex rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                    href={`/app/admin/inspections/${inspection.id}`}
+                    href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(detailHrefBase)}`}
                   >
                     {ctaLabel}
                   </Link>
@@ -269,7 +274,7 @@ export default async function AdminPage({
       role: session.user.role,
       tenantId: session.user.tenantId
     }),
-    getAdminSchedulingQueueData(actor, { statuses: ["open", "in_progress"] }),
+    getAdminSchedulingQueueData(actor, { statuses: ["to_be_completed", "scheduled", "in_progress", "follow_up_required"] }),
     getAdminReportReviewQueueData(actor, { status: "awaiting-review" }),
     getAdminDeficiencyDashboardData(
       actor,
@@ -302,7 +307,7 @@ export default async function AdminPage({
         ? `${schedulingQueueData.counts.inProgress} currently in progress`
         : "Dispatch queue is clear",
       icon: ClipboardList,
-      href: "/app/admin/scheduling?status=open,in_progress",
+      href: "/app/admin/scheduling?status=to_be_completed,scheduled,in_progress,follow_up_required",
       tone: "blue" as const
     },
     {
@@ -486,7 +491,7 @@ export default async function AdminPage({
                       todayItems.map((item) => (
                         <Link
                           key={item.id}
-                          href={`/app/admin/inspections/${item.id}`}
+                          href={`/app/admin/inspections/${item.id}?from=${encodeURIComponent("/app/admin")}`}
                           className="block rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 transition hover:border-slate-300 hover:bg-white"
                         >
                           <div className="flex items-start justify-between gap-3">
@@ -503,7 +508,10 @@ export default async function AdminPage({
                             </div>
                           </div>
                           <div className="mt-3">
-                            <StatusBadge label={inspectionStatusLabel(item.displayStatus)} tone="blue" />
+                            <StatusBadge
+                              label={inspectionStatusLabel(item.displayStatus)}
+                              tone={getInspectionStatusTone(item.displayStatus as Parameters<typeof getInspectionStatusTone>[0])}
+                            />
                           </div>
                         </Link>
                       ))
@@ -555,6 +563,7 @@ export default async function AdminPage({
                 <InspectionListCard
                   title="Active inspections"
                   description={`Operational schedule view with ${data.activeInspections.length} inspection${data.activeInspections.length === 1 ? "" : "s"} loaded right now.`}
+                  detailHrefBase="/app/admin"
                   inspections={data.activeInspections}
                   emptyText="No active inspections are on the board right now."
                   emptyTitle="No active inspections"
@@ -563,6 +572,7 @@ export default async function AdminPage({
                 <InspectionListCard
                   title="Completed archive"
                   description="Recently completed visits that are ready for office follow-up, billing, or customer delivery."
+                  detailHrefBase="/app/admin"
                   inspections={data.completedInspections.slice(0, 6)}
                   emptyText="No completed inspections yet."
                   emptyTitle="No completed archive items"

@@ -32,7 +32,17 @@ describe("technician dashboard inspection access", () => {
           customerCompany: { id: "customer_1", name: "Pinecrest Property Management" },
           assignedTechnician: { id: "tech_1", name: "Alex Turner" },
           technicianAssignments: [],
-          tasks: []
+          tasks: [
+            {
+              id: "task_1",
+              inspectionType: "fire_extinguisher",
+              assignedTechnicianId: "tech_1",
+              schedulingStatus: "scheduled_now",
+              recurrence: null,
+              report: null
+            }
+          ],
+          documents: []
         }
       ])
       .mockResolvedValueOnce([]);
@@ -42,7 +52,14 @@ describe("technician dashboard inspection access", () => {
     expect(prismaMock.inspection.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
       where: expect.objectContaining({
         tenantId: "tenant_1",
-        status: { not: InspectionStatus.completed }
+        status: {
+          in: [
+            InspectionStatus.to_be_completed,
+            InspectionStatus.scheduled,
+            InspectionStatus.in_progress,
+            InspectionStatus.follow_up_required
+          ]
+        }
       })
     }));
     expect(result.assigned).toHaveLength(1);

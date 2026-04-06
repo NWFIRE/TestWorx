@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { InspectionStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@testworx/db";
 import { z } from "zod";
 
@@ -3155,19 +3155,25 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
       throw new Error(`QuickBooks did not verify invoice ${createdDocNumber ?? docNumber} after creation.`);
     }
 
-    await prisma.inspectionBillingSummary.update({
-      where: { id: summary.id },
-      data: {
-        status: "invoiced",
-        quickbooksSyncStatus: "synced",
-        quickbooksInvoiceId: verifiedInvoice.id,
-        quickbooksInvoiceNumber: verifiedInvoice.docNumber ?? createdDocNumber ?? docNumber,
-        quickbooksConnectionMode: connectionStatus.appMode,
-        quickbooksCustomerId: customerId,
-        quickbooksSyncedAt: new Date(),
-        quickbooksSyncError: null
-      }
-    });
+    await prisma.$transaction([
+      prisma.inspectionBillingSummary.update({
+        where: { id: summary.id },
+        data: {
+          status: "invoiced",
+          quickbooksSyncStatus: "synced",
+          quickbooksInvoiceId: verifiedInvoice.id,
+          quickbooksInvoiceNumber: verifiedInvoice.docNumber ?? createdDocNumber ?? docNumber,
+          quickbooksConnectionMode: connectionStatus.appMode,
+          quickbooksCustomerId: customerId,
+          quickbooksSyncedAt: new Date(),
+          quickbooksSyncError: null
+        }
+      }),
+      prisma.inspection.update({
+        where: { id: summary.inspectionId },
+        data: { status: InspectionStatus.invoiced }
+      })
+    ]);
 
     await prisma.auditLog.create({
       data: {

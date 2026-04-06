@@ -31,7 +31,9 @@ const statusClasses: Record<string, string> = {
   scheduled: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100",
   in_progress: "bg-amber-50 text-amber-700 ring-1 ring-amber-100",
   completed: "bg-slate-100 text-slate-700 ring-1 ring-slate-200",
+  invoiced: "bg-violet-50 text-violet-700 ring-1 ring-violet-100",
   cancelled: "bg-rose-50 text-rose-700 ring-1 ring-rose-100",
+  follow_up_required: "bg-amber-50 text-amber-800 ring-1 ring-amber-100",
   past_due: "bg-rose-50 text-rose-800 ring-1 ring-rose-100"
 };
 
@@ -42,7 +44,17 @@ const reportStatusClasses: Record<string, string> = {
 };
 
 function inspectionStatusLabel(status: string) {
-  return formatInspectionStatusLabel(status as "past_due" | "to_be_completed" | "scheduled" | "in_progress" | "completed" | "cancelled");
+  return formatInspectionStatusLabel(
+    status as
+      | "past_due"
+      | "to_be_completed"
+      | "scheduled"
+      | "in_progress"
+      | "completed"
+      | "invoiced"
+      | "cancelled"
+      | "follow_up_required"
+  );
 }
 
 function nextDueLabel(nextDueAt: Date | null | undefined, scheduledStart: Date) {

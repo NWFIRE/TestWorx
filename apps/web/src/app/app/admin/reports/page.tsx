@@ -34,6 +34,7 @@ export default async function AdminReportsQueuePage({
 
   const params = searchParams ? await searchParams : {};
   const status = typeof params.status === "string" ? params.status : "awaiting-review";
+  const currentPath = `/app/admin/reports?status=${encodeURIComponent(status)}`;
 
   const data = await getAdminReportReviewQueueData(
     {
@@ -150,7 +151,7 @@ export default async function AdminReportsQueuePage({
                     ) : null}
                     <Link
                       className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
-                      href={`/app/admin/inspections/${inspection.id}`}
+                      href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`}
                     >
                       View inspection
                     </Link>

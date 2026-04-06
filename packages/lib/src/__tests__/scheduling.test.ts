@@ -15,6 +15,31 @@ import {
   scheduleInspectionSchema
 } from "../scheduling";
 
+function setCurrentVisitServiceLine(formData: FormData, overrides?: Partial<{
+  inspectionType: string;
+  frequency: string;
+  assignedTechnicianId: string | null;
+  dueMonth: string | null;
+  dueDate: string | null;
+  schedulingStatus: string;
+  notes: string | null;
+}>) {
+  formData.set(
+    "serviceLinesJson",
+    JSON.stringify([
+      {
+        inspectionType: overrides?.inspectionType ?? "fire_extinguisher",
+        frequency: overrides?.frequency ?? "ANNUAL",
+        assignedTechnicianId: overrides?.assignedTechnicianId ?? "tech_1",
+        dueMonth: overrides?.dueMonth ?? "2026-03",
+        dueDate: overrides?.dueDate ?? "2026-03-15T00:00",
+        schedulingStatus: overrides?.schedulingStatus ?? "scheduled_now",
+        notes: overrides?.notes ?? null
+      }
+    ])
+  );
+}
+
 describe("schedule creation parsing", () => {
   it("requires at least one inspection type", () => {
     const formData = new FormData();
@@ -43,8 +68,7 @@ describe("schedule creation parsing", () => {
     const formData = new FormData();
     formData.set("customerCompanyId", "customer_1");
     formData.set("scheduledStart", "2026-03-15T09:00:00.000Z");
-    formData.set("type:fire_extinguisher", "true");
-    formData.set("frequency:fire_extinguisher", "ANNUAL");
+    setCurrentVisitServiceLine(formData);
 
     const result = parseCreateInspectionFormData(formData);
     expect(result.success).toBe(true);
@@ -63,8 +87,22 @@ describe("schedule creation parsing", () => {
       status: "scheduled",
       notes: "Bring replacement tags.",
       tasks: [
-        { inspectionType: "fire_extinguisher", frequency: "ANNUAL" },
-        { inspectionType: "fire_extinguisher", frequency: "ANNUAL" }
+        {
+          inspectionType: "fire_extinguisher",
+          frequency: "ANNUAL",
+          assignedTechnicianId: "tech_1",
+          dueMonth: "2026-03",
+          dueDate: new Date("2026-03-15T00:00:00.000Z"),
+          schedulingStatus: "scheduled_now"
+        },
+        {
+          inspectionType: "fire_extinguisher",
+          frequency: "ANNUAL",
+          assignedTechnicianId: "tech_1",
+          dueMonth: "2026-09",
+          dueDate: new Date("2026-09-15T00:00:00.000Z"),
+          schedulingStatus: "scheduled_future"
+        }
       ]
     });
 
@@ -77,8 +115,7 @@ describe("schedule creation parsing", () => {
     formData.set("siteId", "site_1");
     formData.set("scheduledStart", "2026-03-15T09:00:00.000Z");
     formData.set("scheduledEnd", "2026-03-15T08:30:00.000Z");
-    formData.set("type:fire_extinguisher", "true");
-    formData.set("frequency:fire_extinguisher", "ANNUAL");
+    setCurrentVisitServiceLine(formData);
 
     const result = parseCreateInspectionFormData(formData);
     expect(result.success).toBe(false);
@@ -89,8 +126,10 @@ describe("schedule creation parsing", () => {
     formData.set("customerCompanyId", "customer_1");
     formData.set("siteId", "site_1");
     formData.set("inspectionMonth", "2026-03");
-    formData.set("type:fire_extinguisher", "true");
-    formData.set("frequency:fire_extinguisher", "ANNUAL");
+    setCurrentVisitServiceLine(formData, {
+      dueMonth: "2026-03",
+      dueDate: "2026-03-01T00:00"
+    });
 
     const result = parseCreateInspectionFormData(formData);
     expect(result.success).toBe(true);
@@ -109,8 +148,10 @@ describe("schedule creation parsing", () => {
     formData.set("siteId", "site_1");
     formData.set("inspectionMonth", "2026-03");
     formData.set("scheduledStart", "2026-03-12T13:30");
-    formData.set("type:fire_extinguisher", "true");
-    formData.set("frequency:fire_extinguisher", "ANNUAL");
+    setCurrentVisitServiceLine(formData, {
+      dueMonth: "2026-03",
+      dueDate: "2026-03-12T00:00"
+    });
 
     const result = parseCreateInspectionFormData(formData);
     expect(result.success).toBe(true);
@@ -129,8 +170,9 @@ describe("schedule creation parsing", () => {
     formData.set("scheduledStart", "2026-03-12T13:30");
     formData.append("assignedTechnicianIds", "tech_1");
     formData.append("assignedTechnicianIds", "tech_2");
-    formData.set("type:fire_extinguisher", "true");
-    formData.set("frequency:fire_extinguisher", "ANNUAL");
+    setCurrentVisitServiceLine(formData, {
+      assignedTechnicianId: "tech_1"
+    });
 
     const result = parseCreateInspectionFormData(formData);
     expect(result.success).toBe(true);
@@ -144,8 +186,10 @@ describe("schedule creation parsing", () => {
     formData.set("customerCompanyId", "customer_1");
     formData.set("siteId", "site_1");
     formData.set("inspectionMonth", "2026-03");
-    formData.set("type:fire_extinguisher", "true");
-    formData.set("frequency:fire_extinguisher", "ANNUAL");
+    setCurrentVisitServiceLine(formData, {
+      dueMonth: "2026-03",
+      dueDate: "2026-03-01T00:00"
+    });
 
     const result = parseCreateInspectionFormData(formData);
     expect(result.success).toBe(true);

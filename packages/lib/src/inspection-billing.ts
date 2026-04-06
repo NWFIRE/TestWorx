@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { InspectionStatus, Prisma } from "@prisma/client";
 import { prisma } from "@testworx/db";
 
 import type { ActorContext, InspectionType, ReportStatus } from "@testworx/types";
@@ -1624,28 +1624,53 @@ async function getAuthorizedBillingSummary(actor: ActorContext, summaryId: strin
 export async function updateBillingSummaryStatus(actor: ActorContext, summaryId: string, status: BillingSummaryStatus) {
   const { summary } = await getAuthorizedBillingSummary(actor, summaryId);
   const resetQuickBooksFields = summary.status === "invoiced" && status !== "invoiced";
+  const nextInspectionStatus = status === "invoiced"
+    ? InspectionStatus.invoiced
+    : resetQuickBooksFields
+      ? InspectionStatus.completed
+      : null;
   if (resetQuickBooksFields) {
-    await prisma.$executeRaw`
-      UPDATE "InspectionBillingSummary"
-      SET "status" = ${status},
-          "quickbooksSyncStatus" = 'not_synced',
-          "quickbooksInvoiceId" = NULL,
-          "quickbooksInvoiceNumber" = NULL,
-          "quickbooksConnectionMode" = NULL,
-          "quickbooksCustomerId" = NULL,
-          "quickbooksSyncedAt" = NULL,
-          "quickbooksSyncError" = NULL,
-          "updatedAt" = NOW()
-      WHERE "id" = ${summary.id}
-    `;
+    await prisma.$transaction([
+      prisma.$executeRaw`
+        UPDATE "InspectionBillingSummary"
+        SET "status" = ${status},
+            "quickbooksSyncStatus" = 'not_synced',
+            "quickbooksInvoiceId" = NULL,
+            "quickbooksInvoiceNumber" = NULL,
+            "quickbooksConnectionMode" = NULL,
+            "quickbooksCustomerId" = NULL,
+            "quickbooksSyncedAt" = NULL,
+            "quickbooksSyncError" = NULL,
+            "updatedAt" = NOW()
+        WHERE "id" = ${summary.id}
+      `,
+      ...(nextInspectionStatus
+        ? [
+            prisma.inspection.update({
+              where: { id: summary.inspectionId },
+              data: { status: nextInspectionStatus }
+            })
+          ]
+        : [])
+    ]);
     return;
   }
 
-  await prisma.$executeRaw`
-    UPDATE "InspectionBillingSummary"
-    SET "status" = ${status}, "updatedAt" = NOW()
-    WHERE "id" = ${summary.id}
-  `;
+  await prisma.$transaction([
+    prisma.$executeRaw`
+      UPDATE "InspectionBillingSummary"
+      SET "status" = ${status}, "updatedAt" = NOW()
+      WHERE "id" = ${summary.id}
+    `,
+    ...(nextInspectionStatus
+      ? [
+          prisma.inspection.update({
+            where: { id: summary.inspectionId },
+            data: { status: nextInspectionStatus }
+          })
+        ]
+      : [])
+  ]);
 }
 
 export async function updateBillingSummaryNotes(actor: ActorContext, summaryId: string, notes: string) {

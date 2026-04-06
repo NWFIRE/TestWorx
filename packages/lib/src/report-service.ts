@@ -11,7 +11,12 @@ import type { JsonInputValue, JsonObject, JsonValue } from "./json-types";
 import { assertTenantContext } from "./permissions";
 import { generateInspectionReportPdf } from "./pdf-report";
 import { resolveReportTemplate } from "./report-config";
-import { getInspectionAssignedTechnicianIds, isTechnicianAssignedToInspection, withInspectionTaskDisplayLabels } from "./scheduling";
+import {
+  getInspectionAssignedTechnicianIds,
+  isActiveOperationalInspectionStatus,
+  isTechnicianAssignedToInspection,
+  withInspectionTaskDisplayLabels
+} from "./scheduling";
 import {
   type ReportAssetRecord,
   type ReportDetectedDeficiency,
@@ -268,10 +273,10 @@ async function getAuthorizedReport(actor: ActorContext, inspectionId: string, ta
 
   if (
     parsedActor.role === "technician" &&
-    report.inspection.status === InspectionStatus.completed &&
+    !isActiveOperationalInspectionStatus(report.inspection.status) &&
     !hasActiveCorrectionState(report.correctionState)
   ) {
-    throw new Error("Completed inspections are no longer available in the technician app.");
+    throw new Error("Closed inspections are no longer available in the technician app.");
   }
 
   if (parsedActor.role === "customer_user") {
@@ -699,10 +704,10 @@ async function getAuthorizedEditableReport(actor: ActorContext, inspectionReport
 
   if (
     parsedActor.role === "technician" &&
-    report.inspection.status === InspectionStatus.completed &&
+    !isActiveOperationalInspectionStatus(report.inspection.status) &&
     !hasActiveCorrectionState(report.correctionState)
   ) {
-    throw new Error("Completed inspections are no longer editable in the technician app.");
+    throw new Error("Closed inspections are no longer editable in the technician app.");
   }
 
   return { parsedActor, report };

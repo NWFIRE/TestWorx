@@ -9,7 +9,7 @@ import { actorContextSchema } from "@testworx/types";
 import { assertTenantEntitlementForTenant } from "./billing";
 import { assertTenantContext } from "./permissions";
 import { canActorAccessAttachmentDownload } from "./report-service";
-import { getInspectionAssignedTechnicianIds, isTechnicianAssignedToInspection } from "./scheduling";
+import { getInspectionAssignedTechnicianIds, isActiveOperationalInspectionStatus, isTechnicianAssignedToInspection } from "./scheduling";
 import {
   assertStorageKeyBelongsToTenant,
   assertStorageKeyCategory,
@@ -336,8 +336,8 @@ async function assertInspectionDocumentAccess(actor: ActorContext, inspectionId:
       technicianAssignments: readTechnicianAssignments(inspection)
     })
   ) {
-    if (inspection.status === InspectionStatus.completed) {
-      throw new Error("Completed inspections are no longer available in the technician app.");
+    if (!isActiveOperationalInspectionStatus(inspection.status)) {
+      throw new Error("Closed inspections are no longer available in the technician app.");
     }
 
     return { parsedActor, inspection };
@@ -506,8 +506,8 @@ export async function signInspectionDocument(actor: ActorContext, input: {
     throw new Error("You do not have access to sign this inspection document.");
   }
 
-  if (parsedActor.role === "technician" && document.inspection.status === InspectionStatus.completed) {
-    throw new Error("Completed inspections are no longer available in the technician app.");
+  if (parsedActor.role === "technician" && !isActiveOperationalInspectionStatus(document.inspection.status)) {
+    throw new Error("Closed inspections are no longer available in the technician app.");
   }
 
   if (!document.requiresSignature) {
@@ -630,8 +630,8 @@ export async function getAuthorizedInspectionDocumentDownload(actor: ActorContex
     throw new Error("You do not have access to this inspection document.");
   }
 
-  if (parsedActor.role === "technician" && document.inspection.status === InspectionStatus.completed) {
-    throw new Error("Completed inspections are no longer available in the technician app.");
+  if (parsedActor.role === "technician" && !isActiveOperationalInspectionStatus(document.inspection.status)) {
+    throw new Error("Closed inspections are no longer available in the technician app.");
   }
 
   const variant = input.variant ?? "preferred";

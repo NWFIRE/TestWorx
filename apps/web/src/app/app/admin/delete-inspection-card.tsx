@@ -2,24 +2,33 @@
 
 import { useActionState, useEffect } from "react";
 
-const initialState = { error: null as string | null, success: null as string | null };
+const initialState = {
+  error: null as string | null,
+  success: null as string | null,
+  redirectTo: null as string | null
+};
 
 export function DeleteInspectionCard({
   action,
   inspectionId,
+  redirectTo,
   disabled = false
 }: {
-  action: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
+  action: (
+    _: { error: string | null; success: string | null; redirectTo: string | null },
+    formData: FormData
+  ) => Promise<{ error: string | null; success: string | null; redirectTo: string | null }>;
   inspectionId: string;
+  redirectTo?: string | null;
   disabled?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
 
   useEffect(() => {
     if (state.success) {
-      window.location.replace("/app/admin?inspection=deleted");
+      window.location.replace(state.redirectTo || "/app/admin?inspection=deleted");
     }
-  }, [state.success]);
+  }, [state.redirectTo, state.success]);
 
   return (
     <form
@@ -32,6 +41,7 @@ export function DeleteInspectionCard({
       }}
     >
       <input name="inspectionId" type="hidden" value={inspectionId} />
+      <input name="redirectTo" type="hidden" value={redirectTo ?? ""} />
       <p className="text-sm uppercase tracking-[0.25em] text-rose-700">Danger zone</p>
       <h3 className="mt-2 text-2xl font-semibold text-ink">Delete inspection</h3>
       <p className="mt-3 text-sm text-rose-900">

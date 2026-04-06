@@ -46,6 +46,9 @@ const prismaMock = {
     update: vi.fn(),
     updateMany: vi.fn()
   },
+  inspection: {
+    update: vi.fn()
+  },
   auditLog: {
     create: vi.fn(),
     findFirst: vi.fn()
@@ -186,6 +189,16 @@ describe("quickbooks billing sync hardening", () => {
     prismaMock.quickBooksItemCache.deleteMany.mockResolvedValue({ count: 0 });
     prismaMock.quickBooksItemMap.upsert.mockResolvedValue(undefined);
     prismaMock.quickBooksItemMap.deleteMany.mockResolvedValue({ count: 0 });
+    prismaMock.inspection.update.mockResolvedValue(undefined);
+    prismaMock.$transaction.mockImplementation(async (input: unknown) => {
+      if (Array.isArray(input)) {
+        return Promise.all(input as Promise<unknown>[]);
+      }
+      if (typeof input === "function") {
+        return (input as (tx: typeof prismaMock) => Promise<unknown>)(prismaMock as never);
+      }
+      return input;
+    });
     resetServerEnvForTests();
   });
 

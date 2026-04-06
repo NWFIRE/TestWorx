@@ -173,6 +173,7 @@ describe("inspection recurrence rollover", () => {
       tasks: [{
         id: "task_1",
         inspectionType: "fire_alarm",
+        schedulingStatus: "scheduled_now",
         recurrence: {
           id: "recurrence_1",
           frequency: RecurrenceFrequency.ANNUAL,
@@ -203,6 +204,44 @@ describe("inspection recurrence rollover", () => {
         seriesId: "series_1",
         anchorScheduledStart: originalScheduledStart,
         nextDueAt: followingDueAt
+      })
+    });
+  });
+
+  it("records previous status, next status, and an optional note in the audit trail", async () => {
+    prismaMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      assignedTechnicianId: "tech_1",
+      createdByUserId: "office_1",
+      status: InspectionStatus.in_progress,
+      scheduledStart: new Date("2026-03-13T09:00:00.000Z"),
+      scheduledEnd: new Date("2026-03-13T10:00:00.000Z"),
+      notes: "Annual visit",
+      claimable: false,
+      amendments: [],
+      technicianAssignments: [{ technicianId: "tech_1" }],
+      tasks: []
+    });
+
+    await updateInspectionStatus(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1",
+      InspectionStatus.follow_up_required,
+      { note: "Tech completed most work, but a return visit is still needed." }
+    );
+
+    expect(txMock.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "inspection.status_updated",
+        metadata: expect.objectContaining({
+          previousStatus: InspectionStatus.in_progress,
+          status: InspectionStatus.follow_up_required,
+          nextStatus: InspectionStatus.follow_up_required,
+          note: "Tech completed most work, but a return visit is still needed."
+        })
       })
     });
   });

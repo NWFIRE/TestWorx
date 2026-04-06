@@ -39,7 +39,9 @@ enum InspectionStatus {
   scheduled
   in_progress
   completed
+  invoiced
   cancelled
+  follow_up_required
 }
 
 enum ReportStatus {

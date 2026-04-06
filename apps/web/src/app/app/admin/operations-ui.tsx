@@ -161,7 +161,7 @@ const workQueueItems = [
   {
     key: "open",
     label: "Open inspections",
-    href: "/app/admin/scheduling?status=open,in_progress",
+    href: "/app/admin/scheduling?status=to_be_completed,scheduled,in_progress,follow_up_required",
     tone: "blue" as const
   },
   {
