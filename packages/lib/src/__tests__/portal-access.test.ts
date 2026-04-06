@@ -135,21 +135,35 @@ describe("customer portal access controls", () => {
           signedAt: new Date("2026-04-02T16:00:00.000Z"),
           signedStorageKey: "blob:tenant_1/inspection-document-signed/customer-authorization-signed.pdf",
           customerVisible: true
+        },
+        {
+          id: "document_annotated",
+          fileName: "site-sketch.pdf",
+          label: "Annotated site sketch",
+          requiresSignature: false,
+          status: InspectionDocumentStatus.ANNOTATED,
+          uploadedAt: new Date("2026-04-02T12:00:00.000Z"),
+          annotatedAt: new Date("2026-04-02T17:00:00.000Z"),
+          annotatedStorageKey: "blob:tenant_1/inspection-document-signed/site-sketch-annotated.pdf",
+          customerVisible: true
         }
       ]
     });
 
     expect(documents.map((document) => document.category)).toEqual([
+      "inspection_pdf",
       "signed_document",
       "report_pdf",
       "inspection_pdf"
     ]);
     expect(documents.map((document) => document.categoryLabel)).toEqual([
+      "Other inspection PDFs",
       "Signed inspection documents",
       "Report PDFs",
       "Other inspection PDFs"
     ]);
     expect(documents.map((document) => document.downloadPath)).toEqual([
+      "/api/inspection-documents/document_annotated",
       "/api/inspection-documents/document_signed",
       "/api/attachments/attachment_report",
       "/api/attachments/attachment_uploaded"

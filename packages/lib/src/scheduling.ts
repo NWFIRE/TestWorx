@@ -2742,6 +2742,8 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
             fileName: true,
             requiresSignature: true,
             status: true,
+            annotatedStorageKey: true,
+            signedStorageKey: true,
             signedAt: true
           }
         }

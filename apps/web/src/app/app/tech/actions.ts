@@ -112,8 +112,8 @@ export async function signInspectionDocumentAction(_: FormActionResult, formData
     revalidatePath(`/app/tech/inspections/${inspectionId}/documents/${documentId}`);
     revalidatePath(`/app/admin/inspections/${inspectionId}`);
     revalidatePath("/app/customer");
-    return { error: null, success: "Annotated PDF saved to this inspection." };
+    return { error: null, success: "PDF changes saved to this inspection." };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Unable to save annotated inspection document.", success: null };
+    return { error: error instanceof Error ? error.message : "Unable to save inspection document changes.", success: null };
   }
 }

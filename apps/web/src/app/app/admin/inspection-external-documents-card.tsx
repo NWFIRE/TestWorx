@@ -10,6 +10,7 @@ function statusLabel(status: string) {
 
 const statusClasses: Record<string, string> = {
   UPLOADED: "bg-slate-100 text-slate-700",
+  ANNOTATED: "bg-sky-50 text-sky-700",
   READY_FOR_SIGNATURE: "bg-amber-50 text-amber-800",
   SIGNED: "bg-emerald-50 text-emerald-700",
   EXPORTED: "bg-sky-50 text-sky-700"
@@ -29,7 +30,9 @@ export function InspectionExternalDocumentsCard({
     status: string;
     customerVisible: boolean;
     uploadedAt: string;
+    annotatedAt: string | null;
     signedAt: string | null;
+    annotatedStorageKey: string | null;
     signedStorageKey: string | null;
   }>;
   action: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
@@ -83,12 +86,19 @@ export function InspectionExternalDocumentsCard({
                 {document.requiresSignature ? "Requires signature" : "Reference only"} | {document.customerVisible ? "Customer visible" : "Internal only"}
               </p>
               <p className="text-sm text-slate-500">
-                Uploaded {new Date(document.uploadedAt).toLocaleString()}{document.signedAt ? ` | Signed ${new Date(document.signedAt).toLocaleString()}` : ""}
+                Uploaded {new Date(document.uploadedAt).toLocaleString()}
+                {document.annotatedAt ? ` | Annotated ${new Date(document.annotatedAt).toLocaleString()}` : ""}
+                {document.signedAt ? ` | Signed ${new Date(document.signedAt).toLocaleString()}` : ""}
               </p>
               <div className="flex flex-wrap gap-3">
                 <a className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={`/api/inspection-documents/${document.id}?variant=original`}>
                   View original
                 </a>
+                {document.annotatedStorageKey ? (
+                  <a className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={`/api/inspection-documents/${document.id}?variant=annotated`}>
+                    View annotated
+                  </a>
+                ) : null}
                 {document.signedStorageKey ? (
                   <a className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={`/api/inspection-documents/${document.id}?variant=signed`}>
                     View signed

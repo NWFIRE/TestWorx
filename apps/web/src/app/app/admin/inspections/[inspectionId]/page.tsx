@@ -186,7 +186,9 @@ export default async function EditInspectionPage({
     status: string;
     customerVisible: boolean;
     uploadedAt: Date;
+    annotatedAt: Date | null;
     signedAt: Date | null;
+    annotatedStorageKey: string | null;
     signedStorageKey: string | null;
   }>;
   const packetDocuments = buildInspectionPacketDocuments({
@@ -392,6 +394,7 @@ export default async function EditInspectionPage({
             documents={externalDocumentView.map((document) => ({
               ...document,
               uploadedAt: document.uploadedAt.toISOString(),
+              annotatedAt: document.annotatedAt?.toISOString() ?? null,
               signedAt: document.signedAt?.toISOString() ?? null
             }))}
             inspectionId={inspection.id}

@@ -22,6 +22,8 @@ type DashboardDocument = NonNullable<
       fileName: string;
       requiresSignature: boolean;
       status: string;
+      annotatedStorageKey: string | null;
+      signedStorageKey: string | null;
     }>;
   })["documents"]
 >[number];
@@ -261,6 +263,8 @@ export default async function TechnicianPage({
                                   fileName: string;
                                   requiresSignature: boolean;
                                   status: string;
+                                  annotatedStorageKey?: string | null;
+                                  signedStorageKey?: string | null;
                                 }>;
                               }).documents ?? []).map((document: DashboardDocument) => (
                                 <div key={document.id} className="flex flex-col gap-2 rounded-[1.25rem] border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between">
@@ -271,7 +275,9 @@ export default async function TechnicianPage({
                                     </p>
                                   </div>
                                   <Link className="inline-flex min-h-12 items-center justify-center rounded-[1.25rem] bg-white px-4 py-3 text-center text-sm font-semibold text-slateblue ring-1 ring-slate-200" href={`/app/tech/inspections/${inspection.id}/documents/${document.id}`}>
-                                    {document.requiresSignature && document.status !== "SIGNED" && document.status !== "EXPORTED" ? "Sign PDF" : "View PDF"}
+                                    {document.requiresSignature
+                                      ? (document.status !== "SIGNED" && document.status !== "EXPORTED" ? "Sign PDF" : "View signed PDF")
+                                      : (document.annotatedStorageKey ? "View annotated PDF" : "Mark up PDF")}
                                   </Link>
                                 </div>
                               ))}

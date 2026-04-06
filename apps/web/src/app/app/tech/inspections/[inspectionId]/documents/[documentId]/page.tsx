@@ -42,6 +42,7 @@ export default async function TechnicianInspectionDocumentPage({
         fileName: detail.document.fileName,
         requiresSignature: detail.document.requiresSignature,
         status: detail.document.status,
+        annotatedStorageKey: detail.document.annotatedStorageKey,
         signedStorageKey: detail.document.signedStorageKey
       }}
       inspectionId={inspectionId}

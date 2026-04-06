@@ -7,6 +7,7 @@ const initialState = { error: null as string | null, success: null as string | n
 
 const statusClasses: Record<string, string> = {
   UPLOADED: "bg-slate-100 text-slate-700",
+  ANNOTATED: "bg-sky-50 text-sky-700",
   READY_FOR_SIGNATURE: "bg-amber-50 text-amber-800",
   SIGNED: "bg-emerald-50 text-emerald-700",
   EXPORTED: "bg-sky-50 text-sky-700"
@@ -238,6 +239,7 @@ export function ExternalDocumentSigner({
     fileName: string;
     requiresSignature: boolean;
     status: string;
+    annotatedStorageKey: string | null;
     signedStorageKey: string | null;
   };
   action: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
@@ -333,6 +335,15 @@ export function ExternalDocumentSigner({
   );
 
   const totalStrokeCount = annotationStrokes.length;
+  const isSignatureWorkflow = inspectionDocument.requiresSignature;
+  const savedVariantHref = isSignatureWorkflow
+    ? inspectionDocument.signedStorageKey
+      ? `/api/inspection-documents/${inspectionDocument.id}?variant=signed&disposition=inline`
+      : null
+    : inspectionDocument.annotatedStorageKey
+      ? `/api/inspection-documents/${inspectionDocument.id}?variant=annotated&disposition=inline`
+      : null;
+  const savedVariantLabel = isSignatureWorkflow ? "Open saved signed PDF" : "Open saved annotated PDF";
 
   return (
     <div className="space-y-6">
@@ -345,7 +356,9 @@ export function ExternalDocumentSigner({
           </span>
         </div>
         <p className="mt-3 text-slate-500">
-          Mark up and sign directly on the attached PDF with finger or Apple Pencil. The saved annotated copy is preserved for admin review, billing, and customer-facing sharing without altering the original upload.
+          {isSignatureWorkflow
+            ? "Mark up and sign directly on the attached PDF with finger or Apple Pencil. The saved signed copy is preserved for admin review, billing, and customer-facing sharing without altering the original upload."
+            : "Mark up the attached PDF with finger or Apple Pencil. The saved annotated copy is preserved for admin review and customer-facing sharing without altering the original upload."}
         </p>
       </div>
 
@@ -360,14 +373,14 @@ export function ExternalDocumentSigner({
             >
               Open original PDF
             </a>
-            {inspectionDocument.signedStorageKey ? (
+            {savedVariantHref ? (
               <a
                 className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
-                href={`/api/inspection-documents/${inspectionDocument.id}?variant=signed&disposition=inline`}
+                href={savedVariantHref}
                 rel="noreferrer"
                 target="_blank"
               >
-                Open saved annotated PDF
+                {savedVariantLabel}
               </a>
             ) : null}
           </div>
@@ -381,7 +394,7 @@ export function ExternalDocumentSigner({
                 key={page.pageIndex}
                 activeColor={activeColor}
                 activeWidth={activeWidth}
-                disabled={pending || !inspectionDocument.requiresSignature || Boolean(pdfError)}
+                disabled={pending || Boolean(pdfError)}
                 onStrokeComplete={(stroke) => {
                   setAnnotationStrokes((current) => [...current, stroke]);
                 }}
@@ -401,12 +414,15 @@ export function ExternalDocumentSigner({
 
           <div>
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Markup workflow</p>
-            <h3 className="mt-2 text-2xl font-semibold text-ink">Annotate and sign on the PDF</h3>
+            <h3 className="mt-2 text-2xl font-semibold text-ink">{isSignatureWorkflow ? "Annotate and sign on the PDF" : "Mark up the PDF"}</h3>
             <p className="mt-2 text-sm text-slate-500">
-              Add initials, signatures, checkmarks, notes, or markup directly on the document. The saved annotated PDF will be the version used downstream in admin and billing.
+              {isSignatureWorkflow
+                ? "Add initials, signatures, checkmarks, notes, or markup directly on the document. The saved signed PDF will be the version used downstream in admin and billing."
+                : "Add checkmarks, notes, callouts, or markup directly on the document. The saved annotated PDF will be the preferred version for office review and customer access when enabled."}
             </p>
           </div>
 
+          {isSignatureWorkflow ? (
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="signerName">
               Technician name
@@ -420,6 +436,7 @@ export function ExternalDocumentSigner({
               value={signerName}
             />
           </div>
+          ) : null}
 
           <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm font-semibold text-slate-700">Ink tools</p>
@@ -479,15 +496,17 @@ export function ExternalDocumentSigner({
             <p className="mt-2">{totalStrokeCount === 0 ? "No markup added yet." : `${totalStrokeCount} stroke${totalStrokeCount === 1 ? "" : "s"} captured and ready to save.`}</p>
           </div>
 
-          {!inspectionDocument.requiresSignature ? <p className="text-sm text-slate-500">This document was uploaded as reference-only and does not require signature.</p> : null}
+          {!inspectionDocument.requiresSignature ? <p className="text-sm text-slate-500">This document was uploaded as reference-only. Signature is not required, but saved markup will create an annotated PDF variant.</p> : null}
           {state.error ? <p className="text-sm text-rose-600">{state.error}</p> : null}
           {state.success ? <p className="text-sm text-emerald-600">{state.success}</p> : null}
           <button
             className="w-full rounded-2xl bg-slateblue px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
-            disabled={pending || !inspectionDocument.requiresSignature || !signerName.trim() || totalStrokeCount === 0 || Boolean(pdfError) || loadingPdf}
+            disabled={pending || (isSignatureWorkflow && !signerName.trim()) || totalStrokeCount === 0 || Boolean(pdfError) || loadingPdf}
             type="submit"
           >
-            {pending ? "Saving annotated PDF..." : "Save annotated PDF"}
+            {pending
+              ? (isSignatureWorkflow ? "Saving signed PDF..." : "Saving annotated PDF...")
+              : (isSignatureWorkflow ? "Save signed PDF" : "Save annotated PDF")}
           </button>
         </form>
       </div>

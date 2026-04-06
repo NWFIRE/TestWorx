@@ -73,6 +73,7 @@ function canCustomerAccessInspectionDocument(input: {
   customerVisible: boolean;
   requiresSignature: boolean;
   status: InspectionDocumentStatus;
+  annotatedStorageKey: string | null;
   signedStorageKey: string | null;
 }) {
   if (!input.actorTenantId || input.actorTenantId !== input.documentTenantId) {
@@ -134,6 +135,11 @@ async function getDocumentWithInspection(documentId: string, tenantId: string) {
 function buildSignedFileName(fileName: string) {
   const base = fileName.toLowerCase().endsWith(".pdf") ? fileName.slice(0, -4) : fileName;
   return `${slugifyFileName(base)}-signed.pdf`;
+}
+
+function buildAnnotatedFileName(fileName: string) {
+  const base = fileName.toLowerCase().endsWith(".pdf") ? fileName.slice(0, -4) : fileName;
+  return `${slugifyFileName(base)}-annotated.pdf`;
 }
 
 async function buildSignedInspectionDocumentPdf(input: {
@@ -223,8 +229,8 @@ function hexToRgbTuple(hex: string) {
 
 async function buildAnnotatedInspectionDocumentPdf(input: {
   originalBytes: Uint8Array;
-  signerName: string;
-  signedAt: Date;
+  signerName?: string;
+  savedAt: Date;
   label: string;
   annotations: z.infer<typeof documentAnnotationSchema>;
 }) {
@@ -281,30 +287,32 @@ async function buildAnnotatedInspectionDocumentPdf(input: {
     font: regular,
     color: rgb(0.2, 0.27, 0.37)
   });
-  summaryPage.drawText(`Annotated by technician: ${input.signerName}`, {
+  summaryPage.drawText(`Saved at: ${input.savedAt.toISOString()}`, {
     x: 48,
     y: 676,
     size: 12,
     font: regular,
     color: rgb(0.2, 0.27, 0.37)
   });
-  summaryPage.drawText(`Saved at: ${input.signedAt.toISOString()}`, {
-    x: 48,
-    y: 652,
-    size: 12,
-    font: regular,
-    color: rgb(0.2, 0.27, 0.37)
-  });
+  if (input.signerName?.trim()) {
+    summaryPage.drawText(`Annotated by technician: ${input.signerName.trim()}`, {
+      x: 48,
+      y: 652,
+      size: 12,
+      font: regular,
+      color: rgb(0.2, 0.27, 0.37)
+    });
+  }
   summaryPage.drawText(`Markup strokes captured: ${input.annotations.strokes.length}`, {
     x: 48,
-    y: 628,
+    y: input.signerName?.trim() ? 628 : 652,
     size: 12,
     font: regular,
     color: rgb(0.2, 0.27, 0.37)
   });
   summaryPage.drawText("The original uploaded PDF remains preserved separately in TradeWorx.", {
     x: 48,
-    y: 592,
+    y: input.signerName?.trim() ? 592 : 616,
     size: 11,
     font: regular,
     color: rgb(0.2, 0.27, 0.37)
@@ -443,6 +451,7 @@ export async function getInspectionDocuments(actor: ActorContext, inspectionId: 
       customerVisible: document.customerVisible,
       requiresSignature: document.requiresSignature,
       status: document.status,
+      annotatedStorageKey: document.annotatedStorageKey,
       signedStorageKey: document.signedStorageKey
     })
   );
@@ -510,76 +519,85 @@ export async function signInspectionDocument(actor: ActorContext, input: {
     throw new Error("Closed inspections are no longer available in the technician app.");
   }
 
-  if (!document.requiresSignature) {
-    throw new Error("This document does not require signature.");
-  }
-
-  if (!input.signerName.trim()) {
-    throw new Error("Signer name is required.");
-  }
-
-  const signedAt = new Date();
+  const savedAt = new Date();
   const originalPdf = await decodeStoredFile(document.originalStorageKey);
   const annotations = input.annotationData
     ? documentAnnotationSchema.parse(JSON.parse(input.annotationData))
     : null;
 
-  let signedBytes: Uint8Array;
-  if (annotations && annotations.strokes.length > 0) {
-    signedBytes = await buildAnnotatedInspectionDocumentPdf({
+  const hasAnnotations = Boolean(annotations && annotations.strokes.length > 0);
+  const requiresSignature = document.requiresSignature;
+
+  if (requiresSignature && !input.signerName.trim()) {
+    throw new Error("Signer name is required.");
+  }
+
+  let outputBytes: Uint8Array;
+  if (hasAnnotations) {
+    const annotationPayload = annotations!;
+    outputBytes = await buildAnnotatedInspectionDocumentPdf({
       originalBytes: originalPdf.bytes,
-      signerName: input.signerName.trim(),
-      signedAt,
+      signerName: requiresSignature ? input.signerName.trim() : undefined,
+      savedAt,
       label: document.label ?? document.fileName,
-      annotations
+      annotations: annotationPayload
     });
-  } else if (input.signatureDataUrl) {
+  } else if (requiresSignature && input.signatureDataUrl) {
     const signatureImage = await decodeStoredFile(input.signatureDataUrl);
-    signedBytes = await buildSignedInspectionDocumentPdf({
+    outputBytes = await buildSignedInspectionDocumentPdf({
       originalBytes: originalPdf.bytes,
       signatureBytes: signatureImage.bytes,
       signerName: input.signerName.trim(),
-      signedAt,
+      signedAt: savedAt,
       label: document.label ?? document.fileName
     });
   } else {
-    throw new Error("Add markup or a signature before saving this document.");
+    throw new Error(requiresSignature ? "Add markup or a signature before saving this document." : "Add markup before saving this document.");
   }
 
   const payload = await buildStoredFilePayload({
     tenantId: parsedActor.tenantId as string,
-    category: "inspection-document-signed",
-    fileName: buildSignedFileName(document.fileName),
+    category: requiresSignature ? "inspection-document-signed" : "inspection-document-signed",
+    fileName: requiresSignature ? buildSignedFileName(document.fileName) : buildAnnotatedFileName(document.fileName),
     mimeType: "application/pdf",
-    bytes: signedBytes
+    bytes: outputBytes
   });
 
+  const previousAnnotatedKey = document.annotatedStorageKey;
   const previousSignedKey = document.signedStorageKey;
   const updated = await prisma.inspectionDocument.update({
     where: { id: document.id },
     data: {
-      status: InspectionDocumentStatus.SIGNED,
-      signedStorageKey: payload.storageKey,
-      signedByUserId: parsedActor.userId,
-      signedAt
+      status: requiresSignature ? InspectionDocumentStatus.SIGNED : InspectionDocumentStatus.ANNOTATED,
+      annotatedStorageKey: requiresSignature ? document.annotatedStorageKey : payload.storageKey,
+      annotatedByUserId: requiresSignature ? document.annotatedByUserId : parsedActor.userId,
+      annotatedAt: requiresSignature ? document.annotatedAt : savedAt,
+      signedStorageKey: requiresSignature ? payload.storageKey : document.signedStorageKey,
+      signedByUserId: requiresSignature ? parsedActor.userId : document.signedByUserId,
+      signedAt: requiresSignature ? savedAt : document.signedAt
     }
   });
 
   await createInspectionDocumentAuditLog({
     tenantId: parsedActor.tenantId as string,
     actorUserId: parsedActor.userId,
-    action: "inspection_document.signed",
+    action: requiresSignature ? "inspection_document.signed" : "inspection_document.annotated",
     documentId: document.id,
     inspectionId: document.inspectionId,
     metadata: {
-      signedAt: signedAt.toISOString(),
-      signerName: input.signerName.trim(),
-      annotated: Boolean(annotations && annotations.strokes.length > 0)
+      savedAt: savedAt.toISOString(),
+      signerName: input.signerName.trim() || null,
+      annotated: hasAnnotations
     }
   });
 
+  if (!requiresSignature && previousAnnotatedKey) {
+    await deleteStoredFile(previousAnnotatedKey);
+  }
   if (previousSignedKey) {
-    await deleteStoredFile(previousSignedKey);
+    if (requiresSignature) {
+      await deleteStoredFile(previousSignedKey);
+    }
   }
 
   return updated;
@@ -587,7 +605,7 @@ export async function signInspectionDocument(actor: ActorContext, input: {
 
 export async function getAuthorizedInspectionDocumentDownload(actor: ActorContext, input: {
   documentId: string;
-  variant?: "original" | "signed" | "preferred";
+  variant?: "original" | "annotated" | "signed" | "preferred";
 }) {
   const parsedActor = parseActor(actor);
   const actorCustomerCompanyId = await getAuthorizedCustomerCompanyId(parsedActor);
@@ -607,6 +625,7 @@ export async function getAuthorizedInspectionDocumentDownload(actor: ActorContex
       customerVisible: document.customerVisible,
       requiresSignature: document.requiresSignature,
       status: document.status,
+      annotatedStorageKey: document.annotatedStorageKey,
       signedStorageKey: document.signedStorageKey
     });
   } else {
@@ -638,11 +657,16 @@ export async function getAuthorizedInspectionDocumentDownload(actor: ActorContex
   if (parsedActor.role === "customer_user" && document.requiresSignature && variant === "original") {
     throw new Error("Original document is not available in the customer portal.");
   }
-  const useSigned = variant === "signed" || (variant === "preferred" && Boolean(document.signedStorageKey));
-  const storageKey = useSigned ? document.signedStorageKey : document.originalStorageKey;
+  const useSigned = document.requiresSignature && (variant === "signed" || (variant === "preferred" && Boolean(document.signedStorageKey)));
+  const useAnnotated = !document.requiresSignature && (variant === "annotated" || (variant === "preferred" && Boolean(document.annotatedStorageKey)));
+  const storageKey = useSigned
+    ? document.signedStorageKey
+    : useAnnotated
+      ? document.annotatedStorageKey
+      : document.originalStorageKey;
 
   if (!storageKey) {
-    throw new Error("Signed inspection document is not available yet.");
+    throw new Error(document.requiresSignature ? "Signed inspection document is not available yet." : "Annotated inspection document is not available yet.");
   }
 
   assertStorageKeyBelongsToTenant(storageKey, document.tenantId);
@@ -653,7 +677,7 @@ export async function getAuthorizedInspectionDocumentDownload(actor: ActorContex
 
   return buildFileDownloadResponse({
     storageKey,
-    fileName: useSigned ? buildSignedFileName(document.fileName) : document.fileName,
+    fileName: useSigned ? buildSignedFileName(document.fileName) : useAnnotated ? buildAnnotatedFileName(document.fileName) : document.fileName,
     fallbackMimeType: document.mimeType
   });
 }

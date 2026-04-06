@@ -79,7 +79,9 @@ export function buildInspectionPacketDocuments(input: {
     requiresSignature?: boolean | null;
     status?: InspectionDocumentStatus | string | null;
     uploadedAt?: Date;
+    annotatedAt?: Date | null;
     signedAt?: Date | null;
+    annotatedStorageKey?: string | null;
     signedStorageKey?: string | null;
     customerVisible?: boolean | null;
   }>;
@@ -106,6 +108,11 @@ export function buildInspectionPacketDocuments(input: {
         document.signedStorageKey &&
         (document.status === InspectionDocumentStatus.SIGNED || document.status === InspectionDocumentStatus.EXPORTED)
     );
+    const isAnnotatedReferenceDocument = Boolean(
+      !document.requiresSignature &&
+        document.annotatedStorageKey &&
+        document.status === InspectionDocumentStatus.ANNOTATED
+    );
 
     packetDocuments.push({
       id: document.id,
@@ -115,7 +122,11 @@ export function buildInspectionPacketDocuments(input: {
       title: document.label?.trim() || document.fileName,
       fileName: document.fileName,
       customerVisible: Boolean(document.customerVisible),
-      happenedAt: document.signedAt ?? document.uploadedAt ?? new Date(0),
+      happenedAt: isSignedDocument
+        ? document.signedAt ?? document.uploadedAt ?? new Date(0)
+        : isAnnotatedReferenceDocument
+          ? document.annotatedAt ?? document.uploadedAt ?? new Date(0)
+          : document.uploadedAt ?? new Date(0),
       downloadPath: `/api/inspection-documents/${document.id}`
     });
   }

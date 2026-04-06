@@ -86,6 +86,7 @@ enum InspectionDocumentType {
 
 enum InspectionDocumentStatus {
   UPLOADED
+  ANNOTATED
   READY_FOR_SIGNATURE
   SIGNED
   EXPORTED
@@ -666,10 +667,13 @@ model InspectionDocument {
   status                 InspectionDocumentStatus @default(UPLOADED)
   customerVisible        Boolean                  @default(false)
   originalStorageKey     String
+  annotatedStorageKey    String?
   signedStorageKey       String?
   uploadedByUserId       String?
+  annotatedByUserId      String?
   signedByUserId         String?
   uploadedAt             DateTime                 @default(now())
+  annotatedAt            DateTime?
   signedAt               DateTime?
   exportedAt             DateTime?
   externalTransferStatus String?

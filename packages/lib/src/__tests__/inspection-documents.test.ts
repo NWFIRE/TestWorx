@@ -49,7 +49,8 @@ vi.mock("../scheduling", () => ({
       return true;
     }
     return (technicianAssignments ?? []).some((assignment: { technicianId: string }) => assignment.technicianId === userId);
-  })
+  }),
+  isActiveOperationalInspectionStatus: vi.fn(() => true)
 }));
 
 vi.mock("../storage", async () => {
@@ -285,6 +286,74 @@ describe("inspection external documents", () => {
     expect(deleteStoredFile).toHaveBeenCalledWith("blob:tenant_1/inspection-document-signed/old.pdf");
   });
 
+  it("creates a separate annotated PDF for reference-only documents", async () => {
+    const { buildStoredFilePayload, decodeStoredFile, deleteStoredFile } = await import("../storage");
+    vi.mocked(decodeStoredFile).mockResolvedValueOnce({ mimeType: "application/pdf", bytes: minimalPdfBytes() });
+    vi.mocked(buildStoredFilePayload).mockResolvedValue({
+      fileName: "reference-sheet-annotated.pdf",
+      mimeType: "application/pdf",
+      storageKey: "blob:tenant_1/inspection-document-signed/reference-sheet-annotated.pdf",
+      sizeBytes: 4096
+    });
+
+    prismaMock.inspectionDocument.findFirst.mockResolvedValue({
+      id: "doc_reference",
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1",
+      fileName: "reference-sheet.pdf",
+      label: "Reference sheet",
+      requiresSignature: false,
+      status: InspectionDocumentStatus.UPLOADED,
+      originalStorageKey: "blob:tenant_1/inspection-document-original/reference-sheet.pdf",
+      annotatedStorageKey: "blob:tenant_1/inspection-document-signed/old-reference-sheet-annotated.pdf",
+      signedStorageKey: null,
+      inspection: {
+        id: "inspection_1",
+        tenantId: "tenant_1",
+        customerCompanyId: "customer_1",
+        assignedTechnicianId: "tech_1",
+        status: InspectionStatus.in_progress,
+        technicianAssignments: [{ technicianId: "tech_1" }]
+      }
+    });
+    prismaMock.inspectionDocument.update.mockResolvedValue({ id: "doc_reference", status: InspectionDocumentStatus.ANNOTATED });
+
+    const { signInspectionDocument } = await import("../inspection-documents");
+    await signInspectionDocument(
+      { userId: "tech_1", role: "technician", tenantId: "tenant_1" },
+      {
+        documentId: "doc_reference",
+        signerName: "",
+        annotationData: JSON.stringify({
+          version: 1,
+          strokes: [
+            {
+              pageIndex: 0,
+              color: "#2563eb",
+              width: 3,
+              points: [
+                { x: 0.2, y: 0.2 },
+                { x: 0.4, y: 0.4 }
+              ]
+            }
+          ]
+        })
+      }
+    );
+
+    expect(prismaMock.inspectionDocument.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: InspectionDocumentStatus.ANNOTATED,
+          annotatedStorageKey: "blob:tenant_1/inspection-document-signed/reference-sheet-annotated.pdf",
+          annotatedByUserId: "tech_1",
+          signedStorageKey: null
+        })
+      })
+    );
+    expect(deleteStoredFile).toHaveBeenCalledWith("blob:tenant_1/inspection-document-signed/old-reference-sheet-annotated.pdf");
+  });
+
   it("only exposes signed customer-visible documents to customer users when signature is required", async () => {
     prismaMock.user.findFirst.mockResolvedValue({ customerCompanyId: "customer_1" });
     prismaMock.inspection.findFirst.mockResolvedValue({
@@ -362,5 +431,41 @@ describe("inspection external documents", () => {
         { documentId: "doc_1", variant: "original" }
       )
     ).rejects.toThrow(/not available in the customer portal/i);
+  });
+
+  it("prefers annotated reference PDFs for customer-visible document downloads", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({ customerCompanyId: "customer_1" });
+    prismaMock.inspectionDocument.findFirst.mockResolvedValue({
+      id: "doc_reference",
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1",
+      fileName: "reference-sheet.pdf",
+      mimeType: "application/pdf",
+      customerVisible: true,
+      requiresSignature: false,
+      status: InspectionDocumentStatus.ANNOTATED,
+      originalStorageKey: "blob:tenant_1/inspection-document-original/reference-sheet.pdf",
+      annotatedStorageKey: "blob:tenant_1/inspection-document-signed/reference-sheet-annotated.pdf",
+      signedStorageKey: null,
+      inspection: {
+        id: "inspection_1",
+        tenantId: "tenant_1",
+        customerCompanyId: "customer_1",
+        assignedTechnicianId: "tech_1",
+        status: InspectionStatus.completed,
+        technicianAssignments: [{ technicianId: "tech_1" }]
+      }
+    });
+
+    const { getAuthorizedInspectionDocumentDownload } = await import("../inspection-documents");
+    const download = await getAuthorizedInspectionDocumentDownload(
+      { userId: "customer_user_1", role: "customer_user", tenantId: "tenant_1" },
+      { documentId: "doc_reference", variant: "preferred" }
+    );
+
+    expect(download).toEqual(expect.objectContaining({
+      storageKey: "blob:tenant_1/inspection-document-signed/reference-sheet-annotated.pdf",
+      fileName: "reference-sheet-annotated.pdf"
+    }));
   });
 });

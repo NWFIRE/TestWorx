@@ -33,7 +33,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ docu
     const { searchParams } = new URL(request.url);
     const variantParam = searchParams.get("variant");
     const disposition = searchParams.get("disposition") === "inline" ? "inline" : "attachment";
-    const variant = variantParam === "original" || variantParam === "signed" ? variantParam : "preferred";
+    const variant = variantParam === "original" || variantParam === "signed" || variantParam === "annotated" ? variantParam : "preferred";
 
     const { documentId } = await params;
     const file = await getAuthorizedInspectionDocumentDownload(
