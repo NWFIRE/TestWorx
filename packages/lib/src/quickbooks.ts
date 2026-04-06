@@ -796,6 +796,49 @@ async function fetchQuickBooksInvoice(connection: QuickBooksTenantConnection, in
   return null;
 }
 
+async function fetchQuickBooksEstimate(connection: QuickBooksTenantConnection, input: {
+  estimateId?: string | null;
+  docNumber?: string | null;
+}) {
+  const normalizedEstimateId = typeof input.estimateId === "string" && input.estimateId.trim().length > 0
+    ? input.estimateId.trim()
+    : null;
+  const normalizedDocNumber = typeof input.docNumber === "string" && input.docNumber.trim().length > 0
+    ? input.docNumber.trim()
+    : null;
+
+  if (normalizedEstimateId) {
+    try {
+      const estimateById = await quickBooksApiRequest<{ Estimate?: unknown }>(connection, {
+        path: `/estimate/${normalizedEstimateId}`
+      });
+      const normalized = normalizeQuickBooksInvoiceRecord(estimateById.Estimate);
+      if (normalized) {
+        return normalized;
+      }
+    } catch {
+      return null;
+    }
+
+    return null;
+  }
+
+  if (normalizedDocNumber) {
+    const queryResponse = await quickBooksApiRequest<{ QueryResponse?: { Estimate?: unknown[] } }>(connection, {
+      path: "/query",
+      searchParams: new URLSearchParams({
+        query: `select * from Estimate where DocNumber = '${qboQueryEscape(normalizedDocNumber)}' maxresults 1`
+      })
+    });
+    const normalized = normalizeQuickBooksInvoiceRecord(queryResponse.QueryResponse?.Estimate?.[0]);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return null;
+}
+
 function readQuickBooksStringField(value: unknown, field: string) {
   if (!value || typeof value !== "object") {
     return null;
@@ -2339,10 +2382,19 @@ export async function getQuickBooksItemMappingSettings(actor: ActorContext) {
   const validatedConnection = await validateQuickBooksConnectionStatus(tenant);
   const integrationId = tenant.quickbooksRealmId;
 
-  const summaries = await prisma.inspectionBillingSummary.findMany({
-    where: { tenantId: parsedActor.tenantId as string },
-    select: { items: true }
-  });
+  const [summaries, quoteLines] = await Promise.all([
+    prisma.inspectionBillingSummary.findMany({
+      where: { tenantId: parsedActor.tenantId as string },
+      select: { items: true }
+    }),
+    prisma.quoteLineItem.findMany({
+      where: { tenantId: parsedActor.tenantId as string },
+      select: {
+        internalCode: true,
+        title: true
+      }
+    })
+  ]);
 
   const latestByCode = new Map<string, { internalCode: string; internalName: string }>();
   for (const summary of summaries) {
@@ -2358,6 +2410,18 @@ export async function getQuickBooksItemMappingSettings(actor: ActorContext) {
         internalName: item.description.trim()
       });
     }
+  }
+
+  for (const line of quoteLines) {
+    const code = line.internalCode.trim();
+    if (!code || latestByCode.has(code)) {
+      continue;
+    }
+
+    latestByCode.set(code, {
+      internalCode: code,
+      internalName: line.title.trim()
+    });
   }
 
   const [mappings, cacheRows] = integrationId
@@ -3231,6 +3295,267 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
       metadata: {
         inspectionId: summary.inspectionId
       }
+    });
+
+    throw normalizedError;
+  }
+}
+
+export async function syncQuoteToQuickBooksEstimate(actor: ActorContext, quoteId: string) {
+  const parsedActor = parseActor(actor);
+  if (!canManageQuickBooksSync(parsedActor.role)) {
+    throw new Error("Only administrators can sync quotes to QuickBooks.");
+  }
+
+  const tenant = await getTenantQuickBooksConnection(parsedActor.tenantId as string);
+  const connectionStatus = assertQuickBooksConnectionUsable(tenant, "syncing quotes");
+  const integrationId = getQuickBooksIntegrationId(tenant);
+
+  const quote = await prisma.quote.findFirst({
+    where: {
+      id: quoteId,
+      tenantId: parsedActor.tenantId as string
+    },
+    include: {
+      customerCompany: true,
+      site: true,
+      lineItems: { orderBy: { sortOrder: "asc" } }
+    }
+  });
+
+  if (!quote) {
+    throw new Error("Quote not found.");
+  }
+
+  if (quote.lineItems.length === 0) {
+    throw new Error("There are no quote line items to sync.");
+  }
+
+  try {
+    await prisma.quote.update({
+      where: { id: quote.id },
+      data: {
+        syncStatus: "sync_pending",
+        quickbooksSyncError: null
+      }
+    });
+
+    const customerId = await resolveQuickBooksCustomer(tenant, {
+      customerCompanyId: quote.customerCompanyId,
+      customerName: quote.customerCompany.name,
+      billingEmail: quote.recipientEmail ?? quote.customerCompany.billingEmail,
+      phone: quote.customerCompany.phone,
+      siteName: quote.site?.name ?? quote.customerCompany.name,
+      billingAddressLine1: quote.customerCompany.billingAddressLine1 ?? quote.customerCompany.serviceAddressLine1 ?? quote.site?.addressLine1 ?? null,
+      billingAddressLine2: quote.customerCompany.billingAddressLine2 ?? quote.customerCompany.serviceAddressLine2 ?? quote.site?.addressLine2 ?? null,
+      billingCity: quote.customerCompany.billingCity ?? quote.customerCompany.serviceCity ?? quote.site?.city ?? null,
+      billingState: quote.customerCompany.billingState ?? quote.customerCompany.serviceState ?? quote.site?.state ?? null,
+      billingPostalCode: quote.customerCompany.billingPostalCode ?? quote.customerCompany.servicePostalCode ?? quote.site?.postalCode ?? null,
+      billingCountry: quote.customerCompany.billingCountry ?? quote.customerCompany.serviceCountry ?? null,
+      notes: quote.customerCompany.notes ?? null
+    });
+
+    const resolvedLines: Array<Record<string, unknown>> = [];
+    const lineQbIds = new Map<string, string>();
+
+    for (const line of quote.lineItems) {
+      if (!line.internalCode?.trim()) {
+        throw new Error(`Quote line "${line.title}" is missing a stable internal service code.`);
+      }
+
+      let qbItemId = line.qbItemId;
+      let qbItemName: string | undefined;
+
+      if (qbItemId) {
+        const cached = await prisma.quickBooksItemCache.findUnique({
+          where: {
+            tenantId_integrationId_qbItemId: {
+              tenantId: parsedActor.tenantId as string,
+              integrationId,
+              qbItemId
+            }
+          },
+          select: {
+            qbItemId: true,
+            qbItemName: true,
+            qbActive: true
+          }
+        });
+
+        if (!cached) {
+          throw new Error(`QuickBooks item ${qbItemId} for quote line "${line.title}" is missing from the local cache. Re-map the service and retry.`);
+        }
+
+        if (!cached.qbActive) {
+          throw new Error(`QuickBooks item "${cached.qbItemName}" for quote line "${line.title}" is inactive. Re-map the service and retry.`);
+        }
+
+        qbItemId = cached.qbItemId;
+        qbItemName = cached.qbItemName;
+      } else {
+        const resolved = await resolveQuickBooksItemForBilling({
+          tenantId: parsedActor.tenantId as string,
+          integrationId,
+          billingCode: line.internalCode,
+          displayName: line.title
+        });
+
+        if (resolved.status !== "mapped") {
+          const suggestionText = resolved.suggestions.length > 0
+            ? ` Suggested items: ${resolved.suggestions.map((suggestion) => suggestion.qbItemName).join(", ")}.`
+            : "";
+          const reasonText = resolved.reason === "inactive_item"
+            ? " The mapped QuickBooks item is inactive."
+            : resolved.reason === "missing_item"
+              ? " The mapped QuickBooks item is missing from the local cache."
+              : " No QuickBooks item is mapped yet.";
+          throw new Error(`QuickBooks item not mapped for quote line code "${line.internalCode}".${reasonText}${suggestionText}`);
+        }
+
+        qbItemId = resolved.qbItemId;
+        qbItemName = resolved.qbItemName;
+      }
+
+      lineQbIds.set(line.id, qbItemId);
+      resolvedLines.push(toQuickBooksInvoiceLine({
+        amount: Number(line.total.toFixed(2)),
+        description: line.description ?? line.title,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        qbItemId,
+        qbItemName
+      }));
+    }
+
+    const docNumber = quote.quoteNumber;
+    let estimateResponse: { Estimate?: unknown };
+
+    if (quote.quickbooksEstimateId) {
+      const currentEstimate = await quickBooksApiRequest<{ Estimate?: unknown }>(tenant, {
+        path: `/estimate/${quote.quickbooksEstimateId}`
+      });
+      const syncToken = readQuickBooksStringField(currentEstimate.Estimate, "SyncToken");
+      if (!syncToken) {
+        throw new Error("QuickBooks did not return enough estimate data to update this quote.");
+      }
+
+      estimateResponse = await quickBooksApiRequest<{ Estimate?: unknown }>(tenant, {
+        path: "/estimate",
+        method: "POST",
+        searchParams: new URLSearchParams({ operation: "update" }),
+        body: {
+          Id: quote.quickbooksEstimateId,
+          SyncToken: syncToken,
+          sparse: true,
+          DocNumber: docNumber,
+          CustomerRef: { value: customerId },
+          TxnDate: quote.issuedAt.toISOString().slice(0, 10),
+          ...(quote.expiresAt ? { ExpirationDate: quote.expiresAt.toISOString().slice(0, 10) } : {}),
+          ...(quote.customerNotes ? { CustomerMemo: { value: quote.customerNotes } } : {}),
+          Line: resolvedLines
+        }
+      });
+    } else {
+      estimateResponse = await quickBooksApiRequest<{ Estimate?: unknown }>(tenant, {
+        path: "/estimate",
+        method: "POST",
+        body: {
+          DocNumber: docNumber,
+          CustomerRef: { value: customerId },
+          TxnDate: quote.issuedAt.toISOString().slice(0, 10),
+          ...(quote.expiresAt ? { ExpirationDate: quote.expiresAt.toISOString().slice(0, 10) } : {}),
+          ...(quote.customerNotes ? { CustomerMemo: { value: quote.customerNotes } } : {}),
+          Line: resolvedLines
+        }
+      });
+    }
+
+    const createdEstimate = normalizeQuickBooksInvoiceRecord(estimateResponse.Estimate);
+    const responseDocNumber = readQuickBooksDocNumber(estimateResponse.Estimate);
+    if (!createdEstimate && !responseDocNumber) {
+      throw new Error("QuickBooks returned an incomplete estimate response.");
+    }
+
+    const verifiedEstimate = await fetchQuickBooksEstimate(tenant, {
+      estimateId: createdEstimate?.id ?? quote.quickbooksEstimateId ?? null,
+      docNumber: responseDocNumber ?? docNumber
+    });
+    if (!verifiedEstimate) {
+      throw new Error(`QuickBooks did not verify estimate ${responseDocNumber ?? docNumber} after sync.`);
+    }
+
+    await prisma.$transaction([
+      prisma.quote.update({
+        where: { id: quote.id },
+        data: {
+          syncStatus: "synced",
+          quickbooksEstimateId: verifiedEstimate.id,
+          quickbooksEstimateNumber: verifiedEstimate.docNumber ?? responseDocNumber ?? docNumber,
+          quickbooksConnectionMode: connectionStatus.appMode,
+          quickbooksCustomerId: customerId,
+          quickbooksSyncedAt: new Date(),
+          quickbooksSyncError: null
+        }
+      }),
+      ...quote.lineItems
+        .filter((line) => lineQbIds.has(line.id))
+        .map((line) =>
+          prisma.quoteLineItem.update({
+            where: { id: line.id },
+            data: {
+              qbItemId: lineQbIds.get(line.id) ?? line.qbItemId
+            }
+          })
+        )
+    ]);
+
+    await prisma.auditLog.create({
+      data: {
+        tenantId: parsedActor.tenantId as string,
+        actorUserId: parsedActor.userId,
+        action: "quote.quickbooks_synced",
+        entityType: "Quote",
+        entityId: quote.id,
+        metadata: {
+          estimateId: verifiedEstimate.id,
+          estimateNumber: verifiedEstimate.docNumber ?? responseDocNumber ?? docNumber,
+          customerId
+        }
+      }
+    });
+
+    return {
+      quoteId: quote.id,
+      estimateId: verifiedEstimate.id,
+      estimateNumber: verifiedEstimate.docNumber ?? responseDocNumber ?? docNumber
+    };
+  } catch (error) {
+    const normalizedError = normalizeQuickBooksError({
+      error,
+      fallbackOperation: "quote.sync",
+      connectionMode: tenant.quickbooksConnectionMode
+    });
+
+    await prisma.quote.update({
+      where: { id: quote.id },
+      data: {
+        syncStatus: "sync_error",
+        quickbooksSyncError: normalizedError.message
+      }
+    });
+
+    await createQuickBooksFailureAuditLog({
+      tenantId: parsedActor.tenantId as string,
+      actorUserId: parsedActor.userId,
+      action: "quote.quickbooks_sync_failed",
+      operation: normalizedError.operation,
+      message: normalizedError.message,
+      httpStatus: normalizedError.httpStatus,
+      intuitTid: normalizedError.intuitTid,
+      rawBody: normalizedError.rawBody,
+      connectionMode: tenant.quickbooksConnectionMode,
+      entityType: "Quote",
+      entityId: quote.id
     });
 
     throw normalizedError;

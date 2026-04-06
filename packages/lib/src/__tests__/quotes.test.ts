@@ -1,0 +1,197 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { QuoteStatus, QuoteSyncStatus, QuoteDeliveryStatus } from "@prisma/client";
+
+const { prismaMock, sendQuoteEmailMock, syncQuoteToQuickBooksEstimateMock, createInspectionMock } = vi.hoisted(() => ({
+  prismaMock: {
+    quote: {
+      count: vi.fn(),
+      create: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn()
+    },
+    quoteLineItem: {
+      findMany: vi.fn()
+    },
+    tenant: {
+      findUnique: vi.fn()
+    },
+    quickBooksItemMap: {
+      findUnique: vi.fn()
+    },
+    auditLog: {
+      create: vi.fn(),
+      findMany: vi.fn()
+    },
+    customerCompany: {
+      findMany: vi.fn()
+    },
+    site: {
+      findMany: vi.fn()
+    },
+    user: {
+      findFirst: vi.fn()
+    }
+  },
+  sendQuoteEmailMock: vi.fn(),
+  syncQuoteToQuickBooksEstimateMock: vi.fn(),
+  createInspectionMock: vi.fn()
+}));
+
+vi.mock("@testworx/db", () => ({
+  prisma: prismaMock
+}));
+
+vi.mock("../account-email", () => ({
+  sendQuoteEmail: sendQuoteEmailMock
+}));
+
+vi.mock("../quickbooks", () => ({
+  resolveQuickBooksItemForBilling: vi.fn(),
+  syncQuoteToQuickBooksEstimate: syncQuoteToQuickBooksEstimateMock,
+  validateMappedQbItem: vi.fn()
+}));
+
+vi.mock("../scheduling", () => ({
+  createInspection: createInspectionMock
+}));
+
+import { createQuote, getCustomerQuoteDetail, getQuoteWorkspaceData } from "../quotes";
+
+describe("quotes", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prismaMock.customerCompany.findMany.mockResolvedValue([]);
+    prismaMock.site.findMany.mockResolvedValue([]);
+    prismaMock.auditLog.create.mockResolvedValue(undefined);
+    prismaMock.auditLog.findMany.mockResolvedValue([]);
+    prismaMock.quoteLineItem.findMany.mockResolvedValue([]);
+    prismaMock.tenant.findUnique.mockResolvedValue({ quickbooksRealmId: "realm_1" });
+    prismaMock.quickBooksItemMap.findUnique.mockResolvedValue({
+      qbItemId: "qb_item_1",
+      qbActive: true
+    });
+  });
+
+  it("creates a draft quote with mapped qb item ids", async () => {
+    prismaMock.quote.count.mockResolvedValue(3);
+    prismaMock.quote.create.mockResolvedValue({
+      id: "quote_1",
+      quoteNumber: "Q-2026-0004"
+    });
+
+    const result = await createQuote(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        contactName: "Alyssa Reed",
+        recipientEmail: "alyssa@example.com",
+        issuedAt: new Date("2026-04-06T12:00:00.000Z"),
+        expiresAt: new Date("2026-04-30T12:00:00.000Z"),
+        internalNotes: "Internal note",
+        customerNotes: "Customer note",
+        taxAmount: 10,
+        lineItems: [
+          {
+            internalCode: "EXTINGUISHER_ANNUAL",
+            title: "Fire extinguisher annual inspection",
+            description: "Annual field inspection and tagging",
+            quantity: 2,
+            unitPrice: 55,
+            discountAmount: 5,
+            taxable: false,
+            inspectionType: "fire_extinguisher",
+            category: "inspection"
+          }
+        ]
+      }
+    );
+
+    expect(result.id).toBe("quote_1");
+    expect(prismaMock.quote.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: QuoteStatus.draft,
+        syncStatus: QuoteSyncStatus.not_synced,
+        deliveryStatus: QuoteDeliveryStatus.not_sent,
+        subtotal: 105,
+        total: 115,
+        lineItems: {
+          create: [
+            expect.objectContaining({
+              internalCode: "EXTINGUISHER_ANNUAL",
+              qbItemId: "qb_item_1",
+              total: 105
+            })
+          ]
+        }
+      })
+    }));
+    expect(prismaMock.auditLog.create).toHaveBeenCalled();
+  });
+
+  it("marks a sent customer quote as viewed on first access", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      customerCompanyId: "customer_1"
+    });
+    prismaMock.quote.findFirst.mockResolvedValue({
+      id: "quote_1",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      quoteNumber: "Q-2026-0001",
+      status: QuoteStatus.sent,
+      issuedAt: new Date("2026-04-06T12:00:00.000Z"),
+      expiresAt: null,
+      viewedAt: null,
+      subtotal: 100,
+      taxAmount: 0,
+      total: 100,
+      customerNotes: null,
+      site: null,
+      customerCompany: { name: "Acme", contactName: "Alyssa", billingEmail: "alyssa@example.com", phone: null },
+      tenant: { name: "TradeWorx", branding: {}, billingEmail: null },
+      lineItems: []
+    });
+    prismaMock.quote.update.mockResolvedValue(undefined);
+
+    const result = await getCustomerQuoteDetail(
+      { userId: "customer_user_1", role: "customer_user", tenantId: "tenant_1" },
+      "quote_1"
+    );
+
+    expect(prismaMock.quote.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "quote_1" },
+      data: expect.objectContaining({
+        status: QuoteStatus.viewed
+      })
+    }));
+    expect(result?.status).toBe(QuoteStatus.viewed);
+    expect(result?.effectiveStatus).toBe(QuoteStatus.viewed);
+  });
+
+  it("treats overdue active quotes as expired in the workspace", async () => {
+    prismaMock.quote.findMany.mockResolvedValue([
+      {
+        id: "quote_1",
+        quoteNumber: "Q-2026-0001",
+        status: QuoteStatus.sent,
+        syncStatus: QuoteSyncStatus.not_synced,
+        expiresAt: new Date("2026-04-01T12:00:00.000Z"),
+        issuedAt: new Date("2026-03-20T12:00:00.000Z"),
+        total: 100,
+        recipientEmail: "alyssa@example.com",
+        customerCompany: { name: "Acme" },
+        site: { name: "Tower" },
+        lineItems: []
+      }
+    ]);
+
+    const results = await getQuoteWorkspaceData(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      { status: "expired", syncStatus: "all", query: "" }
+    );
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.effectiveStatus).toBe(QuoteStatus.expired);
+  });
+});

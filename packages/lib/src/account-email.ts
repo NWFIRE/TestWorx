@@ -16,6 +16,11 @@ type BaseEmailPayload = {
   tenantName: string;
 };
 
+type EmailAttachment = {
+  fileName: string;
+  content: string;
+};
+
 type WorkspaceInviteEmailPayload = BaseEmailPayload & {
   inviteUrl: string;
   inviterName: string;
@@ -26,6 +31,16 @@ type WorkspaceInviteEmailPayload = BaseEmailPayload & {
 
 type PasswordResetEmailPayload = BaseEmailPayload & {
   resetUrl: string;
+};
+
+type QuoteEmailPayload = BaseEmailPayload & {
+  quoteNumber: string;
+  customerName: string;
+  siteName?: string | null;
+  quoteUrl: string;
+  subjectLine: string;
+  messageBody: string;
+  attachment: EmailAttachment;
 };
 
 function buildShell({
@@ -64,7 +79,7 @@ function buildShell({
   `;
 }
 
-async function sendWithResend(input: { to: string; subject: string; html: string }): Promise<TransactionalEmailDeliveryResult> {
+async function sendWithResend(input: { to: string; subject: string; html: string; attachments?: EmailAttachment[] }): Promise<TransactionalEmailDeliveryResult> {
   const env = getOptionalEmailEnv();
   if (!env.RESEND_API_KEY || !env.RESEND_FROM_EMAIL) {
     return {
@@ -83,7 +98,11 @@ async function sendWithResend(input: { to: string; subject: string; html: string
       from: env.RESEND_FROM_EMAIL,
       to: input.to,
       subject: input.subject,
-      html: input.html
+      html: input.html,
+      attachments: input.attachments?.map((attachment) => ({
+        filename: attachment.fileName,
+        content: attachment.content
+      }))
     });
 
     if (result.error) {
@@ -154,6 +173,26 @@ export async function sendWorkspacePasswordResetEmail(payload: PasswordResetEmai
       actionHref: payload.resetUrl,
       actionLabel: "Reset password",
       footer: "This reset link is single-use and expires automatically for security."
+    })
+  });
+}
+
+export async function sendQuoteEmail(payload: QuoteEmailPayload) {
+  return sendWithResend({
+    to: payload.recipientEmail,
+    subject: payload.subjectLine,
+    attachments: [payload.attachment],
+    html: buildShell({
+      eyebrow: "Customer quote",
+      title: `Quote ${payload.quoteNumber} is ready`,
+      body: [
+        `Hi ${payload.recipientName},`,
+        `A new quote is ready from ${payload.tenantName} for ${payload.customerName}${payload.siteName ? ` at ${payload.siteName}` : ""}.`,
+        payload.messageBody
+      ],
+      actionHref: payload.quoteUrl,
+      actionLabel: "Review quote",
+      footer: "The attached PDF is a customer-ready copy of the quote. Reach out to your TradeWorx contact if anything needs to be adjusted."
     })
   });
 }

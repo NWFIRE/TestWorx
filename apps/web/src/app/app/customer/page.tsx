@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { buildTenantBrandingCss, getCustomerPortalData, inspectionTypeRegistry } from "@testworx/lib";
+import { buildTenantBrandingCss, getCustomerPortalData, getCustomerQuoteList, inspectionTypeRegistry, quoteStatusLabels } from "@testworx/lib";
 
 function getInspectionTypeLabel(inspectionType: keyof typeof inspectionTypeRegistry) {
   return inspectionTypeRegistry[inspectionType]?.label ?? inspectionType.replaceAll("_", " ");
@@ -19,6 +19,7 @@ export default async function CustomerPage() {
   }
 
   const data = await getCustomerPortalData({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId });
+  const quotes = await getCustomerQuoteList({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId });
   const theme = buildTenantBrandingCss(data.branding);
   const inspectionPackets = data.inspectionPackets as unknown as Array<{
     id: string;
@@ -70,6 +71,35 @@ export default async function CustomerPage() {
                     View packet
                   </Link>
                 </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+      <div className="space-y-4 rounded-[2rem] bg-white p-6 shadow-panel">
+        <div>
+          <h3 className="text-2xl font-semibold text-ink">Quotes</h3>
+          <p className="mt-2 text-sm text-slate-500">Review open, approved, and converted quotes tied to your account.</p>
+        </div>
+        {quotes.length === 0 ? (
+          <p className="rounded-[1.5rem] border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No customer quotes are available yet.</p>
+        ) : (
+          quotes.map((quote) => (
+            <div key={quote.id} className="rounded-[1.5rem] border border-slate-200 p-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-lg font-semibold text-ink">{quote.quoteNumber}</p>
+                    <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">{quoteStatusLabels[quote.effectiveStatus]}</span>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {quote.site?.name ?? data.tenantName} | Issued {format(quote.issuedAt, "MMM d, yyyy")}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">Total ${quote.total.toFixed(2)}</p>
+                </div>
+                <Link className="inline-flex rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white" href={`/app/customer/quotes/${quote.id}`}>
+                  View quote
+                </Link>
               </div>
             </div>
           ))

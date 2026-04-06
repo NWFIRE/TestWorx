@@ -110,6 +110,32 @@ enum QuickBooksConnectionMode {
   live
 }
 
+enum QuoteStatus {
+  draft
+  ready_to_send
+  sent
+  viewed
+  approved
+  declined
+  expired
+  converted
+  cancelled
+}
+
+enum QuoteSyncStatus {
+  not_synced
+  sync_pending
+  synced
+  sync_error
+}
+
+enum QuoteDeliveryStatus {
+  not_sent
+  pending
+  sent
+  error
+}
+
 model SubscriptionPlan {
   id                String   @id @default(cuid())
   code              String   @unique
@@ -179,6 +205,8 @@ model Tenant {
   billingItemCatalogMatches BillingItemCatalogMatch[]
   accountInvitations        AccountInvitation[]
   passwordResetTokens       PasswordResetToken[]
+  quotes                    Quote[]
+  quoteLineItems            QuoteLineItem[]
 }
 
 model User {
@@ -211,6 +239,8 @@ model User {
   requestedPasswordResets PasswordResetToken[] @relation("PasswordResetRequestedBy")
   passwordResetTokens PasswordResetToken[]     @relation("PasswordResetUser")
   addedInspectionTasks InspectionTask[]        @relation("InspectionTaskAddedBy")
+  createdQuotes       Quote[]                  @relation("QuoteCreatedBy")
+  updatedQuotes       Quote[]                  @relation("QuoteUpdatedBy")
 }
 
 model CustomerCompany {
@@ -248,6 +278,7 @@ model CustomerCompany {
   billingSummaries          InspectionBillingSummary[]
   serviceFeeRules           ServiceFeeRule[]
   accountInvitations        AccountInvitation[]
+  quotes                    Quote[]
 }
 
 model Site {
@@ -270,6 +301,7 @@ model Site {
   deficiencies      Deficiency[]
   billingSummaries  InspectionBillingSummary[]
   serviceFeeRules   ServiceFeeRule[]
+  quotes            Quote[]
 }
 
 model Asset {
@@ -315,6 +347,91 @@ model Inspection {
   amendments            InspectionAmendment[]   @relation("OriginalInspectionAmendments")
   replacementAmendments InspectionAmendment[]   @relation("ReplacementInspectionAmendments")
   technicianAssignments InspectionTechnicianAssignment[]
+  convertedFromQuotes   Quote[]                 @relation("QuoteConvertedInspection")
+}
+
+model Quote {
+  id                      String              @id @default(cuid())
+  tenantId                String
+  quoteNumber             String
+  customerCompanyId       String
+  siteId                  String?
+  contactName             String?
+  recipientEmail          String?
+  status                  QuoteStatus         @default(draft)
+  syncStatus              QuoteSyncStatus     @default(not_synced)
+  deliveryStatus          QuoteDeliveryStatus @default(not_sent)
+  quickbooksEstimateId    String?
+  quickbooksEstimateNumber String?
+  quickbooksConnectionMode QuickBooksConnectionMode?
+  quickbooksCustomerId    String?
+  quickbooksSyncedAt      DateTime?
+  quickbooksSyncError     String?
+  issuedAt                DateTime            @default(now())
+  expiresAt               DateTime?
+  sentAt                  DateTime?
+  viewedAt                DateTime?
+  approvedAt              DateTime?
+  declinedAt              DateTime?
+  convertedAt             DateTime?
+  subtotal                Float               @default(0)
+  taxAmount               Float               @default(0)
+  total                   Float               @default(0)
+  internalNotes           String?
+  customerNotes           String?
+  deliverySubject         String?
+  deliveryBody            String?
+  lastSentToEmail         String?
+  lastDeliveryMessageId   String?
+  lastDeliveryError       String?
+  deliveryAttempts        Int                 @default(0)
+  convertedInspectionId   String?
+  createdByUserId         String
+  updatedByUserId         String
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  tenant                  Tenant              @relation(fields: [tenantId], references: [id])
+  customerCompany         CustomerCompany     @relation(fields: [customerCompanyId], references: [id])
+  site                    Site?               @relation(fields: [siteId], references: [id])
+  createdBy               User                @relation("QuoteCreatedBy", fields: [createdByUserId], references: [id])
+  updatedBy               User                @relation("QuoteUpdatedBy", fields: [updatedByUserId], references: [id])
+  convertedInspection     Inspection?         @relation("QuoteConvertedInspection", fields: [convertedInspectionId], references: [id])
+  lineItems               QuoteLineItem[]
+
+  @@unique([tenantId, quoteNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, syncStatus])
+  @@index([tenantId, customerCompanyId])
+  @@index([tenantId, siteId])
+  @@index([tenantId, issuedAt])
+  @@index([tenantId, sentAt])
+  @@index([tenantId, expiresAt])
+}
+
+model QuoteLineItem {
+  id                String   @id @default(cuid())
+  tenantId          String
+  quoteId           String
+  sortOrder         Int      @default(0)
+  internalCode      String
+  title             String
+  description       String?
+  quantity          Float    @default(1)
+  unitPrice         Float    @default(0)
+  discountAmount    Float    @default(0)
+  taxable           Boolean  @default(false)
+  total             Float    @default(0)
+  qbItemId          String?
+  inspectionType    InspectionType?
+  category          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+  quote             Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, quoteId])
+  @@index([tenantId, internalCode])
+  @@index([tenantId, qbItemId])
 }
 
 model InspectionTechnicianAssignment {

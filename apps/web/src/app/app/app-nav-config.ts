@@ -41,6 +41,15 @@ const adminNavItems: AppNavItem[] = [
     tone: "amber"
   },
   {
+    href: "/app/admin/quotes",
+    label: "Quotes",
+    shortLabel: "Quotes",
+    abbreviation: "QT",
+    icon: "invoice",
+    description: "Create, send, approve, and sync quotes",
+    tone: "blue"
+  },
+  {
     href: "/app/admin/billing",
     label: "Billing Review",
     shortLabel: "Billing",
@@ -107,7 +116,7 @@ const navByRole: Record<string, AppNavItem[]> = {
       description: "Reports, documents, and history",
       tone: "emerald",
       matchMode: "exact",
-      matchPrefixes: ["/app/customer/reports"]
+      matchPrefixes: ["/app/customer/reports", "/app/customer/quotes"]
     }
   ]
 };
