@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import {
+  buildInspectionPacketDocuments,
   editableInspectionStatuses,
   formatInspectionStatusLabel,
   formatInspectionTaskTypeLabel,
@@ -26,6 +27,7 @@ import { InspectionSchedulerForm } from "../../inspection-scheduler-form";
 import { InspectionStatusUpdateCard } from "../../inspection-status-update-card";
 import { StatusBadge } from "../../operations-ui";
 import { RemoveReportTypeButton } from "../../../tech/remove-report-type-button";
+import { InspectionPacketCard } from "../../../inspection-packet-card";
 
 type InspectionType = Parameters<typeof getDefaultInspectionRecurrenceFrequency>[0];
 type RecurrenceFrequency = ReturnType<typeof getDefaultInspectionRecurrenceFrequency>;
@@ -187,6 +189,13 @@ export default async function EditInspectionPage({
     signedAt: Date | null;
     signedStorageKey: string | null;
   }>;
+  const packetDocuments = buildInspectionPacketDocuments({
+    attachments: attachmentView,
+    inspectionDocuments: externalDocumentView.map((document) => ({
+      ...document,
+      uploadedAt: document.uploadedAt
+    }))
+  });
   type InspectionTask = typeof inspectionView.tasks[number];
   type CorrectionEvent = NonNullable<NonNullable<InspectionTask["report"]>["correctionEvents"]>[number];
   type AuditTrailEntry = { id: string; action: string; createdAt: Date; metadata: unknown; actor?: { id: string; name: string } | null };
@@ -316,6 +325,25 @@ export default async function EditInspectionPage({
           }}
         />
         <div className="space-y-6">
+          <InspectionPacketCard
+            description={
+              inspection.status === "completed" || inspection.status === "invoiced" || inspection.status === "follow_up_required"
+                ? "Access every PDF tied to this completed visit from one inspection packet view."
+                : "This packet becomes the primary PDF handoff area once the visit is completed and documents are available."
+            }
+            documents={packetDocuments}
+            emptyDescription={
+              inspection.status === "completed" || inspection.status === "invoiced" || inspection.status === "follow_up_required"
+                ? "No PDFs are attached to this completed inspection yet."
+                : "This inspection is not completed yet, so the packet is not ready."
+            }
+            emptyTitle={
+              inspection.status === "completed" || inspection.status === "invoiced" || inspection.status === "follow_up_required"
+                ? "No inspection packet documents yet"
+                : "Inspection packet not ready"
+            }
+            showCustomerVisibility
+          />
           <InspectionStatusUpdateCard
             action={updateInspectionStatusAdminAction}
             currentStatus={inspection.status}

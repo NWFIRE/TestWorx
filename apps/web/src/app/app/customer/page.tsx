@@ -20,13 +20,13 @@ export default async function CustomerPage() {
 
   const data = await getCustomerPortalData({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId });
   const theme = buildTenantBrandingCss(data.branding);
-  const reports = data.reports as unknown as Array<{
+  const inspectionPackets = data.inspectionPackets as unknown as Array<{
     id: string;
-    updatedAt: Date;
-    finalizedAt: Date | null;
-    inspection: { site: { name: string }; documents: Array<{ id: string }> };
-    task: { inspectionType: keyof typeof inspectionTypeRegistry };
-    attachments: Array<{ id: string }>;
+    scheduledStart: Date;
+    latestFinalizedAt: Date;
+    site: { name: string };
+    taskTypes: Array<{ id: string; inspectionType: keyof typeof inspectionTypeRegistry; displayLabel?: string }>;
+    packetDocuments: Array<{ id: string }>;
   }>;
 
   return (
@@ -44,35 +44,30 @@ export default async function CustomerPage() {
       </div>
       <div className="space-y-4 rounded-[2rem] bg-white p-6 shadow-panel">
         <div>
-          <h3 className="text-2xl font-semibold text-ink">Available reports</h3>
-          <p className="mt-2 text-sm text-slate-500">Each report includes a structured summary plus downloadable PDFs when available.</p>
+          <h3 className="text-2xl font-semibold text-ink">Completed inspection packets</h3>
+          <p className="mt-2 text-sm text-slate-500">Open each completed visit to access every available PDF packet, signed document, and customer-authorized inspection file.</p>
         </div>
-        {reports.length === 0 ? (
-          <p className="rounded-[1.5rem] border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No finalized reports are available yet.</p>
+        {inspectionPackets.length === 0 ? (
+          <p className="rounded-[1.5rem] border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No completed inspection packets are available yet.</p>
         ) : (
-          reports.map((report) => (
-            <div key={report.id} className="rounded-[1.5rem] border border-slate-200 p-4">
+          inspectionPackets.map((inspection) => (
+            <div key={inspection.id} className="rounded-[1.5rem] border border-slate-200 p-4">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-lg font-semibold text-ink">{report.inspection.site.name}</p>
+                    <p className="text-lg font-semibold text-ink">{inspection.site.name}</p>
                     <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Finalized</span>
                   </div>
-                  <p className="mt-1 text-sm text-slate-500">{getInspectionTypeLabel(report.task.inspectionType)} | {format(report.finalizedAt ?? report.updatedAt, "MMM d, yyyy")}</p>
-                  <p className="mt-1 text-sm text-slate-500">{report.attachments.length + report.inspection.documents.length} PDF attachment{report.attachments.length + report.inspection.documents.length === 1 ? "" : "s"} available</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {inspection.taskTypes.map((task) => task.displayLabel ?? getInspectionTypeLabel(task.inspectionType)).join(", ")} | {format(inspection.latestFinalizedAt, "MMM d, yyyy")}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {inspection.packetDocuments.length} PDF document{inspection.packetDocuments.length === 1 ? "" : "s"} available
+                  </p>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
-                  {report.attachments[0] ? (
-                    <a className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={`/api/attachments/${report.attachments[0].id}`}>
-                      Download PDF
-                    </a>
-                  ) : report.inspection.documents[0] ? (
-                    <a className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={`/api/inspection-documents/${report.inspection.documents[0].id}`}>
-                      Download PDF
-                    </a>
-                  ) : null}
-                  <Link className="inline-flex rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white" href={`/app/customer/reports/${report.id}`}>
-                    View details
+                  <Link className="inline-flex rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white" href={`/app/customer/inspections/${inspection.id}`}>
+                    View packet
                   </Link>
                 </div>
               </div>

@@ -50,6 +50,79 @@ function slugifyFileName(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "inspection-report";
 }
 
+export type InspectionPacketDocumentCategory = "report_pdf" | "signed_document" | "inspection_pdf";
+
+export type InspectionPacketDocument = {
+  id: string;
+  source: "attachment" | "inspection_document";
+  category: InspectionPacketDocumentCategory;
+  categoryLabel: string;
+  title: string;
+  fileName: string;
+  customerVisible: boolean;
+  happenedAt: Date;
+  downloadPath: string;
+};
+
+export function buildInspectionPacketDocuments(input: {
+  attachments?: Array<{
+    id: string;
+    fileName: string;
+    source?: string | null;
+    createdAt: Date;
+    customerVisible?: boolean | null;
+  }>;
+  inspectionDocuments?: Array<{
+    id: string;
+    fileName: string;
+    label?: string | null;
+    requiresSignature?: boolean | null;
+    status?: InspectionDocumentStatus | string | null;
+    uploadedAt?: Date;
+    signedAt?: Date | null;
+    signedStorageKey?: string | null;
+    customerVisible?: boolean | null;
+  }>;
+}) {
+  const packetDocuments: InspectionPacketDocument[] = [];
+
+  for (const attachment of input.attachments ?? []) {
+    packetDocuments.push({
+      id: attachment.id,
+      source: "attachment",
+      category: attachment.source === "generated" ? "report_pdf" : "inspection_pdf",
+      categoryLabel: attachment.source === "generated" ? "Report PDFs" : "Other inspection PDFs",
+      title: attachment.fileName,
+      fileName: attachment.fileName,
+      customerVisible: Boolean(attachment.customerVisible),
+      happenedAt: attachment.createdAt,
+      downloadPath: `/api/attachments/${attachment.id}`
+    });
+  }
+
+  for (const document of input.inspectionDocuments ?? []) {
+    const isSignedDocument = Boolean(
+      document.requiresSignature &&
+        document.signedStorageKey &&
+        (document.status === InspectionDocumentStatus.SIGNED || document.status === InspectionDocumentStatus.EXPORTED)
+    );
+
+    packetDocuments.push({
+      id: document.id,
+      source: "inspection_document",
+      category: isSignedDocument ? "signed_document" : "inspection_pdf",
+      categoryLabel: isSignedDocument ? "Signed inspection documents" : "Other inspection PDFs",
+      title: document.label?.trim() || document.fileName,
+      fileName: document.fileName,
+      customerVisible: Boolean(document.customerVisible),
+      happenedAt: document.signedAt ?? document.uploadedAt ?? new Date(0),
+      downloadPath: `/api/inspection-documents/${document.id}`
+    });
+  }
+
+  return packetDocuments.sort((left, right) => right.happenedAt.getTime() - left.happenedAt.getTime());
+}
+
 async function createAuditLog(tx: Prisma.TransactionClient, input: { tenantId: string; actorUserId: string; action: string; entityId: string; metadata?: Record<string, unknown> }) {
   await tx.auditLog.create({
     data: {
@@ -1389,35 +1462,76 @@ export async function getCustomerPortalData(actor: ActorContext) {
 
   const tenant = await prisma.tenant.findFirst({ where: { id: parsedActor.tenantId as string } });
 
-  const [siteCount, reportCount, openDeficiencyCount, recentReports] = await Promise.all([
+  const [siteCount, reportCount, openDeficiencyCount, recentInspections] = await Promise.all([
     prisma.site.count({ where: { tenantId: parsedActor.tenantId as string, customerCompanyId: customerCompanyId as string } }),
     prisma.inspectionReport.count({ where: { tenantId: parsedActor.tenantId as string, status: reportStatuses.finalized, inspection: { customerCompanyId: customerCompanyId as string } } }),
     prisma.deficiency.count({ where: { tenantId: parsedActor.tenantId as string, status: "open", inspectionReport: { status: reportStatuses.finalized, inspection: { customerCompanyId: customerCompanyId as string } } } }),
-    prisma.inspectionReport.findMany({
-      where: { tenantId: parsedActor.tenantId as string, status: reportStatuses.finalized, inspection: { customerCompanyId: customerCompanyId as string } },
+    prisma.inspection.findMany({
+      where: {
+        tenantId: parsedActor.tenantId as string,
+        customerCompanyId: customerCompanyId as string,
+        reports: { some: { status: reportStatuses.finalized } }
+      },
       include: {
-        inspection: {
+        site: true,
+        tasks: {
           include: {
-            site: true,
-            documents: {
-              where: {
-                customerVisible: true,
-                OR: [
-                  { requiresSignature: false },
-                  { requiresSignature: true, signedStorageKey: { not: null }, status: { in: [InspectionDocumentStatus.SIGNED, InspectionDocumentStatus.EXPORTED] } }
-                ]
-              },
-              orderBy: { createdAt: "desc" }
+            report: {
+              select: {
+                id: true,
+                status: true,
+                finalizedAt: true
+              }
             }
           }
         },
-        task: true,
-        attachments: { where: { kind: AttachmentKind.pdf, customerVisible: true } as any, orderBy: { createdAt: "desc" } }
+        attachments: { where: { kind: AttachmentKind.pdf, customerVisible: true } as any, orderBy: { createdAt: "desc" } },
+        documents: {
+          where: {
+            customerVisible: true,
+            OR: [
+              { requiresSignature: false },
+              { requiresSignature: true, signedStorageKey: { not: null }, status: { in: [InspectionDocumentStatus.SIGNED, InspectionDocumentStatus.EXPORTED] } }
+            ]
+          },
+          orderBy: { createdAt: "desc" }
+        }
       },
-      orderBy: { finalizedAt: "desc" },
+      orderBy: { scheduledStart: "desc" },
       take: 12
     })
   ]);
+
+  const inspectionPackets = recentInspections.map((inspection) => {
+    const finalizedReports = inspection.tasks
+      .map((task) => task.report)
+      .filter((report): report is NonNullable<(typeof inspection.tasks)[number]["report"]> => Boolean(report && report.status === reportStatuses.finalized));
+    const latestFinalizedAt = finalizedReports
+      .map((report) => report.finalizedAt ?? null)
+      .filter((value): value is Date => value instanceof Date)
+      .sort((left, right) => right.getTime() - left.getTime())[0] ?? inspection.scheduledStart;
+
+    return {
+      id: inspection.id,
+      scheduledStart: inspection.scheduledStart,
+      latestFinalizedAt,
+      site: inspection.site,
+      taskTypes: withInspectionTaskDisplayLabels(inspection.tasks)
+        .filter((task) => task.report?.status === reportStatuses.finalized)
+        .map((task) => ({
+          id: task.id,
+          inspectionType: task.inspectionType,
+          displayLabel: task.displayLabel
+        })),
+      packetDocuments: buildInspectionPacketDocuments({
+        attachments: inspection.attachments,
+        inspectionDocuments: inspection.documents.map((document) => ({
+          ...document,
+          uploadedAt: document.createdAt
+        }))
+      })
+    };
+  });
 
   return {
     tenantName: tenant?.name ?? "",
@@ -1425,7 +1539,7 @@ export async function getCustomerPortalData(actor: ActorContext) {
     siteCount,
     reportCount,
     openDeficiencyCount,
-    reports: recentReports
+    inspectionPackets
   };
 }
 
@@ -1484,12 +1598,96 @@ export async function getCustomerReportDetail(actor: ActorContext, reportId: str
   });
 
   const draft = reportDraftSchema.parse(report.contentJson ?? {});
+  const packetDocuments = buildInspectionPacketDocuments({
+    attachments: [...report.attachments, ...inspectionAttachments],
+    inspectionDocuments: inspectionDocuments.map((document) => ({
+      ...document,
+      uploadedAt: document.createdAt
+    }))
+  });
   return {
     report,
     template: resolveReportTemplate({ inspectionType: report.task.inspectionType }),
     draft,
     inspectionAttachments,
-    inspectionDocuments
+    inspectionDocuments,
+    packetDocuments
+  };
+}
+
+export async function getCustomerInspectionPacketDetail(actor: ActorContext, inspectionId: string) {
+  const parsedActor = parseActor(actor);
+  const customerCompanyId = await getAuthorizedCustomerCompanyId(parsedActor);
+
+  const inspection = await prisma.inspection.findFirst({
+    where: {
+      id: inspectionId,
+      tenantId: parsedActor.tenantId as string,
+      customerCompanyId: customerCompanyId as string,
+      reports: { some: { status: reportStatuses.finalized } }
+    },
+    include: {
+      site: true,
+      customerCompany: true,
+      attachments: {
+        where: { kind: AttachmentKind.pdf, customerVisible: true } as any,
+        orderBy: { createdAt: "desc" }
+      },
+      documents: {
+        where: {
+          customerVisible: true,
+          OR: [
+            { requiresSignature: false },
+            { requiresSignature: true, signedStorageKey: { not: null }, status: { in: [InspectionDocumentStatus.SIGNED, InspectionDocumentStatus.EXPORTED] } }
+          ]
+        },
+        orderBy: { createdAt: "desc" }
+      },
+      tasks: {
+        include: {
+          report: {
+            include: {
+              attachments: {
+                where: { kind: AttachmentKind.pdf, customerVisible: true } as any,
+                orderBy: { createdAt: "desc" }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (!inspection) {
+    return null;
+  }
+
+  const reportSummaries = withInspectionTaskDisplayLabels(inspection.tasks)
+    .filter((task) => task.report?.status === reportStatuses.finalized)
+    .map((task) => ({
+      id: task.report!.id,
+      taskId: task.id,
+      inspectionType: task.inspectionType,
+      displayLabel: task.displayLabel,
+      finalizedAt: task.report!.finalizedAt,
+      href: `/app/customer/reports/${task.report!.id}`
+    }));
+
+  const reportAttachments = inspection.tasks
+    .filter((task) => task.report?.status === reportStatuses.finalized)
+    .flatMap((task) => task.report?.attachments ?? []);
+  const packetDocuments = buildInspectionPacketDocuments({
+    attachments: [...inspection.attachments, ...reportAttachments],
+    inspectionDocuments: inspection.documents.map((document) => ({
+      ...document,
+      uploadedAt: document.createdAt
+    }))
+  });
+
+  return {
+    inspection,
+    reportSummaries,
+    packetDocuments
   };
 }
 

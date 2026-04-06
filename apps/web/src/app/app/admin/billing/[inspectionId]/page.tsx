@@ -205,7 +205,7 @@ export default async function BillingSummaryDetailPage({
                   <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No {categoryLabels[category].toLowerCase()} extracted from this visit.</p>
                 ) : items.map((item: BillingSummaryLineItem) => (
                   <div key={item.id} className="rounded-[1.5rem] border border-slate-200 p-4">
-                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.7fr)] xl:items-start">
                       <div className="min-w-0 space-y-2">
                         <p className="text-lg font-semibold text-ink">{item.description}</p>
                         <p className="text-sm text-slate-500">{item.reportType === "inspection" ? "inspection billing" : item.reportType.replaceAll("_", " ")} / {item.sourceSection?.replaceAll("-", " ") ?? "billables"}</p>
@@ -246,7 +246,7 @@ export default async function BillingSummaryDetailPage({
                           summaryId={summary.id}
                         />
                       </div>
-                      <form action={updateBillingSummaryItemGroupAction} className="grid gap-3 sm:grid-cols-2 xl:min-w-[20rem] xl:grid-cols-3">
+                      <form action={updateBillingSummaryItemGroupAction} className="grid gap-3 rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4 sm:grid-cols-2 xl:grid-cols-1">
                         <input name="summaryId" type="hidden" value={summary.id} />
                         <input name="inspectionId" type="hidden" value={summary.inspectionId} />
                         {item.itemIds.map((sourceItemId) => (
@@ -265,7 +265,7 @@ export default async function BillingSummaryDetailPage({
                             {isInvoiced ? "Locked" : "Save line"}
                           </button>
                         </div>
-                        <p className="sm:col-span-2 xl:col-span-3 text-xs text-slate-500">
+                        <p className="sm:col-span-2 xl:col-span-1 text-xs text-slate-500">
                           Subtotal: {item.unitPrice !== null && item.unitPrice !== undefined ? `$${(item.quantity * item.unitPrice).toFixed(2)}` : "Pending price"}
                         </p>
                       </form>

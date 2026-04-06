@@ -1,8 +1,11 @@
+import Link from "next/link";
 import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { buildReportPreview, describeRepeaterValueLines, getCustomerReportDetail, isCustomerVisibleField, type ReportFieldDefinition } from "@testworx/lib";
+
+import { InspectionPacketCard } from "../../../inspection-packet-card";
 
 type CustomerReportView = {
   updatedAt: Date;
@@ -24,13 +27,7 @@ type CustomerReportView = {
     notes: string | null;
     photoStorageKey: string | null;
   }>;
-  attachments: Array<{ id: string; fileName: string }>;
 };
-
-type PdfAttachmentLink = { id: string; fileName: string; href: string };
-type ReportAttachment = CustomerReportView["attachments"][number];
-type InspectionAttachment = { id: string; fileName: string };
-type InspectionDocument = { id: string; fileName: string; label: string | null };
 
 function formatFieldValue(value: string | number | boolean | Array<Record<string, string | number | boolean | null>> | null | undefined) {
   if (typeof value === "boolean") {
@@ -74,15 +71,19 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
   }
 
   const reportView = detail.report as unknown as CustomerReportView;
-  const inspectionAttachments = detail.inspectionAttachments as unknown as InspectionAttachment[];
-  const inspectionDocuments = ((detail as typeof detail & {
-    inspectionDocuments?: InspectionDocument[];
-  }).inspectionDocuments ?? []) as InspectionDocument[];
-  const reportPdfAttachments: PdfAttachmentLink[] = [
-    ...reportView.attachments.map((attachment: ReportAttachment) => ({ id: attachment.id, fileName: attachment.fileName, href: `/api/attachments/${attachment.id}` })),
-    ...inspectionAttachments.map((attachment: InspectionAttachment) => ({ id: attachment.id, fileName: attachment.fileName, href: `/api/attachments/${attachment.id}` })),
-    ...inspectionDocuments.map((document: InspectionDocument) => ({ id: document.id, fileName: document.label || document.fileName, href: `/api/inspection-documents/${document.id}` }))
-  ];
+  const packetDocuments = (detail as typeof detail & {
+    packetDocuments?: Array<{
+      id: string;
+      source: "attachment" | "inspection_document";
+      category: "report_pdf" | "signed_document" | "inspection_pdf";
+      categoryLabel: string;
+      title: string;
+      fileName: string;
+      customerVisible: boolean;
+      happenedAt: Date;
+      downloadPath: string;
+    }>;
+  }).packetDocuments ?? [];
   const preview = buildReportPreview(detail.draft);
 
   return (
@@ -180,21 +181,19 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
           </div>
         </div>
         <div className="space-y-6">
-          <div className="rounded-[2rem] bg-white p-6 shadow-panel">
-            <h3 className="text-2xl font-semibold text-ink">PDF documents</h3>
-            <div className="mt-4 space-y-3">
-              {reportPdfAttachments.length === 0 ? (
-                <p className="rounded-[1.5rem] border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No customer-authorized PDFs are available for this report.</p>
-              ) : (
-                reportPdfAttachments.map((attachment: PdfAttachmentLink) => (
-                  <a key={attachment.id} className="flex items-center justify-between rounded-[1.5rem] border border-slate-200 px-4 py-4 text-sm font-semibold text-slateblue" href={attachment.href}>
-                    <span>{attachment.fileName}</span>
-                    <span>Download</span>
-                  </a>
-                ))
-              )}
-            </div>
-          </div>
+          <InspectionPacketCard
+            description="This report is part of a completed inspection packet. Download every customer-authorized PDF tied to the visit from one place."
+            documents={packetDocuments}
+            emptyDescription="No customer-authorized PDFs are available for this completed inspection."
+            emptyTitle="No packet documents available"
+            title="Inspection packet documents"
+          />
+          <Link
+            className="inline-flex rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue"
+            href={`/app/customer/inspections/${detail.report.inspectionId}`}
+          >
+            Open full inspection packet
+          </Link>
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
             <h3 className="text-2xl font-semibold text-ink">Technician notes</h3>
             <p className="mt-4 text-sm leading-6 text-slate-600">{detail.draft.overallNotes || "No technician notes were recorded."}</p>

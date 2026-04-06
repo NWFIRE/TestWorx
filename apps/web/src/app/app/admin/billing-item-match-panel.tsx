@@ -68,7 +68,7 @@ function SearchPaginationControls({
   const pages = Array.from({ length: pagination.totalPages }, (_, index) => index + 1);
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
       <p className="text-xs text-slate-500">
         Showing page {pagination.page} of {pagination.totalPages}
         {" "}
@@ -178,7 +178,7 @@ export function BillingItemMatchPanel({
 
       {open ? (
         <div className="mt-4 space-y-4">
-          <form action={searchFormAction} className="flex flex-col gap-3 sm:flex-row">
+          <form action={searchFormAction} className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
             <input name="summaryId" type="hidden" value={summaryId} />
             <input name="itemId" type="hidden" value={itemId} />
             {(itemIds ?? []).map((candidateId) => (
@@ -224,25 +224,25 @@ export function BillingItemMatchPanel({
                 />
               ) : null}
 
-              <div className="max-h-[28rem] space-y-3 overflow-y-auto pr-1">
+              <div className="max-h-[28rem] space-y-3 overflow-y-auto pr-1 xl:max-h-[38rem]">
               {results.map((candidate) => (
                 <div key={candidate.catalogItemId} className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-                    <div className="min-w-0">
+                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem] xl:items-start">
+                    <div className="min-w-0 space-y-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="break-words text-sm font-semibold text-ink">{candidate.name}</p>
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-700">
                           {confidenceLabel(candidate.confidence)}
                         </span>
                       </div>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="text-xs text-slate-500">
                         {candidate.itemType}
                         {candidate.sku ? ` | SKU ${candidate.sku}` : ""}
                         {candidate.unitPrice !== null ? ` | $${candidate.unitPrice.toFixed(2)}` : ""}
                       </p>
-                      {candidate.alias ? <p className="mt-1 text-xs text-slate-500">Matched via alias: {candidate.alias}</p> : null}
+                      {candidate.alias ? <p className="text-xs text-slate-500">Matched via alias: {candidate.alias}</p> : null}
                     </div>
-                    <form action={linkFormAction} className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 xl:min-w-[260px]">
+                    <form action={linkFormAction} className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
                       <input name="summaryId" type="hidden" value={summaryId} />
                       <input name="inspectionId" type="hidden" value={inspectionId} />
                       <input name="itemId" type="hidden" value={itemId} />
