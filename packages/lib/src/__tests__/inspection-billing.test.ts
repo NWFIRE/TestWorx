@@ -731,6 +731,58 @@ describe("inspection billing persistence and admin review", () => {
     ).rejects.toThrow(/moved back to review/i);
   });
 
+  it("does not expose catalog matches for service fee lines in admin review", async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      {
+        id: "summary_1",
+        inspectionId: "inspection_1",
+        customerCompanyId: "customer_1",
+        customerName: "Pinecrest Property Management",
+        siteId: "site_1",
+        siteName: "Pinecrest Tower",
+        inspectionDate: new Date("2026-03-20T15:00:00.000Z"),
+        technicianName: "Alex Turner",
+        status: "draft",
+        quickbooksSyncStatus: null,
+        quickbooksInvoiceId: null,
+        quickbooksInvoiceNumber: null,
+        quickbooksConnectionMode: null,
+        quickbooksSyncedAt: null,
+        quickbooksSyncError: null,
+        subtotal: 95,
+        notes: null,
+        items: [
+          {
+            id: "inspection_1:service-fee",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "inspection_1",
+            reportType: "inspection",
+            sourceSection: "service-fee",
+            sourceField: "serviceFee",
+            category: "fee",
+            code: "SERVICE_FEE",
+            description: "Service Fee",
+            quantity: 1,
+            unitPrice: 95,
+            metadata: {
+              resolutionSource: "default"
+            }
+          }
+        ]
+      }
+    ]);
+
+    const detail = await getAdminBillingSummaryDetail(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    expect(detail?.items[0]?.currentCatalogMatch).toBeNull();
+    expect(detail?.items[0]?.suggestedCatalogMatches).toEqual([]);
+    expect(prismaMock.quickBooksCatalogItem.findMany).not.toHaveBeenCalled();
+  });
+
   it("updates grouped billing rows while preserving underlying items", async () => {
     prismaMock.$queryRaw.mockResolvedValueOnce([
       {
@@ -1011,6 +1063,39 @@ describe("inspection billing persistence and admin review", () => {
     );
   });
 
+  it("blocks manual catalog searching for service fee lines", async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      {
+        id: "summary_1",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        status: "draft",
+        subtotal: 95,
+        notes: null,
+        items: [
+          {
+            id: "inspection_1:service-fee",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "inspection_1",
+            reportType: "inspection",
+            category: "fee",
+            description: "Service Fee",
+            quantity: 1,
+            unitPrice: 95
+          }
+        ]
+      }
+    ]);
+
+    await expect(
+      searchBillingSummaryItemCatalogMatches(
+        { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+        { summaryId: "summary_1", itemId: "inspection_1:service-fee", query: "service fee" }
+      )
+    ).rejects.toThrow(/controlled by default fee and location rules/i);
+  });
+
   it("persists a manual billing item link and reusable mapping", async () => {
     prismaMock.$queryRaw.mockResolvedValueOnce([
       {
@@ -1195,6 +1280,53 @@ describe("inspection billing persistence and admin review", () => {
 
     expect(prismaMock.inspectionBillingSummary.update).toHaveBeenCalled();
     expect(prismaMock.auditLog.create).toHaveBeenCalled();
+  });
+
+  it("blocks manual catalog linking and clearing for service fee lines", async () => {
+    const summaryRow = [
+      {
+        id: "summary_1",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        status: "draft",
+        subtotal: 95,
+        notes: null,
+        quickbooksSyncStatus: "not_synced",
+        quickbooksInvoiceId: null,
+        items: [
+          {
+            id: "inspection_1:service-fee",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "inspection_1",
+            reportType: "inspection",
+            category: "fee",
+            description: "Service Fee",
+            quantity: 1,
+            unitPrice: 95
+          }
+        ]
+      }
+    ];
+    prismaMock.$queryRaw.mockImplementation(async () => summaryRow);
+
+    await expect(
+      linkBillingSummaryItemCatalog(
+        { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+        {
+          summaryId: "summary_1",
+          itemId: "inspection_1:service-fee",
+          catalogItemId: "catalog_fee"
+        }
+      )
+    ).rejects.toThrow(/controlled by default fee and location rules/i);
+
+    await expect(
+      clearBillingSummaryItemCatalogLink(
+        { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+        { summaryId: "summary_1", itemId: "inspection_1:service-fee" }
+      )
+    ).rejects.toThrow(/controlled by default fee and location rules/i);
   });
 });
 

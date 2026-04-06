@@ -79,6 +79,10 @@ const AUTO_MATCH_CONFIDENCE_THRESHOLD = 0.96;
 const SUGGESTED_MATCH_CONFIDENCE_THRESHOLD = 0.72;
 const MANUAL_SEARCH_CONFIDENCE_THRESHOLD = 0;
 
+function isRuleControlledFeeItem(item: BillableItem) {
+  return item.category === "fee";
+}
+
 export type BillingSummaryStatus = "draft" | "reviewed" | "invoiced";
 
 type PersistedBillingSummary = {
@@ -1198,6 +1202,13 @@ async function searchCatalogCandidates(
 }
 
 async function buildBillingItemCatalogState(tenantId: string, item: BillableItem) {
+  if (isRuleControlledFeeItem(item)) {
+    return {
+      currentMatch: null,
+      suggestedMatches: [] as BillingCatalogMatchSuggestion[]
+    };
+  }
+
   const linkedCatalogItemId = item.linkedCatalogItemId ?? null;
 
   if (linkedCatalogItemId) {
@@ -1399,6 +1410,17 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
   const mergedItems = mergeBillingItems(existing?.items ?? [], extracted);
   const linkedItems = await Promise.all(
     mergedItems.map(async (item) => {
+      if (isRuleControlledFeeItem(item)) {
+        return {
+          ...item,
+          linkedCatalogItemId: null,
+          linkedCatalogItemName: null,
+          linkedQuickBooksItemId: null,
+          linkedMatchMethod: null,
+          linkedMatchConfidence: null
+        } satisfies BillableItem;
+      }
+
       if (item.linkedCatalogItemId) {
         return item;
       }
@@ -1798,6 +1820,9 @@ export async function searchBillingSummaryItemCatalogMatches(
   if (!item) {
     throw new Error("Billing item not found.");
   }
+  if (isRuleControlledFeeItem(item)) {
+    throw new Error("Service fee pricing is controlled by default fee and location rules.");
+  }
 
   return searchCatalogCandidates(parsedActor.tenantId as string, item, input.query, {
     page: input.page,
@@ -1824,6 +1849,9 @@ export async function linkBillingSummaryItemCatalog(
   const item = summary.items.find((candidate) => candidate.id === input.itemId);
   if (!item) {
     throw new Error("Billing item not found.");
+  }
+  if (isRuleControlledFeeItem(item)) {
+    throw new Error("Service fee pricing is controlled by default fee and location rules.");
   }
 
   const catalogItem = await prisma.quickBooksCatalogItem.findFirst({
@@ -2002,6 +2030,9 @@ export async function linkBillingSummaryItemGroupCatalog(
   if (groupedItems.some((item) => buildBillingReviewGroupKey(item) !== firstKey)) {
     throw new Error("Only identical billing items can be linked as a grouped row.");
   }
+  if (groupedItems.some((item) => isRuleControlledFeeItem(item))) {
+    throw new Error("Service fee pricing is controlled by default fee and location rules.");
+  }
 
   const catalogItem = await prisma.quickBooksCatalogItem.findFirst({
     where: {
@@ -2170,6 +2201,9 @@ export async function clearBillingSummaryItemCatalogLink(
   if (!item) {
     throw new Error("Billing item not found.");
   }
+  if (isRuleControlledFeeItem(item)) {
+    throw new Error("Service fee pricing is controlled by default fee and location rules.");
+  }
 
   const updatedItems = summary.items.map((candidate) =>
     candidate.id === input.itemId
@@ -2234,6 +2268,9 @@ export async function clearBillingSummaryItemGroupCatalogLink(
   }
 
   const representativeItem = groupedItems[0]!;
+  if (groupedItems.some((item) => isRuleControlledFeeItem(item))) {
+    throw new Error("Service fee pricing is controlled by default fee and location rules.");
+  }
   const groupedItemSet = new Set(uniqueItemIds);
   const updatedItems = summary.items.map((candidate) =>
     groupedItemSet.has(candidate.id)

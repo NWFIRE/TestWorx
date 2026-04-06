@@ -83,6 +83,25 @@ function buildBillingItemContext(item: {
   return context;
 }
 
+function describeServiceFeeRuleSource(item: {
+  metadata?: Record<string, unknown> | null;
+}) {
+  const source = typeof item.metadata?.resolutionSource === "string" ? item.metadata.resolutionSource : "";
+
+  switch (source) {
+    case "site":
+      return "Controlled by a site-specific service fee rule.";
+    case "customer":
+      return "Controlled by a customer-specific service fee rule.";
+    case "zip":
+      return "Controlled by a ZIP-code service fee rule.";
+    case "city_state":
+      return "Controlled by a city/state service fee rule.";
+    default:
+      return "Controlled by the tenant default service fee.";
+  }
+}
+
 export default async function BillingSummaryDetailPage({
   params,
   searchParams
@@ -233,18 +252,31 @@ export default async function BillingSummaryDetailPage({
                           </details>
                         ) : null}
                         {item.unitPrice === null || item.unitPrice === undefined ? <p className="text-sm font-semibold text-amber-700">Missing unit price. Review recommended.</p> : null}
-                        <BillingItemMatchPanel
-                          clearAction={clearBillingSummaryItemCatalogLinkAction}
-                          currentMatch={item.currentCatalogMatch ?? null}
-                          inspectionId={summary.inspectionId}
-                          itemDescription={item.description}
-                          itemId={item.id}
-                          itemIds={item.itemIds}
-                          linkAction={linkBillingSummaryItemCatalogAction}
-                          searchAction={searchBillingSummaryItemCatalogMatchesAction}
-                          suggestedMatches={item.suggestedCatalogMatches ?? []}
-                          summaryId={summary.id}
-                        />
+                        {item.category === "fee" ? (
+                          <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50/70 px-4 py-4 text-sm text-amber-900">
+                            <p className="font-semibold text-amber-950">Fee controlled by default fee and location rules</p>
+                            <p className="mt-2">{describeServiceFeeRuleSource(item)}</p>
+                            {typeof item.metadata?.serviceFeePriority === "number" ? (
+                              <p className="mt-2 text-amber-800">Rule priority: {item.metadata.serviceFeePriority}</p>
+                            ) : null}
+                            {typeof item.metadata?.serviceFeeRuleId === "string" && item.metadata.serviceFeeRuleId ? (
+                              <p className="mt-1 break-all text-xs text-amber-700">Rule id: {item.metadata.serviceFeeRuleId}</p>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <BillingItemMatchPanel
+                            clearAction={clearBillingSummaryItemCatalogLinkAction}
+                            currentMatch={item.currentCatalogMatch ?? null}
+                            inspectionId={summary.inspectionId}
+                            itemDescription={item.description}
+                            itemId={item.id}
+                            itemIds={item.itemIds}
+                            linkAction={linkBillingSummaryItemCatalogAction}
+                            searchAction={searchBillingSummaryItemCatalogMatchesAction}
+                            suggestedMatches={item.suggestedCatalogMatches ?? []}
+                            summaryId={summary.id}
+                          />
+                        )}
                       </div>
                       <form action={updateBillingSummaryItemGroupAction} className="grid gap-3 rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4 sm:grid-cols-2 xl:grid-cols-1">
                         <input name="summaryId" type="hidden" value={summary.id} />
