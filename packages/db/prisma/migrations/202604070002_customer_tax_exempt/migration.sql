@@ -1,0 +1,2 @@
+ALTER TABLE "CustomerCompany"
+ADD COLUMN "isTaxExempt" BOOLEAN NOT NULL DEFAULT false;

@@ -25,6 +25,7 @@ const customerCompanySelect = {
   contactName: true,
   billingEmail: true,
   phone: true,
+  isTaxExempt: true,
   serviceAddressLine1: true,
   serviceAddressLine2: true,
   serviceCity: true,
@@ -54,6 +55,7 @@ type SelectedCustomerCompany = {
   contactName: string | null;
   billingEmail: string | null;
   phone: string | null;
+  isTaxExempt: boolean;
   serviceAddressLine1: string | null;
   serviceAddressLine2: string | null;
   serviceCity: string | null;
@@ -152,6 +154,7 @@ export const customerCompanyInputSchema = z
       .optional()
       .transform((value) => value || undefined),
     phone: nullableTrimmedString(60),
+    isTaxExempt: z.boolean().default(false),
     serviceAddressLine1: nullableTrimmedString(160),
     serviceAddressLine2: nullableTrimmedString(160),
     serviceCity: nullableTrimmedString(120),
@@ -215,6 +218,7 @@ function normalizeCustomerCompanyInput(input: z.infer<typeof customerCompanyInpu
     contactName: input.contactName ?? null,
     billingEmail: input.billingEmail ?? null,
     phone: input.phone ?? null,
+    isTaxExempt: input.isTaxExempt ?? false,
     serviceAddressLine1: input.serviceAddressLine1 ?? null,
     serviceAddressLine2: input.serviceAddressLine2 ?? null,
     serviceCity: input.serviceCity ?? null,
@@ -252,6 +256,7 @@ export async function getPaginatedTenantCustomerCompanySettings(
   input?: {
     page?: number;
     limit?: number;
+    query?: string | null;
   }
 ) {
   const parsedActor = parseActor(actor);
@@ -259,18 +264,37 @@ export async function getPaginatedTenantCustomerCompanySettings(
   const page = Math.max(input?.page ?? 1, 1);
   const limit = Math.min(Math.max(input?.limit ?? 10, 1), 100);
   const tenantId = parsedActor.tenantId as string;
+  const query = (input?.query ?? "").trim();
+  const where = {
+    tenantId,
+    ...(query
+      ? {
+          OR: [
+            { name: { contains: query, mode: "insensitive" as const } },
+            { contactName: { contains: query, mode: "insensitive" as const } },
+            { billingEmail: { contains: query, mode: "insensitive" as const } },
+            { phone: { contains: query, mode: "insensitive" as const } }
+          ]
+        }
+      : {})
+  };
 
-  const [totalCount, customers] = await Promise.all([
+  const [totalCount, customers, overallCountRaw] = await Promise.all([
     prisma.customerCompany.count({
-      where: { tenantId }
+      where
     }),
     prisma.customerCompany.findMany({
-      where: { tenantId },
+      where,
       orderBy: [{ name: "asc" }, { createdAt: "asc" }],
       skip: (page - 1) * limit,
       take: limit,
       select: customerCompanySelect
-    })
+    }),
+    query
+      ? prisma.customerCompany.count({
+          where: { tenantId }
+        })
+      : Promise.resolve(0)
   ]);
 
   const totalPages = Math.max(Math.ceil(totalCount / limit), 1);
@@ -279,7 +303,7 @@ export async function getPaginatedTenantCustomerCompanySettings(
     safePage === page
       ? customers
       : await prisma.customerCompany.findMany({
-          where: { tenantId },
+          where,
           orderBy: [{ name: "asc" }, { createdAt: "asc" }],
           skip: (safePage - 1) * limit,
           take: limit,
@@ -292,7 +316,11 @@ export async function getPaginatedTenantCustomerCompanySettings(
       page: safePage,
       limit,
       totalCount,
-      totalPages
+      totalPages,
+      overallCount: query ? overallCountRaw : totalCount
+    },
+    filters: {
+      query
     }
   };
 }
@@ -353,6 +381,7 @@ export async function createCustomerCompany(
         name: customer.name,
         billingEmail: customer.billingEmail,
         phone: customer.phone,
+        isTaxExempt: customer.isTaxExempt,
         isActive: customer.isActive,
         paymentTermsCode: customer.paymentTermsCode,
         billingAddressSameAsService: customer.billingAddressSameAsService
@@ -436,6 +465,7 @@ export async function updateCustomerCompany(
         name: customer.name,
         billingEmail: customer.billingEmail,
         phone: customer.phone,
+        isTaxExempt: customer.isTaxExempt,
         isActive: customer.isActive,
         paymentTermsCode: customer.paymentTermsCode,
         billingAddressSameAsService: customer.billingAddressSameAsService

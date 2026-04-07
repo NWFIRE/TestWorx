@@ -185,6 +185,7 @@ export async function createCustomerCompanyAction(_: { error: string | null; suc
     contactName: String(formData.get("contactName") ?? ""),
     billingEmail: String(formData.get("billingEmail") ?? ""),
     phone: String(formData.get("phone") ?? ""),
+    isTaxExempt: formData.get("isTaxExempt") === "on",
     serviceAddressLine1: String(formData.get("serviceAddressLine1") ?? ""),
     serviceAddressLine2: String(formData.get("serviceAddressLine2") ?? ""),
     serviceCity: String(formData.get("serviceCity") ?? ""),
@@ -236,6 +237,7 @@ export async function updateCustomerCompanyAction(formData: FormData) {
   }
 
   const customersPage = String(formData.get("customersPage") ?? "").trim() || "1";
+  const customersQuery = String(formData.get("customersQuery") ?? "").trim();
 
   const parsed = customerCompanyInputSchema.safeParse({
     customerCompanyId: String(formData.get("customerCompanyId") ?? ""),
@@ -243,6 +245,7 @@ export async function updateCustomerCompanyAction(formData: FormData) {
     contactName: String(formData.get("contactName") ?? ""),
     billingEmail: String(formData.get("billingEmail") ?? ""),
     phone: String(formData.get("phone") ?? ""),
+    isTaxExempt: formData.get("isTaxExempt") === "on",
     serviceAddressLine1: String(formData.get("serviceAddressLine1") ?? ""),
     serviceAddressLine2: String(formData.get("serviceAddressLine2") ?? ""),
     serviceCity: String(formData.get("serviceCity") ?? ""),
@@ -270,6 +273,7 @@ export async function updateCustomerCompanyAction(formData: FormData) {
     redirect(buildSettingsRedirectWithParams({
       customersOpen: "1",
       customersPage,
+      customersQuery: customersQuery || null,
       customers: parsed.error.issues[0]?.message ?? "Invalid customer input."
     }));
   }
@@ -285,6 +289,7 @@ export async function updateCustomerCompanyAction(formData: FormData) {
     redirect(buildSettingsRedirectWithParams({
       customersOpen: "1",
       customersPage,
+      customersQuery: customersQuery || null,
       customers: buildCustomerResultMessage(result, `${result.customer.name} updated.`)
     }));
   } catch (error) {
@@ -294,6 +299,7 @@ export async function updateCustomerCompanyAction(formData: FormData) {
     redirect(buildSettingsRedirectWithParams({
       customersOpen: "1",
       customersPage,
+      customersQuery: customersQuery || null,
       customers: error instanceof Error ? error.message : "Unable to update customer."
     }));
   }

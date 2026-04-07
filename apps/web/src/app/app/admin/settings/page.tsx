@@ -130,16 +130,18 @@ function LazySectionCard({
 async function CustomersSection({
   actor,
   page,
-  notice
+  notice,
+  query
 }: {
   actor: { userId: string; role: string; tenantId: string };
   page: number;
   notice?: string | null;
+  query?: string;
 }) {
   let data: Awaited<ReturnType<typeof getPaginatedTenantCustomerCompanySettings>>;
 
   try {
-    data = await getPaginatedTenantCustomerCompanySettings(actor, { page, limit: 10 });
+    data = await getPaginatedTenantCustomerCompanySettings(actor, { page, limit: 10, query });
   } catch (error) {
     return (
       <LazySectionCard
@@ -157,6 +159,7 @@ async function CustomersSection({
     <CustomerManagementCard
       createCustomerAction={createCustomerCompanyAction}
       customers={data.customers}
+      filters={data.filters}
       notice={notice}
       pagination={data.pagination}
       updateCustomerAction={updateCustomerCompanyAction}
@@ -329,6 +332,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   const catalogStatus = catalogStatusRaw === "active" || catalogStatusRaw === "inactive" ? catalogStatusRaw : "all";
   const catalogPage = readPositiveInt(readSearchParam(params, "qboPage", "1"), 1);
   const customersPage = readPositiveInt(readSearchParam(params, "customersPage", "1"), 1);
+  const customersQuery = readSearchParam(params, "customersQuery");
   const feesPage = readPositiveInt(readSearchParam(params, "feesPage", "1"), 1);
   const feeEditor = readSearchParam(params, "feeEditor") || null;
 
@@ -397,10 +401,10 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
           <TenantBrandingForm action={updateTenantBrandingAction} values={{ ...brandingSettings.branding, billingEmail: brandingSettings.billingEmail }} />
           {customersOpen ? (
             <Suspense
-              key={`customers-${customersPage}`}
+              key={`customers-${customersPage}-${customersQuery}`}
               fallback={
                 <LazySectionCard
-                  actionHref={buildSettingsHref(params, { customersOpen: null, customersPage: null })}
+                  actionHref={buildSettingsHref(params, { customersOpen: null, customersPage: null, customersQuery: null })}
                   actionLabel="Hide section"
                   description="Loading the current customer page..."
                   eyebrow="Customer companies"
@@ -409,11 +413,11 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
                 />
               }
             >
-              <CustomersSection actor={actor} notice={customerNotice} page={customersPage} />
+              <CustomersSection actor={actor} notice={customerNotice} page={customersPage} query={customersQuery} />
             </Suspense>
           ) : (
             <LazySectionCard
-              actionHref={buildSettingsHref(params, { customersOpen: 1, customersPage: 1 })}
+              actionHref={buildSettingsHref(params, { customersOpen: 1, customersPage: 1, customersQuery: null })}
               actionLabel="Open customers"
               description="Load customer companies only when you need them, with a paginated current-customer list and its own empty and error states."
               eyebrow="Customer companies"

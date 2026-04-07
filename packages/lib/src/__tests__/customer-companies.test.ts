@@ -28,7 +28,12 @@ vi.mock("../quickbooks", () => ({
   syncTradeWorxCustomerCompanyToQuickBooks: quickBooksMock.syncTradeWorxCustomerCompanyToQuickBooks
 }));
 
-import { createCustomerCompany, getTenantCustomerCompanySettings, updateCustomerCompany } from "../customer-companies";
+import {
+  createCustomerCompany,
+  getPaginatedTenantCustomerCompanySettings,
+  getTenantCustomerCompanySettings,
+  updateCustomerCompany
+} from "../customer-companies";
 
 function buildCustomerCompany(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -37,6 +42,7 @@ function buildCustomerCompany(overrides: Partial<Record<string, unknown>> = {}) 
     contactName: "Jordan Lee",
     billingEmail: "billing@acme.test",
     phone: "312-555-0101",
+    isTaxExempt: false,
     serviceAddressLine1: "123 Market Street",
     serviceAddressLine2: null,
     serviceCity: "Oklahoma City",
@@ -103,6 +109,7 @@ describe("customer company settings", () => {
         contactName: "Jordan Lee",
         billingEmail: "billing@acme.test",
         phone: "312-555-0101",
+        isTaxExempt: true,
         serviceAddressLine1: "123 Market Street",
         serviceCity: "Oklahoma City",
         serviceState: "OK",
@@ -121,6 +128,7 @@ describe("customer company settings", () => {
         name: "Acme Tower",
         serviceAddressLine1: "123 Market Street",
         billingAddressLine1: "123 Market Street",
+        isTaxExempt: true,
         paymentTermsCode: "due_on_receipt",
         isActive: true
       }),
@@ -169,6 +177,7 @@ describe("customer company settings", () => {
         contactName: "Jordan Lee",
         billingEmail: "billing@acme.test",
         phone: "312-555-0101",
+        isTaxExempt: true,
         serviceAddressLine1: "123 Market Street",
         serviceCity: "Oklahoma City",
         serviceState: "OK",
@@ -191,6 +200,7 @@ describe("customer company settings", () => {
       data: expect.objectContaining({
         billingAddressSameAsService: false,
         billingAddressLine1: "PO Box 122",
+        isTaxExempt: true,
         paymentTermsCode: "custom",
         customPaymentTermsLabel: "Net 45",
         isActive: false
@@ -199,5 +209,34 @@ describe("customer company settings", () => {
     });
     expect(result.quickBooksSynced).toBe(false);
     expect(result.quickBooksSyncError).toMatch(/QuickBooks unavailable/i);
+  });
+
+  it("filters current customers by search query", async () => {
+    prismaMock.customerCompany.count
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(4);
+    prismaMock.customerCompany.findMany.mockResolvedValue([
+      buildCustomerCompany({ name: "Harbor Medical", billingEmail: "ap@harbor.test" })
+    ]);
+
+    const result = await getPaginatedTenantCustomerCompanySettings(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { page: 1, limit: 10, query: "harbor" }
+    );
+
+    expect(prismaMock.customerCompany.count).toHaveBeenNthCalledWith(1, {
+      where: {
+        tenantId: "tenant_1",
+        OR: [
+          { name: { contains: "harbor", mode: "insensitive" } },
+          { contactName: { contains: "harbor", mode: "insensitive" } },
+          { billingEmail: { contains: "harbor", mode: "insensitive" } },
+          { phone: { contains: "harbor", mode: "insensitive" } }
+        ]
+      }
+    });
+    expect(result.filters.query).toBe("harbor");
+    expect(result.pagination.totalCount).toBe(1);
+    expect(result.pagination.overallCount).toBe(4);
   });
 });

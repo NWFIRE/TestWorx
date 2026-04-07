@@ -257,6 +257,7 @@ model CustomerCompany {
   contactName               String?
   billingEmail              String?
   phone                     String?
+  isTaxExempt               Boolean  @default(false)
   serviceAddressLine1       String?
   serviceAddressLine2       String?
   serviceCity               String?

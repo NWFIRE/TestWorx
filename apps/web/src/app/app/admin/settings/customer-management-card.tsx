@@ -22,6 +22,7 @@ type CustomerRecord = {
   contactName: string | null;
   billingEmail: string | null;
   phone: string | null;
+  isTaxExempt: boolean;
   serviceAddressLine1: string | null;
   serviceAddressLine2: string | null;
   serviceCity: string | null;
@@ -50,6 +51,10 @@ type CustomerManagementCardProps = {
     limit: number;
     totalCount: number;
     totalPages: number;
+    overallCount: number;
+  };
+  filters: {
+    query: string;
   };
   createCustomerAction: (
     _: { error: string | null; success: string | null },
@@ -64,6 +69,7 @@ type CustomerFormValues = {
   contactName: string;
   billingEmail: string;
   phone: string;
+  isTaxExempt: boolean;
   serviceAddressLine1: string;
   serviceAddressLine2: string;
   serviceCity: string;
@@ -90,6 +96,7 @@ function toFormValues(customer?: CustomerRecord): CustomerFormValues {
     contactName: customer?.contactName ?? "",
     billingEmail: customer?.billingEmail ?? "",
     phone: customer?.phone ?? "",
+    isTaxExempt: customer?.isTaxExempt ?? false,
     serviceAddressLine1: customer?.serviceAddressLine1 ?? "",
     serviceAddressLine2: customer?.serviceAddressLine2 ?? "",
     serviceCity: customer?.serviceCity ?? "",
@@ -167,6 +174,13 @@ function CustomerProfileFields({
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-phone`}>Phone</label>
             <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" defaultValue={initialValues.phone} id={`${formIdPrefix}-phone`} name="phone" />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-isTaxExempt`}>Tax treatment</label>
+            <label className="flex min-h-[52px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700">
+              <input className="h-4 w-4 rounded border-slate-300 text-slateblue focus:ring-slateblue" defaultChecked={initialValues.isTaxExempt} id={`${formIdPrefix}-isTaxExempt`} name="isTaxExempt" type="checkbox" />
+              Customer is tax exempt
+            </label>
           </div>
         </div>
       </CustomerFieldGroup>
@@ -302,6 +316,7 @@ function CustomerProfileFields({
 export function CustomerManagementCard({
   customers,
   pagination,
+  filters,
   createCustomerAction,
   updateCustomerAction,
   notice
@@ -311,11 +326,18 @@ export function CustomerManagementCard({
   const searchParams = useSearchParams();
   const previousPageHref = buildSettingsHref(pathname, searchParams, {
     customersOpen: 1,
-    customersPage: Math.max(pagination.page - 1, 1)
+    customersPage: Math.max(pagination.page - 1, 1),
+    customersQuery: filters.query || null
   });
   const nextPageHref = buildSettingsHref(pathname, searchParams, {
     customersOpen: 1,
-    customersPage: Math.min(pagination.page + 1, pagination.totalPages)
+    customersPage: Math.min(pagination.page + 1, pagination.totalPages),
+    customersQuery: filters.query || null
+  });
+  const clearSearchHref = buildSettingsHref(pathname, searchParams, {
+    customersOpen: 1,
+    customersPage: 1,
+    customersQuery: null
   });
 
   return (
@@ -343,15 +365,38 @@ export function CustomerManagementCard({
       <div className="space-y-4">
         <div>
           <p className="text-sm uppercase tracking-[0.18em] text-slate-500">Current customers</p>
-          <h4 className="mt-1 text-lg font-semibold text-ink">{pagination.totalCount} configured</h4>
+          <h4 className="mt-1 text-lg font-semibold text-ink">{filters.query ? `${pagination.totalCount} match${pagination.totalCount === 1 ? "" : "es"}` : `${pagination.totalCount} configured`}</h4>
           {pagination.totalCount > 0 ? (
             <p className="mt-2 text-sm text-slate-500">
               Showing {(pagination.page - 1) * pagination.limit + 1}-{Math.min(pagination.page * pagination.limit, pagination.totalCount)} of {pagination.totalCount}
+              {filters.query ? ` filtered result${pagination.totalCount === 1 ? "" : "s"} from ${pagination.overallCount} total customers` : ""}
             </p>
           ) : null}
         </div>
+        <form action="/app/admin/settings" className="grid gap-3 rounded-[1.5rem] border border-slate-200 p-4 lg:grid-cols-[1.3fr_auto_auto]">
+          <input name="customersOpen" type="hidden" value="1" />
+          <input name="customersPage" type="hidden" value="1" />
+          <input
+            className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
+            defaultValue={filters.query}
+            name="customersQuery"
+            placeholder="Search customer name, contact, billing email, or phone"
+          />
+          <button className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="submit">
+            Search
+          </button>
+          {filters.query ? (
+            <Link className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" href={clearSearchHref}>
+              Clear
+            </Link>
+          ) : null}
+        </form>
         {customers.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No customers yet. Add your first customer company here or bring them over through the import flow.</p>
+          <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">
+            {filters.query
+              ? "No customers match this search yet. Try a different company name, email, contact, or phone number."
+              : "No customers yet. Add your first customer company here or bring them over through the import flow."}
+          </p>
         ) : (
           customers.map((customer) => (
             <div key={customer.id} className="rounded-[1.5rem] border border-slate-200 p-5">
@@ -362,6 +407,11 @@ export function CustomerManagementCard({
                     <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${customer.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
                       {customer.isActive ? "Active" : "Inactive"}
                     </span>
+                    {customer.isTaxExempt ? (
+                      <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-800">
+                        Tax exempt
+                      </span>
+                    ) : null}
                     {customer.paymentTermsCode === "due_on_receipt" ? (
                       <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-800">
                         Due on site
@@ -377,6 +427,7 @@ export function CustomerManagementCard({
                 <input name="customerCompanyId" type="hidden" value={customer.id} />
                 <input name="customersOpen" type="hidden" value="1" />
                 <input name="customersPage" type="hidden" value={String(pagination.page)} />
+                <input name="customersQuery" type="hidden" value={filters.query} />
                 <CustomerProfileFields customer={customer} formIdPrefix={`customer-${customer.id}`} />
                 <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" type="submit">
                   Save customer
