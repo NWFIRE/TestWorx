@@ -845,6 +845,8 @@ export async function convertQuoteToInspection(actor: ActorContext, quoteId: str
     {
       customerCompanyId: quote.customerCompanyId,
       siteId: quote.siteId,
+      inspectionClassification: "standard",
+      isPriority: false,
       scheduledStart,
       scheduledEnd: new Date(scheduledStart.getTime() + 60 * 60 * 1000),
       assignedTechnicianIds: [],

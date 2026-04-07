@@ -44,6 +44,13 @@ enum InspectionStatus {
   follow_up_required
 }
 
+enum InspectionClassification {
+  standard
+  call_in
+  follow_up
+  emergency
+}
+
 enum ReportStatus {
   draft
   submitted
@@ -320,17 +327,22 @@ model Asset {
 }
 
 model Inspection {
-  id                    String                  @id @default(cuid())
-  tenantId              String
-  customerCompanyId     String
-  siteId                String
-  assignedTechnicianId  String?
-  createdByUserId       String
-  status                InspectionStatus        @default(to_be_completed)
-  scheduledStart        DateTime
-  scheduledEnd          DateTime?
-  notes                 String?
-  claimable             Boolean                 @default(true)
+    id                    String                  @id @default(cuid())
+    tenantId              String
+    customerCompanyId     String
+    siteId                String
+    assignedTechnicianId  String?
+    createdByUserId       String
+    inspectionClassification InspectionClassification @default(standard)
+    isPriority            Boolean                 @default(false)
+    priorityAssignedAt    DateTime?
+    priorityClearedAt     DateTime?
+    classificationUpdatedAt DateTime?
+    status                InspectionStatus        @default(to_be_completed)
+    scheduledStart        DateTime
+    scheduledEnd          DateTime?
+    notes                 String?
+    claimable             Boolean                 @default(true)
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
   tenant                Tenant                  @relation(fields: [tenantId], references: [id])
@@ -344,11 +356,14 @@ model Inspection {
   deficiencies          Deficiency[]
   billingSummary        InspectionBillingSummary?
   documents             InspectionDocument[]
-  amendments            InspectionAmendment[]   @relation("OriginalInspectionAmendments")
-  replacementAmendments InspectionAmendment[]   @relation("ReplacementInspectionAmendments")
-  technicianAssignments InspectionTechnicianAssignment[]
-  convertedFromQuotes   Quote[]                 @relation("QuoteConvertedInspection")
-}
+    amendments            InspectionAmendment[]   @relation("OriginalInspectionAmendments")
+    replacementAmendments InspectionAmendment[]   @relation("ReplacementInspectionAmendments")
+    technicianAssignments InspectionTechnicianAssignment[]
+    convertedFromQuotes   Quote[]                 @relation("QuoteConvertedInspection")
+
+    @@index([tenantId, inspectionClassification])
+    @@index([tenantId, isPriority])
+  }
 
 model Quote {
   id                      String              @id @default(cuid())

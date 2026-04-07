@@ -3,12 +3,22 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { formatInspectionStatusLabel, getTechnicianDashboardData, isDueAtTimeOfServiceCustomer, pickEarliestNextDueAt } from "@testworx/lib";
+import {
+  formatInspectionClassificationLabel,
+  formatInspectionStatusLabel,
+  getInspectionClassificationTone,
+  getInspectionPriorityTone,
+  getInspectionStatusTone,
+  getTechnicianDashboardData,
+  isDueAtTimeOfServiceCustomer,
+  pickEarliestNextDueAt
+} from "@testworx/lib";
 
 import { AddReportTypeControl } from "./add-report-type-control";
 import { ClaimButton } from "./claim-button";
 import { RemoveReportTypeButton } from "./remove-report-type-button";
 import { StatusButton } from "./status-button";
+import { StatusBadge } from "../admin/operations-ui";
 
 type TechnicianDashboardData = Awaited<ReturnType<typeof getTechnicianDashboardData>>;
 type AssignedInspection = TechnicianDashboardData["assigned"][number];
@@ -27,17 +37,6 @@ type DashboardDocument = NonNullable<
     }>;
   })["documents"]
 >[number];
-
-const statusClasses: Record<string, string> = {
-  to_be_completed: "bg-sky-50 text-sky-700 ring-1 ring-sky-100",
-  scheduled: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100",
-  in_progress: "bg-amber-50 text-amber-700 ring-1 ring-amber-100",
-  completed: "bg-slate-100 text-slate-700 ring-1 ring-slate-200",
-  invoiced: "bg-violet-50 text-violet-700 ring-1 ring-violet-100",
-  cancelled: "bg-rose-50 text-rose-700 ring-1 ring-rose-100",
-  follow_up_required: "bg-amber-50 text-amber-800 ring-1 ring-amber-100",
-  past_due: "bg-rose-50 text-rose-800 ring-1 ring-rose-100"
-};
 
 const reportStatusClasses: Record<string, string> = {
   draft: "bg-amber-50 text-amber-700 ring-1 ring-amber-100",
@@ -175,9 +174,13 @@ export default async function TechnicianPage({
                 {(entry as typeof entry & { secondaryTitle?: string }).secondaryTitle ? (
                   <p className="mt-1 text-sm text-slate-500">{(entry as typeof entry & { secondaryTitle?: string }).secondaryTitle}</p>
                 ) : null}
-                <span className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[entry.status]}`}>{inspectionStatusLabel(entry.status)}</span>
-              </div>
-            ))
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <StatusBadge label={formatInspectionClassificationLabel(entry.inspectionClassification)} tone={getInspectionClassificationTone(entry.inspectionClassification)} />
+                    {entry.isPriority ? <StatusBadge label="Priority" tone={getInspectionPriorityTone(true)} /> : null}
+                    <StatusBadge label={inspectionStatusLabel(entry.status)} tone={getInspectionStatusTone(entry.status as Parameters<typeof getInspectionStatusTone>[0])} />
+                  </div>
+                </div>
+              ))
           )}
         </div>
       </div>
@@ -201,11 +204,13 @@ export default async function TechnicianPage({
                   <div key={inspection.id} className="rounded-[1.5rem] border border-slate-200 p-4">
                     <div className="flex flex-col gap-4">
                       <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-lg font-semibold text-ink">{(inspection as typeof inspection & { primaryTitle?: string }).primaryTitle ?? inspection.site.name}</p>
-                          <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[(inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status]}`}>{inspectionStatusLabel((inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status)}</span>
-                          <PaymentCollectionBadge visible={isDueAtTimeOfServiceCustomer(inspection.customerCompany)} />
-                        </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-lg font-semibold text-ink">{(inspection as typeof inspection & { primaryTitle?: string }).primaryTitle ?? inspection.site.name}</p>
+                            <StatusBadge label={formatInspectionClassificationLabel(inspection.inspectionClassification)} tone={getInspectionClassificationTone(inspection.inspectionClassification)} />
+                            {inspection.isPriority ? <StatusBadge label="Priority" tone={getInspectionPriorityTone(true)} /> : null}
+                            <StatusBadge label={inspectionStatusLabel((inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status)} tone={getInspectionStatusTone(((inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status) as Parameters<typeof getInspectionStatusTone>[0])} />
+                            <PaymentCollectionBadge visible={isDueAtTimeOfServiceCustomer(inspection.customerCompany)} />
+                          </div>
                         <p className="mt-2 text-sm text-slate-500">
                           {format(inspection.scheduledStart, "EEE, MMM d h:mm a")} | {((inspection as typeof inspection & { secondaryTitle?: string }).secondaryTitle ?? inspection.customerCompany.name)}
                         </p>
@@ -313,11 +318,13 @@ export default async function TechnicianPage({
                   <div key={inspection.id} className="rounded-[1.5rem] border border-slate-200 p-4">
                     <div className="space-y-4">
                       <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-lg font-semibold text-ink">{(inspection as typeof inspection & { primaryTitle?: string }).primaryTitle ?? inspection.site.name}</p>
-                          <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[(inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status]}`}>{inspectionStatusLabel((inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status)}</span>
-                          <PaymentCollectionBadge visible={isDueAtTimeOfServiceCustomer(inspection.customerCompany)} />
-                        </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-lg font-semibold text-ink">{(inspection as typeof inspection & { primaryTitle?: string }).primaryTitle ?? inspection.site.name}</p>
+                            <StatusBadge label={formatInspectionClassificationLabel(inspection.inspectionClassification)} tone={getInspectionClassificationTone(inspection.inspectionClassification)} />
+                            {inspection.isPriority ? <StatusBadge label="Priority" tone={getInspectionPriorityTone(true)} /> : null}
+                            <StatusBadge label={inspectionStatusLabel((inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status)} tone={getInspectionStatusTone(((inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status) as Parameters<typeof getInspectionStatusTone>[0])} />
+                            <PaymentCollectionBadge visible={isDueAtTimeOfServiceCustomer(inspection.customerCompany)} />
+                          </div>
                         <p className="mt-2 text-sm text-slate-500">
                           {format(inspection.scheduledStart, "MMM d, h:mm a")} | {((inspection as typeof inspection & { secondaryTitle?: string }).secondaryTitle ?? inspection.customerCompany.name)}
                         </p>

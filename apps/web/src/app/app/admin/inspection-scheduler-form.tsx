@@ -8,12 +8,14 @@ import {
   customInspectionSiteOptionValue,
   defaultScheduledStartForMonth,
   editableInspectionStatuses,
+  formatInspectionClassificationLabel,
   formatInspectionStatusLabel,
   formatInspectionTaskSchedulingStatusLabel,
   formatInspectionTaskTypeLabel,
   genericInspectionSiteName,
   genericInspectionSiteOptionValue,
   getDefaultInspectionRecurrenceFrequency,
+  inspectionClassificationValues,
   inspectionTaskSchedulingStatuses,
   inspectionTypeRegistry
 } from "@testworx/lib";
@@ -23,7 +25,9 @@ type RecurrenceFrequency = "ONCE" | "MONTHLY" | "QUARTERLY" | "SEMI_ANNUAL" | "A
 type InspectionTaskSchedulingStatus = (typeof inspectionTaskSchedulingStatuses)[number];
 const recurrenceOptions: RecurrenceFrequency[] = ["ONCE", "MONTHLY", "QUARTERLY", "SEMI_ANNUAL", "ANNUAL"];
 type EditableInspectionStatus = (typeof editableInspectionStatuses)[number];
+type InspectionClassification = (typeof inspectionClassificationValues)[number];
 const statusOptions = editableInspectionStatuses;
+const inspectionClassificationOptions = inspectionClassificationValues;
 const initialState = { error: null as string | null, success: null as string | null };
 const inspectionTypeOptions = Object.keys(inspectionTypeRegistry) as InspectionType[];
 const serviceSchedulingOptions: InspectionTaskSchedulingStatus[] = [
@@ -60,6 +64,8 @@ type InitialValues = {
   inspectionId?: string;
   customerCompanyId?: string;
   siteId?: string;
+  inspectionClassification?: InspectionClassification;
+  isPriority?: boolean;
   inspectionMonth?: string;
   scheduledStart?: string;
   scheduledEnd?: string;
@@ -181,6 +187,10 @@ export function InspectionSchedulerForm({
   const isCreateWorkflow = !initialValues?.inspectionId && !reasonLabel;
   const [selectedCustomerId, setSelectedCustomerId] = useState(initialValues?.customerCompanyId ?? "");
   const [selectedSiteId, setSelectedSiteId] = useState(initialValues?.siteId ?? "");
+  const [inspectionClassification, setInspectionClassification] = useState<InspectionClassification>(
+    initialValues?.inspectionClassification ?? "standard"
+  );
+  const [isPriority, setIsPriority] = useState(Boolean(initialValues?.isPriority));
   const [inspectionMonth, setInspectionMonth] = useState(
     initialValues?.inspectionMonth ?? (initialValues?.scheduledStart ? initialValues.scheduledStart.slice(0, 7) : new Date().toISOString().slice(0, 7))
   );
@@ -235,6 +245,8 @@ export function InspectionSchedulerForm({
     formRef.current?.reset();
     setSelectedCustomerId("");
     setSelectedSiteId("");
+    setInspectionClassification("standard");
+    setIsPriority(false);
     setInspectionMonth(defaultMonth);
     setScheduledStart(defaultStart);
     setScheduledEnd("");
@@ -256,11 +268,57 @@ export function InspectionSchedulerForm({
     <form action={formAction} className="min-w-0 overflow-hidden space-y-5 rounded-[1.5rem] bg-white p-4 shadow-panel sm:space-y-6 sm:rounded-[2rem] sm:p-6" ref={formRef}>
       {initialValues?.inspectionId ? <input name="inspectionId" type="hidden" value={initialValues.inspectionId} /> : null}
       <input name="serviceLinesJson" type="hidden" value={serviceLinesJson} />
+      <input name="inspectionClassification" type="hidden" value={inspectionClassification} />
+      <input name="isPriority" type="hidden" value={isPriority ? "on" : ""} />
       <div>
         <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500 sm:text-sm sm:tracking-[0.25em]">Scheduling workflow</p>
         <h3 className="mt-2 text-xl font-semibold text-ink sm:text-2xl">{title}</h3>
         {banner ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-5 text-amber-900">{banner}</p> : null}
         {workflowNote ? <p className="mt-3 text-sm leading-5 text-slate-500">{workflowNote}</p> : null}
+      </div>
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+        <div className="min-w-0 rounded-[1.25rem] border border-slate-200 p-4 sm:rounded-[1.5rem]">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 sm:text-sm sm:tracking-[0.2em]">Inspection context</p>
+          <h4 className="mt-1 text-lg font-semibold text-ink">Inspection Classification</h4>
+          <p className="mt-2 text-sm leading-5 text-slate-500">Identify the nature of the inspection.</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            {inspectionClassificationOptions.map((option) => {
+              const active = inspectionClassification === option;
+              return (
+                <button
+                  key={option}
+                  className={active
+                    ? "inline-flex min-h-11 items-center rounded-full border border-[#1f4678] bg-[#1f4678] px-4 py-2 text-sm font-semibold text-white"
+                    : "inline-flex min-h-11 items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setInspectionClassification(option);
+                  }}
+                  type="button"
+                >
+                  {formatInspectionClassificationLabel(option)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="min-w-0 rounded-[1.25rem] border border-slate-200 p-4 sm:rounded-[1.5rem]">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 sm:text-sm sm:tracking-[0.2em]">Operational visibility</p>
+          <h4 className="mt-1 text-lg font-semibold text-ink">Priority</h4>
+          <p className="mt-2 text-sm leading-5 text-slate-500">Use priority to make the inspection stand out for office staff and technicians.</p>
+          <label className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">{isPriority ? "Priority on" : "Priority off"}</p>
+              <p className="mt-1 text-sm text-slate-500">Priority is separate from inspection classification and status.</p>
+            </div>
+            <input
+              checked={isPriority}
+              className="h-5 w-5 rounded border-slate-300"
+              onChange={(event) => setIsPriority(event.target.checked)}
+              type="checkbox"
+            />
+          </label>
+        </div>
       </div>
       <div className="grid min-w-0 gap-4 md:grid-cols-2">
         <div className="min-w-0">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InspectionStatus } from "@prisma/client";
+import { InspectionClassification, InspectionStatus } from "@prisma/client";
 
 import {
   defaultScheduledStartForMonth,
@@ -195,6 +195,46 @@ describe("schedule creation parsing", () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.status).toBe(InspectionStatus.to_be_completed);
+    }
+  });
+
+  it("defaults inspection classification to standard and priority to off", () => {
+    const formData = new FormData();
+    formData.set("customerCompanyId", "customer_1");
+    formData.set("siteId", "site_1");
+    formData.set("inspectionMonth", "2026-03");
+    setCurrentVisitServiceLine(formData, {
+      dueMonth: "2026-03",
+      dueDate: "2026-03-01T00:00"
+    });
+
+    const result = parseCreateInspectionFormData(formData);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.inspectionClassification).toBe(InspectionClassification.standard);
+      expect(result.data.isPriority).toBe(false);
+    }
+  });
+
+  it("parses inspection classification and priority separately from status", () => {
+    const formData = new FormData();
+    formData.set("customerCompanyId", "customer_1");
+    formData.set("siteId", "site_1");
+    formData.set("inspectionMonth", "2026-03");
+    formData.set("inspectionClassification", "emergency");
+    formData.set("isPriority", "on");
+    formData.set("status", "scheduled");
+    setCurrentVisitServiceLine(formData, {
+      dueMonth: "2026-03",
+      dueDate: "2026-03-01T00:00"
+    });
+
+    const result = parseCreateInspectionFormData(formData);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.inspectionClassification).toBe(InspectionClassification.emergency);
+      expect(result.data.isPriority).toBe(true);
+      expect(result.data.status).toBe(InspectionStatus.scheduled);
     }
   });
 });

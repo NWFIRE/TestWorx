@@ -27,6 +27,8 @@ describe("technician dashboard inspection access", () => {
           id: "inspection_1",
           tenantId: "tenant_1",
           status: InspectionStatus.scheduled,
+          inspectionClassification: "standard",
+          isPriority: false,
           scheduledStart: new Date("2026-03-17T09:00:00.000Z"),
           site: { id: "site_1", name: "Pinecrest Tower" },
           customerCompany: { id: "customer_1", name: "Pinecrest Property Management" },

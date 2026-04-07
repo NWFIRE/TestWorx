@@ -6,14 +6,17 @@ import { auth } from "@/auth";
 import {
   buildInspectionPacketDocuments,
   editableInspectionStatuses,
+  formatInspectionClassificationLabel,
   formatInspectionStatusLabel,
   formatInspectionTaskTypeLabel,
   getAdminDashboardData,
   getAdminInspectionPdfAttachments,
   getDefaultInspectionRecurrenceFrequency,
+  getInspectionClassificationTone,
   getInspectionDisplayLabels,
   getInspectionDocuments,
   getInspectionForEdit,
+  getInspectionPriorityTone,
   getInspectionStatusTone,
   isDueAtTimeOfServiceCustomer
 } from "@testworx/lib";
@@ -284,6 +287,16 @@ export default async function EditInspectionPage({
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <StatusBadge
+            label={formatInspectionClassificationLabel(inspection.inspectionClassification)}
+            tone={getInspectionClassificationTone(inspection.inspectionClassification)}
+          />
+          {inspection.isPriority ? (
+            <StatusBadge
+              label="Priority"
+              tone={getInspectionPriorityTone(true)}
+            />
+          ) : null}
+          <StatusBadge
             label={formatInspectionStatusLabel((inspectionView.displayStatus ?? inspection.status) as Parameters<typeof formatInspectionStatusLabel>[0])}
             tone={getInspectionStatusTone((inspectionView.displayStatus ?? inspection.status) as Parameters<typeof getInspectionStatusTone>[0])}
           />
@@ -310,6 +323,8 @@ export default async function EditInspectionPage({
             inspectionId: inspection.id,
             customerCompanyId: inspection.customerCompanyId,
             siteId: inspection.siteId,
+            inspectionClassification: inspection.inspectionClassification,
+            isPriority: inspection.isPriority,
             inspectionMonth: format(inspection.scheduledStart, "yyyy-MM"),
             scheduledStart: toDateTimeLocal(inspection.scheduledStart),
             scheduledEnd: toDateTimeLocal(inspection.scheduledEnd),
@@ -490,6 +505,24 @@ export default async function EditInspectionPage({
                     <p className="mt-2 text-sm text-slate-700">
                       Status changed from {formatStatusFromAuditValue(metadata.previousStatus)} to {formatStatusFromAuditValue(metadata.nextStatus)}.
                     </p>
+                  ) : null}
+                  {metadata && "previousClassification" in metadata && "nextClassification" in metadata ? (
+                    <p className="mt-2 text-sm text-slate-700">
+                      Inspection classification changed from {formatInspectionClassificationLabel(String(metadata.previousClassification) as Parameters<typeof formatInspectionClassificationLabel>[0])} to {formatInspectionClassificationLabel(String(metadata.nextClassification) as Parameters<typeof formatInspectionClassificationLabel>[0])}.
+                    </p>
+                  ) : null}
+                  {entry.action === "inspection.classification_set" && metadata && "inspectionClassification" in metadata ? (
+                    <p className="mt-2 text-sm text-slate-700">
+                      Inspection classification set to {formatInspectionClassificationLabel(String(metadata.inspectionClassification) as Parameters<typeof formatInspectionClassificationLabel>[0])}.
+                    </p>
+                  ) : null}
+                  {metadata && "previousPriority" in metadata && "nextPriority" in metadata ? (
+                    <p className="mt-2 text-sm text-slate-700">
+                      Priority changed from {Boolean(metadata.previousPriority) ? "On" : "Off"} to {Boolean(metadata.nextPriority) ? "On" : "Off"}.
+                    </p>
+                  ) : null}
+                  {entry.action === "inspection.priority_enabled" ? (
+                    <p className="mt-2 text-sm text-slate-700">Priority enabled for this inspection.</p>
                   ) : null}
                   {metadata && "reason" in metadata ? <p className="mt-2 text-sm text-slate-700">{String(metadata.reason ?? "")}</p> : null}
                   {metadata && "note" in metadata && String(metadata.note ?? "").trim() ? <p className="mt-2 text-sm text-slate-700">{String(metadata.note ?? "")}</p> : null}

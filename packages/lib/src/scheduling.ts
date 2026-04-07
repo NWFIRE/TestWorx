@@ -1,5 +1,5 @@
 import { addMonths, endOfMonth, endOfWeek, format, isAfter, isSameDay, startOfDay, startOfMonth } from "date-fns";
-import { InspectionStatus, Prisma, RecurrenceFrequency } from "@prisma/client";
+import { InspectionClassification, InspectionStatus, Prisma, RecurrenceFrequency } from "@prisma/client";
 import { prisma } from "@testworx/db";
 import { z } from "zod";
 
@@ -13,6 +13,16 @@ import { getDefaultInspectionRecurrenceFrequency, inspectionTypeRegistry } from 
 import { deleteStoredFile } from "./storage";
 
 const inspectionTypeEnum = z.enum(Object.keys(inspectionTypeRegistry) as [keyof typeof inspectionTypeRegistry, ...(keyof typeof inspectionTypeRegistry)[]]);
+export const inspectionClassificationValues = [
+  "standard",
+  "call_in",
+  "follow_up",
+  "emergency"
+] as const;
+export type InspectionClassificationValue = (typeof inspectionClassificationValues)[number];
+const inspectionClassificationSchema = z.enum(inspectionClassificationValues);
+export const inspectionPriorityFilterValues = ["all", "priority", "non_priority"] as const;
+export type InspectionPriorityFilterValue = (typeof inspectionPriorityFilterValues)[number];
 export const inspectionFilterStatuses = [
   "to_be_completed",
   "scheduled",
@@ -81,6 +91,12 @@ export const inspectionStatusLabels: Record<InspectionStatus | "past_due", strin
   follow_up_required: "Follow-Up Required",
   past_due: "Past Due"
 };
+export const inspectionClassificationLabels: Record<InspectionClassificationValue, string> = {
+  standard: "Standard",
+  call_in: "Call-In",
+  follow_up: "Follow-Up",
+  emergency: "Emergency"
+};
 
 const currentVisitTaskSchedulingStatuses = new Set<InspectionTaskSchedulingStatus>([
   "due_now",
@@ -92,6 +108,8 @@ const currentVisitTaskSchedulingStatuses = new Set<InspectionTaskSchedulingStatu
 export const scheduleInspectionSchema = z.object({
   customerCompanyId: z.string().min(1, "Select a customer before creating the inspection."),
   siteId: z.string().min(1, "Select a site before creating the inspection."),
+  inspectionClassification: inspectionClassificationSchema.default("standard"),
+  isPriority: z.boolean().default(false),
   inspectionMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   scheduledStart: z.coerce.date(),
   scheduledEnd: z.union([z.null(), z.coerce.date()]).optional(),
@@ -217,6 +235,32 @@ export function formatInspectionTaskSchedulingStatusLabel(status: InspectionTask
     default:
       return String(status).replaceAll("_", " ");
   }
+}
+
+export function formatInspectionClassificationLabel(classification: InspectionClassification | InspectionClassificationValue) {
+  return inspectionClassificationLabels[classification as InspectionClassificationValue];
+}
+
+export function getInspectionClassificationTone(classification: InspectionClassification | InspectionClassificationValue) {
+  switch (classification) {
+    case "call_in":
+      return "blue" as const;
+    case "follow_up":
+      return "violet" as const;
+    case "emergency":
+      return "rose" as const;
+    case "standard":
+    default:
+      return "slate" as const;
+  }
+}
+
+export function formatInspectionPriorityLabel(isPriority: boolean) {
+  return isPriority ? "Priority" : "Standard priority";
+}
+
+export function getInspectionPriorityTone(isPriority: boolean) {
+  return isPriority ? ("amber" as const) : ("slate" as const);
 }
 
 export function isCurrentVisitTaskSchedulingStatus(status?: string | null) {
@@ -482,6 +526,43 @@ export function getInspectionStatusTone(status: InspectionStatus | "past_due") {
   }
 }
 
+function inspectionClassificationFromFilterValue(value: string): InspectionClassificationValue[] {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || normalized === "all") {
+    return [];
+  }
+
+  return inspectionClassificationValues.includes(normalized as InspectionClassificationValue)
+    ? [normalized as InspectionClassificationValue]
+    : [];
+}
+
+export function normalizeInspectionClassificationFilters(
+  input?: string | string[] | null
+): InspectionClassificationValue[] {
+  const values = Array.isArray(input)
+    ? input
+    : typeof input === "string"
+      ? input.split(",")
+      : [];
+
+  const normalized = new Set<InspectionClassificationValue>();
+  for (const value of values) {
+    for (const resolved of inspectionClassificationFromFilterValue(value)) {
+      normalized.add(resolved);
+    }
+  }
+
+  return [...normalized];
+}
+
+export function normalizeInspectionPriorityFilter(input?: string | null): InspectionPriorityFilterValue {
+  const normalized = (input ?? "all").trim().toLowerCase();
+  return inspectionPriorityFilterValues.includes(normalized as InspectionPriorityFilterValue)
+    ? (normalized as InspectionPriorityFilterValue)
+    : "all";
+}
+
 function inspectionStatusFromFilterValue(value: string): InspectionFilterStatus[] {
   switch (value.trim().toLowerCase()) {
     case "":
@@ -613,6 +694,23 @@ function parseActor(actor: ActorContext) {
   return parsed;
 }
 
+function resolveInspectionPriorityState(input: {
+  previousIsPriority?: boolean;
+  nextIsPriority: boolean;
+  nextStatus: InspectionStatus;
+}) {
+  const completesInspection = input.nextStatus === InspectionStatus.completed;
+  const effectiveIsPriority = completesInspection ? false : input.nextIsPriority;
+
+  return {
+    isPriority: effectiveIsPriority,
+    priorityAssignedAt:
+      effectiveIsPriority && !input.previousIsPriority ? new Date() : undefined,
+    priorityClearedAt:
+      input.previousIsPriority && !effectiveIsPriority ? new Date() : undefined
+  };
+}
+
 function parseInspectionFormData(formData: FormData) {
   const inspectionMonth = String(formData.get("inspectionMonth") ?? "");
   const scheduledStart = String(formData.get("scheduledStart") ?? "") || defaultScheduledStartForMonth(inspectionMonth);
@@ -620,6 +718,8 @@ function parseInspectionFormData(formData: FormData) {
   const customerCompanyId = String(formData.get("customerCompanyId") ?? "").trim();
   const selectedSiteId = String(formData.get("siteId") ?? "").trim();
   const siteId = selectedSiteId || (customerCompanyId ? genericInspectionSiteOptionValue : "");
+  const inspectionClassification = String(formData.get("inspectionClassification") ?? "standard");
+  const isPriority = formData.get("isPriority") === "on";
   const status = String(formData.get("status") ?? "to_be_completed");
   const assignedTechnicianIds = normalizeAssignedTechnicianIds({
     assignedTechnicianIds: formData.getAll("assignedTechnicianIds").map((value) => String(value)).filter(Boolean),
@@ -658,6 +758,8 @@ function parseInspectionFormData(formData: FormData) {
   return scheduleInspectionSchema.safeParse({
     customerCompanyId,
     siteId,
+    inspectionClassification,
+    isPriority,
     inspectionMonth: inspectionMonth || undefined,
     scheduledStart: parseDateTimeInput(scheduledStart) ?? scheduledStart,
     scheduledEnd: scheduledEndValue ? parseDateTimeInput(scheduledEndValue) ?? scheduledEndValue : null,
@@ -1348,6 +1450,10 @@ export async function createInspection(actor: ActorContext, input: z.infer<typeo
 
   return prisma.$transaction(async (tx) => {
     const { customerCompany, site, assignedTechnicianIds, primaryAssignedTechnicianId } = await validateSchedulingReferences(tx, tenantId, input);
+    const priorityState = resolveInspectionPriorityState({
+      nextIsPriority: input.isPriority,
+      nextStatus: input.status
+    });
 
     const inspection = await tx.inspection.create({
       data: {
@@ -1356,6 +1462,10 @@ export async function createInspection(actor: ActorContext, input: z.infer<typeo
         siteId: site.id,
         assignedTechnicianId: primaryAssignedTechnicianId,
         createdByUserId: parsedActor.userId,
+        inspectionClassification: input.inspectionClassification,
+        isPriority: priorityState.isPriority,
+        priorityAssignedAt: priorityState.priorityAssignedAt,
+        priorityClearedAt: priorityState.priorityClearedAt,
         scheduledStart: input.scheduledStart,
         scheduledEnd: input.scheduledEnd ?? null,
         status: input.status,
@@ -1371,15 +1481,39 @@ export async function createInspection(actor: ActorContext, input: z.infer<typeo
       actorUserId: parsedActor.userId,
       action: "inspection.created",
       entityId: inspection.id,
-      metadata: {
-        customerCompanyId: customerCompany.id,
-        siteId: site.id,
-        status: input.status,
-        taskCount: input.tasks.length
-      }
-    });
+        metadata: {
+          customerCompanyId: customerCompany.id,
+          siteId: site.id,
+          inspectionClassification: input.inspectionClassification,
+          isPriority: priorityState.isPriority,
+          status: input.status,
+          taskCount: input.tasks.length
+        }
+      });
 
-    if (assignedTechnicianIds.length > 0) {
+      await createAuditLog(tx, {
+        tenantId,
+        actorUserId: parsedActor.userId,
+        action: "inspection.classification_set",
+        entityId: inspection.id,
+        metadata: {
+          inspectionClassification: input.inspectionClassification
+        }
+      });
+
+      if (priorityState.isPriority) {
+        await createAuditLog(tx, {
+          tenantId,
+          actorUserId: parsedActor.userId,
+          action: "inspection.priority_enabled",
+          entityId: inspection.id,
+          metadata: {
+            isPriority: true
+          }
+        });
+      }
+
+      if (assignedTechnicianIds.length > 0) {
       await createAuditLog(tx, {
         tenantId,
         actorUserId: parsedActor.userId,
@@ -1446,6 +1580,11 @@ export async function updateInspection(actor: ActorContext, inspectionId: string
 
     const { customerCompany, site, assignedTechnicianIds, primaryAssignedTechnicianId } = await validateSchedulingReferences(tx, tenantId, input);
     const effectiveTasks = mergeExistingDuplicateTasks(existing.tasks, input.tasks);
+    const priorityState = resolveInspectionPriorityState({
+      previousIsPriority: existing.isPriority,
+      nextIsPriority: input.isPriority,
+      nextStatus: input.status
+    });
     const taskDefinitions = mapRecurringTaskDefinitions({
       existingTasks: existing.tasks,
       nextTasks: effectiveTasks,
@@ -1470,6 +1609,10 @@ export async function updateInspection(actor: ActorContext, inspectionId: string
         customerCompanyId: customerCompany.id,
         siteId: site.id,
         assignedTechnicianId: primaryAssignedTechnicianId,
+        inspectionClassification: input.inspectionClassification,
+        isPriority: priorityState.isPriority,
+        priorityAssignedAt: priorityState.priorityAssignedAt,
+        priorityClearedAt: priorityState.priorityClearedAt,
         scheduledStart: input.scheduledStart,
         scheduledEnd: input.scheduledEnd ?? null,
         status: input.status,
@@ -1491,6 +1634,46 @@ export async function updateInspection(actor: ActorContext, inspectionId: string
         metadata: {
           previousTechnicianIds: previousAssignedTechnicianIds,
           nextTechnicianIds: assignedTechnicianIds
+        }
+      });
+    }
+
+    if (existing.inspectionClassification !== input.inspectionClassification) {
+      await createAuditLog(tx, {
+        tenantId,
+        actorUserId: parsedActor.userId,
+        action: "inspection.classification_updated",
+        entityId: inspectionId,
+        metadata: {
+          previousClassification: existing.inspectionClassification,
+          nextClassification: input.inspectionClassification
+        }
+      });
+    }
+
+    if (!existing.isPriority && priorityState.isPriority) {
+      await createAuditLog(tx, {
+        tenantId,
+        actorUserId: parsedActor.userId,
+        action: "inspection.priority_enabled",
+        entityId: inspectionId,
+        metadata: {
+          previousPriority: false,
+          nextPriority: true
+        }
+      });
+    }
+
+    if (existing.isPriority && !priorityState.isPriority) {
+      await createAuditLog(tx, {
+        tenantId,
+        actorUserId: parsedActor.userId,
+        action: input.status === InspectionStatus.completed ? "inspection.priority_cleared_automatically" : "inspection.priority_disabled",
+        entityId: inspectionId,
+        metadata: {
+          previousPriority: true,
+          nextPriority: false,
+          reason: input.status === InspectionStatus.completed ? "Priority cleared automatically when inspection was marked Completed." : null
         }
       });
     }
@@ -1569,9 +1752,19 @@ export async function updateInspectionStatus(
       return inspection;
     }
 
+    const priorityState = resolveInspectionPriorityState({
+      previousIsPriority: inspection.isPriority,
+      nextIsPriority: inspection.isPriority,
+      nextStatus: status
+    });
+
     const updated = await tx.inspection.update({
       where: { id: inspectionId },
-      data: { status }
+      data: {
+        status,
+        isPriority: priorityState.isPriority,
+        priorityClearedAt: priorityState.priorityClearedAt
+      }
     });
 
     if (status !== InspectionStatus.completed) {
@@ -1614,6 +1807,20 @@ export async function updateInspectionStatus(
         generatedInspectionsCount
       }
     });
+
+    if (inspection.isPriority && !priorityState.isPriority) {
+      await createAuditLog(tx, {
+        tenantId,
+        actorUserId: parsedActor.userId,
+        action: "inspection.priority_cleared_automatically",
+        entityId: inspectionId,
+        metadata: {
+          previousPriority: true,
+          nextPriority: false,
+          reason: "Priority cleared automatically when inspection was marked Completed."
+        }
+      });
+    }
 
     return updated;
   });
@@ -1952,6 +2159,8 @@ function buildInspectionSnapshot(input: {
   customerCompanyId: string;
   siteId: string;
   assignedTechnicianIds: string[];
+  inspectionClassification: InspectionClassification;
+  isPriority: boolean;
   status: InspectionStatus;
   scheduledStart: Date;
   scheduledEnd: Date | null;
@@ -1972,6 +2181,8 @@ function buildInspectionSnapshot(input: {
     customerCompanyId: input.customerCompanyId,
     siteId: input.siteId,
     assignedTechnicianIds: input.assignedTechnicianIds,
+    inspectionClassification: input.inspectionClassification,
+    isPriority: input.isPriority,
     status: input.status,
     scheduledStart: input.scheduledStart.toISOString(),
     scheduledEnd: input.scheduledEnd?.toISOString() ?? null,
@@ -2044,46 +2255,53 @@ export async function createInspectionAmendment(actor: ActorContext, inspectionI
       mode: "preserve_anchor",
       fallbackAnchorScheduledStart: existing.scheduledStart
     });
-    const previousSnapshot = buildInspectionSnapshot({
-      id: existing.id,
-      customerCompanyId: existing.customerCompanyId,
-      siteId: existing.siteId,
-      assignedTechnicianIds: getInspectionAssignedTechnicianIds({
+      const previousSnapshot = buildInspectionSnapshot({
+        id: existing.id,
+        customerCompanyId: existing.customerCompanyId,
+        siteId: existing.siteId,
+        assignedTechnicianIds: getInspectionAssignedTechnicianIds({
         assignedTechnicianId: existing.assignedTechnicianId,
         technicianAssignments: readTechnicianAssignments(existing)
-      }),
-      status: existing.status,
-      scheduledStart: existing.scheduledStart,
-      scheduledEnd: existing.scheduledEnd,
+        }),
+        inspectionClassification: existing.inspectionClassification,
+        isPriority: existing.isPriority,
+        status: existing.status,
+        scheduledStart: existing.scheduledStart,
+        scheduledEnd: existing.scheduledEnd,
       notes: existing.notes,
       tasks: existing.tasks
     });
-    const replacementSnapshot = buildInspectionSnapshot({
-      customerCompanyId: customerCompany.id,
-      siteId: site.id,
-      assignedTechnicianIds,
-      status: InspectionStatus.to_be_completed,
-      scheduledStart: input.scheduledStart,
-      scheduledEnd: input.scheduledEnd ?? null,
+      const replacementSnapshot = buildInspectionSnapshot({
+        customerCompanyId: customerCompany.id,
+        siteId: site.id,
+        assignedTechnicianIds,
+        inspectionClassification: input.inspectionClassification,
+        isPriority: input.isPriority,
+        status: InspectionStatus.to_be_completed,
+        scheduledStart: input.scheduledStart,
+        scheduledEnd: input.scheduledEnd ?? null,
       notes: input.notes,
       tasks: effectiveTasks
     });
 
-    const comparablePrevious = { ...previousSnapshot, inspectionId: null, status: InspectionStatus.to_be_completed };
-    if (JSON.stringify(comparablePrevious) === JSON.stringify({ ...replacementSnapshot, inspectionId: null })) {
+      const comparablePrevious = { ...previousSnapshot, inspectionId: null, status: InspectionStatus.to_be_completed };
+      if (JSON.stringify(comparablePrevious) === JSON.stringify({ ...replacementSnapshot, inspectionId: null })) {
       throw new Error("No scheduling changes were detected for this amendment.");
     }
 
-    const replacementInspection = await tx.inspection.create({
-      data: {
-        tenantId,
-        customerCompanyId: customerCompany.id,
-        siteId: site.id,
-        assignedTechnicianId: primaryAssignedTechnicianId,
-        createdByUserId: parsedActor.userId,
-        scheduledStart: input.scheduledStart,
-        scheduledEnd: input.scheduledEnd ?? null,
-        status: InspectionStatus.to_be_completed,
+      const replacementInspection = await tx.inspection.create({
+        data: {
+          tenantId,
+          customerCompanyId: customerCompany.id,
+          siteId: site.id,
+          assignedTechnicianId: primaryAssignedTechnicianId,
+          createdByUserId: parsedActor.userId,
+          inspectionClassification: input.inspectionClassification,
+          isPriority: input.isPriority,
+          priorityAssignedAt: input.isPriority ? new Date() : null,
+          scheduledStart: input.scheduledStart,
+          scheduledEnd: input.scheduledEnd ?? null,
+          status: InspectionStatus.to_be_completed,
         notes: input.notes,
         claimable: assignedTechnicianIds.length === 0
       }
@@ -2419,7 +2637,11 @@ export async function getAdminDashboardData(actor: ActorContext) {
 
 export async function getAdminSchedulingQueueData(
   actor: ActorContext,
-  input?: { statuses?: string[] | InspectionFilterStatus[] }
+  input?: {
+    statuses?: string[] | InspectionFilterStatus[];
+    classifications?: string[] | InspectionClassificationValue[];
+    priority?: InspectionPriorityFilterValue;
+  }
 ) {
   const parsedActor = parseActor(actor);
   if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
@@ -2428,14 +2650,24 @@ export async function getAdminSchedulingQueueData(
 
   const tenantId = parsedActor.tenantId as string;
   const requestedStatuses = normalizeInspectionStatusFilters(input?.statuses ?? []);
+  const requestedClassifications = normalizeInspectionClassificationFilters(input?.classifications ?? []);
+  const requestedPriority = normalizeInspectionPriorityFilter(input?.priority);
   const statusFilter = requestedStatuses.length
     ? { in: requestedStatuses as InspectionStatus[] }
     : undefined;
+  const classificationFilter = requestedClassifications.length
+    ? { in: requestedClassifications as InspectionClassification[] }
+    : undefined;
+  const priorityFilter = requestedPriority === "all"
+    ? undefined
+    : requestedPriority === "priority";
 
   const inspections = await prisma.inspection.findMany({
     where: {
       tenantId,
-      ...(statusFilter ? { status: statusFilter } : {})
+      ...(statusFilter ? { status: statusFilter } : {}),
+      ...(classificationFilter ? { inspectionClassification: classificationFilter } : {}),
+      ...(typeof priorityFilter === "boolean" ? { isPriority: priorityFilter } : {})
     },
     include: {
       site: true,
@@ -2473,7 +2705,9 @@ export async function getAdminSchedulingQueueData(
 
   return {
     filters: {
-      statuses: requestedStatuses
+      statuses: requestedStatuses,
+      classifications: requestedClassifications,
+      priority: requestedPriority
     },
     counts: {
       toBeCompleted: mapped.filter((inspection) => inspection.status === InspectionStatus.to_be_completed).length,
@@ -2682,7 +2916,14 @@ export async function getAdminAmendmentManagementData(
   };
 }
 
-function buildMonthCalendar(inspections: Array<{ scheduledStart: Date; status: InspectionStatus; site: { name: string }; customerCompany: { name: string } }>) {
+function buildMonthCalendar(inspections: Array<{
+  scheduledStart: Date;
+  status: InspectionStatus;
+  inspectionClassification: InspectionClassification;
+  isPriority: boolean;
+  site: { name: string };
+  customerCompany: { name: string };
+}>) {
   return inspections.map((inspection) => ({
     ...getInspectionDisplayLabels({
       siteName: inspection.site.name,
@@ -2691,7 +2932,9 @@ function buildMonthCalendar(inspections: Array<{ scheduledStart: Date; status: I
     dayKey: format(inspection.scheduledStart, "yyyy-MM-dd"),
     label: format(inspection.scheduledStart, "MMM d"),
     siteName: inspection.site.name,
-    status: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart })
+    status: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
+    inspectionClassification: inspection.inspectionClassification,
+    isPriority: inspection.isPriority
   }));
 }
 

@@ -1670,7 +1670,9 @@ export async function updateBillingSummaryStatus(actor: ActorContext, summaryId:
         ? [
             prisma.inspection.update({
               where: { id: summary.inspectionId },
-              data: { status: nextInspectionStatus }
+              data: nextInspectionStatus === "completed"
+                ? { status: nextInspectionStatus, isPriority: false, priorityClearedAt: new Date() }
+                : { status: nextInspectionStatus }
             })
           ]
         : [])
@@ -1686,11 +1688,13 @@ export async function updateBillingSummaryStatus(actor: ActorContext, summaryId:
     `,
     ...(nextInspectionStatus
       ? [
-          prisma.inspection.update({
-            where: { id: summary.inspectionId },
-            data: { status: nextInspectionStatus }
-          })
-        ]
+        prisma.inspection.update({
+          where: { id: summary.inspectionId },
+          data: nextInspectionStatus === "completed"
+            ? { status: nextInspectionStatus, isPriority: false, priorityClearedAt: new Date() }
+            : { status: nextInspectionStatus }
+        })
+      ]
       : [])
   ]);
 }

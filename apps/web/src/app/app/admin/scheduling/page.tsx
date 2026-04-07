@@ -4,10 +4,16 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import {
+  formatInspectionClassificationLabel,
   formatInspectionStatusLabel,
   getAdminSchedulingQueueData,
+  getInspectionClassificationTone,
+  getInspectionPriorityTone,
   getInspectionStatusTone,
+  inspectionClassificationValues,
   inspectionFilterStatuses,
+  normalizeInspectionClassificationFilters,
+  normalizeInspectionPriorityFilter,
   normalizeInspectionStatusFilters,
   pickEarliestNextDueAt
 } from "@testworx/lib";
@@ -29,6 +35,31 @@ const statusOptions = inspectionFilterStatuses.map((status) => ({
   label: formatInspectionStatusLabel(status),
   tone: getInspectionStatusTone(status)
 }));
+const classificationOptions = inspectionClassificationValues.map((classification) => ({
+  value: classification,
+  label: formatInspectionClassificationLabel(classification),
+  tone: getInspectionClassificationTone(classification)
+}));
+
+function buildSchedulingHref(input: {
+  statuses?: string[];
+  classifications?: string[];
+  priority?: string;
+}) {
+  const params = new URLSearchParams();
+  if (input.statuses?.length) {
+    params.set("status", input.statuses.join(","));
+  }
+  if (input.classifications?.length) {
+    params.set("classification", input.classifications.join(","));
+  }
+  if (input.priority && input.priority !== "all") {
+    params.set("priority", input.priority);
+  }
+
+  const query = params.toString();
+  return query ? `/app/admin/scheduling?${query}` : "/app/admin/scheduling";
+}
 
 function taskDisplayLabel(task: { inspectionType: string; displayLabel?: string }) {
   return task.displayLabel ?? task.inspectionType.replaceAll("_", " ");
@@ -47,7 +78,7 @@ function taskDueLabel(task: { dueDate?: Date | null; dueMonth?: string | null; s
 export default async function AdminSchedulingQueuePage({
   searchParams
 }: {
-  searchParams?: Promise<{ status?: string }>;
+  searchParams?: Promise<{ status?: string; classification?: string; priority?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -59,10 +90,15 @@ export default async function AdminSchedulingQueuePage({
 
   const params = searchParams ? await searchParams : {};
   const requestedStatuses = normalizeInspectionStatusFilters(typeof params.status === "string" ? params.status : null);
+  const requestedClassifications = normalizeInspectionClassificationFilters(typeof params.classification === "string" ? params.classification : null);
+  const requestedPriority = normalizeInspectionPriorityFilter(typeof params.priority === "string" ? params.priority : null);
   const activeStatusParam = requestedStatuses.length ? requestedStatuses.join(",") : "all";
-  const currentPath = requestedStatuses.length
-    ? `/app/admin/scheduling?status=${requestedStatuses.join(",")}`
-    : "/app/admin/scheduling";
+  const activeClassificationParam = requestedClassifications.length ? requestedClassifications.join(",") : "all";
+  const currentPath = buildSchedulingHref({
+    statuses: requestedStatuses,
+    classifications: requestedClassifications,
+    priority: requestedPriority
+  });
 
   const data = await getAdminSchedulingQueueData(
     {
@@ -70,7 +106,11 @@ export default async function AdminSchedulingQueuePage({
       role: session.user.role,
       tenantId: session.user.tenantId
     },
-    { statuses: requestedStatuses }
+    {
+      statuses: requestedStatuses,
+      classifications: requestedClassifications,
+      priority: requestedPriority
+    }
   );
 
   return (
@@ -113,24 +153,61 @@ export default async function AdminSchedulingQueuePage({
       </section>
 
       <FilterBar
-        description="Filter the inspection board by canonical workflow status. Shareable URLs keep the same status view when you send someone this page."
-        title="Inspection status"
+        description="Filter the inspection board by workflow status, inspection classification, and priority without losing a shareable URL."
+        title="Inspection filters"
       >
         <FilterChipLink
-          active={requestedStatuses.length === 0}
+          active={requestedStatuses.length === 0 && requestedClassifications.length === 0 && requestedPriority === "all"}
           href="/app/admin/scheduling"
-          label="All statuses"
+          label="All inspections"
           tone="slate"
         />
         {statusOptions.map((option) => (
           <FilterChipLink
             active={requestedStatuses.length > 0 && activeStatusParam === option.value}
-            href={`/app/admin/scheduling?status=${option.value}`}
+            href={buildSchedulingHref({
+              statuses: [option.value],
+              classifications: requestedClassifications,
+              priority: requestedPriority
+            })}
             key={option.value}
             label={option.label}
             tone={option.tone}
           />
         ))}
+        {classificationOptions.map((option) => (
+          <FilterChipLink
+            active={requestedClassifications.length > 0 && activeClassificationParam === option.value}
+            href={buildSchedulingHref({
+              statuses: requestedStatuses,
+              classifications: [option.value],
+              priority: requestedPriority
+            })}
+            key={option.value}
+            label={option.label}
+            tone={option.tone}
+          />
+        ))}
+        <FilterChipLink
+          active={requestedPriority === "priority"}
+          href={buildSchedulingHref({
+            statuses: requestedStatuses,
+            classifications: requestedClassifications,
+            priority: "priority"
+          })}
+          label="Priority only"
+          tone="amber"
+        />
+        <FilterChipLink
+          active={requestedPriority === "non_priority"}
+          href={buildSchedulingHref({
+            statuses: requestedStatuses,
+            classifications: requestedClassifications,
+            priority: "non_priority"
+          })}
+          label="Non-priority only"
+          tone="slate"
+        />
       </FilterBar>
 
       <SectionCard>
@@ -171,6 +248,16 @@ export default async function AdminSchedulingQueuePage({
                         <p className="text-lg font-semibold text-slate-950">
                           {inspection.primaryTitle ?? inspection.site.name}
                         </p>
+                        <StatusBadge
+                          label={formatInspectionClassificationLabel(inspection.inspectionClassification)}
+                          tone={getInspectionClassificationTone(inspection.inspectionClassification)}
+                        />
+                        {inspection.isPriority ? (
+                          <StatusBadge
+                            label="Priority"
+                            tone={getInspectionPriorityTone(true)}
+                          />
+                        ) : null}
                         <StatusBadge
                           label={formatInspectionStatusLabel(inspection.displayStatus as Parameters<typeof formatInspectionStatusLabel>[0])}
                           tone={getInspectionStatusTone(inspection.displayStatus as Parameters<typeof getInspectionStatusTone>[0])}

@@ -1312,7 +1312,11 @@ export async function finalizeInspectionReport(actor: ActorContext, input: { ins
     if (remainingDrafts === 0 && pendingRequiredInspectionDocuments === 0) {
       await tx.inspection.update({
         where: { id: report.inspectionId },
-        data: { status: "completed" }
+        data: {
+          status: "completed",
+          isPriority: false,
+          priorityClearedAt: new Date()
+        }
       });
     }
 
@@ -1332,6 +1336,20 @@ export async function finalizeInspectionReport(actor: ActorContext, input: { ins
         generatedAttachmentId: generatedAttachment.id
       }
     });
+
+    if (remainingDrafts === 0 && pendingRequiredInspectionDocuments === 0 && finalized.inspection.isPriority) {
+      await createAuditLog(tx, {
+        tenantId: parsedActor.tenantId as string,
+        actorUserId: parsedActor.userId,
+        action: "inspection.priority_cleared_automatically",
+        entityId: report.inspectionId,
+        metadata: {
+          previousPriority: true,
+          nextPriority: false,
+          reason: "Priority cleared automatically when inspection was marked Completed."
+        }
+      });
+    }
 
     if (hasActiveCorrectionState(priorCorrectionState)) {
       await tx.inspectionReport.update({
