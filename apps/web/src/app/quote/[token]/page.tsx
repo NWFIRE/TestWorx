@@ -12,6 +12,14 @@ import {
 
 import { approveQuoteFromHostedPage, declineQuoteFromHostedPage } from "./actions";
 
+function formatMoney(value: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
+}
+
+function formatQuoteDate(value: Date | null | undefined) {
+  return value ? format(value, "MMM d, yyyy") : "—";
+}
+
 function HostedQuoteBadge({
   label,
   tone
@@ -28,9 +36,100 @@ function HostedQuoteBadge({
   } as const;
 
   return (
-    <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${tones[tone]}`}>
+    <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${tones[tone]}`}>
       {label}
     </span>
+  );
+}
+
+function BrandedMark({
+  companyName,
+  logoDataUrl
+}: {
+  companyName: string;
+  logoDataUrl: string;
+}) {
+  if (logoDataUrl) {
+    return (
+      <img
+        alt={`${companyName} logo`}
+        className="h-14 w-auto max-w-[220px] object-contain"
+        src={logoDataUrl}
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-14 min-w-14 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-lg font-semibold tracking-[-0.03em] text-slate-950 shadow-sm">
+      {companyName}
+    </div>
+  );
+}
+
+function SummaryField({
+  label,
+  value
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200/80 bg-white px-4 py-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className="mt-2 text-sm font-medium text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function ResponseCtas({
+  canRespond,
+  token,
+  primaryColor,
+  accentColor
+}: {
+  canRespond: boolean;
+  token: string;
+  primaryColor: string;
+  accentColor: string;
+}) {
+  if (!canRespond) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-4">
+      <form action={approveQuoteFromHostedPage} className="space-y-3">
+        <input name="token" type="hidden" value={token} />
+        <textarea
+          className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900"
+          name="note"
+          placeholder="Optional approval note or scheduling preference"
+        />
+        <button
+          className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-105"
+          style={{ backgroundColor: primaryColor }}
+          type="submit"
+        >
+          Approve Quote
+        </button>
+      </form>
+
+      <form action={declineQuoteFromHostedPage} className="space-y-3">
+        <input name="token" type="hidden" value={token} />
+        <textarea
+          className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900"
+          name="note"
+          placeholder="Optional reason for declining or requested changes"
+        />
+        <button
+          className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border bg-white px-5 py-3 text-sm font-semibold transition hover:bg-slate-50"
+          style={{ borderColor: `${accentColor}33`, color: accentColor }}
+          type="submit"
+        >
+          Decline Quote
+        </button>
+      </form>
+    </div>
   );
 }
 
@@ -63,6 +162,8 @@ export default async function HostedQuotePage({
     branding: quote.tenant.branding,
     billingEmail: quote.tenant.billingEmail
   });
+  const primaryColor = branding.primaryColor || "#1E3A5F";
+  const accentColor = branding.accentColor || "#C2410C";
   const stateTone = result.accessState === "approved"
     ? "emerald"
     : result.accessState === "declined" || result.accessState === "cancelled"
@@ -71,43 +172,84 @@ export default async function HostedQuotePage({
         ? "amber"
         : "blue";
 
+  const summaryFields = [
+    { label: "Customer", value: quote.customerCompany.name },
+    quote.contactName || quote.customerCompany.contactName || quote.recipientEmail
+      ? { label: "Contact", value: quote.contactName ?? quote.customerCompany.contactName ?? quote.recipientEmail ?? "" }
+      : null,
+    quote.customerCompany.phone ? { label: "Phone", value: quote.customerCompany.phone } : null,
+    quote.site?.name ? { label: "Site", value: quote.site.name } : null,
+    { label: "Issued", value: formatQuoteDate(quote.issuedAt) },
+    quote.expiresAt ? { label: "Expiration", value: formatQuoteDate(quote.expiresAt) } : null
+  ].filter((field): field is { label: string; value: string } => Boolean(field));
+
   return (
     <main
-      className="min-h-screen bg-[linear-gradient(180deg,rgba(var(--tenant-primary-rgb),0.08),rgba(255,255,255,0.92)_28%,#f8fafc_100%)] px-4 py-8 sm:px-6 lg:px-8"
+      className="min-h-screen bg-[linear-gradient(180deg,rgba(var(--tenant-primary-rgb),0.09),rgba(255,255,255,0.95)_26%,#f8fafc_100%)] px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
       style={buildTenantBrandingCss(branding)}
     >
-      <div className="mx-auto max-w-6xl">
-        <section className="overflow-hidden rounded-[36px] border border-slate-200/90 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
-          <div className="border-b border-slate-200/80 bg-[linear-gradient(135deg,rgba(var(--tenant-primary-rgb),0.08),rgba(255,255,255,0.96))] px-6 py-8 lg:px-10">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-2xl">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Customer quote</p>
-                <h1 className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-slate-950 lg:text-4xl">{quote.quoteNumber}</h1>
-                <p className="mt-4 text-sm leading-7 text-slate-600">Review the quote details below. When you’re ready, approve the quote and we’ll move forward with the work.</p>
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <HostedQuoteBadge label={quoteStatusLabels[quote.effectiveStatus]} tone={getQuoteStatusTone(quote.effectiveStatus)} />
-                  <HostedQuoteBadge label={hostedQuoteStateLabels[result.accessState]} tone={stateTone} />
+      <div className="mx-auto max-w-[1220px]">
+        <section className="overflow-hidden rounded-[36px] border border-slate-200/80 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
+          <div className="px-6 py-8 lg:px-10 lg:py-9">
+            <div className="flex flex-col gap-8 border-b border-slate-200 pb-8 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <BrandedMark companyName={branding.legalBusinessName} logoDataUrl={branding.logoDataUrl} />
+                <div className="mt-5 space-y-1">
+                  <p className="text-2xl font-semibold tracking-[-0.04em] text-slate-950">{branding.legalBusinessName}</p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
+                    {branding.phone ? <span>{branding.phone}</span> : null}
+                    {branding.email ? <span>{branding.email}</span> : null}
+                    {branding.website ? (
+                      <Link className="font-medium" href={branding.website} target="_blank">
+                        {branding.website.replace(/^https?:\/\//, "")}
+                      </Link>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
-              <div className="grid gap-3 rounded-[28px] border border-slate-200 bg-white/90 p-5 sm:grid-cols-3 lg:min-w-[420px]">
+              <div className="grid gap-4 rounded-[28px] border border-slate-200 bg-slate-50/70 p-5 sm:grid-cols-2 lg:min-w-[420px]">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Issued</p>
-                  <p className="mt-2 text-base font-semibold text-slate-950">{format(quote.issuedAt, "MMM d, yyyy")}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Quote</p>
+                  <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Customer Quote</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Expires</p>
-                  <p className="mt-2 text-base font-semibold text-slate-950">{quote.expiresAt ? format(quote.expiresAt, "MMM d, yyyy") : "—"}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Quote number</p>
+                  <p className="mt-2 text-base font-semibold text-slate-950">{quote.quoteNumber}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Total</p>
-                  <p className="mt-2 text-base font-semibold text-slate-950">${quote.total.toFixed(2)}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Issue date</p>
+                  <p className="mt-2 text-base font-medium text-slate-900">{formatQuoteDate(quote.issuedAt)}</p>
                 </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Expiration</p>
+                  <p className="mt-2 text-base font-medium text-slate-900">{formatQuoteDate(quote.expiresAt)}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-3 lg:grid-cols-3">
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 px-5 py-5 text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Status</p>
+                <div className="mt-3 flex justify-center">
+                  <HostedQuoteBadge label={quoteStatusLabels[quote.effectiveStatus]} tone={getQuoteStatusTone(quote.effectiveStatus)} />
+                </div>
+                <div className="mt-2 flex justify-center">
+                  <HostedQuoteBadge label={hostedQuoteStateLabels[result.accessState]} tone={stateTone} />
+                </div>
+              </div>
+              <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-5 text-center shadow-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Total</p>
+                <p className="mt-3 text-4xl font-semibold tracking-[-0.05em] text-slate-950">{formatMoney(quote.total)}</p>
+              </div>
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 px-5 py-5 text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Expiration date</p>
+                <p className="mt-3 text-xl font-semibold tracking-[-0.03em] text-slate-950">{formatQuoteDate(quote.expiresAt)}</p>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-8 px-6 py-8 lg:grid-cols-[1.3fr_0.7fr] lg:px-10">
+          <div className="grid gap-8 px-6 pb-10 lg:grid-cols-[1.45fr_0.75fr] lg:px-10">
             <div className="space-y-6">
               {query.error ? (
                 <div className="rounded-[24px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">{query.error}</div>
@@ -119,25 +261,27 @@ export default async function HostedQuotePage({
                 <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-4 text-sm text-slate-700">This quote was declined. If something needs to be adjusted, please contact us and we can update it.</div>
               ) : null}
 
-              <section className="rounded-[28px] border border-slate-200 bg-slate-50/50 p-5">
-                <h2 className="text-xl font-semibold text-slate-950">Quote overview</h2>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Customer</p>
-                    <p className="mt-2 text-base font-semibold text-slate-950">{quote.customerCompany.name}</p>
-                    <p className="mt-1 text-sm text-slate-500">{quote.contactName ?? quote.customerCompany.contactName ?? quote.recipientEmail ?? "—"}</p>
+              <section className="rounded-[28px] border border-slate-200 bg-white p-5 lg:p-6">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Quote summary</p>
+                    <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-950">Review scope and customer details</h2>
                   </div>
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Site</p>
-                    <p className="mt-2 text-base font-semibold text-slate-950">{quote.site?.name ?? "No site listed"}</p>
-                    <p className="mt-1 text-sm text-slate-500">{quote.site ? [quote.site.addressLine1, quote.site.city, quote.site.state].filter(Boolean).join(", ") : "—"}</p>
-                  </div>
+                  <p className="text-sm leading-7 text-slate-600">Clear pricing, streamlined approval, and a downloadable PDF if you need to share it internally.</p>
+                </div>
+                <div className="mt-5 grid gap-3 md:grid-cols-2">
+                  {summaryFields.map((field) => (
+                    <SummaryField key={field.label} label={field.label} value={field.value} />
+                  ))}
                 </div>
               </section>
 
-              <section className="rounded-[28px] border border-slate-200 bg-white p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-xl font-semibold text-slate-950">Quoted work</h2>
+              <section className="rounded-[28px] border border-slate-200 bg-white p-5 lg:p-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Line items</p>
+                    <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-950">Quoted work</h2>
+                  </div>
                   <a
                     className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                     href={`/api/quotes/access/${token}/pdf`}
@@ -147,73 +291,95 @@ export default async function HostedQuotePage({
                     Download PDF
                   </a>
                 </div>
-                <div className="mt-4 overflow-hidden rounded-[24px] border border-slate-200">
-                  <table className="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead className="bg-slate-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left font-semibold text-slate-500">Service</th>
-                        <th className="px-4 py-3 text-left font-semibold text-slate-500">Description</th>
-                        <th className="px-4 py-3 text-left font-semibold text-slate-500">Qty</th>
-                        <th className="px-4 py-3 text-left font-semibold text-slate-500">Unit</th>
-                        <th className="px-4 py-3 text-right font-semibold text-slate-500">Line total</th>
+
+                <div className="mt-5 overflow-hidden rounded-[24px] border border-slate-200/90">
+                  <table className="min-w-full border-collapse text-sm">
+                    <thead className="bg-slate-50/90">
+                      <tr className="border-b border-slate-200">
+                        <th className="px-5 py-4 text-left font-semibold text-slate-500">Service</th>
+                        <th className="px-5 py-4 text-left font-semibold text-slate-500">Description</th>
+                        <th className="px-5 py-4 text-right font-semibold text-slate-500">Qty</th>
+                        <th className="px-5 py-4 text-right font-semibold text-slate-500">Unit Price</th>
+                        <th className="px-5 py-4 text-right font-semibold text-slate-500">Total</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 bg-white">
-                      {quote.lineItems.map((line) => (
-                        <tr key={line.id}>
-                          <td className="px-4 py-4 align-top font-semibold text-slate-950">{line.title}</td>
-                          <td className="px-4 py-4 align-top text-slate-600">{line.description ?? "—"}</td>
-                          <td className="px-4 py-4 align-top text-slate-600">{line.quantity}</td>
-                          <td className="px-4 py-4 align-top text-slate-600">${line.unitPrice.toFixed(2)}</td>
-                          <td className="px-4 py-4 text-right align-top font-semibold text-slate-950">${line.total.toFixed(2)}</td>
+                    <tbody className="bg-white">
+                      {quote.lineItems.map((line, index) => (
+                        <tr className={index < quote.lineItems.length - 1 ? "border-b border-slate-200/80" : ""} key={line.id}>
+                          <td className="px-5 py-4 align-top">
+                            <p className="font-semibold text-slate-950">{line.title}</p>
+                          </td>
+                          <td className="px-5 py-4 align-top text-slate-600">{line.description?.trim() || "—"}</td>
+                          <td className="px-5 py-4 text-right align-top text-slate-600">{line.quantity}</td>
+                          <td className="px-5 py-4 text-right align-top text-slate-600">{formatMoney(line.unitPrice)}</td>
+                          <td className="px-5 py-4 text-right align-top font-semibold text-slate-950">{formatMoney(line.total)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </section>
 
-              {quote.customerNotes ? (
-                <section className="rounded-[28px] border border-slate-200 bg-white p-5">
-                  <h2 className="text-xl font-semibold text-slate-950">Notes</h2>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">{quote.customerNotes}</p>
-                </section>
-              ) : null}
+                {quote.customerNotes ? (
+                  <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50/60 p-5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Notes</p>
+                    <p className="mt-3 text-sm leading-7 text-slate-600">{quote.customerNotes}</p>
+                  </div>
+                ) : null}
+
+                {quote.canRespond ? (
+                  <div className="mt-6 rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,rgba(var(--tenant-primary-rgb),0.05),rgba(255,255,255,0.98))] p-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Ready to move forward?</p>
+                        <h3 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">Approve the quote and we will take care of next steps.</h3>
+                      </div>
+                      <button
+                        className="inline-flex min-h-11 items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-105"
+                        formAction={approveQuoteFromHostedPage}
+                        formMethod="post"
+                        formNoValidate
+                        style={{ backgroundColor: primaryColor }}
+                        type="submit"
+                      >
+                        Approve Quote
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </section>
             </div>
 
             <aside className="space-y-6">
-              <section className="rounded-[28px] border border-slate-200 bg-slate-950 p-6 text-white">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">Quote total</p>
-                <p className="mt-3 text-4xl font-semibold tracking-[-0.05em]">${quote.total.toFixed(2)}</p>
-                <div className="mt-5 space-y-3 text-sm text-slate-300">
-                  <div className="flex items-center justify-between"><span>Subtotal</span><span className="font-semibold text-white">${quote.subtotal.toFixed(2)}</span></div>
-                  <div className="flex items-center justify-between"><span>Tax</span><span className="font-semibold text-white">${quote.taxAmount.toFixed(2)}</span></div>
+              <section className="rounded-[28px] border border-slate-200 bg-slate-950 p-6 text-white shadow-[0_18px_60px_rgba(15,23,42,0.18)]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300">Totals</p>
+                <p className="mt-3 text-4xl font-semibold tracking-[-0.05em]">{formatMoney(quote.total)}</p>
+                <div className="mt-6 space-y-4 text-sm">
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span>Subtotal</span>
+                    <span className="font-semibold text-white">{formatMoney(quote.subtotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span>Tax</span>
+                    <span className="font-semibold text-white">{formatMoney(quote.taxAmount)}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-white/10 pt-4 text-base">
+                    <span className="text-white/85">Total</span>
+                    <span className="font-semibold text-white">{formatMoney(quote.total)}</span>
+                  </div>
                 </div>
               </section>
 
               <section className="rounded-[28px] border border-slate-200 bg-white p-5">
-                <h2 className="text-xl font-semibold text-slate-950">Respond to this quote</h2>
-                <p className="mt-2 text-sm leading-7 text-slate-600">Approve the quote to let our office move forward, or decline it if you’d like us to revise the scope or timing.</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Approval</p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-950">Respond to this quote</h2>
+                <p className="mt-3 text-sm leading-7 text-slate-600">Approve the quote to let our office move forward, or decline it if you'd like us to revise the scope or timing.</p>
 
                 {quote.canRespond ? (
-                  <div className="mt-4 space-y-4">
-                    <form action={approveQuoteFromHostedPage} className="space-y-3">
-                      <input name="token" type="hidden" value={token} />
-                      <textarea className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" name="note" placeholder="Optional approval note or scheduling preference" />
-                      <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-[#1f4678] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" type="submit">
-                        Approve quote
-                      </button>
-                    </form>
-                    <form action={declineQuoteFromHostedPage} className="space-y-3">
-                      <input name="token" type="hidden" value={token} />
-                      <textarea className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" name="note" placeholder="Optional reason for declining or requested changes" />
-                      <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="submit">
-                        Decline quote
-                      </button>
-                    </form>
+                  <div className="mt-5">
+                    <ResponseCtas accentColor={accentColor} canRespond={quote.canRespond} primaryColor={primaryColor} token={token} />
                   </div>
                 ) : (
-                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                     {result.accessState === "approved" ? "This quote has already been approved. Our office will follow up with next steps." : null}
                     {result.accessState === "declined" ? "This quote has already been declined. Contact us if you'd like an updated version." : null}
                     {result.accessState === "expired" ? "This quote has expired. Contact us if you'd like us to refresh and resend it." : null}
@@ -223,14 +389,15 @@ export default async function HostedQuotePage({
               </section>
 
               <section className="rounded-[28px] border border-slate-200 bg-white p-5">
-                <h2 className="text-xl font-semibold text-slate-950">Questions?</h2>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Need help?</p>
+                <h2 className="mt-2 text-xl font-semibold text-slate-950">Questions before approval</h2>
                 <p className="mt-3 text-sm leading-7 text-slate-600">If anything needs to be adjusted before approval, reply to the quote email or contact {branding.legalBusinessName} directly.</p>
                 <div className="mt-4 space-y-2 text-sm text-slate-600">
-                  <p>{branding.email || "—"}</p>
-                  <p>{branding.phone || "—"}</p>
+                  {branding.email ? <p>{branding.email}</p> : null}
+                  {branding.phone ? <p>{branding.phone}</p> : null}
                   {branding.website ? (
-                    <Link className="font-semibold text-[#1f4678]" href={branding.website} target="_blank">
-                      Visit website
+                    <Link className="font-semibold" href={branding.website} style={{ color: primaryColor }} target="_blank">
+                      {branding.website.replace(/^https?:\/\//, "")}
                     </Link>
                   ) : null}
                 </div>

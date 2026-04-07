@@ -54,16 +54,15 @@ type Theme = {
   line: ReturnType<typeof rgb>;
   surface: ReturnType<typeof rgb>;
   softSurface: ReturnType<typeof rgb>;
-  positiveBg: ReturnType<typeof rgb>;
-  positiveText: ReturnType<typeof rgb>;
+  successSurface: ReturnType<typeof rgb>;
+  successInk: ReturnType<typeof rgb>;
 };
 
 const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
-const PAGE_MARGIN = 36;
+const PAGE_MARGIN = 34;
 const CONTENT_WIDTH = PAGE_WIDTH - PAGE_MARGIN * 2;
-const BODY_TOP = PAGE_HEIGHT - PAGE_MARGIN - 120;
-const BODY_BOTTOM = PAGE_MARGIN + 36;
+const HEADER_HEIGHT = 104;
 
 function hexToRgb(hex: string, fallback: { r: number; g: number; b: number }) {
   const normalized = hex.replace("#", "").trim();
@@ -83,21 +82,18 @@ function buildTheme(primaryHex?: string | null, accentHex?: string | null): Them
     primary: hexToRgb(primaryHex ?? "#1E3A5F", { r: 0.12, g: 0.23, b: 0.37 }),
     accent: hexToRgb(accentHex ?? "#C2410C", { r: 0.76, g: 0.25, b: 0.05 }),
     ink: rgb(0.09, 0.13, 0.19),
-    muted: rgb(0.34, 0.39, 0.47),
+    muted: rgb(0.35, 0.4, 0.47),
     soft: rgb(0.5, 0.56, 0.63),
-    line: rgb(0.86, 0.9, 0.94),
+    line: rgb(0.88, 0.91, 0.95),
     surface: rgb(1, 1, 1),
     softSurface: rgb(0.972, 0.979, 0.987),
-    positiveBg: rgb(0.93, 0.975, 0.947),
-    positiveText: rgb(0.11, 0.41, 0.24)
+    successSurface: rgb(0.93, 0.975, 0.947),
+    successInk: rgb(0.11, 0.41, 0.24)
   };
 }
 
 function formatDate(value: Date | null | undefined) {
-  if (!value) {
-    return "—";
-  }
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(value);
+  return value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(value) : "—";
 }
 
 function money(value: number) {
@@ -105,7 +101,8 @@ function money(value: number) {
 }
 
 function wrap(font: PDFFont, text: string, maxWidth: number, size: number) {
-  const words = (text.trim() || "—").split(/\s+/).filter(Boolean);
+  const safeText = text.trim() || "—";
+  const words = safeText.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let current = "";
 
@@ -130,7 +127,17 @@ function paragraphHeight(font: PDFFont, text: string, maxWidth: number, size: nu
   return wrap(font, text, maxWidth, size).length * (size + gap);
 }
 
-function drawParagraph(page: PDFPage, font: PDFFont, text: string, x: number, y: number, maxWidth: number, size: number, color: ReturnType<typeof rgb>, gap = 3) {
+function drawParagraph(
+  page: PDFPage,
+  font: PDFFont,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  size: number,
+  color: ReturnType<typeof rgb>,
+  gap = 3
+) {
   const lines = wrap(font, text, maxWidth, size);
   lines.forEach((line, index) => {
     page.drawText(line, {
@@ -144,7 +151,15 @@ function drawParagraph(page: PDFPage, font: PDFFont, text: string, x: number, y:
   return y - lines.length * (size + gap);
 }
 
-function drawRect(page: PDFPage, x: number, yTop: number, width: number, height: number, color: ReturnType<typeof rgb>, borderColor?: ReturnType<typeof rgb>) {
+function drawRect(
+  page: PDFPage,
+  x: number,
+  yTop: number,
+  width: number,
+  height: number,
+  color: ReturnType<typeof rgb>,
+  borderColor?: ReturnType<typeof rgb>
+) {
   page.drawRectangle({
     x,
     y: yTop - height,
@@ -176,93 +191,122 @@ async function embedImage(pdfDoc: PDFDocument, dataUrl: string | null | undefine
   return null;
 }
 
-function drawPageChrome(input: QuotePdfInput, page: PDFPage, theme: Theme, boldFont: PDFFont, regularFont: PDFFont, logo: PDFImage | null, pageNumber: number) {
+function buildSummaryFields(input: QuotePdfInput) {
+  return [
+    { label: "Customer", value: input.customerCompany.name },
+    input.customerCompany.contactName || input.quote.recipientEmail
+      ? { label: "Contact", value: input.customerCompany.contactName ?? input.quote.recipientEmail ?? "" }
+      : null,
+    input.customerCompany.phone ? { label: "Phone", value: input.customerCompany.phone } : null,
+    input.site?.name ? { label: "Site", value: input.site.name } : null,
+    { label: "Issued", value: formatDate(input.quote.issuedAt) },
+    input.quote.expiresAt ? { label: "Expiration", value: formatDate(input.quote.expiresAt) } : null
+  ].filter((field): field is { label: string; value: string } => Boolean(field));
+}
+
+function drawHeader(
+  input: QuotePdfInput,
+  page: PDFPage,
+  theme: Theme,
+  boldFont: PDFFont,
+  regularFont: PDFFont,
+  logo: PDFImage | null,
+  pageNumber: number
+) {
   const branding = resolveTenantBranding({
     tenantName: input.tenant.name,
     branding: input.tenant.branding,
     billingEmail: input.tenant.billingEmail
   });
-
-  const headerTop = PAGE_HEIGHT - PAGE_MARGIN;
-  const rightX = PAGE_WIDTH - PAGE_MARGIN;
+  const top = PAGE_HEIGHT - PAGE_MARGIN;
+  const metaX = PAGE_WIDTH - PAGE_MARGIN - 190;
 
   if (logo) {
     const scaled = logo.scale(1);
-    const ratio = Math.min(52 / scaled.width, 52 / scaled.height, 1);
+    const ratio = Math.min(54 / scaled.height, 150 / scaled.width, 1);
     page.drawImage(logo, {
       x: PAGE_MARGIN,
-      y: headerTop - 54,
+      y: top - 56,
       width: scaled.width * ratio,
       height: scaled.height * ratio
     });
   } else {
-    drawRect(page, PAGE_MARGIN, headerTop - 2, 52, 52, theme.softSurface, theme.line);
-    page.drawText((branding.legalBusinessName || input.tenant.name).slice(0, 2).toUpperCase(), {
-      x: PAGE_MARGIN + 13,
-      y: headerTop - 33,
+    page.drawText(branding.legalBusinessName || input.tenant.name, {
+      x: PAGE_MARGIN,
+      y: top - 24,
       size: 18,
       font: boldFont,
-      color: theme.primary
+      color: theme.ink
     });
   }
 
+  const companyTextX = logo ? PAGE_MARGIN + 164 : PAGE_MARGIN;
   page.drawText(branding.legalBusinessName || input.tenant.name, {
-    x: PAGE_MARGIN + 64,
-    y: headerTop - 18,
-    size: 16,
+    x: companyTextX,
+    y: top - 22,
+    size: logo ? 16 : 0,
     font: boldFont,
     color: theme.ink
   });
 
   const contactLines = [
-    [branding.phone, branding.email].filter(Boolean).join(" • "),
+    [branding.phone, branding.email].filter(Boolean).join(" | "),
     branding.website || ""
   ].filter(Boolean);
-  let contactY = headerTop - 34;
+  let contactY = top - 38;
   for (const line of contactLines) {
     page.drawText(line, {
-      x: PAGE_MARGIN + 64,
+      x: companyTextX,
       y: contactY,
       size: 8.5,
       font: regularFont,
-      color: theme.soft
+      color: theme.muted
     });
     contactY -= 12;
   }
 
-  const title = "Customer Quote";
-  page.drawText(title, {
-    x: rightX - boldFont.widthOfTextAtSize(title, 18),
-    y: headerTop - 18,
-    size: 18,
+  page.drawText("Customer Quote", {
+    x: metaX,
+    y: top - 20,
+    size: 19,
     font: boldFont,
     color: theme.ink
   });
 
-  const meta: Array<[string, string]> = [
-    ["Quote", input.quote.quoteNumber],
-    ["Issued", formatDate(input.quote.issuedAt)],
-    ["Page", `${pageNumber}`]
+  const headerMeta: Array<[string, string]> = [
+    ["Quote Number", input.quote.quoteNumber],
+    ["Issue Date", formatDate(input.quote.issuedAt)],
+    ["Expiration", formatDate(input.quote.expiresAt)],
+    ["Page", String(pageNumber)]
   ];
-  let metaY = headerTop - 36;
-  for (const [label, value] of meta) {
-    const labelWidth = regularFont.widthOfTextAtSize(label, 8);
-    const valueWidth = boldFont.widthOfTextAtSize(value, 8.5);
-    const x = rightX - Math.max(labelWidth, valueWidth);
-    page.drawText(label, { x, y: metaY, size: 8, font: regularFont, color: theme.soft });
-    page.drawText(value, { x: rightX - valueWidth, y: metaY - 11, size: 8.5, font: boldFont, color: theme.ink });
-    metaY -= 24;
-  }
+
+  let metaY = top - 42;
+  headerMeta.forEach(([label, value]) => {
+    page.drawText(label.toUpperCase(), {
+      x: metaX,
+      y: metaY,
+      size: 7.5,
+      font: boldFont,
+      color: theme.soft
+    });
+    page.drawText(value, {
+      x: metaX + 88,
+      y: metaY,
+      size: 8.5,
+      font: regularFont,
+      color: theme.ink
+    });
+    metaY -= 14;
+  });
 
   page.drawLine({
-    start: { x: PAGE_MARGIN, y: PAGE_HEIGHT - PAGE_MARGIN - 84 },
-    end: { x: PAGE_WIDTH - PAGE_MARGIN, y: PAGE_HEIGHT - PAGE_MARGIN - 84 },
+    start: { x: PAGE_MARGIN, y: PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT },
+    end: { x: PAGE_WIDTH - PAGE_MARGIN, y: PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT },
     thickness: 1,
     color: theme.line
   });
 
-  const footerLabel = branding.legalBusinessName || input.tenant.name;
-  page.drawText(footerLabel, {
+  page.drawText(branding.legalBusinessName || input.tenant.name, {
     x: PAGE_MARGIN,
     y: PAGE_MARGIN - 2,
     size: 8,
@@ -279,168 +323,234 @@ function drawPageChrome(input: QuotePdfInput, page: PDFPage, theme: Theme, boldF
   });
 }
 
-function drawKpis(input: QuotePdfInput, page: PDFPage, theme: Theme, boldFont: PDFFont, regularFont: PDFFont) {
-  const top = BODY_TOP;
-  const gap = 10;
+function drawKpis(input: QuotePdfInput, page: PDFPage, theme: Theme, boldFont: PDFFont, regularFont: PDFFont, top: number) {
+  const gap = 12;
   const width = (CONTENT_WIDTH - gap * 2) / 3;
   const cards = [
-    { label: "Status", value: input.quote.status.replaceAll("_", " "), bg: theme.softSurface, text: theme.primary },
-    { label: "Expiry", value: formatDate(input.quote.expiresAt), bg: theme.softSurface, text: theme.ink },
-    { label: "Total", value: money(input.quote.total), bg: theme.positiveBg, text: theme.positiveText }
+    { label: "Status", value: input.quote.status.replaceAll("_", " ").replace(/\b\w/g, (match) => match.toUpperCase()), bg: theme.softSurface, color: theme.primary, size: 13 },
+    { label: "Total", value: money(input.quote.total), bg: theme.surface, color: theme.ink, size: 18 },
+    { label: "Expiration", value: formatDate(input.quote.expiresAt), bg: theme.softSurface, color: theme.ink, size: 13 }
   ];
 
   cards.forEach((card, index) => {
     const x = PAGE_MARGIN + index * (width + gap);
     drawRect(page, x, top, width, 64, card.bg, theme.line);
+    const labelWidth = boldFont.widthOfTextAtSize(card.label.toUpperCase(), 7);
     page.drawText(card.label.toUpperCase(), {
-      x: x + width / 2 - boldFont.widthOfTextAtSize(card.label.toUpperCase(), 7) / 2,
+      x: x + width / 2 - labelWidth / 2,
       y: top - 16,
       size: 7,
       font: boldFont,
       color: theme.soft
     });
+    const valueWidth = boldFont.widthOfTextAtSize(card.value, card.size);
     page.drawText(card.value, {
-      x: x + width / 2 - boldFont.widthOfTextAtSize(card.value, 16) / 2,
-      y: top - 40,
-      size: 16,
+      x: x + width / 2 - valueWidth / 2,
+      y: top - 39,
+      size: card.size,
       font: boldFont,
-      color: card.text
+      color: card.color
     });
   });
-}
 
-function renderSummary(page: PDFPage, input: QuotePdfInput, theme: Theme, boldFont: PDFFont, regularFont: PDFFont) {
-  const top = BODY_TOP - 88;
-  page.drawText("Quote summary", {
-    x: PAGE_MARGIN,
-    y: top,
-    size: 13,
-    font: boldFont,
-    color: theme.ink
+  const statusChipWidth = Math.max(72, regularFont.widthOfTextAtSize(cards[0]!.value, 8.5) + 18);
+  drawRect(page, PAGE_MARGIN + 18, top - 34, statusChipWidth, 20, theme.successSurface, theme.successSurface);
+  page.drawText(cards[0]!.value, {
+    x: PAGE_MARGIN + 18 + statusChipWidth / 2 - regularFont.widthOfTextAtSize(cards[0]!.value, 8.5) / 2,
+    y: top - 47,
+    size: 8.5,
+    font: regularFont,
+    color: theme.successInk
   });
-
-  const fields: Array<[string, string]> = [
-    ["Customer", input.customerCompany.name],
-    ["Contact", input.quote.recipientEmail || input.customerCompany.contactName || input.customerCompany.billingEmail || "—"],
-    ["Site", input.site?.name || "—"],
-    ["Phone", input.customerCompany.phone || "—"],
-    ["Issued", formatDate(input.quote.issuedAt)],
-    ["Expires", formatDate(input.quote.expiresAt)]
-  ];
-
-  const gap = 12;
-  const width = (CONTENT_WIDTH - gap) / 2;
-  let y = top - 18;
-  for (let index = 0; index < fields.length; index += 2) {
-    for (let col = 0; col < 2; col += 1) {
-      const field = fields[index + col];
-      if (!field) {
-        continue;
-      }
-      const x = PAGE_MARGIN + col * (width + gap);
-      drawRect(page, x, y, width, 46, theme.surface, theme.line);
-      page.drawText(field[0].toUpperCase(), {
-        x: x + 10,
-        y: y - 14,
-        size: 7,
-        font: boldFont,
-        color: theme.soft
-      });
-      drawParagraph(page, regularFont, field[1], x + 10, y - 28, width - 20, 10, theme.ink);
-    }
-    y -= 58;
-  }
-
-  return y - 8;
 }
 
-function renderLineItems(page: PDFPage, input: QuotePdfInput, theme: Theme, boldFont: PDFFont, regularFont: PDFFont, startY: number) {
-  let y = startY;
-  page.drawText("Quoted work", {
+function drawSectionTitle(page: PDFPage, title: string, y: number, boldFont: PDFFont, theme: Theme) {
+  page.drawText(title, {
     x: PAGE_MARGIN,
     y,
     size: 13,
     font: boldFont,
     color: theme.ink
   });
+}
+
+function renderSummary(page: PDFPage, input: QuotePdfInput, theme: Theme, boldFont: PDFFont, regularFont: PDFFont, startY: number) {
+  let y = startY;
+  drawSectionTitle(page, "Quote Summary", y, boldFont, theme);
+  y -= 16;
+
+  const fields = buildSummaryFields(input);
+  const gap = 12;
+  const width = (CONTENT_WIDTH - gap) / 2;
+
+  for (let index = 0; index < fields.length; index += 2) {
+    const rowFields = fields.slice(index, index + 2);
+    const rowHeight = rowFields.reduce((maxHeight, field) => {
+      const contentHeight = 24 + paragraphHeight(regularFont, field.value, width - 20, 10, 3);
+      return Math.max(maxHeight, Math.max(46, contentHeight));
+    }, 46);
+
+    rowFields.forEach((field, columnIndex) => {
+      const x = PAGE_MARGIN + columnIndex * (width + gap);
+      drawRect(page, x, y, width, rowHeight, theme.surface, theme.line);
+      page.drawText(field.label.toUpperCase(), {
+        x: x + 10,
+        y: y - 14,
+        size: 7,
+        font: boldFont,
+        color: theme.soft
+      });
+      drawParagraph(page, regularFont, field.value, x + 10, y - 28, width - 20, 10, theme.ink);
+    });
+
+    y -= rowHeight + 10;
+  }
+
+  return y - 4;
+}
+
+function renderLineItems(page: PDFPage, input: QuotePdfInput, theme: Theme, boldFont: PDFFont, regularFont: PDFFont, startY: number) {
+  let y = startY;
+  drawSectionTitle(page, "Quoted Work", y, boldFont, theme);
   y -= 16;
 
   const columns = [
-    { label: "Service", width: 0.38 },
-    { label: "Description", width: 0.28 },
-    { label: "Qty", width: 0.08 },
-    { label: "Unit", width: 0.12 },
-    { label: "Line total", width: 0.14 }
+    { label: "Service", width: 0.27, align: "left" as const },
+    { label: "Description", width: 0.35, align: "left" as const },
+    { label: "Qty", width: 0.1, align: "right" as const },
+    { label: "Unit Price", width: 0.13, align: "right" as const },
+    { label: "Total", width: 0.15, align: "right" as const }
   ];
 
-  drawRect(page, PAGE_MARGIN, y, CONTENT_WIDTH, 22, theme.softSurface, theme.line);
+  drawRect(page, PAGE_MARGIN, y, CONTENT_WIDTH, 24, theme.softSurface, theme.line);
   let x = PAGE_MARGIN;
   for (const column of columns) {
     const width = CONTENT_WIDTH * column.width;
-    page.drawText(column.label.toUpperCase(), {
-      x: x + 8,
-      y: y - 14,
-      size: 7,
+    const textWidth = boldFont.widthOfTextAtSize(column.label, 7.5);
+    page.drawText(column.label, {
+      x: column.align === "right" ? x + width - 10 - textWidth : x + 10,
+      y: y - 15,
+      size: 7.5,
       font: boldFont,
-      color: theme.soft
+      color: theme.muted
     });
     x += width;
   }
-  y -= 22;
+  y -= 24;
 
   input.lineItems.forEach((line, index) => {
-    const cells: [string, string, string, string, string] = [
+    const values = [
       line.title,
-      line.description || "—",
-      `${line.quantity}`,
+      line.description?.trim() || "—",
+      String(line.quantity),
       money(line.unitPrice),
       money(line.total)
     ];
     const rowHeight = Math.max(
-      34,
+      36,
       16 + Math.max(
-        paragraphHeight(regularFont, cells[0], CONTENT_WIDTH * columns[0]!.width - 16, 8.5),
-        paragraphHeight(regularFont, cells[1], CONTENT_WIDTH * columns[1]!.width - 16, 8.5)
+        paragraphHeight(regularFont, values[0]!, CONTENT_WIDTH * columns[0]!.width - 20, 8.5),
+        paragraphHeight(regularFont, values[1]!, CONTENT_WIDTH * columns[1]!.width - 20, 8.5)
       )
     );
+
     drawRect(page, PAGE_MARGIN, y, CONTENT_WIDTH, rowHeight, index % 2 === 0 ? theme.surface : theme.softSurface, theme.line);
-    let currentX = PAGE_MARGIN;
-    columns.forEach((column, cellIndex) => {
+    let columnX = PAGE_MARGIN;
+    columns.forEach((column, columnIndex) => {
       const width = CONTENT_WIDTH * column.width;
-      drawParagraph(page, regularFont, cells[cellIndex]!, currentX + 8, y - 12, width - 16, 8.5, theme.ink);
-      currentX += width;
+      const value = values[columnIndex]!;
+      if (column.align === "right") {
+        const valueWidth = regularFont.widthOfTextAtSize(value, 8.5);
+        page.drawText(value, {
+          x: columnX + width - 10 - valueWidth,
+          y: y - 14,
+          size: 8.5,
+          font: columnIndex === values.length - 1 ? boldFont : regularFont,
+          color: columnIndex === values.length - 1 ? theme.ink : theme.muted
+        });
+      } else {
+        drawParagraph(
+          page,
+          columnIndex === 0 ? boldFont : regularFont,
+          value,
+          columnX + 10,
+          y - 14,
+          width - 20,
+          8.5,
+          columnIndex === 0 ? theme.ink : theme.muted
+        );
+      }
+      columnX += width;
     });
     y -= rowHeight;
   });
 
-  return y - 16;
+  return y - 18;
 }
 
 function renderTotals(page: PDFPage, input: QuotePdfInput, theme: Theme, boldFont: PDFFont, regularFont: PDFFont, startY: number) {
-  const boxWidth = 220;
+  const boxWidth = 230;
   const x = PAGE_WIDTH - PAGE_MARGIN - boxWidth;
-  drawRect(page, x, startY, boxWidth, 88, theme.surface, theme.line);
+  const y = startY;
+  drawRect(page, x, y, boxWidth, 96, theme.surface, theme.line);
   const rows: Array<[string, string]> = [
     ["Subtotal", money(input.quote.subtotal)],
     ["Tax", money(input.quote.taxAmount)],
     ["Total", money(input.quote.total)]
   ];
-  let y = startY - 16;
+  let rowY = y - 16;
   rows.forEach(([label, value], index) => {
-    const font = index === rows.length - 1 ? boldFont : regularFont;
-    const size = index === rows.length - 1 ? 11 : 9.5;
-    page.drawText(label, { x: x + 12, y, size, font, color: theme.ink });
+    const isTotal = index === rows.length - 1;
+    const font = isTotal ? boldFont : regularFont;
+    const size = isTotal ? 12 : 9.5;
+    page.drawText(label, {
+      x: x + 14,
+      y: rowY,
+      size,
+      font,
+      color: isTotal ? theme.ink : theme.muted
+    });
     page.drawText(value, {
-      x: x + boxWidth - 12 - font.widthOfTextAtSize(value, size),
-      y,
+      x: x + boxWidth - 14 - font.widthOfTextAtSize(value, size),
+      y: rowY,
       size,
       font,
       color: theme.ink
     });
-    y -= 22;
+    if (isTotal) {
+      page.drawLine({
+        start: { x: x + 14, y: rowY + 9 },
+        end: { x: x + boxWidth - 14, y: rowY + 9 },
+        thickness: 1,
+        color: theme.line
+      });
+    }
+    rowY -= isTotal ? 24 : 20;
   });
 
-  return startY - 104;
+  return y - 112;
+}
+
+function renderNotes(page: PDFPage, text: string, theme: Theme, boldFont: PDFFont, regularFont: PDFFont, startY: number) {
+  let y = startY;
+  drawSectionTitle(page, "Customer Notes", y, boldFont, theme);
+  y -= 16;
+  const height = 26 + paragraphHeight(regularFont, text, CONTENT_WIDTH - 20, 9);
+  drawRect(page, PAGE_MARGIN, y, CONTENT_WIDTH, height, theme.softSurface, theme.line);
+  drawParagraph(page, regularFont, text, PAGE_MARGIN + 10, y - 14, CONTENT_WIDTH - 20, 9, theme.ink);
+  return y - height - 16;
+}
+
+function renderHostedLink(page: PDFPage, url: string, theme: Theme, boldFont: PDFFont, regularFont: PDFFont, startY: number) {
+  let y = startY;
+  drawSectionTitle(page, "Review and Approve Online", y, boldFont, theme);
+  y -= 16;
+  const copy = "Use the secure link below to review the quote online, download the latest PDF, and approve it digitally.";
+  const height = 38 + paragraphHeight(regularFont, copy, CONTENT_WIDTH - 20, 9) + paragraphHeight(regularFont, url, CONTENT_WIDTH - 20, 8);
+  drawRect(page, PAGE_MARGIN, y, CONTENT_WIDTH, height, theme.surface, theme.line);
+  const afterCopy = drawParagraph(page, regularFont, copy, PAGE_MARGIN + 10, y - 14, CONTENT_WIDTH - 20, 9, theme.ink);
+  drawParagraph(page, regularFont, url, PAGE_MARGIN + 10, afterCopy - 8, CONTENT_WIDTH - 20, 8, theme.primary);
+  return y - height - 10;
 }
 
 export async function generateQuotePdf(input: QuotePdfInput) {
@@ -456,42 +566,21 @@ export async function generateQuotePdf(input: QuotePdfInput) {
   const logo = await embedImage(pdfDoc, branding.logoDataUrl);
 
   const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-  drawPageChrome(input, page, theme, boldFont, regularFont, logo, 1);
-  drawKpis(input, page, theme, boldFont, regularFont);
-  const afterSummary = renderSummary(page, input, theme, boldFont, regularFont);
-  const afterTable = renderLineItems(page, input, theme, boldFont, regularFont, afterSummary);
-  let y = renderTotals(page, input, theme, boldFont, regularFont, afterTable);
+  drawHeader(input, page, theme, boldFont, regularFont, logo, 1);
+
+  let y = PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT - 18;
+  drawKpis(input, page, theme, boldFont, regularFont, y);
+  y -= 82;
+  y = renderSummary(page, input, theme, boldFont, regularFont, y);
+  y = renderLineItems(page, input, theme, boldFont, regularFont, y);
+  y = renderTotals(page, input, theme, boldFont, regularFont, y);
 
   if (input.quote.customerNotes?.trim()) {
-    page.drawText("Customer notes", {
-      x: PAGE_MARGIN,
-      y,
-      size: 13,
-      font: boldFont,
-      color: theme.ink
-    });
-    y -= 16;
-    const height = 28 + paragraphHeight(regularFont, input.quote.customerNotes, CONTENT_WIDTH - 20, 9);
-    drawRect(page, PAGE_MARGIN, y, CONTENT_WIDTH, height, theme.softSurface, theme.line);
-    drawParagraph(page, regularFont, input.quote.customerNotes, PAGE_MARGIN + 10, y - 14, CONTENT_WIDTH - 20, 9, theme.ink);
-    y -= height + 16;
+    y = renderNotes(page, input.quote.customerNotes, theme, boldFont, regularFont, y);
   }
 
   if (input.quote.hostedQuoteUrl) {
-    page.drawText("Review and approve online", {
-      x: PAGE_MARGIN,
-      y,
-      size: 13,
-      font: boldFont,
-      color: theme.ink
-    });
-    y -= 16;
-    const hostedCopy = "Use the secure quote link below to review the quote online, download the latest PDF, and respond digitally.";
-    const urlText = input.quote.hostedQuoteUrl;
-    const height = 40 + paragraphHeight(regularFont, hostedCopy, CONTENT_WIDTH - 20, 9) + paragraphHeight(regularFont, urlText, CONTENT_WIDTH - 20, 8);
-    drawRect(page, PAGE_MARGIN, y, CONTENT_WIDTH, height, theme.surface, theme.line);
-    const afterCopy = drawParagraph(page, regularFont, hostedCopy, PAGE_MARGIN + 10, y - 14, CONTENT_WIDTH - 20, 9, theme.ink);
-    drawParagraph(page, regularFont, urlText, PAGE_MARGIN + 10, afterCopy - 8, CONTENT_WIDTH - 20, 8, theme.primary);
+    renderHostedLink(page, input.quote.hostedQuoteUrl, theme, boldFont, regularFont, y);
   }
 
   return pdfDoc.save();
