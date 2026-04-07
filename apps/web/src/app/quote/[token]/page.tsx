@@ -372,7 +372,7 @@ export default async function HostedQuotePage({
               <section className="rounded-[28px] border border-slate-200 bg-white p-5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Approval</p>
                 <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-950">Respond to this quote</h2>
-                <p className="mt-3 text-sm leading-7 text-slate-600">Approve the quote to let our office move forward, or decline it if you'd like us to revise the scope or timing.</p>
+                <p className="mt-3 text-sm leading-7 text-slate-600">Approve the quote to let our office move forward, or decline it if you&apos;d like us to revise the scope or timing.</p>
 
                 {quote.canRespond ? (
                   <div className="mt-5">
@@ -381,8 +381,8 @@ export default async function HostedQuotePage({
                 ) : (
                   <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                     {result.accessState === "approved" ? "This quote has already been approved. Our office will follow up with next steps." : null}
-                    {result.accessState === "declined" ? "This quote has already been declined. Contact us if you'd like an updated version." : null}
-                    {result.accessState === "expired" ? "This quote has expired. Contact us if you'd like us to refresh and resend it." : null}
+                    {result.accessState === "declined" ? "This quote has already been declined. Contact us if you&apos;d like an updated version." : null}
+                    {result.accessState === "expired" ? "This quote has expired. Contact us if you&apos;d like us to refresh and resend it." : null}
                     {result.accessState === "cancelled" ? "This quote is no longer active. Reach out to your TradeWorx contact if you need assistance." : null}
                   </div>
                 )}
