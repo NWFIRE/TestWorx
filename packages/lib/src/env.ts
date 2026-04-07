@@ -30,6 +30,11 @@ function formatIssues(issues: z.ZodIssue[]) {
   return issues.map((issue) => `- ${issue.message}`).join("\n");
 }
 
+function normalizeOptionalEnvValue(value: string | undefined) {
+  const trimmed = value?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : undefined;
+}
+
 function parseServerEnv(raw: NodeJS.ProcessEnv) {
   const parsed = baseServerEnvSchema.safeParse({
     DATABASE_URL: raw.DATABASE_URL,
@@ -164,8 +169,8 @@ export function getOptionalQuickBooksEnv() {
 export function getOptionalEmailEnv() {
   const env = getServerEnv();
   return {
-    RESEND_API_KEY: env.RESEND_API_KEY || null,
-    RESEND_FROM_EMAIL: env.RESEND_FROM_EMAIL || null
+    RESEND_API_KEY: normalizeOptionalEnvValue(env.RESEND_API_KEY) ?? null,
+    RESEND_FROM_EMAIL: normalizeOptionalEnvValue(env.RESEND_FROM_EMAIL) ?? null
   };
 }
 
