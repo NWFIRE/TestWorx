@@ -37,6 +37,11 @@ export default async function CustomerQuoteDetailPage({
             <a className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" href={`/api/quotes/${quote.id}/pdf`} target="_blank">
               Download PDF
             </a>
+            {quote.hostedQuoteUrl ? (
+              <a className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#1f4678] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" href={quote.hostedQuoteUrl} rel="noreferrer" target="_blank">
+                Open hosted quote
+              </a>
+            ) : null}
             <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" href="/app/customer">
               Back to portal
             </Link>
@@ -102,6 +107,27 @@ export default async function CustomerQuoteDetailPage({
             ) : (
               <EmptyState className="mt-3" description="No customer-facing notes were added to this quote." title="No quote notes" />
             )}
+          </SectionCard>
+
+          <SectionCard>
+            <h2 className="text-xl font-semibold text-slate-950">Response activity</h2>
+            <div className="mt-4 space-y-3 text-sm text-slate-600">
+              <div className="flex items-center justify-between">
+                <span>First viewed</span>
+                <span className="font-semibold text-slate-950">{quote.firstViewedAt ? format(quote.firstViewedAt, "MMM d, yyyy h:mm a") : "—"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Last viewed</span>
+                <span className="font-semibold text-slate-950">{quote.lastViewedAt ? format(quote.lastViewedAt, "MMM d, yyyy h:mm a") : "—"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Approval state</span>
+                <span className="font-semibold text-slate-950">{quote.approvedAt ? "Approved" : quote.declinedAt ? "Declined" : "Awaiting response"}</span>
+              </div>
+              {quote.customerResponseNote ? (
+                <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 leading-7 text-slate-600">{quote.customerResponseNote}</p>
+              ) : null}
+            </div>
           </SectionCard>
         </div>
       </section>

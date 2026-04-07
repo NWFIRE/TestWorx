@@ -386,7 +386,18 @@ model Quote {
   issuedAt                DateTime            @default(now())
   expiresAt               DateTime?
   sentAt                  DateTime?
+  lastSentAt              DateTime?
+  resendCount             Int                 @default(0)
   viewedAt                DateTime?
+  firstViewedAt           DateTime?
+  lastViewedAt            DateTime?
+  viewCount               Int                 @default(0)
+  customerResponseNote    String?
+  lastAccessedByEmail     String?
+  quoteAccessToken        String?             @unique
+  quoteAccessTokenExpiresAt DateTime?
+  quoteAccessTokenRevokedAt DateTime?
+  quoteAccessTokenSentToEmail String?
   approvedAt              DateTime?
   declinedAt              DateTime?
   convertedAt             DateTime?

@@ -9,6 +9,7 @@ import type { ActorContext } from "@testworx/types";
 
 import { auth } from "@/auth";
 import {
+  regenerateQuoteAccessToken,
   clearQuoteLineItemQuickBooksMapping,
   createQuote,
   quoteInputSchema,
@@ -273,5 +274,25 @@ export async function convertQuoteAction(formData: FormData) {
       throw error;
     }
     redirect(quoteDetailHref(quoteId, { error: error instanceof Error ? error.message : "Unable to convert quote." }));
+  }
+}
+
+export async function regenerateQuoteLinkAction(formData: FormData) {
+  const session = await auth();
+  const quoteId = String(formData.get("quoteId") ?? "");
+  if (!session?.user?.tenantId || !quoteId) {
+    redirect("/login");
+  }
+
+  try {
+    await regenerateQuoteAccessToken(getActor(getQuoteActionSession(session)), quoteId);
+    revalidatePath("/app/admin/quotes");
+    revalidatePath(`/app/admin/quotes/${quoteId}`);
+    redirect(quoteDetailHref(quoteId, { status: "hosted_link_refreshed" }));
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+    redirect(quoteDetailHref(quoteId, { error: error instanceof Error ? error.message : "Unable to refresh hosted quote link." }));
   }
 }

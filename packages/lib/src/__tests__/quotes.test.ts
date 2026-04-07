@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QuoteStatus, QuoteSyncStatus, QuoteDeliveryStatus } from "@prisma/client";
+import { addDays } from "date-fns";
 
-const { prismaMock, sendQuoteEmailMock, syncQuoteToQuickBooksEstimateMock, createInspectionMock, saveQuickBooksItemMappingForCodeMock, clearQuickBooksItemMappingForCodeMock } = vi.hoisted(() => ({
+const { prismaMock, sendQuoteEmailMock, syncQuoteToQuickBooksEstimateMock, createInspectionMock, saveQuickBooksItemMappingForCodeMock, clearQuickBooksItemMappingForCodeMock, generateQuotePdfMock } = vi.hoisted(() => ({
   prismaMock: {
     quote: {
       count: vi.fn(),
@@ -41,7 +42,8 @@ const { prismaMock, sendQuoteEmailMock, syncQuoteToQuickBooksEstimateMock, creat
   syncQuoteToQuickBooksEstimateMock: vi.fn(),
   createInspectionMock: vi.fn(),
   saveQuickBooksItemMappingForCodeMock: vi.fn(),
-  clearQuickBooksItemMappingForCodeMock: vi.fn()
+  clearQuickBooksItemMappingForCodeMock: vi.fn(),
+  generateQuotePdfMock: vi.fn()
 }));
 
 vi.mock("@testworx/db", () => ({
@@ -50,6 +52,12 @@ vi.mock("@testworx/db", () => ({
 
 vi.mock("../account-email", () => ({
   sendQuoteEmail: sendQuoteEmailMock
+}));
+
+vi.mock("../env", () => ({
+  getServerEnv: () => ({
+    APP_URL: "https://tradeworx.example"
+  })
 }));
 
 vi.mock("../quickbooks", () => ({
@@ -64,13 +72,21 @@ vi.mock("../scheduling", () => ({
   createInspection: createInspectionMock
 }));
 
+vi.mock("../quote-pdf", () => ({
+  generateQuotePdf: generateQuotePdfMock
+}));
+
 import {
+  approveQuoteByAccessToken,
+  convertQuoteToInspection,
   createQuote,
+  getHostedQuoteDetailByToken,
   getCustomerQuoteDetail,
   getQuoteFormOptions,
   getQuoteWorkspaceData,
   saveQuoteLineItemQuickBooksMapping,
-  clearQuoteLineItemQuickBooksMapping
+  clearQuoteLineItemQuickBooksMapping,
+  sendQuote
 } from "../quotes";
 
 describe("quotes", () => {
@@ -96,6 +112,7 @@ describe("quotes", () => {
     prismaMock.quoteLineItem.update.mockResolvedValue(undefined);
     saveQuickBooksItemMappingForCodeMock.mockResolvedValue(undefined);
     clearQuickBooksItemMappingForCodeMock.mockResolvedValue(undefined);
+    generateQuotePdfMock.mockResolvedValue(new Uint8Array([1, 2, 3]));
   });
 
   it("creates a draft quote with mapped qb item ids", async () => {
@@ -301,5 +318,230 @@ describe("quotes", () => {
       where: { id: "line_1" },
       data: { qbItemId: null }
     }));
+  });
+
+  it("sends a quote using a hosted access link and increments resend metadata", async () => {
+    prismaMock.quote.findFirst
+      .mockResolvedValueOnce({
+        id: "quote_1",
+        tenantId: "tenant_1",
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        contactName: "Alyssa Reed",
+        recipientEmail: "alyssa@example.com",
+        quoteNumber: "Q-2026-0005",
+        status: QuoteStatus.sent,
+        syncStatus: QuoteSyncStatus.not_synced,
+        deliveryStatus: QuoteDeliveryStatus.not_sent,
+        sentAt: new Date("2026-04-06T12:00:00.000Z"),
+        expiresAt: new Date("2026-05-01T12:00:00.000Z"),
+        quoteAccessToken: "token_123",
+        quoteAccessTokenRevokedAt: null,
+        quoteAccessTokenExpiresAt: new Date("2026-05-01T23:59:59.000Z"),
+        tenant: { name: "TradeWorx", branding: {}, billingEmail: "office@example.com" },
+        lineItems: [],
+        subtotal: 100,
+        taxAmount: 0,
+        total: 100,
+        customerNotes: null
+      })
+      .mockResolvedValueOnce({
+        id: "quote_1",
+        tenantId: "tenant_1",
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        quoteNumber: "Q-2026-0005",
+        recipientEmail: "alyssa@example.com",
+        issuedAt: new Date("2026-04-06T12:00:00.000Z"),
+        expiresAt: new Date("2026-05-01T12:00:00.000Z"),
+        status: QuoteStatus.sent,
+        customerNotes: null,
+        subtotal: 100,
+        taxAmount: 0,
+        total: 100,
+        lineItems: [],
+        tenant: { name: "TradeWorx", branding: {}, billingEmail: "office@example.com" }
+      });
+    prismaMock.customerCompany.findFirst.mockResolvedValue({
+      id: "customer_1",
+      name: "Acme",
+      contactName: "Alyssa Reed",
+      billingEmail: "alyssa@example.com",
+      phone: null
+    });
+    prismaMock.site.findFirst.mockResolvedValue({
+      id: "site_1",
+      name: "Main campus",
+      addressLine1: "123 Main",
+      addressLine2: null,
+      city: "Austin",
+      state: "TX",
+      postalCode: "78701"
+    });
+    prismaMock.quote.update.mockResolvedValue(undefined);
+    sendQuoteEmailMock.mockResolvedValue({
+      sent: true,
+      provider: "resend",
+      messageId: "msg_1",
+      error: null,
+      reason: "sent"
+    });
+
+    await sendQuote(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      "quote_1",
+      { recipientEmail: "alyssa@example.com" }
+    );
+
+    expect(sendQuoteEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+      quoteUrl: "https://tradeworx.example/quote/token_123",
+      expiresAt: new Date("2026-05-01T12:00:00.000Z")
+    }));
+    expect(prismaMock.quote.update).toHaveBeenLastCalledWith(expect.objectContaining({
+      where: { id: "quote_1" },
+      data: expect.objectContaining({
+        lastSentAt: expect.any(Date),
+        resendCount: { increment: 1 },
+        quoteAccessTokenSentToEmail: "alyssa@example.com"
+      })
+    }));
+  });
+
+  it("records hosted quote views and moves sent quotes into viewed", async () => {
+    prismaMock.quote.findFirst.mockResolvedValue({
+      id: "quote_1",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      quoteNumber: "Q-2026-0008",
+      contactName: "Alyssa Reed",
+      recipientEmail: "alyssa@example.com",
+      status: QuoteStatus.sent,
+      issuedAt: new Date("2026-04-06T12:00:00.000Z"),
+      expiresAt: null,
+      viewedAt: null,
+      firstViewedAt: null,
+      lastViewedAt: null,
+      viewCount: 0,
+      quoteAccessToken: "token_abc",
+      quoteAccessTokenRevokedAt: null,
+      quoteAccessTokenExpiresAt: addDays(new Date(), 10),
+      quoteAccessTokenSentToEmail: "alyssa@example.com",
+      subtotal: 100,
+      taxAmount: 0,
+      total: 100,
+      customerNotes: null,
+      customerCompany: { name: "Acme", contactName: "Alyssa", billingEmail: "alyssa@example.com", phone: null },
+      site: { name: "Main campus", addressLine1: "123 Main", addressLine2: null, city: "Austin", state: "TX", postalCode: "78701" },
+      tenant: { id: "tenant_1", name: "TradeWorx", branding: {}, billingEmail: "office@example.com" },
+      lineItems: []
+    });
+    prismaMock.quote.update.mockResolvedValue(undefined);
+
+    const result = await getHostedQuoteDetailByToken("token_abc");
+
+    expect(prismaMock.quote.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "quote_1" },
+      data: expect.objectContaining({
+        status: QuoteStatus.viewed,
+        viewCount: { increment: 1 }
+      })
+    }));
+    expect(result.quote?.status).toBe(QuoteStatus.viewed);
+    expect(result.quote?.viewCount).toBe(1);
+  });
+
+  it("approves a quote through the hosted access token without duplicating approval", async () => {
+    prismaMock.quote.findFirst.mockResolvedValue({
+      id: "quote_1",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      quoteNumber: "Q-2026-0009",
+      contactName: "Alyssa Reed",
+      recipientEmail: "alyssa@example.com",
+      status: QuoteStatus.viewed,
+      issuedAt: new Date("2026-04-06T12:00:00.000Z"),
+      expiresAt: null,
+      quoteAccessToken: "token_approve",
+      quoteAccessTokenRevokedAt: null,
+      quoteAccessTokenExpiresAt: addDays(new Date(), 5),
+      quoteAccessTokenSentToEmail: "alyssa@example.com",
+      approvedAt: null,
+      declinedAt: null,
+      subtotal: 100,
+      taxAmount: 0,
+      total: 100,
+      customerNotes: null,
+      customerCompany: { name: "Acme", contactName: "Alyssa", billingEmail: "alyssa@example.com", phone: null },
+      site: { name: "Main campus", addressLine1: "123 Main", addressLine2: null, city: "Austin", state: "TX", postalCode: "78701" },
+      tenant: { id: "tenant_1", name: "TradeWorx", branding: {}, billingEmail: "office@example.com" },
+      lineItems: []
+    });
+    prismaMock.quote.update.mockResolvedValue({
+      id: "quote_1",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      quoteNumber: "Q-2026-0009",
+      contactName: "Alyssa Reed",
+      recipientEmail: "alyssa@example.com",
+      status: QuoteStatus.approved,
+      issuedAt: new Date("2026-04-06T12:00:00.000Z"),
+      expiresAt: null,
+      quoteAccessToken: "token_approve",
+      quoteAccessTokenRevokedAt: null,
+      quoteAccessTokenExpiresAt: addDays(new Date(), 5),
+      quoteAccessTokenSentToEmail: "alyssa@example.com",
+      approvedAt: new Date(),
+      declinedAt: null,
+      subtotal: 100,
+      taxAmount: 0,
+      total: 100,
+      customerNotes: null,
+      customerResponseNote: "Please schedule next week.",
+      customerCompany: { name: "Acme", contactName: "Alyssa", billingEmail: "alyssa@example.com", phone: null },
+      site: { name: "Main campus", addressLine1: "123 Main", addressLine2: null, city: "Austin", state: "TX", postalCode: "78701" },
+      tenant: { id: "tenant_1", name: "TradeWorx", branding: {}, billingEmail: "office@example.com" },
+      lineItems: []
+    });
+
+    const result = await approveQuoteByAccessToken("token_approve", { note: "Please schedule next week." });
+
+    expect(prismaMock.quote.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "quote_1" },
+      data: expect.objectContaining({
+        status: QuoteStatus.approved,
+        customerResponseNote: "Please schedule next week."
+      })
+    }));
+    expect(result.accessState).toBe("approved");
+  });
+
+  it("blocks quote conversion until the quote is approved", async () => {
+    prismaMock.quote.findFirst.mockResolvedValue({
+      id: "quote_1",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      quoteNumber: "Q-2026-0010",
+      status: QuoteStatus.sent,
+      expiresAt: null,
+      convertedInspectionId: null,
+      customerNotes: null,
+      lineItems: [
+        {
+          id: "line_1",
+          inspectionType: "fire_extinguisher",
+          description: "Annual inspection",
+          title: "Fire extinguisher annual inspection"
+        }
+      ]
+    });
+
+    await expect(convertQuoteToInspection(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      "quote_1"
+    )).rejects.toThrow("Approve this quote before converting it into work.");
   });
 });

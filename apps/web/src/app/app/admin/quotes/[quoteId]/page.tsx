@@ -16,12 +16,14 @@ import { AppPageShell, PageHeader, SectionCard, StatusBadge } from "../../operat
 import {
   clearQuoteLineItemMappingAction,
   convertQuoteAction,
+  regenerateQuoteLinkAction,
   saveQuoteLineItemMappingAction,
   sendQuoteAction,
   syncQuoteAction,
   updateQuoteAction,
   updateQuoteStatusAction
 } from "../actions";
+import { CopyQuoteLinkButton } from "../copy-quote-link-button";
 import { QuoteEditorForm } from "../quote-editor-form";
 
 export default async function QuoteDetailPage({
@@ -99,7 +101,7 @@ export default async function QuoteDetailPage({
                 <p className="mt-1 text-sm text-slate-500">{detail.contactName ?? "—"}</p>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Site</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Delivery</p>
                 <p className="mt-2 text-base font-semibold text-slate-950">{detail.site?.name ?? "No site linked"}</p>
                 <p className="mt-1 text-sm text-slate-500">{detail.recipientEmail ?? "No recipient email saved"}</p>
               </div>
@@ -142,6 +144,38 @@ export default async function QuoteDetailPage({
             sites={detail.formOptions.sites}
             submitLabel="Save quote updates"
           />
+
+          <SectionCard>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Customer approval activity</h2>
+                <p className="mt-2 text-sm text-slate-500">Track hosted-link delivery, customer engagement, and the current response state without leaving the quote workspace.</p>
+              </div>
+              <StatusBadge label={detail.engagementStatus.replaceAll("_", " ")} tone={detail.engagementStatus === "available" || detail.engagementStatus === "approved" ? "emerald" : detail.engagementStatus === "declined" || detail.engagementStatus === "cancelled" ? "rose" : detail.engagementStatus === "expired" ? "amber" : "slate"} />
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Sent</p>
+                <p className="mt-2 text-base font-semibold text-slate-950">{detail.lastSentAt ? format(detail.lastSentAt, "MMM d, yyyy h:mm a") : "Not sent yet"}</p>
+                <p className="mt-1 text-sm text-slate-500">Resends {detail.resendCount}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Customer viewed</p>
+                <p className="mt-2 text-base font-semibold text-slate-950">{detail.firstViewedAt ? format(detail.firstViewedAt, "MMM d, yyyy h:mm a") : "Not viewed yet"}</p>
+                <p className="mt-1 text-sm text-slate-500">Last activity {detail.lastViewedAt ? format(detail.lastViewedAt, "MMM d, yyyy h:mm a") : "—"} • {detail.viewCount} views</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Response</p>
+                <p className="mt-2 text-base font-semibold text-slate-950">{detail.approvedAt ? `Approved ${format(detail.approvedAt, "MMM d, yyyy h:mm a")}` : detail.declinedAt ? `Declined ${format(detail.declinedAt, "MMM d, yyyy h:mm a")}` : "Awaiting customer response"}</p>
+                <p className="mt-1 text-sm text-slate-500">{detail.customerResponseNote ?? "No customer response note yet."}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Hosted link</p>
+                <p className="mt-2 text-base font-semibold text-slate-950">{detail.hostedQuoteUrl ? "Ready to share" : "Will be generated on send"}</p>
+                <p className="mt-1 break-all text-sm text-slate-500">{detail.hostedQuoteUrl ?? "Send the quote to issue a secure hosted link."}</p>
+              </div>
+            </div>
+          </SectionCard>
 
           <SectionCard>
             <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Audit history</h2>
@@ -234,6 +268,7 @@ export default async function QuoteDetailPage({
         <aside className="space-y-6">
           <SectionCard>
             <h2 className="text-xl font-semibold text-slate-950">Send quote</h2>
+            <p className="mt-2 text-sm text-slate-500">Email the customer a secure hosted quote link with the branded PDF attached. The email CTA opens the online approval experience first.</p>
             <form action={sendQuoteAction} className="mt-4 space-y-3">
               <input name="quoteId" type="hidden" value={detail.id} />
               <label className="block">
@@ -246,10 +281,28 @@ export default async function QuoteDetailPage({
               </label>
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-700">Message</span>
-                <textarea className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" defaultValue={detail.customerNotes ?? ""} name="message" />
+                <textarea className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" defaultValue={detail.customerNotes ?? "Review the quote details below. When you’re ready, approve the quote and we’ll move forward with the work."} name="message" />
               </label>
               <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-[#1f4678] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" type="submit">
                 {detail.sentAt ? "Resend quote" : "Send quote"}
+              </button>
+            </form>
+            {detail.hostedQuoteUrl ? (
+              <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Hosted quote link</p>
+                <p className="break-all text-sm text-slate-600">{detail.hostedQuoteUrl}</p>
+                <div className="flex flex-wrap gap-3">
+                  <CopyQuoteLinkButton href={detail.hostedQuoteUrl} />
+                  <a className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" href={detail.hostedQuoteUrl} rel="noreferrer" target="_blank">
+                    Open hosted quote
+                  </a>
+                </div>
+              </div>
+            ) : null}
+            <form action={regenerateQuoteLinkAction} className="mt-4">
+              <input name="quoteId" type="hidden" value={detail.id} />
+              <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="submit">
+                Regenerate secure link
               </button>
             </form>
           </SectionCard>

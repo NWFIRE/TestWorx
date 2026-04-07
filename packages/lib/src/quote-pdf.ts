@@ -19,6 +19,7 @@ type QuotePdfInput = {
     subtotal: number;
     taxAmount: number;
     total: number;
+    hostedQuoteUrl?: string | null;
   };
   customerCompany: {
     name: string;
@@ -473,6 +474,24 @@ export async function generateQuotePdf(input: QuotePdfInput) {
     const height = 28 + paragraphHeight(regularFont, input.quote.customerNotes, CONTENT_WIDTH - 20, 9);
     drawRect(page, PAGE_MARGIN, y, CONTENT_WIDTH, height, theme.softSurface, theme.line);
     drawParagraph(page, regularFont, input.quote.customerNotes, PAGE_MARGIN + 10, y - 14, CONTENT_WIDTH - 20, 9, theme.ink);
+    y -= height + 16;
+  }
+
+  if (input.quote.hostedQuoteUrl) {
+    page.drawText("Review and approve online", {
+      x: PAGE_MARGIN,
+      y,
+      size: 13,
+      font: boldFont,
+      color: theme.ink
+    });
+    y -= 16;
+    const hostedCopy = "Use the secure quote link below to review the quote online, download the latest PDF, and respond digitally.";
+    const urlText = input.quote.hostedQuoteUrl;
+    const height = 40 + paragraphHeight(regularFont, hostedCopy, CONTENT_WIDTH - 20, 9) + paragraphHeight(regularFont, urlText, CONTENT_WIDTH - 20, 8);
+    drawRect(page, PAGE_MARGIN, y, CONTENT_WIDTH, height, theme.surface, theme.line);
+    const afterCopy = drawParagraph(page, regularFont, hostedCopy, PAGE_MARGIN + 10, y - 14, CONTENT_WIDTH - 20, 9, theme.ink);
+    drawParagraph(page, regularFont, urlText, PAGE_MARGIN + 10, afterCopy - 8, CONTENT_WIDTH - 20, 8, theme.primary);
   }
 
   return pdfDoc.save();

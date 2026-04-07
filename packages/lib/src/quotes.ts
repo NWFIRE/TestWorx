@@ -30,6 +30,7 @@ import { assertTenantContext } from "./permissions";
 const adminRoles = ["platform_admin", "tenant_admin", "office_admin"] as const;
 const quoteStatusValues = Object.values(QuoteStatus);
 const quoteSyncStatusValues = Object.values(QuoteSyncStatus);
+const closedQuoteStatuses: QuoteStatus[] = [QuoteStatus.approved, QuoteStatus.declined, QuoteStatus.converted, QuoteStatus.cancelled];
 
 type NormalizedQuoteLineItem = {
   tenantId: string;
@@ -189,6 +190,15 @@ export const quoteSyncStatusLabels = {
   [QuoteSyncStatus.sync_error]: "Sync Error"
 } satisfies Record<QuoteSyncStatus, string>;
 
+export const hostedQuoteStateLabels = {
+  available: "Available",
+  approved: "Approved",
+  declined: "Declined",
+  expired: "Expired",
+  cancelled: "Cancelled",
+  unavailable: "Unavailable"
+} as const;
+
 export function getQuoteStatusTone(status: QuoteStatus) {
   switch (status) {
     case QuoteStatus.ready_to_send:
@@ -226,6 +236,16 @@ export function getQuoteSyncTone(status: QuoteSyncStatus) {
 function normalizeNullableString(value: string | null | undefined) {
   const trimmed = (value ?? "").trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function createQuoteAccessToken() {
+  const bytes = new Uint8Array(24);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function buildQuoteAccessUrl(token: string) {
+  return `${getServerEnv().APP_URL}/quote/${token}`;
 }
 
 function roundMoney(value: number) {
@@ -314,7 +334,7 @@ function isQuoteEffectivelyExpired(status: QuoteStatus, expiresAt: Date | null) 
   if (!expiresAt) {
     return false;
   }
-  if (([QuoteStatus.approved, QuoteStatus.declined, QuoteStatus.converted, QuoteStatus.cancelled] as QuoteStatus[]).includes(status)) {
+  if (closedQuoteStatuses.includes(status)) {
     return false;
   }
   return isBefore(endOfDay(expiresAt), new Date());
@@ -326,7 +346,7 @@ function getEffectiveQuoteStatus(status: QuoteStatus, expiresAt: Date | null) {
 
 async function createQuoteAuditLog(input: {
   tenantId: string;
-  actorUserId: string;
+  actorUserId: string | null;
   action: string;
   quoteId: string;
   metadata?: Prisma.InputJsonValue;
@@ -341,6 +361,137 @@ async function createQuoteAuditLog(input: {
       metadata: input.metadata
     }
   });
+}
+
+async function ensureQuoteAccessTokenForQuote(input: {
+  quoteId: string;
+  expiresAt: Date | null;
+  recipientEmail?: string | null;
+}) {
+  const freshToken = createQuoteAccessToken();
+  const updated = await prisma.quote.update({
+    where: { id: input.quoteId },
+    data: {
+      quoteAccessToken: freshToken,
+      quoteAccessTokenRevokedAt: null,
+      quoteAccessTokenExpiresAt: input.expiresAt ? endOfDay(input.expiresAt) : addDays(new Date(), 180),
+      quoteAccessTokenSentToEmail: normalizeNullableString(input.recipientEmail)
+    },
+    select: {
+      quoteAccessToken: true,
+      quoteAccessTokenExpiresAt: true,
+      quoteAccessTokenRevokedAt: true
+    }
+  });
+
+  return updated;
+}
+
+function getHostedQuoteAvailability(quote: {
+  status: QuoteStatus;
+  expiresAt: Date | null;
+  quoteAccessTokenRevokedAt: Date | null;
+  quoteAccessTokenExpiresAt: Date | null;
+}) {
+  if (quote.quoteAccessTokenRevokedAt) {
+    return "unavailable" as const;
+  }
+  if (quote.status === QuoteStatus.cancelled) {
+    return "cancelled" as const;
+  }
+  if (quote.status === QuoteStatus.approved || quote.status === QuoteStatus.converted) {
+    return "approved" as const;
+  }
+  if (quote.status === QuoteStatus.declined) {
+    return "declined" as const;
+  }
+  if (
+    (quote.quoteAccessTokenExpiresAt && isBefore(quote.quoteAccessTokenExpiresAt, new Date()))
+    || isQuoteEffectivelyExpired(quote.status, quote.expiresAt)
+  ) {
+    return "expired" as const;
+  }
+  return "available" as const;
+}
+
+async function recordQuoteViewed(input: {
+  tenantId: string;
+  quoteId: string;
+  status: QuoteStatus;
+  recipientEmail?: string | null;
+}) {
+  const now = new Date();
+  const nextStatus = input.status === QuoteStatus.sent ? QuoteStatus.viewed : input.status;
+  await prisma.quote.update({
+    where: { id: input.quoteId },
+    data: {
+      viewedAt: now,
+      firstViewedAt: now,
+      lastViewedAt: now,
+      viewCount: { increment: 1 },
+      lastAccessedByEmail: normalizeNullableString(input.recipientEmail),
+      status: nextStatus
+    }
+  });
+
+  await createQuoteAuditLog({
+    tenantId: input.tenantId,
+    actorUserId: null,
+    action: "quote.viewed",
+    quoteId: input.quoteId,
+    metadata: {
+      recipientEmail: normalizeNullableString(input.recipientEmail)
+    }
+  });
+
+  return {
+    viewedAt: now,
+    firstViewedAt: now,
+    lastViewedAt: now,
+    viewCountIncremented: true,
+    nextStatus
+  };
+}
+
+async function getQuoteByAccessToken(token: string) {
+  const normalizedToken = token.trim();
+  if (!normalizedToken) {
+    return null;
+  }
+
+  const quote = await prisma.quote.findFirst({
+    where: { quoteAccessToken: normalizedToken },
+    include: {
+      customerCompany: true,
+      site: true,
+      lineItems: { orderBy: { sortOrder: "asc" } },
+      tenant: {
+        select: {
+          id: true,
+          name: true,
+          branding: true,
+          billingEmail: true
+        }
+      }
+    }
+  });
+
+  if (!quote) {
+    return null;
+  }
+
+  return quote;
+}
+
+function shapeHostedQuoteDetail(quote: NonNullable<Awaited<ReturnType<typeof getQuoteByAccessToken>>>) {
+  const accessState = getHostedQuoteAvailability(quote);
+  return {
+    ...quote,
+    accessState,
+    effectiveStatus: getEffectiveQuoteStatus(quote.status, quote.expiresAt),
+    hostedQuoteUrl: quote.quoteAccessToken ? buildQuoteAccessUrl(quote.quoteAccessToken) : null,
+    canRespond: accessState === "available"
+  };
 }
 
 async function getQuoteByIdForTenant(tenantId: string, quoteId: string) {
@@ -718,7 +869,8 @@ export async function getQuoteWorkspaceData(
         ...quote,
         customerCompany,
         site,
-        effectiveStatus
+        effectiveStatus,
+        engagementStatus: getHostedQuoteAvailability(quote)
       };
     })
     .filter((quote) => requestedStatus === "all" || quote.effectiveStatus === requestedStatus)
@@ -854,6 +1006,8 @@ export async function getQuoteDetail(actor: ActorContext, quoteId: string) {
   return {
     ...quote,
     effectiveStatus: getEffectiveQuoteStatus(quote.status, quote.expiresAt),
+    engagementStatus: getHostedQuoteAvailability(quote),
+    hostedQuoteUrl: quote.quoteAccessToken ? buildQuoteAccessUrl(quote.quoteAccessToken) : null,
     lineItems,
     auditLogs,
     formOptions
@@ -932,7 +1086,8 @@ export async function getAuthorizedQuotePdf(actor: ActorContext, quoteId: string
       customerNotes: quote.customerNotes,
       subtotal: quote.subtotal,
       taxAmount: quote.taxAmount,
-      total: quote.total
+      total: quote.total,
+      hostedQuoteUrl: quote.quoteAccessToken ? buildQuoteAccessUrl(quote.quoteAccessToken) : null
     },
     customerCompany: {
       name: customerCompany?.name ?? "Archived customer",
@@ -1014,12 +1169,24 @@ export async function sendQuote(actor: ActorContext, quoteId: string, input?: { 
     throw new Error("Add a recipient email before sending this quote.");
   }
 
+  const access = quote.quoteAccessToken
+    && !quote.quoteAccessTokenRevokedAt
+    && (!quote.quoteAccessTokenExpiresAt || !isBefore(quote.quoteAccessTokenExpiresAt, new Date()))
+    ? {
+        quoteAccessToken: quote.quoteAccessToken,
+        quoteAccessTokenExpiresAt: quote.quoteAccessTokenExpiresAt
+      }
+    : await ensureQuoteAccessTokenForQuote({
+        quoteId: quote.id,
+        expiresAt: quote.expiresAt,
+        recipientEmail
+      });
+
   const { pdfBytes, fileName } = await getAuthorizedQuotePdf(actor, quoteId);
-  const appUrl = getServerEnv().APP_URL;
-  const customerUrl = `${appUrl}/app/customer/quotes/${quote.id}`;
+  const customerUrl = buildQuoteAccessUrl(access.quoteAccessToken as string);
   const subject = normalizeNullableString(input?.subject) ?? `Quote ${quote.quoteNumber} from ${quote.tenant.name}`;
   const body = normalizeNullableString(input?.message)
-    ?? `Please review quote ${quote.quoteNumber}. You can review it in the customer portal or from the attached PDF.`;
+    ?? `Please review quote ${quote.quoteNumber} online. When you're ready, approve the quote and we'll move forward with the work.`;
 
   await prisma.quote.update({
     where: { id: quote.id },
@@ -1041,6 +1208,7 @@ export async function sendQuote(actor: ActorContext, quoteId: string, input?: { 
     quoteUrl: customerUrl,
     subjectLine: subject,
     messageBody: body,
+    expiresAt: quote.expiresAt,
     attachment: {
       fileName,
       content: Buffer.from(pdfBytes).toString("base64")
@@ -1048,16 +1216,20 @@ export async function sendQuote(actor: ActorContext, quoteId: string, input?: { 
   });
 
   const nextStatus = quote.status === QuoteStatus.draft ? QuoteStatus.sent : quote.status === QuoteStatus.ready_to_send ? QuoteStatus.sent : quote.status;
+  const deliveryTimestamp = delivery.sent ? new Date() : quote.sentAt;
   await prisma.quote.update({
     where: { id: quote.id },
     data: {
       status: nextStatus,
       deliveryStatus: delivery.sent ? QuoteDeliveryStatus.sent : QuoteDeliveryStatus.error,
-      sentAt: delivery.sent ? new Date() : quote.sentAt,
+      sentAt: deliveryTimestamp,
+      lastSentAt: deliveryTimestamp,
       lastSentToEmail: recipientEmail,
       lastDeliveryMessageId: delivery.messageId,
       lastDeliveryError: delivery.error,
       deliveryAttempts: { increment: 1 },
+      resendCount: delivery.sent && quote.sentAt ? { increment: 1 } : undefined,
+      quoteAccessTokenSentToEmail: recipientEmail,
       recipientEmail,
       updatedByUserId: parsedActor.userId
     }
@@ -1070,6 +1242,7 @@ export async function sendQuote(actor: ActorContext, quoteId: string, input?: { 
     quoteId: quote.id,
     metadata: {
       recipientEmail,
+      hostedQuoteUrl: customerUrl,
       provider: delivery.provider,
       reason: delivery.reason,
       error: delivery.error
@@ -1106,7 +1279,8 @@ export async function updateQuoteStatus(
     status,
     updatedBy: { connect: { id: parsedActor.userId } },
     approvedAt: status === QuoteStatus.approved ? now : quote.status === QuoteStatus.approved ? null : undefined,
-    declinedAt: status === QuoteStatus.declined ? now : quote.status === QuoteStatus.declined ? null : undefined
+    declinedAt: status === QuoteStatus.declined ? now : quote.status === QuoteStatus.declined ? null : undefined,
+    customerResponseNote: normalizeNullableString(options?.note) ?? undefined
   };
 
   await prisma.quote.update({
@@ -1145,6 +1319,9 @@ export async function convertQuoteToInspection(actor: ActorContext, quoteId: str
   }
   if (quote.convertedInspectionId) {
     throw new Error("This quote has already been converted.");
+  }
+  if (getEffectiveQuoteStatus(quote.status, quote.expiresAt) !== QuoteStatus.approved) {
+    throw new Error("Approve this quote before converting it into work.");
   }
   if (!quote.siteId) {
     throw new Error("Assign a site before converting this quote into work.");
@@ -1278,23 +1455,224 @@ export async function getCustomerQuoteDetail(actor: ActorContext, quoteId: strin
     return null;
   }
 
-  if (!quote.viewedAt) {
-    await prisma.quote.update({
-      where: { id: quote.id },
-      data: {
-        viewedAt: new Date(),
-        status: quote.status === QuoteStatus.sent ? QuoteStatus.viewed : quote.status
-      }
-    });
-  }
-
-  const effectiveViewedStatus = !quote.viewedAt && quote.status === QuoteStatus.sent
-    ? QuoteStatus.viewed
-    : quote.status;
+  const viewUpdate = await recordQuoteViewed({
+    tenantId: quote.tenantId,
+    quoteId: quote.id,
+    status: quote.status,
+    recipientEmail: quote.recipientEmail ?? quote.customerCompany.billingEmail ?? null
+  });
+  const effectiveViewedStatus = viewUpdate.nextStatus;
 
   return {
     ...quote,
     status: effectiveViewedStatus,
-    effectiveStatus: getEffectiveQuoteStatus(effectiveViewedStatus, quote.expiresAt)
+    viewedAt: viewUpdate.viewedAt,
+    firstViewedAt: quote.firstViewedAt ?? viewUpdate.firstViewedAt,
+    lastViewedAt: viewUpdate.lastViewedAt,
+    viewCount: quote.viewCount + 1,
+    effectiveStatus: getEffectiveQuoteStatus(effectiveViewedStatus, quote.expiresAt),
+    hostedQuoteUrl: quote.quoteAccessToken ? buildQuoteAccessUrl(quote.quoteAccessToken) : null
+  };
+}
+
+export async function regenerateQuoteAccessToken(actor: ActorContext, quoteId: string) {
+  const parsedActor = parseActor(actor);
+  assertAdminRole(parsedActor.role);
+
+  const quote = await prisma.quote.findFirst({
+    where: { id: quoteId, tenantId: parsedActor.tenantId as string },
+    select: {
+      id: true,
+      quoteAccessToken: true,
+      expiresAt: true,
+      recipientEmail: true
+    }
+  });
+
+  if (!quote) {
+    throw new Error("Quote not found.");
+  }
+
+  const refreshed = await ensureQuoteAccessTokenForQuote({
+    quoteId: quote.id,
+    expiresAt: quote.expiresAt,
+    recipientEmail: quote.recipientEmail
+  });
+
+  await createQuoteAuditLog({
+    tenantId: parsedActor.tenantId as string,
+    actorUserId: parsedActor.userId,
+    action: "quote.link_regenerated",
+    quoteId: quote.id,
+    metadata: {
+      previousTokenPresent: Boolean(quote.quoteAccessToken),
+      hostedQuoteUrl: refreshed.quoteAccessToken ? buildQuoteAccessUrl(refreshed.quoteAccessToken) : null
+    }
+  });
+
+  return refreshed.quoteAccessToken ? buildQuoteAccessUrl(refreshed.quoteAccessToken) : null;
+}
+
+export async function getHostedQuoteDetailByToken(token: string) {
+  const quote = await getQuoteByAccessToken(token);
+  if (!quote) {
+    return { accessState: "unavailable" as const, quote: null };
+  }
+
+  const accessState = getHostedQuoteAvailability(quote);
+  if (accessState === "unavailable") {
+    return { accessState, quote: null };
+  }
+
+  const updatedView = await recordQuoteViewed({
+    tenantId: quote.tenantId,
+    quoteId: quote.id,
+    status: quote.status,
+    recipientEmail: quote.quoteAccessTokenSentToEmail ?? quote.recipientEmail ?? quote.customerCompany.billingEmail ?? null
+  });
+
+  return {
+    accessState,
+    quote: {
+      ...shapeHostedQuoteDetail(quote),
+      status: updatedView.nextStatus,
+      viewedAt: updatedView.viewedAt,
+      firstViewedAt: quote.firstViewedAt ?? updatedView.firstViewedAt,
+      lastViewedAt: updatedView.lastViewedAt,
+      viewCount: quote.viewCount + 1,
+      effectiveStatus: getEffectiveQuoteStatus(updatedView.nextStatus, quote.expiresAt)
+    }
+  };
+}
+
+async function respondToQuoteByAccessToken(input: {
+  token: string;
+  response: "approved" | "declined";
+  note?: string | null;
+}) {
+  const quote = await getQuoteByAccessToken(input.token);
+  if (!quote) {
+    return { accessState: "unavailable" as const, quote: null };
+  }
+
+  const accessState = getHostedQuoteAvailability(quote);
+  if (accessState === "unavailable" || accessState === "cancelled" || accessState === "expired") {
+    return { accessState, quote: shapeHostedQuoteDetail(quote) };
+  }
+
+  if (accessState === "approved") {
+    return { accessState: "approved" as const, quote: shapeHostedQuoteDetail(quote) };
+  }
+
+  if (accessState === "declined") {
+    return { accessState: "declined" as const, quote: shapeHostedQuoteDetail(quote) };
+  }
+
+  const now = new Date();
+  const nextStatus = input.response === "approved" ? QuoteStatus.approved : QuoteStatus.declined;
+  const note = normalizeNullableString(input.note);
+  const updated = await prisma.quote.update({
+    where: { id: quote.id },
+    data: {
+      status: nextStatus,
+      approvedAt: nextStatus === QuoteStatus.approved ? now : quote.approvedAt,
+      declinedAt: nextStatus === QuoteStatus.declined ? now : quote.declinedAt,
+      customerResponseNote: note,
+      lastAccessedByEmail: quote.quoteAccessTokenSentToEmail ?? quote.recipientEmail ?? quote.customerCompany.billingEmail ?? null
+    },
+    include: {
+      customerCompany: true,
+      site: true,
+      lineItems: { orderBy: { sortOrder: "asc" } },
+      tenant: {
+        select: {
+          id: true,
+          name: true,
+          branding: true,
+          billingEmail: true
+        }
+      }
+    }
+  });
+
+  await createQuoteAuditLog({
+    tenantId: updated.tenantId,
+    actorUserId: null,
+    action: input.response === "approved" ? "quote.approved" : "quote.declined",
+    quoteId: updated.id,
+    metadata: {
+      note,
+      via: "secure_link",
+      recipientEmail: updated.quoteAccessTokenSentToEmail ?? updated.recipientEmail
+    }
+  });
+
+  return {
+    accessState: input.response,
+    quote: shapeHostedQuoteDetail(updated)
+  };
+}
+
+export async function approveQuoteByAccessToken(token: string, options?: { note?: string | null }) {
+  return respondToQuoteByAccessToken({ token, response: "approved", note: options?.note });
+}
+
+export async function declineQuoteByAccessToken(token: string, options?: { note?: string | null }) {
+  return respondToQuoteByAccessToken({ token, response: "declined", note: options?.note });
+}
+
+export async function getPublicQuotePdfByAccessToken(token: string) {
+  const quote = await getQuoteByAccessToken(token);
+  if (!quote) {
+    throw new Error("Quote not found.");
+  }
+  if (quote.quoteAccessTokenRevokedAt) {
+    throw new Error("Quote access is no longer available.");
+  }
+
+  const pdfBytes = await generateQuotePdf({
+    tenant: quote.tenant,
+    quote: {
+      quoteNumber: quote.quoteNumber,
+      recipientEmail: quote.recipientEmail,
+      issuedAt: quote.issuedAt,
+      expiresAt: quote.expiresAt,
+      status: quote.status,
+      customerNotes: quote.customerNotes,
+      subtotal: quote.subtotal,
+      taxAmount: quote.taxAmount,
+      total: quote.total,
+      hostedQuoteUrl: quote.quoteAccessToken ? buildQuoteAccessUrl(quote.quoteAccessToken) : null
+    },
+    customerCompany: {
+      name: quote.customerCompany.name,
+      contactName: quote.contactName ?? quote.customerCompany.contactName ?? null,
+      billingEmail: quote.recipientEmail ?? quote.customerCompany.billingEmail ?? null,
+      phone: quote.customerCompany.phone ?? null
+    },
+    site: quote.site
+      ? {
+          name: quote.site.name,
+          addressLine1: quote.site.addressLine1,
+          addressLine2: quote.site.addressLine2,
+          city: quote.site.city,
+          state: quote.site.state,
+          postalCode: quote.site.postalCode
+        }
+      : null,
+    lineItems: quote.lineItems.map((line) => ({
+      title: line.title,
+      description: line.description,
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
+      discountAmount: line.discountAmount,
+      total: line.total
+    }))
+  });
+
+  return {
+    fileName: `${quote.quoteNumber}.pdf`,
+    mimeType: "application/pdf",
+    pdfBytes
   };
 }

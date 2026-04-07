@@ -41,6 +41,7 @@ type QuoteEmailPayload = BaseEmailPayload & {
   subjectLine: string;
   messageBody: string;
   attachment: EmailAttachment;
+  expiresAt?: Date | null;
 };
 
 function buildShell({
@@ -188,11 +189,12 @@ export async function sendQuoteEmail(payload: QuoteEmailPayload) {
       body: [
         `Hi ${payload.recipientName},`,
         `A new quote is ready from ${payload.tenantName} for ${payload.customerName}${payload.siteName ? ` at ${payload.siteName}` : ""}.`,
-        payload.messageBody
+        payload.messageBody,
+        payload.expiresAt ? `This quote is available for review through ${payload.expiresAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}.` : "Use the secure link below to review the quote online, download the PDF, and approve or decline it when you're ready."
       ],
       actionHref: payload.quoteUrl,
-      actionLabel: "Review quote",
-      footer: "The attached PDF is a customer-ready copy of the quote. Reach out to your TradeWorx contact if anything needs to be adjusted."
+      actionLabel: "View quote",
+      footer: "The attached PDF is a customer-ready copy of the quote, but the secure online quote page is the fastest way to review details and approve or decline it."
     })
   });
 }

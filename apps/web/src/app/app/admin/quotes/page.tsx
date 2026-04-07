@@ -83,14 +83,14 @@ export default async function QuotesPage({
         eyebrow="Quotes"
         title="Customer quotes"
         description="Create, send, approve, sync, and convert quotes without leaving the TradeWorx operations workspace."
-        actions={
+        actions={(
           <Link
             className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#1f4678] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110"
             href="/app/admin/quotes/new"
           >
             New quote
           </Link>
-        }
+        )}
       />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -164,6 +164,12 @@ export default async function QuotesPage({
                       <p className="text-sm text-slate-600">Recipient: <span className="font-semibold text-slate-950">{quote.recipientEmail ?? "—"}</span></p>
                       <p className="text-sm text-slate-600">Expires: <span className="font-semibold text-slate-950">{quote.expiresAt ? format(quote.expiresAt, "MMM d, yyyy") : "—"}</span></p>
                       <p className="text-sm text-slate-600">Total: <span className="font-semibold text-slate-950">${quote.total.toFixed(2)}</span></p>
+                    </div>
+                    <div className="grid gap-3 pt-1 md:grid-cols-4">
+                      <p className="text-sm text-slate-600">Sent: <span className="font-semibold text-slate-950">{quote.lastSentAt ? format(quote.lastSentAt, "MMM d, yyyy") : "—"}</span></p>
+                      <p className="text-sm text-slate-600">Viewed: <span className="font-semibold text-slate-950">{quote.firstViewedAt ? format(quote.firstViewedAt, "MMM d, yyyy") : "—"}</span></p>
+                      <p className="text-sm text-slate-600">Response: <span className="font-semibold text-slate-950">{quote.approvedAt ? "Approved" : quote.declinedAt ? "Declined" : "Pending"}</span></p>
+                      <p className="text-sm text-slate-600">Engagement: <span className="font-semibold capitalize text-slate-950">{quote.engagementStatus.replaceAll("_", " ")}</span></p>
                     </div>
                   </div>
 
