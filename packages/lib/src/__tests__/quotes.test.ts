@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QuoteStatus, QuoteSyncStatus, QuoteDeliveryStatus } from "@prisma/client";
 
-const { prismaMock, sendQuoteEmailMock, syncQuoteToQuickBooksEstimateMock, createInspectionMock } = vi.hoisted(() => ({
+const { prismaMock, sendQuoteEmailMock, syncQuoteToQuickBooksEstimateMock, createInspectionMock, saveQuickBooksItemMappingForCodeMock, clearQuickBooksItemMappingForCodeMock } = vi.hoisted(() => ({
   prismaMock: {
     quote: {
       count: vi.fn(),
@@ -11,7 +11,9 @@ const { prismaMock, sendQuoteEmailMock, syncQuoteToQuickBooksEstimateMock, creat
       update: vi.fn()
     },
     quoteLineItem: {
-      findMany: vi.fn()
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn()
     },
     tenant: {
       findUnique: vi.fn()
@@ -35,7 +37,9 @@ const { prismaMock, sendQuoteEmailMock, syncQuoteToQuickBooksEstimateMock, creat
   },
   sendQuoteEmailMock: vi.fn(),
   syncQuoteToQuickBooksEstimateMock: vi.fn(),
-  createInspectionMock: vi.fn()
+  createInspectionMock: vi.fn(),
+  saveQuickBooksItemMappingForCodeMock: vi.fn(),
+  clearQuickBooksItemMappingForCodeMock: vi.fn()
 }));
 
 vi.mock("@testworx/db", () => ({
@@ -48,6 +52,8 @@ vi.mock("../account-email", () => ({
 
 vi.mock("../quickbooks", () => ({
   resolveQuickBooksItemForBilling: vi.fn(),
+  saveQuickBooksItemMappingForCode: saveQuickBooksItemMappingForCodeMock,
+  clearQuickBooksItemMappingForCode: clearQuickBooksItemMappingForCodeMock,
   syncQuoteToQuickBooksEstimate: syncQuoteToQuickBooksEstimateMock,
   validateMappedQbItem: vi.fn()
 }));
@@ -56,7 +62,14 @@ vi.mock("../scheduling", () => ({
   createInspection: createInspectionMock
 }));
 
-import { createQuote, getCustomerQuoteDetail, getQuoteWorkspaceData } from "../quotes";
+import {
+  createQuote,
+  getCustomerQuoteDetail,
+  getQuoteFormOptions,
+  getQuoteWorkspaceData,
+  saveQuoteLineItemQuickBooksMapping,
+  clearQuoteLineItemQuickBooksMapping
+} from "../quotes";
 
 describe("quotes", () => {
   beforeEach(() => {
@@ -71,6 +84,14 @@ describe("quotes", () => {
       qbItemId: "qb_item_1",
       qbActive: true
     });
+    prismaMock.quoteLineItem.findFirst.mockResolvedValue({
+      id: "line_1",
+      quoteId: "quote_1",
+      internalCode: "WET_FIRE_SPRINKLER_ANNUAL"
+    });
+    prismaMock.quoteLineItem.update.mockResolvedValue(undefined);
+    saveQuickBooksItemMappingForCodeMock.mockResolvedValue(undefined);
+    clearQuickBooksItemMappingForCodeMock.mockResolvedValue(undefined);
   });
 
   it("creates a draft quote with mapped qb item ids", async () => {
@@ -193,5 +214,58 @@ describe("quotes", () => {
 
     expect(results).toHaveLength(1);
     expect(results[0]?.effectiveStatus).toBe(QuoteStatus.expired);
+  });
+
+  it("includes wet fire sprinkler annual inspection in quote form options", async () => {
+    const result = await getQuoteFormOptions(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" }
+    );
+
+    expect(result.catalog.some((item) => item.code === "WET_FIRE_SPRINKLER_ANNUAL")).toBe(true);
+  });
+
+  it("saves a quote line item QuickBooks mapping and persists the chosen qb item id", async () => {
+    await saveQuoteLineItemQuickBooksMapping(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        quoteId: "quote_1",
+        lineItemId: "line_1",
+        internalCode: "WET_FIRE_SPRINKLER_ANNUAL",
+        internalName: "Wet fire sprinkler annual inspection",
+        qbItemId: "qb_item_77"
+      }
+    );
+
+    expect(saveQuickBooksItemMappingForCodeMock).toHaveBeenCalledWith(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      expect.objectContaining({
+        internalCode: "WET_FIRE_SPRINKLER_ANNUAL",
+        qbItemId: "qb_item_77"
+      })
+    );
+    expect(prismaMock.quoteLineItem.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "line_1" },
+      data: { qbItemId: "qb_item_77" }
+    }));
+  });
+
+  it("clears a quote line item QuickBooks mapping and removes the stored line item qb id", async () => {
+    await clearQuoteLineItemQuickBooksMapping(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        quoteId: "quote_1",
+        lineItemId: "line_1",
+        internalCode: "WET_FIRE_SPRINKLER_ANNUAL"
+      }
+    );
+
+    expect(clearQuickBooksItemMappingForCodeMock).toHaveBeenCalledWith(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      "WET_FIRE_SPRINKLER_ANNUAL"
+    );
+    expect(prismaMock.quoteLineItem.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "line_1" },
+      data: { qbItemId: null }
+    }));
   });
 });

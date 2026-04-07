@@ -17,7 +17,13 @@ import { sendQuoteEmail } from "./account-email";
 import { getServerEnv } from "./env";
 import { inspectionTypeRegistry } from "./report-config";
 import { generateQuotePdf } from "./quote-pdf";
-import { resolveQuickBooksItemForBilling, syncQuoteToQuickBooksEstimate, validateMappedQbItem } from "./quickbooks";
+import {
+  resolveQuickBooksItemForBilling,
+  saveQuickBooksItemMappingForCode,
+  clearQuickBooksItemMappingForCode,
+  syncQuoteToQuickBooksEstimate,
+  validateMappedQbItem
+} from "./quickbooks";
 import { createInspection } from "./scheduling";
 import { assertTenantContext } from "./permissions";
 
@@ -41,7 +47,7 @@ type NormalizedQuoteLineItem = {
   category: string | null;
 };
 
-export const quoteCatalog = [
+const inspectionQuoteCatalog = [
   {
     code: "EXTINGUISHER_ANNUAL",
     title: "Fire extinguisher annual inspection",
@@ -50,18 +56,25 @@ export const quoteCatalog = [
     inspectionType: "fire_extinguisher" as const
   },
   {
-    code: "HOOD_STANDARD",
-    title: "Kitchen suppression inspection",
-    description: "Standard hood and kitchen suppression inspection service.",
-    category: "inspection",
-    inspectionType: "kitchen_suppression" as const
-  },
-  {
     code: "FIRE_ALARM_INSPECTION",
     title: "Fire alarm inspection",
     description: "Inspection and reporting for the fire alarm system.",
     category: "inspection",
     inspectionType: "fire_alarm" as const
+  },
+  {
+    code: "WET_FIRE_SPRINKLER_ANNUAL",
+    title: "Wet fire sprinkler annual inspection",
+    description: "Annual inspection, testing coordination, and reporting for wet fire sprinkler systems.",
+    category: "inspection",
+    inspectionType: "wet_fire_sprinkler" as const
+  },
+  {
+    code: "JOINT_COMMISSION_FIRE_SPRINKLER",
+    title: "Joint Commission fire sprinkler inspection",
+    description: "Joint Commission-oriented fire sprinkler inspection and documentation.",
+    category: "inspection",
+    inspectionType: "joint_commission_fire_sprinkler" as const
   },
   {
     code: "BACKFLOW_TEST",
@@ -78,6 +91,34 @@ export const quoteCatalog = [
     inspectionType: "fire_pump" as const
   },
   {
+    code: "DRY_FIRE_SPRINKLER_ANNUAL",
+    title: "Dry fire sprinkler annual inspection",
+    description: "Annual inspection, testing coordination, and reporting for dry fire sprinkler systems.",
+    category: "inspection",
+    inspectionType: "dry_fire_sprinkler" as const
+  },
+  {
+    code: "HOOD_STANDARD",
+    title: "Kitchen suppression inspection",
+    description: "Standard hood and kitchen suppression inspection service.",
+    category: "inspection",
+    inspectionType: "kitchen_suppression" as const
+  },
+  {
+    code: "KITCHEN_SUPPRESSION_SEMI_ANNUAL",
+    title: "Kitchen suppression semi-annual inspection",
+    description: "Semi-annual hood and kitchen suppression inspection service.",
+    category: "inspection",
+    inspectionType: "kitchen_suppression" as const
+  },
+  {
+    code: "INDUSTRIAL_SUPPRESSION_INSPECTION",
+    title: "Industrial suppression inspection",
+    description: "Inspection and reporting for industrial suppression systems.",
+    category: "inspection",
+    inspectionType: "industrial_suppression" as const
+  },
+  {
     code: "DEFICIENCY_REPAIR",
     title: "Deficiency repair",
     description: "Repair work required to resolve inspection deficiencies.",
@@ -92,6 +133,8 @@ export const quoteCatalog = [
     inspectionType: "emergency_exit_lighting" as const
   }
 ] as const;
+
+export const quoteCatalog = inspectionQuoteCatalog;
 
 export const quoteLineItemInputSchema = z.object({
   id: z.string().trim().optional(),
@@ -460,6 +503,103 @@ export async function updateQuote(actor: ActorContext, quoteId: string, input: Q
   return updated;
 }
 
+export async function saveQuoteLineItemQuickBooksMapping(actor: ActorContext, input: {
+  quoteId: string;
+  lineItemId: string;
+  internalCode: string;
+  internalName: string;
+  qbItemId: string;
+}) {
+  const parsedActor = parseActor(actor);
+  assertAdminRole(parsedActor.role);
+
+  const lineItem = await prisma.quoteLineItem.findFirst({
+    where: {
+      id: input.lineItemId,
+      quoteId: input.quoteId,
+      tenantId: parsedActor.tenantId as string
+    },
+    select: {
+      id: true,
+      internalCode: true
+    }
+  });
+
+  if (!lineItem) {
+    throw new Error("Quote line item not found.");
+  }
+
+  await saveQuickBooksItemMappingForCode(actor, {
+    internalCode: input.internalCode.trim(),
+    internalName: input.internalName.trim(),
+    qbItemId: input.qbItemId.trim()
+  });
+
+  await prisma.quoteLineItem.update({
+    where: { id: lineItem.id },
+    data: {
+      qbItemId: input.qbItemId.trim()
+    }
+  });
+
+  await createQuoteAuditLog({
+    tenantId: parsedActor.tenantId as string,
+    actorUserId: parsedActor.userId,
+    action: "quote.line_item_mapping_saved",
+    quoteId: input.quoteId,
+    metadata: {
+      lineItemId: lineItem.id,
+      internalCode: lineItem.internalCode,
+      qbItemId: input.qbItemId.trim()
+    }
+  });
+}
+
+export async function clearQuoteLineItemQuickBooksMapping(actor: ActorContext, input: {
+  quoteId: string;
+  lineItemId: string;
+  internalCode: string;
+}) {
+  const parsedActor = parseActor(actor);
+  assertAdminRole(parsedActor.role);
+
+  const lineItem = await prisma.quoteLineItem.findFirst({
+    where: {
+      id: input.lineItemId,
+      quoteId: input.quoteId,
+      tenantId: parsedActor.tenantId as string
+    },
+    select: {
+      id: true,
+      internalCode: true
+    }
+  });
+
+  if (!lineItem) {
+    throw new Error("Quote line item not found.");
+  }
+
+  await prisma.quoteLineItem.update({
+    where: { id: lineItem.id },
+    data: {
+      qbItemId: null
+    }
+  });
+
+  await clearQuickBooksItemMappingForCode(actor, input.internalCode.trim());
+
+  await createQuoteAuditLog({
+    tenantId: parsedActor.tenantId as string,
+    actorUserId: parsedActor.userId,
+    action: "quote.line_item_mapping_cleared",
+    quoteId: input.quoteId,
+    metadata: {
+      lineItemId: lineItem.id,
+      internalCode: lineItem.internalCode
+    }
+  });
+}
+
 export async function getQuoteWorkspaceData(
   actor: ActorContext,
   filters?: {
@@ -537,6 +677,11 @@ export async function getQuoteDetail(actor: ActorContext, quoteId: string) {
 
   const integrationId = await getTenantQuickBooksIntegrationId(parsedActor.tenantId as string);
   const lineItems = await Promise.all(quote.lineItems.map(async (line) => {
+    let currentQuickBooksItem: {
+      qbItemId: string;
+      qbItemName: string;
+      qbActive: boolean;
+    } | null = null;
     let mappingState: {
       status: "mapped" | "needs_mapping";
       suggestions: Array<{ qbItemId: string; qbItemName: string; score: number }>;
@@ -544,6 +689,20 @@ export async function getQuoteDetail(actor: ActorContext, quoteId: string) {
     } = { status: "mapped", suggestions: [] };
 
     if (integrationId && !line.qbItemId) {
+      const validated = await validateMappedQbItem({
+        tenantId: parsedActor.tenantId as string,
+        integrationId,
+        internalCode: line.internalCode
+      }).catch(() => ({ ok: false as const, reason: "missing_mapping" as const }));
+      const validatedItem = validated.ok ? validated.item ?? null : null;
+      if (validatedItem) {
+        currentQuickBooksItem = {
+          qbItemId: validatedItem.qbItemId,
+          qbItemName: validatedItem.qbItemName,
+          qbActive: validatedItem.qbActive
+        };
+      }
+
       const resolved = await resolveQuickBooksItemForBilling({
         tenantId: parsedActor.tenantId as string,
         integrationId,
@@ -554,6 +713,29 @@ export async function getQuoteDetail(actor: ActorContext, quoteId: string) {
         ? { status: "mapped", suggestions: [] }
         : { status: "needs_mapping", suggestions: resolved.suggestions, reason: resolved.reason };
     } else if (integrationId && line.qbItemId) {
+      const cached = await prisma.quickBooksItemCache.findUnique({
+        where: {
+          tenantId_integrationId_qbItemId: {
+            tenantId: parsedActor.tenantId as string,
+            integrationId,
+            qbItemId: line.qbItemId
+          }
+        },
+        select: {
+          qbItemId: true,
+          qbItemName: true,
+          qbActive: true
+        }
+      }).catch(() => null);
+
+      if (cached) {
+        currentQuickBooksItem = {
+          qbItemId: cached.qbItemId,
+          qbItemName: cached.qbItemName,
+          qbActive: cached.qbActive
+        };
+      }
+
       const validated = await validateMappedQbItem({
         tenantId: parsedActor.tenantId as string,
         integrationId,
@@ -575,6 +757,7 @@ export async function getQuoteDetail(actor: ActorContext, quoteId: string) {
 
     return {
       ...line,
+      currentQuickBooksItem,
       mappingState
     };
   }));

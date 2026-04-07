@@ -9,8 +9,10 @@ import type { ActorContext } from "@testworx/types";
 
 import { auth } from "@/auth";
 import {
+  clearQuoteLineItemQuickBooksMapping,
   createQuote,
   quoteInputSchema,
+  saveQuoteLineItemQuickBooksMapping,
   sendQuote,
   syncQuoteToQuickBooksEstimate,
   updateQuote,
@@ -166,6 +168,62 @@ export async function syncQuoteAction(formData: FormData) {
       throw error;
     }
     redirect(quoteDetailHref(quoteId, { quickbooks: error instanceof Error ? error.message : "Quote sync failed." }));
+  }
+}
+
+export async function saveQuoteLineItemMappingAction(formData: FormData) {
+  const session = await auth();
+  const quoteId = String(formData.get("quoteId") ?? "");
+  const lineItemId = String(formData.get("lineItemId") ?? "");
+  const internalCode = String(formData.get("internalCode") ?? "").trim();
+  const internalName = String(formData.get("internalName") ?? "").trim();
+  const qbItemId = String(formData.get("qbItemId") ?? "").trim();
+  if (!session?.user?.tenantId || !quoteId || !lineItemId || !internalCode || !internalName || !qbItemId) {
+    redirect("/login");
+  }
+
+  try {
+    await saveQuoteLineItemQuickBooksMapping(getActor(getQuoteActionSession(session)), {
+      quoteId,
+      lineItemId,
+      internalCode,
+      internalName,
+      qbItemId
+    });
+    revalidatePath("/app/admin/quotes");
+    revalidatePath(`/app/admin/quotes/${quoteId}`);
+    redirect(quoteDetailHref(quoteId, { quickbooks: `${internalName} mapped successfully.` }));
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+    redirect(quoteDetailHref(quoteId, { quickbooks: error instanceof Error ? error.message : "Unable to save QuickBooks mapping." }));
+  }
+}
+
+export async function clearQuoteLineItemMappingAction(formData: FormData) {
+  const session = await auth();
+  const quoteId = String(formData.get("quoteId") ?? "");
+  const lineItemId = String(formData.get("lineItemId") ?? "");
+  const internalCode = String(formData.get("internalCode") ?? "").trim();
+  if (!session?.user?.tenantId || !quoteId || !lineItemId || !internalCode) {
+    redirect("/login");
+  }
+
+  try {
+    await clearQuoteLineItemQuickBooksMapping(getActor(getQuoteActionSession(session)), {
+      quoteId,
+      lineItemId,
+      internalCode
+    });
+    revalidatePath("/app/admin/quotes");
+    revalidatePath(`/app/admin/quotes/${quoteId}`);
+    redirect(quoteDetailHref(quoteId, { quickbooks: `${internalCode} mapping cleared.` }));
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+    redirect(quoteDetailHref(quoteId, { quickbooks: error instanceof Error ? error.message : "Unable to clear QuickBooks mapping." }));
   }
 }
 

@@ -261,7 +261,7 @@ export function QuoteEditorForm({
                         <option value="">Select service</option>
                         {catalog.map((item) => (
                           <option key={item.code} value={item.code}>
-                            {item.title}
+                            {item.title} ({item.code})
                           </option>
                         ))}
                       </select>

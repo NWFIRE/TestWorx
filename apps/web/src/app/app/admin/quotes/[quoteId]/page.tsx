@@ -13,7 +13,15 @@ import {
 } from "@testworx/lib";
 
 import { AppPageShell, PageHeader, SectionCard, StatusBadge } from "../../operations-ui";
-import { convertQuoteAction, sendQuoteAction, syncQuoteAction, updateQuoteAction, updateQuoteStatusAction } from "../actions";
+import {
+  clearQuoteLineItemMappingAction,
+  convertQuoteAction,
+  saveQuoteLineItemMappingAction,
+  sendQuoteAction,
+  syncQuoteAction,
+  updateQuoteAction,
+  updateQuoteStatusAction
+} from "../actions";
 import { QuoteEditorForm } from "../quote-editor-form";
 
 export default async function QuoteDetailPage({
@@ -147,6 +155,76 @@ export default async function QuoteDetailPage({
                     <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{format(event.createdAt, "MMM d, yyyy h:mm a")}</p>
                   </div>
                   <p className="mt-1 text-sm text-slate-500">Actor: {event.actor?.name ?? "System"}</p>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+
+          <SectionCard>
+            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">QuickBooks item mapping</h2>
+            <p className="mt-2 text-sm text-slate-500">Map each quote line to the correct QuickBooks product or service using the cached QuickBooks item catalog. Sync uses stored QuickBooks item ids, not name guessing.</p>
+            <div className="mt-4 space-y-4">
+              {detail.lineItems.map((line) => (
+                <div key={line.id} className="rounded-[24px] border border-slate-200/80 bg-slate-50/70 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-base font-semibold text-slate-950">{line.title}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">{line.internalCode}</p>
+                    </div>
+                    <StatusBadge
+                      label={line.mappingState.status === "mapped" ? "Mapped" : "Needs mapping"}
+                      tone={line.mappingState.status === "mapped" ? "emerald" : "amber"}
+                    />
+                  </div>
+                  <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Current QuickBooks item</p>
+                      {line.currentQuickBooksItem ? (
+                        <div className="mt-3 space-y-1 text-sm text-slate-600">
+                          <p className="font-semibold text-slate-950">{line.currentQuickBooksItem.qbItemName}</p>
+                          <p>ID: {line.currentQuickBooksItem.qbItemId}</p>
+                          <p>Status: {line.currentQuickBooksItem.qbActive ? "Active" : "Inactive"}</p>
+                        </div>
+                      ) : (
+                        <p className="mt-3 text-sm text-slate-500">No QuickBooks item is mapped for this line yet.</p>
+                      )}
+                      {line.currentQuickBooksItem ? (
+                        <form action={clearQuoteLineItemMappingAction} className="mt-4">
+                          <input name="quoteId" type="hidden" value={detail.id} />
+                          <input name="lineItemId" type="hidden" value={line.id} />
+                          <input name="internalCode" type="hidden" value={line.internalCode} />
+                          <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50" type="submit">
+                            Clear mapping
+                          </button>
+                        </form>
+                      ) : null}
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Suggested QuickBooks items</p>
+                      {line.mappingState.suggestions.length === 0 ? (
+                        <p className="mt-3 text-sm text-slate-500">No strong matches yet. Resync the QuickBooks item cache or create the service in QuickBooks first, then return here to map it.</p>
+                      ) : (
+                        <div className="mt-3 space-y-3">
+                          {line.mappingState.suggestions.slice(0, 5).map((suggestion) => (
+                            <form key={`${line.id}-${suggestion.qbItemId}`} action={saveQuoteLineItemMappingAction} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+                              <input name="quoteId" type="hidden" value={detail.id} />
+                              <input name="lineItemId" type="hidden" value={line.id} />
+                              <input name="internalCode" type="hidden" value={line.internalCode} />
+                              <input name="internalName" type="hidden" value={line.title} />
+                              <input name="qbItemId" type="hidden" value={suggestion.qbItemId} />
+                              <div className="min-w-0">
+                                <p className="font-medium text-slate-950">{suggestion.qbItemName}</p>
+                                <p className="mt-1 break-all text-xs text-slate-500">ID {suggestion.qbItemId} - Score {suggestion.score}</p>
+                              </div>
+                              <button className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#1f4678] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" type="submit">
+                                Use this item
+                              </button>
+                            </form>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
