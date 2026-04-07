@@ -26,10 +26,12 @@ const { prismaMock, sendQuoteEmailMock, syncQuoteToQuickBooksEstimateMock, creat
       findMany: vi.fn()
     },
     customerCompany: {
-      findMany: vi.fn()
+      findMany: vi.fn(),
+      findFirst: vi.fn()
     },
     site: {
-      findMany: vi.fn()
+      findMany: vi.fn(),
+      findFirst: vi.fn()
     },
     user: {
       findFirst: vi.fn()
@@ -75,7 +77,9 @@ describe("quotes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     prismaMock.customerCompany.findMany.mockResolvedValue([]);
+    prismaMock.customerCompany.findFirst.mockResolvedValue(null);
     prismaMock.site.findMany.mockResolvedValue([]);
+    prismaMock.site.findFirst.mockResolvedValue(null);
     prismaMock.auditLog.create.mockResolvedValue(undefined);
     prismaMock.auditLog.findMany.mockResolvedValue([]);
     prismaMock.quoteLineItem.findMany.mockResolvedValue([]);
@@ -214,6 +218,36 @@ describe("quotes", () => {
 
     expect(results).toHaveLength(1);
     expect(results[0]?.effectiveStatus).toBe(QuoteStatus.expired);
+  });
+
+  it("keeps the quotes workspace loading when a quote's customer or site record is missing", async () => {
+    prismaMock.quote.findMany.mockResolvedValue([
+      {
+        id: "quote_2",
+        tenantId: "tenant_1",
+        customerCompanyId: "customer_missing",
+        siteId: "site_missing",
+        quoteNumber: "Q-2026-0002",
+        status: QuoteStatus.draft,
+        syncStatus: QuoteSyncStatus.not_synced,
+        expiresAt: null,
+        issuedAt: new Date("2026-04-07T12:00:00.000Z"),
+        total: 125,
+        recipientEmail: null,
+        lineItems: []
+      }
+    ]);
+    prismaMock.customerCompany.findMany.mockResolvedValue([]);
+    prismaMock.site.findMany.mockResolvedValue([]);
+
+    const results = await getQuoteWorkspaceData(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      { status: "all", syncStatus: "all", query: "" }
+    );
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.customerCompany.name).toBe("Archived customer");
+    expect(results[0]?.site?.name).toBe("Archived site");
   });
 
   it("includes wet fire sprinkler annual inspection in quote form options", async () => {

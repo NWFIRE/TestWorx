@@ -344,11 +344,9 @@ async function createQuoteAuditLog(input: {
 }
 
 async function getQuoteByIdForTenant(tenantId: string, quoteId: string) {
-  return prisma.quote.findFirst({
+  const quote = await prisma.quote.findFirst({
     where: { id: quoteId, tenantId },
     include: {
-      customerCompany: true,
-      site: true,
       createdBy: { select: { id: true, name: true } },
       updatedBy: { select: { id: true, name: true } },
       convertedInspection: {
@@ -361,6 +359,89 @@ async function getQuoteByIdForTenant(tenantId: string, quoteId: string) {
       lineItems: { orderBy: { sortOrder: "asc" } }
     }
   });
+
+  if (!quote) {
+    return null;
+  }
+
+  const [customerCompany, site] = await Promise.all([
+    prisma.customerCompany.findFirst({
+      where: { tenantId, id: quote.customerCompanyId },
+      select: {
+        id: true,
+        name: true,
+        contactName: true,
+        billingEmail: true,
+        phone: true
+      }
+    }),
+    quote.siteId
+      ? prisma.site.findFirst({
+          where: { tenantId, id: quote.siteId },
+          select: {
+            id: true,
+            name: true,
+            addressLine1: true,
+            addressLine2: true,
+            city: true,
+            state: true,
+            postalCode: true
+          }
+        })
+      : Promise.resolve(null)
+  ]);
+
+  return {
+    ...quote,
+    customerCompany: customerCompany ?? {
+      id: quote.customerCompanyId,
+      name: "Archived customer",
+      contactName: null,
+      billingEmail: null,
+      phone: null
+    },
+    site: site ?? (quote.siteId ? { id: quote.siteId, name: "Archived site", addressLine1: null, addressLine2: null, city: null, state: null, postalCode: null } : null)
+  };
+}
+
+async function loadQuoteReferenceMaps(
+  tenantId: string,
+  quotes: Array<{ customerCompanyId: string; siteId: string | null }>
+) {
+  const customerCompanyIds = [...new Set(quotes.map((quote) => quote.customerCompanyId).filter(Boolean))];
+  const siteIds = [...new Set(quotes.map((quote) => quote.siteId).filter((siteId): siteId is string => Boolean(siteId)))];
+
+  const [customerCompanies, sites] = await Promise.all([
+    customerCompanyIds.length > 0
+      ? prisma.customerCompany.findMany({
+          where: {
+            tenantId,
+            id: { in: customerCompanyIds }
+          },
+          select: {
+            id: true,
+            name: true
+          }
+        })
+      : Promise.resolve([]),
+    siteIds.length > 0
+      ? prisma.site.findMany({
+          where: {
+            tenantId,
+            id: { in: siteIds }
+          },
+          select: {
+            id: true,
+            name: true
+          }
+        })
+      : Promise.resolve([])
+  ]);
+
+  return {
+    customerCompanyMap: new Map(customerCompanies.map((customerCompany) => [customerCompany.id, customerCompany])),
+    siteMap: new Map(sites.map((site) => [site.id, site]))
+  };
 }
 
 export async function getQuoteFormOptions(actor: ActorContext) {
@@ -613,12 +694,11 @@ export async function getQuoteWorkspaceData(
   const quotes = await prisma.quote.findMany({
     where: { tenantId: parsedActor.tenantId as string },
     include: {
-      customerCompany: { select: { id: true, name: true } },
-      site: { select: { id: true, name: true } },
       lineItems: { orderBy: { sortOrder: "asc" } }
     },
     orderBy: [{ issuedAt: "desc" }, { createdAt: "desc" }]
   });
+  const { customerCompanyMap, siteMap } = await loadQuoteReferenceMaps(parsedActor.tenantId as string, quotes);
 
   const normalizedQuery = (filters?.query ?? "").trim().toLowerCase();
   const requestedStatus = (filters?.status ?? "all").trim();
@@ -627,8 +707,17 @@ export async function getQuoteWorkspaceData(
   return quotes
     .map((quote) => {
       const effectiveStatus = getEffectiveQuoteStatus(quote.status, quote.expiresAt);
+      const customerCompany = customerCompanyMap.get(quote.customerCompanyId) ?? {
+        id: quote.customerCompanyId,
+        name: "Archived customer"
+      };
+      const site = quote.siteId
+        ? siteMap.get(quote.siteId) ?? { id: quote.siteId, name: "Archived site" }
+        : null;
       return {
         ...quote,
+        customerCompany,
+        site,
         effectiveStatus
       };
     })
@@ -640,7 +729,7 @@ export async function getQuoteWorkspaceData(
       }
       const haystack = [
         quote.quoteNumber,
-        quote.customerCompany.name,
+        quote.customerCompany?.name ?? "Archived customer",
         quote.site?.name ?? "",
         quote.recipientEmail ?? "",
         ...quote.lineItems.map((line) => `${line.internalCode} ${line.title} ${line.description ?? ""}`)
@@ -790,8 +879,6 @@ export async function getAuthorizedQuotePdf(actor: ActorContext, quoteId: string
   const quote = await prisma.quote.findFirst({
     where,
     include: {
-      customerCompany: true,
-      site: true,
       lineItems: { orderBy: { sortOrder: "asc" } },
       tenant: {
         select: {
@@ -807,6 +894,33 @@ export async function getAuthorizedQuotePdf(actor: ActorContext, quoteId: string
     throw new Error("Quote not found.");
   }
 
+  const [customerCompany, site] = await Promise.all([
+    prisma.customerCompany.findFirst({
+      where: { tenantId: parsedActor.tenantId as string, id: quote.customerCompanyId },
+      select: {
+        id: true,
+        name: true,
+        contactName: true,
+        billingEmail: true,
+        phone: true
+      }
+    }),
+    quote.siteId
+      ? prisma.site.findFirst({
+          where: { tenantId: parsedActor.tenantId as string, id: quote.siteId },
+          select: {
+            id: true,
+            name: true,
+            addressLine1: true,
+            addressLine2: true,
+            city: true,
+            state: true,
+            postalCode: true
+          }
+        })
+      : Promise.resolve(null)
+  ]);
+
   const pdfBytes = await generateQuotePdf({
     tenant: quote.tenant,
     quote: {
@@ -821,19 +935,19 @@ export async function getAuthorizedQuotePdf(actor: ActorContext, quoteId: string
       total: quote.total
     },
     customerCompany: {
-      name: quote.customerCompany.name,
-      contactName: quote.contactName ?? quote.customerCompany.contactName,
-      billingEmail: quote.recipientEmail ?? quote.customerCompany.billingEmail,
-      phone: quote.customerCompany.phone
+      name: customerCompany?.name ?? "Archived customer",
+      contactName: quote.contactName ?? customerCompany?.contactName ?? null,
+      billingEmail: quote.recipientEmail ?? customerCompany?.billingEmail ?? null,
+      phone: customerCompany?.phone ?? null
     },
-    site: quote.site
+    site: site
       ? {
-          name: quote.site.name,
-          addressLine1: quote.site.addressLine1,
-          addressLine2: quote.site.addressLine2,
-          city: quote.site.city,
-          state: quote.site.state,
-          postalCode: quote.site.postalCode
+          name: site.name,
+          addressLine1: site.addressLine1,
+          addressLine2: site.addressLine2,
+          city: site.city,
+          state: site.state,
+          postalCode: site.postalCode
         }
       : null,
     lineItems: quote.lineItems.map((line) => ({
@@ -859,8 +973,6 @@ export async function sendQuote(actor: ActorContext, quoteId: string, input?: { 
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, tenantId: parsedActor.tenantId as string },
     include: {
-      customerCompany: true,
-      site: true,
       tenant: {
         select: {
           name: true,
@@ -876,7 +988,28 @@ export async function sendQuote(actor: ActorContext, quoteId: string, input?: { 
     throw new Error("Quote not found.");
   }
 
-  const recipientEmail = normalizeNullableString(input?.recipientEmail) ?? quote.recipientEmail ?? quote.customerCompany.billingEmail;
+  const [customerCompany, site] = await Promise.all([
+    prisma.customerCompany.findFirst({
+      where: { tenantId: parsedActor.tenantId as string, id: quote.customerCompanyId },
+      select: {
+        id: true,
+        name: true,
+        contactName: true,
+        billingEmail: true
+      }
+    }),
+    quote.siteId
+      ? prisma.site.findFirst({
+          where: { tenantId: parsedActor.tenantId as string, id: quote.siteId },
+          select: {
+            id: true,
+            name: true
+          }
+        })
+      : Promise.resolve(null)
+  ]);
+
+  const recipientEmail = normalizeNullableString(input?.recipientEmail) ?? quote.recipientEmail ?? customerCompany?.billingEmail;
   if (!recipientEmail) {
     throw new Error("Add a recipient email before sending this quote.");
   }
@@ -900,11 +1033,11 @@ export async function sendQuote(actor: ActorContext, quoteId: string, input?: { 
 
   const delivery = await sendQuoteEmail({
     recipientEmail,
-    recipientName: quote.contactName ?? quote.customerCompany.contactName ?? quote.customerCompany.name,
+    recipientName: quote.contactName ?? customerCompany?.contactName ?? customerCompany?.name ?? "Customer",
     tenantName: quote.tenant.name,
     quoteNumber: quote.quoteNumber,
-    customerName: quote.customerCompany.name,
-    siteName: quote.site?.name ?? null,
+    customerName: customerCompany?.name ?? "Archived customer",
+    siteName: site?.name ?? null,
     quoteUrl: customerUrl,
     subjectLine: subject,
     messageBody: body,
