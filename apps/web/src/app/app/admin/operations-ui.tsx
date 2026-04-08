@@ -259,6 +259,19 @@ export function StatusBadge({
   );
 }
 
+export function PriorityBadge({
+  label = "Priority"
+}: {
+  label?: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-fuchsia-300 bg-fuchsia-600 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-white shadow-[0_10px_24px_rgba(192,38,211,0.28)] ring-4 ring-fuchsia-100/80">
+      <span className="h-2 w-2 rounded-full bg-white/90" />
+      {label}
+    </span>
+  );
+}
+
 export function EmptyState({
   title,
   description,

@@ -7,7 +7,6 @@ import {
   formatInspectionClassificationLabel,
   formatInspectionStatusLabel,
   getInspectionClassificationTone,
-  getInspectionPriorityTone,
   getInspectionStatusTone,
   getTechnicianDashboardData,
   isDueAtTimeOfServiceCustomer,
@@ -18,7 +17,7 @@ import { AddReportTypeControl } from "./add-report-type-control";
 import { ClaimButton } from "./claim-button";
 import { RemoveReportTypeButton } from "./remove-report-type-button";
 import { StatusButton } from "./status-button";
-import { StatusBadge } from "../admin/operations-ui";
+import { PriorityBadge, StatusBadge } from "../admin/operations-ui";
 
 type TechnicianDashboardData = Awaited<ReturnType<typeof getTechnicianDashboardData>>;
 type AssignedInspection = TechnicianDashboardData["assigned"][number];
@@ -176,7 +175,7 @@ export default async function TechnicianPage({
                 ) : null}
                   <div className="mt-3 flex flex-wrap gap-2">
                     <StatusBadge label={formatInspectionClassificationLabel(entry.inspectionClassification)} tone={getInspectionClassificationTone(entry.inspectionClassification)} />
-                    {entry.isPriority ? <StatusBadge label="Priority" tone={getInspectionPriorityTone(true)} /> : null}
+                    {entry.isPriority ? <PriorityBadge /> : null}
                     <StatusBadge label={inspectionStatusLabel(entry.status)} tone={getInspectionStatusTone(entry.status as Parameters<typeof getInspectionStatusTone>[0])} />
                   </div>
                 </div>
@@ -207,7 +206,7 @@ export default async function TechnicianPage({
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-lg font-semibold text-ink">{(inspection as typeof inspection & { primaryTitle?: string }).primaryTitle ?? inspection.site.name}</p>
                             <StatusBadge label={formatInspectionClassificationLabel(inspection.inspectionClassification)} tone={getInspectionClassificationTone(inspection.inspectionClassification)} />
-                            {inspection.isPriority ? <StatusBadge label="Priority" tone={getInspectionPriorityTone(true)} /> : null}
+                            {inspection.isPriority ? <PriorityBadge /> : null}
                             <StatusBadge label={inspectionStatusLabel((inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status)} tone={getInspectionStatusTone(((inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status) as Parameters<typeof getInspectionStatusTone>[0])} />
                             <PaymentCollectionBadge visible={isDueAtTimeOfServiceCustomer(inspection.customerCompany)} />
                           </div>
@@ -321,7 +320,7 @@ export default async function TechnicianPage({
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-lg font-semibold text-ink">{(inspection as typeof inspection & { primaryTitle?: string }).primaryTitle ?? inspection.site.name}</p>
                             <StatusBadge label={formatInspectionClassificationLabel(inspection.inspectionClassification)} tone={getInspectionClassificationTone(inspection.inspectionClassification)} />
-                            {inspection.isPriority ? <StatusBadge label="Priority" tone={getInspectionPriorityTone(true)} /> : null}
+                            {inspection.isPriority ? <PriorityBadge /> : null}
                             <StatusBadge label={inspectionStatusLabel((inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status)} tone={getInspectionStatusTone(((inspection as typeof inspection & { displayStatus?: string }).displayStatus ?? inspection.status) as Parameters<typeof getInspectionStatusTone>[0])} />
                             <PaymentCollectionBadge visible={isDueAtTimeOfServiceCustomer(inspection.customerCompany)} />
                           </div>

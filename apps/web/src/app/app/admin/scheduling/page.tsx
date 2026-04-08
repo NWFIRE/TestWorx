@@ -8,7 +8,6 @@ import {
   formatInspectionStatusLabel,
   getAdminSchedulingQueueData,
   getInspectionClassificationTone,
-  getInspectionPriorityTone,
   getInspectionStatusTone,
   inspectionClassificationValues,
   inspectionFilterStatuses,
@@ -25,6 +24,7 @@ import {
   FilterChipLink,
   KPIStatCard,
   PageHeader,
+  PriorityBadge,
   SectionCard,
   StatusBadge,
   WorkQueueNav
@@ -252,12 +252,7 @@ export default async function AdminSchedulingQueuePage({
                           label={formatInspectionClassificationLabel(inspection.inspectionClassification)}
                           tone={getInspectionClassificationTone(inspection.inspectionClassification)}
                         />
-                        {inspection.isPriority ? (
-                          <StatusBadge
-                            label="Priority"
-                            tone={getInspectionPriorityTone(true)}
-                          />
-                        ) : null}
+                        {inspection.isPriority ? <PriorityBadge /> : null}
                         <StatusBadge
                           label={formatInspectionStatusLabel(inspection.displayStatus as Parameters<typeof formatInspectionStatusLabel>[0])}
                           tone={getInspectionStatusTone(inspection.displayStatus as Parameters<typeof getInspectionStatusTone>[0])}

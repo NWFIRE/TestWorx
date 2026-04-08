@@ -16,7 +16,6 @@ import {
   getInspectionDisplayLabels,
   getInspectionDocuments,
   getInspectionForEdit,
-  getInspectionPriorityTone,
   getInspectionStatusTone,
   isDueAtTimeOfServiceCustomer
 } from "@testworx/lib";
@@ -28,7 +27,7 @@ import { InspectionPdfUploadCard } from "../../inspection-pdf-upload-card";
 import { InspectionReportCorrectionsCard } from "../../inspection-report-corrections-card";
 import { InspectionSchedulerForm } from "../../inspection-scheduler-form";
 import { InspectionStatusUpdateCard } from "../../inspection-status-update-card";
-import { StatusBadge } from "../../operations-ui";
+import { PriorityBadge, StatusBadge } from "../../operations-ui";
 import { RemoveReportTypeButton } from "../../../tech/remove-report-type-button";
 import { InspectionPacketCard } from "../../../inspection-packet-card";
 
@@ -290,12 +289,7 @@ export default async function EditInspectionPage({
             label={formatInspectionClassificationLabel(inspection.inspectionClassification)}
             tone={getInspectionClassificationTone(inspection.inspectionClassification)}
           />
-          {inspection.isPriority ? (
-            <StatusBadge
-              label="Priority"
-              tone={getInspectionPriorityTone(true)}
-            />
-          ) : null}
+          {inspection.isPriority ? <PriorityBadge /> : null}
           <StatusBadge
             label={formatInspectionStatusLabel((inspectionView.displayStatus ?? inspection.status) as Parameters<typeof formatInspectionStatusLabel>[0])}
             tone={getInspectionStatusTone((inspectionView.displayStatus ?? inspection.status) as Parameters<typeof getInspectionStatusTone>[0])}
