@@ -1,5 +1,12 @@
 import { addMonths, endOfMonth, endOfWeek, format, isAfter, isSameDay, startOfDay, startOfMonth } from "date-fns";
-import { InspectionClassification, InspectionStatus, Prisma, RecurrenceFrequency } from "@prisma/client";
+import {
+  InspectionClassification,
+  InspectionCloseoutRequestStatus,
+  InspectionCloseoutRequestType,
+  InspectionStatus,
+  Prisma,
+  RecurrenceFrequency
+} from "@prisma/client";
 import { prisma } from "@testworx/db";
 import { z } from "zod";
 
@@ -56,6 +63,14 @@ const inspectionTaskSchedulingStatusSchema = z.enum(inspectionTaskSchedulingStat
 export const adminInspectionLifecycleValues = ["original", "amended", "replacement", "superseded"] as const;
 export type AdminInspectionLifecycle = (typeof adminInspectionLifecycleValues)[number];
 const adminInspectionLifecycleFilterSchema = z.enum(["all", ...adminInspectionLifecycleValues]);
+export const inspectionCloseoutRequestTypes = ["new_inspection", "follow_up_inspection"] as const;
+export type InspectionCloseoutRequestTypeValue = (typeof inspectionCloseoutRequestTypes)[number];
+const inspectionCloseoutRequestTypeSchema = z.enum(inspectionCloseoutRequestTypes);
+export const inspectionCloseoutRequestStatuses = ["pending", "approved", "dismissed"] as const;
+export type InspectionCloseoutRequestStatusValue = (typeof inspectionCloseoutRequestStatuses)[number];
+export const inspectionReviewFilters = ["needs_review", "pending_follow_up_request", "approved_created", "dismissed", "has_amendment_linkage"] as const;
+export type InspectionReviewFilterValue = (typeof inspectionReviewFilters)[number];
+const inspectionReviewFilterSchema = z.enum(["all", ...inspectionReviewFilters]);
 export const unstartedInspectionStatuses = [InspectionStatus.to_be_completed, InspectionStatus.scheduled] as const;
 export const claimableInspectionStatuses = [InspectionStatus.to_be_completed, InspectionStatus.scheduled] as const;
 export const activeOperationalInspectionStatuses = [
@@ -97,6 +112,25 @@ export const inspectionClassificationLabels: Record<InspectionClassificationValu
   follow_up: "Follow-Up",
   emergency: "Emergency"
 };
+export const inspectionCloseoutRequestTypeLabels: Record<InspectionCloseoutRequestTypeValue, string> = {
+  new_inspection: "New inspection",
+  follow_up_inspection: "Follow-up inspection"
+};
+export const inspectionCloseoutRequestStatusLabels: Record<InspectionCloseoutRequestStatusValue, string> = {
+  pending: "Pending",
+  approved: "Approved",
+  dismissed: "Dismissed"
+};
+
+const inspectionCloseoutRequestSchema = z.discriminatedUnion("requestType", [
+  z.object({
+    requestType: z.literal("none")
+  }),
+  z.object({
+    requestType: inspectionCloseoutRequestTypeSchema,
+    note: z.string().trim().min(5, "Add a short note so office staff knows what to schedule next.").max(2000)
+  })
+]);
 
 const currentVisitTaskSchedulingStatuses = new Set<InspectionTaskSchedulingStatus>([
   "due_now",
@@ -261,6 +295,26 @@ export function formatInspectionPriorityLabel(isPriority: boolean) {
 
 export function getInspectionPriorityTone(isPriority: boolean) {
   return isPriority ? ("amber" as const) : ("slate" as const);
+}
+
+export function formatInspectionCloseoutRequestTypeLabel(requestType: InspectionCloseoutRequestType | InspectionCloseoutRequestTypeValue) {
+  return inspectionCloseoutRequestTypeLabels[requestType as InspectionCloseoutRequestTypeValue];
+}
+
+export function formatInspectionCloseoutRequestStatusLabel(status: InspectionCloseoutRequestStatus | InspectionCloseoutRequestStatusValue) {
+  return inspectionCloseoutRequestStatusLabels[status as InspectionCloseoutRequestStatusValue];
+}
+
+export function getInspectionCloseoutRequestTone(status: InspectionCloseoutRequestStatus | InspectionCloseoutRequestStatusValue) {
+  switch (status) {
+    case "approved":
+      return "emerald" as const;
+    case "dismissed":
+      return "slate" as const;
+    case "pending":
+    default:
+      return "blue" as const;
+  }
 }
 
 export function isCurrentVisitTaskSchedulingStatus(status?: string | null) {
@@ -1436,6 +1490,101 @@ async function createAuditLog(tx: Prisma.TransactionClient, input: {
   });
 }
 
+function serializeCloseoutRequestMetadata(input: {
+  requestType: InspectionCloseoutRequestType | InspectionCloseoutRequestTypeValue;
+  note: string;
+  createdInspectionId?: string | null;
+}) {
+  return {
+    requestType: input.requestType,
+    note: input.note,
+    createdInspectionId: input.createdInspectionId ?? null
+  };
+}
+
+async function createInspectionCloseoutRequestTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    tenantId: string;
+    inspectionId: string;
+    requestedByUserId: string;
+    requestType: InspectionCloseoutRequestTypeValue;
+    note: string;
+  }
+) {
+  const closeoutRequest = await tx.inspectionCloseoutRequest.upsert({
+    where: { inspectionId: input.inspectionId },
+    update: {
+      requestedByUserId: input.requestedByUserId,
+      requestType: input.requestType,
+      note: input.note,
+      status: InspectionCloseoutRequestStatus.pending,
+      createdInspectionId: null,
+      approvedByUserId: null,
+      dismissedByUserId: null,
+      approvedAt: null,
+      dismissedAt: null
+    },
+    create: {
+      tenantId: input.tenantId,
+      inspectionId: input.inspectionId,
+      requestedByUserId: input.requestedByUserId,
+      requestType: input.requestType,
+      note: input.note
+    },
+    include: {
+      requestedBy: { select: { id: true, name: true } }
+    }
+  });
+
+  await createAuditLog(tx, {
+    tenantId: input.tenantId,
+    actorUserId: input.requestedByUserId,
+    action: "inspection.closeout_request_created",
+    entityId: input.inspectionId,
+    metadata: serializeCloseoutRequestMetadata({
+      requestType: input.requestType,
+      note: input.note
+    })
+  });
+
+  return closeoutRequest;
+}
+
+function getReviewCompletionSummary(input: {
+  tasks: Array<{
+    report: {
+      id: string;
+      status: string;
+      finalizedAt: Date | null;
+    } | null;
+  }>;
+  deficiencies: Array<unknown>;
+  documents: Array<{
+    requiresSignature: boolean;
+    status: string;
+  }>;
+  attachments: Array<unknown>;
+}) {
+  const totalTasks = input.tasks.length;
+  const finalizedTasks = input.tasks.filter((task) => task.report?.status === reportStatuses.finalized).length;
+  const missingReports = totalTasks - finalizedTasks;
+  const pendingDocuments = input.documents.filter((document) => document.requiresSignature && !["SIGNED", "EXPORTED"].includes(document.status)).length;
+
+  return {
+    totalTasks,
+    finalizedTasks,
+    missingReports,
+    reportCompletionLabel: totalTasks ? `${finalizedTasks}/${totalTasks} finalized` : "0/0 finalized",
+    signaturesReady: pendingDocuments === 0,
+    pendingSignatureDocuments: pendingDocuments,
+    documentCount: input.documents.length,
+    attachmentCount: input.attachments.length,
+    deficiencyCount: input.deficiencies.length,
+    readyForOfficeReview: missingReports === 0 && pendingDocuments === 0
+  };
+}
+
 export async function createInspection(actor: ActorContext, input: z.infer<typeof scheduleInspectionSchema>) {
   const parsedActor = parseActor(actor);
   if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
@@ -1807,6 +1956,130 @@ export async function updateInspectionStatus(
         generatedInspectionsCount
       }
     });
+
+    if (inspection.isPriority && !priorityState.isPriority) {
+      await createAuditLog(tx, {
+        tenantId,
+        actorUserId: parsedActor.userId,
+        action: "inspection.priority_cleared_automatically",
+        entityId: inspectionId,
+        metadata: {
+          previousPriority: true,
+          nextPriority: false,
+          reason: "Priority cleared automatically when inspection was marked Completed."
+        }
+      });
+    }
+
+    return updated;
+  });
+}
+
+export async function completeInspectionWithCloseoutRequest(
+  actor: ActorContext,
+  inspectionId: string,
+  input?: z.infer<typeof inspectionCloseoutRequestSchema>
+) {
+  const parsedActor = parseActor(actor);
+  const tenantId = parsedActor.tenantId as string;
+  const parsedRequest = inspectionCloseoutRequestSchema.parse(input ?? { requestType: "none" });
+
+  const inspection = await prisma.inspection.findFirst({
+    where: { id: inspectionId, tenantId },
+    include: {
+      technicianAssignments: { select: { technicianId: true } },
+      tasks: { include: { recurrence: true } }
+    }
+  });
+  if (!inspection) {
+    throw new Error("Inspection not found.");
+  }
+
+  const canManageStatus =
+    ["tenant_admin", "office_admin"].includes(parsedActor.role) ||
+    (parsedActor.role === "technician" &&
+      isTechnicianAssignedToInspection({
+        userId: parsedActor.userId,
+        assignedTechnicianId: inspection.assignedTechnicianId,
+        technicianAssignments: readTechnicianAssignments(inspection)
+      }));
+  if (!canManageStatus) {
+    throw new Error("You do not have access to update this inspection.");
+  }
+
+  const remainingDrafts = await prisma.inspectionReport.count({
+    where: {
+      tenantId,
+      inspectionId,
+      status: { not: reportStatuses.finalized },
+      task: {
+        OR: [
+          { schedulingStatus: "due_now" },
+          { schedulingStatus: "scheduled_now" },
+          { schedulingStatus: "completed" },
+          { schedulingStatus: "deferred" }
+        ]
+      }
+    }
+  });
+
+  if (remainingDrafts > 0) {
+    throw new Error("Finalize all inspection reports before marking the inspection completed.");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const priorityState = resolveInspectionPriorityState({
+      previousIsPriority: inspection.isPriority,
+      nextIsPriority: inspection.isPriority,
+      nextStatus: InspectionStatus.completed
+    });
+
+    const updated = inspection.status === InspectionStatus.completed
+      ? inspection
+      : await tx.inspection.update({
+          where: { id: inspectionId },
+          data: {
+            status: InspectionStatus.completed,
+            isPriority: priorityState.isPriority,
+            priorityClearedAt: priorityState.priorityClearedAt
+          }
+        });
+
+    const generatedInspections = inspection.status === InspectionStatus.completed
+      ? []
+      : await createRecurringFollowUpInspectionsTx(tx, {
+          tenantId,
+          actorUserId: parsedActor.userId,
+          inspection
+        });
+
+    let closeoutRequestId: string | null = null;
+    if (parsedRequest.requestType !== "none") {
+      const closeoutRequest = await createInspectionCloseoutRequestTx(tx, {
+        tenantId,
+        inspectionId,
+        requestedByUserId: parsedActor.userId,
+        requestType: parsedRequest.requestType,
+        note: parsedRequest.note
+      });
+      closeoutRequestId = closeoutRequest.id;
+    }
+
+    if (inspection.status !== InspectionStatus.completed) {
+      await createAuditLog(tx, {
+        tenantId,
+        actorUserId: parsedActor.userId,
+        action: "inspection.status_updated",
+        entityId: inspectionId,
+        metadata: {
+          previousStatus: inspection.status,
+          status: InspectionStatus.completed,
+          nextStatus: InspectionStatus.completed,
+          generatedInspectionsCount: generatedInspections.length,
+          closeoutRequestId
+        }
+      });
+    }
 
     if (inspection.isPriority && !priorityState.isPriority) {
       await createAuditLog(tx, {
@@ -2388,6 +2661,169 @@ export async function createInspectionAmendment(actor: ActorContext, inspectionI
   });
 }
 
+export async function approveInspectionCloseoutRequest(actor: ActorContext, inspectionId: string) {
+  const parsedActor = parseActor(actor);
+  if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
+    throw new Error("Only office administrators can approve technician closeout requests.");
+  }
+
+  const tenantId = parsedActor.tenantId as string;
+
+  return prisma.$transaction(async (tx) => {
+    const inspection = await tx.inspection.findFirst({
+      where: { id: inspectionId, tenantId },
+      include: {
+        tasks: { include: { recurrence: true } },
+        closeoutRequest: true
+      }
+    });
+
+    if (!inspection?.closeoutRequest) {
+      throw new Error("No technician closeout request is pending for this inspection.");
+    }
+
+    if (inspection.closeoutRequest.status !== InspectionCloseoutRequestStatus.pending) {
+      throw new Error("This closeout request has already been resolved.");
+    }
+
+    const closeoutRequest = inspection.closeoutRequest;
+
+    const createdInspection = await tx.inspection.create({
+      data: {
+        tenantId,
+        customerCompanyId: inspection.customerCompanyId,
+        siteId: inspection.siteId,
+        createdByUserId: parsedActor.userId,
+        inspectionClassification: closeoutRequest.requestType === InspectionCloseoutRequestType.follow_up_inspection
+          ? InspectionClassification.follow_up
+          : InspectionClassification.standard,
+        scheduledStart: inspection.scheduledStart,
+        scheduledEnd: inspection.scheduledEnd,
+        status: InspectionStatus.to_be_completed,
+        notes: closeoutRequest.note,
+        claimable: true
+      }
+    });
+
+    await writeInspectionTasks(
+      tx,
+      createdInspection.id,
+      tenantId,
+      createdInspection.scheduledStart,
+      createdInspection.scheduledStart,
+      inspection.tasks.map((task) => ({
+        inspectionType: task.inspectionType,
+        frequency: task.recurrence?.frequency ?? getDefaultInspectionRecurrenceFrequency(task.inspectionType),
+        assignedTechnicianId: null,
+        dueMonth: task.dueMonth ?? format(createdInspection.scheduledStart, "yyyy-MM"),
+        dueDate: task.dueDate ?? createdInspection.scheduledStart,
+        schedulingStatus: "scheduled_now" as const,
+        notes: task.notes ?? closeoutRequest.note
+      }))
+    );
+
+    await createAuditLog(tx, {
+      tenantId,
+      actorUserId: parsedActor.userId,
+      action: "inspection.created",
+      entityId: createdInspection.id,
+      metadata: {
+        customerCompanyId: inspection.customerCompanyId,
+        siteId: inspection.siteId,
+        inspectionClassification: closeoutRequest.requestType === InspectionCloseoutRequestType.follow_up_inspection
+          ? InspectionClassification.follow_up
+          : InspectionClassification.standard,
+        isPriority: false,
+        status: InspectionStatus.to_be_completed,
+        taskCount: inspection.tasks.length,
+        sourceInspectionId: inspection.id,
+        closeoutRequestId: closeoutRequest.id
+      }
+    });
+
+    await tx.inspectionCloseoutRequest.update({
+      where: { inspectionId: inspection.id },
+      data: {
+        status: InspectionCloseoutRequestStatus.approved,
+        createdInspectionId: createdInspection.id,
+        approvedByUserId: parsedActor.userId,
+        approvedAt: new Date()
+      }
+    });
+
+    await createAuditLog(tx, {
+      tenantId,
+      actorUserId: parsedActor.userId,
+      action: "inspection.closeout_request_approved",
+      entityId: inspection.id,
+      metadata: serializeCloseoutRequestMetadata({
+        requestType: closeoutRequest.requestType,
+        note: closeoutRequest.note,
+        createdInspectionId: createdInspection.id
+      })
+    });
+
+    await createAuditLog(tx, {
+      tenantId,
+      actorUserId: parsedActor.userId,
+      action: "inspection.created_from_closeout_request",
+      entityId: createdInspection.id,
+      metadata: {
+        sourceInspectionId: inspection.id,
+        closeoutRequestId: closeoutRequest.id,
+        requestType: closeoutRequest.requestType
+      }
+    });
+
+    return createdInspection;
+  });
+}
+
+export async function dismissInspectionCloseoutRequest(actor: ActorContext, inspectionId: string) {
+  const parsedActor = parseActor(actor);
+  if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
+    throw new Error("Only office administrators can dismiss technician closeout requests.");
+  }
+
+  const tenantId = parsedActor.tenantId as string;
+
+  return prisma.$transaction(async (tx) => {
+    const closeoutRequest = await tx.inspectionCloseoutRequest.findFirst({
+      where: { tenantId, inspectionId }
+    });
+
+    if (!closeoutRequest) {
+      throw new Error("No technician closeout request is pending for this inspection.");
+    }
+
+    if (closeoutRequest.status !== InspectionCloseoutRequestStatus.pending) {
+      throw new Error("This closeout request has already been resolved.");
+    }
+
+    const dismissed = await tx.inspectionCloseoutRequest.update({
+      where: { id: closeoutRequest.id },
+      data: {
+        status: InspectionCloseoutRequestStatus.dismissed,
+        dismissedByUserId: parsedActor.userId,
+        dismissedAt: new Date()
+      }
+    });
+
+    await createAuditLog(tx, {
+      tenantId,
+      actorUserId: parsedActor.userId,
+      action: "inspection.closeout_request_dismissed",
+      entityId: inspectionId,
+      metadata: serializeCloseoutRequestMetadata({
+        requestType: closeoutRequest.requestType,
+        note: closeoutRequest.note
+      })
+    });
+
+    return dismissed;
+  });
+}
+
 export async function getInspectionForEdit(actor: ActorContext, inspectionId: string) {
   const parsedActor = parseActor(actor);
   if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
@@ -2420,6 +2856,40 @@ export async function getInspectionForEdit(actor: ActorContext, inspectionId: st
       customerCompany: true,
       assignedTechnician: true,
       technicianAssignments: { include: { technician: true } },
+      closeoutRequest: {
+        include: {
+          requestedBy: { select: { id: true, name: true } },
+          approvedBy: { select: { id: true, name: true } },
+          dismissedBy: { select: { id: true, name: true } },
+          createdInspection: {
+            include: {
+              site: true,
+              customerCompany: true
+            }
+          }
+        }
+      },
+      documents: {
+        orderBy: [{ createdAt: "desc" }],
+        select: {
+          id: true,
+          fileName: true,
+          label: true,
+          requiresSignature: true,
+          status: true,
+          uploadedAt: true,
+          signedAt: true
+        }
+      },
+      attachments: {
+        orderBy: [{ createdAt: "desc" }],
+        select: {
+          id: true,
+          fileName: true,
+          createdAt: true,
+          customerVisible: true
+        }
+      },
       replacementAmendments: {
         include: {
           inspection: {
@@ -2493,6 +2963,12 @@ export async function getInspectionForEdit(actor: ActorContext, inspectionId: st
     hasOutgoingAmendment: Boolean(outgoingAmendment),
     hasStartedWork: reportActivityCount > 0 || !isInspectionInUnstartedState(inspection.status)
   });
+  const reviewSummary = getReviewCompletionSummary({
+    tasks: inspection.tasks,
+    deficiencies,
+    documents: inspection.documents,
+    attachments: inspection.attachments
+  });
 
   return {
     ...inspection,
@@ -2511,6 +2987,7 @@ export async function getInspectionForEdit(actor: ActorContext, inspectionId: st
     auditTrail,
     deficiencies,
     deficiencyCount: deficiencies.length,
+    reviewSummary,
     reportActivityCount,
     hasStartedWork: !isInspectionInUnstartedState(inspection.status) || reportActivityCount > 0
   };
@@ -2801,7 +3278,7 @@ export async function getAdminReportReviewQueueData(
 
 export async function getAdminAmendmentManagementData(
   actor: ActorContext,
-  input?: { lifecycle?: "all" | AdminInspectionLifecycle }
+  input?: { lifecycle?: "all" | AdminInspectionLifecycle; filter?: "all" | InspectionReviewFilterValue }
 ) {
   const parsedActor = parseActor(actor);
   if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
@@ -2809,7 +3286,7 @@ export async function getAdminAmendmentManagementData(
   }
 
   const tenantId = parsedActor.tenantId as string;
-  const lifecycleFilter = adminInspectionLifecycleFilterSchema.parse(input?.lifecycle ?? "all");
+  const reviewFilter = inspectionReviewFilterSchema.parse(input?.filter ?? "all");
 
   const inspections = await prisma.inspection.findMany({
     where: { tenantId },
@@ -2818,6 +3295,42 @@ export async function getAdminAmendmentManagementData(
       customerCompany: true,
       assignedTechnician: true,
       technicianAssignments: { include: { technician: true } },
+      closeoutRequest: {
+        include: {
+          requestedBy: { select: { id: true, name: true } },
+          approvedBy: { select: { id: true, name: true } },
+          dismissedBy: { select: { id: true, name: true } },
+          createdInspection: {
+            include: {
+              site: true,
+              customerCompany: true
+            }
+          }
+        }
+      },
+      tasks: {
+        include: {
+          report: {
+            select: {
+              id: true,
+              status: true,
+              finalizedAt: true
+            }
+          }
+        }
+      },
+      documents: {
+        select: {
+          id: true,
+          requiresSignature: true,
+          status: true
+        }
+      },
+      attachments: {
+        select: {
+          id: true
+        }
+      },
       amendments: {
         include: {
           replacementInspection: {
@@ -2881,6 +3394,13 @@ export async function getAdminAmendmentManagementData(
     replacement: 0,
     superseded: 0
   } satisfies Record<AdminInspectionLifecycle, number>;
+  const filterCounts = {
+    needs_review: 0,
+    pending_follow_up_request: 0,
+    approved_created: 0,
+    dismissed: 0,
+    has_amendment_linkage: 0
+  } satisfies Record<InspectionReviewFilterValue, number>;
 
   const items = inspections.map((inspection) => {
     const originalAmendment = inspection.replacementAmendments[0] ?? null;
@@ -2892,6 +3412,30 @@ export async function getAdminAmendmentManagementData(
       hasStartedWork
     });
     lifecycleCounts[lifecycle] += 1;
+    const reviewSummary = getReviewCompletionSummary({
+      tasks: inspection.tasks,
+      deficiencies: [],
+      documents: inspection.documents,
+      attachments: inspection.attachments
+    });
+    const hasAmendmentLinkage = Boolean(originalAmendment || outgoingAmendment);
+    const needsReview = !reviewSummary.readyForOfficeReview || inspection.closeoutRequest?.status === InspectionCloseoutRequestStatus.pending;
+
+    if (needsReview) {
+      filterCounts.needs_review += 1;
+    }
+    if (inspection.closeoutRequest?.status === InspectionCloseoutRequestStatus.pending) {
+      filterCounts.pending_follow_up_request += 1;
+    }
+    if (inspection.closeoutRequest?.status === InspectionCloseoutRequestStatus.approved) {
+      filterCounts.approved_created += 1;
+    }
+    if (inspection.closeoutRequest?.status === InspectionCloseoutRequestStatus.dismissed) {
+      filterCounts.dismissed += 1;
+    }
+    if (hasAmendmentLinkage) {
+      filterCounts.has_amendment_linkage += 1;
+    }
 
     return {
       ...inspection,
@@ -2902,16 +3446,40 @@ export async function getAdminAmendmentManagementData(
         technicianAssignments: readTechnicianNameAssignments(inspection)
       }),
       hasStartedWork,
+      needsReview,
+      reviewSummary,
+      hasAmendmentLinkage,
       reportActivityCount: reportActivityCounts.get(inspection.id) ?? 0,
       originalAmendment,
       outgoingAmendment,
       latestAuditEntry: latestAuditByInspectionId.get(inspection.id) ?? null
     };
-  }).filter((inspection) => lifecycleFilter === "all" || inspection.lifecycle === lifecycleFilter);
+  }).filter((inspection) => {
+    if (reviewFilter === "all") {
+      return true;
+    }
+    if (reviewFilter === "needs_review") {
+      return inspection.needsReview;
+    }
+    if (reviewFilter === "pending_follow_up_request") {
+      return inspection.closeoutRequest?.status === InspectionCloseoutRequestStatus.pending;
+    }
+    if (reviewFilter === "approved_created") {
+      return inspection.closeoutRequest?.status === InspectionCloseoutRequestStatus.approved;
+    }
+    if (reviewFilter === "dismissed") {
+      return inspection.closeoutRequest?.status === InspectionCloseoutRequestStatus.dismissed;
+    }
+    if (reviewFilter === "has_amendment_linkage") {
+      return inspection.hasAmendmentLinkage;
+    }
+    return true;
+  });
 
   return {
-    lifecycleFilter,
+    filter: reviewFilter,
     lifecycleCounts,
+    filterCounts,
     items
   };
 }
@@ -2976,6 +3544,11 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
         customerCompany: true,
         assignedTechnician: true,
         technicianAssignments: { include: { technician: true } },
+        closeoutRequest: {
+          include: {
+            requestedBy: { select: { id: true, name: true } }
+          }
+        },
         tasks: { include: { recurrence: true, report: true, assignedTechnician: true } },
         documents: {
           orderBy: [{ createdAt: "desc" }],
@@ -3018,6 +3591,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
         siteName: inspection.site.name,
         customerName: inspection.customerCompany.name
       }),
+      closeoutRequest: inspection.closeoutRequest,
       displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
       assignedTechnicianNames: formatAssignedTechnicianNames({
         assignedTechnician: inspection.assignedTechnician,

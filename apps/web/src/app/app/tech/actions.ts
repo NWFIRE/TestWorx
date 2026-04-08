@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import {
   addInspectionTask,
   claimInspection,
+  completeInspectionWithCloseoutRequest,
   editableInspectionStatuses,
   inspectionTypeRegistry,
   removeInspectionTask,
@@ -67,6 +68,33 @@ export async function addInspectionTaskAction(inspectionId: string, inspectionTy
     return { ok: true, error: null };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unable to add this report type." };
+  }
+}
+
+export async function completeInspectionWithCloseoutRequestAction(
+  inspectionId: string,
+  input: { requestType: "none" | "new_inspection" | "follow_up_inspection"; note?: string }
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { ok: false, error: "Your session has expired. Please sign in again." };
+  }
+
+  try {
+    await completeInspectionWithCloseoutRequest(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      inspectionId,
+      input.requestType === "none"
+        ? { requestType: "none" }
+        : { requestType: input.requestType, note: input.note ?? "" }
+    );
+    revalidatePath("/app/tech");
+    revalidatePath("/app/admin");
+    revalidatePath("/app/admin/amendments");
+    revalidatePath(`/app/admin/inspections/${inspectionId}`);
+    return { ok: true, error: null };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to complete this inspection." };
   }
 }
 

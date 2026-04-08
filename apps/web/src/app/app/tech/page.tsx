@@ -15,6 +15,7 @@ import {
 
 import { AddReportTypeControl } from "./add-report-type-control";
 import { ClaimButton } from "./claim-button";
+import { CompleteInspectionCard } from "./complete-inspection-card";
 import { RemoveReportTypeButton } from "./remove-report-type-button";
 import { StatusButton } from "./status-button";
 import { PriorityBadge, StatusBadge } from "../admin/operations-ui";
@@ -220,6 +221,14 @@ export default async function TechnicianPage({
                         ) : null}
                         <p className="mt-1 text-sm text-slate-500">Report types: {inspection.tasks.map((task: DashboardTask) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
                         <p className="mt-1 text-sm text-slate-500">{finalizedTaskCount} of {inspection.tasks.length} report task{inspection.tasks.length === 1 ? "" : "s"} finalized</p>
+                        {inspection.closeoutRequest?.status === "pending" ? (
+                          <div className="mt-3 rounded-[1.25rem] border border-blue-200 bg-blue-50/80 px-4 py-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-900">Follow-up request pending office review</p>
+                            <p className="mt-1 text-sm text-blue-950">
+                              {inspection.closeoutRequest.requestType === "follow_up_inspection" ? "Follow-up inspection" : "New inspection"} requested.
+                            </p>
+                          </div>
+                        ) : null}
                         <DispatchNotes notes={inspection.notes} />
                         <div className="mt-3 grid gap-2 sm:grid-cols-2">
                           {inspection.tasks.map((task: DashboardTask) => (
@@ -294,7 +303,7 @@ export default async function TechnicianPage({
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2">
                         {inspection.status === "to_be_completed" || inspection.status === "scheduled" ? <StatusButton inspectionId={inspection.id} status="in_progress" label="Start inspection" /> : null}
-                        {inspection.status === "in_progress" ? <StatusButton inspectionId={inspection.id} status="completed" label="Mark completed" /> : null}
+                        {inspection.status === "in_progress" ? <CompleteInspectionCard inspectionId={inspection.id} /> : null}
                       </div>
                     </div>
                   </div>

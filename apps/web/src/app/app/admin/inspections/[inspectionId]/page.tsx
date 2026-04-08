@@ -6,6 +6,8 @@ import { auth } from "@/auth";
 import {
   buildInspectionPacketDocuments,
   editableInspectionStatuses,
+  formatInspectionCloseoutRequestStatusLabel,
+  formatInspectionCloseoutRequestTypeLabel,
   formatInspectionClassificationLabel,
   formatInspectionStatusLabel,
   formatInspectionTaskTypeLabel,
@@ -23,6 +25,7 @@ import {
 import { amendInspectionAction, deleteInspectionAction, reopenCompletedReportAction, updateInspectionAction, updateInspectionStatusAdminAction, uploadInspectionExternalDocumentAction, uploadInspectionPdfAction } from "../../actions";
 import { DeleteInspectionCard } from "../../delete-inspection-card";
 import { InspectionExternalDocumentsCard } from "../../inspection-external-documents-card";
+import { InspectionCloseoutRequestActions } from "../../inspection-closeout-request-actions";
 import { InspectionPdfUploadCard } from "../../inspection-pdf-upload-card";
 import { InspectionReportCorrectionsCard } from "../../inspection-report-corrections-card";
 import { InspectionSchedulerForm } from "../../inspection-scheduler-form";
@@ -89,12 +92,16 @@ function resolveInspectionOrigin(value: string | undefined) {
   return candidate;
 }
 
+function resolveInspectionMode(value: string | undefined) {
+  return value === "review" ? "review" : "workspace";
+}
+
 export default async function EditInspectionPage({
   params,
   searchParams
 }: {
   params: Promise<{ inspectionId: string }>;
-  searchParams?: Promise<{ from?: string }>;
+  searchParams?: Promise<{ from?: string; mode?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -107,6 +114,8 @@ export default async function EditInspectionPage({
   const { inspectionId } = await params;
   const rawSearchParams = searchParams ? await searchParams : {};
   const originPath = resolveInspectionOrigin(typeof rawSearchParams.from === "string" ? rawSearchParams.from : undefined);
+  const mode = resolveInspectionMode(typeof rawSearchParams.mode === "string" ? rawSearchParams.mode : undefined);
+  const isReviewMode = mode === "review";
   const [dashboardData, inspection] = await Promise.all([
     getAdminDashboardData({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }),
     getInspectionForEdit({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId)
@@ -178,6 +187,31 @@ export default async function EditInspectionPage({
       replacementInspection: { id: string; scheduledStart: Date; site: { name: string }; customerCompany: { name: string }; assignedTechnician: { name: string } | null };
     } | null;
     amendments?: Array<{ id: string; reason: string; type: string; createdAt: Date; replacementInspection: { id: string; scheduledStart: Date; site: { name: string }; customerCompany: { name: string }; assignedTechnician: { name: string } | null } }>;
+    closeoutRequest?: {
+      id: string;
+      requestType: "new_inspection" | "follow_up_inspection";
+      status: "pending" | "approved" | "dismissed";
+      note: string;
+      createdAt: Date;
+      approvedAt: Date | null;
+      dismissedAt: Date | null;
+      requestedBy?: { id: string; name: string } | null;
+      approvedBy?: { id: string; name: string } | null;
+      dismissedBy?: { id: string; name: string } | null;
+      createdInspection?: { id: string; site: { name: string }; customerCompany: { name: string } } | null;
+    } | null;
+    reviewSummary?: {
+      totalTasks: number;
+      finalizedTasks: number;
+      missingReports: number;
+      reportCompletionLabel: string;
+      signaturesReady: boolean;
+      pendingSignatureDocuments: number;
+      documentCount: number;
+      attachmentCount: number;
+      deficiencyCount: number;
+      readyForOfficeReview: boolean;
+    };
   };
   const attachmentView = attachments as unknown as Array<{ id: string; fileName: string; source: "uploaded" | "generated"; customerVisible: boolean; createdAt: Date }>;
   const externalDocumentView = documents as unknown as Array<{
@@ -224,19 +258,26 @@ export default async function EditInspectionPage({
   return (
     <section className="space-y-6">
       <div className="rounded-[2rem] bg-white p-6 shadow-panel">
-        <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Inspection editor</p>
+        <p className="text-sm uppercase tracking-[0.25em] text-slate-500">{isReviewMode ? "Inspection review" : "Inspection editor"}</p>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h2 className="text-3xl font-semibold text-ink">{inspectionDisplay.primaryTitle}</h2>
           <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${lifecycleBadgeStyles[inspectionView.lifecycle ?? "original"]}`}>
             {formatLifecycleLabel(inspectionView.lifecycle ?? "original")}
           </span>
           <Link className="inline-flex rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slateblue" href="/app/admin/amendments">
-            Amendment center
+            Review queue
           </Link>
+          {isReviewMode ? (
+            <Link className="inline-flex rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slateblue" href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(originPath)}`}>
+              Open full inspection workspace
+            </Link>
+          ) : null}
         </div>
         <p className="mt-3 text-slate-500">
           {inspectionDisplay.secondaryTitle ? `${inspectionDisplay.secondaryTitle} | ` : ""}
-          Adjust assignment, status, recurrence mix, scheduling details, and customer-facing PDF delivery for this visit.
+          {isReviewMode
+            ? "Review the current status, report completion, signatures, documents, and any technician-requested next-step work before deciding what needs to happen next."
+            : "Adjust assignment, status, recurrence mix, scheduling details, and customer-facing PDF delivery for this visit."}
         </p>
         {inspectionView.hasStartedWork ? <p className="mt-3 text-sm text-amber-700">Started work is protected. Changes here create an audited follow-up visit instead of rewriting history.</p> : null}
         {isDueAtTimeOfServiceCustomer(inspection.customerCompany) ? (
@@ -284,6 +325,36 @@ export default async function EditInspectionPage({
             </Link>
           </div>
         </div>
+        {inspectionView.closeoutRequest ? (
+          <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-900">Technician next-step request</p>
+              <StatusBadge
+                label={formatInspectionCloseoutRequestStatusLabel(inspectionView.closeoutRequest.status)}
+                tone={inspectionView.closeoutRequest.status === "approved" ? "emerald" : inspectionView.closeoutRequest.status === "dismissed" ? "slate" : "blue"}
+              />
+            </div>
+            <p className="mt-2 text-sm font-semibold text-blue-950">
+              {formatInspectionCloseoutRequestTypeLabel(inspectionView.closeoutRequest.requestType)}
+            </p>
+            <p className="mt-1 text-sm text-blue-900">{inspectionView.closeoutRequest.note}</p>
+            <p className="mt-2 text-xs text-blue-800">
+              Requested by {inspectionView.closeoutRequest.requestedBy?.name ?? "Technician"} on {format(inspectionView.closeoutRequest.createdAt, "MMM d, yyyy h:mm a")}
+            </p>
+            {inspectionView.closeoutRequest.status === "pending" ? (
+              <div className="mt-4">
+                <InspectionCloseoutRequestActions inspectionId={inspection.id} canApprove />
+              </div>
+            ) : inspectionView.closeoutRequest.createdInspection ? (
+              <Link
+                className="mt-4 inline-flex text-sm font-semibold text-slateblue"
+                href={`/app/admin/inspections/${inspectionView.closeoutRequest.createdInspection.id}?from=${encodeURIComponent(originPath)}`}
+              >
+                Open created inspection
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <StatusBadge
             label={formatInspectionClassificationLabel(inspection.inspectionClassification)}
@@ -300,6 +371,7 @@ export default async function EditInspectionPage({
         </div>
       </div>
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        {!isReviewMode ? (
         <InspectionSchedulerForm
           action={inspectionView.hasStartedWork ? amendInspectionAction : updateInspectionAction}
           title={inspectionView.hasStartedWork ? "Create amended follow-up visit" : "Edit inspection"}
@@ -335,6 +407,44 @@ export default async function EditInspectionPage({
             }))
           }}
         />
+        ) : (
+          <div className="space-y-6">
+            <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+              <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Review summary</p>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Report completion</p>
+                  <p className="mt-2 text-sm font-semibold text-ink">{inspectionView.reviewSummary?.reportCompletionLabel ?? "0/0 finalized"}</p>
+                  <p className="mt-1 text-sm text-slate-500">{inspectionView.reviewSummary?.missingReports ?? 0} report task{(inspectionView.reviewSummary?.missingReports ?? 0) === 1 ? "" : "s"} still not finalized.</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Signatures and documents</p>
+                  <p className="mt-2 text-sm font-semibold text-ink">{inspectionView.reviewSummary?.pendingSignatureDocuments ? `${inspectionView.reviewSummary.pendingSignatureDocuments} document(s) pending signature` : "All signature documents complete"}</p>
+                  <p className="mt-1 text-sm text-slate-500">Packet docs: {inspectionView.reviewSummary?.documentCount ?? 0} | Attachments: {inspectionView.reviewSummary?.attachmentCount ?? 0}</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+              <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Report task completion</p>
+              <div className="mt-4 space-y-3">
+                {inspectionView.tasks.map((task: InspectionTask) => (
+                  <div key={task.id} className="rounded-2xl border border-slate-200 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-ink">{formatInspectionTaskTypeLabel(task.inspectionType)}</p>
+                      <StatusBadge
+                        label={task.report?.status === "finalized" ? "Finalized" : "Draft"}
+                        tone={task.report?.status === "finalized" ? "emerald" : "amber"}
+                      />
+                    </div>
+                    <p className="mt-2 text-sm text-slate-500">
+                      {task.report?.finalizedAt ? `Finalized ${format(task.report.finalizedAt, "MMM d, yyyy h:mm a")}` : "This report still needs finalization."}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
         <div className="space-y-6">
           <InspectionPacketCard
             description={
@@ -355,12 +465,14 @@ export default async function EditInspectionPage({
             }
             showCustomerVisibility
           />
+          {!isReviewMode ? (
           <InspectionStatusUpdateCard
             action={updateInspectionStatusAdminAction}
             currentStatus={inspection.status}
             inspectionId={inspection.id}
             key={`${inspection.id}:${inspection.status}`}
           />
+          ) : null}
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Lifecycle timeline</p>
             <div className="mt-4 space-y-4">
@@ -398,6 +510,7 @@ export default async function EditInspectionPage({
               ) : null}
             </div>
           </div>
+          {!isReviewMode ? (
           <InspectionExternalDocumentsCard
             action={uploadInspectionExternalDocumentAction}
             documents={externalDocumentView.map((document) => ({
@@ -408,6 +521,8 @@ export default async function EditInspectionPage({
             }))}
             inspectionId={inspection.id}
           />
+          ) : null}
+          {!isReviewMode ? (
           <InspectionReportCorrectionsCard
             action={reopenCompletedReportAction}
             inspectionId={inspection.id}
@@ -432,6 +547,8 @@ export default async function EditInspectionPage({
               } : null
             }))}
           />
+          ) : null}
+          {!isReviewMode ? (
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Report type management</p>
             <div className="mt-4 space-y-3">
@@ -481,8 +598,9 @@ export default async function EditInspectionPage({
               )}
             </div>
           </div>
-          <InspectionPdfUploadCard action={uploadInspectionPdfAction} attachments={attachmentView} inspectionId={inspection.id} />
-          <DeleteInspectionCard action={deleteInspectionAction} inspectionId={inspection.id} redirectTo={originPath} />
+          ) : null}
+          {!isReviewMode ? <InspectionPdfUploadCard action={uploadInspectionPdfAction} attachments={attachmentView} inspectionId={inspection.id} /> : null}
+          {!isReviewMode ? <DeleteInspectionCard action={deleteInspectionAction} inspectionId={inspection.id} redirectTo={originPath} /> : null}
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Audit trail</p>
             <div className="mt-4 space-y-3">

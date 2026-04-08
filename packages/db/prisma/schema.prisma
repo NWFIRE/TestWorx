@@ -106,6 +106,17 @@ enum InspectionAmendmentType {
   scope_change
 }
 
+enum InspectionCloseoutRequestType {
+  new_inspection
+  follow_up_inspection
+}
+
+enum InspectionCloseoutRequestStatus {
+  pending
+  approved
+  dismissed
+}
+
 enum StripeWebhookEventStatus {
   received
   processing
@@ -221,6 +232,7 @@ model Tenant {
   auditLogs                 AuditLog[]
   reportCorrectionEvents    ReportCorrectionEvent[]
   inspectionAmendments      InspectionAmendment[]
+  inspectionCloseoutRequests InspectionCloseoutRequest[]
   inspectionTechnicianAssignments InspectionTechnicianAssignment[]
   stripeWebhookEvents       StripeWebhookEvent[]
   serviceFeeRules           ServiceFeeRule[]
@@ -260,6 +272,9 @@ model User {
   auditLogs           AuditLog[]
   reportCorrectionEvents ReportCorrectionEvent[] @relation("ReportCorrectionEventActor")
   createdAmendments   InspectionAmendment[]   @relation("InspectionAmendmentCreatedBy")
+  requestedInspectionCloseoutRequests InspectionCloseoutRequest[] @relation("InspectionCloseoutRequestRequestedBy")
+  approvedInspectionCloseoutRequests InspectionCloseoutRequest[] @relation("InspectionCloseoutRequestApprovedBy")
+  dismissedInspectionCloseoutRequests InspectionCloseoutRequest[] @relation("InspectionCloseoutRequestDismissedBy")
   inspectionAssignments InspectionTechnicianAssignment[]
   sentAccountInvitations AccountInvitation[]  @relation("AccountInvitationInvitedBy")
   acceptedAccountInvitations AccountInvitation[] @relation("AccountInvitationAcceptedBy")
@@ -377,11 +392,13 @@ model Inspection {
   reports               InspectionReport[]
   deficiencies          Deficiency[]
   billingSummary        InspectionBillingSummary?
-  documents             InspectionDocument[]
-    amendments            InspectionAmendment[]   @relation("OriginalInspectionAmendments")
-    replacementAmendments InspectionAmendment[]   @relation("ReplacementInspectionAmendments")
-    technicianAssignments InspectionTechnicianAssignment[]
-    convertedFromQuotes   Quote[]                 @relation("QuoteConvertedInspection")
+    documents             InspectionDocument[]
+      amendments            InspectionAmendment[]   @relation("OriginalInspectionAmendments")
+      replacementAmendments InspectionAmendment[]   @relation("ReplacementInspectionAmendments")
+      closeoutRequest       InspectionCloseoutRequest?
+      createdFromCloseoutRequests InspectionCloseoutRequest[] @relation("InspectionCloseoutRequestCreatedInspection")
+      technicianAssignments InspectionTechnicianAssignment[]
+      convertedFromQuotes   Quote[]                 @relation("QuoteConvertedInspection")
 
     @@index([tenantId, inspectionClassification])
     @@index([tenantId, isPriority])
@@ -917,6 +934,33 @@ model InspectionAmendment {
   inspection             Inspection              @relation("OriginalInspectionAmendments", fields: [inspectionId], references: [id])
   replacementInspection  Inspection              @relation("ReplacementInspectionAmendments", fields: [replacementInspectionId], references: [id])
   createdBy              User                    @relation("InspectionAmendmentCreatedBy", fields: [createdByUserId], references: [id])
+}
+
+model InspectionCloseoutRequest {
+  id                  String                         @id @default(cuid())
+  tenantId            String
+  inspectionId        String                         @unique
+  requestedByUserId   String
+  requestType         InspectionCloseoutRequestType
+  note                String
+  status              InspectionCloseoutRequestStatus @default(pending)
+  createdInspectionId String?
+  approvedByUserId    String?
+  dismissedByUserId   String?
+  approvedAt          DateTime?
+  dismissedAt         DateTime?
+  createdAt           DateTime                       @default(now())
+  updatedAt           DateTime                       @updatedAt
+  tenant              Tenant                         @relation(fields: [tenantId], references: [id])
+  inspection          Inspection                     @relation(fields: [inspectionId], references: [id])
+  requestedBy         User                           @relation("InspectionCloseoutRequestRequestedBy", fields: [requestedByUserId], references: [id])
+  approvedBy          User?                          @relation("InspectionCloseoutRequestApprovedBy", fields: [approvedByUserId], references: [id])
+  dismissedBy         User?                          @relation("InspectionCloseoutRequestDismissedBy", fields: [dismissedByUserId], references: [id])
+  createdInspection   Inspection?                    @relation("InspectionCloseoutRequestCreatedInspection", fields: [createdInspectionId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([tenantId, requestType])
+  @@index([tenantId, createdInspectionId])
 }
 
 model StripeWebhookEvent {

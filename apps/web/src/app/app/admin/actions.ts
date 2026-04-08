@@ -6,6 +6,8 @@ import { isRedirectError } from "next/dist/client/components/redirect-error";
 
 import { auth } from "@/auth";
 import {
+  approveInspectionCloseoutRequest,
+  dismissInspectionCloseoutRequest,
   createInspection,
   clearBillingSummaryItemCatalogLink,
   clearBillingSummaryItemGroupCatalogLink,
@@ -289,6 +291,53 @@ export async function updateInspectionStatusAdminAction(
     return { error: null, success: "Inspection status updated successfully." };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unable to update inspection status.", success: null };
+  }
+}
+
+export async function approveInspectionCloseoutRequestAction(inspectionId: string) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  try {
+    const createdInspection = await approveInspectionCloseoutRequest(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      inspectionId
+    );
+
+    revalidatePath("/app/admin");
+    revalidatePath("/app/admin/amendments");
+    revalidatePath(`/app/admin/inspections/${inspectionId}`);
+    revalidatePath(`/app/admin/inspections/${createdInspection.id}`);
+    revalidatePath("/app/tech");
+
+    return { ok: true, error: null };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to approve this request." };
+  }
+}
+
+export async function dismissInspectionCloseoutRequestAction(inspectionId: string) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  try {
+    await dismissInspectionCloseoutRequest(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      inspectionId
+    );
+
+    revalidatePath("/app/admin");
+    revalidatePath("/app/admin/amendments");
+    revalidatePath(`/app/admin/inspections/${inspectionId}`);
+    revalidatePath("/app/tech");
+
+    return { ok: true, error: null };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to dismiss this request." };
   }
 }
 

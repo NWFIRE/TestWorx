@@ -3,7 +3,11 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getAdminAmendmentManagementData } from "@testworx/lib";
+import {
+  formatInspectionCloseoutRequestStatusLabel,
+  formatInspectionCloseoutRequestTypeLabel,
+  getAdminAmendmentManagementData
+} from "@testworx/lib";
 
 import {
   AppPageShell,
@@ -16,32 +20,22 @@ import {
   StatusBadge
 } from "../operations-ui";
 
-type AmendmentManagementItem = Awaited<ReturnType<typeof getAdminAmendmentManagementData>>["items"][number];
+type ReviewItem = Awaited<ReturnType<typeof getAdminAmendmentManagementData>>["items"][number];
 
-const lifecycleOptions = [
-  { value: "all", label: "All lifecycle states" },
-  { value: "original", label: "Original" },
-  { value: "amended", label: "Amended" },
-  { value: "replacement", label: "Replacement" },
-  { value: "superseded", label: "Superseded" }
+const reviewOptions = [
+  { value: "all", label: "All inspections" },
+  { value: "needs_review", label: "Needs review" },
+  { value: "pending_follow_up_request", label: "Pending requests" },
+  { value: "approved_created", label: "Approved / created" },
+  { value: "dismissed", label: "Dismissed" },
+  { value: "has_amendment_linkage", label: "Has amendment linkage" }
 ] as const;
-
-const lifecycleTones = {
-  original: "slate",
-  amended: "amber",
-  replacement: "blue",
-  superseded: "rose"
-} as const;
-
-function formatLifecycle(value: string) {
-  return value.replaceAll("_", " ");
-}
 
 function formatAuditAction(value: string) {
   return value.replaceAll(".", " ").replaceAll("_", " ");
 }
 
-function getRelationshipSummary(item: AmendmentManagementItem) {
+function getRelationshipSummary(item: ReviewItem) {
   if (item.originalAmendment) {
     return {
       label: "Replacement for",
@@ -68,7 +62,7 @@ function getRelationshipSummary(item: AmendmentManagementItem) {
 export default async function AdminAmendmentsPage({
   searchParams
 }: {
-  searchParams: Promise<{ lifecycle?: string }>;
+  searchParams: Promise<{ filter?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -79,51 +73,66 @@ export default async function AdminAmendmentsPage({
   }
 
   const params = await searchParams;
-  const lifecycle = lifecycleOptions.some((option) => option.value === params.lifecycle) ? params.lifecycle : "all";
-  const currentPath = lifecycle === "all"
+  const selectedFilter = reviewOptions.some((option) => option.value === params.filter) ? params.filter : "all";
+  const currentPath = selectedFilter === "all"
     ? "/app/admin/amendments"
-    : `/app/admin/amendments?lifecycle=${lifecycle}`;
+    : `/app/admin/amendments?filter=${selectedFilter}`;
   const data = await getAdminAmendmentManagementData(
     { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-    { lifecycle: lifecycle as "all" | "original" | "amended" | "replacement" | "superseded" }
+    { filter: selectedFilter as "all" | "needs_review" | "pending_follow_up_request" | "approved_created" | "dismissed" | "has_amendment_linkage" }
   );
 
   return (
     <AppPageShell>
       <PageHeader
-        actions={
+        actions={(
           <Link
             className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
             href="/app/admin"
           >
             Back to scheduling
           </Link>
-        }
-        description="Track original visits, started-work amendments, and replacement scheduling from one operational view without rewriting history."
-        eyebrow="Amendment center"
-        title="Replacement and superseded visit management"
+        )}
+        description="Review completed visits, confirm the packet is complete, and respond to technician requests for the next inspection without dropping into the full edit workspace."
+        eyebrow="Post-visit review"
+        title="Inspection review and next-step requests"
       />
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {(["original", "amended", "replacement", "superseded"] as const).map((key) => (
-          <KPIStatCard
-            key={key}
-            label={formatLifecycle(key)}
-            note={`${data.lifecycleCounts[key]} inspection${data.lifecycleCounts[key] === 1 ? "" : "s"} in this lifecycle state.`}
-            tone={lifecycleTones[key]}
-            value={data.lifecycleCounts[key]}
-          />
-        ))}
+        <KPIStatCard
+          label="Needs review"
+          note="Inspections with unfinished packet details or a pending technician request."
+          tone="violet"
+          value={data.filterCounts.needs_review}
+        />
+        <KPIStatCard
+          label="Pending requests"
+          note="Technician requests waiting for office approval."
+          tone="blue"
+          value={data.filterCounts.pending_follow_up_request}
+        />
+        <KPIStatCard
+          label="Approved / created"
+          note="Requests already turned into the next inspection."
+          tone="emerald"
+          value={data.filterCounts.approved_created}
+        />
+        <KPIStatCard
+          label="Amendment linkage"
+          note="Historical amendment relationships still tied to these visits."
+          tone="amber"
+          value={data.filterCounts.has_amendment_linkage}
+        />
       </section>
 
       <FilterBar
-        description="Use lifecycle filters to keep amendment chains readable without losing the original or replacement context."
-        title="Lifecycle filters"
+        description="Filter the review queue by technician request state and inspection readiness instead of amendment lifecycle."
+        title="Review filters"
       >
-        {lifecycleOptions.map((option) => (
+        {reviewOptions.map((option) => (
           <FilterChipLink
-            active={data.lifecycleFilter === option.value}
-            href={option.value === "all" ? "/app/admin/amendments" : `/app/admin/amendments?lifecycle=${option.value}`}
+            active={data.filter === option.value}
+            href={option.value === "all" ? "/app/admin/amendments" : `/app/admin/amendments?filter=${option.value}`}
             key={option.value}
             label={option.label}
             tone="violet"
@@ -135,10 +144,10 @@ export default async function AdminAmendmentsPage({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-              Inspection relationships
+              Review queue
             </p>
             <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-              Recent amendment activity
+              Completed visits ready for office review
             </h2>
           </div>
           <p className="text-sm text-slate-500">
@@ -149,14 +158,12 @@ export default async function AdminAmendmentsPage({
         <div className="mt-5 space-y-4">
           {data.items.length === 0 ? (
             <EmptyState
-              description="No inspections matched the selected amendment lifecycle filter."
-              title="No amendment activity matches these filters"
+              description="No inspections matched the selected review filter."
+              title="Nothing to review with these filters"
             />
           ) : (
-            data.items.map((inspection: AmendmentManagementItem) => {
+            data.items.map((inspection) => {
               const relationship = getRelationshipSummary(inspection);
-              const amendmentReason =
-                inspection.originalAmendment?.reason ?? inspection.outgoingAmendment?.reason ?? null;
 
               return (
                 <div
@@ -167,106 +174,118 @@ export default async function AdminAmendmentsPage({
                     <div className="space-y-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-lg font-semibold text-slate-950">{inspection.site.name}</p>
-                        <StatusBadge
-                          label={formatLifecycle(inspection.lifecycle)}
-                          tone={lifecycleTones[inspection.lifecycle as keyof typeof lifecycleTones] ?? "slate"}
-                        />
+                        {inspection.needsReview ? <StatusBadge label="Needs review" tone="violet" /> : <StatusBadge label="Review ready" tone="emerald" />}
+                        {inspection.closeoutRequest ? (
+                          <StatusBadge
+                            label={formatInspectionCloseoutRequestStatusLabel(inspection.closeoutRequest.status)}
+                            tone={inspection.closeoutRequest.status === "approved" ? "emerald" : inspection.closeoutRequest.status === "dismissed" ? "slate" : "blue"}
+                          />
+                        ) : null}
                       </div>
                       <p className="text-sm text-slate-500">
-                        {inspection.customerCompany.name} • {format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}
+                        {inspection.customerCompany.name} | {format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}
                       </p>
-                      <div className="grid gap-3 md:grid-cols-2">
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         <div className="rounded-2xl border border-slate-200 bg-white p-4">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                            Visit status
+                            Current status
                           </p>
-                          <p className="mt-2 text-sm text-slate-700">
-                            {(inspection.displayStatus ?? inspection.status).replaceAll("_", " ")}
-                          </p>
+                          <p className="mt-2 text-sm text-slate-700">{(inspection.displayStatus ?? inspection.status).replaceAll("_", " ")}</p>
                           <p className="mt-1 text-sm text-slate-500">
                             Assigned: {(inspection.assignedTechnicianNames ?? []).length
                               ? inspection.assignedTechnicianNames.join(", ")
                               : "Shared queue"}
                           </p>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            Report completion
+                          </p>
+                          <p className="mt-2 text-sm text-slate-700">{inspection.reviewSummary.reportCompletionLabel}</p>
                           <p className="mt-1 text-sm text-slate-500">
-                            Report activity markers: {inspection.reportActivityCount}
+                            {inspection.reviewSummary.pendingSignatureDocuments === 0
+                              ? "All required signature documents complete."
+                              : `${inspection.reviewSummary.pendingSignatureDocuments} signature document${inspection.reviewSummary.pendingSignatureDocuments === 1 ? "" : "s"} still pending.`}
                           </p>
                         </div>
                         <div className="rounded-2xl border border-slate-200 bg-white p-4">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                            Relationship
-                          </p>
-                          {relationship ? (
-                            <>
-                              <p className="mt-2 text-sm text-slate-700">
-                                {relationship.label}: {relationship.siteName}
-                              </p>
-                              <p className="mt-1 text-sm text-slate-500">
-                                {format(relationship.scheduledStart, "MMM d, yyyy h:mm a")}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-400">
-                                Inspection id: {relationship.inspectionId}
-                              </p>
-                            </>
-                          ) : (
-                            <p className="mt-2 text-sm text-slate-700">
-                              No linked replacement or superseding visit yet.
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                            Amendment reason
+                            Packet readiness
                           </p>
                           <p className="mt-2 text-sm text-slate-700">
-                            {amendmentReason ?? "No amendment reason recorded on this inspection."}
+                            {inspection.reviewSummary.readyForOfficeReview ? "Ready for review" : "Needs attention"}
                           </p>
-                          {(inspection.originalAmendment?.createdAt ?? inspection.outgoingAmendment?.createdAt) ? (
-                            <p className="mt-2 text-xs text-slate-400">
-                              Logged{" "}
-                              {format(
-                                inspection.originalAmendment?.createdAt
-                                  ?? inspection.outgoingAmendment?.createdAt
-                                  ?? inspection.createdAt,
-                                "MMM d, yyyy h:mm a"
-                              )}
+                          <p className="mt-1 text-sm text-slate-500">
+                            PDFs / docs: {inspection.reviewSummary.documentCount} | Attachments: {inspection.reviewSummary.attachmentCount}
+                          </p>
+                        </div>
+                      </div>
+                      {inspection.closeoutRequest ? (
+                        <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-900">
+                            Technician next-step request
+                          </p>
+                          <p className="mt-2 text-sm font-semibold text-blue-950">
+                            {formatInspectionCloseoutRequestTypeLabel(inspection.closeoutRequest.requestType)}
+                          </p>
+                          <p className="mt-1 text-sm text-blue-900">{inspection.closeoutRequest.note}</p>
+                          <p className="mt-2 text-xs text-blue-800">
+                            Requested by {inspection.closeoutRequest.requestedBy?.name ?? "Technician"} on {format(inspection.closeoutRequest.createdAt, "MMM d, yyyy h:mm a")}
+                          </p>
+                          {inspection.closeoutRequest.createdInspection ? (
+                            <p className="mt-2 text-xs text-blue-800">
+                              Created inspection: {inspection.closeoutRequest.createdInspection.site.name} | {inspection.closeoutRequest.createdInspection.customerCompany.name}
                             </p>
                           ) : null}
                         </div>
+                      ) : (
                         <div className="rounded-2xl border border-slate-200 bg-white p-4">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                            Latest audit note
+                            Technician request
                           </p>
-                          {inspection.latestAuditEntry ? (
-                            <>
-                              <p className="mt-2 text-sm text-slate-700">
-                                {formatAuditAction(inspection.latestAuditEntry.action)}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-400">
-                                {format(inspection.latestAuditEntry.createdAt, "MMM d, yyyy h:mm a")}
-                              </p>
-                            </>
-                          ) : (
-                            <p className="mt-2 text-sm text-slate-700">
-                              No amendment-related audit entries yet.
-                            </p>
-                          )}
+                          <p className="mt-2 text-sm text-slate-700">No new or follow-up inspection requested at closeout.</p>
                         </div>
+                      )}
+                      {relationship ? (
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            Historical amendment linkage
+                          </p>
+                          <p className="mt-2 text-sm text-slate-700">
+                            {relationship.label}: {relationship.siteName}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-400">
+                            {format(relationship.scheduledStart, "MMM d, yyyy h:mm a")}
+                          </p>
+                        </div>
+                      ) : null}
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Latest audit note
+                        </p>
+                        {inspection.latestAuditEntry ? (
+                          <>
+                            <p className="mt-2 text-sm text-slate-700">{formatAuditAction(inspection.latestAuditEntry.action)}</p>
+                            <p className="mt-1 text-xs text-slate-400">
+                              {format(inspection.latestAuditEntry.createdAt, "MMM d, yyyy h:mm a")}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="mt-2 text-sm text-slate-700">No review-related audit entries yet.</p>
+                        )}
                       </div>
                     </div>
                     <div className="flex min-w-56 flex-col gap-3">
                       <Link
                         className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#1f4678] px-4 py-3 text-sm font-semibold text-white"
-                        href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`}
+                        href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}&mode=review`}
                       >
-                        Open inspection
+                        Review inspection
                       </Link>
                       {relationship ? (
                         <Link
                           className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
-                          href={`${relationship.href}?from=${encodeURIComponent(currentPath)}`}
+                          href={`${relationship.href}?from=${encodeURIComponent(currentPath)}&mode=review`}
                         >
                           Open linked inspection
                         </Link>

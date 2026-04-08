@@ -54,6 +54,22 @@ describe("inspection admin lifecycle view", () => {
       site: { name: "Original Site" },
       customerCompany: { name: "Original Customer" },
       assignedTechnician: { id: "tech_1", name: "Taylor Tech" },
+      technicianAssignments: [],
+      closeoutRequest: {
+        id: "request_1",
+        requestType: "follow_up_inspection",
+        status: "pending",
+        note: "Return for remaining devices.",
+        createdAt: new Date("2026-03-13T15:00:00.000Z"),
+        approvedAt: null,
+        dismissedAt: null,
+        requestedBy: { id: "tech_1", name: "Taylor Tech" },
+        approvedBy: null,
+        dismissedBy: null,
+        createdInspection: null
+      },
+      documents: [{ id: "document_1", fileName: "packet.pdf", label: null, requiresSignature: true, status: "READY_FOR_SIGNATURE", uploadedAt: new Date("2026-03-13T12:00:00.000Z"), signedAt: null }],
+      attachments: [{ id: "attachment_1", fileName: "visit.pdf", createdAt: new Date("2026-03-13T12:00:00.000Z"), customerVisible: true }],
       replacementAmendments: [],
       amendments: [
         {
@@ -77,6 +93,8 @@ describe("inspection admin lifecycle view", () => {
     expect(result?.lifecycle).toBe("superseded");
     expect(result?.outgoingAmendment?.replacementInspection.id).toBe("replacement_1");
     expect(result?.auditTrail).toHaveLength(1);
+    expect(result?.closeoutRequest?.requestType).toBe("follow_up_inspection");
+    expect(result?.reviewSummary?.pendingSignatureDocuments).toBe(1);
   }, 15000);
 
   it("returns replacement state with original inspection navigation details", async () => {
@@ -94,6 +112,10 @@ describe("inspection admin lifecycle view", () => {
       site: { name: "Replacement Site" },
       customerCompany: { name: "Original Customer" },
       assignedTechnician: { id: "tech_2", name: "Alex Tech" },
+      technicianAssignments: [],
+      closeoutRequest: null,
+      documents: [],
+      attachments: [],
       replacementAmendments: [
         {
           id: "amendment_1",
