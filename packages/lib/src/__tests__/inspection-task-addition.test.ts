@@ -43,6 +43,9 @@ const { prismaMock, txMock } = vi.hoisted(() => {
   return {
     txMock: tx,
     prismaMock: {
+      auditLog: {
+        create: vi.fn()
+      },
       $transaction: vi.fn(async (callback: (tx: typeof tx) => Promise<unknown>) => callback(tx))
     }
   };
@@ -75,6 +78,7 @@ describe("inspection task addition", () => {
     txMock.signature.deleteMany.mockResolvedValue({ count: 0 });
     txMock.deficiency.deleteMany.mockResolvedValue({ count: 0 });
     txMock.auditLog.create.mockResolvedValue({ id: "audit_1" });
+    prismaMock.auditLog.create.mockResolvedValue({ id: "audit_2" });
   });
 
   it("allows an assigned technician to add another report type to an active inspection", async () => {
@@ -318,5 +322,51 @@ describe("inspection task addition", () => {
     )).rejects.toThrow(/already has report activity/i);
 
     expect(txMock.inspectionTask.delete).not.toHaveBeenCalled();
+  });
+
+  it("allows office admins to force delete a report after work has started or completed", async () => {
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      tenantId: "tenant_1",
+      assignedTechnicianId: "tech_1",
+      technicianAssignments: [{ technicianId: "tech_1" }],
+      status: InspectionStatus.completed
+    });
+    txMock.inspectionTask.findFirst.mockResolvedValue({
+      id: "task_existing",
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1",
+      inspectionType: "fire_extinguisher",
+      addedByUserId: null,
+      report: {
+        id: "report_existing",
+        attachments: [{ storageKey: "blob:attachment_1" }],
+        signatures: [{ imageDataUrl: "blob:signature_1" }],
+        deficiencies: [{ photoStorageKey: "blob:deficiency_1" }]
+      }
+    });
+    txMock.inspectionTask.findMany.mockResolvedValue([]);
+    txMock.inspectionReport.count.mockResolvedValue(3);
+
+    const removedTask = await removeInspectionTask(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { inspectionId: "inspection_1", inspectionTaskId: "task_existing", force: true }
+    );
+
+    expect(txMock.inspectionReport.delete).toHaveBeenCalledWith({
+      where: { id: "report_existing" }
+    });
+    expect(txMock.inspectionTask.delete).toHaveBeenCalledWith({
+      where: { id: "task_existing" }
+    });
+    expect(txMock.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "inspection.task_removed",
+        metadata: expect.objectContaining({
+          forceRemoval: true
+        })
+      })
+    });
+    expect(removedTask).toEqual({ id: "task_existing" });
   });
 });

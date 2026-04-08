@@ -36,6 +36,7 @@ import {
   updateInspection,
   updateInspectionStatus,
   reopenCompletedReportForCorrection,
+  removeInspectionTask,
   uploadInspectionPdfAttachment
 } from "@testworx/lib";
 
@@ -338,6 +339,32 @@ export async function dismissInspectionCloseoutRequestAction(inspectionId: strin
     return { ok: true, error: null };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unable to dismiss this request." };
+  }
+}
+
+export async function removeInspectionTaskAdminAction(inspectionId: string, inspectionTaskId: string) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  try {
+    await removeInspectionTask(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      { inspectionId, inspectionTaskId, force: true }
+    );
+
+    revalidatePath("/app/admin");
+    revalidatePath("/app/admin/amendments");
+    revalidatePath("/app/admin/reports");
+    revalidatePath(`/app/admin/inspections/${inspectionId}`);
+    revalidatePath(`/app/admin/reports/${inspectionId}/${inspectionTaskId}`);
+    revalidatePath("/app/tech");
+    revalidatePath("/app/customer");
+
+    return { ok: true, error: null };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to delete this report." };
   }
 }
 

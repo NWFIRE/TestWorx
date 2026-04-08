@@ -36,16 +36,21 @@ export default async function AdminReportCorrectionPage({ params }: { params: Pr
     notFound();
   }
 
+  const adminOverrideForFinalized = report.status === "finalized";
+  const correctionNotice = adminOverrideForFinalized
+    ? "Admin override mode. Saving changes will return this report to draft until you finalize it again."
+    : buildCorrectionNotice(report);
+
   return (
     <ReportEditor
       data={{
         reportId: report.id,
-        reportStatus: report.status,
+        reportStatus: adminOverrideForFinalized ? "draft" : report.status,
         reportUpdatedAt: report.updatedAt,
         finalizedAt: report.finalizedAt,
-        correctionNotice: buildCorrectionNotice(report),
-        canEdit: report.permissions.canEdit,
-        canFinalize: report.permissions.canFinalize,
+        correctionNotice,
+        canEdit: report.permissions.canEdit || adminOverrideForFinalized,
+        canFinalize: report.permissions.canFinalize || adminOverrideForFinalized,
         inspectionTypeLabel: report.task.displayLabel ?? report.template.label,
         siteName: report.inspection.site.name,
         customerName: report.inspection.customerCompany.name,

@@ -1123,6 +1123,10 @@ export function shouldAutosaveDraft(input: { dirty: boolean; millisecondsSinceLa
 }
 
 export function canEditReport(actorRole: UserRole | string, reportStatus: ReportStatus) {
+  if (reportStatus === "finalized" && ["platform_admin", "tenant_admin", "office_admin"].includes(actorRole)) {
+    return true;
+  }
+
   if (reportStatus === "finalized") {
     return false;
   }
@@ -1131,11 +1135,8 @@ export function canEditReport(actorRole: UserRole | string, reportStatus: Report
 }
 
 export function canFinalizeReport(actorRole: UserRole | string, reportStatus: ReportStatus) {
-  if (!canEditReport(actorRole, reportStatus)) {
-    return false;
-  }
-
-  return ["technician", "tenant_admin", "office_admin", "platform_admin"].includes(actorRole);
+  return canEditReport(actorRole, reportStatus) &&
+    ["technician", "tenant_admin", "office_admin", "platform_admin"].includes(actorRole);
 }
 
 export function describeRepeaterRowLabel(row: Record<string, ReportPrimitiveValue>, rowIndex: number) {

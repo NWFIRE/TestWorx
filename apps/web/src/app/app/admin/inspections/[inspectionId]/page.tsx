@@ -23,6 +23,7 @@ import {
 } from "@testworx/lib";
 
 import { amendInspectionAction, deleteInspectionAction, reopenCompletedReportAction, updateInspectionAction, updateInspectionStatusAdminAction, uploadInspectionExternalDocumentAction, uploadInspectionPdfAction } from "../../actions";
+import { AdminReportDeleteButton } from "../../admin-report-delete-button";
 import { DeleteInspectionCard } from "../../delete-inspection-card";
 import { InspectionExternalDocumentsCard } from "../../inspection-external-documents-card";
 import { InspectionCloseoutRequestActions } from "../../inspection-closeout-request-actions";
@@ -465,13 +466,47 @@ export default async function EditInspectionPage({
             }
             showCustomerVisibility
           />
-          {!isReviewMode ? (
           <InspectionStatusUpdateCard
             action={updateInspectionStatusAdminAction}
             currentStatus={inspection.status}
             inspectionId={inspection.id}
-            key={`${inspection.id}:${inspection.status}`}
+            key={`${inspection.id}:${inspection.status}:${isReviewMode ? "review" : "workspace"}`}
           />
+          {isReviewMode ? (
+            <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+              <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Report access and admin controls</p>
+              <div className="mt-4 space-y-3">
+                {inspectionView.tasks.map((task: InspectionTask) => (
+                  <div key={task.id} className="rounded-2xl border border-slate-200 p-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-ink">{formatInspectionTaskTypeLabel(task.inspectionType)}</p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {task.report?.finalizedAt
+                            ? `Finalized ${format(task.report.finalizedAt, "MMM d, yyyy h:mm a")}`
+                            : task.report
+                              ? `Current report status: ${task.report.status.replaceAll("_", " ")}`
+                              : "No report started yet."}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Link
+                          className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue"
+                          href={`/app/admin/reports/${inspection.id}/${task.id}`}
+                        >
+                          {task.report?.status === "finalized" ? "Open admin editor" : "Open report"}
+                        </Link>
+                        <AdminReportDeleteButton
+                          inspectionId={inspection.id}
+                          inspectionTaskId={task.id}
+                          taskLabel={formatInspectionTaskTypeLabel(task.inspectionType)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : null}
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Lifecycle timeline</p>

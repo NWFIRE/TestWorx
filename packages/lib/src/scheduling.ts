@@ -2182,6 +2182,7 @@ export async function addInspectionTask(actor: ActorContext, input: {
 export async function removeInspectionTask(actor: ActorContext, input: {
   inspectionId: string;
   inspectionTaskId: string;
+  force?: boolean;
 }) {
   const parsedActor = parseActor(actor);
   const tenantId = parsedActor.tenantId as string;
@@ -2211,7 +2212,9 @@ export async function removeInspectionTask(actor: ActorContext, input: {
       throw new Error("You do not have access to remove report types from this inspection.");
     }
 
-    if (isTerminalInspectionStatus(inspection.status)) {
+    const forceRemoval = Boolean(input.force && ["tenant_admin", "office_admin", "platform_admin"].includes(parsedActor.role));
+
+    if (!forceRemoval && isTerminalInspectionStatus(inspection.status)) {
       throw new Error("Report types can only be removed from active inspections.");
     }
 
@@ -2268,7 +2271,7 @@ export async function removeInspectionTask(actor: ActorContext, input: {
         })
       : 0;
 
-    if (reportActivityCount > 0) {
+    if (!forceRemoval && reportActivityCount > 0) {
       throw new Error("This report type already has report activity and cannot be removed.");
     }
 
@@ -2356,7 +2359,8 @@ export async function removeInspectionTask(actor: ActorContext, input: {
       metadata: {
         inspectionTaskId: task.id,
         inspectionType: task.inspectionType,
-        removedByUserId: parsedActor.userId
+        removedByUserId: parsedActor.userId,
+        forceRemoval
       }
     });
 
