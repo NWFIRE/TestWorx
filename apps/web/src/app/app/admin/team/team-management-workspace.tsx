@@ -75,7 +75,7 @@ const internalAllowanceLabelMap: Record<(typeof internalAllowanceKeys)[number], 
   settingsAccess: "Settings",
   reportReviewAccess: "Reports",
   deficiencyAccess: "Deficiencies",
-  amendmentAccess: "Amendments",
+  amendmentAccess: "Inspection review",
   customerPortalAdmin: "Portal access"
 };
 

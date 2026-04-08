@@ -28,7 +28,7 @@ export const allowanceLabelMap: Record<TeamAllowanceKey, string> = {
   settingsAccess: "Settings",
   reportReviewAccess: "Report review",
   deficiencyAccess: "Deficiencies",
-  amendmentAccess: "Amendments",
+  amendmentAccess: "Inspection review",
   customerPortalAdmin: "Portal access admin",
   reportDownload: "Report download",
   documentDownload: "Document download",

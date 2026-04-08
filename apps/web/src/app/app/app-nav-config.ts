@@ -24,11 +24,11 @@ const adminNavItems: AppNavItem[] = [
   },
   {
     href: "/app/admin/amendments",
-    label: "Amendment Center",
-    shortLabel: "Amendments",
-    abbreviation: "AC",
+    label: "Inspection Review",
+    shortLabel: "Review",
+    abbreviation: "IR",
     icon: "branch",
-    description: "Replacements and superseded visits",
+    description: "Inspection review and next-step requests",
     tone: "violet"
   },
   {

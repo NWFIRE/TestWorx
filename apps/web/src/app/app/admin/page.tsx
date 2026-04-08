@@ -477,7 +477,7 @@ export default async function AdminPage({
                       href="/app/admin/amendments"
                     >
                       <CalendarDays className="h-4 w-4" />
-                      <span className="hidden lg:inline">Amendments</span>
+                      <span className="hidden lg:inline">Inspection Review</span>
                     </Link>
                   </div>
 
