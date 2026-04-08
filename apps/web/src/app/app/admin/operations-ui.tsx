@@ -15,11 +15,11 @@ function cn(...classes: Array<string | false | null | undefined>) {
 
 const toneClasses: Record<Tone, string> = {
   slate: "border-slate-200 bg-slate-50 text-slate-700",
-  blue: "border-blue-200 bg-blue-50 text-blue-700",
+  blue: "badge-brand-primary",
   emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
   amber: "border-amber-200 bg-amber-50 text-amber-700",
   rose: "border-rose-200 bg-rose-50 text-rose-700",
-  violet: "border-violet-200 bg-violet-50 text-violet-700"
+  violet: "badge-brand-accent"
 };
 
 export function AppPageShell({
@@ -69,7 +69,7 @@ export function PageHeader({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
           {eyebrow ? (
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--tenant-primary)]">
               {eyebrow}
             </p>
           ) : null}
@@ -122,7 +122,7 @@ export function KPIStatCard({
 
   return (
     <Link
-      className="block rounded-[24px] outline-none transition duration-200 hover:-translate-y-0.5 hover:[&_div]:border-slate-300 hover:[&_div]:shadow-[0_16px_40px_rgba(15,23,42,0.06)] focus-visible:[&_div]:ring-2 focus-visible:[&_div]:ring-[#1f4678]/20"
+      className="block rounded-[24px] outline-none transition duration-200 hover:-translate-y-0.5 hover:[&_div]:border-slate-300 hover:[&_div]:shadow-[0_16px_40px_rgba(15,23,42,0.06)] focus-visible:[&_div]:ring-2 focus-visible:[&_div]:ring-[color:rgb(var(--tenant-primary-rgb)/0.2)]"
       href={href}
     >
       {content}
@@ -216,13 +216,13 @@ export function FilterChipLink({
 }) {
   const activeClass =
     tone === "blue"
-      ? "border-[#1f4678] bg-[#1f4678] text-white"
+      ? "border-[var(--tenant-primary)] bg-[var(--tenant-primary)] text-[var(--tenant-primary-contrast)]"
       : tone === "amber"
         ? "border-amber-500 bg-amber-500 text-white"
         : tone === "emerald"
           ? "border-emerald-600 bg-emerald-600 text-white"
           : tone === "violet"
-            ? "border-violet-600 bg-violet-600 text-white"
+            ? "border-[var(--tenant-accent)] bg-[var(--tenant-accent)] text-[var(--tenant-accent-contrast)]"
             : "border-slate-900 bg-slate-900 text-white";
 
   return (

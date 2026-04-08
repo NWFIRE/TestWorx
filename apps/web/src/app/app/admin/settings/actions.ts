@@ -119,7 +119,10 @@ export async function updateTenantBrandingAction(_: { error: string | null; succ
     );
 
     revalidatePath("/app/admin/settings");
+    revalidatePath("/app/admin");
+    revalidatePath("/app/tech");
     revalidatePath("/app/customer");
+    revalidatePath("/app", "layout");
     return { error: null, success: "Branding updated." };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unable to update branding.", success: null };

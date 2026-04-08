@@ -85,12 +85,37 @@ export function resolveTenantBranding(input: { tenantName: string; branding: unk
 export function buildTenantBrandingCss(branding: TenantBranding) {
   const primaryColor = branding.primaryColor || "#1E3A5F";
   const accentColor = branding.accentColor || "#C2410C";
+  const primaryRgb = hexToRgbChannels(primaryColor);
+  const accentRgb = hexToRgbChannels(accentColor);
   return {
     "--tenant-primary": primaryColor,
-    "--tenant-primary-rgb": hexToRgbChannels(primaryColor),
+    "--tenant-primary-rgb": primaryRgb,
+    "--tenant-primary-soft": `rgb(${primaryRgb} / 0.08)`,
+    "--tenant-primary-border": `rgb(${primaryRgb} / 0.24)`,
+    "--tenant-primary-contrast": getReadableForeground(primaryColor),
     "--tenant-accent": accentColor,
-    "--tenant-accent-rgb": hexToRgbChannels(accentColor)
+    "--tenant-accent-rgb": accentRgb,
+    "--tenant-accent-soft": `rgb(${accentRgb} / 0.1)`,
+    "--tenant-accent-border": `rgb(${accentRgb} / 0.24)`,
+    "--tenant-accent-contrast": getReadableForeground(accentColor)
   } as Record<string, string>;
+}
+
+function getReadableForeground(value: string) {
+  const normalized = value.replace("#", "");
+  const expanded = normalized.length === 3
+    ? normalized.split("").map((segment) => `${segment}${segment}`).join("")
+    : normalized;
+
+  if (expanded.length !== 6) {
+    return "#FFFFFF";
+  }
+
+  const red = Number.parseInt(expanded.slice(0, 2), 16);
+  const green = Number.parseInt(expanded.slice(2, 4), 16);
+  const blue = Number.parseInt(expanded.slice(4, 6), 16);
+  const luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255;
+  return luminance > 0.62 ? "#0F172A" : "#FFFFFF";
 }
 
 function hexToRgbChannels(value: string) {
