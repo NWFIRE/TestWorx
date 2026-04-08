@@ -74,6 +74,9 @@ export type ReportOptionProviderKey =
   | "alarmDeviceTypes"
   | "alarmNotificationApplianceTypes"
   | "communicationPathTypes"
+  | "workOrderJobsiteHours"
+  | "workOrderPartsEquipmentOptions"
+  | "workOrderServiceOptions"
   | "fireAlarmBatterySizes"
   | "quantity_0_10"
   | "quantityZeroToTen"
@@ -745,6 +748,53 @@ const emergencyLightTypes: ReportOption[] = [
   { label: "Remote Head Unit", value: "Remote Head Unit" },
   { label: "Other", value: "Other" }
 ];
+const workOrderJobsiteHours: ReportOption[] = [
+  { label: "0.5 hours", value: "0.5" },
+  { label: "1 hour", value: "1" },
+  { label: "1.5 hours", value: "1.5" },
+  { label: "2 hours", value: "2" },
+  { label: "2.5 hours", value: "2.5" },
+  { label: "3 hours", value: "3" },
+  { label: "4 hours", value: "4" },
+  { label: "5 hours", value: "5" },
+  { label: "6 hours", value: "6" },
+  { label: "8 hours", value: "8" },
+  { label: "Other", value: "other" }
+];
+const workOrderPartsEquipmentOptions: ReportOption[] = [
+  ...extinguisherTypes
+    .filter((option) => option.value !== "other")
+    .map((option) => ({
+      ...option,
+      metadata: {
+        ...(option.metadata ?? {}),
+        category: "Fire extinguisher"
+      }
+    })),
+  ...emergencyLightTypes
+    .filter((option) => option.value !== "Other")
+    .map((option) => ({
+      ...option,
+      metadata: {
+        ...(option.metadata ?? {}),
+        category: option.label.includes("Exit") ? "Exit / emergency lighting" : "Emergency lighting"
+      }
+    })),
+  { label: "Other", value: "other", metadata: { category: "Custom" } }
+];
+const workOrderServiceOptions: ReportOption[] = [
+  { label: "Annual Inspection", value: "Annual Inspection" },
+  { label: "Recharge", value: "Recharge" },
+  { label: "6-Year Maintenance", value: "6-Year Maintenance" },
+  { label: "Hydro Test", value: "Hydro Test" },
+  { label: "Installation", value: "Installation" },
+  { label: "Replacement", value: "Replacement" },
+  { label: "Repair", value: "Repair" },
+  { label: "Troubleshooting", value: "Troubleshooting" },
+  { label: "Emergency Light Service", value: "Emergency Light Service" },
+  { label: "Exit Sign / Light Service", value: "Exit Sign / Light Service" },
+  { label: "Other", value: "other" }
+];
 const emergencyLightBatterySizes: ReportOption[] = [
   { label: "NiCad", value: "NiCad" },
   { label: "6V4.5AH", value: "6V4.5AH" },
@@ -995,6 +1045,9 @@ export const reportOptionProviders = {
   jointCommissionRequiredTimelineOptions,
   jointCommissionOverallResultOptions,
   jointCommissionPhotoCategoryOptions,
+  workOrderJobsiteHours,
+  workOrderPartsEquipmentOptions,
+  workOrderServiceOptions,
   alarmDeviceTypes,
   alarmNotificationApplianceTypes,
   communicationPathTypes,

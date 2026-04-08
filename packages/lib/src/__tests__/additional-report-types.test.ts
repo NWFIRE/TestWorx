@@ -5,6 +5,7 @@ import { getReportPdfMetadata, inspectionTypeRegistry } from "../report-config";
 
 const additionalTypes = [
   "joint_commission_fire_sprinkler",
+  "work_order",
   "backflow",
   "fire_pump",
   "dry_fire_sprinkler",

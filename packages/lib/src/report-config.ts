@@ -6,6 +6,7 @@ import type { ReportOptionProviderKey } from "./report-options";
 import { backflowReportTemplate } from "./backflow-report";
 import { jointCommissionFireSprinklerReportTemplate } from "./joint-commission-fire-sprinkler-report";
 import { wetSprinklerReportTemplate } from "./wet-sprinkler-report";
+import { workOrderReportTemplate } from "./work-order-report";
 
 export type ReportPrimitiveValue = string | number | boolean | null;
 
@@ -1012,6 +1013,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
       }
     ]
   },
+  work_order: workOrderReportTemplate,
   wet_fire_sprinkler: wetSprinklerReportTemplate,
   joint_commission_fire_sprinkler: jointCommissionFireSprinklerReportTemplate,
   backflow: backflowReportTemplate,

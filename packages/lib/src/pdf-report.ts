@@ -158,6 +158,24 @@ function normalizeDisplayValue(value: ReportPrimitiveValue | undefined) {
   return String(value);
 }
 
+function isOtherOptionValue(value: unknown) {
+  return typeof value === "string" && value.trim().toLowerCase() === "other";
+}
+
+function resolveWorkOrderDisplayValue(primary: unknown, custom?: unknown) {
+  const customValue = normalizeDisplayValue(custom as ReportPrimitiveValue | undefined);
+  if (isMeaningful(customValue)) {
+    return customValue;
+  }
+
+  const primaryValue = normalizeDisplayValue(primary as ReportPrimitiveValue | undefined);
+  if (isOtherOptionValue(primary) && !isMeaningful(customValue)) {
+    return "—";
+  }
+
+  return primaryValue;
+}
+
 function isMeaningful(value: string | null | undefined) {
   return Boolean(value && value.trim() && value.trim() !== "—");
 }
@@ -700,7 +718,7 @@ function drawTableRow(
   state.y -= rowHeight;
 }
 
-function renderRepeaterTable(
+function renderTableBlock(
   state: PageState,
   pdfDoc: PDFDocument,
   input: PdfInput,
@@ -710,17 +728,10 @@ function renderRepeaterTable(
   regularFont: PDFFont,
   logoEmbedded: PDFImage | null,
   title: string,
-  rows: TableRow[]
+  columns: TableColumn[],
+  rows: TableRow[],
+  emptyMessage: string
 ) {
-  const columns: TableColumn[] = [
-    { key: "location", label: "Location", width: 0.17 },
-    { key: "type", label: "Type", width: 0.15 },
-    { key: "manufacturer", label: "Manufacturer", width: 0.13 },
-    { key: "service", label: "Service", width: 0.15 },
-    { key: "indicators", label: "Key inspection indicators", width: 0.24 },
-    { key: "notes", label: "Notes", width: 0.16 }
-  ];
-
   state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 54);
   state.page.drawText(title, {
     x: PAGE_MARGIN,
@@ -730,6 +741,19 @@ function renderRepeaterTable(
     color: theme.ink
   });
   state.y -= 16;
+
+  if (rows.length === 0) {
+    drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, 42, theme.surface, theme.line, 1);
+    state.page.drawText(emptyMessage, {
+      x: PAGE_MARGIN + 10,
+      y: state.y - 24,
+      size: 9,
+      font: regularFont,
+      color: theme.softText
+    });
+    state.y -= 56;
+    return state;
+  }
 
   renderTableHeader(state, columns, theme, boldFont);
 
@@ -752,6 +776,30 @@ function renderRepeaterTable(
 
   state.y -= 14;
   return state;
+}
+
+function renderRepeaterTable(
+  state: PageState,
+  pdfDoc: PDFDocument,
+  input: PdfInput,
+  branding: ReturnType<typeof resolveTenantBranding>,
+  theme: PdfTheme,
+  boldFont: PDFFont,
+  regularFont: PDFFont,
+  logoEmbedded: PDFImage | null,
+  title: string,
+  rows: TableRow[]
+) {
+  const columns: TableColumn[] = [
+    { key: "location", label: "Location", width: 0.17 },
+    { key: "type", label: "Type", width: 0.15 },
+    { key: "manufacturer", label: "Manufacturer", width: 0.13 },
+    { key: "service", label: "Service", width: 0.15 },
+    { key: "indicators", label: "Key inspection indicators", width: 0.24 },
+    { key: "notes", label: "Notes", width: 0.16 }
+  ];
+
+  return renderTableBlock(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, title, columns, rows, "No items recorded.");
 }
 
 function getScalarSectionItems(
@@ -849,6 +897,193 @@ function renderSummaryContext(
     { label: "Site address", value: [input.site.addressLine1, input.site.addressLine2, [input.site.city, input.site.state, input.site.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ") || "—" },
     { label: "Prior inspection context", value: input.draft.context.priorReportSummary || "—" }
   ], theme, boldFont, regularFont, 2);
+}
+
+function getDraftSectionFieldValue(input: PdfInput, sectionId: string, fieldId: string) {
+  return input.draft.sections[sectionId]?.fields?.[fieldId] as ReportPrimitiveValue | Array<Record<string, unknown>> | undefined;
+}
+
+function formatWorkOrderHours(value: unknown, custom?: unknown) {
+  const resolved = resolveWorkOrderDisplayValue(value, custom);
+  if (!isMeaningful(resolved)) {
+    return "—";
+  }
+
+  if (/^\d+(\.\d+)?$/.test(resolved)) {
+    const numeric = Number.parseFloat(resolved);
+    return `${numeric} ${numeric === 1 ? "hour" : "hours"}`;
+  }
+
+  return resolved;
+}
+
+function renderWorkOrderSummaryStrip(
+  state: PageState,
+  input: PdfInput,
+  theme: PdfTheme,
+  boldFont: PDFFont,
+  regularFont: PDFFont
+) {
+  const gap = 10;
+  const cardWidth = (CONTENT_WIDTH - gap * 2) / 3;
+  const cardHeight = 68;
+  const workOrderNumber = normalizeDisplayValue(getDraftSectionFieldValue(input, "work-performed", "workOrderNumber") as ReportPrimitiveValue | undefined);
+  const jobsiteHours = formatWorkOrderHours(
+    getDraftSectionFieldValue(input, "work-performed", "jobsiteHours"),
+    getDraftSectionFieldValue(input, "work-performed", "jobsiteHoursCustom")
+  );
+  const followUpRequired = getDraftSectionFieldValue(input, "work-performed", "followUpRequired") === true ? "Yes" : "No";
+  const cards = [
+    { label: "Work Order", value: isMeaningful(workOrderNumber) ? workOrderNumber : input.report.id, tone: "neutral" as const },
+    { label: "Jobsite Hours", value: jobsiteHours, tone: "neutral" as const },
+    { label: "Follow-Up", value: followUpRequired, tone: followUpRequired === "Yes" ? "warn" as const : "pass" as const }
+  ];
+
+  cards.forEach((card, index) => {
+    const x = PAGE_MARGIN + index * (cardWidth + gap);
+    const bg = card.tone === "pass" ? theme.passBg : card.tone === "warn" ? theme.warnBg : theme.softSurface;
+    const text = card.tone === "pass" ? theme.passText : card.tone === "warn" ? theme.warnText : theme.primary;
+    drawRect(state.page, x, state.y, cardWidth, cardHeight, bg, theme.line, 1);
+    state.page.drawText(card.label.toUpperCase(), {
+      x: x + cardWidth / 2 - boldFont.widthOfTextAtSize(card.label.toUpperCase(), 7) / 2,
+      y: state.y - 16,
+      size: 7,
+      font: boldFont,
+      color: theme.softText
+    });
+    state.page.drawText(card.value, {
+      x: x + cardWidth / 2 - boldFont.widthOfTextAtSize(card.value, 16) / 2,
+      y: state.y - 42,
+      size: 16,
+      font: boldFont,
+      color: text
+    });
+  });
+
+  state.y -= cardHeight + 18;
+}
+
+function renderWorkOrderNarrative(
+  state: PageState,
+  title: string,
+  body: string,
+  theme: PdfTheme,
+  boldFont: PDFFont,
+  regularFont: PDFFont
+) {
+  const narrative = isMeaningful(body) ? body : "—";
+  const height = 30 + measureParagraphHeight(regularFont, narrative, CONTENT_WIDTH - 20, 9.5, 3, 10);
+  drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, height, theme.surface, theme.line, 1);
+  state.page.drawText(title.toUpperCase(), {
+    x: PAGE_MARGIN + 10,
+    y: state.y - 15,
+    size: 7,
+    font: boldFont,
+    color: theme.softText
+  });
+  drawParagraph(state.page, regularFont, narrative, PAGE_MARGIN + 10, state.y - 30, CONTENT_WIDTH - 20, 9.5, theme.ink, 3, 10);
+  state.y -= height + 14;
+}
+
+function buildWorkOrderPartsRows(input: PdfInput) {
+  const rows = Array.isArray(getDraftSectionFieldValue(input, "parts-equipment-used", "partsEquipmentUsed"))
+    ? getDraftSectionFieldValue(input, "parts-equipment-used", "partsEquipmentUsed") as Array<Record<string, unknown>>
+    : [];
+
+  return rows.map((row) => ({
+    item: resolveWorkOrderDisplayValue(row.item, row.itemCustom),
+    category: normalizeDisplayValue(row.category as ReportPrimitiveValue | undefined),
+    quantity: normalizeDisplayValue(row.quantity as ReportPrimitiveValue | undefined),
+    notes: normalizeDisplayValue(row.notes as ReportPrimitiveValue | undefined)
+  }));
+}
+
+function buildWorkOrderServiceRows(input: PdfInput) {
+  const rows = Array.isArray(getDraftSectionFieldValue(input, "service-provided", "serviceProvided"))
+    ? getDraftSectionFieldValue(input, "service-provided", "serviceProvided") as Array<Record<string, unknown>>
+    : [];
+
+  return rows.map((row) => ({
+    service: resolveWorkOrderDisplayValue(row.service, row.serviceCustom),
+    equipment: resolveWorkOrderDisplayValue(row.applicableEquipment, row.applicableEquipmentCustom),
+    quantity: normalizeDisplayValue(row.quantity as ReportPrimitiveValue | undefined),
+    notes: normalizeDisplayValue(row.notes as ReportPrimitiveValue | undefined)
+  }));
+}
+
+async function renderWorkOrderReport(
+  pdfDoc: PDFDocument,
+  input: PdfInput,
+  branding: ReturnType<typeof resolveTenantBranding>,
+  theme: PdfTheme,
+  boldFont: PDFFont,
+  regularFont: PDFFont,
+  logoEmbedded: PDFImage | null
+) {
+  let state = addPage(pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 1);
+  const workOrderNumber = normalizeDisplayValue(getDraftSectionFieldValue(input, "work-performed", "workOrderNumber") as ReportPrimitiveValue | undefined);
+  const jobsiteHours = formatWorkOrderHours(
+    getDraftSectionFieldValue(input, "work-performed", "jobsiteHours"),
+    getDraftSectionFieldValue(input, "work-performed", "jobsiteHoursCustom")
+  );
+  const followUpRequired = getDraftSectionFieldValue(input, "work-performed", "followUpRequired") === true ? "Yes" : "No";
+  const descriptionOfWork = normalizeDisplayValue(getDraftSectionFieldValue(input, "work-performed", "descriptionOfWork") as ReportPrimitiveValue | undefined);
+  const additionalNotes = normalizeDisplayValue(getDraftSectionFieldValue(input, "work-performed", "additionalNotes") as ReportPrimitiveValue | undefined);
+
+  renderWorkOrderSummaryStrip(state, input, theme, boldFont, regularFont);
+
+  drawSectionTitle(state, "Summary", "Customer, site, technician, and job summary details for this work order visit.", theme, boldFont, regularFont);
+  renderKeyValueGrid(state, [
+    { label: "Customer", value: input.customerCompany.name },
+    { label: "Site", value: input.site.name },
+    { label: "Site address", value: [input.site.addressLine1, input.site.addressLine2, [input.site.city, input.site.state, input.site.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ") },
+    { label: "Customer contact", value: input.customerCompany.contactName ?? input.customerCompany.billingEmail ?? input.customerCompany.phone ?? "—" },
+    { label: "Technician", value: input.report.technicianName ?? "—" },
+    { label: "Work date", value: formatDate(input.inspection.scheduledStart) },
+    { label: "Completion date", value: input.report.finalizedAt ? formatDateTime(input.report.finalizedAt) : "—" },
+    { label: "Jobsite hours", value: jobsiteHours },
+    { label: "Follow-up required", value: followUpRequired },
+    { label: "Work order ID", value: isMeaningful(workOrderNumber) ? workOrderNumber : input.report.id }
+  ], theme, boldFont, regularFont, 2);
+
+  state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 120);
+  drawSectionTitle(state, "Work performed", "This work order outlines the service work completed and any supporting notes captured during the visit.", theme, boldFont, regularFont);
+  renderWorkOrderNarrative(state, "Description of Work", descriptionOfWork, theme, boldFont, regularFont);
+  if (isMeaningful(additionalNotes) && additionalNotes !== "—") {
+    state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 96);
+    renderWorkOrderNarrative(state, "Additional Notes", additionalNotes, theme, boldFont, regularFont);
+  }
+
+  state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 88);
+  drawSectionTitle(state, "Parts / Equipment Used", "Parts, equipment, and replacement devices supplied during this work order visit.", theme, boldFont, regularFont);
+  const partColumns: TableColumn[] = [
+    { key: "item", label: "Item", width: 0.36 },
+    { key: "category", label: "Category / Type", width: 0.2 },
+    { key: "quantity", label: "Qty", width: 0.12 },
+    { key: "notes", label: "Notes", width: 0.32 }
+  ];
+  state = renderTableBlock(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, "Parts / Equipment Used", partColumns, buildWorkOrderPartsRows(input), "No parts or equipment recorded.");
+
+  state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 88);
+  drawSectionTitle(state, "Service Provided", "Review the service actions completed during this job, along with any applicable device or equipment type.", theme, boldFont, regularFont);
+  const serviceColumns: TableColumn[] = [
+    { key: "service", label: "Service", width: 0.28 },
+    { key: "equipment", label: "Applicable Type / Equipment", width: 0.3 },
+    { key: "quantity", label: "Qty", width: 0.1 },
+    { key: "notes", label: "Notes", width: 0.32 }
+  ];
+  state = renderTableBlock(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, "Service Provided", serviceColumns, buildWorkOrderServiceRows(input), "No service entries recorded.");
+
+  if (followUpRequired === "Yes") {
+    state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 80);
+    renderFindingsBlock(state, "Follow-up requirements", ["Follow-up is required for this job."], "warn", theme, boldFont, regularFont);
+  }
+
+  state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 170);
+  drawSectionTitle(state, "Signatures", "Technician and customer sign-off captured for this work order report.", theme, boldFont, regularFont);
+  await renderSignatures(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded);
+
+  return pdfDoc.save();
 }
 
 function renderFindingsBlock(
@@ -1057,10 +1292,15 @@ export async function generateInspectionReportPdf(input: PdfInput) {
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const branding = resolveTenantBranding({ tenantName: input.tenant.name, branding: input.tenant.branding });
   const theme = buildTheme(branding.primaryColor, branding.accentColor);
+  const logoEmbedded = branding.logoDataUrl ? await embedImage(pdfDoc, branding.logoDataUrl) : null;
+
+  if (input.task.inspectionType === "work_order") {
+    return renderWorkOrderReport(pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded);
+  }
+
   const template = resolveReportTemplate({ inspectionType: input.task.inspectionType });
   const pdfMetadata = getReportPdfMetadata(input.task.inspectionType);
   const preview = buildReportPreview(input.draft);
-  const logoEmbedded = branding.logoDataUrl ? await embedImage(pdfDoc, branding.logoDataUrl) : null;
 
   let state = addPage(pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 1);
 

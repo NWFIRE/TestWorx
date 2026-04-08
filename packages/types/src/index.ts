@@ -17,6 +17,7 @@ export const inspectionTypes = {
   fire_alarm: "fire_alarm",
   wet_fire_sprinkler: "wet_fire_sprinkler",
   joint_commission_fire_sprinkler: "joint_commission_fire_sprinkler",
+  work_order: "work_order",
   backflow: "backflow",
   fire_pump: "fire_pump",
   dry_fire_sprinkler: "dry_fire_sprinkler",

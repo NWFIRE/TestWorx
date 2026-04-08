@@ -176,6 +176,104 @@ describe("pdf generation workflow", () => {
     expect(pdf.getPageCount()).toBeGreaterThan(1);
   });
 
+  it("generates a branded work order report PDF using the shared premium renderer", async () => {
+    const bytes = await generateInspectionReportPdf({
+      tenant: {
+        name: "Evergreen Fire Protection",
+        branding: {
+          primaryColor: "#1E3A5F",
+          accentColor: "#C2410C",
+          phone: "312-555-0199",
+          email: "service@evergreenfire.com",
+          website: "https://evergreenfire.com"
+        }
+      },
+      customerCompany: {
+        name: "Pinecrest Property Management",
+        contactName: "Alyssa Reed",
+        billingEmail: "ap@pinecrestpm.com",
+        phone: "312-555-0110"
+      },
+      site: {
+        name: "Pinecrest Tower",
+        addressLine1: "100 State St",
+        addressLine2: null,
+        city: "Chicago",
+        state: "IL",
+        postalCode: "60601"
+      },
+      inspection: {
+        id: "inspection_work_order_1",
+        scheduledStart: new Date("2026-03-15T09:00:00.000Z"),
+        scheduledEnd: new Date("2026-03-15T11:30:00.000Z"),
+        status: "completed",
+        notes: "Customer approved replacement devices on site."
+      },
+      task: { inspectionType: "work_order" },
+      report: { id: "report_work_order_1", finalizedAt: new Date("2026-03-15T11:45:00.000Z"), technicianName: "Alex Turner" },
+      draft: {
+        templateVersion: 1,
+        inspectionType: "work_order",
+        overallNotes: "",
+        sectionOrder: ["work-performed", "parts-equipment-used", "service-provided"],
+        activeSectionId: "work-performed",
+        sections: {
+          "work-performed": {
+            status: "completed",
+            notes: "",
+            fields: {
+              workOrderNumber: "WO-2026-0142",
+              descriptionOfWork: "Replaced two extinguishers in the lobby, recharged one 10 lb ABC unit, and completed light service in the north corridor.",
+              jobsiteHours: "2.5",
+              jobsiteHoursCustom: "",
+              followUpRequired: true,
+              additionalNotes: "Recommend follow-up visit for additional corridor fixtures next week."
+            }
+          },
+          "parts-equipment-used": {
+            status: "completed",
+            notes: "",
+            fields: {
+              partsEquipmentUsed: [
+                { item: "5 lb ABC", itemCustom: "", category: "Fire extinguisher", quantity: 2, notes: "New units installed at lobby exits." },
+                { item: "Exit Sign", itemCustom: "", category: "Exit / emergency lighting", quantity: 1, notes: "North corridor replacement." }
+              ]
+            }
+          },
+          "service-provided": {
+            status: "completed",
+            notes: "",
+            fields: {
+              serviceProvided: [
+                { service: "Recharge", serviceCustom: "", applicableEquipment: "10 lb ABC", applicableEquipmentCustom: "", quantity: 1, notes: "Existing unit recharged and tagged." },
+                { service: "Emergency Light Service", serviceCustom: "", applicableEquipment: "Emergency Light", applicableEquipmentCustom: "", quantity: 2, notes: "Battery and lamp verification complete." }
+              ]
+            }
+          }
+        },
+        deficiencies: [],
+        attachments: [],
+        signatures: {
+          technician: { signerName: "Alex Turner", imageDataUrl: tinyPngDataUrl, signedAt: "2026-03-15T11:42:00.000Z" },
+          customer: { signerName: "Alyssa Reed", imageDataUrl: tinyPngDataUrl, signedAt: "2026-03-15T11:44:00.000Z" }
+        },
+        context: {
+          siteName: "Pinecrest Tower",
+          customerName: "Pinecrest Property Management",
+          scheduledDate: "2026-03-15T09:00:00.000Z",
+          assetCount: 0,
+          priorReportSummary: ""
+        }
+      },
+      deficiencies: [],
+      photos: [],
+      technicianSignature: { signerName: "Alex Turner", imageDataUrl: tinyPngDataUrl, signedAt: "2026-03-15T11:42:00.000Z" },
+      customerSignature: { signerName: "Alyssa Reed", imageDataUrl: tinyPngDataUrl, signedAt: "2026-03-15T11:44:00.000Z" }
+    });
+
+    expect(Buffer.from(bytes).slice(0, 4).toString()).toBe("%PDF");
+  });
+
   it("round-trips stored attachment payloads through the storage abstraction", async () => {
     const storageKey = buildDataUrlStorageKey({ mimeType: "application/pdf", bytes: new Uint8Array([37, 80, 68, 70]) });
     const decoded = await decodeStoredFile(storageKey);

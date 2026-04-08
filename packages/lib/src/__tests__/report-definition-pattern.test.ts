@@ -8,9 +8,14 @@ describe("report definition pattern", () => {
   it("resolves shared option providers for extinguisher dropdowns through configuration", () => {
     const manufacturers = resolveOptionProvider("extinguisherManufacturers");
     const ulRatings = resolveOptionProvider("extinguisherUlRatings");
+    const workOrderParts = resolveOptionProvider("workOrderPartsEquipmentOptions");
+    const workOrderServices = resolveOptionProvider("workOrderServiceOptions");
 
     expect(manufacturers.some((option) => option.value === "amerex")).toBe(true);
     expect(ulRatings.some((option) => option.value === "3-A:40-B:C")).toBe(true);
+    expect(workOrderParts.some((option) => option.label === "5 lb ABC")).toBe(true);
+    expect(workOrderParts.some((option) => option.label === "Exit Sign")).toBe(true);
+    expect(workOrderServices.some((option) => option.label === "Recharge")).toBe(true);
   });
 
   it("uses configuration-driven calculations for report fields", () => {
