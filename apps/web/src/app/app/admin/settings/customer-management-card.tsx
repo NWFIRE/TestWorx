@@ -1,11 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import type { ReactNode } from "react";
-
-import { buildSettingsHref } from "./settings-query";
+import type { KeyboardEvent, ReactNode } from "react";
 
 const initialState = { error: null as string | null, success: null as string | null };
 const paymentTermsOptions = [
@@ -15,6 +12,7 @@ const paymentTermsOptions = [
   { value: "net_60", label: "Net 60" },
   { value: "custom", label: "Custom terms" }
 ] as const;
+const LIVE_SEARCH_DEBOUNCE_MS = 250;
 
 type CustomerRecord = {
   id: string;
@@ -44,18 +42,28 @@ type CustomerRecord = {
   quickbooksCustomerId: string | null;
 };
 
+type CustomerPagination = {
+  page: number;
+  limit: number;
+  totalCount: number;
+  totalPages: number;
+  overallCount: number;
+};
+
+type CustomerFilters = {
+  query: string;
+};
+
+type CustomerSearchResponse = {
+  customers: CustomerRecord[];
+  pagination: CustomerPagination;
+  filters: CustomerFilters;
+};
+
 type CustomerManagementCardProps = {
   customers: CustomerRecord[];
-  pagination: {
-    page: number;
-    limit: number;
-    totalCount: number;
-    totalPages: number;
-    overallCount: number;
-  };
-  filters: {
-    query: string;
-  };
+  pagination: CustomerPagination;
+  filters: CustomerFilters;
   createCustomerAction: (
     _: { error: string | null; success: string | null },
     formData: FormData
@@ -324,21 +332,128 @@ export function CustomerManagementCard({
   const [createState, createFormAction, createPending] = useActionState(createCustomerAction, initialState);
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const previousPageHref = buildSettingsHref(pathname, searchParams, {
-    customersOpen: 1,
-    customersPage: Math.max(pagination.page - 1, 1),
-    customersQuery: filters.query || null
-  });
-  const nextPageHref = buildSettingsHref(pathname, searchParams, {
-    customersOpen: 1,
-    customersPage: Math.min(pagination.page + 1, pagination.totalPages),
-    customersQuery: filters.query || null
-  });
-  const clearSearchHref = buildSettingsHref(pathname, searchParams, {
-    customersOpen: 1,
-    customersPage: 1,
-    customersQuery: null
-  });
+  const [queryInput, setQueryInput] = useState(filters.query);
+  const [customerRows, setCustomerRows] = useState(customers);
+  const [customerPagination, setCustomerPagination] = useState(pagination);
+  const [activeQuery, setActiveQuery] = useState(filters.query);
+  const [isLoadingResults, setIsLoadingResults] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const requestSequenceRef = useRef(0);
+  const activeAbortRef = useRef<AbortController | null>(null);
+  const hydratedRef = useRef(false);
+
+  useEffect(() => {
+    setQueryInput(filters.query);
+    setCustomerRows(customers);
+    setCustomerPagination(pagination);
+    setActiveQuery(filters.query);
+    hydratedRef.current = true;
+  }, [customers, filters.query, pagination]);
+
+  const syncCustomersUrl = useCallback((page: number, query: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("customersOpen", "1");
+    params.set("customersPage", String(page));
+    if (query) {
+      params.set("customersQuery", query);
+    } else {
+      params.delete("customersQuery");
+    }
+
+    const nextUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+    window.history.replaceState(window.history.state, "", nextUrl);
+  }, [pathname, searchParams]);
+
+  const loadCustomers = useCallback(async (page: number, nextQuery: string) => {
+    const trimmedQuery = nextQuery.trim();
+    const sequence = requestSequenceRef.current + 1;
+    requestSequenceRef.current = sequence;
+    const controller = new AbortController();
+    activeAbortRef.current?.abort();
+    activeAbortRef.current = controller;
+    setIsLoadingResults(true);
+    setSearchError(null);
+
+    try {
+      const url = new URL("/api/admin/settings/customers", window.location.origin);
+      url.searchParams.set("page", String(page));
+      if (trimmedQuery) {
+        url.searchParams.set("query", trimmedQuery);
+      }
+
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        signal: controller.signal,
+        cache: "no-store"
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error ?? "Unable to load customers.");
+      }
+
+      const payload = await response.json() as CustomerSearchResponse;
+      if (requestSequenceRef.current !== sequence) {
+        return;
+      }
+
+      setCustomerRows(payload.customers);
+      setCustomerPagination(payload.pagination);
+      setActiveQuery(payload.filters.query);
+      syncCustomersUrl(payload.pagination.page, payload.filters.query);
+    } catch (error) {
+      if ((error as Error).name === "AbortError") {
+        return;
+      }
+      if (requestSequenceRef.current === sequence) {
+        setSearchError(error instanceof Error ? error.message : "Unable to load customers.");
+      }
+    } finally {
+      if (requestSequenceRef.current === sequence) {
+        setIsLoadingResults(false);
+      }
+    }
+  }, [syncCustomersUrl]);
+
+  useEffect(() => {
+    if (!hydratedRef.current) {
+      return;
+    }
+
+    const normalizedQuery = queryInput.trim();
+    if (normalizedQuery === activeQuery) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void loadCustomers(1, normalizedQuery);
+    }, LIVE_SEARCH_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [activeQuery, loadCustomers, queryInput]);
+
+  useEffect(() => () => {
+    activeAbortRef.current?.abort();
+  }, []);
+
+  function clearSearch() {
+    setQueryInput("");
+    setSearchError(null);
+  }
+
+  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+    }
+  }
+
+  const currentQuery = activeQuery;
+  const currentPagination = customerPagination;
+  const currentCustomers = customerRows;
+  const hasSearch = Boolean(queryInput.trim());
+  const summaryLabel = currentQuery
+    ? `${currentPagination.totalCount} match${currentPagination.totalCount === 1 ? "" : "es"}`
+    : `${currentPagination.totalCount} configured`;
 
   return (
     <div className="space-y-6 rounded-[2rem] bg-white p-6 shadow-panel">
@@ -365,40 +480,55 @@ export function CustomerManagementCard({
       <div className="space-y-4">
         <div>
           <p className="text-sm uppercase tracking-[0.18em] text-slate-500">Current customers</p>
-          <h4 className="mt-1 text-lg font-semibold text-ink">{filters.query ? `${pagination.totalCount} match${pagination.totalCount === 1 ? "" : "es"}` : `${pagination.totalCount} configured`}</h4>
-          {pagination.totalCount > 0 ? (
+          <div className="mt-1 flex flex-wrap items-center gap-3">
+            <h4 className="text-lg font-semibold text-ink">{summaryLabel}</h4>
+            {isLoadingResults ? (
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Updating results...
+              </span>
+            ) : null}
+          </div>
+          {currentPagination.totalCount > 0 ? (
             <p className="mt-2 text-sm text-slate-500">
-              Showing {(pagination.page - 1) * pagination.limit + 1}-{Math.min(pagination.page * pagination.limit, pagination.totalCount)} of {pagination.totalCount}
-              {filters.query ? ` filtered result${pagination.totalCount === 1 ? "" : "s"} from ${pagination.overallCount} total customers` : ""}
+              Showing {(currentPagination.page - 1) * currentPagination.limit + 1}-{Math.min(currentPagination.page * currentPagination.limit, currentPagination.totalCount)} of {currentPagination.totalCount}
+              {currentQuery ? ` filtered result${currentPagination.totalCount === 1 ? "" : "s"} from ${currentPagination.overallCount} total customers` : ""}
             </p>
           ) : null}
         </div>
-        <form action="/app/admin/settings" className="grid gap-3 rounded-[1.5rem] border border-slate-200 p-4 lg:grid-cols-[1.3fr_auto_auto]">
-          <input name="customersOpen" type="hidden" value="1" />
-          <input name="customersPage" type="hidden" value="1" />
-          <input
-            className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
-            defaultValue={filters.query}
-            name="customersQuery"
-            placeholder="Search customer name, contact, billing email, or phone"
-          />
-          <button className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="submit">
-            Search
+
+        <div className="grid gap-3 rounded-[1.5rem] border border-slate-200 p-4 lg:grid-cols-[1.3fr_auto]">
+          <div className="relative">
+            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-slate-400">Search</span>
+            <input
+              className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-20 pr-4 text-sm text-slate-900 outline-none transition focus:border-slateblue"
+              onChange={(event) => setQueryInput(event.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              placeholder="Search customer name, contact, billing email, or phone"
+              value={queryInput}
+            />
+          </div>
+          <button
+            className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!hasSearch && !currentQuery}
+            onClick={clearSearch}
+            type="button"
+          >
+            Clear
           </button>
-          {filters.query ? (
-            <Link className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" href={clearSearchHref}>
-              Clear
-            </Link>
-          ) : null}
-        </form>
-        {customers.length === 0 ? (
+        </div>
+
+        {searchError ? (
+          <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{searchError}</p>
+        ) : null}
+
+        {currentCustomers.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">
-            {filters.query
-              ? "No customers match this search yet. Try a different company name, email, contact, or phone number."
+            {currentQuery
+              ? "No customers match your search."
               : "No customers yet. Add your first customer company here or bring them over through the import flow."}
           </p>
         ) : (
-          customers.map((customer) => (
+          currentCustomers.map((customer) => (
             <div key={customer.id} className="rounded-[1.5rem] border border-slate-200 p-5">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -426,8 +556,8 @@ export function CustomerManagementCard({
               <form action={updateCustomerAction} className="space-y-4">
                 <input name="customerCompanyId" type="hidden" value={customer.id} />
                 <input name="customersOpen" type="hidden" value="1" />
-                <input name="customersPage" type="hidden" value={String(pagination.page)} />
-                <input name="customersQuery" type="hidden" value={filters.query} />
+                <input name="customersPage" type="hidden" value={String(currentPagination.page)} />
+                <input name="customersQuery" type="hidden" value={currentQuery} />
                 <CustomerProfileFields customer={customer} formIdPrefix={`customer-${customer.id}`} />
                 <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" type="submit">
                   Save customer
@@ -436,28 +566,27 @@ export function CustomerManagementCard({
             </div>
           ))
         )}
-        {pagination.totalCount > 0 ? (
+
+        {currentPagination.totalCount > 0 ? (
           <div className="flex flex-col gap-3 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-            <p>Page {pagination.page} of {pagination.totalPages}</p>
+            <p>Page {currentPagination.page} of {currentPagination.totalPages}</p>
             <div className="flex flex-wrap gap-3">
-              {pagination.page > 1 ? (
-                <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={previousPageHref}>
-                  Previous
-                </Link>
-              ) : (
-                <span className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-300">
-                  Previous
-                </span>
-              )}
-              {pagination.page < pagination.totalPages ? (
-                <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={nextPageHref}>
-                  Next
-                </Link>
-              ) : (
-                <span className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-300">
-                  Next
-                </span>
-              )}
+              <button
+                className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:text-slate-300"
+                disabled={currentPagination.page <= 1 || isLoadingResults}
+                onClick={() => { void loadCustomers(currentPagination.page - 1, queryInput); }}
+                type="button"
+              >
+                Previous
+              </button>
+              <button
+                className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:text-slate-300"
+                disabled={currentPagination.page >= currentPagination.totalPages || isLoadingResults}
+                onClick={() => { void loadCustomers(currentPagination.page + 1, queryInput); }}
+                type="button"
+              >
+                Next
+              </button>
             </div>
           </div>
         ) : null}
