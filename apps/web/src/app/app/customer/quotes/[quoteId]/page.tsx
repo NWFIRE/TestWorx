@@ -38,7 +38,7 @@ export default async function CustomerQuoteDetailPage({
               Download PDF
             </a>
             {quote.hostedQuoteUrl ? (
-              <a className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#1f4678] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" href={quote.hostedQuoteUrl} rel="noreferrer" target="_blank">
+              <a className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" href={quote.hostedQuoteUrl} rel="noreferrer" target="_blank">
                 Open hosted quote
               </a>
             ) : null}

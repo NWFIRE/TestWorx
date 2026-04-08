@@ -6,7 +6,10 @@ export default function LoginPage() {
       <div className="mx-auto flex min-h-screen max-w-7xl items-center px-6 py-10 lg:px-10">
         <div className="grid w-full grid-cols-1 gap-10 lg:grid-cols-[1.05fr_0.95fr] xl:gap-16">
           <section className="login-fade-up flex items-center">
-            <div className="relative max-w-2xl overflow-hidden rounded-[28px] bg-[#1f4678] px-10 py-12 text-white shadow-[0_20px_60px_rgba(15,23,42,0.10)]">
+            <div
+              className="relative max-w-2xl overflow-hidden rounded-[28px] bg-slateblue px-10 py-12 text-white"
+              style={{ boxShadow: "0 20px 60px rgb(var(--tenant-primary-rgb) / 0.22)" }}
+            >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(0,0,0,0.18),transparent_40%)]" />
 
               <div className="relative">

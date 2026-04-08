@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth, signOut } from "@/auth";
-import { buildTenantBrandingCss, getTenantBrandingSettings } from "@testworx/lib";
+import { getTenantBrandingSettings } from "@testworx/lib";
 import { AppShell } from "./app-shell";
 import { MobilePullToRefresh } from "./mobile-pull-to-refresh";
 
@@ -15,15 +15,13 @@ export default async function AppLayout({ children }: Readonly<{ children: React
     redirect("/login");
   }
 
-  let theme: React.CSSProperties | undefined;
-
   if (session.user.tenantId) {
     try {
-      theme = buildTenantBrandingCss(
-        (
-          await getTenantBrandingSettings({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId })
-        ).branding
-      );
+      await getTenantBrandingSettings({
+        userId: session.user.id,
+        role: session.user.role,
+        tenantId: session.user.tenantId
+      });
     } catch (error) {
       if (isStaleSessionError(error)) {
         redirect("/login?session=stale");
@@ -38,7 +36,7 @@ export default async function AppLayout({ children }: Readonly<{ children: React
   };
 
   return (
-    <div className="min-h-screen bg-slate-100" style={theme}>
+    <div className="min-h-screen bg-slate-100">
       <MobilePullToRefresh />
       <AppShell
         role={session.user.role}

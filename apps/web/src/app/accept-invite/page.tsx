@@ -21,7 +21,13 @@ export default async function AcceptInvitePage({
   const invite = token ? await getInvitationAcceptanceDetails(token) : null;
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(30,58,95,0.15),_transparent_35%),linear-gradient(135deg,_#F8FAFC,_#E2E8F0)] px-6 py-10">
+    <main
+      className="min-h-screen px-6 py-10"
+      style={{
+        backgroundImage:
+          "radial-gradient(circle at top, rgb(var(--tenant-primary-rgb) / 0.15), transparent 35%), linear-gradient(135deg, #F8FAFC, #E2E8F0)"
+      }}
+    >
       <div className="mx-auto grid min-h-[85vh] max-w-6xl gap-10 lg:grid-cols-[1.05fr_0.95fr]">
         <section className="flex flex-col justify-between rounded-[2rem] bg-slateblue p-8 text-white shadow-panel">
           <div className="space-y-6">

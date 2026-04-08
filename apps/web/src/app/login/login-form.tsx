@@ -54,7 +54,7 @@ export function LoginForm() {
             type="email"
             required
             placeholder="you@company.com"
-            className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50/60 px-4 text-[15px] text-slate-900 outline-none transition-all duration-200 ease-out placeholder:text-slate-400 focus:border-[#1f4678] focus:bg-white focus:ring-4 focus:ring-[#1f4678]/10"
+            className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50/60 px-4 text-[15px] text-slate-900 outline-none transition-all duration-200 ease-out placeholder:text-slate-400 focus:border-slateblue focus:bg-white focus:ring-4 focus:ring-slateblue/10"
           />
         </label>
 
@@ -78,7 +78,7 @@ export function LoginForm() {
             type="password"
             required
             placeholder="Enter your password"
-            className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50/60 px-4 text-[15px] text-slate-900 outline-none transition-all duration-200 ease-out placeholder:text-slate-400 focus:border-[#1f4678] focus:bg-white focus:ring-4 focus:ring-[#1f4678]/10"
+            className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50/60 px-4 text-[15px] text-slate-900 outline-none transition-all duration-200 ease-out placeholder:text-slate-400 focus:border-slateblue focus:bg-white focus:ring-4 focus:ring-slateblue/10"
           />
         </label>
       </div>
@@ -89,8 +89,9 @@ export function LoginForm() {
       ) : null}
 
       <button
-        className="mt-7 inline-flex h-14 w-full items-center justify-center rounded-2xl bg-[#1f4678] text-base font-semibold text-white shadow-[0_12px_24px_rgba(31,70,120,0.25)] transition-all duration-150 ease-out hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-7 inline-flex h-14 w-full items-center justify-center rounded-2xl bg-slateblue text-base font-semibold text-white transition-all duration-150 ease-out hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
         disabled={pending}
+        style={{ boxShadow: "0 12px 24px rgb(var(--tenant-primary-rgb) / 0.25)" }}
         type="submit"
       >
         {pending ? "Signing in..." : "Sign in"}

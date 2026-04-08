@@ -289,7 +289,7 @@ export default async function AdminSchedulingQueuePage({
                     </div>
                     <div className="flex min-w-56 flex-col gap-3">
                       <Link
-                        className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#1f4678] px-4 py-3 text-sm font-semibold text-white"
+                        className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white"
                         href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`}
                       >
                         Open inspection

@@ -143,7 +143,7 @@ export default async function AdminReportsQueuePage({
                   <div className="flex min-w-64 flex-col gap-3">
                     {inspection.reviewTasks[0] ? (
                       <Link
-                        className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#1f4678] px-4 py-3 text-sm font-semibold text-white"
+                        className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white"
                         href={`/app/admin/reports/${inspection.id}/${inspection.reviewTasks[0].id}`}
                       >
                         Open report review

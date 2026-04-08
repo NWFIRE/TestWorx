@@ -288,7 +288,7 @@ export function InspectionSchedulerForm({
                 <button
                   key={option}
                   className={active
-                    ? "inline-flex min-h-11 items-center rounded-full border border-[#1f4678] bg-[#1f4678] px-4 py-2 text-sm font-semibold text-white"
+                    ? "inline-flex min-h-11 items-center rounded-full border border-slateblue bg-slateblue px-4 py-2 text-sm font-semibold text-white"
                     : "inline-flex min-h-11 items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"}
                   onClick={(event) => {
                     event.preventDefault();

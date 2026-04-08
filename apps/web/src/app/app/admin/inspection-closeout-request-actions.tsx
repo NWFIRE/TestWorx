@@ -15,7 +15,7 @@ export function InspectionCloseoutRequestActions({ inspectionId, canApprove }: {
       <div className="flex flex-col gap-3 sm:flex-row">
         {canApprove ? (
           <button
-            className="min-h-11 rounded-2xl bg-[#1f4678] px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+            className="min-h-11 rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
             disabled={pending}
             onClick={() => startTransition(async () => {
               const result = await approveInspectionCloseoutRequestAction(inspectionId);

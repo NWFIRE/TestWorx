@@ -101,7 +101,7 @@ export default async function QuotesPage({
         description="Create, send, approve, sync, and convert quotes without leaving the TradeWorx operations workspace."
         actions={(
           <Link
-            className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#1f4678] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110"
+            className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110"
             href="/app/admin/quotes/new"
           >
             New quote

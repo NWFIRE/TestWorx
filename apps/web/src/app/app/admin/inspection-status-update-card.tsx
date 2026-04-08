@@ -100,7 +100,7 @@ export function InspectionStatusUpdateCard({
         <label className="block">
           <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">New status</span>
           <select
-            className="mt-2 min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-[#1f4678] focus:ring-4 focus:ring-[#1f4678]/10"
+            className="mt-2 min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-slateblue focus:ring-4 focus:ring-slateblue/10"
             name="status"
             onChange={(event) => setSelectedStatus(event.target.value as InspectionStatus)}
             value={selectedStatus}
@@ -115,7 +115,7 @@ export function InspectionStatusUpdateCard({
         <label className="block">
           <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Correction note (optional)</span>
           <textarea
-            className="mt-2 min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-ink outline-none transition placeholder:text-slate-400 focus:border-[#1f4678] focus:ring-4 focus:ring-[#1f4678]/10"
+            className="mt-2 min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-ink outline-none transition placeholder:text-slate-400 focus:border-slateblue focus:ring-4 focus:ring-slateblue/10"
             name="note"
             onChange={(event) => setNote(event.target.value)}
             placeholder="Example: Technician completed work but missed the final status update."
@@ -140,7 +140,7 @@ export function InspectionStatusUpdateCard({
       ) : null}
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <button
-          className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#1f4678] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-slateblue px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
           disabled={pending || selectedStatus === currentStatus}
           type="submit"
         >

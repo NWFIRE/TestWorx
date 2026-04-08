@@ -160,7 +160,7 @@ function calculateBillingPipeline(
 
   return [
     { label: "Draft billing", value: Math.round((draft / total) * 100), tone: "bg-slate-900" },
-    { label: "Awaiting approval", value: Math.round((reviewed / total) * 100), tone: "bg-[#1f4678]" },
+    { label: "Awaiting approval", value: Math.round((reviewed / total) * 100), tone: "bg-slateblue" },
     { label: "Ready to invoice", value: Math.round((invoiced / total) * 100), tone: "bg-emerald-500" }
   ];
 }
@@ -366,7 +366,7 @@ export default async function AdminPage({
                     <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
                       placeholder="Search inspections, reports, customers"
-                      className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-11 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-[#1f4678] focus:ring-4 focus:ring-[#1f4678]/10"
+                      className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-11 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-slateblue focus:ring-4 focus:ring-slateblue/10"
                     />
                   </div>
                   <Link
@@ -377,7 +377,7 @@ export default async function AdminPage({
                     Alerts
                   </Link>
                   <a
-                    className="inline-flex h-12 items-center rounded-2xl bg-[#1f4678] px-5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(31,70,120,0.20)] transition duration-150 hover:brightness-110 active:scale-[0.99]"
+                    className="inline-flex h-12 items-center rounded-2xl bg-slateblue px-5 text-sm font-semibold text-white shadow-[0_12px_24px_rgb(var(--tenant-primary-rgb)_/_0.2)] transition duration-150 hover:brightness-110 active:scale-[0.99]"
                     href="#create-inspection"
                   >
                     New inspection
@@ -396,7 +396,7 @@ export default async function AdminPage({
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   placeholder="Search inspections, reports, customers"
-                  className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-11 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-[#1f4678] focus:ring-4 focus:ring-[#1f4678]/10"
+                  className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-11 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-slateblue focus:ring-4 focus:ring-slateblue/10"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -407,7 +407,7 @@ export default async function AdminPage({
                   Alerts
                 </Link>
                 <a
-                  className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#1f4678] text-sm font-semibold text-white shadow-[0_12px_24px_rgba(31,70,120,0.18)] transition hover:brightness-110 active:scale-[0.99]"
+                  className="inline-flex h-12 items-center justify-center rounded-2xl bg-slateblue text-sm font-semibold text-white shadow-[0_12px_24px_rgb(var(--tenant-primary-rgb)_/_0.18)] transition hover:brightness-110 active:scale-[0.99]"
                   href="#create-inspection"
                 >
                   New inspection
@@ -434,7 +434,7 @@ export default async function AdminPage({
 
           <div className="grid gap-5 xl:grid-cols-[1.45fr_0.95fr]">
             <div className="space-y-5 lg:space-y-6">
-              <section className="relative overflow-hidden rounded-[28px] bg-[#1f4678] p-5 text-white shadow-[0_20px_50px_rgba(31,70,120,0.18)] lg:px-6 lg:py-6 lg:shadow-[0_22px_60px_rgba(31,70,120,0.18)]">
+              <section className="relative overflow-hidden rounded-[28px] bg-slateblue p-5 text-white shadow-[0_20px_50px_rgb(var(--tenant-primary-rgb)_/_0.18)] lg:px-6 lg:py-6 lg:shadow-[0_22px_60px_rgb(var(--tenant-primary-rgb)_/_0.18)]">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(0,0,0,0.14),transparent_42%)]" />
                 <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                   <div className="max-w-2xl">

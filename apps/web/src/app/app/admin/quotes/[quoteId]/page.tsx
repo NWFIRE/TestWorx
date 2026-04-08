@@ -263,7 +263,7 @@ export default async function QuoteDetailPage({
                                 <p className="font-medium text-slate-950">{suggestion.qbItemName}</p>
                                 <p className="mt-1 break-all text-xs text-slate-500">ID {suggestion.qbItemId} - Score {suggestion.score}</p>
                               </div>
-                              <button className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#1f4678] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" type="submit">
+                              <button className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" type="submit">
                                 Use this item
                               </button>
                             </form>
@@ -291,7 +291,7 @@ export default async function QuoteDetailPage({
             <div className="mt-4 grid gap-3">
               <form action={sendQuoteReminderNowAction}>
                 <input name="quoteId" type="hidden" value={detail.id} />
-                <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-[#1f4678] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" type="submit">
+                <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" type="submit">
                   Send reminder now
                 </button>
               </form>
@@ -347,7 +347,7 @@ export default async function QuoteDetailPage({
                 <span className="mb-2 block text-sm font-medium text-slate-700">Message</span>
                 <textarea className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" defaultValue={detail.customerNotes ?? "Review the quote details below. When you’re ready, approve the quote and we’ll move forward with the work."} name="message" />
               </label>
-              <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-[#1f4678] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" type="submit">
+              <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" type="submit">
                 {detail.sentAt ? "Resend quote" : "Send quote"}
               </button>
             </form>
@@ -427,7 +427,7 @@ export default async function QuoteDetailPage({
               </button>
             </form>
             {detail.convertedInspectionId ? (
-              <Link className="mt-3 inline-flex text-sm font-semibold text-[#1f4678]" href={`/app/admin/inspections/${detail.convertedInspectionId}`}>
+              <Link className="mt-3 inline-flex text-sm font-semibold text-slateblue" href={`/app/admin/inspections/${detail.convertedInspectionId}`}>
                 Open converted inspection
               </Link>
             ) : null}

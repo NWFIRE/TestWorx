@@ -33,6 +33,8 @@ import {
 } from "@testworx/lib";
 
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+const BRAND_PRIMARY_COOKIE = "tradeworx_brand_primary";
+const BRAND_ACCENT_COOKIE = "tradeworx_brand_accent";
 
 function getAppUrl() {
   return process.env.APP_URL || process.env.NEXTAUTH_URL || "http://localhost:3000";
@@ -98,13 +100,15 @@ export async function updateTenantBrandingAction(_: { error: string | null; succ
     const logo = formData.get("logo");
     const currentBranding = await getTenantBrandingSettings({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId });
     const logoDataUrl = await fileToDataUrl(logo instanceof File ? logo : null, currentBranding.branding.logoDataUrl ?? "");
+    const primaryColor = String(formData.get("primaryColor") ?? "#1E3A5F");
+    const accentColor = String(formData.get("accentColor") ?? "#C2410C");
 
     await updateTenantBranding(
       { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
       {
         logoDataUrl,
-        primaryColor: String(formData.get("primaryColor") ?? "#1E3A5F"),
-        accentColor: String(formData.get("accentColor") ?? "#C2410C"),
+        primaryColor,
+        accentColor,
         legalBusinessName: String(formData.get("legalBusinessName") ?? ""),
         phone: String(formData.get("phone") ?? ""),
         email: String(formData.get("email") ?? ""),
@@ -118,11 +122,26 @@ export async function updateTenantBrandingAction(_: { error: string | null; succ
       }
     );
 
+    const cookieStore = await cookies();
+    const cookieOptions = {
+      httpOnly: false,
+      sameSite: "lax" as const,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365
+    };
+    cookieStore.set(BRAND_PRIMARY_COOKIE, primaryColor, cookieOptions);
+    cookieStore.set(BRAND_ACCENT_COOKIE, accentColor, cookieOptions);
+
     revalidatePath("/app/admin/settings");
     revalidatePath("/app/admin");
     revalidatePath("/app/tech");
     revalidatePath("/app/customer");
+    revalidatePath("/login");
+    revalidatePath("/accept-invite");
+    revalidatePath("/reset-password");
     revalidatePath("/app", "layout");
+    revalidatePath("/", "layout");
     return { error: null, success: "Branding updated." };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unable to update branding.", success: null };

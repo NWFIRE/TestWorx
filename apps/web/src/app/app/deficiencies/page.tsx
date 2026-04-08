@@ -257,7 +257,7 @@ export default async function DeficienciesPage({
                         <p>Notes: {deficiency.notes ?? "No follow-up notes yet."}</p>
                         {deficiency.photoStorageKey ? (
                           <a
-                            className="mt-3 inline-flex font-semibold text-[#1f4678]"
+                            className="mt-3 inline-flex font-semibold text-slateblue"
                             href={`/api/deficiencies/${deficiency.id}/photo`}
                           >
                             View photo evidence
@@ -308,7 +308,7 @@ export default async function DeficienciesPage({
                       </button>
                     </form>
                     <Link
-                      className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#1f4678] px-4 py-3 text-sm font-semibold text-white"
+                      className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white"
                       href={`/app/admin/inspections/${deficiency.inspectionId}`}
                     >
                       View inspection
