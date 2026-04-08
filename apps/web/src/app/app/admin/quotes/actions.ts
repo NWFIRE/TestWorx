@@ -12,6 +12,7 @@ import {
   regenerateQuoteAccessToken,
   clearQuoteLineItemQuickBooksMapping,
   createQuote,
+  deleteQuote,
   quoteInputSchema,
   getQuoteReminderSettings,
   saveQuoteLineItemQuickBooksMapping,
@@ -128,6 +129,34 @@ export async function updateQuoteAction(formData: FormData) {
       throw error;
     }
     redirect(quoteDetailHref(quoteId, { error: error instanceof Error ? error.message : "Unable to update quote." }));
+  }
+}
+
+export async function deleteQuoteAction(
+  _: { error: string | null; success: string | null; redirectTo: string | null },
+  formData: FormData
+) {
+  const session = await auth();
+  const quoteId = String(formData.get("quoteId") ?? "");
+  const requestedRedirect = String(formData.get("redirectTo") ?? "");
+  const redirectTo = requestedRedirect.startsWith("/app/") ? requestedRedirect : "/app/admin/quotes?quote=deleted";
+
+  if (!session?.user?.tenantId || !quoteId) {
+    return { error: "Unauthorized", success: null, redirectTo: null };
+  }
+
+  try {
+    await deleteQuote(getActor(getQuoteActionSession(session)), quoteId);
+    revalidatePath("/app/admin/quotes");
+    revalidatePath(`/app/admin/quotes/${quoteId}`);
+    revalidatePath("/app/customer");
+    return { error: null, success: "Quote deleted successfully.", redirectTo };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Unable to delete quote.",
+      success: null,
+      redirectTo: null
+    };
   }
 }
 

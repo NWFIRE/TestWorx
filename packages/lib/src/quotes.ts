@@ -1099,6 +1099,57 @@ export async function updateQuote(actor: ActorContext, quoteId: string, input: Q
   return updated;
 }
 
+export async function deleteQuote(actor: ActorContext, quoteId: string) {
+  const parsedActor = parseActor(actor);
+  assertAdminRole(parsedActor.role);
+
+  const quote = await prisma.quote.findFirst({
+    where: { id: quoteId, tenantId: parsedActor.tenantId as string },
+    select: {
+      id: true,
+      quoteNumber: true,
+      quickbooksEstimateId: true,
+      syncStatus: true,
+      convertedInspectionId: true
+    }
+  });
+
+  if (!quote) {
+    throw new Error("Quote not found.");
+  }
+
+  if (quote.convertedInspectionId) {
+    throw new Error("Converted quotes cannot be deleted. Open the linked inspection from the quote instead.");
+  }
+
+  if (quote.quickbooksEstimateId) {
+    throw new Error("Quotes already synced to QuickBooks cannot be deleted.");
+  }
+
+  if (quote.syncStatus === QuoteSyncStatus.sync_pending) {
+    throw new Error("Wait for the QuickBooks sync to finish before deleting this quote.");
+  }
+
+  await createQuoteAuditLog({
+    tenantId: parsedActor.tenantId as string,
+    actorUserId: parsedActor.userId,
+    action: "quote.deleted",
+    quoteId: quote.id,
+    metadata: {
+      quoteNumber: quote.quoteNumber
+    }
+  });
+
+  await prisma.quote.delete({
+    where: { id: quote.id }
+  });
+
+  return {
+    id: quote.id,
+    quoteNumber: quote.quoteNumber
+  };
+}
+
 export async function saveQuoteLineItemQuickBooksMapping(actor: ActorContext, input: {
   quoteId: string;
   lineItemId: string;

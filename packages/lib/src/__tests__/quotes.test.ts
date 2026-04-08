@@ -7,6 +7,7 @@ const { prismaMock, sendQuoteEmailMock, sendQuoteReminderEmailMock, syncQuoteToQ
     quote: {
       count: vi.fn(),
       create: vi.fn(),
+      delete: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
@@ -90,6 +91,7 @@ import {
   approveQuoteByAccessToken,
   convertQuoteToInspection,
   createQuote,
+  deleteQuote,
   getHostedQuoteDetailByToken,
   getCustomerQuoteDetail,
   getQuoteFormOptions,
@@ -128,6 +130,7 @@ describe("quotes", () => {
       reminderCount: 0
     });
     prismaMock.quote.findMany.mockResolvedValue([]);
+    prismaMock.quote.delete.mockResolvedValue(undefined);
     prismaMock.quoteReminderDispatch.findMany.mockResolvedValue([]);
     prismaMock.quoteReminderDispatch.findFirst.mockResolvedValue(null);
     prismaMock.quoteReminderDispatch.create.mockResolvedValue({
@@ -587,6 +590,46 @@ describe("quotes", () => {
       { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
       "quote_1"
     )).rejects.toThrow("Approve this quote before converting it into work.");
+  });
+
+  it("deletes an unsynced quote and records the deletion audit event", async () => {
+    prismaMock.quote.findFirst.mockResolvedValue({
+      id: "quote_1",
+      quoteNumber: "Q-2026-0013",
+      quickbooksEstimateId: null,
+      syncStatus: QuoteSyncStatus.not_synced,
+      convertedInspectionId: null
+    });
+
+    await deleteQuote(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      "quote_1"
+    );
+
+    expect(prismaMock.quote.delete).toHaveBeenCalledWith({
+      where: { id: "quote_1" }
+    });
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        action: "quote.deleted",
+        entityId: "quote_1"
+      })
+    }));
+  });
+
+  it("prevents deleting a quote that is already synced to QuickBooks", async () => {
+    prismaMock.quote.findFirst.mockResolvedValue({
+      id: "quote_1",
+      quoteNumber: "Q-2026-0014",
+      quickbooksEstimateId: "qb_estimate_1",
+      syncStatus: QuoteSyncStatus.synced,
+      convertedInspectionId: null
+    });
+
+    await expect(deleteQuote(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      "quote_1"
+    )).rejects.toThrow("Quotes already synced to QuickBooks cannot be deleted.");
   });
 
   it("stores tenant quote reminder settings", async () => {

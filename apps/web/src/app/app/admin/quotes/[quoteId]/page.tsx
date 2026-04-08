@@ -16,6 +16,7 @@ import { AppPageShell, PageHeader, SectionCard, StatusBadge } from "../../operat
 import {
   clearQuoteLineItemMappingAction,
   convertQuoteAction,
+  deleteQuoteAction,
   regenerateQuoteLinkAction,
   saveQuoteLineItemMappingAction,
   sendQuoteReminderNowAction,
@@ -26,6 +27,7 @@ import {
   updateQuoteStatusAction
 } from "../actions";
 import { CopyQuoteLinkButton } from "../copy-quote-link-button";
+import { DeleteQuoteCard } from "../delete-quote-card";
 import { QuoteEditorForm } from "../quote-editor-form";
 
 export default async function QuoteDetailPage({
@@ -430,6 +432,13 @@ export default async function QuoteDetailPage({
               </Link>
             ) : null}
           </SectionCard>
+
+          <DeleteQuoteCard
+            action={deleteQuoteAction}
+            disabled={Boolean(detail.convertedInspectionId) || Boolean(detail.quickbooksEstimateId) || detail.syncStatus === "sync_pending"}
+            quoteId={detail.id}
+            redirectTo={returnHref}
+          />
         </aside>
       </section>
     </AppPageShell>
