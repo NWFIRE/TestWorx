@@ -3444,6 +3444,10 @@ export async function getAdminAmendmentManagementData(
     return {
       ...inspection,
       lifecycle,
+      ...getInspectionDisplayLabels({
+        siteName: inspection.site.name,
+        customerName: inspection.customerCompany.name
+      }),
       displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
       assignedTechnicianNames: formatAssignedTechnicianNames({
         assignedTechnician: inspection.assignedTechnician,

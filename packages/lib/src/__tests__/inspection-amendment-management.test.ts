@@ -236,6 +236,38 @@ describe("admin amendment management data", () => {
     expect(result.filter).toBe("pending_follow_up_request");
   });
 
+  it("uses the customer as the primary title for generic inspection sites", async () => {
+    prismaMock.inspection.findMany.mockResolvedValue([
+      {
+        id: "inspection_generic",
+        tenantId: "tenant_1",
+        status: "completed",
+        createdAt: new Date("2026-03-10T09:00:00.000Z"),
+        scheduledStart: new Date("2026-03-21T09:00:00.000Z"),
+        customerCompany: { name: "Land Run Historical Center" },
+        site: { name: "General / No Fixed Site" },
+        assignedTechnician: { name: "Taylor Tech" },
+        technicianAssignments: [],
+        closeoutRequest: null,
+        tasks: [{ report: { id: "report_1", status: "draft", finalizedAt: null } }],
+        documents: [],
+        attachments: [],
+        amendments: [],
+        replacementAmendments: []
+      }
+    ]);
+    prismaMock.inspectionReport.groupBy.mockResolvedValue([]);
+
+    const { getAdminAmendmentManagementData } = await import("../scheduling");
+    const result = await getAdminAmendmentManagementData(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { filter: "all" }
+    );
+
+    expect(result.items[0]?.primaryTitle).toBe("Land Run Historical Center");
+    expect(result.items[0]?.secondaryTitle).toBe("General / No Fixed Site");
+  });
+
   it("blocks technician access to amendment management", async () => {
     const { getAdminAmendmentManagementData } = await import("../scheduling");
 

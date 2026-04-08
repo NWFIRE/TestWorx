@@ -173,7 +173,7 @@ export default async function AdminAmendmentsPage({
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div className="space-y-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-lg font-semibold text-slate-950">{inspection.site.name}</p>
+                        <p className="text-lg font-semibold text-slate-950">{inspection.primaryTitle ?? inspection.site.name}</p>
                         {inspection.needsReview ? <StatusBadge label="Needs review" tone="violet" /> : <StatusBadge label="Review ready" tone="emerald" />}
                         {inspection.closeoutRequest ? (
                           <StatusBadge
@@ -183,7 +183,7 @@ export default async function AdminAmendmentsPage({
                         ) : null}
                       </div>
                       <p className="text-sm text-slate-500">
-                        {inspection.customerCompany.name} | {format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}
+                        {inspection.secondaryTitle ?? inspection.customerCompany.name} | {format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}
                       </p>
                       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         <div className="rounded-2xl border border-slate-200 bg-white p-4">
