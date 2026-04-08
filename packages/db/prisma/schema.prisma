@@ -143,6 +143,23 @@ enum QuoteDeliveryStatus {
   error
 }
 
+enum QuoteReminderType {
+  sent_not_viewed_first
+  sent_not_viewed_second
+  viewed_pending_first
+  viewed_pending_second
+  expiring_soon
+  expired_follow_up
+  manual_follow_up
+}
+
+enum QuoteReminderDispatchStatus {
+  pending
+  sent
+  skipped
+  failed
+}
+
 model SubscriptionPlan {
   id                String   @id @default(cuid())
   code              String   @unique
@@ -183,6 +200,7 @@ model Tenant {
   quickbooksRefreshToken     String?
   quickbooksTokenExpiresAt   DateTime?
   quickbooksConnectedAt      DateTime?
+  quoteReminderSettings      Json?
   createdAt                 DateTime               @default(now())
   updatedAt                 DateTime               @updatedAt
   subscriptionPlan          SubscriptionPlan?      @relation(fields: [subscriptionPlanId], references: [id])
@@ -214,6 +232,7 @@ model Tenant {
   passwordResetTokens       PasswordResetToken[]
   quotes                    Quote[]
   quoteLineItems            QuoteLineItem[]
+  quoteReminderDispatches   QuoteReminderDispatch[]
 }
 
 model User {
@@ -248,6 +267,7 @@ model User {
   addedInspectionTasks InspectionTask[]        @relation("InspectionTaskAddedBy")
   createdQuotes       Quote[]                  @relation("QuoteCreatedBy")
   updatedQuotes       Quote[]                  @relation("QuoteUpdatedBy")
+  pausedQuoteReminders Quote[]                @relation("QuoteRemindersPausedBy")
 }
 
 model CustomerCompany {
@@ -398,6 +418,14 @@ model Quote {
   quoteAccessTokenExpiresAt DateTime?
   quoteAccessTokenRevokedAt DateTime?
   quoteAccessTokenSentToEmail String?
+  remindersEnabled        Boolean             @default(true)
+  remindersPausedAt       DateTime?
+  remindersPausedByUserId String?
+  nextReminderAt          DateTime?
+  lastReminderAt          DateTime?
+  reminderStage           String?
+  reminderCount           Int                 @default(0)
+  reminderError           String?
   approvedAt              DateTime?
   declinedAt              DateTime?
   convertedAt             DateTime?
@@ -422,8 +450,10 @@ model Quote {
   site                    Site?               @relation(fields: [siteId], references: [id])
   createdBy               User                @relation("QuoteCreatedBy", fields: [createdByUserId], references: [id])
   updatedBy               User                @relation("QuoteUpdatedBy", fields: [updatedByUserId], references: [id])
+  remindersPausedBy       User?               @relation("QuoteRemindersPausedBy", fields: [remindersPausedByUserId], references: [id])
   convertedInspection     Inspection?         @relation("QuoteConvertedInspection", fields: [convertedInspectionId], references: [id])
   lineItems               QuoteLineItem[]
+  reminderDispatches      QuoteReminderDispatch[]
 
   @@unique([tenantId, quoteNumber])
   @@index([tenantId, status])
@@ -433,6 +463,8 @@ model Quote {
   @@index([tenantId, issuedAt])
   @@index([tenantId, sentAt])
   @@index([tenantId, expiresAt])
+  @@index([tenantId, remindersEnabled])
+  @@index([tenantId, nextReminderAt])
 }
 
 model QuoteLineItem {
@@ -459,6 +491,30 @@ model QuoteLineItem {
   @@index([tenantId, quoteId])
   @@index([tenantId, internalCode])
   @@index([tenantId, qbItemId])
+}
+
+model QuoteReminderDispatch {
+  id            String                     @id @default(cuid())
+  tenantId      String
+  quoteId       String
+  reminderType  QuoteReminderType
+  status        QuoteReminderDispatchStatus @default(pending)
+  dedupeKey     String?                    @unique
+  recipientEmail String?
+  scheduledFor  DateTime?
+  attemptedAt   DateTime?
+  sentAt        DateTime?
+  messageId     String?
+  error         String?
+  metadata      Json?
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+  tenant        Tenant                     @relation(fields: [tenantId], references: [id])
+  quote         Quote                      @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, quoteId])
+  @@index([tenantId, status])
+  @@index([tenantId, reminderType])
 }
 
 model InspectionTechnicianAssignment {

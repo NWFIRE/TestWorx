@@ -44,6 +44,19 @@ type QuoteEmailPayload = BaseEmailPayload & {
   expiresAt?: Date | null;
 };
 
+type QuoteReminderEmailPayload = BaseEmailPayload & {
+  quoteNumber: string;
+  customerName: string;
+  siteName?: string | null;
+  quoteUrl: string;
+  quoteTotal?: string | null;
+  reminderTitle: string;
+  subjectLine: string;
+  messageBody: string;
+  actionLabel?: string;
+  expiresAt?: Date | null;
+};
+
 function buildShell({
   eyebrow,
   title,
@@ -195,6 +208,27 @@ export async function sendQuoteEmail(payload: QuoteEmailPayload) {
       actionHref: payload.quoteUrl,
       actionLabel: "View quote",
       footer: "The attached PDF is a customer-ready copy of the quote, but the secure online quote page is the fastest way to review details and approve or decline it."
+    })
+  });
+}
+
+export async function sendQuoteReminderEmail(payload: QuoteReminderEmailPayload) {
+  return sendWithResend({
+    to: payload.recipientEmail,
+    subject: payload.subjectLine,
+    html: buildShell({
+      eyebrow: "Quote reminder",
+      title: payload.reminderTitle,
+      body: [
+        `Hi ${payload.recipientName},`,
+        `We’re following up on quote ${payload.quoteNumber} from ${payload.tenantName} for ${payload.customerName}${payload.siteName ? ` at ${payload.siteName}` : ""}.`,
+        payload.quoteTotal ? `Quote total: ${payload.quoteTotal}.` : "",
+        payload.messageBody,
+        payload.expiresAt ? `This quote is set to expire on ${payload.expiresAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}.` : ""
+      ].filter(Boolean),
+      actionHref: payload.quoteUrl,
+      actionLabel: payload.actionLabel ?? "View quote",
+      footer: "Use the secure online quote page to review details, download the PDF, and approve or decline when you’re ready."
     })
   });
 }

@@ -22,6 +22,22 @@ import {
   StatusBadge
 } from "../operations-ui";
 
+function formatReminderStatus(status: string) {
+  switch (status) {
+    case "paused":
+      return "Paused";
+    case "disabled":
+      return "Disabled";
+    case "scheduled":
+      return "Scheduled";
+    case "sent":
+      return "Reminder sent";
+    case "idle":
+    default:
+      return "Idle";
+  }
+}
+
 const statusOptions = [
   { value: "all", label: "All quotes" },
   { value: "draft", label: "Draft" },
@@ -170,6 +186,12 @@ export default async function QuotesPage({
                       <p className="text-sm text-slate-600">Viewed: <span className="font-semibold text-slate-950">{quote.firstViewedAt ? format(quote.firstViewedAt, "MMM d, yyyy") : "—"}</span></p>
                       <p className="text-sm text-slate-600">Response: <span className="font-semibold text-slate-950">{quote.approvedAt ? "Approved" : quote.declinedAt ? "Declined" : "Pending"}</span></p>
                       <p className="text-sm text-slate-600">Engagement: <span className="font-semibold capitalize text-slate-950">{quote.engagementStatus.replaceAll("_", " ")}</span></p>
+                    </div>
+                    <div className="grid gap-3 pt-1 md:grid-cols-4">
+                      <p className="text-sm text-slate-600">Reminders: <span className="font-semibold text-slate-950">{formatReminderStatus(quote.reminderStatus)}</span></p>
+                      <p className="text-sm text-slate-600">Next reminder: <span className="font-semibold text-slate-950">{quote.nextReminderAt ? format(quote.nextReminderAt, "MMM d, yyyy") : "â€”"}</span></p>
+                      <p className="text-sm text-slate-600">Last reminder: <span className="font-semibold text-slate-950">{quote.lastReminderAt ? format(quote.lastReminderAt, "MMM d, yyyy") : "â€”"}</span></p>
+                      <p className="text-sm text-slate-600">Reminder stage: <span className="font-semibold capitalize text-slate-950">{quote.reminderStage ? quote.reminderStage.replaceAll("_", " ") : "â€”"}</span></p>
                     </div>
                   </div>
 

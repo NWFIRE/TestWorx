@@ -9,6 +9,7 @@ import {
   getPaginatedTenantQuickBooksCatalogSettings,
   getQuickBooksItemMappingSettings,
   getPaginatedTenantServiceFeeSettings,
+  getQuoteReminderSettings,
   getTenantBillingSettings,
   getTenantBrandingSettings,
   getTenantQuickBooksConnectionSettings
@@ -31,6 +32,7 @@ import {
   startQuickBooksConnectAction,
   startBillingCheckoutAction,
   updateCustomerCompanyAction,
+  updateQuoteReminderSettingsAction,
   updateQuickBooksCatalogItemAction,
   updateDefaultServiceFeeAction,
   updateServiceFeeRuleAction,
@@ -39,6 +41,7 @@ import {
 import { CustomerManagementCard } from "./customer-management-card";
 import { QuickBooksCatalogManagementCard } from "./quickbooks-catalog-management-card";
 import { QuickBooksItemMappingCard } from "./quickbooks-item-mapping-card";
+import { QuoteReminderSettingsCard } from "./quote-reminder-settings-card";
 import { ServiceFeeSettingsCard } from "./service-fee-settings-card";
 import { QuickBooksSettingsCard } from "./quickbooks-settings-card";
 import { TenantBrandingForm } from "./tenant-branding-form";
@@ -336,10 +339,11 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   const feesPage = readPositiveInt(readSearchParam(params, "feesPage", "1"), 1);
   const feeEditor = readSearchParam(params, "feeEditor") || null;
 
-  const [billingSettings, brandingSettings, quickBooksSettings] = await Promise.all([
+  const [billingSettings, brandingSettings, quickBooksSettings, quoteReminderSettings] = await Promise.all([
     getTenantBillingSettings(actor),
     getTenantBrandingSettings(actor),
-    getTenantQuickBooksConnectionSettings(actor)
+    getTenantQuickBooksConnectionSettings(actor),
+    getQuoteReminderSettings(actor)
   ]);
   const canManageSubscription = canManageBilling(session.user.role);
   const quickBooksNotice = Array.isArray(params.quickbooks)
@@ -532,6 +536,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
           )}
         </div>
         <div className="space-y-6">
+          <QuoteReminderSettingsCard action={updateQuoteReminderSettingsAction} values={quoteReminderSettings} />
           <SectionCard>
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing settings</p>
             <h3 className="mt-2 text-2xl font-semibold text-ink">Current subscription</h3>

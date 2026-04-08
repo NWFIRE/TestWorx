@@ -18,9 +18,11 @@ import {
   convertQuoteAction,
   regenerateQuoteLinkAction,
   saveQuoteLineItemMappingAction,
+  sendQuoteReminderNowAction,
   sendQuoteAction,
   syncQuoteAction,
   updateQuoteAction,
+  updateQuoteReminderControlAction,
   updateQuoteStatusAction
 } from "../actions";
 import { CopyQuoteLinkButton } from "../copy-quote-link-button";
@@ -174,6 +176,15 @@ export default async function QuoteDetailPage({
                 <p className="mt-2 text-base font-semibold text-slate-950">{detail.hostedQuoteUrl ? "Ready to share" : "Will be generated on send"}</p>
                 <p className="mt-1 break-all text-sm text-slate-500">{detail.hostedQuoteUrl ?? "Send the quote to issue a secure hosted link."}</p>
               </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Reminders</p>
+                <p className="mt-2 text-base font-semibold text-slate-950">
+                  {detail.remindersPausedAt ? "Paused" : !detail.remindersEnabled ? "Disabled" : detail.nextReminderAt ? `Next ${format(detail.nextReminderAt, "MMM d, yyyy h:mm a")}` : "No reminder scheduled"}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Stage {detail.reminderStage ?? "—"} • Last sent {detail.lastReminderAt ? format(detail.lastReminderAt, "MMM d, yyyy h:mm a") : "—"} • {detail.reminderCount} reminder{detail.reminderCount === 1 ? "" : "s"}
+                </p>
+              </div>
             </div>
           </SectionCard>
 
@@ -266,6 +277,57 @@ export default async function QuoteDetailPage({
         </div>
 
         <aside className="space-y-6">
+          <SectionCard>
+            <h2 className="text-xl font-semibold text-slate-950">Reminder automation</h2>
+            <p className="mt-2 text-sm text-slate-500">Control quote follow-up without interrupting the hosted approval workflow. Automatic reminders stop when quotes are approved, declined, cancelled, expired, or converted.</p>
+            <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-600">
+              <p><span className="font-semibold text-slate-950">Automation:</span> {detail.remindersPausedAt ? "Paused" : detail.remindersEnabled ? "Enabled" : "Disabled"}</p>
+              <p><span className="font-semibold text-slate-950">Next reminder:</span> {detail.nextReminderAt ? format(detail.nextReminderAt, "MMM d, yyyy h:mm a") : "—"}</p>
+              <p><span className="font-semibold text-slate-950">Reminder stage:</span> {detail.reminderStage ?? "—"}</p>
+              <p><span className="font-semibold text-slate-950">Last reminder:</span> {detail.lastReminderAt ? format(detail.lastReminderAt, "MMM d, yyyy h:mm a") : "—"}</p>
+            </div>
+            <div className="mt-4 grid gap-3">
+              <form action={sendQuoteReminderNowAction}>
+                <input name="quoteId" type="hidden" value={detail.id} />
+                <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-[#1f4678] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" type="submit">
+                  Send reminder now
+                </button>
+              </form>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <form action={updateQuoteReminderControlAction}>
+                  <input name="quoteId" type="hidden" value={detail.id} />
+                  <input name="reminderAction" type="hidden" value={detail.remindersPausedAt ? "resume" : "pause"} />
+                  <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="submit">
+                    {detail.remindersPausedAt ? "Resume reminders" : "Pause reminders"}
+                  </button>
+                </form>
+                <form action={updateQuoteReminderControlAction}>
+                  <input name="quoteId" type="hidden" value={detail.id} />
+                  <input name="reminderAction" type="hidden" value={detail.remindersEnabled ? "disable" : "enable"} />
+                  <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="submit">
+                    {detail.remindersEnabled ? "Disable reminders" : "Enable reminders"}
+                  </button>
+                </form>
+              </div>
+            </div>
+            <div className="mt-4 space-y-3">
+              <p className="text-sm font-semibold text-slate-950">Reminder history</p>
+              {detail.reminderDispatches.length === 0 ? (
+                <p className="text-sm text-slate-500">No reminder activity recorded yet.</p>
+              ) : detail.reminderDispatches.map((dispatch) => (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4" key={dispatch.id}>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-slate-950">{dispatch.reminderType.replaceAll("_", " ")}</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{dispatch.status}</p>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-500">Recipient: {dispatch.recipientEmail ?? "—"}</p>
+                  <p className="mt-1 text-sm text-slate-500">Sent: {dispatch.sentAt ? format(dispatch.sentAt, "MMM d, yyyy h:mm a") : dispatch.attemptedAt ? format(dispatch.attemptedAt, "MMM d, yyyy h:mm a") : "—"}</p>
+                  {dispatch.error ? <p className="mt-1 text-sm text-rose-600">{dispatch.error}</p> : null}
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+
           <SectionCard>
             <h2 className="text-xl font-semibold text-slate-950">Send quote</h2>
             <p className="mt-2 text-sm text-slate-500">Email the customer a secure hosted quote link with the branded PDF attached. The email CTA opens the online approval experience first.</p>

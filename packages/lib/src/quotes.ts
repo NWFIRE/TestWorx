@@ -1,4 +1,4 @@
-import { addDays, endOfDay, isBefore, setHours, setMinutes, startOfDay } from "date-fns";
+import { addBusinessDays, addDays, endOfDay, isBefore, setHours, setMinutes, startOfDay, subDays } from "date-fns";
 import {
   InspectionStatus,
   Prisma,
@@ -12,8 +12,9 @@ import { z } from "zod";
 
 import type { ActorContext, InspectionType } from "@testworx/types";
 import { actorContextSchema } from "@testworx/types";
+import type { QuoteReminderDispatchStatus, QuoteReminderType } from "@prisma/client";
 
-import { sendQuoteEmail } from "./account-email";
+import { sendQuoteEmail, sendQuoteReminderEmail } from "./account-email";
 import { getServerEnv } from "./env";
 import { inspectionTypeRegistry } from "./report-config";
 import { generateQuotePdf } from "./quote-pdf";
@@ -31,6 +32,22 @@ const adminRoles = ["platform_admin", "tenant_admin", "office_admin"] as const;
 const quoteStatusValues = Object.values(QuoteStatus);
 const quoteSyncStatusValues = Object.values(QuoteSyncStatus);
 const closedQuoteStatuses: QuoteStatus[] = [QuoteStatus.approved, QuoteStatus.declined, QuoteStatus.converted, QuoteStatus.cancelled];
+const actionableQuoteStatuses: QuoteStatus[] = [QuoteStatus.sent, QuoteStatus.viewed, QuoteStatus.ready_to_send];
+const quoteReminderTypeValues = {
+  sent_not_viewed_first: "sent_not_viewed_first",
+  sent_not_viewed_second: "sent_not_viewed_second",
+  viewed_pending_first: "viewed_pending_first",
+  viewed_pending_second: "viewed_pending_second",
+  expiring_soon: "expiring_soon",
+  expired_follow_up: "expired_follow_up",
+  manual_follow_up: "manual_follow_up"
+} as const satisfies Record<string, QuoteReminderType>;
+const quoteReminderDispatchStatusValues = {
+  pending: "pending",
+  sent: "sent",
+  skipped: "skipped",
+  failed: "failed"
+} as const satisfies Record<string, QuoteReminderDispatchStatus>;
 
 type NormalizedQuoteLineItem = {
   tenantId: string;
@@ -199,6 +216,90 @@ export const hostedQuoteStateLabels = {
   unavailable: "Unavailable"
 } as const;
 
+export const quoteReminderTypeLabels = {
+  [quoteReminderTypeValues.sent_not_viewed_first]: "Sent, not viewed",
+  [quoteReminderTypeValues.sent_not_viewed_second]: "Sent, not viewed follow-up",
+  [quoteReminderTypeValues.viewed_pending_first]: "Viewed, pending approval",
+  [quoteReminderTypeValues.viewed_pending_second]: "Viewed, pending follow-up",
+  [quoteReminderTypeValues.expiring_soon]: "Expiring soon",
+  [quoteReminderTypeValues.expired_follow_up]: "Expired",
+  [quoteReminderTypeValues.manual_follow_up]: "Manual follow-up"
+} satisfies Record<QuoteReminderType, string>;
+
+const quoteReminderTemplateKeys = [
+  "sentNotViewed",
+  "viewedPending",
+  "expiringSoon",
+  "expired"
+] as const;
+
+const quoteReminderSettingsSchema = z.object({
+  enabled: z.boolean().default(true),
+  sentNotViewedFirstBusinessDays: z.number().int().min(1).max(30).default(2),
+  sentNotViewedSecondBusinessDays: z.number().int().min(1).max(30).default(5),
+  viewedPendingFirstBusinessDays: z.number().int().min(1).max(30).default(2),
+  viewedPendingSecondBusinessDays: z.number().int().min(1).max(30).default(5),
+  expiringSoonDays: z.number().int().min(1).max(30).default(2),
+  expiredFollowUpEnabled: z.boolean().default(true),
+  expiredFollowUpDays: z.number().int().min(1).max(30).default(1),
+  maxAutoReminders: z.number().int().min(1).max(6).default(5),
+  templates: z.object({
+    sentNotViewed: z.object({
+      subject: z.string().trim().min(1).max(200).default("Reminder: quote {{quoteNumber}} is ready to review"),
+      body: z.string().trim().min(1).max(2000).default("We wanted to follow up on the quote we sent over. You can review the details and approve online here.")
+    }).default({
+      subject: "Reminder: quote {{quoteNumber}} is ready to review",
+      body: "We wanted to follow up on the quote we sent over. You can review the details and approve online here."
+    }),
+    viewedPending: z.object({
+      subject: z.string().trim().min(1).max(200).default("Reminder: quote {{quoteNumber}} is ready when you are"),
+      body: z.string().trim().min(1).max(2000).default("We noticed you’ve had a chance to review your quote. When you’re ready, you can approve it online and we’ll move forward.")
+    }).default({
+      subject: "Reminder: quote {{quoteNumber}} is ready when you are",
+      body: "We noticed you’ve had a chance to review your quote. When you’re ready, you can approve it online and we’ll move forward."
+    }),
+    expiringSoon: z.object({
+      subject: z.string().trim().min(1).max(200).default("Reminder: quote {{quoteNumber}} is expiring soon"),
+      body: z.string().trim().min(1).max(2000).default("Your quote is set to expire soon. Review and approve it here if you’d like to move forward.")
+    }).default({
+      subject: "Reminder: quote {{quoteNumber}} is expiring soon",
+      body: "Your quote is set to expire soon. Review and approve it here if you’d like to move forward."
+    }),
+    expired: z.object({
+      subject: z.string().trim().min(1).max(200).default("Quote {{quoteNumber}} has expired"),
+      body: z.string().trim().min(1).max(2000).default("This quote has expired, but we’d be happy to update or reissue it if needed.")
+    }).default({
+      subject: "Quote {{quoteNumber}} has expired",
+      body: "This quote has expired, but we’d be happy to update or reissue it if needed."
+    })
+  }).default({
+    sentNotViewed: {
+      subject: "Reminder: quote {{quoteNumber}} is ready to review",
+      body: "We wanted to follow up on the quote we sent over. You can review the details and approve online here."
+    },
+    viewedPending: {
+      subject: "Reminder: quote {{quoteNumber}} is ready when you are",
+      body: "We noticed you’ve had a chance to review your quote. When you’re ready, you can approve it online and we’ll move forward."
+    },
+    expiringSoon: {
+      subject: "Reminder: quote {{quoteNumber}} is expiring soon",
+      body: "Your quote is set to expire soon. Review and approve it here if you’d like to move forward."
+    },
+    expired: {
+      subject: "Quote {{quoteNumber}} has expired",
+      body: "This quote has expired, but we’d be happy to update or reissue it if needed."
+    }
+  })
+});
+
+export type QuoteReminderSettings = z.infer<typeof quoteReminderSettingsSchema>;
+
+export const quoteReminderSettingsInputSchema = quoteReminderSettingsSchema.extend({
+  templates: quoteReminderSettingsSchema.shape.templates
+});
+
+export type QuoteReminderSettingsInput = z.infer<typeof quoteReminderSettingsInputSchema>;
+
 export function getQuoteStatusTone(status: QuoteStatus) {
   switch (status) {
     case QuoteStatus.ready_to_send:
@@ -236,6 +337,143 @@ export function getQuoteSyncTone(status: QuoteSyncStatus) {
 function normalizeNullableString(value: string | null | undefined) {
   const trimmed = (value ?? "").trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function getDefaultQuoteReminderSettings(): QuoteReminderSettings {
+  return quoteReminderSettingsSchema.parse({});
+}
+
+function normalizeQuoteReminderSettings(value: unknown): QuoteReminderSettings {
+  const parsed = quoteReminderSettingsSchema.safeParse(value ?? {});
+  if (!parsed.success) {
+    return getDefaultQuoteReminderSettings();
+  }
+  return parsed.data;
+}
+
+function interpolateReminderTemplate(template: string, values: Record<string, string>) {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => values[key] ?? "");
+}
+
+type ReminderEvaluationQuote = {
+  id: string;
+  status: QuoteStatus;
+  sentAt: Date | null;
+  firstViewedAt: Date | null;
+  expiresAt: Date | null;
+  approvedAt: Date | null;
+  declinedAt: Date | null;
+  convertedAt: Date | null;
+  remindersEnabled: boolean;
+  remindersPausedAt: Date | null;
+  reminderCount: number;
+};
+
+type QuoteReminderStageEvaluation = {
+  type: QuoteReminderType;
+  scheduledFor: Date;
+  stageLabel: string;
+  templateKey: (typeof quoteReminderTemplateKeys)[number];
+  dedupeKey: string;
+};
+
+function isQuoteClosedForReminders(quote: ReminderEvaluationQuote) {
+  const effectiveStatus = getEffectiveQuoteStatus(quote.status, quote.expiresAt);
+  return closedQuoteStatuses.includes(effectiveStatus) || effectiveStatus === QuoteStatus.expired;
+}
+
+function evaluateQuoteReminderStage(
+  quote: ReminderEvaluationQuote,
+  settings: QuoteReminderSettings,
+  existingDedupeKeys: Set<string>
+): QuoteReminderStageEvaluation | null {
+  if (!settings.enabled || !quote.remindersEnabled || quote.remindersPausedAt || isQuoteClosedForReminders(quote)) {
+    return null;
+  }
+
+  const effectiveStatus = getEffectiveQuoteStatus(quote.status, quote.expiresAt);
+  if (!actionableQuoteStatuses.includes(effectiveStatus)) {
+    return null;
+  }
+
+  const dueCandidates: QuoteReminderStageEvaluation[] = [];
+
+  if (quote.sentAt && !quote.firstViewedAt) {
+    const first = addBusinessDays(quote.sentAt, settings.sentNotViewedFirstBusinessDays);
+    dueCandidates.push({
+      type: quoteReminderTypeValues.sent_not_viewed_first,
+      scheduledFor: first,
+      stageLabel: "sent_not_viewed_first",
+      templateKey: "sentNotViewed",
+      dedupeKey: `${quote.id}:${quoteReminderTypeValues.sent_not_viewed_first}`
+    });
+
+    const second = addBusinessDays(quote.sentAt, settings.sentNotViewedSecondBusinessDays);
+    dueCandidates.push({
+      type: quoteReminderTypeValues.sent_not_viewed_second,
+      scheduledFor: second,
+      stageLabel: "sent_not_viewed_second",
+      templateKey: "sentNotViewed",
+      dedupeKey: `${quote.id}:${quoteReminderTypeValues.sent_not_viewed_second}`
+    });
+  }
+
+  if (quote.firstViewedAt && !quote.approvedAt && !quote.declinedAt) {
+    const first = addBusinessDays(quote.firstViewedAt, settings.viewedPendingFirstBusinessDays);
+    dueCandidates.push({
+      type: quoteReminderTypeValues.viewed_pending_first,
+      scheduledFor: first,
+      stageLabel: "viewed_pending_first",
+      templateKey: "viewedPending",
+      dedupeKey: `${quote.id}:${quoteReminderTypeValues.viewed_pending_first}`
+    });
+
+    const second = addBusinessDays(quote.firstViewedAt, settings.viewedPendingSecondBusinessDays);
+    dueCandidates.push({
+      type: quoteReminderTypeValues.viewed_pending_second,
+      scheduledFor: second,
+      stageLabel: "viewed_pending_second",
+      templateKey: "viewedPending",
+      dedupeKey: `${quote.id}:${quoteReminderTypeValues.viewed_pending_second}`
+    });
+  }
+
+  if (quote.expiresAt) {
+    const expirationReminderDate = startOfDay(subDays(quote.expiresAt, settings.expiringSoonDays));
+    dueCandidates.push({
+      type: quoteReminderTypeValues.expiring_soon,
+      scheduledFor: expirationReminderDate,
+      stageLabel: "expiring_soon",
+      templateKey: "expiringSoon",
+      dedupeKey: `${quote.id}:${quoteReminderTypeValues.expiring_soon}`
+    });
+  }
+
+  const autoCandidates = dueCandidates
+    .filter((candidate) => !existingDedupeKeys.has(candidate.dedupeKey))
+    .sort((left, right) => left.scheduledFor.getTime() - right.scheduledFor.getTime());
+
+  const limitedCandidates = autoCandidates.slice(0, Math.max(1, settings.maxAutoReminders));
+  return limitedCandidates[0] ?? null;
+}
+
+function buildExpiredFollowUpSchedule(quote: ReminderEvaluationQuote, settings: QuoteReminderSettings) {
+  if (!settings.enabled || !settings.expiredFollowUpEnabled || !quote.remindersEnabled || quote.remindersPausedAt || !quote.expiresAt) {
+    return null;
+  }
+  if (quote.approvedAt || quote.declinedAt || quote.convertedAt || quote.status === QuoteStatus.cancelled) {
+    return null;
+  }
+  if (!isQuoteEffectivelyExpired(quote.status, quote.expiresAt)) {
+    return null;
+  }
+  return {
+    type: quoteReminderTypeValues.expired_follow_up,
+    scheduledFor: addDays(endOfDay(quote.expiresAt), settings.expiredFollowUpDays),
+    stageLabel: "expired_follow_up",
+    templateKey: "expired",
+    dedupeKey: `${quote.id}:${quoteReminderTypeValues.expired_follow_up}`
+  } satisfies QuoteReminderStageEvaluation;
 }
 
 function createQuoteAccessToken() {
@@ -276,6 +514,15 @@ async function getTenantQuickBooksIntegrationId(tenantId: string) {
   });
 
   return tenant?.quickbooksRealmId ?? null;
+}
+
+async function getTenantQuoteReminderSettingsByTenantId(tenantId: string) {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { quoteReminderSettings: true }
+  });
+
+  return normalizeQuoteReminderSettings(tenant?.quoteReminderSettings);
 }
 
 async function resolveMappedQbItemId(tenantId: string, internalCode: string) {
@@ -363,6 +610,79 @@ async function createQuoteAuditLog(input: {
   });
 }
 
+async function refreshQuoteReminderState(quoteId: string) {
+  const quote = await prisma.quote.findUnique({
+    where: { id: quoteId },
+    select: {
+      id: true,
+      tenantId: true,
+      status: true,
+      sentAt: true,
+      firstViewedAt: true,
+      expiresAt: true,
+      approvedAt: true,
+      declinedAt: true,
+      convertedAt: true,
+      remindersEnabled: true,
+      remindersPausedAt: true,
+      reminderCount: true
+    }
+  });
+
+  if (!quote) {
+    return null;
+  }
+
+  const [settings, existingDispatches] = await Promise.all([
+    getTenantQuoteReminderSettingsByTenantId(quote.tenantId),
+    prisma.quoteReminderDispatch.findMany({
+      where: { quoteId },
+      select: {
+        dedupeKey: true,
+        reminderType: true,
+        status: true,
+        sentAt: true,
+        attemptedAt: true
+      }
+    })
+  ]);
+
+  const existingDedupeKeys = new Set(existingDispatches.map((dispatch) => dispatch.dedupeKey).filter((value): value is string => Boolean(value)));
+  const nextAutoReminder = evaluateQuoteReminderStage(quote, settings, existingDedupeKeys);
+  const expiredFollowUp = buildExpiredFollowUpSchedule(quote, settings);
+  const expiredCandidate = expiredFollowUp && !existingDedupeKeys.has(expiredFollowUp.dedupeKey) ? expiredFollowUp : null;
+  const nextReminder = [nextAutoReminder, expiredCandidate]
+    .filter((item): item is QuoteReminderStageEvaluation => Boolean(item))
+    .sort((left, right) => left.scheduledFor.getTime() - right.scheduledFor.getTime())[0] ?? null;
+
+  const latestSentReminder = existingDispatches
+    .filter((dispatch) => dispatch.status === quoteReminderDispatchStatusValues.sent && dispatch.sentAt)
+    .sort((left, right) => (right.sentAt?.getTime() ?? 0) - (left.sentAt?.getTime() ?? 0))[0] ?? null;
+  const latestFailedReminder = existingDispatches
+    .filter((dispatch) => dispatch.status === quoteReminderDispatchStatusValues.failed && dispatch.attemptedAt)
+    .sort((left, right) => (right.attemptedAt?.getTime() ?? 0) - (left.attemptedAt?.getTime() ?? 0))[0] ?? null;
+
+  await prisma.quote.update({
+    where: { id: quoteId },
+    data: {
+      nextReminderAt: nextReminder?.scheduledFor ?? null,
+      reminderStage: quote.remindersPausedAt
+        ? "paused"
+        : !quote.remindersEnabled
+          ? "disabled"
+          : nextReminder?.stageLabel ?? (isQuoteEffectivelyExpired(quote.status, quote.expiresAt) ? "expired_closed" : null),
+      lastReminderAt: latestSentReminder?.sentAt ?? null,
+      reminderError: latestFailedReminder ? "Last reminder attempt failed." : null,
+      reminderCount: existingDispatches.filter((dispatch) => dispatch.status === quoteReminderDispatchStatusValues.sent).length
+    }
+  });
+
+  return {
+    nextReminderAt: nextReminder?.scheduledFor ?? null,
+    reminderStage: nextReminder?.stageLabel ?? null
+  };
+}
+
 async function ensureQuoteAccessTokenForQuote(input: {
   quoteId: string;
   expiresAt: Date | null;
@@ -443,6 +763,8 @@ async function recordQuoteViewed(input: {
       recipientEmail: normalizeNullableString(input.recipientEmail)
     }
   });
+
+  await refreshQuoteReminderState(input.quoteId);
 
   return {
     viewedAt: now,
@@ -632,6 +954,44 @@ export async function getQuoteFormOptions(actor: ActorContext) {
   };
 }
 
+export async function getQuoteReminderSettings(actor: ActorContext) {
+  const parsedActor = parseActor(actor);
+  assertAdminRole(parsedActor.role);
+  return getTenantQuoteReminderSettingsByTenantId(parsedActor.tenantId as string);
+}
+
+export async function updateQuoteReminderSettings(actor: ActorContext, input: QuoteReminderSettingsInput) {
+  const parsedActor = parseActor(actor);
+  assertAdminRole(parsedActor.role);
+  const parsedInput = quoteReminderSettingsInputSchema.parse(input);
+
+  await prisma.tenant.update({
+    where: { id: parsedActor.tenantId as string },
+    data: {
+      quoteReminderSettings: parsedInput
+    }
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      tenantId: parsedActor.tenantId as string,
+      actorUserId: parsedActor.userId,
+      action: "quote.reminder_settings_updated",
+      entityType: "Tenant",
+      entityId: parsedActor.tenantId as string,
+      metadata: parsedInput as Prisma.InputJsonValue
+    }
+  });
+
+  const tenantQuotes = await prisma.quote.findMany({
+    where: { tenantId: parsedActor.tenantId as string },
+    select: { id: true }
+  });
+  await Promise.all(tenantQuotes.map((quote) => refreshQuoteReminderState(quote.id)));
+
+  return parsedInput;
+}
+
 export async function createQuote(actor: ActorContext, input: QuoteInput) {
   const parsedActor = parseActor(actor);
   assertAdminRole(parsedActor.role);
@@ -674,6 +1034,8 @@ export async function createQuote(actor: ActorContext, input: QuoteInput) {
     quoteId: quote.id,
     metadata: { quoteNumber }
   });
+
+  await refreshQuoteReminderState(quote.id);
 
   return quote;
 }
@@ -731,6 +1093,8 @@ export async function updateQuote(actor: ActorContext, quoteId: string, input: Q
       quickbooksEstimateId: existing.quickbooksEstimateId
     }
   });
+
+  await refreshQuoteReminderState(quoteId);
 
   return updated;
 }
@@ -870,7 +1234,16 @@ export async function getQuoteWorkspaceData(
         customerCompany,
         site,
         effectiveStatus,
-        engagementStatus: getHostedQuoteAvailability(quote)
+        engagementStatus: getHostedQuoteAvailability(quote),
+        reminderStatus: quote.remindersPausedAt
+          ? "paused"
+          : !quote.remindersEnabled
+            ? "disabled"
+            : quote.nextReminderAt
+              ? "scheduled"
+              : quote.lastReminderAt
+                ? "sent"
+                : "idle"
       };
     })
     .filter((quote) => requestedStatus === "all" || quote.effectiveStatus === requestedStatus)
@@ -894,7 +1267,7 @@ export async function getQuoteDetail(actor: ActorContext, quoteId: string) {
   const parsedActor = parseActor(actor);
   assertAdminRole(parsedActor.role);
 
-  const [quote, auditLogs, formOptions] = await Promise.all([
+  const [quote, auditLogs, formOptions, reminderSettings, reminderDispatches] = await Promise.all([
     getQuoteByIdForTenant(parsedActor.tenantId as string, quoteId),
     prisma.auditLog.findMany({
       where: {
@@ -909,7 +1282,15 @@ export async function getQuoteDetail(actor: ActorContext, quoteId: string) {
       },
       orderBy: { createdAt: "desc" }
     }),
-    getQuoteFormOptions(actor)
+    getQuoteFormOptions(actor),
+    getTenantQuoteReminderSettingsByTenantId(parsedActor.tenantId as string),
+    prisma.quoteReminderDispatch.findMany({
+      where: {
+        tenantId: parsedActor.tenantId as string,
+        quoteId
+      },
+      orderBy: { createdAt: "desc" }
+    })
   ]);
 
   if (!quote) {
@@ -1008,6 +1389,8 @@ export async function getQuoteDetail(actor: ActorContext, quoteId: string) {
     effectiveStatus: getEffectiveQuoteStatus(quote.status, quote.expiresAt),
     engagementStatus: getHostedQuoteAvailability(quote),
     hostedQuoteUrl: quote.quoteAccessToken ? buildQuoteAccessUrl(quote.quoteAccessToken) : null,
+    reminderSettings,
+    reminderDispatches,
     lineItems,
     auditLogs,
     formOptions
@@ -1253,7 +1636,444 @@ export async function sendQuote(actor: ActorContext, quoteId: string, input?: { 
     throw new Error(delivery.error ?? "Quote email failed to send.");
   }
 
+  await refreshQuoteReminderState(quote.id);
+
   return delivery;
+}
+
+function getReminderTemplateForType(settings: QuoteReminderSettings, type: QuoteReminderType) {
+  if (type === quoteReminderTypeValues.sent_not_viewed_first || type === quoteReminderTypeValues.sent_not_viewed_second) {
+    return settings.templates.sentNotViewed;
+  }
+  if (type === quoteReminderTypeValues.viewed_pending_first || type === quoteReminderTypeValues.viewed_pending_second || type === quoteReminderTypeValues.manual_follow_up) {
+    return settings.templates.viewedPending;
+  }
+  if (type === quoteReminderTypeValues.expiring_soon) {
+    return settings.templates.expiringSoon;
+  }
+  return settings.templates.expired;
+}
+
+function buildReminderTitle(type: QuoteReminderType, quoteNumber: string) {
+  switch (type) {
+    case quoteReminderTypeValues.sent_not_viewed_first:
+    case quoteReminderTypeValues.sent_not_viewed_second:
+      return `Quote ${quoteNumber} is ready to review`;
+    case quoteReminderTypeValues.viewed_pending_first:
+    case quoteReminderTypeValues.viewed_pending_second:
+    case quoteReminderTypeValues.manual_follow_up:
+      return `Quote ${quoteNumber} is ready when you are`;
+    case quoteReminderTypeValues.expiring_soon:
+      return `Quote ${quoteNumber} is expiring soon`;
+    case quoteReminderTypeValues.expired_follow_up:
+      return `Quote ${quoteNumber} has expired`;
+    default:
+      return `Quote ${quoteNumber} follow-up`;
+  }
+}
+
+async function sendQuoteReminderInternal(input: {
+  quoteId: string;
+  tenantId: string;
+  reminderType: QuoteReminderType;
+  dedupeKey?: string | null;
+  actorUserId?: string | null;
+  manual?: boolean;
+}) {
+  const quote = await prisma.quote.findFirst({
+    where: { id: input.quoteId, tenantId: input.tenantId },
+    include: {
+      tenant: {
+        select: {
+          id: true,
+          name: true,
+          branding: true,
+          billingEmail: true,
+          quoteReminderSettings: true
+        }
+      },
+      customerCompany: {
+        select: {
+          id: true,
+          name: true,
+          contactName: true,
+          billingEmail: true,
+          phone: true
+        }
+      },
+      site: {
+        select: {
+          id: true,
+          name: true
+        }
+      }
+    }
+  });
+
+  if (!quote) {
+    throw new Error("Quote not found.");
+  }
+
+  const effectiveStatus = getEffectiveQuoteStatus(quote.status, quote.expiresAt);
+  if (closedQuoteStatuses.includes(effectiveStatus) || effectiveStatus === QuoteStatus.expired && input.reminderType !== quoteReminderTypeValues.expired_follow_up) {
+    await createQuoteAuditLog({
+      tenantId: quote.tenantId,
+      actorUserId: input.actorUserId ?? null,
+      action: "quote.reminder_skipped",
+      quoteId: quote.id,
+      metadata: {
+        reminderType: input.reminderType,
+        reason: "quote_no_longer_actionable"
+      }
+    });
+    return { sent: false, skipped: true, reason: "quote_no_longer_actionable" as const };
+  }
+
+  if (!quote.remindersEnabled || quote.remindersPausedAt) {
+    await createQuoteAuditLog({
+      tenantId: quote.tenantId,
+      actorUserId: input.actorUserId ?? null,
+      action: "quote.reminder_skipped",
+      quoteId: quote.id,
+      metadata: {
+        reminderType: input.reminderType,
+        reason: quote.remindersPausedAt ? "reminders_paused" : "reminders_disabled"
+      }
+    });
+    return { sent: false, skipped: true, reason: quote.remindersPausedAt ? "reminders_paused" as const : "reminders_disabled" as const };
+  }
+
+  const recipientEmail = normalizeNullableString(quote.recipientEmail) ?? normalizeNullableString(quote.customerCompany.billingEmail);
+  if (!recipientEmail) {
+    await prisma.quote.update({
+      where: { id: quote.id },
+      data: {
+        reminderError: "Missing recipient email for reminders.",
+        nextReminderAt: null
+      }
+    });
+    await createQuoteAuditLog({
+      tenantId: quote.tenantId,
+      actorUserId: input.actorUserId ?? null,
+      action: "quote.reminder_failed",
+      quoteId: quote.id,
+      metadata: {
+        reminderType: input.reminderType,
+        reason: "missing_recipient_email"
+      }
+    });
+    return { sent: false, skipped: true, reason: "missing_recipient_email" as const };
+  }
+
+  const settings = normalizeQuoteReminderSettings(quote.tenant.quoteReminderSettings);
+  const template = getReminderTemplateForType(settings, input.reminderType);
+  const hostedQuoteUrl = quote.quoteAccessToken ? buildQuoteAccessUrl(quote.quoteAccessToken) : null;
+  if (!hostedQuoteUrl) {
+    await createQuoteAuditLog({
+      tenantId: quote.tenantId,
+      actorUserId: input.actorUserId ?? null,
+      action: "quote.reminder_failed",
+      quoteId: quote.id,
+      metadata: {
+        reminderType: input.reminderType,
+        reason: "missing_hosted_quote_link"
+      }
+    });
+    return { sent: false, skipped: true, reason: "missing_hosted_quote_link" as const };
+  }
+
+  const mergeValues = {
+    quoteNumber: quote.quoteNumber,
+    customerName: quote.customerCompany.name,
+    total: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(quote.total)
+  };
+  const subjectLine = interpolateReminderTemplate(template.subject, mergeValues);
+  const messageBody = interpolateReminderTemplate(template.body, mergeValues);
+
+  const dispatch = await prisma.quoteReminderDispatch.create({
+    data: {
+      tenantId: quote.tenantId,
+      quoteId: quote.id,
+      reminderType: input.reminderType,
+      status: quoteReminderDispatchStatusValues.pending,
+      dedupeKey: input.dedupeKey ?? undefined,
+      recipientEmail,
+      scheduledFor: new Date()
+    }
+  }).catch(async (error) => {
+    if (input.dedupeKey && error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return prisma.quoteReminderDispatch.findFirst({
+        where: {
+          quoteId: quote.id,
+          dedupeKey: input.dedupeKey
+        }
+      });
+    }
+    throw error;
+  });
+
+  if (!dispatch) {
+    return { sent: false, skipped: true, reason: "duplicate_dispatch" as const };
+  }
+
+  if (dispatch.status === quoteReminderDispatchStatusValues.sent || dispatch.status === quoteReminderDispatchStatusValues.skipped) {
+    return { sent: false, skipped: true, reason: "duplicate_dispatch" as const };
+  }
+
+  const delivery = await sendQuoteReminderEmail({
+    recipientEmail,
+    recipientName: quote.contactName ?? quote.customerCompany.contactName ?? quote.customerCompany.name,
+    tenantName: quote.tenant.name,
+    quoteNumber: quote.quoteNumber,
+    customerName: quote.customerCompany.name,
+    siteName: quote.site?.name ?? null,
+    quoteUrl: hostedQuoteUrl,
+    quoteTotal: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(quote.total),
+    reminderTitle: buildReminderTitle(input.reminderType, quote.quoteNumber),
+    subjectLine,
+    messageBody,
+    actionLabel: input.reminderType === quoteReminderTypeValues.expired_follow_up ? "View expired quote" : "View quote",
+    expiresAt: quote.expiresAt
+  });
+
+  await prisma.quoteReminderDispatch.update({
+    where: { id: dispatch.id },
+    data: {
+      status: delivery.sent ? quoteReminderDispatchStatusValues.sent : quoteReminderDispatchStatusValues.failed,
+      attemptedAt: new Date(),
+      sentAt: delivery.sent ? new Date() : null,
+      messageId: delivery.messageId,
+      error: delivery.error
+    }
+  });
+
+  await prisma.quote.update({
+    where: { id: quote.id },
+    data: {
+      lastReminderAt: delivery.sent ? new Date() : quote.lastReminderAt,
+      reminderError: delivery.sent ? null : (delivery.error ?? "Reminder send failed.")
+    }
+  });
+
+  await createQuoteAuditLog({
+    tenantId: quote.tenantId,
+    actorUserId: input.actorUserId ?? null,
+    action: delivery.sent ? "quote.reminder_sent" : "quote.reminder_failed",
+    quoteId: quote.id,
+    metadata: {
+      reminderType: input.reminderType,
+      recipientEmail,
+      messageId: delivery.messageId,
+      manual: input.manual ?? false,
+      error: delivery.error
+    }
+  });
+
+  await refreshQuoteReminderState(quote.id);
+
+  if (!delivery.sent) {
+    throw new Error(delivery.error ?? "Unable to send quote reminder.");
+  }
+
+  return { sent: true, skipped: false, delivery };
+}
+
+export async function updateQuoteReminderControl(
+  actor: ActorContext,
+  quoteId: string,
+  action: "pause" | "resume" | "disable" | "enable"
+) {
+  const parsedActor = parseActor(actor);
+  assertAdminRole(parsedActor.role);
+
+  const quote = await prisma.quote.findFirst({
+    where: { id: quoteId, tenantId: parsedActor.tenantId as string },
+    select: { id: true }
+  });
+
+  if (!quote) {
+    throw new Error("Quote not found.");
+  }
+
+  const now = new Date();
+  await prisma.quote.update({
+    where: { id: quoteId },
+    data: action === "pause"
+      ? {
+          remindersEnabled: true,
+          remindersPausedAt: now,
+          remindersPausedByUserId: parsedActor.userId,
+          nextReminderAt: null,
+          reminderStage: "paused"
+        }
+      : action === "resume"
+        ? {
+            remindersEnabled: true,
+            remindersPausedAt: null,
+            remindersPausedByUserId: null
+          }
+        : action === "disable"
+          ? {
+              remindersEnabled: false,
+              remindersPausedAt: null,
+              remindersPausedByUserId: null,
+              nextReminderAt: null,
+              reminderStage: "disabled"
+            }
+          : {
+              remindersEnabled: true,
+              remindersPausedAt: null,
+              remindersPausedByUserId: null
+            }
+  });
+
+  await createQuoteAuditLog({
+    tenantId: parsedActor.tenantId as string,
+    actorUserId: parsedActor.userId,
+    action: `quote.reminders_${action}`,
+    quoteId,
+    metadata: {
+      action
+    }
+  });
+
+  await refreshQuoteReminderState(quoteId);
+}
+
+export async function sendQuoteReminderNow(actor: ActorContext, quoteId: string) {
+  const parsedActor = parseActor(actor);
+  assertAdminRole(parsedActor.role);
+
+  const quote = await prisma.quote.findFirst({
+    where: { id: quoteId, tenantId: parsedActor.tenantId as string },
+    select: {
+      id: true,
+      tenantId: true,
+      status: true,
+      sentAt: true,
+      firstViewedAt: true,
+      expiresAt: true,
+      approvedAt: true,
+      declinedAt: true,
+      convertedAt: true,
+      remindersEnabled: true,
+      remindersPausedAt: true,
+      reminderCount: true
+    }
+  });
+
+  if (!quote) {
+    throw new Error("Quote not found.");
+  }
+
+  const settings = await getTenantQuoteReminderSettingsByTenantId(parsedActor.tenantId as string);
+  const existingDispatches = await prisma.quoteReminderDispatch.findMany({
+    where: { quoteId },
+    select: { dedupeKey: true }
+  });
+  const nextReminder = evaluateQuoteReminderStage(
+    quote,
+    settings,
+    new Set(existingDispatches.map((dispatch) => dispatch.dedupeKey).filter((value): value is string => Boolean(value)))
+  );
+  const expiredReminder = buildExpiredFollowUpSchedule(quote, settings);
+  const selectedType = nextReminder?.type
+    ?? expiredReminder?.type
+    ?? (quote.firstViewedAt ? quoteReminderTypeValues.viewed_pending_first : quoteReminderTypeValues.sent_not_viewed_first);
+
+  return sendQuoteReminderInternal({
+    quoteId,
+    tenantId: parsedActor.tenantId as string,
+    reminderType: selectedType,
+    dedupeKey: `manual:${quoteId}:${Date.now()}`,
+    actorUserId: parsedActor.userId,
+    manual: true
+  });
+}
+
+export async function runQuoteReminderSweep(options?: { tenantId?: string | null; limit?: number }) {
+  const where: Prisma.QuoteWhereInput = {
+    remindersEnabled: true,
+    remindersPausedAt: null,
+    status: {
+      in: [QuoteStatus.sent, QuoteStatus.viewed, QuoteStatus.ready_to_send]
+    }
+  };
+
+  if (options?.tenantId) {
+    where.tenantId = options.tenantId;
+  }
+
+  const quotes = await prisma.quote.findMany({
+    where,
+    select: {
+      id: true,
+      tenantId: true,
+      status: true,
+      sentAt: true,
+      firstViewedAt: true,
+      expiresAt: true,
+      approvedAt: true,
+      declinedAt: true,
+      convertedAt: true,
+      remindersEnabled: true,
+      remindersPausedAt: true,
+      reminderCount: true
+    },
+    take: options?.limit ?? 200,
+    orderBy: [{ nextReminderAt: "asc" }, { sentAt: "asc" }]
+  });
+
+  let sentCount = 0;
+  let skippedCount = 0;
+  const now = new Date();
+
+  for (const quote of quotes) {
+    const [settings, existingDispatches] = await Promise.all([
+      getTenantQuoteReminderSettingsByTenantId(quote.tenantId),
+      prisma.quoteReminderDispatch.findMany({
+        where: { quoteId: quote.id },
+        select: { dedupeKey: true }
+      })
+    ]);
+
+    const dedupeKeys = new Set(existingDispatches.map((dispatch) => dispatch.dedupeKey).filter((value): value is string => Boolean(value)));
+    const nextReminder = evaluateQuoteReminderStage(quote, settings, dedupeKeys);
+    const expiredReminder = buildExpiredFollowUpSchedule(quote, settings);
+    const dueReminder = [nextReminder, expiredReminder]
+      .filter((item): item is QuoteReminderStageEvaluation => Boolean(item))
+      .filter((item) => item.scheduledFor.getTime() <= now.getTime())
+      .sort((left, right) => left.scheduledFor.getTime() - right.scheduledFor.getTime())[0] ?? null;
+
+    if (!dueReminder) {
+      await refreshQuoteReminderState(quote.id);
+      continue;
+    }
+
+    try {
+      const result = await sendQuoteReminderInternal({
+        quoteId: quote.id,
+        tenantId: quote.tenantId,
+        reminderType: dueReminder.type,
+        dedupeKey: dueReminder.dedupeKey,
+        actorUserId: null,
+        manual: false
+      });
+      if (result.sent) {
+        sentCount += 1;
+      } else {
+        skippedCount += 1;
+      }
+    } catch {
+      skippedCount += 1;
+    }
+  }
+
+  return {
+    processed: quotes.length,
+    sentCount,
+    skippedCount
+  };
 }
 
 export async function updateQuoteStatus(
@@ -1299,6 +2119,8 @@ export async function updateQuoteStatus(
       note: normalizeNullableString(options?.note)
     }
   });
+
+  await refreshQuoteReminderState(quoteId);
 }
 
 function defaultConversionStart() {
@@ -1376,6 +2198,8 @@ export async function convertQuoteToInspection(actor: ActorContext, quoteId: str
       inspectionId: inspection.id
     }
   });
+
+  await refreshQuoteReminderState(quote.id);
 
   return inspection;
 }
@@ -1606,6 +2430,8 @@ async function respondToQuoteByAccessToken(input: {
       recipientEmail: updated.quoteAccessTokenSentToEmail ?? updated.recipientEmail
     }
   });
+
+  await refreshQuoteReminderState(updated.id);
 
   return {
     accessState: input.response,

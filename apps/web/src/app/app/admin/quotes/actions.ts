@@ -13,10 +13,14 @@ import {
   clearQuoteLineItemQuickBooksMapping,
   createQuote,
   quoteInputSchema,
+  getQuoteReminderSettings,
   saveQuoteLineItemQuickBooksMapping,
+  sendQuoteReminderNow,
   sendQuote,
   syncQuoteToQuickBooksEstimate,
   updateQuote,
+  updateQuoteReminderControl,
+  updateQuoteReminderSettings,
   updateQuoteStatus,
   convertQuoteToInspection
 } from "@testworx/lib";
@@ -294,5 +298,95 @@ export async function regenerateQuoteLinkAction(formData: FormData) {
       throw error;
     }
     redirect(quoteDetailHref(quoteId, { error: error instanceof Error ? error.message : "Unable to refresh hosted quote link." }));
+  }
+}
+
+export async function sendQuoteReminderNowAction(formData: FormData) {
+  const session = await auth();
+  const quoteId = String(formData.get("quoteId") ?? "");
+  if (!session?.user?.tenantId || !quoteId) {
+    redirect("/login");
+  }
+
+  try {
+    await sendQuoteReminderNow(getActor(getQuoteActionSession(session)), quoteId);
+    revalidatePath("/app/admin/quotes");
+    revalidatePath(`/app/admin/quotes/${quoteId}`);
+    redirect(quoteDetailHref(quoteId, { status: "reminder_sent" }));
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+    redirect(quoteDetailHref(quoteId, { error: error instanceof Error ? error.message : "Unable to send reminder." }));
+  }
+}
+
+export async function updateQuoteReminderControlAction(formData: FormData) {
+  const session = await auth();
+  const quoteId = String(formData.get("quoteId") ?? "");
+  const action = String(formData.get("reminderAction") ?? "") as "pause" | "resume" | "disable" | "enable";
+  if (!session?.user?.tenantId || !quoteId) {
+    redirect("/login");
+  }
+
+  try {
+    await updateQuoteReminderControl(getActor(getQuoteActionSession(session)), quoteId, action);
+    revalidatePath("/app/admin/quotes");
+    revalidatePath(`/app/admin/quotes/${quoteId}`);
+    redirect(quoteDetailHref(quoteId, { status: `reminders_${action}` }));
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+    redirect(quoteDetailHref(quoteId, { error: error instanceof Error ? error.message : "Unable to update reminders." }));
+  }
+}
+
+export async function updateQuoteReminderSettingsAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    redirect("/login");
+  }
+
+  const currentSettings = await getQuoteReminderSettings(getActor(getQuoteActionSession(session)));
+
+  try {
+    await updateQuoteReminderSettings(getActor(getQuoteActionSession(session)), {
+      enabled: formData.get("enabled") === "on",
+      sentNotViewedFirstBusinessDays: Number(formData.get("sentNotViewedFirstBusinessDays") ?? currentSettings.sentNotViewedFirstBusinessDays),
+      sentNotViewedSecondBusinessDays: Number(formData.get("sentNotViewedSecondBusinessDays") ?? currentSettings.sentNotViewedSecondBusinessDays),
+      viewedPendingFirstBusinessDays: Number(formData.get("viewedPendingFirstBusinessDays") ?? currentSettings.viewedPendingFirstBusinessDays),
+      viewedPendingSecondBusinessDays: Number(formData.get("viewedPendingSecondBusinessDays") ?? currentSettings.viewedPendingSecondBusinessDays),
+      expiringSoonDays: Number(formData.get("expiringSoonDays") ?? currentSettings.expiringSoonDays),
+      expiredFollowUpEnabled: formData.get("expiredFollowUpEnabled") === "on",
+      expiredFollowUpDays: Number(formData.get("expiredFollowUpDays") ?? currentSettings.expiredFollowUpDays),
+      maxAutoReminders: Number(formData.get("maxAutoReminders") ?? currentSettings.maxAutoReminders),
+      templates: {
+        sentNotViewed: {
+          subject: String(formData.get("templateSentNotViewedSubject") ?? currentSettings.templates.sentNotViewed.subject),
+          body: String(formData.get("templateSentNotViewedBody") ?? currentSettings.templates.sentNotViewed.body)
+        },
+        viewedPending: {
+          subject: String(formData.get("templateViewedPendingSubject") ?? currentSettings.templates.viewedPending.subject),
+          body: String(formData.get("templateViewedPendingBody") ?? currentSettings.templates.viewedPending.body)
+        },
+        expiringSoon: {
+          subject: String(formData.get("templateExpiringSoonSubject") ?? currentSettings.templates.expiringSoon.subject),
+          body: String(formData.get("templateExpiringSoonBody") ?? currentSettings.templates.expiringSoon.body)
+        },
+        expired: {
+          subject: String(formData.get("templateExpiredSubject") ?? currentSettings.templates.expired.subject),
+          body: String(formData.get("templateExpiredBody") ?? currentSettings.templates.expired.body)
+        }
+      }
+    });
+    revalidatePath("/app/admin/settings");
+    revalidatePath("/app/admin/quotes");
+    redirect("/app/admin/settings?quoteReminders=updated");
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+    redirect(`/app/admin/settings?quoteReminders=${encodeURIComponent(error instanceof Error ? error.message : "Unable to update quote reminders.")}`);
   }
 }

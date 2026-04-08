@@ -22,8 +22,10 @@ import {
   saveQuickBooksItemMappingForCode,
   clearQuickBooksItemMappingForCode,
   syncQuickBooksCustomers,
+  quoteReminderSettingsInputSchema,
   updateCustomerCompany,
   getTenantBrandingSettings,
+  updateQuoteReminderSettings,
   updateQuickBooksCatalogItem,
   updateServiceFeeRule,
   updateTenantBranding,
@@ -582,6 +584,60 @@ export async function updateDefaultServiceFeeAction(_: { error: string | null; s
     return { error: null, success: "Default service fee updated." };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unable to update default service fee.", success: null };
+  }
+}
+
+export async function updateQuoteReminderSettingsAction(_: { error: string | null; success: string | null }, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { error: "Unauthorized", success: null };
+  }
+
+  const parsed = quoteReminderSettingsInputSchema.safeParse({
+    enabled: formData.get("enabled") === "on",
+    sentNotViewedFirstBusinessDays: Number(formData.get("sentNotViewedFirstBusinessDays") ?? "2"),
+    sentNotViewedSecondBusinessDays: Number(formData.get("sentNotViewedSecondBusinessDays") ?? "5"),
+    viewedPendingFirstBusinessDays: Number(formData.get("viewedPendingFirstBusinessDays") ?? "2"),
+    viewedPendingSecondBusinessDays: Number(formData.get("viewedPendingSecondBusinessDays") ?? "5"),
+    expiringSoonDays: Number(formData.get("expiringSoonDays") ?? "2"),
+    expiredFollowUpEnabled: formData.get("expiredFollowUpEnabled") === "on",
+    expiredFollowUpDays: Number(formData.get("expiredFollowUpDays") ?? "1"),
+    maxAutoReminders: Number(formData.get("maxAutoReminders") ?? "5"),
+    templates: {
+      sentNotViewed: {
+        subject: String(formData.get("templateSentNotViewedSubject") ?? ""),
+        body: String(formData.get("templateSentNotViewedBody") ?? "")
+      },
+      viewedPending: {
+        subject: String(formData.get("templateViewedPendingSubject") ?? ""),
+        body: String(formData.get("templateViewedPendingBody") ?? "")
+      },
+      expiringSoon: {
+        subject: String(formData.get("templateExpiringSoonSubject") ?? ""),
+        body: String(formData.get("templateExpiringSoonBody") ?? "")
+      },
+      expired: {
+        subject: String(formData.get("templateExpiredSubject") ?? ""),
+        body: String(formData.get("templateExpiredBody") ?? "")
+      }
+    }
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid quote reminder settings.", success: null };
+  }
+
+  try {
+    await updateQuoteReminderSettings(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      parsed.data
+    );
+
+    revalidatePath("/app/admin/settings");
+    revalidatePath("/app/admin/quotes");
+    return { error: null, success: "Quote reminder settings updated." };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Unable to update quote reminder settings.", success: null };
   }
 }
 

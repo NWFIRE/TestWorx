@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { QuoteStatus, QuoteSyncStatus, QuoteDeliveryStatus } from "@prisma/client";
+import { QuoteDeliveryStatus, QuoteStatus, QuoteSyncStatus } from "@prisma/client";
 import { addDays } from "date-fns";
 
-const { prismaMock, sendQuoteEmailMock, syncQuoteToQuickBooksEstimateMock, createInspectionMock, saveQuickBooksItemMappingForCodeMock, clearQuickBooksItemMappingForCodeMock, generateQuotePdfMock } = vi.hoisted(() => ({
+const { prismaMock, sendQuoteEmailMock, sendQuoteReminderEmailMock, syncQuoteToQuickBooksEstimateMock, createInspectionMock, saveQuickBooksItemMappingForCodeMock, clearQuickBooksItemMappingForCodeMock, generateQuotePdfMock } = vi.hoisted(() => ({
   prismaMock: {
     quote: {
       count: vi.fn(),
       create: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
+      findUnique: vi.fn(),
       update: vi.fn()
     },
     quoteLineItem: {
@@ -17,10 +18,17 @@ const { prismaMock, sendQuoteEmailMock, syncQuoteToQuickBooksEstimateMock, creat
       update: vi.fn()
     },
     tenant: {
-      findUnique: vi.fn()
+      findUnique: vi.fn(),
+      update: vi.fn()
     },
     quickBooksItemMap: {
       findUnique: vi.fn()
+    },
+    quoteReminderDispatch: {
+      create: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn()
     },
     auditLog: {
       create: vi.fn(),
@@ -39,6 +47,7 @@ const { prismaMock, sendQuoteEmailMock, syncQuoteToQuickBooksEstimateMock, creat
     }
   },
   sendQuoteEmailMock: vi.fn(),
+  sendQuoteReminderEmailMock: vi.fn(),
   syncQuoteToQuickBooksEstimateMock: vi.fn(),
   createInspectionMock: vi.fn(),
   saveQuickBooksItemMappingForCodeMock: vi.fn(),
@@ -51,7 +60,8 @@ vi.mock("@testworx/db", () => ({
 }));
 
 vi.mock("../account-email", () => ({
-  sendQuoteEmail: sendQuoteEmailMock
+  sendQuoteEmail: sendQuoteEmailMock,
+  sendQuoteReminderEmail: sendQuoteReminderEmailMock
 }));
 
 vi.mock("../env", () => ({
@@ -84,9 +94,13 @@ import {
   getCustomerQuoteDetail,
   getQuoteFormOptions,
   getQuoteWorkspaceData,
+  runQuoteReminderSweep,
   saveQuoteLineItemQuickBooksMapping,
+  sendQuoteReminderNow,
   clearQuoteLineItemQuickBooksMapping,
-  sendQuote
+  sendQuote,
+  updateQuoteReminderControl,
+  updateQuoteReminderSettings
 } from "../quotes";
 
 describe("quotes", () => {
@@ -99,7 +113,30 @@ describe("quotes", () => {
     prismaMock.auditLog.create.mockResolvedValue(undefined);
     prismaMock.auditLog.findMany.mockResolvedValue([]);
     prismaMock.quoteLineItem.findMany.mockResolvedValue([]);
-    prismaMock.tenant.findUnique.mockResolvedValue({ quickbooksRealmId: "realm_1" });
+    prismaMock.quote.findUnique.mockResolvedValue({
+      id: "quote_1",
+      tenantId: "tenant_1",
+      status: QuoteStatus.draft,
+      sentAt: null,
+      firstViewedAt: null,
+      expiresAt: null,
+      approvedAt: null,
+      declinedAt: null,
+      convertedAt: null,
+      remindersEnabled: true,
+      remindersPausedAt: null,
+      reminderCount: 0
+    });
+    prismaMock.quote.findMany.mockResolvedValue([]);
+    prismaMock.quoteReminderDispatch.findMany.mockResolvedValue([]);
+    prismaMock.quoteReminderDispatch.findFirst.mockResolvedValue(null);
+    prismaMock.quoteReminderDispatch.create.mockResolvedValue({
+      id: "dispatch_1",
+      status: "pending"
+    });
+    prismaMock.quoteReminderDispatch.update.mockResolvedValue(undefined);
+    prismaMock.tenant.findUnique.mockResolvedValue({ quickbooksRealmId: "realm_1", quoteReminderSettings: null });
+    prismaMock.tenant.update.mockResolvedValue(undefined);
     prismaMock.quickBooksItemMap.findUnique.mockResolvedValue({
       qbItemId: "qb_item_1",
       qbActive: true
@@ -113,6 +150,13 @@ describe("quotes", () => {
     saveQuickBooksItemMappingForCodeMock.mockResolvedValue(undefined);
     clearQuickBooksItemMappingForCodeMock.mockResolvedValue(undefined);
     generateQuotePdfMock.mockResolvedValue(new Uint8Array([1, 2, 3]));
+    sendQuoteReminderEmailMock.mockResolvedValue({
+      sent: true,
+      provider: "resend",
+      messageId: "reminder_msg_1",
+      error: null,
+      reason: "sent"
+    });
   });
 
   it("creates a draft quote with mapped qb item ids", async () => {
@@ -397,7 +441,7 @@ describe("quotes", () => {
       quoteUrl: "https://tradeworx.example/quote/token_123",
       expiresAt: new Date("2026-05-01T12:00:00.000Z")
     }));
-    expect(prismaMock.quote.update).toHaveBeenLastCalledWith(expect.objectContaining({
+    expect(prismaMock.quote.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "quote_1" },
       data: expect.objectContaining({
         lastSentAt: expect.any(Date),
@@ -543,5 +587,176 @@ describe("quotes", () => {
       { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
       "quote_1"
     )).rejects.toThrow("Approve this quote before converting it into work.");
+  });
+
+  it("stores tenant quote reminder settings", async () => {
+    await updateQuoteReminderSettings(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        enabled: true,
+        sentNotViewedFirstBusinessDays: 3,
+        sentNotViewedSecondBusinessDays: 6,
+        viewedPendingFirstBusinessDays: 2,
+        viewedPendingSecondBusinessDays: 5,
+        expiringSoonDays: 2,
+        expiredFollowUpEnabled: true,
+        expiredFollowUpDays: 1,
+        maxAutoReminders: 4,
+        templates: {
+          sentNotViewed: {
+            subject: "Reminder: quote {{quoteNumber}} is ready",
+            body: "Please review your quote online."
+          },
+          viewedPending: {
+            subject: "Reminder: quote {{quoteNumber}} is waiting on approval",
+            body: "Approve the quote when you are ready."
+          },
+          expiringSoon: {
+            subject: "Quote {{quoteNumber}} expires soon",
+            body: "Review the quote before it expires."
+          },
+          expired: {
+            subject: "Quote {{quoteNumber}} has expired",
+            body: "Reply if you would like us to reissue it."
+          }
+        }
+      }
+    );
+
+    expect(prismaMock.tenant.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "tenant_1" },
+      data: expect.objectContaining({
+        quoteReminderSettings: expect.objectContaining({
+          enabled: true,
+          maxAutoReminders: 4
+        })
+      })
+    }));
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        action: "quote.reminder_settings_updated",
+        entityType: "Tenant"
+      })
+    }));
+  });
+
+  it("pauses quote reminders and clears the next reminder schedule", async () => {
+    prismaMock.quote.findFirst.mockResolvedValue({
+      id: "quote_1"
+    });
+
+    await updateQuoteReminderControl(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      "quote_1",
+      "pause"
+    );
+
+    expect(prismaMock.quote.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "quote_1" },
+      data: expect.objectContaining({
+        remindersPausedAt: expect.any(Date),
+        remindersPausedByUserId: "admin_1",
+        nextReminderAt: null,
+        reminderStage: "paused"
+      })
+    }));
+  });
+
+  it("sends a manual quote reminder using the hosted quote link", async () => {
+    prismaMock.quote.findFirst.mockResolvedValueOnce({
+      id: "quote_1",
+      tenantId: "tenant_1",
+      status: QuoteStatus.viewed,
+      sentAt: new Date("2026-04-01T12:00:00.000Z"),
+      firstViewedAt: new Date("2026-04-02T12:00:00.000Z"),
+      expiresAt: addDays(new Date("2026-04-07T12:00:00.000Z"), 10),
+      approvedAt: null,
+      declinedAt: null,
+      convertedAt: null,
+      remindersEnabled: true,
+      remindersPausedAt: null,
+      reminderCount: 0
+    }).mockResolvedValueOnce({
+      id: "quote_1",
+      tenantId: "tenant_1",
+      quoteNumber: "Q-2026-0011",
+      status: QuoteStatus.viewed,
+      expiresAt: addDays(new Date("2026-04-07T12:00:00.000Z"), 10),
+      remindersEnabled: true,
+      remindersPausedAt: null,
+      recipientEmail: "alyssa@example.com",
+      contactName: "Alyssa Reed",
+      total: 275,
+      lastReminderAt: null,
+      quoteAccessToken: "token_followup",
+      tenant: { id: "tenant_1", name: "TradeWorx", branding: {}, billingEmail: "office@example.com", quoteReminderSettings: null },
+      customerCompany: { id: "customer_1", name: "Acme", contactName: "Alyssa Reed", billingEmail: "alyssa@example.com", phone: null },
+      site: { id: "site_1", name: "Main campus" }
+    });
+
+    await sendQuoteReminderNow(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      "quote_1"
+    );
+
+    expect(sendQuoteReminderEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+      quoteUrl: "https://tradeworx.example/quote/token_followup",
+      recipientEmail: "alyssa@example.com"
+    }));
+    expect(prismaMock.quoteReminderDispatch.create).toHaveBeenCalled();
+  });
+
+  it("sweeps due reminder quotes and only sends reminders for quotes that are due", async () => {
+    prismaMock.quote.findMany.mockResolvedValue([
+      {
+        id: "quote_due",
+        tenantId: "tenant_1",
+        status: QuoteStatus.sent,
+        sentAt: new Date("2026-04-01T12:00:00.000Z"),
+        firstViewedAt: null,
+        expiresAt: null,
+        approvedAt: null,
+        declinedAt: null,
+        convertedAt: null,
+        remindersEnabled: true,
+        remindersPausedAt: null,
+        reminderCount: 0
+      }
+    ]);
+    prismaMock.quoteReminderDispatch.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    prismaMock.quote.findFirst.mockResolvedValue({
+      id: "quote_due",
+      tenantId: "tenant_1",
+      quoteNumber: "Q-2026-0012",
+      status: QuoteStatus.sent,
+      expiresAt: null,
+      remindersEnabled: true,
+      remindersPausedAt: null,
+      recipientEmail: "alyssa@example.com",
+      contactName: "Alyssa Reed",
+      total: 199,
+      lastReminderAt: null,
+      quoteAccessToken: "token_due",
+      tenant: { id: "tenant_1", name: "TradeWorx", branding: {}, billingEmail: "office@example.com", quoteReminderSettings: null },
+      customerCompany: { id: "customer_1", name: "Acme", contactName: "Alyssa Reed", billingEmail: "alyssa@example.com", phone: null },
+      site: null
+    });
+
+    const result = await runQuoteReminderSweep({ tenantId: "tenant_1", limit: 10 });
+
+    expect(result).toEqual({
+      processed: 1,
+      sentCount: 1,
+      skippedCount: 0
+    });
+    expect(sendQuoteReminderEmailMock).toHaveBeenCalledTimes(1);
+    expect(prismaMock.quoteReminderDispatch.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        quoteId: "quote_due",
+        reminderType: "sent_not_viewed_first"
+      })
+    }));
   });
 });
