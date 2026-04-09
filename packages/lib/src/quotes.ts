@@ -15,7 +15,9 @@ import { actorContextSchema } from "@testworx/types";
 import type { QuoteReminderDispatchStatus, QuoteReminderType } from "@prisma/client";
 
 import { sendQuoteEmail, sendQuoteReminderEmail } from "./account-email";
+import { resolveTenantBranding } from "./branding";
 import { getServerEnv } from "./env";
+import { buildQuoteEmailDefaultMessage, buildQuoteEmailSubject } from "./quote-email";
 import { getDefaultQuoteExpirationDate } from "./quote-terms";
 import { inspectionTypeRegistry } from "./report-config";
 import { generateQuotePdf } from "./quote-pdf";
@@ -1479,6 +1481,7 @@ export async function getQuoteDetail(actor: ActorContext, quoteId: string) {
 
   return {
     ...quote,
+    tenant: quote.tenant,
     effectiveStatus: getEffectiveQuoteStatus(quote.status, quote.expiresAt),
     engagementStatus: getHostedQuoteAvailability(quote),
     hostedQuoteUrl: quote.quoteAccessToken ? buildQuoteAccessUrl(quote.quoteAccessToken) : null,
@@ -1660,9 +1663,13 @@ export async function sendQuote(actor: ActorContext, quoteId: string, input?: { 
 
   const { pdfBytes, fileName } = await getAuthorizedQuotePdf(actor, quoteId);
   const customerUrl = buildQuoteAccessUrl(access.quoteAccessToken as string);
-  const subject = normalizeNullableString(input?.subject) ?? `Quote ${quote.quoteNumber} from ${quote.tenant.name}`;
-  const body = normalizeNullableString(input?.message)
-    ?? `Please review quote ${quote.quoteNumber} online. When you're ready, approve the quote and we'll move forward with the work.`;
+  const companyName = resolveTenantBranding({
+    tenantName: quote.tenant.name,
+    branding: quote.tenant.branding,
+    billingEmail: quote.tenant.billingEmail
+  }).legalBusinessName;
+  const subject = normalizeNullableString(input?.subject) ?? buildQuoteEmailSubject({ companyName, quoteNumber: quote.quoteNumber });
+  const body = normalizeNullableString(input?.message) ?? buildQuoteEmailDefaultMessage();
 
   await prisma.quote.update({
     where: { id: quote.id },
@@ -1677,7 +1684,7 @@ export async function sendQuote(actor: ActorContext, quoteId: string, input?: { 
   const delivery = await sendQuoteEmail({
     recipientEmail,
     recipientName: quote.contactName ?? customerCompany?.contactName ?? customerCompany?.name ?? "Customer",
-    tenantName: quote.tenant.name,
+    tenantName: companyName,
     quoteNumber: quote.quoteNumber,
     customerName: customerCompany?.name ?? "Archived customer",
     siteName: site?.name ?? null,

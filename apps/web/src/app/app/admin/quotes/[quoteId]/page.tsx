@@ -5,11 +5,14 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import {
+  buildQuoteEmailDefaultMessage,
+  buildQuoteEmailSubject,
   getQuoteDetail,
   getQuoteStatusTone,
   getQuoteSyncTone,
   quoteStatusLabels,
-  quoteSyncStatusLabels
+  quoteSyncStatusLabels,
+  resolveTenantBranding
 } from "@testworx/lib";
 
 import { AppPageShell, PageHeader, SectionCard, StatusBadge, WorkspaceSplit } from "../../operations-ui";
@@ -51,6 +54,11 @@ export default async function QuoteDetailPage({
   if (!detail) {
     redirect("/app/admin/quotes");
   }
+  const companyName = resolveTenantBranding({
+    tenantName: detail.tenant.name,
+    branding: detail.tenant.branding,
+    billingEmail: detail.tenant.billingEmail
+  }).legalBusinessName;
 
   const returnHref = paramsData.from?.startsWith("/app/") ? paramsData.from : "/app/admin/quotes";
   const feedback = paramsData.error ?? paramsData.quote ?? paramsData.delivery ?? paramsData.quickbooks ?? paramsData.status ?? null;
@@ -342,11 +350,11 @@ export default async function QuoteDetailPage({
               </label>
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-700">Subject</span>
-                <input className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900" defaultValue={`Quote ${detail.quoteNumber} from TradeWorx`} name="subject" />
+                <input className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900" defaultValue={detail.deliverySubject ?? buildQuoteEmailSubject({ companyName, quoteNumber: detail.quoteNumber })} name="subject" />
               </label>
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-700">Message</span>
-                <textarea className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" defaultValue={detail.customerNotes ?? "Review the quote details below. When you’re ready, approve the quote and we’ll move forward with the work."} name="message" />
+                <textarea className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" defaultValue={detail.deliveryBody ?? buildQuoteEmailDefaultMessage()} name="message" />
               </label>
               <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" type="submit">
                 {detail.sentAt ? "Resend quote" : "Send quote"}

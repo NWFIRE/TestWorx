@@ -612,9 +612,19 @@ describe("quotes", () => {
 
     expect(sendQuoteEmailMock).toHaveBeenCalledWith(expect.objectContaining({
       quoteUrl: "https://tradeworx.example/quote/token_123",
-      expiresAt: new Date("2026-05-01T12:00:00.000Z")
+      expiresAt: new Date("2026-05-01T12:00:00.000Z"),
+      tenantName: "TradeWorx",
+      subjectLine: "TradeWorx Proposal Ready: Q-2026-0005",
+      messageBody: "Please use the link below to review the project scope, pricing, and details. Once reviewed, you can approve the proposal online."
     }));
-    expect(prismaMock.quote.update).toHaveBeenCalledWith(expect.objectContaining({
+    expect(prismaMock.quote.update).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: { id: "quote_1" },
+      data: expect.objectContaining({
+        deliverySubject: "TradeWorx Proposal Ready: Q-2026-0005",
+        deliveryBody: "Please use the link below to review the project scope, pricing, and details. Once reviewed, you can approve the proposal online."
+      })
+    }));
+    expect(prismaMock.quote.update).toHaveBeenNthCalledWith(2, expect.objectContaining({
       where: { id: "quote_1" },
       data: expect.objectContaining({
         lastSentAt: expect.any(Date),

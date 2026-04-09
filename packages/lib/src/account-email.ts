@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 
 import { getOptionalEmailEnv } from "./env";
+import { buildQuoteEmailGreeting, buildQuoteEmailDefaultMessage } from "./quote-email";
 
 export type TransactionalEmailDeliveryResult = {
   sent: boolean;
@@ -192,22 +193,31 @@ export async function sendWorkspacePasswordResetEmail(payload: PasswordResetEmai
 }
 
 export async function sendQuoteEmail(payload: QuoteEmailPayload) {
+  const greeting = buildQuoteEmailGreeting(payload.recipientName);
+  const proposalMessage = payload.messageBody.trim() || buildQuoteEmailDefaultMessage();
+  const proposalWindow = payload.expiresAt
+    ? `Please review it by ${payload.expiresAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}.`
+    : null;
+  const companySignoff = payload.tenantName.trim();
+
   return sendWithResend({
     to: payload.recipientEmail,
     subject: payload.subjectLine,
     attachments: [payload.attachment],
     html: buildShell({
-      eyebrow: "Customer quote",
-      title: `Quote ${payload.quoteNumber} is ready`,
+      eyebrow: "Proposal ready",
+      title: "Your proposal is ready for review",
       body: [
-        `Hi ${payload.recipientName},`,
-        `A new quote is ready from ${payload.tenantName} for ${payload.customerName}${payload.siteName ? ` at ${payload.siteName}` : ""}.`,
-        payload.messageBody,
-        payload.expiresAt ? `This quote is available for review through ${payload.expiresAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}.` : "Use the secure link below to review the quote online, download the PDF, and approve or decline it when you're ready."
+        greeting,
+        "Your proposal is ready for review.",
+        proposalMessage,
+        proposalWindow ?? "Use the secure link below to review the proposal online and approve it when you're ready.",
+        "If you have any questions, simply reply to this email and our team will be happy to assist.",
+        companySignoff ? `Thank you,<br />${companySignoff}` : "Thank you,"
       ],
       actionHref: payload.quoteUrl,
-      actionLabel: "View quote",
-      footer: "The attached PDF is a customer-ready copy of the quote, but the secure online quote page is the fastest way to review details and approve or decline it."
+      actionLabel: "Review Proposal",
+      footer: "The attached PDF is included for convenience, but the secure proposal link is the fastest way to review details and approve online."
     })
   });
 }
