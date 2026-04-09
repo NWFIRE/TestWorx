@@ -643,18 +643,18 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
               </form>
             ) : null}
           </SectionCard>
-          <BillingPlansSection
-            addons={billingSettings.config.addons}
-            canManageSubscription={canManageSubscription}
-            currentPlanCode={billingSettings.tenant.subscriptionPlan?.code ?? null}
-            plans={billingSettings.config.plans.map((plan) => ({
-              ...plan,
-              stripePriceId: billingSettings.config.enabled ? plan.stripePriceId : null
-            }))}
-            startBillingCheckoutAction={startBillingCheckoutAction}
-          />
         </div>
       </div>
+      <BillingPlansSection
+        addons={billingSettings.config.addons}
+        canManageSubscription={canManageSubscription}
+        currentPlanCode={billingSettings.tenant.subscriptionPlan?.code ?? null}
+        plans={billingSettings.config.plans.map((plan) => ({
+          ...plan,
+          stripePriceId: billingSettings.config.enabled ? plan.stripePriceId : null
+        }))}
+        startBillingCheckoutAction={startBillingCheckoutAction}
+      />
     </AppPageShell>
   );
 }

@@ -48,7 +48,7 @@ export function BillingPlansSection({
             TradeWorx is structured to support a clear progression from getting organized, to automating growth, to operating with tighter control and compliance oversight.
           </p>
         </div>
-        <div className="mt-6 grid gap-4 xl:grid-cols-3">
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
           {plans.map((plan) => {
             const isCurrentPlan = currentPlanCode === plan.code;
             const cardClassName = plan.highlighted
@@ -62,7 +62,7 @@ export function BillingPlansSection({
                 key={plan.code}
                 className={`pressable-surface flex h-full flex-col rounded-[2rem] border p-6 transition duration-200 hover:-translate-y-1 sm:p-7 ${cardClassName}`}
               >
-                <div className="flex min-h-[4rem] items-start justify-between gap-3">
+                <div className="flex min-h-[4rem] flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h4 className="text-2xl font-semibold tracking-tight text-ink">{plan.label}</h4>
@@ -77,9 +77,9 @@ export function BillingPlansSection({
                         </span>
                       ) : null}
                     </div>
-                    <p className="mt-4 text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">{plan.highlight}</p>
+                    <p className="mt-4 text-sm font-medium leading-6 text-slate-500">{plan.highlight}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="sm:text-right">
                     <p className="text-4xl font-semibold tracking-tight text-ink">${(plan.monthlyPriceCents / 100).toFixed(0)}</p>
                     <p className="mt-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">per month</p>
                   </div>
@@ -91,7 +91,7 @@ export function BillingPlansSection({
                 </div>
 
                 {plan.limits ? (
-                  <dl className="mt-6 grid gap-3 rounded-[1.5rem] border border-slate-200/80 bg-white/70 p-4 text-sm sm:grid-cols-3">
+                  <dl className="mt-6 grid gap-3 rounded-[1.5rem] border border-slate-200/80 bg-white/70 p-4 text-sm xl:grid-cols-3">
                     {plan.limits.users ? (
                       <div>
                         <dt className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Team fit</dt>
