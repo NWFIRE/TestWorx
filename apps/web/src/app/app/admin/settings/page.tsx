@@ -416,6 +416,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   const feesOpen = isSectionOpen(params, "feesOpen");
   const complianceFeesOpen = isSectionOpen(params, "complianceFeesOpen");
   const mappingsOpen = isSectionOpen(params, "mappingsOpen", quickBooksNotice);
+  const quoteRemindersOpen = isSectionOpen(params, "quoteRemindersOpen");
 
   return (
     <AppPageShell>
@@ -611,7 +612,27 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
           )}
         </div>
         <div className="space-y-6">
-          <QuoteReminderSettingsCard action={updateQuoteReminderSettingsAction} values={quoteReminderSettings} />
+          {quoteRemindersOpen ? (
+            <>
+              <div className="flex justify-end">
+                <Link
+                  className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
+                  href={buildSettingsHref(params, { quoteRemindersOpen: null })}
+                >
+                  Hide section
+                </Link>
+              </div>
+              <QuoteReminderSettingsCard action={updateQuoteReminderSettingsAction} values={quoteReminderSettings} />
+            </>
+          ) : (
+            <LazySectionCard
+              actionHref={buildSettingsHref(params, { quoteRemindersOpen: 1 })}
+              actionLabel="Open quote reminders"
+              description="Review reminder timing, enable or disable automated follow-up, and update the customer-facing email templates only when you need them."
+              eyebrow="Quote reminders"
+              title="Automated follow-up"
+            />
+          )}
           <SectionCard>
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing settings</p>
             <h3 className="mt-2 text-2xl font-semibold text-ink">Current subscription</h3>
