@@ -20,6 +20,12 @@ type QuickBooksItemMappingCardProps = {
       score: number;
     }>;
   }>;
+  availableItems: Array<{
+    qbItemId: string;
+    qbItemName: string;
+    qbItemType: string | null;
+    qbActive: boolean;
+  }>;
   saveMappingAction: (formData: FormData) => Promise<void>;
   clearMappingAction: (formData: FormData) => Promise<void>;
   resyncAction: () => Promise<void>;
@@ -56,6 +62,7 @@ export function QuickBooksItemMappingCard({
   reconnectRequired,
   modeMismatch,
   rows,
+  availableItems,
   saveMappingAction,
   clearMappingAction,
   resyncAction,
@@ -165,6 +172,45 @@ export function QuickBooksItemMappingCard({
                       ))}
                     </div>
                   )}
+
+                  <div className="mt-4 border-t border-slate-200 pt-4">
+                    <p className="text-sm font-semibold text-ink">Manually map an item</p>
+                    <p className="mt-2 text-sm text-slate-500">
+                      Choose any active QuickBooks product or service from your synced cache when suggestions are missing or not the right match.
+                    </p>
+                    <form action={saveMappingAction} className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
+                      <input name="internalCode" type="hidden" value={row.internalCode} />
+                      <input name="internalName" type="hidden" value={row.internalName} />
+                      <div className="min-w-0 flex-1">
+                        <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`manual-map-${row.internalCode}`}>
+                          QuickBooks item
+                        </label>
+                        <select
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"
+                          defaultValue={row.currentMapping?.qbItemId ?? ""}
+                          id={`manual-map-${row.internalCode}`}
+                          name="qbItemId"
+                        >
+                          <option value="">Select a QuickBooks item</option>
+                          {availableItems.map((item) => (
+                            <option key={item.qbItemId} value={item.qbItemId}>
+                              {item.qbItemName}{item.qbItemType ? ` (${item.qbItemType})` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        className="pressable pressable-filled inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+                        disabled={!canManageMappings || availableItems.length === 0}
+                        type="submit"
+                      >
+                        Save manual mapping
+                      </button>
+                    </form>
+                    {availableItems.length === 0 ? (
+                      <p className="mt-2 text-sm text-amber-700">No active QuickBooks items are cached yet. Resync QuickBooks items first.</p>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </div>

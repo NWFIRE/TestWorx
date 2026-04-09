@@ -352,6 +352,7 @@ async function QuickBooksMappingsSection({
 
   return (
     <QuickBooksItemMappingCard
+      availableItems={data.availableItems}
       clearMappingAction={clearQuickBooksItemMappingAction}
       configured={data.configured}
       connected={data.connected}

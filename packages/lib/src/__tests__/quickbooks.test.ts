@@ -41,8 +41,12 @@ const prismaMock = {
     upsert: vi.fn(),
     deleteMany: vi.fn()
   },
+  quoteLineItem: {
+    findMany: vi.fn()
+  },
   inspectionBillingSummary: {
     findUnique: vi.fn(),
+    findMany: vi.fn(),
     update: vi.fn(),
     updateMany: vi.fn()
   },
@@ -194,6 +198,8 @@ describe("quickbooks billing sync hardening", () => {
     prismaMock.quickBooksItemCache.upsert.mockResolvedValue(undefined);
     prismaMock.quickBooksItemCache.createMany.mockResolvedValue({ count: 0 });
     prismaMock.quickBooksItemCache.deleteMany.mockResolvedValue({ count: 0 });
+    prismaMock.quoteLineItem.findMany.mockResolvedValue([]);
+    prismaMock.inspectionBillingSummary.findMany.mockResolvedValue([]);
     prismaMock.quickBooksItemMap.upsert.mockResolvedValue(undefined);
     prismaMock.quickBooksItemMap.deleteMany.mockResolvedValue({ count: 0 });
     prismaMock.inspection.update.mockResolvedValue(undefined);
@@ -1252,5 +1258,85 @@ describe("quickbooks billing sync hardening", () => {
         })
       })
     });
+  });
+
+  it("returns active cached QuickBooks items for manual mapping in settings", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.inspectionBillingSummary.findMany.mockResolvedValue([
+      {
+        items: [
+          {
+            id: "item_1",
+            description: "New (2.5 lb ABC)",
+            quantity: 1,
+            unitPrice: 25,
+            amount: 25,
+            unit: "ea",
+            category: "service",
+            code: "FE-NEW-2_5_LB_ABC"
+          }
+        ]
+      }
+    ]);
+    prismaMock.quoteLineItem.findMany.mockResolvedValue([]);
+    prismaMock.quickBooksItemMap.findMany.mockResolvedValue([]);
+    prismaMock.quickBooksItemCache.findMany.mockResolvedValue([
+      {
+        qbItemId: "qb_active_2",
+        qbItemName: "Zeta Service",
+        normalizedName: "zeta service",
+        qbItemType: "Service",
+        qbActive: true,
+        qbSyncToken: "2"
+      },
+      {
+        qbItemId: "qb_inactive_1",
+        qbItemName: "Inactive Service",
+        normalizedName: "inactive service",
+        qbItemType: "Service",
+        qbActive: false,
+        qbSyncToken: "1"
+      },
+      {
+        qbItemId: "qb_active_1",
+        qbItemName: "Alpha Service",
+        normalizedName: "alpha service",
+        qbItemType: "Service",
+        qbActive: true,
+        qbSyncToken: "3"
+      }
+    ]);
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      CompanyInfo: {
+        CompanyName: "Evergreen Fire QBO"
+      }
+    }));
+
+    const { getQuickBooksItemMappingSettings } = await import("../quickbooks");
+
+    const result = await getQuickBooksItemMappingSettings(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" }
+    );
+
+    expect(result.availableItems).toEqual([
+      {
+        qbItemId: "qb_active_1",
+        qbItemName: "Alpha Service",
+        qbItemType: "Service",
+        qbActive: true
+      },
+      {
+        qbItemId: "qb_active_2",
+        qbItemName: "Zeta Service",
+        qbItemType: "Service",
+        qbActive: true
+      }
+    ]);
+    expect(result.rows).toEqual([
+      expect.objectContaining({
+        internalCode: "FE-NEW-2_5_LB_ABC",
+        status: "unmapped"
+      })
+    ]);
   });
 });

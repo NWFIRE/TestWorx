@@ -147,6 +147,13 @@ type QuickBooksItemMappingRow = {
   suggestions: QuickBooksItemSuggestion[];
 };
 
+type QuickBooksItemMappingManualOption = {
+  qbItemId: string;
+  qbItemName: string;
+  qbItemType: string | null;
+  qbActive: boolean;
+};
+
 type QuickBooksCustomerRecord = {
   quickbooksCustomerId: string;
   displayName: string;
@@ -2536,6 +2543,15 @@ export async function getQuickBooksItemMappingSettings(actor: ActorContext) {
     reconnectRequired: validatedConnection.status.reconnectRequired,
     modeMismatch: validatedConnection.status.modeMismatch,
     integrationId,
+    availableItems: cacheRows
+      .filter((row) => row.qbActive)
+      .sort((left, right) => left.qbItemName.localeCompare(right.qbItemName))
+      .map((row) => ({
+        qbItemId: row.qbItemId,
+        qbItemName: row.qbItemName,
+        qbItemType: row.qbItemType,
+        qbActive: row.qbActive
+      } satisfies QuickBooksItemMappingManualOption)),
     rows
   };
 }
