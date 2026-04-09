@@ -153,6 +153,7 @@ const inspectionQuoteCatalog = [
 ] as const;
 
 export const quoteCatalog = inspectionQuoteCatalog;
+const quickBooksQuoteCodePrefix = "QBO_ITEM:";
 
 export const quoteLineItemInputSchema = z.object({
   id: z.string().trim().optional(),
@@ -507,6 +508,14 @@ function getQuoteCatalogItem(code: string) {
   return quoteCatalog.find((item) => item.code === code) ?? null;
 }
 
+function buildQuickBooksQuoteCatalogCode(qbItemId: string) {
+  return `${quickBooksQuoteCodePrefix}${qbItemId}`;
+}
+
+function resolveDirectQuickBooksItemId(code: string) {
+  return code.startsWith(quickBooksQuoteCodePrefix) ? code.slice(quickBooksQuoteCodePrefix.length) : null;
+}
+
 async function getTenantQuickBooksIntegrationId(tenantId: string) {
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
@@ -551,7 +560,8 @@ async function resolveMappedQbItemId(tenantId: string, internalCode: string) {
 async function normalizeQuoteLineItems(tenantId: string, lineItems: QuoteInput["lineItems"]) {
   const normalized: NormalizedQuoteLineItem[] = [];
   for (const [index, line] of lineItems.entries()) {
-    const qbItemId = await resolveMappedQbItemId(tenantId, line.internalCode);
+    const directQbItemId = resolveDirectQuickBooksItemId(line.internalCode);
+    const qbItemId = directQbItemId ?? await resolveMappedQbItemId(tenantId, line.internalCode);
     const catalogItem = getQuoteCatalogItem(line.internalCode);
     normalized.push({
       tenantId,
@@ -921,7 +931,7 @@ export async function getQuoteFormOptions(actor: ActorContext) {
   const parsedActor = parseActor(actor);
   assertAdminRole(parsedActor.role);
 
-  const [customers, sites] = await Promise.all([
+  const [customers, sites, quickBooksCatalogItems] = await Promise.all([
     prisma.customerCompany.findMany({
       where: { tenantId: parsedActor.tenantId as string, isActive: true },
       select: {
@@ -941,16 +951,45 @@ export async function getQuoteFormOptions(actor: ActorContext) {
         customerCompanyId: true
       },
       orderBy: [{ name: "asc" }]
+    }),
+    prisma.quickBooksCatalogItem.findMany({
+      where: {
+        tenantId: parsedActor.tenantId as string,
+        active: true
+      },
+      select: {
+        quickbooksItemId: true,
+        name: true,
+        sku: true,
+        itemType: true,
+        unitPrice: true
+      },
+      orderBy: [{ name: "asc" }]
     })
   ]);
 
   return {
     customers,
     sites,
-    catalog: quoteCatalog.map((item) => ({
-      ...item,
-      inspectionTypeLabel: item.inspectionType ? inspectionTypeRegistry[item.inspectionType].label : null
-    }))
+    catalog: [
+      ...quoteCatalog.map((item) => ({
+        ...item,
+        source: "internal" as const,
+        inspectionTypeLabel: item.inspectionType ? inspectionTypeRegistry[item.inspectionType].label : null
+      })),
+      ...quickBooksCatalogItems.map((item) => ({
+        code: buildQuickBooksQuoteCatalogCode(item.quickbooksItemId),
+        title: item.name,
+        description: item.sku ? `QuickBooks ${item.itemType}${item.sku ? ` • SKU ${item.sku}` : ""}` : `QuickBooks ${item.itemType}`,
+        category: item.itemType.toLowerCase(),
+        inspectionType: null,
+        inspectionTypeLabel: null,
+        source: "quickbooks" as const,
+        quickbooksItemId: item.quickbooksItemId,
+        quickbooksItemType: item.itemType,
+        unitPrice: item.unitPrice
+      }))
+    ]
   };
 }
 

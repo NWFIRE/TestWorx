@@ -25,6 +25,9 @@ const { prismaMock, sendQuoteEmailMock, sendQuoteReminderEmailMock, syncQuoteToQ
     quickBooksItemMap: {
       findUnique: vi.fn()
     },
+    quickBooksCatalogItem: {
+      findMany: vi.fn()
+    },
     quoteReminderDispatch: {
       create: vi.fn(),
       findFirst: vi.fn(),
@@ -112,6 +115,7 @@ describe("quotes", () => {
     prismaMock.customerCompany.findFirst.mockResolvedValue(null);
     prismaMock.site.findMany.mockResolvedValue([]);
     prismaMock.site.findFirst.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
     prismaMock.auditLog.create.mockResolvedValue(undefined);
     prismaMock.auditLog.findMany.mockResolvedValue([]);
     prismaMock.quoteLineItem.findMany.mockResolvedValue([]);
@@ -219,6 +223,57 @@ describe("quotes", () => {
     expect(prismaMock.auditLog.create).toHaveBeenCalled();
   });
 
+  it("persists the direct QuickBooks item id when a quote line is selected from the imported catalog", async () => {
+    prismaMock.quote.count.mockResolvedValue(4);
+    prismaMock.quote.create.mockResolvedValue({
+      id: "quote_2",
+      quoteNumber: "Q-2026-0005"
+    });
+
+    const result = await createQuote(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        contactName: "Alyssa Reed",
+        recipientEmail: "alyssa@example.com",
+        issuedAt: new Date("2026-04-06T12:00:00.000Z"),
+        expiresAt: null,
+        internalNotes: null,
+        customerNotes: null,
+        taxAmount: 0,
+        lineItems: [
+          {
+            internalCode: "QBO_ITEM:qb_catalog_9",
+            title: "Kitchen System Recharge",
+            description: "QuickBooks Service • SKU KS-RECHARGE",
+            quantity: 1,
+            unitPrice: 185,
+            discountAmount: 0,
+            taxable: false,
+            inspectionType: null,
+            category: "service"
+          }
+        ]
+      }
+    );
+
+    expect(result.id).toBe("quote_2");
+    expect(prismaMock.quote.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        lineItems: {
+          create: [
+            expect.objectContaining({
+              internalCode: "QBO_ITEM:qb_catalog_9",
+              qbItemId: "qb_catalog_9",
+              title: "Kitchen System Recharge"
+            })
+          ]
+        }
+      })
+    }));
+  });
+
   it("marks a sent customer quote as viewed on first access", async () => {
     prismaMock.user.findFirst.mockResolvedValue({
       customerCompanyId: "customer_1"
@@ -314,12 +369,33 @@ describe("quotes", () => {
     expect(results[0]?.site?.name).toBe("Archived site");
   });
 
-  it("includes wet fire sprinkler annual inspection in quote form options", async () => {
+  it("includes wet fire sprinkler annual inspection and imported QuickBooks catalog items in quote form options", async () => {
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([
+      {
+        quickbooksItemId: "qb_service_1",
+        name: "Kitchen System Recharge",
+        sku: "KS-RECHARGE",
+        itemType: "Service",
+        unitPrice: 185
+      }
+    ]);
+
     const result = await getQuoteFormOptions(
       { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" }
     );
 
     expect(result.catalog.some((item) => item.code === "WET_FIRE_SPRINKLER_ANNUAL")).toBe(true);
+    expect(result.catalog).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "QBO_ITEM:qb_service_1",
+          title: "Kitchen System Recharge",
+          source: "quickbooks",
+          quickbooksItemId: "qb_service_1",
+          unitPrice: 185
+        })
+      ])
+    );
   });
 
   it("saves a quote line item QuickBooks mapping and persists the chosen qb item id", async () => {

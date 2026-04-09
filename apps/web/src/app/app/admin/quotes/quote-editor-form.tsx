@@ -9,6 +9,10 @@ type QuoteCatalogItem = {
   category: string;
   inspectionType: string | null;
   inspectionTypeLabel: string | null;
+  source?: "internal" | "quickbooks";
+  quickbooksItemId?: string;
+  quickbooksItemType?: string;
+  unitPrice?: number | null;
 };
 
 type CustomerOption = {
@@ -126,6 +130,7 @@ export function QuoteEditorForm({
       internalCode: code,
       title: match?.title ?? "",
       description: match?.description ?? "",
+      unitPrice: typeof match?.unitPrice === "number" ? match.unitPrice : 0,
       inspectionType: match?.inspectionType ?? null,
       category: match?.category ?? null
     });
@@ -231,7 +236,7 @@ export function QuoteEditorForm({
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Line items</h2>
-              <p className="mt-1 text-sm text-slate-500">Choose internal service codes, then refine description, pricing, and quantity.</p>
+              <p className="mt-1 text-sm text-slate-500">Choose from internal services or imported QuickBooks products and services, then refine description, pricing, and quantity.</p>
             </div>
             <button
               className="inline-flex min-h-11 items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
@@ -259,11 +264,23 @@ export function QuoteEditorForm({
                         value={line.internalCode}
                       >
                         <option value="">Select service</option>
-                        {catalog.map((item) => (
-                          <option key={item.code} value={item.code}>
-                            {item.title} ({item.code})
-                          </option>
-                        ))}
+                        <optgroup label="TradeWorx services">
+                          {catalog.filter((item) => item.source !== "quickbooks").map((item) => (
+                            <option key={item.code} value={item.code}>
+                              {item.title} ({item.code})
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="QuickBooks products and services">
+                          {catalog.filter((item) => item.source === "quickbooks").map((item) => (
+                            <option key={item.code} value={item.code}>
+                              {item.title}
+                              {item.quickbooksItemType ? ` (${item.quickbooksItemType}` : ""}
+                              {item.unitPrice !== null && item.unitPrice !== undefined ? ` • $${item.unitPrice.toFixed(2)}` : ""}
+                              {item.quickbooksItemType ? ")" : ""}
+                            </option>
+                          ))}
+                        </optgroup>
                       </select>
                     </label>
 
