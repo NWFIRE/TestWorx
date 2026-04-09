@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import {
   canManageBilling,
+  getPaginatedTenantComplianceReportingFeeSettings,
   getPaginatedTenantCustomerCompanySettings,
   getPaginatedTenantQuickBooksCatalogSettings,
   getQuickBooksItemMappingSettings,
@@ -19,8 +20,10 @@ import { AppPageShell, KPIStatCard, PageHeader, SectionCard } from "../operation
 
 import {
   createCustomerCompanyAction,
+  createComplianceReportingFeeRuleAction,
   createQuickBooksCatalogItemAction,
   createServiceFeeRuleAction,
+  deleteComplianceReportingFeeRuleAction,
   deleteServiceFeeRuleAction,
   disconnectQuickBooksAction,
   importQuickBooksCustomersAction,
@@ -32,6 +35,7 @@ import {
   startQuickBooksConnectAction,
   startBillingCheckoutAction,
   updateCustomerCompanyAction,
+  updateComplianceReportingFeeRuleAction,
   updateQuoteReminderSettingsAction,
   updateQuickBooksCatalogItemAction,
   updateDefaultServiceFeeAction,
@@ -39,6 +43,7 @@ import {
   updateTenantBrandingAction
 } from "./actions";
 import { CustomerManagementCard } from "./customer-management-card";
+import { ComplianceReportingFeeSettingsCard } from "./compliance-reporting-fee-settings-card";
 import { QuickBooksCatalogManagementCard } from "./quickbooks-catalog-management-card";
 import { QuickBooksItemMappingCard } from "./quickbooks-item-mapping-card";
 import { QuoteReminderSettingsCard } from "./quote-reminder-settings-card";
@@ -278,6 +283,48 @@ async function ServiceFeesSection({
   );
 }
 
+async function ComplianceReportingFeesSection({
+  actor,
+  page,
+  activeEditor
+}: {
+  actor: { userId: string; role: string; tenantId: string };
+  page: number;
+  activeEditor: string | null;
+}) {
+  let data: Awaited<ReturnType<typeof getPaginatedTenantComplianceReportingFeeSettings>>;
+  void activeEditor;
+
+  try {
+    data = await getPaginatedTenantComplianceReportingFeeSettings(actor, {
+      page,
+      limit: 10
+    });
+  } catch (error) {
+    return (
+      <LazySectionCard
+        actionHref={buildSettingsHref({ complianceFeesOpen: "1" }, { complianceFeesOpen: 1 })}
+        actionLabel="Try again"
+        description={error instanceof Error ? error.message : "Unable to load compliance reporting fee rules right now."}
+        eyebrow="Compliance reporting fees"
+        title="Jurisdiction-based reporting fees"
+        tone="error"
+      />
+    );
+  }
+
+  return (
+    <ComplianceReportingFeeSettingsCard
+      activeEditor={activeEditor}
+      createRuleAction={createComplianceReportingFeeRuleAction}
+      deleteRuleAction={deleteComplianceReportingFeeRuleAction}
+      pagination={data.pagination}
+      rules={data.rules}
+      updateRuleAction={updateComplianceReportingFeeRuleAction}
+    />
+  );
+}
+
 async function QuickBooksMappingsSection({
   actor,
   notice
@@ -338,6 +385,8 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   const customersQuery = readSearchParam(params, "customersQuery");
   const feesPage = readPositiveInt(readSearchParam(params, "feesPage", "1"), 1);
   const feeEditor = readSearchParam(params, "feeEditor") || null;
+  const complianceFeePage = readPositiveInt(readSearchParam(params, "complianceFeePage", "1"), 1);
+  const complianceFeeEditor = readSearchParam(params, "complianceFeeEditor") || null;
 
   const [billingSettings, brandingSettings, quickBooksSettings, quoteReminderSettings] = await Promise.all([
     getTenantBillingSettings(actor),
@@ -365,6 +414,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   const customersOpen = isSectionOpen(params, "customersOpen", customerNotice);
   const catalogOpen = isSectionOpen(params, "catalogOpen", catalogNotice);
   const feesOpen = isSectionOpen(params, "feesOpen");
+  const complianceFeesOpen = isSectionOpen(params, "complianceFeesOpen");
   const mappingsOpen = isSectionOpen(params, "mappingsOpen", quickBooksNotice);
 
   return (
@@ -532,6 +582,31 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
               description="Load service fee rules only when you open the section. Rules stay paginated and keep their own loading, empty, and error states."
               eyebrow="Inspection service fees"
               title="Default fee and location rules"
+            />
+          )}
+          {complianceFeesOpen ? (
+            <Suspense
+              key={`compliance-fees-${complianceFeePage}`}
+              fallback={
+                <LazySectionCard
+                  actionHref={buildSettingsHref(params, { complianceFeesOpen: null, complianceFeePage: null })}
+                  actionLabel="Hide section"
+                  description="Loading the current compliance reporting fee rules page..."
+                  eyebrow="Compliance reporting fees"
+                  title="Jurisdiction-based reporting fees"
+                  tone="loading"
+                />
+              }
+            >
+              <ComplianceReportingFeesSection activeEditor={complianceFeeEditor} actor={actor} page={complianceFeePage} />
+            </Suspense>
+          ) : (
+            <LazySectionCard
+              actionHref={buildSettingsHref(params, { complianceFeesOpen: 1, complianceFeePage: 1 })}
+              actionLabel="Open compliance reporting fees"
+              description="Load jurisdiction-based compliance reporting fees only when needed. Rules stay paginated and automatically drive matching compliance fee lines in billing."
+              eyebrow="Compliance reporting fees"
+              title="Jurisdiction-based reporting fees"
             />
           )}
         </div>

@@ -182,6 +182,7 @@ async function main() {
   await prisma.auditLog.deleteMany();
   await prisma.deficiency.deleteMany();
   await prisma.inspectionBillingSummary.deleteMany();
+  await prisma.complianceReportingFeeRule.deleteMany();
   await prisma.inspectionDocument.deleteMany();
   await prisma.signature.deleteMany();
   await prisma.attachment.deleteMany();
@@ -334,6 +335,47 @@ async function main() {
     prisma.site.create({ data: { tenantId: tenant.id, customerCompanyId: harbor.id, name: "Harbor Main Campus", addressLine1: "800 Harbor Dr", city: "Chicago", state: "IL", postalCode: "60611" } }),
     prisma.site.create({ data: { tenantId: tenant.id, customerCompanyId: summit.id, name: "Summit Distribution Hub", addressLine1: "4250 Commerce Way", city: "Joliet", state: "IL", postalCode: "60431" } })
   ]);
+
+  await prisma.complianceReportingFeeRule.createMany({
+    data: [
+      {
+        tenantId: tenant.id,
+        division: "fire_alarm",
+        city: "Chicago",
+        normalizedCity: "CHICAGO",
+        county: "Cook",
+        normalizedCounty: "COOK",
+        state: "IL",
+        normalizedState: "IL",
+        feeAmount: 18,
+        active: true
+      },
+      {
+        tenantId: tenant.id,
+        division: "fire_sprinkler",
+        city: "Chicago",
+        normalizedCity: "CHICAGO",
+        county: "Cook",
+        normalizedCounty: "COOK",
+        state: "IL",
+        normalizedState: "IL",
+        feeAmount: 27.5,
+        active: true
+      },
+      {
+        tenantId: tenant.id,
+        division: "kitchen_suppression",
+        city: "Naperville",
+        normalizedCity: "NAPERVILLE",
+        county: "DuPage",
+        normalizedCounty: "DUPAGE",
+        state: "IL",
+        normalizedState: "IL",
+        feeAmount: 22,
+        active: true
+      }
+    ]
+  });
 
   await prisma.asset.createMany({
     data: [
@@ -656,6 +698,21 @@ async function main() {
 
   const northshoreSite = await prisma.site.create({
     data: { tenantId: northshoreTenant.id, customerCompanyId: northshoreCustomer.id, name: "Lakefront Residences - North Tower", addressLine1: "12 Sheridan Rd", city: "Evanston", state: "IL", postalCode: "60202" }
+  });
+
+  await prisma.complianceReportingFeeRule.create({
+    data: {
+      tenantId: northshoreTenant.id,
+      division: "fire_alarm",
+      city: "Evanston",
+      normalizedCity: "EVANSTON",
+      county: "Cook",
+      normalizedCounty: "COOK",
+      state: "IL",
+      normalizedState: "IL",
+      feeAmount: 15,
+      active: true
+    }
   });
 
   await prisma.asset.create({

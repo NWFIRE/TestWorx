@@ -9,13 +9,16 @@ import { auth } from "@/auth";
 import {
   createBillingCheckoutSession,
   createBillingPortalSession,
+  createComplianceReportingFeeRule,
   createCustomerCompany,
   createQuickBooksCatalogItem,
   createServiceFeeRule,
   buildQuickBooksConnectUrl,
+  deleteComplianceReportingFeeRule,
   disconnectQuickBooks,
   importQuickBooksCustomers,
   deleteServiceFeeRule,
+  complianceReportingFeeRuleInputSchema,
   customerCompanyInputSchema,
   importQuickBooksCatalogItems,
   quickBooksCatalogItemInputSchema,
@@ -24,6 +27,7 @@ import {
   syncQuickBooksCustomers,
   quoteReminderSettingsInputSchema,
   updateCustomerCompany,
+  updateComplianceReportingFeeRule,
   getTenantBrandingSettings,
   updateQuoteReminderSettings,
   updateQuickBooksCatalogItem,
@@ -731,6 +735,84 @@ export async function deleteServiceFeeRuleAction(formData: FormData) {
   }
 
   await deleteServiceFeeRule(
+    { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+    ruleId
+  );
+
+  revalidatePath("/app/admin/settings");
+  revalidatePath("/app/admin/billing");
+}
+
+export async function createComplianceReportingFeeRuleAction(_: { error: string | null; success: string | null }, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { error: "Unauthorized", success: null };
+  }
+
+  const parsed = complianceReportingFeeRuleInputSchema.safeParse({
+    division: String(formData.get("division") ?? ""),
+    city: String(formData.get("city") ?? ""),
+    county: String(formData.get("county") ?? ""),
+    state: String(formData.get("state") ?? ""),
+    feeAmount: Number(formData.get("feeAmount") ?? "0"),
+    active: formData.get("active") === "on"
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid compliance reporting fee rule.", success: null };
+  }
+
+  try {
+    await createComplianceReportingFeeRule(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      parsed.data
+    );
+
+    revalidatePath("/app/admin/settings");
+    revalidatePath("/app/admin/billing");
+    return { error: null, success: "Compliance reporting fee rule created." };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Unable to create compliance reporting fee rule.", success: null };
+  }
+}
+
+export async function updateComplianceReportingFeeRuleAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return;
+  }
+
+  const parsed = complianceReportingFeeRuleInputSchema.parse({
+    ruleId: String(formData.get("ruleId") ?? ""),
+    division: String(formData.get("division") ?? ""),
+    city: String(formData.get("city") ?? ""),
+    county: String(formData.get("county") ?? ""),
+    state: String(formData.get("state") ?? ""),
+    feeAmount: Number(formData.get("feeAmount") ?? "0"),
+    active: formData.get("active") === "on"
+  });
+
+  await updateComplianceReportingFeeRule(
+    { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+    parsed
+  );
+
+  revalidatePath("/app/admin/settings");
+  revalidatePath("/app/admin/billing");
+}
+
+export async function deleteComplianceReportingFeeRuleAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return;
+  }
+
+  const ruleId = String(formData.get("ruleId") ?? "");
+  if (!ruleId) {
+    return;
+  }
+
+  await deleteComplianceReportingFeeRule(
     { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
     ruleId
   );

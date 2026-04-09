@@ -7,8 +7,10 @@ const { prismaMock, txMock } = vi.hoisted(() => ({
     $executeRaw: vi.fn(),
     $transaction: vi.fn(),
     inspection: { findFirst: vi.fn() },
+    site: { findFirst: vi.fn() },
     tenant: { findUnique: vi.fn() },
     serviceFeeRule: { findMany: vi.fn() },
+    complianceReportingFeeRule: { findFirst: vi.fn() },
     billingItemCatalogMatch: { findUnique: vi.fn(), upsert: vi.fn() },
     quickBooksCatalogItem: { findFirst: vi.fn(), findMany: vi.fn() },
     quickBooksCatalogItemAlias: { findMany: vi.fn(), upsert: vi.fn() },
@@ -19,8 +21,10 @@ const { prismaMock, txMock } = vi.hoisted(() => ({
     $queryRaw: vi.fn(),
     $executeRaw: vi.fn(),
     inspection: { findFirst: vi.fn() },
+    site: { findFirst: vi.fn() },
     tenant: { findUnique: vi.fn() },
-    serviceFeeRule: { findMany: vi.fn() }
+    serviceFeeRule: { findMany: vi.fn() },
+    complianceReportingFeeRule: { findFirst: vi.fn() }
   }
 }));
 
@@ -49,6 +53,7 @@ import {
   updateBillingSummaryNotes
 } from "../inspection-billing";
 import { buildInitialReportDraft } from "../report-engine";
+import { mapInspectionTypeToComplianceReportingDivision } from "../compliance-reporting-fees";
 import { resolveInspectionServiceFeeTx } from "../service-fees";
 
 function buildKitchenDraftForManufacturer(manufacturer: string) {
@@ -194,8 +199,10 @@ describe("inspection billing extraction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     txMock.inspection.findFirst.mockReset();
+    txMock.site.findFirst.mockReset();
     txMock.tenant.findUnique.mockReset();
     txMock.serviceFeeRule.findMany.mockReset();
+    txMock.complianceReportingFeeRule.findFirst.mockReset();
     prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
@@ -449,8 +456,10 @@ describe("inspection billing persistence and admin review", () => {
     txMock.$queryRaw.mockReset();
     txMock.$executeRaw.mockReset();
     txMock.inspection.findFirst.mockReset();
+    txMock.site.findFirst.mockReset();
     txMock.tenant.findUnique.mockReset();
     txMock.serviceFeeRule.findMany.mockReset();
+    txMock.complianceReportingFeeRule.findFirst.mockReset();
     prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
@@ -529,6 +538,17 @@ describe("inspection billing persistence and admin review", () => {
       defaultServiceFeeUnitPrice: 95
     });
     txMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    txMock.site.findFirst.mockResolvedValue({
+      city: "Chicago",
+      state: "IL"
+    });
+    txMock.complianceReportingFeeRule.findFirst.mockResolvedValue({
+      id: "compliance_rule_1",
+      city: "Chicago",
+      county: "Cook",
+      state: "IL",
+      feeAmount: 22.5
+    });
 
     txMock.$queryRaw
       .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }])
@@ -549,9 +569,82 @@ describe("inspection billing persistence and admin review", () => {
     });
 
     expect(summary?.inspectionId).toBe("inspection_1");
-    expect(summary?.items).toHaveLength(5);
+    expect(summary?.items).toHaveLength(6);
     expect(summary?.items.find((item) => item.description === "Service Fee")?.unitPrice).toBe(95);
+    expect(summary?.items.find((item) => item.description === "Compliance Reporting Fee")).toEqual(
+      expect.objectContaining({
+        code: "COMPLIANCE_REPORTING_FEE_KITCHEN_SUPPRESSION",
+        unitPrice: 22.5
+      })
+    );
     expect(txMock.$executeRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not duplicate compliance reporting fees when multiple sprinkler report types are finalized together", async () => {
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      site: {
+        city: "Chicago",
+        state: "IL",
+        postalCode: "60601"
+      }
+    });
+    txMock.tenant.findUnique.mockResolvedValue({
+      defaultServiceFeeCode: "SERVICE_FEE",
+      defaultServiceFeeUnitPrice: 95
+    });
+    txMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    txMock.site.findFirst.mockResolvedValue({
+      city: "Chicago",
+      state: "IL"
+    });
+    txMock.complianceReportingFeeRule.findFirst.mockResolvedValue({
+      id: "compliance_rule_sprinkler",
+      city: "Chicago",
+      county: "Cook",
+      state: "IL",
+      feeAmount: 30
+    });
+
+    txMock.$queryRaw
+      .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }])
+      .mockResolvedValueOnce([
+        {
+          id: "report_1",
+          inspectionId: "inspection_1",
+          tenantId: "tenant_1",
+          contentJson: {},
+          inspectionType: "wet_fire_sprinkler"
+        },
+        {
+          id: "report_2",
+          inspectionId: "inspection_1",
+          tenantId: "tenant_1",
+          contentJson: {},
+          inspectionType: "dry_fire_sprinkler"
+        }
+      ])
+      .mockResolvedValueOnce([]);
+
+    const summary = await syncInspectionBillingSummaryTx(txMock as never, {
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1"
+    });
+
+    const complianceFees = summary?.items.filter((item) => item.description === "Compliance Reporting Fee") ?? [];
+    expect(complianceFees).toHaveLength(1);
+    expect(complianceFees[0]?.code).toBe("COMPLIANCE_REPORTING_FEE_FIRE_SPRINKLER");
+  });
+
+  it("maps only supported inspection types into compliance reporting divisions", () => {
+    expect(mapInspectionTypeToComplianceReportingDivision("fire_extinguisher")).toBe("fire_extinguishers");
+    expect(mapInspectionTypeToComplianceReportingDivision("fire_alarm")).toBe("fire_alarm");
+    expect(mapInspectionTypeToComplianceReportingDivision("wet_fire_sprinkler")).toBe("fire_sprinkler");
+    expect(mapInspectionTypeToComplianceReportingDivision("joint_commission_fire_sprinkler")).toBe("fire_sprinkler");
+    expect(mapInspectionTypeToComplianceReportingDivision("kitchen_suppression")).toBe("kitchen_suppression");
+    expect(mapInspectionTypeToComplianceReportingDivision("industrial_suppression")).toBeNull();
   });
 
   it("hydrates missing unit price from a stored catalog mapping during billing summary sync", async () => {
@@ -572,6 +665,11 @@ describe("inspection billing persistence and admin review", () => {
       defaultServiceFeeUnitPrice: null
     });
     txMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    txMock.site.findFirst.mockResolvedValue({
+      city: "Chicago",
+      state: "IL"
+    });
+    txMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
     prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue({
       sourceKey: "service|fire_extinguisher|inventory|servicePerformed||annual inspection",
       catalogItemId: "catalog_annual",
@@ -1093,7 +1191,7 @@ describe("inspection billing persistence and admin review", () => {
         { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
         { summaryId: "summary_1", itemId: "inspection_1:service-fee", query: "service fee" }
       )
-    ).rejects.toThrow(/controlled by default fee and location rules/i);
+    ).rejects.toThrow(/automatic fee pricing is controlled by fee rules/i);
   });
 
   it("persists a manual billing item link and reusable mapping", async () => {
@@ -1319,14 +1417,14 @@ describe("inspection billing persistence and admin review", () => {
           catalogItemId: "catalog_fee"
         }
       )
-    ).rejects.toThrow(/controlled by default fee and location rules/i);
+    ).rejects.toThrow(/automatic fee pricing is controlled by fee rules/i);
 
     await expect(
       clearBillingSummaryItemCatalogLink(
         { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
         { summaryId: "summary_1", itemId: "inspection_1:service-fee" }
       )
-    ).rejects.toThrow(/controlled by default fee and location rules/i);
+    ).rejects.toThrow(/automatic fee pricing is controlled by fee rules/i);
   });
 });
 
