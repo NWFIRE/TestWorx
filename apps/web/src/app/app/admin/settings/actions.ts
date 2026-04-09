@@ -451,10 +451,24 @@ export async function importQuickBooksCustomersAction() {
   }
 }
 
-export async function saveQuickBooksItemMappingAction(formData: FormData) {
+export async function saveQuickBooksItemMappingAction(
+  _: {
+    error: string | null;
+    success: string | null;
+    internalCode?: string | null;
+    mapping?: {
+      qbItemId: string;
+      qbItemName: string;
+      qbItemType: string | null;
+      matchSource: string;
+      qbActive: boolean;
+    } | null;
+  },
+  formData: FormData
+) {
   const session = await auth();
   if (!session?.user?.tenantId) {
-    redirect("/login");
+    return { error: "Unauthorized", success: null, internalCode: null, mapping: null };
   }
 
   const internalCode = String(formData.get("internalCode") ?? "").trim();
@@ -462,47 +476,59 @@ export async function saveQuickBooksItemMappingAction(formData: FormData) {
   const qbItemId = String(formData.get("qbItemId") ?? "").trim();
 
   if (!internalCode || !internalName || !qbItemId) {
-    redirect(buildSettingsRedirectWithParams({
-      mappingsOpen: "1",
-      quickbooks: "QuickBooks item mapping is missing required values."
-    }));
+    return {
+      error: "QuickBooks item mapping is missing required values.",
+      success: null,
+      internalCode,
+      mapping: null
+    };
   }
 
   try {
-    await saveQuickBooksItemMappingForCode(
+    const mapping = await saveQuickBooksItemMappingForCode(
       { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
       { internalCode, internalName, qbItemId }
     );
     revalidatePath("/app/admin/settings");
     revalidatePath("/app/admin/billing");
-    redirect(buildSettingsRedirectWithParams({
-      mappingsOpen: "1",
-      quickbooks: `${internalName} mapped successfully.`
-    }));
+    return {
+      error: null,
+      success: `${internalName} mapped successfully.`,
+      internalCode,
+      mapping: {
+        qbItemId: mapping.qbItemId,
+        qbItemName: mapping.qbItemName,
+        qbItemType: mapping.qbItemType,
+        matchSource: mapping.matchSource,
+        qbActive: mapping.qbActive
+      }
+    };
   } catch (error) {
     if (isRedirectError(error)) {
       throw error;
     }
 
-    redirect(buildSettingsRedirectWithParams({
-      mappingsOpen: "1",
-      quickbooks: error instanceof Error ? error.message : "Unable to save QuickBooks item mapping."
-    }));
+    return {
+      error: error instanceof Error ? error.message : "Unable to save QuickBooks item mapping.",
+      success: null,
+      internalCode,
+      mapping: null
+    };
   }
 }
 
-export async function clearQuickBooksItemMappingAction(formData: FormData) {
+export async function clearQuickBooksItemMappingAction(
+  _: { error: string | null; success: string | null; internalCode?: string | null },
+  formData: FormData
+) {
   const session = await auth();
   if (!session?.user?.tenantId) {
-    redirect("/login");
+    return { error: "Unauthorized", success: null, internalCode: null };
   }
 
   const internalCode = String(formData.get("internalCode") ?? "").trim();
   if (!internalCode) {
-    redirect(buildSettingsRedirectWithParams({
-      mappingsOpen: "1",
-      quickbooks: "QuickBooks item mapping code is missing."
-    }));
+    return { error: "QuickBooks item mapping code is missing.", success: null, internalCode: null };
   }
 
   try {
@@ -512,19 +538,17 @@ export async function clearQuickBooksItemMappingAction(formData: FormData) {
     );
     revalidatePath("/app/admin/settings");
     revalidatePath("/app/admin/billing");
-    redirect(buildSettingsRedirectWithParams({
-      mappingsOpen: "1",
-      quickbooks: `${internalCode} mapping cleared.`
-    }));
+    return { error: null, success: `${internalCode} mapping cleared.`, internalCode };
   } catch (error) {
     if (isRedirectError(error)) {
       throw error;
     }
 
-    redirect(buildSettingsRedirectWithParams({
-      mappingsOpen: "1",
-      quickbooks: error instanceof Error ? error.message : "Unable to clear QuickBooks item mapping."
-    }));
+    return {
+      error: error instanceof Error ? error.message : "Unable to clear QuickBooks item mapping.",
+      success: null,
+      internalCode
+    };
   }
 }
 
