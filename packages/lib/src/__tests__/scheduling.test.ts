@@ -109,6 +109,40 @@ describe("schedule creation parsing", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts multiple identical report types scheduled on the same visit", () => {
+    const result = scheduleInspectionSchema.safeParse({
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      scheduledStart: new Date("2026-03-15T09:00:00.000Z"),
+      scheduledEnd: null,
+      assignedTechnicianIds: [],
+      status: "scheduled",
+      notes: "Two separate hood systems on the same visit.",
+      tasks: [
+        {
+          inspectionType: "kitchen_suppression",
+          frequency: "SEMI_ANNUAL",
+          assignedTechnicianId: "tech_1",
+          dueMonth: "2026-03",
+          dueDate: new Date("2026-03-15T00:00:00.000Z"),
+          schedulingStatus: "scheduled_now",
+          notes: "Main kitchen"
+        },
+        {
+          inspectionType: "kitchen_suppression",
+          frequency: "SEMI_ANNUAL",
+          assignedTechnicianId: "tech_1",
+          dueMonth: "2026-03",
+          dueDate: new Date("2026-03-15T00:00:00.000Z"),
+          schedulingStatus: "scheduled_now",
+          notes: "Secondary kitchen"
+        }
+      ]
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it("rejects an inspection end time before the start time", () => {
     const formData = new FormData();
     formData.set("customerCompanyId", "customer_1");

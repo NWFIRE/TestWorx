@@ -167,7 +167,6 @@ export const scheduleInspectionSchema = z.object({
   }
 
   const currentVisitStatuses: InspectionTaskSchedulingStatus[] = ["due_now", "scheduled_now"];
-  const seen = new Set<string>();
   input.tasks.forEach((task, index) => {
     const normalizedDueMonth =
       task.dueMonth ||
@@ -190,21 +189,6 @@ export const scheduleInspectionSchema = z.object({
         path: ["tasks", index, "assignedTechnicianId"]
       });
     }
-
-    const duplicateKey = [
-      task.inspectionType,
-      normalizedDueMonth,
-      task.dueDate instanceof Date && !Number.isNaN(task.dueDate.getTime()) ? task.dueDate.toISOString() : "",
-      task.schedulingStatus
-    ].join("|");
-    if (seen.has(duplicateKey)) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Duplicate service lines on the same visit need different due timing or status.",
-        path: ["tasks", index, "inspectionType"]
-      });
-    }
-    seen.add(duplicateKey);
   });
 });
 
