@@ -29,6 +29,56 @@ body {
 }
 
 @layer components {
+  .pressable,
+  .pressable-icon,
+  .pressable-surface,
+  .pressable-row {
+    transition-property: transform, filter, opacity, box-shadow, background-color, border-color, color;
+    transition-duration: 140ms;
+    transition-timing-function: ease-out;
+    transform: translateZ(0);
+    will-change: transform;
+  }
+
+  .pressable:active,
+  .pressable-icon:active,
+  .pressable-surface:active,
+  .pressable-row:active {
+    transform: scale(0.985);
+    transition-duration: 90ms;
+    transition-timing-function: ease-in;
+  }
+
+  .pressable-filled:active {
+    filter: brightness(0.98);
+  }
+
+  .pressable-icon:active,
+  .pressable-row:active {
+    transform: scale(0.99);
+  }
+
+  .pressable-surface:active {
+    transform: scale(0.992);
+  }
+
+  .pressable:disabled,
+  .pressable-icon:disabled,
+  .pressable-surface:disabled,
+  .pressable-row:disabled,
+  .pressable[aria-disabled="true"],
+  .pressable-icon[aria-disabled="true"],
+  .pressable-surface[aria-disabled="true"],
+  .pressable-row[aria-disabled="true"],
+  .pressable[data-pending="true"],
+  .pressable-icon[data-pending="true"],
+  .pressable-surface[data-pending="true"],
+  .pressable-row[data-pending="true"] {
+    transform: none;
+    filter: none;
+    will-change: auto;
+  }
+
   .btn-brand-primary {
     background-color: var(--tenant-primary);
     color: var(--tenant-primary-contrast);
@@ -91,6 +141,24 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .pressable,
+  .pressable-icon,
+  .pressable-surface,
+  .pressable-row {
+    transition-duration: 0ms;
+    transform: none;
+    will-change: auto;
+  }
+
+  .pressable:active,
+  .pressable-icon:active,
+  .pressable-surface:active,
+  .pressable-row:active,
+  .pressable-filled:active {
+    transform: none;
+    filter: none;
+  }
+
   .login-fade-up,
   .login-fade-up-delay-1,
   .login-fade-up-delay-2 {

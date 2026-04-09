@@ -75,7 +75,7 @@ export function QuickBooksItemMappingCard({
         </div>
         <form action={resyncAction}>
           <button
-            className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-60"
+            className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-60"
             disabled={!canManageMappings}
             type="submit"
           >
@@ -132,7 +132,7 @@ export function QuickBooksItemMappingCard({
                   {row.currentMapping ? (
                     <form action={clearMappingAction} className="mt-4">
                       <input name="internalCode" type="hidden" value={row.internalCode} />
-                      <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700" type="submit">
+                      <button className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700" type="submit">
                         Clear mapping
                       </button>
                     </form>
@@ -155,7 +155,7 @@ export function QuickBooksItemMappingCard({
                             <p className="mt-1 break-all text-xs text-slate-500">ID {suggestion.qbItemId} • Score {suggestion.score}</p>
                           </div>
                           <button
-                            className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+                            className="pressable pressable-filled inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
                             disabled={!canManageMappings}
                             type="submit"
                           >

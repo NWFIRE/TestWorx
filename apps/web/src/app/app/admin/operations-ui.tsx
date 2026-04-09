@@ -122,7 +122,7 @@ export function KPIStatCard({
 
   return (
     <Link
-      className="block rounded-[24px] outline-none transition duration-200 hover:-translate-y-0.5 hover:[&_div]:border-slate-300 hover:[&_div]:shadow-[0_16px_40px_rgba(15,23,42,0.06)] focus-visible:[&_div]:ring-2 focus-visible:[&_div]:ring-[color:rgb(var(--tenant-primary-rgb)/0.2)]"
+      className="pressable-surface block rounded-[24px] outline-none transition duration-200 hover:-translate-y-0.5 hover:[&_div]:border-slate-300 hover:[&_div]:shadow-[0_16px_40px_rgba(15,23,42,0.06)] focus-visible:[&_div]:ring-2 focus-visible:[&_div]:ring-[color:rgb(var(--tenant-primary-rgb)/0.2)]"
       href={href}
     >
       {content}
@@ -228,7 +228,7 @@ export function FilterChipLink({
   return (
     <Link
       className={cn(
-        "inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-semibold transition",
+        "pressable pressable-row inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-semibold transition",
         active
           ? activeClass
           : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"

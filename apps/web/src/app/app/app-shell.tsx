@@ -155,7 +155,7 @@ function NavItem({
     <Link
       aria-current={active ? "page" : undefined}
       aria-label={item.label}
-      className={`group relative flex min-h-[44px] min-w-0 items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-sm outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2 motion-reduce:transition-none before:absolute before:bottom-1.5 before:left-0 before:top-1.5 before:w-0.5 before:rounded-full before:opacity-0 ${
+      className={`pressable pressable-row group relative flex min-h-[44px] min-w-0 items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-sm outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2 motion-reduce:transition-none before:absolute before:bottom-1.5 before:left-0 before:top-1.5 before:w-0.5 before:rounded-full before:opacity-0 ${
         active
           ? "bg-[var(--tenant-primary-soft)] text-slate-950 before:opacity-100"
           : "text-slate-600 hover:bg-white hover:text-slate-900"
@@ -378,7 +378,7 @@ export function AppShell({
               {!sidebarCollapsed ? (
                 <button
                   aria-label="Collapse sidebar"
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 outline-none transition-colors hover:bg-white hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
+                  className="pressable pressable-icon inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 outline-none transition-colors hover:bg-white hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
                   onClick={() => setSidebarCollapsed(true)}
                   type="button"
                 >
@@ -390,7 +390,7 @@ export function AppShell({
               <div className="mt-3 flex justify-center">
                 <button
                   aria-label="Expand sidebar"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 outline-none transition-colors hover:bg-white hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
+                  className="pressable pressable-icon inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 outline-none transition-colors hover:bg-white hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
                   onClick={() => setSidebarCollapsed(false)}
                   type="button"
                 >
@@ -429,7 +429,7 @@ export function AppShell({
               <BrandBlock collapsed={false} />
               <button
                 aria-label="Close navigation"
-                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 outline-none transition-colors hover:bg-white hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
+                className="pressable pressable-icon inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 outline-none transition-colors hover:bg-white hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
                 onClick={closeDrawer}
                 type="button"
               >
@@ -458,7 +458,7 @@ export function AppShell({
               {navItems.length > 0 ? (
                 <button
                   aria-label="Open navigation"
-                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-600 outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2 lg:hidden"
+                  className="pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-600 outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2 lg:hidden"
                   onClick={() => setDrawerOpen(true)}
                   ref={menuButtonRef}
                   type="button"
@@ -477,7 +477,7 @@ export function AppShell({
                 <p className="truncate capitalize">{role.replaceAll("_", " ")}</p>
               </div>
               <form action={signOutAction}>
-                <button className="min-h-11 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2" type="submit">
+                <button className="pressable min-h-11 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2" type="submit">
                   Sign out
                 </button>
               </form>

@@ -15,7 +15,7 @@ export function StatusButton({ inspectionId, status, label }: { inspectionId: st
   return (
     <div className="space-y-2">
       <button
-        className="min-h-12 w-full rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-ink shadow-sm disabled:opacity-60"
+        className="pressable min-h-12 w-full rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-ink shadow-sm disabled:opacity-60"
         disabled={pending}
         onClick={() => startTransition(async () => {
           const result = await updateInspectionStatusAction(inspectionId, status);

@@ -36,7 +36,7 @@ export function CompleteInspectionCard({ inspectionId }: { inspectionId: string 
   return (
     <div className="space-y-2">
       <button
-        className="min-h-12 w-full rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-ink shadow-sm disabled:opacity-60"
+        className="pressable min-h-12 w-full rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-ink shadow-sm disabled:opacity-60"
         disabled={pending}
         onClick={() => setIsOpen((current) => !current)}
         type="button"
@@ -86,7 +86,7 @@ export function CompleteInspectionCard({ inspectionId }: { inspectionId: string 
           </p>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             <button
-              className="min-h-12 flex-1 rounded-[1.25rem] bg-ink px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+              className="pressable pressable-filled min-h-12 flex-1 rounded-[1.25rem] bg-ink px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
               disabled={pending}
               onClick={() => startTransition(async () => {
                 const result = await completeInspectionWithCloseoutRequestAction(inspectionId, {
@@ -106,7 +106,7 @@ export function CompleteInspectionCard({ inspectionId }: { inspectionId: string 
               {pending ? "Saving..." : "Complete inspection"}
             </button>
             <button
-              className="min-h-12 rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-60"
+              className="pressable min-h-12 rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-60"
               disabled={pending}
               onClick={() => {
                 setIsOpen(false);
