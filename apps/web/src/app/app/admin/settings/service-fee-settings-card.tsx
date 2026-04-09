@@ -83,6 +83,7 @@ export function ServiceFeeSettingsCard({
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Inspection service fees</p>
         <h3 className="mt-2 text-2xl font-semibold text-ink">Default fee and location rules</h3>
         <p className="mt-2 text-sm text-slate-500">Every inspection generates one service fee line. Site and customer overrides win first, then matching location rules, then the default service fee.</p>
+        <p className="mt-2 text-sm text-slate-500">The unit price changes by location. The fee code is the stable internal billing code QuickBooks uses for item mapping.</p>
       </div>
 
       <form action={defaultFormAction} className="rounded-[1.5rem] border border-slate-200 p-5">
@@ -90,10 +91,12 @@ export function ServiceFeeSettingsCard({
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="defaultServiceFeeCode">Default fee code</label>
             <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={defaultValues.defaultServiceFeeCode} id="defaultServiceFeeCode" name="defaultServiceFeeCode" />
+            <p className="mt-2 text-xs text-slate-500">Recommended default: <span className="font-semibold text-ink">SERVICE_FEE</span>. Map this once in QuickBooks if all locations use the same QuickBooks item.</p>
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="defaultServiceFeeUnitPrice">Default unit price</label>
             <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={defaultValues.defaultServiceFeeUnitPrice ?? ""} id="defaultServiceFeeUnitPrice" min="0" name="defaultServiceFeeUnitPrice" placeholder="95.00" step="0.01" type="number" />
+            <p className="mt-2 text-xs text-slate-500">Change the amount by location rule when needed. You only need a different fee code if accounting wants a different QuickBooks item.</p>
           </div>
         </div>
         {defaultState.error ? <p className="mt-3 text-sm text-rose-600">{defaultState.error}</p> : null}
@@ -146,6 +149,7 @@ export function ServiceFeeSettingsCard({
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="feeCode">Fee code</label>
               <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue="SERVICE_FEE" id="feeCode" name="feeCode" />
+              <p className="mt-2 text-xs text-slate-500">This code controls QuickBooks item mapping. Examples: <span className="font-semibold text-ink">SERVICE_FEE</span>, <span className="font-semibold text-ink">SERVICE_FEE_LOCAL</span>, <span className="font-semibold text-ink">SERVICE_FEE_STANDARD</span>.</p>
             </div>
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="priority">Priority</label>
@@ -247,6 +251,7 @@ export function ServiceFeeSettingsCard({
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-600">Fee code</label>
                     <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.feeCode} name="feeCode" />
+                    <p className="mt-2 text-xs text-slate-500">Keep the same fee code when only the price changes. Use a different code only if this rule should map to a different QuickBooks item.</p>
                   </div>
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-600">Priority</label>

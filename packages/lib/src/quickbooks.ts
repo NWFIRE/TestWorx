@@ -530,6 +530,35 @@ function getQuickBooksRuleLabelForBillingCode(billingCode: string) {
   return ruleKeys[billingCode] ?? null;
 }
 
+function buildQuickBooksBillingCodeMappingError(params: {
+  billingCode: string;
+  description: string;
+  resolvedReason: "unmapped" | "missing_mapping" | "inactive_item" | "missing_item" | undefined;
+  suggestions: Array<{ qbItemName: string }>;
+}) {
+  const { billingCode, description, resolvedReason, suggestions } = params;
+  const suggestionText = suggestions.length > 0
+    ? ` Suggested items: ${suggestions.map((suggestion) => suggestion.qbItemName).join(", ")}.`
+    : "";
+  const reasonText = resolvedReason === "inactive_item"
+    ? " The mapped QuickBooks item is inactive."
+    : resolvedReason === "missing_item"
+      ? " The mapped QuickBooks item is missing from the local cache."
+      : " No QuickBooks item is mapped yet.";
+  const normalizedCode = billingCode.trim().toUpperCase();
+  const isServiceFee = normalizedCode.startsWith("SERVICE_FEE");
+
+  if (!isServiceFee) {
+    return `QuickBooks item not mapped for billing code "${billingCode}".${reasonText}${suggestionText}`;
+  }
+
+  const guidance = normalizedCode === "SERVICE_FEE"
+    ? " This service fee price is already being resolved correctly from your location-based fee rules. Map billing code \"SERVICE_FEE\" to the QuickBooks item you want to use for all service fees, or give specific location rules their own fee codes like \"SERVICE_FEE_LOCAL\" and map those separately."
+    : ` This service fee price is already being resolved correctly from your location-based fee rules. QuickBooks still needs an item mapping for this specific fee code so it knows which product or service to use for "${description}".`;
+
+  return `QuickBooks item not mapped for billing code "${billingCode}".${reasonText}${guidance}${suggestionText}`;
+}
+
 async function exchangeQuickBooksToken(grant: Record<string, string>) {
   const env = assertEnvForFeature("quickbooks") as {
     QUICKBOOKS_CLIENT_ID: string;
@@ -3160,15 +3189,12 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
         });
 
         if (resolved.status !== "mapped") {
-          const suggestionText = resolved.suggestions.length > 0
-            ? ` Suggested items: ${resolved.suggestions.map((suggestion) => suggestion.qbItemName).join(", ")}.`
-            : "";
-          const reasonText = resolved.reason === "inactive_item"
-            ? " The mapped QuickBooks item is inactive."
-            : resolved.reason === "missing_item"
-              ? " The mapped QuickBooks item is missing from the local cache."
-              : " No QuickBooks item is mapped yet.";
-          throw new Error(`QuickBooks item not mapped for billing code "${billingCode}".${reasonText}${suggestionText}`);
+          throw new Error(buildQuickBooksBillingCodeMappingError({
+            billingCode,
+            description: item.description,
+            resolvedReason: resolved.reason,
+            suggestions: resolved.suggestions
+          }));
         }
 
         resolvedItem = {

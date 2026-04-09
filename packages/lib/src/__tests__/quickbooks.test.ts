@@ -644,6 +644,60 @@ describe("quickbooks billing sync hardening", () => {
     });
   });
 
+  it("explains how to fix unmapped location-based service fee codes during invoice sync", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: "qbo_customer_1" });
+    prismaMock.customerCompany.update.mockResolvedValue(undefined);
+    prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue({
+      ...buildBillingSummary(),
+      items: [
+        {
+          id: "item_service_fee",
+          description: "Service Fee",
+          quantity: 1,
+          unitPrice: 95,
+          amount: 95,
+          unit: "ea",
+          category: "fee",
+          code: "SERVICE_FEE"
+        }
+      ]
+    });
+    prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
+    prismaMock.quickBooksItemMap.findUnique.mockResolvedValue(null);
+    prismaMock.quickBooksItemCache.findUnique.mockResolvedValue(null);
+    prismaMock.quickBooksItemCache.findMany.mockResolvedValue([
+      {
+        id: "cache_service_fee",
+        tenantId: "tenant_1",
+        integrationId: "realm_1",
+        qbItemId: "mapped_item_service_fee",
+        qbItemName: "Service Fee",
+        normalizedName: "service fee",
+        qbItemType: "Service",
+        qbActive: true,
+        qbSyncToken: "1",
+        rawJson: {}
+      }
+    ]);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management", SyncToken: "0" } }))
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management" } }));
+
+    const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
+
+    const failure = syncBillingSummaryToQuickBooks(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    await expect(failure).rejects.toThrow(/Map billing code "SERVICE_FEE" to the QuickBooks item you want to use for all service fees/i);
+    await expect(failure).rejects.toThrow(/Suggested items: Service Fee/i);
+    await expect(failure).rejects.toThrow(/location-based fee rules/i);
+  });
+
   it("returns the latest QuickBooks support reference in tenant settings", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue({
       ...buildTenantConnection(),
