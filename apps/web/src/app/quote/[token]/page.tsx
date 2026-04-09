@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { format } from "date-fns";
 
@@ -51,10 +52,13 @@ function BrandedMark({
 }) {
   if (logoDataUrl) {
     return (
-      <img
+      <Image
         alt={`${companyName} logo`}
         className="h-16 w-auto max-w-[250px] object-contain"
         src={logoDataUrl}
+        unoptimized
+        width={250}
+        height={64}
       />
     );
   }
