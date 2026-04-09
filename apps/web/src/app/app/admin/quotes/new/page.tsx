@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { addDays } from "date-fns";
 
 import { auth } from "@/auth";
-import { getQuoteFormOptions } from "@testworx/lib";
+import { DEFAULT_QUOTE_EXPIRATION_DAYS, getQuoteFormOptions } from "@testworx/lib";
 
 import { AppPageShell, PageHeader } from "../../operations-ui";
 import { createQuoteAction } from "../actions";
@@ -51,7 +52,7 @@ export default async function NewQuotePage({
           contactName: "",
           recipientEmail: "",
           issuedAt: new Date().toISOString().slice(0, 10),
-          expiresAt: "",
+          expiresAt: addDays(new Date(), DEFAULT_QUOTE_EXPIRATION_DAYS).toISOString().slice(0, 10),
           internalNotes: "",
           customerNotes: "",
           taxAmount: 0,

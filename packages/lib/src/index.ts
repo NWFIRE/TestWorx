@@ -13,6 +13,7 @@ export * from "./permissions";
 export * from "./pilot-readiness";
 export * from "./quickbooks";
 export * from "./quote-pdf";
+export * from "./quote-terms";
 export * from "./quotes";
 export * from "./report-calculations";
 export * from "./report-config";

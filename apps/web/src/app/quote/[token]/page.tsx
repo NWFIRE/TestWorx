@@ -12,6 +12,7 @@ import {
 } from "@testworx/lib";
 
 import { approveQuoteFromHostedPage, declineQuoteFromHostedPage } from "./actions";
+import { QuoteProjectTermsCard } from "../../quote-project-terms-card";
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
@@ -328,12 +329,7 @@ export default async function HostedQuotePage({
                   </table>
                 </div>
 
-                {quote.customerNotes ? (
-                  <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50/60 p-5">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Notes</p>
-                    <p className="mt-3 text-sm leading-7 text-slate-600">{quote.customerNotes}</p>
-                  </div>
-                ) : null}
+                <QuoteProjectTermsCard className="mt-5" customerNotes={quote.customerNotes} primaryColor={primaryColor} />
 
                 {quote.canRespond ? (
                   <div className="mt-5 rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,rgba(var(--tenant-primary-rgb),0.05),rgba(255,255,255,0.98))] p-5">

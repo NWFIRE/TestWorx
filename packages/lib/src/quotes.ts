@@ -16,6 +16,7 @@ import type { QuoteReminderDispatchStatus, QuoteReminderType } from "@prisma/cli
 
 import { sendQuoteEmail, sendQuoteReminderEmail } from "./account-email";
 import { getServerEnv } from "./env";
+import { getDefaultQuoteExpirationDate } from "./quote-terms";
 import { inspectionTypeRegistry } from "./report-config";
 import { generateQuotePdf } from "./quote-pdf";
 import {
@@ -1039,6 +1040,7 @@ export async function createQuote(actor: ActorContext, input: QuoteInput) {
   const lineItems = await normalizeQuoteLineItems(parsedActor.tenantId as string, parsedInput.lineItems);
   const totals = calculateQuoteTotals(lineItems, parsedInput.taxAmount);
   const quoteNumber = await buildNextQuoteNumber(parsedActor.tenantId as string);
+  const expiresAt = parsedInput.expiresAt ?? getDefaultQuoteExpirationDate(parsedInput.issuedAt);
 
   const quote = await prisma.quote.create({
     data: {
@@ -1049,7 +1051,7 @@ export async function createQuote(actor: ActorContext, input: QuoteInput) {
       contactName: normalizeNullableString(parsedInput.contactName),
       recipientEmail: normalizeNullableString(parsedInput.recipientEmail),
       issuedAt: parsedInput.issuedAt,
-      expiresAt: parsedInput.expiresAt ?? null,
+      expiresAt,
       status: QuoteStatus.draft,
       syncStatus: QuoteSyncStatus.not_synced,
       deliveryStatus: QuoteDeliveryStatus.not_sent,
@@ -1098,6 +1100,7 @@ export async function updateQuote(actor: ActorContext, quoteId: string, input: Q
 
   const lineItems = await normalizeQuoteLineItems(parsedActor.tenantId as string, parsedInput.lineItems);
   const totals = calculateQuoteTotals(lineItems, parsedInput.taxAmount);
+  const expiresAt = parsedInput.expiresAt ?? getDefaultQuoteExpirationDate(parsedInput.issuedAt);
 
   const updated = await prisma.quote.update({
     where: { id: quoteId },
@@ -1107,7 +1110,7 @@ export async function updateQuote(actor: ActorContext, quoteId: string, input: Q
       contactName: normalizeNullableString(parsedInput.contactName),
       recipientEmail: normalizeNullableString(parsedInput.recipientEmail),
       issuedAt: parsedInput.issuedAt,
-      expiresAt: parsedInput.expiresAt ?? null,
+      expiresAt,
       subtotal: totals.subtotal,
       taxAmount: totals.taxAmount,
       total: totals.total,

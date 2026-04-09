@@ -104,6 +104,7 @@ import {
   sendQuoteReminderNow,
   clearQuoteLineItemQuickBooksMapping,
   sendQuote,
+  updateQuote,
   updateQuoteReminderControl,
   updateQuoteReminderSettings
 } from "../quotes";
@@ -270,6 +271,99 @@ describe("quotes", () => {
             })
           ]
         }
+      })
+    }));
+  });
+
+  it("defaults draft quote expiration to 30 days from the issue date when no expiration is provided", async () => {
+    prismaMock.quote.count.mockResolvedValue(5);
+    prismaMock.quote.create.mockResolvedValue({
+      id: "quote_3",
+      quoteNumber: "Q-2026-0006"
+    });
+
+    const issuedAt = new Date("2026-04-06T12:00:00.000Z");
+
+    await createQuote(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        contactName: "Alyssa Reed",
+        recipientEmail: "alyssa@example.com",
+        issuedAt,
+        expiresAt: null,
+        internalNotes: null,
+        customerNotes: null,
+        taxAmount: 0,
+        lineItems: [
+          {
+            internalCode: "EXTINGUISHER_ANNUAL",
+            title: "Fire extinguisher annual inspection",
+            description: "Annual field inspection and tagging",
+            quantity: 1,
+            unitPrice: 55,
+            discountAmount: 0,
+            taxable: false,
+            inspectionType: "fire_extinguisher",
+            category: "inspection"
+          }
+        ]
+      }
+    );
+
+    expect(prismaMock.quote.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        expiresAt: addDays(issuedAt, 30)
+      })
+    }));
+  });
+
+  it("defaults quote expiration to 30 days from the issue date when an update leaves it blank", async () => {
+    prismaMock.quote.findFirst.mockResolvedValue({
+      id: "quote_1",
+      syncStatus: QuoteSyncStatus.not_synced,
+      quickbooksEstimateId: null
+    });
+    prismaMock.quote.update.mockResolvedValue({
+      id: "quote_1"
+    });
+
+    const issuedAt = new Date("2026-04-10T12:00:00.000Z");
+
+    await updateQuote(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      "quote_1",
+      {
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        contactName: "Alyssa Reed",
+        recipientEmail: "alyssa@example.com",
+        issuedAt,
+        expiresAt: null,
+        internalNotes: null,
+        customerNotes: null,
+        taxAmount: 0,
+        lineItems: [
+          {
+            internalCode: "EXTINGUISHER_ANNUAL",
+            title: "Fire extinguisher annual inspection",
+            description: "Annual field inspection and tagging",
+            quantity: 1,
+            unitPrice: 55,
+            discountAmount: 0,
+            taxable: false,
+            inspectionType: "fire_extinguisher",
+            category: "inspection"
+          }
+        ]
+      }
+    );
+
+    expect(prismaMock.quote.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "quote_1" },
+      data: expect.objectContaining({
+        expiresAt: addDays(issuedAt, 30)
       })
     }));
   });

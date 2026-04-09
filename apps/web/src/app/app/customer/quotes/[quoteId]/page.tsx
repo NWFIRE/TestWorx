@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getCustomerQuoteDetail, getQuoteStatusTone, quoteStatusLabels } from "@testworx/lib";
 
-import { AppPageShell, EmptyState, PageHeader, SectionCard, StatusBadge, WorkspaceSplit } from "../../../admin/operations-ui";
+import { AppPageShell, PageHeader, SectionCard, StatusBadge, WorkspaceSplit } from "../../../admin/operations-ui";
+import { QuoteProjectTermsCard } from "../../../../quote-project-terms-card";
 
 export default async function CustomerQuoteDetailPage({
   params
@@ -101,14 +102,7 @@ export default async function CustomerQuoteDetailPage({
             </div>
           </SectionCard>
 
-          <SectionCard>
-            <h2 className="text-xl font-semibold text-slate-950">Notes</h2>
-            {quote.customerNotes ? (
-              <p className="mt-3 text-sm leading-7 text-slate-600">{quote.customerNotes}</p>
-            ) : (
-              <EmptyState className="mt-3" description="No customer-facing notes were added to this quote." title="No quote notes" />
-            )}
-          </SectionCard>
+          <QuoteProjectTermsCard customerNotes={quote.customerNotes} />
 
           <SectionCard>
             <h2 className="text-xl font-semibold text-slate-950">Response activity</h2>

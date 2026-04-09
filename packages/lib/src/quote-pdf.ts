@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 
 import { resolveTenantBranding } from "./branding";
+import { getQuoteTermsContent } from "./quote-terms";
 import { decodeStoredFile } from "./storage";
 
 type QuotePdfInput = {
@@ -533,12 +534,71 @@ function renderTotals(page: PDFPage, input: QuotePdfInput, theme: Theme, boldFon
 
 function renderNotes(page: PDFPage, text: string, theme: Theme, boldFont: PDFFont, regularFont: PDFFont, startY: number) {
   let y = startY;
-  drawSectionTitle(page, "Customer Notes", y, boldFont, theme);
+  drawSectionTitle(page, "Additional Quote Notes", y, boldFont, theme);
   y -= 16;
   const height = 26 + paragraphHeight(regularFont, text, CONTENT_WIDTH - 20, 9);
   drawRect(page, PAGE_MARGIN, y, CONTENT_WIDTH, height, theme.softSurface, theme.line);
   drawParagraph(page, regularFont, text, PAGE_MARGIN + 10, y - 14, CONTENT_WIDTH - 20, 9, theme.ink);
   return y - height - 16;
+}
+
+function renderProjectTerms(page: PDFPage, theme: Theme, boldFont: PDFFont, regularFont: PDFFont, startY: number) {
+  const terms = getQuoteTermsContent();
+  let y = startY;
+  drawSectionTitle(page, terms.title, y, boldFont, theme);
+  y -= 16;
+
+  if (terms.intro) {
+    const introHeight = 26 + paragraphHeight(regularFont, terms.intro, CONTENT_WIDTH - 20, 9);
+    drawRect(page, PAGE_MARGIN, y, CONTENT_WIDTH, introHeight, theme.surface, theme.line);
+    drawParagraph(page, regularFont, terms.intro, PAGE_MARGIN + 10, y - 14, CONTENT_WIDTH - 20, 9, theme.ink);
+    y -= introHeight + 12;
+  }
+
+  const emphasisHeight = 36 + paragraphHeight(regularFont, terms.emphasisBody, CONTENT_WIDTH - 20, 9);
+  drawRect(page, PAGE_MARGIN, y, CONTENT_WIDTH, emphasisHeight, theme.softSurface, theme.line);
+  page.drawText(terms.emphasisTitle.toUpperCase(), {
+    x: PAGE_MARGIN + 10,
+    y: y - 14,
+    size: 7.5,
+    font: boldFont,
+    color: theme.primary
+  });
+  drawParagraph(page, regularFont, terms.emphasisBody, PAGE_MARGIN + 10, y - 29, CONTENT_WIDTH - 20, 9, theme.ink);
+  y -= emphasisHeight + 12;
+
+  for (const section of terms.sections) {
+    const bulletHeight = (section.bullets ?? []).length * 14;
+    const bodyHeight = (section.body ?? []).reduce((sum, paragraph) => sum + paragraphHeight(regularFont, paragraph, CONTENT_WIDTH - 20, 9) + 8, 0);
+    const sectionHeight = 24 + bodyHeight + bulletHeight + 10;
+    drawRect(page, PAGE_MARGIN, y, CONTENT_WIDTH, sectionHeight, theme.surface, theme.line);
+    page.drawText(section.title.toUpperCase(), {
+      x: PAGE_MARGIN + 10,
+      y: y - 14,
+      size: 7.5,
+      font: boldFont,
+      color: theme.muted
+    });
+
+    let sectionY = y - 30;
+    for (const paragraph of section.body ?? []) {
+      sectionY = drawParagraph(page, regularFont, paragraph, PAGE_MARGIN + 10, sectionY, CONTENT_WIDTH - 20, 9, theme.ink) - 5;
+    }
+
+    for (const bullet of section.bullets ?? []) {
+      page.drawCircle({
+        x: PAGE_MARGIN + 13,
+        y: sectionY + 4,
+        size: 1.8,
+        color: theme.soft
+      });
+      sectionY = drawParagraph(page, regularFont, bullet, PAGE_MARGIN + 22, sectionY + 8, CONTENT_WIDTH - 32, 9, theme.ink) - 1;
+    }
+
+    y -= sectionHeight + 10;
+  }
+
+  return y - 6;
 }
 
 function renderHostedLink(page: PDFPage, url: string, theme: Theme, boldFont: PDFFont, regularFont: PDFFont, startY: number) {
@@ -574,6 +634,7 @@ export async function generateQuotePdf(input: QuotePdfInput) {
   y = renderSummary(page, input, theme, boldFont, regularFont, y);
   y = renderLineItems(page, input, theme, boldFont, regularFont, y);
   y = renderTotals(page, input, theme, boldFont, regularFont, y);
+  y = renderProjectTerms(page, theme, boldFont, regularFont, y);
 
   if (input.quote.customerNotes?.trim()) {
     y = renderNotes(page, input.quote.customerNotes, theme, boldFont, regularFont, y);
