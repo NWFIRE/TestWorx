@@ -97,8 +97,12 @@ function buildTenantConnection() {
 function buildBillingSummary(overrides?: Partial<{
   status: string;
   quickbooksSyncStatus: string | null;
+  quickbooksSendStatus: string | null;
   quickbooksInvoiceId: string | null;
   quickbooksConnectionMode: string | null;
+  quickbooksSentAt: Date | null;
+  quickbooksSendError: string | null;
+  billingEmail: string | null;
 }>) {
   return {
     id: "summary_1",
@@ -121,13 +125,16 @@ function buildBillingSummary(overrides?: Partial<{
       }
     ],
     quickbooksSyncStatus: overrides?.quickbooksSyncStatus ?? "not_synced",
+    quickbooksSendStatus: overrides?.quickbooksSendStatus ?? "not_sent",
     quickbooksInvoiceId: overrides?.quickbooksInvoiceId ?? null,
     quickbooksConnectionMode: overrides?.quickbooksConnectionMode ?? null,
+    quickbooksSentAt: overrides?.quickbooksSentAt ?? null,
+    quickbooksSendError: overrides?.quickbooksSendError ?? null,
     quickbooksInvoiceNumber: null,
     customerCompany: {
       id: "customer_1",
       name: "Pinecrest Property Management",
-      billingEmail: "billing@pinecrest.example",
+      billingEmail: overrides?.billingEmail === undefined ? "billing@pinecrest.example" : overrides.billingEmail,
       phone: "312-555-0110"
     },
     site: {
@@ -208,7 +215,7 @@ describe("quickbooks billing sync hardening", () => {
     resetServerEnvForTests();
   });
 
-  it("marks billing summaries synced only after the created invoice is verified", async () => {
+  it("marks billing summaries synced and auto-sent after the created invoice is verified", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
     prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: null });
     prismaMock.customerCompany.update.mockResolvedValue(undefined);
@@ -216,6 +223,60 @@ describe("quickbooks billing sync hardening", () => {
     prismaMock.site.findFirst.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
     prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue(buildBillingSummary());
+    prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
+    prismaMock.auditLog.create.mockResolvedValue(undefined);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
+      .mockResolvedValueOnce(jsonResponse({}));
+
+    const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
+
+    const result = await syncBillingSummaryToQuickBooks(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    expect(result).toEqual({
+      summaryId: "summary_1",
+      inspectionId: "inspection_1",
+      invoiceId: "invoice_1",
+      invoiceNumber: "TW-TION_1",
+      quickbooksSendStatus: "sent",
+      quickbooksSendError: null,
+      quickbooksSentTo: "billing@pinecrest.example"
+    });
+    expect(prismaMock.inspectionBillingSummary.update).toHaveBeenCalledWith({
+      where: { id: "summary_1" },
+      data: expect.objectContaining({
+        status: "invoiced",
+        quickbooksSyncStatus: "synced",
+        quickbooksInvoiceId: "invoice_1",
+        quickbooksConnectionMode: "live",
+        quickbooksInvoiceNumber: "TW-TION_1",
+        quickbooksCustomerId: "qbo_customer_1",
+        quickbooksSyncError: null
+      })
+    });
+    expect(prismaMock.inspectionBillingSummary.update).toHaveBeenCalledWith({
+      where: { id: "summary_1" },
+      data: expect.objectContaining({
+        quickbooksSendStatus: "sent",
+        quickbooksSendError: null
+      })
+    });
+  });
+
+  it("keeps invoice synced and marks send skipped when billing email is missing", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: null });
+    prismaMock.customerCompany.update.mockResolvedValue(undefined);
+    prismaMock.site.findFirst.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
+    prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue(buildBillingSummary({ billingEmail: null }));
     prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
     prismaMock.auditLog.create.mockResolvedValue(undefined);
 
@@ -232,22 +293,60 @@ describe("quickbooks billing sync hardening", () => {
       "inspection_1"
     );
 
-    expect(result).toEqual({
-      summaryId: "summary_1",
-      inspectionId: "inspection_1",
-      invoiceId: "invoice_1",
-      invoiceNumber: "TW-TION_1"
+    expect(result.quickbooksSendStatus).toBe("send_skipped");
+    expect(result.quickbooksSendError).toMatch(/does not have a billing email/i);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(prismaMock.inspectionBillingSummary.update).toHaveBeenCalledWith({
+      where: { id: "summary_1" },
+      data: expect.objectContaining({
+        quickbooksSyncStatus: "synced",
+        quickbooksInvoiceId: "invoice_1"
+      })
     });
     expect(prismaMock.inspectionBillingSummary.update).toHaveBeenCalledWith({
       where: { id: "summary_1" },
       data: expect.objectContaining({
-        status: "invoiced",
-        quickbooksSyncStatus: "synced",
-        quickbooksInvoiceId: "invoice_1",
-        quickbooksConnectionMode: "live",
-        quickbooksInvoiceNumber: "TW-TION_1",
-        quickbooksCustomerId: "qbo_customer_1",
-        quickbooksSyncError: null
+        quickbooksSendStatus: "send_skipped"
+      })
+    });
+  });
+
+  it("keeps invoice synced when auto-send fails after sync", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: null });
+    prismaMock.customerCompany.update.mockResolvedValue(undefined);
+    prismaMock.site.findFirst.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
+    prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue(buildBillingSummary());
+    prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
+    prismaMock.auditLog.create.mockResolvedValue(undefined);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
+      .mockResolvedValueOnce(new Response("Send failed", { status: 500 }));
+
+    const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
+
+    const result = await syncBillingSummaryToQuickBooks(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    expect(result.quickbooksSendStatus).toBe("send_failed");
+    expect(result.quickbooksSendError).toMatch(/send failed/i);
+    expect(prismaMock.inspectionBillingSummary.update).toHaveBeenCalledWith({
+      where: { id: "summary_1" },
+      data: expect.objectContaining({
+        quickbooksSendStatus: "send_failed"
+      })
+    });
+    expect(prismaMock.inspectionBillingSummary.update).not.toHaveBeenCalledWith({
+      where: { id: "summary_1" },
+      data: expect.objectContaining({
+        quickbooksSyncStatus: "failed"
       })
     });
   });
@@ -636,7 +735,7 @@ describe("quickbooks billing sync hardening", () => {
       "inspection_1"
     );
 
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
     const invoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
     expect(invoiceBody.Line?.[0]?.SalesItemLineDetail?.ItemRef).toEqual({
       value: "mapped_item_1",

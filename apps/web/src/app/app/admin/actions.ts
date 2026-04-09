@@ -545,6 +545,7 @@ export async function updateBillingSummaryStatusAction(formData: FormData) {
   revalidatePath("/app/admin");
   revalidatePath("/app/admin/billing");
   revalidatePath(`/app/admin/billing/${inspectionId}`);
+  redirect(`/app/admin/billing/${inspectionId}?billing=${encodeURIComponent(`Billing summary marked ${status.replaceAll("_", " ")}.`)}`);
 }
 
 export async function updateBillingSummaryNotesAction(formData: FormData) {
@@ -754,7 +755,7 @@ export async function syncBillingSummaryToQuickBooksAction(formData: FormData) {
   }
 
   try {
-    await syncBillingSummaryToQuickBooks(
+    const result = await syncBillingSummaryToQuickBooks(
       { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
       inspectionId
     );
@@ -762,7 +763,14 @@ export async function syncBillingSummaryToQuickBooksAction(formData: FormData) {
     revalidatePath("/app/admin");
     revalidatePath("/app/admin/billing");
     revalidatePath(`/app/admin/billing/${inspectionId}`);
-    redirect(`/app/admin/billing/${inspectionId}?quickbooks=success`);
+    const quickbooksNotice = result.quickbooksSendStatus === "sent"
+      ? "sent"
+      : result.quickbooksSendStatus === "send_skipped"
+        ? encodeURIComponent(result.quickbooksSendError ?? "Invoice synced to QuickBooks, but email send was skipped.")
+        : result.quickbooksSendStatus === "send_failed"
+          ? encodeURIComponent(result.quickbooksSendError ?? "Invoice synced to QuickBooks, but email send failed.")
+          : "success";
+    redirect(`/app/admin/billing/${inspectionId}?quickbooks=${quickbooksNotice}`);
   } catch (error) {
     if (isRedirectError(error)) {
       throw error;
@@ -781,7 +789,7 @@ export async function sendQuickBooksInvoiceAction(formData: FormData) {
   }
 
   try {
-    await sendQuickBooksInvoice(
+    const result = await sendQuickBooksInvoice(
       { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
       inspectionId
     );
@@ -789,7 +797,10 @@ export async function sendQuickBooksInvoiceAction(formData: FormData) {
     revalidatePath("/app/admin");
     revalidatePath("/app/admin/billing");
     revalidatePath(`/app/admin/billing/${inspectionId}`);
-    redirect(`/app/admin/billing/${inspectionId}?quickbooks=sent`);
+    const quickbooksNotice = result.sendStatus === "sent"
+      ? "sent"
+      : encodeURIComponent(result.error ?? "QuickBooks email send was skipped.");
+    redirect(`/app/admin/billing/${inspectionId}?quickbooks=${quickbooksNotice}`);
   } catch (error) {
     if (isRedirectError(error)) {
       throw error;

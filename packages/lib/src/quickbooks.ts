@@ -83,8 +83,18 @@ type QuickBooksBillingSummary = {
     category: string;
   }>;
   quickbooksSyncStatus: string | null;
+  quickbooksSendStatus: string | null;
   quickbooksInvoiceId: string | null;
   quickbooksInvoiceNumber: string | null;
+};
+
+type QuickBooksInvoiceSendResult = {
+  summaryId: string;
+  inspectionId: string;
+  invoiceId: string;
+  sendStatus: "sent" | "send_failed" | "send_skipped";
+  sentTo: string | null;
+  error: string | null;
 };
 
 type QuickBooksInvoiceRecord = {
@@ -3144,6 +3154,7 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
     notes: summary.notes,
     items: Array.isArray(summary.items) ? summary.items as QuickBooksBillingSummary["items"] : [],
     quickbooksSyncStatus: summary.quickbooksSyncStatus,
+    quickbooksSendStatus: summary.quickbooksSendStatus ?? (summary.quickbooksSyncStatus === "sent" ? "sent" : "not_sent"),
     quickbooksInvoiceId: summary.quickbooksInvoiceId,
     quickbooksInvoiceNumber: summary.quickbooksInvoiceNumber
   } satisfies QuickBooksBillingSummary;
@@ -3251,12 +3262,15 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
         data: {
           status: "invoiced",
           quickbooksSyncStatus: "synced",
+          quickbooksSendStatus: "not_sent",
           quickbooksInvoiceId: verifiedInvoice.id,
           quickbooksInvoiceNumber: verifiedInvoice.docNumber ?? createdDocNumber ?? docNumber,
           quickbooksConnectionMode: connectionStatus.appMode,
           quickbooksCustomerId: customerId,
           quickbooksSyncedAt: new Date(),
-          quickbooksSyncError: null
+          quickbooksSyncError: null,
+          quickbooksSentAt: null,
+          quickbooksSendError: null
         }
       }),
       prisma.inspection.update({
@@ -3281,11 +3295,32 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
       }
     });
 
-    return {
+    const syncResult = {
       summaryId: summary.id,
       inspectionId: summary.inspectionId,
       invoiceId: verifiedInvoice.id,
       invoiceNumber: verifiedInvoice.docNumber ?? createdDocNumber ?? docNumber
+    };
+
+    const sendResult = await sendQuickBooksInvoiceForSummary({
+      parsedActor,
+      tenant,
+      summary: {
+        id: summary.id,
+        inspectionId: summary.inspectionId,
+        quickbooksInvoiceId: verifiedInvoice.id,
+        customerCompany: {
+          billingEmail: summary.customerCompany.billingEmail
+        }
+      },
+      suppressThrowOnSendFailure: true
+    });
+
+    return {
+      ...syncResult,
+      quickbooksSendStatus: sendResult.sendStatus,
+      quickbooksSendError: sendResult.error,
+      quickbooksSentTo: sendResult.sentTo
     };
   } catch (error) {
     const normalizedError = normalizeQuickBooksError({
@@ -3302,7 +3337,10 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
         quickbooksCustomerId: null,
         quickbooksSyncedAt: null,
         quickbooksSyncStatus: "failed",
-        quickbooksSyncError: normalizedError.message
+        quickbooksSyncError: normalizedError.message,
+        quickbooksSendStatus: "not_sent",
+        quickbooksSentAt: null,
+        quickbooksSendError: null
       }
     });
 
@@ -3588,7 +3626,153 @@ export async function syncQuoteToQuickBooksEstimate(actor: ActorContext, quoteId
   }
 }
 
-export async function sendQuickBooksInvoice(actor: ActorContext, inspectionId: string) {
+async function sendQuickBooksInvoiceForSummary(input: {
+  parsedActor: ReturnType<typeof parseActor>;
+  tenant: QuickBooksTenantConnection;
+  summary: {
+    id: string;
+    inspectionId: string;
+    quickbooksInvoiceId: string;
+    customerCompany: {
+      billingEmail: string | null;
+    };
+  };
+  suppressThrowOnSendFailure?: boolean;
+}) {
+  const { parsedActor, tenant, summary, suppressThrowOnSendFailure } = input;
+
+  if (!summary.customerCompany.billingEmail) {
+    const message = "QuickBooks invoice send skipped because the customer does not have a billing email.";
+
+    await prisma.inspectionBillingSummary.update({
+      where: { id: summary.id },
+      data: {
+        quickbooksSendStatus: "send_skipped",
+        quickbooksSentAt: null,
+        quickbooksSendError: message
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        tenantId: parsedActor.tenantId as string,
+        actorUserId: parsedActor.userId,
+        action: "billing.quickbooks_send_skipped",
+        entityType: "InspectionBillingSummary",
+        entityId: summary.id,
+        metadata: {
+          inspectionId: summary.inspectionId,
+          invoiceId: summary.quickbooksInvoiceId,
+          reason: "missing_billing_email"
+        }
+      }
+    });
+
+    return {
+      summaryId: summary.id,
+      inspectionId: summary.inspectionId,
+      invoiceId: summary.quickbooksInvoiceId,
+      sendStatus: "send_skipped",
+      sentTo: null,
+      error: message
+    } satisfies QuickBooksInvoiceSendResult;
+  }
+
+  const sendParams = new URLSearchParams();
+  sendParams.set("sendTo", summary.customerCompany.billingEmail);
+
+  try {
+    await quickBooksApiRequest<Record<string, unknown>>(tenant, {
+      path: `/invoice/${summary.quickbooksInvoiceId}/send`,
+      method: "POST",
+      searchParams: sendParams
+    });
+
+    await prisma.inspectionBillingSummary.update({
+      where: { id: summary.id },
+      data: {
+        quickbooksSendStatus: "sent",
+        quickbooksSentAt: new Date(),
+        quickbooksSendError: null
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        tenantId: parsedActor.tenantId as string,
+        actorUserId: parsedActor.userId,
+        action: "billing.quickbooks_sent",
+        entityType: "InspectionBillingSummary",
+        entityId: summary.id,
+        metadata: {
+          inspectionId: summary.inspectionId,
+          invoiceId: summary.quickbooksInvoiceId,
+          sentTo: summary.customerCompany.billingEmail ?? null
+        }
+      }
+    });
+
+    return {
+      summaryId: summary.id,
+      inspectionId: summary.inspectionId,
+      invoiceId: summary.quickbooksInvoiceId,
+      sendStatus: "sent",
+      sentTo: summary.customerCompany.billingEmail,
+      error: null
+    } satisfies QuickBooksInvoiceSendResult;
+  } catch (error) {
+    const normalizedError = normalizeQuickBooksError({
+      error,
+      fallbackOperation: "billing.send",
+      connectionMode: tenant.quickbooksConnectionMode
+    });
+    await prisma.inspectionBillingSummary.update({
+      where: { id: summary.id },
+      data: {
+        quickbooksSendStatus: "send_failed",
+        quickbooksSentAt: null,
+        quickbooksSendError: normalizedError.message
+      }
+    });
+
+    await createQuickBooksFailureAuditLog({
+      tenantId: parsedActor.tenantId as string,
+      actorUserId: parsedActor.userId,
+      action: "quickbooks.send_failed",
+      operation: normalizedError.operation,
+      message: normalizedError.message,
+      httpStatus: normalizedError.httpStatus,
+      intuitTid: normalizedError.intuitTid,
+      rawBody: normalizedError.rawBody,
+      connectionMode: tenant.quickbooksConnectionMode,
+      entityType: "InspectionBillingSummary",
+      entityId: summary.id,
+      metadata: {
+        inspectionId: summary.inspectionId,
+        invoiceId: summary.quickbooksInvoiceId
+      }
+    });
+
+    if (!suppressThrowOnSendFailure) {
+      throw normalizedError;
+    }
+
+    return {
+      summaryId: summary.id,
+      inspectionId: summary.inspectionId,
+      invoiceId: summary.quickbooksInvoiceId,
+      sendStatus: "send_failed",
+      sentTo: summary.customerCompany.billingEmail,
+      error: normalizedError.message
+    } satisfies QuickBooksInvoiceSendResult;
+  }
+}
+
+export async function sendQuickBooksInvoice(
+  actor: ActorContext,
+  inspectionId: string,
+  options?: { suppressThrowOnSendFailure?: boolean }
+) {
   const parsedActor = parseActor(actor);
   if (!canManageQuickBooksSync(parsedActor.role)) {
     throw new Error("Only administrators can send QuickBooks invoices.");
@@ -3619,80 +3803,17 @@ export async function sendQuickBooksInvoice(actor: ActorContext, inspectionId: s
     throw new Error(`This billing summary was synced in QuickBooks ${summary.quickbooksConnectionMode ? formatQuickBooksConnectionModeLabel(summary.quickbooksConnectionMode as QuickBooksConnectionMode) : "Unknown"}. Re-sync it in ${connectionStatus.appModeLabel} mode before sending.`);
   }
 
-  const sendParams = new URLSearchParams();
-  if (summary.customerCompany.billingEmail) {
-    sendParams.set("sendTo", summary.customerCompany.billingEmail);
-  }
-
-  try {
-    await quickBooksApiRequest<Record<string, unknown>>(tenant, {
-      path: `/invoice/${summary.quickbooksInvoiceId}/send`,
-      method: "POST",
-      searchParams: sendParams
-    });
-
-    await prisma.inspectionBillingSummary.update({
-      where: { id: summary.id },
-      data: {
-        quickbooksSyncStatus: "sent",
-        quickbooksSyncError: null,
-        quickbooksSyncedAt: new Date()
-      }
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        tenantId: parsedActor.tenantId as string,
-        actorUserId: parsedActor.userId,
-        action: "billing.quickbooks_sent",
-        entityType: "InspectionBillingSummary",
-        entityId: summary.id,
-        metadata: {
-          inspectionId: summary.inspectionId,
-          invoiceId: summary.quickbooksInvoiceId,
-          sentTo: summary.customerCompany.billingEmail ?? null
-        }
-      }
-    });
-
-    return {
-      summaryId: summary.id,
+  return sendQuickBooksInvoiceForSummary({
+    parsedActor,
+    tenant,
+    summary: {
+      id: summary.id,
       inspectionId: summary.inspectionId,
-      invoiceId: summary.quickbooksInvoiceId,
-      sentTo: summary.customerCompany.billingEmail ?? null
-    };
-  } catch (error) {
-    const normalizedError = normalizeQuickBooksError({
-      error,
-      fallbackOperation: "billing.send",
-      connectionMode: tenant.quickbooksConnectionMode
-    });
-    await prisma.inspectionBillingSummary.update({
-      where: { id: summary.id },
-      data: {
-        quickbooksSyncStatus: "failed",
-        quickbooksSyncError: normalizedError.message
+      quickbooksInvoiceId: summary.quickbooksInvoiceId,
+      customerCompany: {
+        billingEmail: summary.customerCompany.billingEmail
       }
-    });
-
-    await createQuickBooksFailureAuditLog({
-      tenantId: parsedActor.tenantId as string,
-      actorUserId: parsedActor.userId,
-      action: "quickbooks.send_failed",
-      operation: normalizedError.operation,
-      message: normalizedError.message,
-      httpStatus: normalizedError.httpStatus,
-      intuitTid: normalizedError.intuitTid,
-      rawBody: normalizedError.rawBody,
-      connectionMode: tenant.quickbooksConnectionMode,
-      entityType: "InspectionBillingSummary",
-      entityId: summary.id,
-      metadata: {
-        inspectionId: summary.inspectionId,
-        invoiceId: summary.quickbooksInvoiceId
-      }
-    });
-
-    throw normalizedError;
-  }
+    },
+    suppressThrowOnSendFailure: options?.suppressThrowOnSendFailure
+  });
 }

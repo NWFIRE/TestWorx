@@ -10,6 +10,10 @@ import { resolveReportTemplate } from "./report-config";
 import { assertTenantContext } from "./permissions";
 import { reportDraftSchema, type ReportDraft, type ReportPrimitiveValue } from "./report-engine";
 import { runCalculation } from "./report-calculations";
+import {
+  mapInspectionTypeToComplianceReportingDivision,
+  resolveComplianceReportingFeeTx
+} from "./compliance-reporting-fees";
 import { resolveInspectionServiceFeeTx } from "./service-fees";
 import { saveQuickBooksItemMappingForCode } from "./quickbooks";
 
@@ -128,7 +132,10 @@ type BillingSummaryListRow = {
   quickbooksInvoiceNumber: string | null;
   quickbooksConnectionMode: string | null;
   quickbooksSyncedAt: Date | null;
+  quickbooksSendStatus: string | null;
+  quickbooksSentAt: Date | null;
   quickbooksSyncError: string | null;
+  quickbooksSendError: string | null;
   subtotal: number;
   notes: string | null;
   items: BillableItem[];
@@ -149,7 +156,10 @@ type AdminBillingSummaryDetailRow = {
   quickbooksInvoiceNumber: string | null;
   quickbooksConnectionMode: string | null;
   quickbooksSyncedAt: Date | null;
+  quickbooksSendStatus: string | null;
+  quickbooksSentAt: Date | null;
   quickbooksSyncError: string | null;
+  quickbooksSendError: string | null;
   subtotal: number;
   notes: string | null;
   items: JsonValue;
@@ -165,6 +175,7 @@ type AuthorizedBillingSummaryRow = {
   items: JsonValue;
   quickbooksSyncStatus: string | null;
   quickbooksInvoiceId: string | null;
+  quickbooksSendStatus: string | null;
 };
 
 type FinalizedReportRow = {
@@ -182,6 +193,7 @@ type InspectionRow = {
 };
 
 const INSPECTION_LEVEL_REPORT_TYPE = "inspection";
+const COMPLIANCE_FEE_REPORT_TYPE = "compliance_reporting";
 
 function parseActor(actor: ActorContext) {
   const parsed = actorContextSchema.parse(actor);
@@ -1335,6 +1347,80 @@ async function buildInspectionServiceFeeItemTx(tx: TransactionClient, input: {
   } satisfies BillableItem;
 }
 
+async function buildComplianceReportingFeeItemsTx(tx: TransactionClient, input: {
+  tenantId: string;
+  inspectionId: string;
+  siteId: string;
+  reportTypes: InspectionType[];
+}) {
+  const feeItems: BillableItem[] = [];
+  const processedDivisions = new Set<string>();
+  const site = await tx.site.findFirst({
+    where: {
+      id: input.siteId,
+      tenantId: input.tenantId
+    },
+    select: {
+      city: true,
+      state: true
+    }
+  });
+
+  if (!site) {
+    throw new Error("Site not found for compliance reporting fee resolution.");
+  }
+
+  for (const reportType of input.reportTypes) {
+    const division = mapInspectionTypeToComplianceReportingDivision(reportType);
+    if (!division || processedDivisions.has(division)) {
+      continue;
+    }
+
+    processedDivisions.add(division);
+    const resolvedFee = await resolveComplianceReportingFeeTx(tx, {
+      tenantId: input.tenantId,
+      division,
+      location: {
+        city: site.city,
+        state: site.state
+      }
+    });
+
+    if (!resolvedFee.matched || resolvedFee.feeAmount <= 0) {
+      continue;
+    }
+
+    feeItems.push({
+      id: `${input.inspectionId}:compliance-fee:${division}`,
+      tenantId: input.tenantId,
+      inspectionId: input.inspectionId,
+      reportId: input.inspectionId,
+      reportType: COMPLIANCE_FEE_REPORT_TYPE,
+      sourceSection: "compliance-reporting-fee",
+      sourceField: division,
+      category: "fee" as const,
+      code: `COMPLIANCE_REPORTING_FEE_${division.toUpperCase()}`,
+      description: "Compliance Reporting Fee",
+      quantity: 1,
+      unit: "jurisdiction",
+      unitPrice: resolvedFee.feeAmount,
+      amount: calculateAmount(1, resolvedFee.feeAmount),
+      metadata: {
+        displayGroup: "fee",
+        feeType: "compliance_reporting",
+        complianceDivision: division,
+        complianceRuleId: resolvedFee.ruleId ?? null,
+        complianceJurisdictionCity: resolvedFee.city ?? null,
+        complianceJurisdictionCounty: resolvedFee.county ?? null,
+        complianceJurisdictionState: resolvedFee.state ?? null,
+        complianceResolutionSource: resolvedFee.source
+      }
+    } satisfies BillableItem);
+  }
+
+  return feeItems;
+}
+
 function subtotalForItems(items: BillableItem[]) {
   return Number(items.reduce((sum, item) => sum + (item.amount ?? 0), 0).toFixed(2));
 }
@@ -1397,6 +1483,12 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
   );
 
   extracted.push(await buildInspectionServiceFeeItemTx(db, input));
+  extracted.push(...await buildComplianceReportingFeeItemsTx(db, {
+    tenantId: input.tenantId,
+    inspectionId: input.inspectionId,
+    siteId: inspection.siteId,
+    reportTypes: reports.map((report) => report.inspectionType)
+  }));
 
   const existing = await getExistingBillingSummaryRow(db, input.inspectionId);
   if (extracted.length === 0) {
@@ -1525,7 +1617,10 @@ export async function getAdminBillingSummaries(actor: ActorContext) {
       s."quickbooksInvoiceNumber",
       s."quickbooksConnectionMode",
       s."quickbooksSyncedAt",
+      s."quickbooksSendStatus",
+      s."quickbooksSentAt",
       s."quickbooksSyncError",
+      s."quickbooksSendError",
       s."subtotal",
       s."notes",
       s."items"
@@ -1571,7 +1666,10 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
       s."quickbooksInvoiceNumber",
       s."quickbooksConnectionMode",
       s."quickbooksSyncedAt",
+      s."quickbooksSendStatus",
+      s."quickbooksSentAt",
       s."quickbooksSyncError",
+      s."quickbooksSendError",
       s."subtotal",
       s."notes",
       s."items"
@@ -1608,7 +1706,10 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
     quickbooksInvoiceNumber: row.quickbooksInvoiceNumber ?? null,
     quickbooksConnectionMode: row.quickbooksConnectionMode ?? null,
     quickbooksSyncedAt: row.quickbooksSyncedAt ?? null,
+    quickbooksSendStatus: row.quickbooksSendStatus ?? (row.quickbooksSyncStatus === "sent" ? "sent" : "not_sent"),
+    quickbooksSentAt: row.quickbooksSentAt ?? (row.quickbooksSyncStatus === "sent" ? row.quickbooksSyncedAt ?? null : null),
     quickbooksSyncError: row.quickbooksSyncError ?? null,
+    quickbooksSendError: row.quickbooksSendError ?? null,
     items: itemsWithCatalogState,
     groupedItems: groupBillableItems(itemsWithCatalogState),
     reviewGroupedItems: groupBillingReviewItems(itemsWithCatalogState),
@@ -1622,7 +1723,7 @@ async function getAuthorizedBillingSummary(actor: ActorContext, summaryId: strin
   ensureAdmin(parsedActor);
 
   const rows = (await prisma.$queryRaw`
-    SELECT "id", "tenantId", "inspectionId", "status", "subtotal", "notes", "items", "quickbooksSyncStatus", "quickbooksInvoiceId"
+    SELECT "id", "tenantId", "inspectionId", "status", "subtotal", "notes", "items", "quickbooksSyncStatus", "quickbooksInvoiceId", "quickbooksSendStatus"
     FROM "InspectionBillingSummary"
     WHERE "id" = ${summaryId} AND "tenantId" = ${parsedActor.tenantId as string}
     LIMIT 1
@@ -1825,7 +1926,7 @@ export async function searchBillingSummaryItemCatalogMatches(
     throw new Error("Billing item not found.");
   }
   if (isRuleControlledFeeItem(item)) {
-    throw new Error("Service fee pricing is controlled by default fee and location rules.");
+    throw new Error("Automatic fee pricing is controlled by fee rules and cannot be edited here.");
   }
 
   return searchCatalogCandidates(parsedActor.tenantId as string, item, input.query, {
@@ -1855,7 +1956,7 @@ export async function linkBillingSummaryItemCatalog(
     throw new Error("Billing item not found.");
   }
   if (isRuleControlledFeeItem(item)) {
-    throw new Error("Service fee pricing is controlled by default fee and location rules.");
+    throw new Error("Automatic fee pricing is controlled by fee rules and cannot be edited here.");
   }
 
   const catalogItem = await prisma.quickBooksCatalogItem.findFirst({
@@ -1905,7 +2006,10 @@ export async function linkBillingSummaryItemCatalog(
         quickbooksConnectionMode: null,
         quickbooksCustomerId: null,
         quickbooksSyncedAt: null,
-        quickbooksSyncError: null
+        quickbooksSyncError: null,
+        quickbooksSendStatus: "not_sent",
+        quickbooksSentAt: null,
+        quickbooksSendError: null
       }
     });
 
@@ -2035,7 +2139,7 @@ export async function linkBillingSummaryItemGroupCatalog(
     throw new Error("Only identical billing items can be linked as a grouped row.");
   }
   if (groupedItems.some((item) => isRuleControlledFeeItem(item))) {
-    throw new Error("Service fee pricing is controlled by default fee and location rules.");
+    throw new Error("Automatic fee pricing is controlled by fee rules and cannot be edited here.");
   }
 
   const catalogItem = await prisma.quickBooksCatalogItem.findFirst({
@@ -2086,7 +2190,10 @@ export async function linkBillingSummaryItemGroupCatalog(
         quickbooksConnectionMode: null,
         quickbooksCustomerId: null,
         quickbooksSyncedAt: null,
-        quickbooksSyncError: null
+        quickbooksSyncError: null,
+        quickbooksSendStatus: "not_sent",
+        quickbooksSentAt: null,
+        quickbooksSendError: null
       }
     });
 
@@ -2206,7 +2313,7 @@ export async function clearBillingSummaryItemCatalogLink(
     throw new Error("Billing item not found.");
   }
   if (isRuleControlledFeeItem(item)) {
-    throw new Error("Service fee pricing is controlled by default fee and location rules.");
+    throw new Error("Automatic fee pricing is controlled by fee rules and cannot be edited here.");
   }
 
   const updatedItems = summary.items.map((candidate) =>
@@ -2233,7 +2340,10 @@ export async function clearBillingSummaryItemCatalogLink(
       quickbooksConnectionMode: null,
       quickbooksCustomerId: null,
       quickbooksSyncedAt: null,
-      quickbooksSyncError: null
+      quickbooksSyncError: null,
+      quickbooksSendStatus: "not_sent",
+      quickbooksSentAt: null,
+      quickbooksSendError: null
     }
   });
 
@@ -2273,7 +2383,7 @@ export async function clearBillingSummaryItemGroupCatalogLink(
 
   const representativeItem = groupedItems[0]!;
   if (groupedItems.some((item) => isRuleControlledFeeItem(item))) {
-    throw new Error("Service fee pricing is controlled by default fee and location rules.");
+    throw new Error("Automatic fee pricing is controlled by fee rules and cannot be edited here.");
   }
   const groupedItemSet = new Set(uniqueItemIds);
   const updatedItems = summary.items.map((candidate) =>
@@ -2300,7 +2410,10 @@ export async function clearBillingSummaryItemGroupCatalogLink(
       quickbooksConnectionMode: null,
       quickbooksCustomerId: null,
       quickbooksSyncedAt: null,
-      quickbooksSyncError: null
+      quickbooksSyncError: null,
+      quickbooksSendStatus: "not_sent",
+      quickbooksSentAt: null,
+      quickbooksSendError: null
     }
   });
 

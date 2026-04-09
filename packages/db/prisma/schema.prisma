@@ -129,6 +129,13 @@ enum QuickBooksConnectionMode {
   live
 }
 
+enum ComplianceReportingDivision {
+  fire_extinguishers
+  fire_alarm
+  fire_sprinkler
+  kitchen_suppression
+}
+
 enum QuoteStatus {
   draft
   ready_to_send
@@ -236,6 +243,7 @@ model Tenant {
   inspectionTechnicianAssignments InspectionTechnicianAssignment[]
   stripeWebhookEvents       StripeWebhookEvent[]
   serviceFeeRules           ServiceFeeRule[]
+  complianceReportingFeeRules ComplianceReportingFeeRule[]
   quickbooksCatalogItems    QuickBooksCatalogItem[]
   quickBooksItemMaps        QuickBooksItemMap[]
   quickBooksItemCache       QuickBooksItemCache[]
@@ -717,12 +725,15 @@ model InspectionBillingSummary {
   siteId            String
   status            String       @default("draft")
   quickbooksSyncStatus String?   @default("not_synced")
+  quickbooksSendStatus String?   @default("not_sent")
   quickbooksInvoiceId String?
   quickbooksInvoiceNumber String?
   quickbooksConnectionMode QuickBooksConnectionMode?
   quickbooksCustomerId String?
   quickbooksSyncedAt  DateTime?
+  quickbooksSentAt    DateTime?
   quickbooksSyncError String?
+  quickbooksSendError String?
   items             Json
   subtotal          Float        @default(0)
   notes             String?
@@ -761,6 +772,26 @@ model ServiceFeeRule {
   @@index([tenantId, siteId])
   @@index([tenantId, zipCode])
   @@index([tenantId, city, state])
+}
+
+model ComplianceReportingFeeRule {
+  id             String                      @id @default(cuid())
+  tenantId       String
+  division       ComplianceReportingDivision
+  city           String
+  normalizedCity String
+  county         String?
+  normalizedCounty String                    @default("")
+  state          String?
+  normalizedState String                     @default("")
+  feeAmount      Float
+  active         Boolean                     @default(true)
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+  tenant         Tenant                      @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, active, division])
+  @@index([tenantId, normalizedCity])
 }
 
 model QuickBooksCatalogItem {

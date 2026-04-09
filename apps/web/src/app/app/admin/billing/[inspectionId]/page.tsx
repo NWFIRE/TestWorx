@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { buildQuickBooksInvoiceAppUrl, getAdminBillingSummaryDetail, getTenantQuickBooksConnectionStatus } from "@testworx/lib";
 
+import { BillingSummaryStatusActions } from "../billing-summary-status-actions";
 import { BillingItemMatchPanel } from "../../billing-item-match-panel";
 import { clearBillingSummaryItemCatalogLinkAction, linkBillingSummaryItemCatalogAction, searchBillingSummaryItemCatalogMatchesAction, sendQuickBooksInvoiceAction, syncBillingSummaryToQuickBooksAction, updateBillingSummaryItemGroupAction, updateBillingSummaryNotesAction, updateBillingSummaryStatusAction } from "../../actions";
 
@@ -83,19 +84,39 @@ function buildBillingItemContext(item: {
   return context;
 }
 
-function describeServiceFeeRuleSource(item: {
+function describeAutomaticFeeSource(item: {
   metadata?: Record<string, unknown> | null;
 }) {
-  const source = typeof item.metadata?.resolutionSource === "string" ? item.metadata.resolutionSource : "";
+  const feeType = typeof item.metadata?.feeType === "string" ? item.metadata.feeType : "service_fee";
+  const source = typeof item.metadata?.resolutionSource === "string"
+    ? item.metadata.resolutionSource
+    : typeof item.metadata?.complianceResolutionSource === "string"
+      ? item.metadata.complianceResolutionSource
+      : "";
+
+  if (feeType === "compliance_reporting") {
+    const division = typeof item.metadata?.complianceDivision === "string"
+      ? item.metadata.complianceDivision.replaceAll("_", " ")
+      : "compliance reporting";
+    const jurisdiction = [
+      typeof item.metadata?.complianceJurisdictionCity === "string" ? item.metadata.complianceJurisdictionCity : null,
+      typeof item.metadata?.complianceJurisdictionCounty === "string" ? item.metadata.complianceJurisdictionCounty : null,
+      typeof item.metadata?.complianceJurisdictionState === "string" ? item.metadata.complianceJurisdictionState : null
+    ].filter(Boolean).join(", ");
+
+    return jurisdiction
+      ? `Controlled by the ${division} compliance reporting rule for ${jurisdiction}.`
+      : `Controlled by the ${division} compliance reporting rule.`;
+  }
 
   switch (source) {
-    case "site":
+    case "site_override":
       return "Controlled by a site-specific service fee rule.";
-    case "customer":
+    case "customer_override":
       return "Controlled by a customer-specific service fee rule.";
-    case "zip":
+    case "zip_rule":
       return "Controlled by a ZIP-code service fee rule.";
-    case "city_state":
+    case "city_state_rule":
       return "Controlled by a city/state service fee rule.";
     default:
       return "Controlled by the tenant default service fee.";
@@ -148,13 +169,18 @@ export default async function BillingSummaryDetailPage({
   const summaryModeMismatch = Boolean(summaryQuickBooksMode && summaryQuickBooksMode !== quickBooksConnection.connection.appMode);
   const hasVerifiedQuickBooksInvoice = Boolean(verifiedQuickBooksInvoiceId);
   const quickBooksNoticeRaw = Array.isArray(resolvedSearchParams.quickbooks) ? resolvedSearchParams.quickbooks[0] : resolvedSearchParams.quickbooks;
+  const billingNoticeRaw = Array.isArray(resolvedSearchParams.billing) ? resolvedSearchParams.billing[0] : resolvedSearchParams.billing;
   const quickBooksNotice = quickBooksNoticeRaw === "success"
     ? "Invoice synced to QuickBooks."
     : quickBooksNoticeRaw === "sent"
-      ? "Invoice send request submitted to QuickBooks."
-    : quickBooksNoticeRaw
+      ? "Invoice synced and sent from QuickBooks."
+      : quickBooksNoticeRaw
       ? decodeURIComponent(quickBooksNoticeRaw)
       : null;
+  const quickBooksNoticeTone = quickBooksNoticeRaw === "success" || quickBooksNoticeRaw === "sent"
+    ? "success"
+    : "warning";
+  const billingNotice = billingNoticeRaw ? decodeURIComponent(billingNoticeRaw) : null;
 
   return (
     <section className="space-y-6">
@@ -190,8 +216,13 @@ export default async function BillingSummaryDetailPage({
         </div>
       ) : null}
       {quickBooksNotice ? (
-        <div className={`rounded-[2rem] px-6 py-4 text-sm shadow-panel ${quickBooksNoticeRaw === "success" ? "border border-emerald-200 bg-emerald-50 text-emerald-800" : "border border-amber-200 bg-amber-50 text-amber-800"}`}>
+        <div className={`rounded-[2rem] px-6 py-4 text-sm shadow-panel ${quickBooksNoticeTone === "success" ? "border border-emerald-200 bg-emerald-50 text-emerald-800" : "border border-amber-200 bg-amber-50 text-amber-800"}`}>
           {quickBooksNotice}
+        </div>
+      ) : null}
+      {billingNotice ? (
+        <div className="rounded-[2rem] border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm text-emerald-800 shadow-panel">
+          {billingNotice}
         </div>
       ) : null}
       {!canUseQuickBooksActions ? (
@@ -254,13 +285,16 @@ export default async function BillingSummaryDetailPage({
                         {item.unitPrice === null || item.unitPrice === undefined ? <p className="text-sm font-semibold text-amber-700">Missing unit price. Review recommended.</p> : null}
                         {item.category === "fee" ? (
                           <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50/70 px-4 py-4 text-sm text-amber-900">
-                            <p className="font-semibold text-amber-950">Fee controlled by default fee and location rules</p>
-                            <p className="mt-2">{describeServiceFeeRuleSource(item)}</p>
+                            <p className="font-semibold text-amber-950">Automatic fee line</p>
+                            <p className="mt-2">{describeAutomaticFeeSource(item)}</p>
                             {typeof item.metadata?.serviceFeePriority === "number" ? (
                               <p className="mt-2 text-amber-800">Rule priority: {item.metadata.serviceFeePriority}</p>
                             ) : null}
                             {typeof item.metadata?.serviceFeeRuleId === "string" && item.metadata.serviceFeeRuleId ? (
                               <p className="mt-1 break-all text-xs text-amber-700">Rule id: {item.metadata.serviceFeeRuleId}</p>
+                            ) : null}
+                            {typeof item.metadata?.complianceRuleId === "string" && item.metadata.complianceRuleId ? (
+                              <p className="mt-1 break-all text-xs text-amber-700">Rule id: {item.metadata.complianceRuleId}</p>
                             ) : null}
                           </div>
                         ) : (
@@ -322,61 +356,29 @@ export default async function BillingSummaryDetailPage({
               <p className="mt-2">Invoice id: <span className="font-semibold text-ink">{summary.quickbooksInvoiceId ?? "Not synced"}</span></p>
               <p className="mt-2">Invoice mode: <span className="font-semibold text-ink">{summaryQuickBooksMode ? (summaryQuickBooksMode === "sandbox" ? "Sandbox" : "Live") : "Not recorded"}</span></p>
               <p className="mt-2">Synced at: <span className="font-semibold text-ink">{summary.quickbooksSyncedAt ? summary.quickbooksSyncedAt.toLocaleString() : "Not synced"}</span></p>
+              <p className="mt-2">QuickBooks send: <span className="font-semibold text-ink">{summary.quickbooksSendStatus ?? "not_sent"}</span></p>
+              <p className="mt-2">Sent at: <span className="font-semibold text-ink">{summary.quickbooksSentAt ? summary.quickbooksSentAt.toLocaleString() : "Not sent"}</span></p>
               {summary.quickbooksSyncError ? <p className="mt-2 text-rose-700">Last sync error: {summary.quickbooksSyncError}</p> : null}
+              {summary.quickbooksSendError ? <p className="mt-2 text-amber-700">Last send note: {summary.quickbooksSendError}</p> : null}
             </div>
-            <div className="mt-4 grid gap-3">
-              <form action={syncBillingSummaryToQuickBooksAction}>
-                <input name="inspectionId" type="hidden" value={summary.inspectionId} />
-                <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={hasVerifiedQuickBooksInvoice || summary.metrics.missingPriceCount > 0 || !canUseQuickBooksActions} type="submit">
-                  {hasVerifiedQuickBooksInvoice ? "Already synced to QuickBooks" : "Sync invoice to QuickBooks"}
-                </button>
-              </form>
-              {verifiedQuickBooksInvoiceId && !summaryModeMismatch && canUseQuickBooksActions ? (
-                <a className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={buildQuickBooksInvoiceAppUrl(verifiedQuickBooksInvoiceId, summaryQuickBooksMode)} rel="noreferrer" target="_blank">
-                  Open in QuickBooks
-                </a>
-              ) : null}
-              {verifiedQuickBooksInvoiceId && !summaryModeMismatch && canUseQuickBooksActions ? (
-                <form action={sendQuickBooksInvoiceAction}>
-                  <input name="inspectionId" type="hidden" value={summary.inspectionId} />
-                  <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" type="submit">
-                    Send from QuickBooks
-                  </button>
-                </form>
-              ) : null}
-              <form action={updateBillingSummaryStatusAction}>
-                <input name="summaryId" type="hidden" value={summary.id} />
-                <input name="inspectionId" type="hidden" value={summary.inspectionId} />
-                <input name="status" type="hidden" value="draft" />
-                <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" type="submit">
-                  Move to draft
-                </button>
-              </form>
-              <form action={updateBillingSummaryStatusAction}>
-                <input name="summaryId" type="hidden" value={summary.id} />
-                <input name="inspectionId" type="hidden" value={summary.inspectionId} />
-                <input name="status" type="hidden" value="reviewed" />
-                <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" type="submit">
-                  Mark reviewed
-                </button>
-              </form>
-              <form action={updateBillingSummaryStatusAction}>
-                <input name="summaryId" type="hidden" value={summary.id} />
-                <input name="inspectionId" type="hidden" value={summary.inspectionId} />
-                <input name="status" type="hidden" value="reviewed" />
-                <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" type="submit">
-                  Create invoice draft
-                </button>
-              </form>
-              <form action={updateBillingSummaryStatusAction}>
-                <input name="summaryId" type="hidden" value={summary.id} />
-                <input name="inspectionId" type="hidden" value={summary.inspectionId} />
-                <input name="status" type="hidden" value="invoiced" />
-                <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white" type="submit">
-                  Mark invoiced
-                </button>
-              </form>
-            </div>
+            <BillingSummaryStatusActions
+              canUseQuickBooksActions={canUseQuickBooksActions}
+              hasMissingPrices={summary.metrics.missingPriceCount > 0}
+              hasVerifiedQuickBooksInvoice={hasVerifiedQuickBooksInvoice}
+              inspectionId={summary.inspectionId}
+              quickbooksSendStatus={summary.quickbooksSendStatus === "sent" || summary.quickbooksSendStatus === "send_failed" || summary.quickbooksSendStatus === "send_skipped" ? summary.quickbooksSendStatus : "not_sent"}
+              sendQuickBooksInvoiceAction={sendQuickBooksInvoiceAction}
+              summaryId={summary.id}
+              summaryModeMismatch={summaryModeMismatch}
+              summaryStatus={summary.status}
+              syncBillingSummaryToQuickBooksAction={syncBillingSummaryToQuickBooksAction}
+              updateBillingSummaryStatusAction={updateBillingSummaryStatusAction}
+            />
+            {verifiedQuickBooksInvoiceId && !summaryModeMismatch && canUseQuickBooksActions ? (
+              <a className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={buildQuickBooksInvoiceAppUrl(verifiedQuickBooksInvoiceId, summaryQuickBooksMode)} rel="noreferrer" target="_blank">
+                Open in QuickBooks
+              </a>
+            ) : null}
           </div>
 
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
