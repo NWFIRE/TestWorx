@@ -12,7 +12,7 @@ import {
   quoteSyncStatusLabels
 } from "@testworx/lib";
 
-import { AppPageShell, PageHeader, SectionCard, StatusBadge } from "../../operations-ui";
+import { AppPageShell, PageHeader, SectionCard, StatusBadge, WorkspaceSplit } from "../../operations-ui";
 import {
   clearQuoteLineItemMappingAction,
   convertQuoteAction,
@@ -59,11 +59,12 @@ export default async function QuoteDetailPage({
     : "emerald";
 
   return (
-    <AppPageShell>
+    <AppPageShell density="wide">
       <PageHeader
         eyebrow="Quotes"
         title={detail.quoteNumber}
         description="Manage delivery, QuickBooks sync, approval, and operational conversion from one quote workspace."
+        contentWidth="full"
         actions={
           <>
             <a
@@ -89,7 +90,7 @@ export default async function QuoteDetailPage({
         </div>
       ) : null}
 
-      <section className="grid gap-6 xl:grid-cols-[1.45fr_0.75fr]">
+      <WorkspaceSplit variant="content-heavy">
         <div className="space-y-6">
           <SectionCard>
             <div className="flex flex-wrap items-center gap-3">
@@ -440,7 +441,7 @@ export default async function QuoteDetailPage({
             redirectTo={returnHref}
           />
         </aside>
-      </section>
+      </WorkspaceSplit>
     </AppPageShell>
   );
 }

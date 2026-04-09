@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getCustomerQuoteDetail, getQuoteStatusTone, quoteStatusLabels } from "@testworx/lib";
 
-import { AppPageShell, EmptyState, PageHeader, SectionCard, StatusBadge } from "../../../admin/operations-ui";
+import { AppPageShell, EmptyState, PageHeader, SectionCard, StatusBadge, WorkspaceSplit } from "../../../admin/operations-ui";
 
 export default async function CustomerQuoteDetailPage({
   params
@@ -27,11 +27,12 @@ export default async function CustomerQuoteDetailPage({
   }
 
   return (
-    <AppPageShell>
+    <AppPageShell density="wide">
       <PageHeader
         eyebrow="Customer quote"
         title={quote.quoteNumber}
         description="Review quoted work, totals, and the current approval state from one place."
+        contentWidth="full"
         actions={
           <>
             <a className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" href={`/api/quotes/${quote.id}/pdf`} target="_blank">
@@ -58,7 +59,7 @@ export default async function CustomerQuoteDetailPage({
         </div>
       </SectionCard>
 
-      <section className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
+      <WorkspaceSplit variant="content-heavy">
         <SectionCard>
           <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Quoted work</h2>
           <div className="mt-4 space-y-3">
@@ -130,7 +131,7 @@ export default async function CustomerQuoteDetailPage({
             </div>
           </SectionCard>
         </div>
-      </section>
+      </WorkspaceSplit>
     </AppPageShell>
   );
 }

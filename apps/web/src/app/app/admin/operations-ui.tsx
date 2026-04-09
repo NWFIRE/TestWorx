@@ -24,12 +24,14 @@ const toneClasses: Record<Tone, string> = {
 
 export function AppPageShell({
   children,
-  className
+  className,
+  density = "default"
 }: {
   children: ReactNode;
   className?: string;
+  density?: "default" | "wide";
 }) {
-  return <section className={cn("space-y-5 lg:space-y-6", className)}>{children}</section>;
+  return <section className={cn(density === "wide" ? "space-y-6 lg:space-y-7" : "space-y-5 lg:space-y-6", className)}>{children}</section>;
 }
 
 export function SectionCard({
@@ -56,18 +58,27 @@ export function PageHeader({
   title,
   description,
   actions,
-  className
+  className,
+  contentWidth = "wide"
 }: {
   eyebrow?: string;
   title: string;
   description: string;
   actions?: ReactNode;
   className?: string;
+  contentWidth?: "default" | "wide" | "full";
 }) {
+  const widthClass =
+    contentWidth === "full"
+      ? "max-w-6xl"
+      : contentWidth === "wide"
+        ? "max-w-5xl"
+        : "max-w-3xl";
+
   return (
     <SectionCard className={className}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="max-w-3xl">
+        <div className={widthClass}>
           {eyebrow ? (
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--tenant-primary)]">
               {eyebrow}
@@ -82,6 +93,25 @@ export function PageHeader({
       </div>
     </SectionCard>
   );
+}
+
+export function WorkspaceSplit({
+  children,
+  className,
+  variant = "balanced"
+}: {
+  children: ReactNode;
+  className?: string;
+  variant?: "balanced" | "content-heavy" | "even";
+}) {
+  const variantClass =
+    variant === "content-heavy"
+      ? "xl:grid-cols-[minmax(0,1.3fr)_minmax(22rem,0.85fr)] 2xl:grid-cols-[minmax(0,1.45fr)_minmax(24rem,0.78fr)]"
+      : variant === "even"
+        ? "xl:grid-cols-2"
+        : "xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.95fr)] 2xl:grid-cols-[minmax(0,1.22fr)_minmax(24rem,0.88fr)]";
+
+  return <section className={cn("grid gap-6", variantClass, className)}>{children}</section>;
 }
 
 export function KPIStatCard({

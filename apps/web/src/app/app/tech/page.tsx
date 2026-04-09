@@ -185,7 +185,7 @@ export default async function TechnicianPage({
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.25fr)_minmax(24rem,0.9fr)]">
         <div className="rounded-[2rem] bg-white p-5 shadow-panel">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>

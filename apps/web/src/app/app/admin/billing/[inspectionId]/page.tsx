@@ -7,6 +7,7 @@ import { buildQuickBooksInvoiceAppUrl, getAdminBillingSummaryDetail, getTenantQu
 
 import { BillingSummaryStatusActions } from "../billing-summary-status-actions";
 import { BillingItemMatchPanel } from "../../billing-item-match-panel";
+import { AppPageShell, WorkspaceSplit } from "../../operations-ui";
 import { clearBillingSummaryItemCatalogLinkAction, linkBillingSummaryItemCatalogAction, searchBillingSummaryItemCatalogMatchesAction, sendQuickBooksInvoiceAction, syncBillingSummaryToQuickBooksAction, updateBillingSummaryItemGroupAction, updateBillingSummaryNotesAction, updateBillingSummaryStatusAction } from "../../actions";
 
 type BillingSummaryDetail = NonNullable<Awaited<ReturnType<typeof getAdminBillingSummaryDetail>>>;
@@ -183,7 +184,7 @@ export default async function BillingSummaryDetailPage({
   const billingNotice = billingNoticeRaw ? decodeURIComponent(billingNoticeRaw) : null;
 
   return (
-    <section className="space-y-6">
+    <AppPageShell density="wide">
       <div className="rounded-[2rem] bg-white p-6 shadow-panel">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -236,7 +237,7 @@ export default async function BillingSummaryDetailPage({
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      <WorkspaceSplit variant="content-heavy">
         <div className="space-y-6">
           {groupedEntries.map(([category, items]) => (
             <div key={category} className="rounded-[2rem] bg-white p-6 shadow-panel">
@@ -255,7 +256,7 @@ export default async function BillingSummaryDetailPage({
                   <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No {categoryLabels[category].toLowerCase()} extracted from this visit.</p>
                 ) : items.map((item: BillingSummaryLineItem) => (
                   <div key={item.id} className="rounded-[1.5rem] border border-slate-200 p-4">
-                    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.7fr)] xl:items-start">
+                    <div className="grid gap-5 2xl:grid-cols-[minmax(0,1.45fr)_minmax(22rem,0.72fr)] 2xl:items-start">
                       <div className="min-w-0 space-y-2">
                         <p className="text-lg font-semibold text-ink">{item.description}</p>
                         <p className="text-sm text-slate-500">{item.reportType === "inspection" ? "inspection billing" : item.reportType.replaceAll("_", " ")} / {item.sourceSection?.replaceAll("-", " ") ?? "billables"}</p>
@@ -312,7 +313,7 @@ export default async function BillingSummaryDetailPage({
                           />
                         )}
                       </div>
-                      <form action={updateBillingSummaryItemGroupAction} className="grid gap-3 rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4 sm:grid-cols-2 xl:grid-cols-1">
+                      <form action={updateBillingSummaryItemGroupAction} className="grid gap-3 rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4 sm:grid-cols-2 2xl:grid-cols-1">
                         <input name="summaryId" type="hidden" value={summary.id} />
                         <input name="inspectionId" type="hidden" value={summary.inspectionId} />
                         {item.itemIds.map((sourceItemId) => (
@@ -331,7 +332,7 @@ export default async function BillingSummaryDetailPage({
                             {isInvoiced ? "Locked" : "Save line"}
                           </button>
                         </div>
-                        <p className="sm:col-span-2 xl:col-span-1 text-xs text-slate-500">
+                        <p className="sm:col-span-2 2xl:col-span-1 text-xs text-slate-500">
                           Subtotal: {item.unitPrice !== null && item.unitPrice !== undefined ? `$${(item.quantity * item.unitPrice).toFixed(2)}` : "Pending price"}
                         </p>
                       </form>
@@ -393,7 +394,7 @@ export default async function BillingSummaryDetailPage({
             </form>
           </div>
         </div>
-      </div>
-    </section>
+      </WorkspaceSplit>
+    </AppPageShell>
   );
 }

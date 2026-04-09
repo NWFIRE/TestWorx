@@ -31,7 +31,7 @@ import { InspectionPdfUploadCard } from "../../inspection-pdf-upload-card";
 import { InspectionReportCorrectionsCard } from "../../inspection-report-corrections-card";
 import { InspectionSchedulerForm } from "../../inspection-scheduler-form";
 import { InspectionStatusUpdateCard } from "../../inspection-status-update-card";
-import { PriorityBadge, StatusBadge } from "../../operations-ui";
+import { PriorityBadge, StatusBadge, WorkspaceSplit } from "../../operations-ui";
 import { RemoveReportTypeButton } from "../../../tech/remove-report-type-button";
 import { InspectionPacketCard } from "../../../inspection-packet-card";
 
@@ -371,7 +371,7 @@ export default async function EditInspectionPage({
           </p>
         </div>
       </div>
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <WorkspaceSplit variant={isReviewMode ? "balanced" : "content-heavy"}>
         {!isReviewMode ? (
         <InspectionSchedulerForm
           action={inspectionView.hasStartedWork ? amendInspectionAction : updateInspectionAction}
@@ -700,7 +700,7 @@ export default async function EditInspectionPage({
             </div>
           </div>
         </div>
-      </div>
+      </WorkspaceSplit>
     </section>
   );
 }

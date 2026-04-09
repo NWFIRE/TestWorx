@@ -16,7 +16,7 @@ import {
   getTenantQuickBooksConnectionSettings
 } from "@testworx/lib";
 
-import { AppPageShell, KPIStatCard, PageHeader, SectionCard } from "../operations-ui";
+import { AppPageShell, KPIStatCard, PageHeader, SectionCard, WorkspaceSplit } from "../operations-ui";
 
 import {
   createCustomerCompanyAction,
@@ -422,11 +422,12 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   const quoteRemindersOpen = isSectionOpen(params, "quoteRemindersOpen");
 
   return (
-    <AppPageShell>
+    <AppPageShell density="wide">
       <PageHeader
         description="Manage subscription readiness, billing contacts, branding, catalog mappings, and service fee rules from one quieter settings workspace."
         eyebrow="Tenant settings"
         title="Billing and branding"
+        contentWidth="full"
       />
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KPIStatCard
@@ -454,7 +455,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
           value={feesOpen ? "Open" : "Ready"}
         />
       </section>
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <WorkspaceSplit variant="balanced">
         <div className="space-y-6">
           <TenantBrandingForm action={updateTenantBrandingAction} values={{ ...brandingSettings.branding, billingEmail: brandingSettings.billingEmail }} />
           <SettingsDisclosureCard
@@ -644,7 +645,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
             ) : null}
           </SectionCard>
         </div>
-      </div>
+      </WorkspaceSplit>
       <BillingPlansSection
         addons={billingSettings.config.addons}
         canManageSubscription={canManageSubscription}

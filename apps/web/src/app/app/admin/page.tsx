@@ -34,7 +34,8 @@ import {
   PageHeader,
   SectionCard,
   StatusBadge,
-  WorkQueueNav
+  WorkQueueNav,
+  WorkspaceSplit
 } from "./operations-ui";
 
 type AdminDashboardData = Awaited<ReturnType<typeof getAdminDashboardData>>;
@@ -341,7 +342,7 @@ export default async function AdminPage({
   return (
     <div className="min-h-screen bg-[#f4f7fb] text-slate-900">
       <div className="py-5 lg:py-6">
-        <AppPageShell>
+        <AppPageShell density="wide">
           <div className="lg:hidden">
             <PageHeader
               actions={
@@ -355,6 +356,7 @@ export default async function AdminPage({
               description="Scheduling, review, and billing readiness from one operations workspace."
               eyebrow="Operations dashboard"
               title={`${greeting}, ${firstName}.`}
+              contentWidth="full"
             />
           </div>
 
@@ -387,6 +389,7 @@ export default async function AdminPage({
               description="Scheduling, review, and billing readiness from one calm operational workspace."
               eyebrow="Operations dashboard"
               title={`${greeting}, ${firstName}.`}
+              contentWidth="full"
             />
           </div>
 
@@ -432,7 +435,7 @@ export default async function AdminPage({
 
           <WorkQueueNav activeKey="all" />
 
-          <div className="grid gap-5 xl:grid-cols-[1.45fr_0.95fr]">
+          <WorkspaceSplit className="gap-5" variant="content-heavy">
             <div className="space-y-5 lg:space-y-6">
               <section className="relative overflow-hidden rounded-[28px] bg-slateblue p-5 text-white shadow-[0_20px_50px_rgb(var(--tenant-primary-rgb)_/_0.18)] lg:px-6 lg:py-6 lg:shadow-[0_22px_60px_rgb(var(--tenant-primary-rgb)_/_0.18)]">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(0,0,0,0.14),transparent_42%)]" />
@@ -461,7 +464,7 @@ export default async function AdminPage({
                 </div>
               </section>
 
-              <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+              <WorkspaceSplit className="gap-5" variant="balanced">
                 <SectionCard>
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -557,9 +560,9 @@ export default async function AdminPage({
                     )}
                   </div>
                 </SectionCard>
-              </section>
+              </WorkspaceSplit>
 
-              <section className="grid gap-5 xl:grid-cols-2">
+              <section className="grid gap-5 2xl:grid-cols-2">
                 <InspectionListCard
                   title="Active inspections"
                   description={`Operational schedule view with ${data.activeInspections.length} inspection${data.activeInspections.length === 1 ? "" : "s"} loaded right now.`}
@@ -685,7 +688,7 @@ export default async function AdminPage({
                 />
               </section>
             </div>
-          </div>
+          </WorkspaceSplit>
         </AppPageShell>
       </div>
     </div>
