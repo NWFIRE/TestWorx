@@ -26,20 +26,58 @@ export type StripeWebhookProcessingResult = {
 
 type BillingPlanDefinition = {
   label: string;
+  badge?: string;
+  headline: string;
   description: string;
   highlight: string;
   features: string[];
+  upgradeTriggers: string[];
+  ctaLabel: string;
+  highlighted: boolean;
+  contactSales?: boolean;
+  limits?: {
+    users?: string;
+    jobs?: string;
+    automation?: string;
+  };
   monthlyPriceCents: number;
   entitlements: TenantEntitlements;
+};
+
+type BillingAddOnDefinition = {
+  id: string;
+  name: string;
+  description: string;
 };
 
 const billingPlanContent: Record<BillingPlanCode, BillingPlanDefinition> = {
   starter: {
     label: "Starter",
-    description: "Operational foundation for growing inspection teams.",
-    highlight: "Great for early-stage multi-tech teams",
+    headline: "Run your day-to-day operations with confidence",
+    description: "Everything you need to schedule jobs, manage customers, and deliver professional field work.",
+    highlight: "Built for smaller teams getting their core operations organized",
+    features: [
+      "Scheduling and dispatch",
+      "Mobile technician workflows",
+      "Customer records and site history",
+      "Hosted quotes and branded PDFs",
+      "Basic inspections and reporting",
+      "Customer portal access"
+    ],
+    upgradeTriggers: [
+      "Need recurring inspections",
+      "Need quote follow-up and approval automation",
+      "Need deeper reporting and workflow control",
+      "Growing team or increasing job volume"
+    ],
+    ctaLabel: "Get Started",
+    highlighted: false,
+    limits: {
+      users: "Small inspection and service teams",
+      jobs: "Core day-to-day scheduling",
+      automation: "Foundational workflows"
+    },
     monthlyPriceCents: 19900,
-    features: ["Core scheduling", "Mobile technician workflows", "Customer portal and PDFs"],
     entitlements: {
       advancedRecurrence: false,
       uploadedInspectionPdfs: false
@@ -47,10 +85,34 @@ const billingPlanContent: Record<BillingPlanCode, BillingPlanDefinition> = {
   },
   professional: {
     label: "Professional",
-    description: "Full-service operations for scaling inspection companies.",
-    highlight: "Recommended for active field service companies",
+    badge: "Most Popular",
+    headline: "Scale operations and convert more work",
+    description: "Advanced workflows, recurring service management, and automation for active field service businesses.",
+    highlight: "Designed for growing companies that need better close rates and operational visibility",
+    features: [
+      "Everything in Starter",
+      "Advanced inspection and report workflows",
+      "Recurring inspection scheduling",
+      "Quote approval and conversion workflow",
+      "Automated reminders and follow-ups",
+      "Uploaded inspection PDFs and document management",
+      "Advanced dashboards and operational reporting",
+      "Core compliance workflow support"
+    ],
+    upgradeTriggers: [
+      "Multi-office operations",
+      "More advanced compliance requirements",
+      "More control over permissions and automation",
+      "Need onboarding and support at a higher level"
+    ],
+    ctaLabel: "Start Professional",
+    highlighted: true,
+    limits: {
+      users: "Growing field teams",
+      jobs: "Recurring service operations",
+      automation: "Automation included"
+    },
     monthlyPriceCents: 49900,
-    features: ["Everything in Starter", "Advanced report workflows", "Recurring inspection management", "Uploaded inspection PDFs"],
     entitlements: {
       advancedRecurrence: true,
       uploadedInspectionPdfs: true
@@ -58,16 +120,67 @@ const billingPlanContent: Record<BillingPlanCode, BillingPlanDefinition> = {
   },
   enterprise: {
     label: "Enterprise",
-    description: "Custom rollout support, controls, and volume pricing.",
-    highlight: "Best for multi-office and complex compliance teams",
+    headline: "Operate at scale with control and compliance",
+    description: "Built for complex service organizations with advanced compliance, automation, and operational oversight needs.",
+    highlight: "Purpose-built for larger, multi-location, compliance-heavy service organizations",
+    features: [
+      "Everything in Professional",
+      "Multi-office / multi-location support",
+      "Advanced compliance engine and jurisdiction-based workflows",
+      "Advanced automation workflows",
+      "Role-based permissions and operational controls",
+      "Priority onboarding",
+      "SLA-backed support",
+      "Custom rollout support"
+    ],
+    upgradeTriggers: [
+      "API / integrations",
+      "Custom implementation support",
+      "Custom pricing for larger rollouts"
+    ],
+    ctaLabel: "Talk to Sales",
+    highlighted: false,
+    contactSales: true,
+    limits: {
+      users: "Multi-office organizations",
+      jobs: "Scale and oversight",
+      automation: "Advanced control"
+    },
     monthlyPriceCents: 99900,
-    features: ["Everything in Professional", "Priority onboarding", "Custom SLA and account support"],
     entitlements: {
       advancedRecurrence: true,
       uploadedInspectionPdfs: true
     }
   }
 };
+
+const billingAddOnContent: BillingAddOnDefinition[] = [
+  {
+    id: "additional-users",
+    name: "Additional technicians / users",
+    description: "Expand seats as the team grows without rebuilding your workflow."
+  },
+  {
+    id: "advanced-automation",
+    name: "Advanced automation pack",
+    description: "Layer in more workflow triggers, follow-up rules, and operational handoffs."
+  },
+  {
+    id: "compliance-reporting",
+    name: "Compliance reporting module",
+    description: "Add deeper jurisdiction-based reporting support where local requirements demand it."
+  },
+  {
+    id: "api-integrations",
+    name: "API / integrations",
+    description: "Connect TradeWorx to the rest of your operational stack."
+  },
+  {
+    id: "white-label-branding",
+    name: "White-label branding",
+    description: "Extend your customer-facing experience with deeper brand control."
+  }
+];
 
 function parseActor(actor: ActorContext) {
   const parsed = actorContextSchema.parse(actor);
@@ -137,6 +250,7 @@ export function getBillingConfiguration() {
     publishableKey: env.STRIPE_PUBLISHABLE_KEY ?? null,
     webhookConfigured: Boolean(getStripeWebhookSecret()),
     storageConfigured: env.STORAGE_DRIVER === "vercel_blob" || Boolean(env.BLOB_READ_WRITE_TOKEN),
+    addons: billingAddOnContent,
     plans
   };
 }

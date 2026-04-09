@@ -43,6 +43,7 @@ import {
   updateTenantBrandingAction
 } from "./actions";
 import { CustomerManagementCard } from "./customer-management-card";
+import { BillingPlansSection } from "./billing-plans-section";
 import { ComplianceReportingFeeSettingsCard } from "./compliance-reporting-fee-settings-card";
 import { QuickBooksCatalogManagementCard } from "./quickbooks-catalog-management-card";
 import { QuickBooksItemMappingCard } from "./quickbooks-item-mapping-card";
@@ -642,35 +643,16 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
               </form>
             ) : null}
           </SectionCard>
-          <SectionCard className="space-y-4">
-            <div>
-              <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Plans</p>
-              <h3 className="mt-2 text-2xl font-semibold text-ink">Available subscriptions</h3>
-            </div>
-            {billingSettings.config.plans.map((plan) => (
-              <div key={plan.code} className="rounded-[1.5rem] border border-slate-200 p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-lg font-semibold text-ink">{plan.label}</p>
-                    <p className="mt-1 text-sm text-slate-500">{plan.description}</p>
-                    <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{plan.highlight}</p>
-                  </div>
-                  <p className="text-xl font-semibold text-ink">${(plan.monthlyPriceCents / 100).toFixed(0)}</p>
-                </div>
-                <div className="mt-3 space-y-2 text-sm text-slate-600">
-                  {plan.features.map((feature) => <p key={feature}>{feature}</p>)}
-                </div>
-                {canManageSubscription ? (
-                  <form action={startBillingCheckoutAction} className="mt-4">
-                    <input name="planCode" type="hidden" value={plan.code} />
-                    <button className="w-full rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={!billingSettings.config.enabled || !plan.stripePriceId} type="submit">
-                      {plan.code === "enterprise" ? "Request enterprise billing" : `Choose ${plan.label}`}
-                    </button>
-                  </form>
-                ) : null}
-              </div>
-            ))}
-          </SectionCard>
+          <BillingPlansSection
+            addons={billingSettings.config.addons}
+            canManageSubscription={canManageSubscription}
+            currentPlanCode={billingSettings.tenant.subscriptionPlan?.code ?? null}
+            plans={billingSettings.config.plans.map((plan) => ({
+              ...plan,
+              stripePriceId: billingSettings.config.enabled ? plan.stripePriceId : null
+            }))}
+            startBillingCheckoutAction={startBillingCheckoutAction}
+          />
         </div>
       </div>
     </AppPageShell>

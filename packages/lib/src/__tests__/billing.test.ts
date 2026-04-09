@@ -39,5 +39,8 @@ describe("billing authorization and config", () => {
     expect(config.publishableKey).toBe("pk_test_123");
     expect(config.plans.find((plan) => plan.code === "starter")?.stripePriceId).toBe("price_starter");
     expect(config.plans.find((plan) => plan.code === "enterprise")?.label).toBe("Enterprise");
+    expect(config.plans.find((plan) => plan.code === "professional")?.badge).toBe("Most Popular");
+    expect(config.plans.find((plan) => plan.code === "professional")?.highlighted).toBe(true);
+    expect(config.addons).toHaveLength(5);
   });
 });
