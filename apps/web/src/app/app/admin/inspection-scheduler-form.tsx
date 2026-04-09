@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChangeEvent, ReactNode } from "react";
-import { useActionState, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import type { CustomerOption, SiteOption, TechnicianOption } from "@testworx/types";
 import {
   customInspectionSiteName,
@@ -202,6 +202,8 @@ export function InspectionSchedulerForm({
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
   const [startManuallyEdited, setStartManuallyEdited] = useState(Boolean(initialValues?.scheduledStart));
   const [serviceLines, setServiceLines] = useState<ServiceLineDraft[]>(() => buildInitialServiceLines(initialValues));
+  const [newestServiceLineId, setNewestServiceLineId] = useState<string | null>(null);
+  const serviceLineRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const filteredSites = useMemo(
     () => sites.filter((site) => !selectedCustomerId || site.customerCompanyId === selectedCustomerId),
     [selectedCustomerId, sites]
@@ -232,7 +234,9 @@ export function InspectionSchedulerForm({
   };
 
   const addServiceLine = () => {
-    setServiceLines((current) => [...current, createServiceLineDraft(inspectionMonth, scheduledStart)]);
+    const nextLine = createServiceLineDraft(inspectionMonth, scheduledStart);
+    setServiceLines((current) => [...current, nextLine]);
+    setNewestServiceLineId(nextLine.id);
   };
 
   const removeServiceLine = (lineId: string) => {
@@ -263,6 +267,22 @@ export function InspectionSchedulerForm({
     }
     return result;
   }, initialState);
+
+  useEffect(() => {
+    if (!newestServiceLineId) {
+      return;
+    }
+
+    const nextFrame = requestAnimationFrame(() => {
+      serviceLineRefs.current[newestServiceLineId]?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+      setNewestServiceLineId(null);
+    });
+
+    return () => cancelAnimationFrame(nextFrame);
+  }, [newestServiceLineId]);
 
   return (
     <form action={formAction} className="min-w-0 overflow-hidden space-y-5 rounded-[1.5rem] bg-white p-4 shadow-panel sm:space-y-6 sm:rounded-[2rem] sm:p-6" ref={formRef}>
@@ -487,22 +507,12 @@ export function InspectionSchedulerForm({
         </div>
       </div>
       <div className="min-w-0 space-y-4 rounded-[1.25rem] border border-slate-200 p-4 sm:rounded-[1.5rem]">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-3">
           <div>
             <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 sm:text-sm sm:tracking-[0.2em]">Services on this visit</p>
             <h4 className="mt-1 text-lg font-semibold text-ink">Schedule for this visit and track future due work</h4>
             <p className="mt-2 text-sm leading-5 text-slate-500">Each service line can have its own technician, due month, due date, and scheduling status.</p>
           </div>
-          <button
-            className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-            onClick={(event) => {
-              event.preventDefault();
-              addServiceLine();
-            }}
-            type="button"
-          >
-            Add service line
-          </button>
         </div>
         <div className="space-y-4">
           {serviceLines.map((line, index) => {
@@ -510,7 +520,13 @@ export function InspectionSchedulerForm({
             const isFutureLine = line.schedulingStatus === "scheduled_future" || line.schedulingStatus === "not_scheduled";
 
             return (
-              <div key={line.id} className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4">
+              <div
+                key={line.id}
+                className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4"
+                ref={(node) => {
+                  serviceLineRefs.current[line.id] = node;
+                }}
+              >
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-ink">Service line {index + 1}</p>
@@ -655,6 +671,18 @@ export function InspectionSchedulerForm({
               </div>
             );
           })}
+        </div>
+        <div className="flex justify-start">
+          <button
+            className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            onClick={(event) => {
+              event.preventDefault();
+              addServiceLine();
+            }}
+            type="button"
+          >
+            Add service line
+          </button>
         </div>
       </div>
       <div className="min-w-0">
