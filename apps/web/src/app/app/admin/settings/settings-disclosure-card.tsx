@@ -11,6 +11,7 @@ type SettingsDisclosureCardProps = {
   openLabel: string;
   initialOpen?: boolean;
   queryKey?: string;
+  desktopSpan?: "single" | "full" | "fullWhenOpen";
   children: ReactNode;
 };
 
@@ -21,6 +22,7 @@ export function SettingsDisclosureCard({
   openLabel,
   initialOpen = false,
   queryKey,
+  desktopSpan = "single",
   children
 }: SettingsDisclosureCardProps) {
   const pathname = usePathname();
@@ -51,8 +53,15 @@ export function SettingsDisclosureCard({
     window.history.replaceState(null, "", nextUrl);
   }
 
+  const spanClass =
+    desktopSpan === "full"
+      ? "xl:col-span-2"
+      : desktopSpan === "fullWhenOpen" && open
+        ? "xl:col-span-2"
+        : "";
+
   return (
-    <div className="rounded-[2rem] border border-slate-200 bg-white shadow-panel">
+    <div className={`rounded-[2rem] border border-slate-200 bg-white shadow-panel ${spanClass}`}>
       <div className="flex flex-wrap items-start justify-between gap-4 p-6">
         <div className="max-w-2xl">
           <p className="text-sm uppercase tracking-[0.25em] text-slate-500">{eyebrow}</p>
