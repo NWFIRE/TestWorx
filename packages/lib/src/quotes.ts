@@ -833,6 +833,13 @@ async function getQuoteByIdForTenant(tenantId: string, quoteId: string) {
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, tenantId },
     include: {
+      tenant: {
+        select: {
+          name: true,
+          branding: true,
+          billingEmail: true
+        }
+      },
       createdBy: { select: { id: true, name: true } },
       updatedBy: { select: { id: true, name: true } },
       convertedInspection: {
