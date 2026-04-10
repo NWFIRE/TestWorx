@@ -82,6 +82,8 @@ const SECTION_GAP = 22;
 const CARD_GAP = 14;
 const SUBSECTION_GAP = 16;
 const LINE_ITEM_ROW_GAP = 8;
+const PDF_TEXT_LINE_GAP = 4;
+const PDF_SECTION_INSET = 12;
 
 function hexToRgb(hex: string, fallback: { r: number; g: number; b: number }) {
   const normalized = hex.replace("#", "").trim();
@@ -188,6 +190,49 @@ function drawParagraph(
   });
 
   return y - lines.length * (size + lineGap);
+}
+
+function drawBulletList(
+  page: PDFPage,
+  font: PDFFont,
+  bullets: string[],
+  x: number,
+  y: number,
+  maxWidth: number,
+  size: number,
+  color: ReturnType<typeof rgb>,
+  bulletColor: ReturnType<typeof rgb>,
+  lineGap = PDF_TEXT_LINE_GAP,
+  itemGap = 8
+) {
+  const bulletX = x;
+  const textX = x + 14;
+  const textWidth = Math.max(0, maxWidth - 14);
+  let cursorY = y;
+
+  for (const bullet of bullets) {
+    const lines = wrapText(font, bullet, textWidth, size);
+    page.drawCircle({
+      x: bulletX + 4,
+      y: cursorY - size / 2 + 1,
+      size: 1.7,
+      color: bulletColor
+    });
+
+    lines.forEach((line, index) => {
+      page.drawText(line, {
+        x: textX,
+        y: cursorY - index * (size + lineGap),
+        size,
+        font,
+        color
+      });
+    });
+
+    cursorY -= lines.length * (size + lineGap) + itemGap;
+  }
+
+  return cursorY;
 }
 
 function drawRect(
@@ -314,11 +359,15 @@ function renderPageChrome(
     ["Issued", formatDate(input.quote.issuedAt)],
     ["Expires", formatDate(input.quote.expiresAt)]
   ];
-  let metaY = top - 39;
+  const metaCardWidth = 132;
+  const metaCardHeight = 58;
+  const metaCardX = rightX - metaCardWidth;
+  const metaCardTop = top - 12;
+  drawRect(page, metaCardX, metaCardTop, metaCardWidth, metaCardHeight, theme.softSurface, theme.line);
+
+  let metaY = metaCardTop - 13;
   for (const [label, value] of metaRows) {
-    const labelWidth = regularFont.widthOfTextAtSize(label, 8);
-    const valueWidth = boldFont.widthOfTextAtSize(value, 8.5);
-    const x = rightX - Math.max(labelWidth, valueWidth);
+    const x = metaCardX + 12;
     page.drawText(label, {
       x,
       y: metaY,
@@ -327,13 +376,13 @@ function renderPageChrome(
       color: theme.softText
     });
     page.drawText(value, {
-      x: rightX - valueWidth,
+      x,
       y: metaY - 11,
       size: 8.5,
       font: boldFont,
       color: theme.ink
     });
-    metaY -= 23;
+    metaY -= 18;
   }
 
   page.drawLine({
@@ -634,7 +683,7 @@ function renderLineItems(
 function renderTotals(state: PageState, input: QuotePdfInput, theme: Theme, boldFont: PDFFont, regularFont: PDFFont) {
   const width = 240;
   const x = PAGE_WIDTH - PAGE_MARGIN - width;
-  drawRect(state.page, x, state.y, width, 116, theme.surface, theme.line);
+  drawRect(state.page, x, state.y, width, 126, theme.surface, theme.line);
   drawRect(state.page, x, state.y, width, 6, theme.primary, theme.primary, 0);
 
   const rows: Array<[string, string, boolean]> = [
@@ -648,11 +697,12 @@ function renderTotals(state: PageState, input: QuotePdfInput, theme: Theme, bold
     const size = isTotal ? 11.5 : 9.5;
     if (isTotal) {
       state.page.drawLine({
-        start: { x: x + 14, y: y + 10 },
-        end: { x: x + width - 14, y: y + 10 },
+        start: { x: x + 14, y: y + 16 },
+        end: { x: x + width - 14, y: y + 16 },
         thickness: 1,
         color: theme.line
       });
+      y -= 8;
     }
     state.page.drawText(label, {
       x: x + 14,
@@ -668,10 +718,10 @@ function renderTotals(state: PageState, input: QuotePdfInput, theme: Theme, bold
       font,
       color: theme.ink
     });
-    y -= isTotal ? 30 : 24;
+    y -= isTotal ? 34 : 24;
   }
 
-  state.y -= 132;
+  state.y -= 142;
 }
 
 function renderTerms(
@@ -688,53 +738,59 @@ function renderTerms(
   drawSectionTitle(state, terms.title, "Clear project terms, scope boundaries, and approval expectations for this proposal.", theme, boldFont, regularFont);
 
   if (terms.intro) {
-    const introHeight = 30 + measureParagraphHeight(regularFont, terms.intro, CONTENT_WIDTH - 24, 9.5, 4);
+    const introHeight = 34 + measureParagraphHeight(regularFont, terms.intro, CONTENT_WIDTH - 24, 9.5, PDF_TEXT_LINE_GAP);
     state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, introHeight + CARD_GAP);
     drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, introHeight, theme.surface, theme.line);
-    drawParagraph(state.page, regularFont, terms.intro, PAGE_MARGIN + 12, state.y - 18, CONTENT_WIDTH - 24, 9.5, theme.ink, 4);
+    drawParagraph(state.page, regularFont, terms.intro, PAGE_MARGIN + PDF_SECTION_INSET, state.y - 20, CONTENT_WIDTH - 24, 9.5, theme.ink, PDF_TEXT_LINE_GAP);
     state.y -= introHeight + CARD_GAP;
   }
 
-  const emphasisHeight = 40 + measureParagraphHeight(regularFont, terms.emphasisBody, CONTENT_WIDTH - 24, 9.5, 4);
+  const emphasisHeight = 46 + measureParagraphHeight(regularFont, terms.emphasisBody, CONTENT_WIDTH - 24, 9.5, PDF_TEXT_LINE_GAP);
   state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, emphasisHeight + CARD_GAP);
   drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, emphasisHeight, theme.accentSurface, theme.line);
   state.page.drawText(terms.emphasisTitle.toUpperCase(), {
-    x: PAGE_MARGIN + 12,
+    x: PAGE_MARGIN + PDF_SECTION_INSET,
     y: state.y - 18,
     size: 7.5,
     font: boldFont,
     color: theme.accentText
   });
-  drawParagraph(state.page, regularFont, terms.emphasisBody, PAGE_MARGIN + 12, state.y - 36, CONTENT_WIDTH - 24, 9.5, theme.ink, 4);
+  drawParagraph(state.page, regularFont, terms.emphasisBody, PAGE_MARGIN + PDF_SECTION_INSET, state.y - 38, CONTENT_WIDTH - 24, 9.5, theme.ink, PDF_TEXT_LINE_GAP);
   state.y -= emphasisHeight + CARD_GAP;
 
   for (const section of terms.sections) {
-    const bodyHeight = (section.body ?? []).reduce((sum, paragraph) => sum + measureParagraphHeight(regularFont, paragraph, CONTENT_WIDTH - 32, 9, 4) + 10, 0);
-    const bulletHeight = (section.bullets ?? []).reduce((sum, bullet) => sum + measureParagraphHeight(regularFont, bullet, CONTENT_WIDTH - 52, 9, 4) + 10, 0);
-    const sectionHeight = Math.max(66, 34 + bodyHeight + bulletHeight);
+    const bodyHeight = (section.body ?? []).reduce((sum, paragraph) => sum + measureParagraphHeight(regularFont, paragraph, CONTENT_WIDTH - 32, 9, PDF_TEXT_LINE_GAP) + 12, 0);
+    const bulletHeight = (section.bullets ?? []).reduce((sum, bullet) => sum + measureParagraphHeight(regularFont, bullet, CONTENT_WIDTH - 50, 9, PDF_TEXT_LINE_GAP) + 8, 0);
+    const sectionHeight = Math.max(74, 38 + bodyHeight + bulletHeight);
     state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, sectionHeight + CARD_GAP);
     drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, sectionHeight, theme.surface, theme.line);
     state.page.drawText(section.title.toUpperCase(), {
-      x: PAGE_MARGIN + 12,
+      x: PAGE_MARGIN + PDF_SECTION_INSET,
       y: state.y - 18,
       size: 7.5,
       font: boldFont,
       color: theme.muted
     });
 
-    let y = state.y - 38;
+    let y = state.y - 40;
     for (const paragraph of section.body ?? []) {
-      y = drawParagraph(state.page, regularFont, paragraph, PAGE_MARGIN + 12, y, CONTENT_WIDTH - 24, 9, theme.ink, 4) - 8;
+      y = drawParagraph(state.page, regularFont, paragraph, PAGE_MARGIN + PDF_SECTION_INSET, y, CONTENT_WIDTH - 24, 9, theme.ink, PDF_TEXT_LINE_GAP) - 10;
     }
 
-    for (const bullet of section.bullets ?? []) {
-      state.page.drawCircle({
-        x: PAGE_MARGIN + 15,
-        y: y + 4,
-        size: 1.8,
-        color: theme.softText
-      });
-      y = drawParagraph(state.page, regularFont, bullet, PAGE_MARGIN + 24, y + 8, CONTENT_WIDTH - 44, 9, theme.ink, 4) - 6;
+    if ((section.bullets ?? []).length > 0) {
+      y = drawBulletList(
+        state.page,
+        regularFont,
+        section.bullets ?? [],
+        PAGE_MARGIN + PDF_SECTION_INSET,
+        y,
+        CONTENT_WIDTH - 24,
+        9,
+        theme.ink,
+        theme.softText,
+        PDF_TEXT_LINE_GAP,
+        8
+      ) - 2;
     }
 
     state.y -= sectionHeight + CARD_GAP;
