@@ -4,6 +4,8 @@ import { useActionState, useCallback, useEffect, useMemo, useRef, useState } fro
 import { usePathname, useSearchParams } from "next/navigation";
 import type { KeyboardEvent, ReactNode } from "react";
 
+import { BrandLoader } from "@/app/brand-loader";
+
 const initialState = { error: null as string | null, success: null as string | null };
 const paymentTermsOptions = [
   { value: "due_on_receipt", label: "Due at time of service" },
@@ -483,7 +485,8 @@ export function CustomerManagementCard({
           <div className="mt-1 flex flex-wrap items-center gap-3">
             <h4 className="text-lg font-semibold text-ink">{summaryLabel}</h4>
             {isLoadingResults ? (
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                <BrandLoader label="Updating results" size="sm" tone="muted" />
                 Updating results...
               </span>
             ) : null}

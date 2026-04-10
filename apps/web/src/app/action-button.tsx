@@ -43,8 +43,16 @@ export function ActionButton({
       disabled={disabled || pending}
       type={props.type ?? "button"}
     >
-      {pending ? <BrandLoader label={typeof pendingLabel === "string" ? pendingLabel : "Loading"} size={16} /> : null}
-      <span>{pending ? (pendingLabel ?? children) : children}</span>
+      <span className="inline-flex w-4 shrink-0 items-center justify-center">
+        {pending ? (
+          <BrandLoader
+            label={typeof pendingLabel === "string" ? pendingLabel : "Loading"}
+            size="md"
+            tone={tone === "primary" || tone === "danger" || tone === "dark" ? "inverse" : "default"}
+          />
+        ) : null}
+      </span>
+      <span className="min-w-0">{pending ? (pendingLabel ?? children) : children}</span>
     </button>
   );
 }

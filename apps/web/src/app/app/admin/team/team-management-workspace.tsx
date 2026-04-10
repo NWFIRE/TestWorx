@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
+import { BrandLoader } from "@/app/brand-loader";
 import { customerAllowanceKeys, internalAllowanceKeys, type TeamAllowanceMap } from "@testworx/lib";
 
 import {
@@ -601,7 +602,10 @@ function AsyncUserLookupSection({
 
               <div className="mt-3 max-h-80 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50">
                 {loading && items.length === 0 ? (
-                  <div className="px-4 py-4 text-sm text-slate-500">Loading users…</div>
+                  <div className="inline-flex items-center gap-2 px-4 py-4 text-sm text-slate-500">
+                    <BrandLoader label="Loading users" size="sm" tone="muted" />
+                    Loading users…
+                  </div>
                 ) : error ? (
                   <div className="space-y-3 px-4 py-4 text-sm text-rose-600">
                     <p>{error}</p>
@@ -653,7 +657,12 @@ function AsyncUserLookupSection({
                     }}
                     type="button"
                   >
-                    {loading && items.length > 0 ? "Loading more…" : "Load more"}
+                    {loading && items.length > 0 ? (
+                      <span className="inline-flex items-center gap-2">
+                        <BrandLoader label="Loading more users" size="sm" tone="muted" />
+                        Loading more…
+                      </span>
+                    ) : "Load more"}
                   </button>
                 </div>
               ) : null}

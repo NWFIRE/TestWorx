@@ -17,6 +17,7 @@ import {
 } from "@testworx/lib";
 
 import { AppPageShell, KPIStatCard, PageHeader, SectionCard, WorkspaceSplit } from "../operations-ui";
+import { BrandLoader } from "@/app/brand-loader";
 
 import {
   createCustomerCompanyAction,
@@ -122,13 +123,16 @@ function LazySectionCard({
       : "border-slate-200 bg-white";
 
   return (
-    <div className={`rounded-[2rem] border p-6 shadow-panel ${toneClasses}`}>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="max-w-2xl">
-          <p className="text-sm uppercase tracking-[0.25em] text-slate-500">{eyebrow}</p>
-          <h3 className="mt-2 text-2xl font-semibold text-ink">{title}</h3>
-          <p className="mt-2 text-sm text-slate-500">{description}</p>
-        </div>
+      <div className={`rounded-[2rem] border p-6 shadow-panel ${toneClasses}`}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-2xl">
+            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">{eyebrow}</p>
+            <h3 className="mt-2 text-2xl font-semibold text-ink">{title}</h3>
+            <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
+              {tone === "loading" ? <BrandLoader label={description} size="sm" tone="muted" /> : null}
+              <p>{description}</p>
+            </div>
+          </div>
         <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={actionHref}>
           {actionLabel}
         </Link>

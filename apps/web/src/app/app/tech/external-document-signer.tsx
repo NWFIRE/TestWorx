@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
+import { BrandLoader } from "@/app/brand-loader";
+
 const initialState = { error: null as string | null, success: null as string | null };
 
 const statusClasses: Record<string, string> = {
@@ -385,7 +387,12 @@ export function ExternalDocumentSigner({
             ) : null}
           </div>
 
-          {loadingPdf ? <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">Loading PDF pages…</p> : null}
+          {loadingPdf ? (
+            <p className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
+              <BrandLoader label="Loading PDF pages" size="sm" tone="muted" />
+              Loading PDF pages…
+            </p>
+          ) : null}
           {pdfError ? <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-600">{pdfError}</p> : null}
 
           <div className="space-y-4">
