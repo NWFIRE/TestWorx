@@ -495,6 +495,7 @@ describe("quickbooks billing sync hardening", () => {
       sku: "FE-ANNUAL",
       itemType: "Service",
       active: true,
+      taxable: true,
       unitPrice: 95,
       incomeAccountId: "income_1",
       incomeAccountName: null,
@@ -512,6 +513,7 @@ describe("quickbooks billing sync hardening", () => {
           Sku: "FE-ANNUAL",
           Type: "Service",
           Active: true,
+          SalesTaxCodeRef: { value: "TAX" },
           UnitPrice: 95,
           IncomeAccountRef: { value: "income_1" }
         }
@@ -526,6 +528,7 @@ describe("quickbooks billing sync hardening", () => {
         sku: "FE-ANNUAL",
         itemType: "Service",
         unitPrice: 95,
+        taxable: true,
         active: true
       }
     );
@@ -540,6 +543,7 @@ describe("quickbooks billing sync hardening", () => {
         unitPrice: 95
       })
     });
+    expect(fetchMock.mock.calls[1]?.[1]?.body).toContain("\"SalesTaxCodeRef\":{\"value\":\"TAX\"}");
     expect(result).toEqual(expect.objectContaining({
       id: "catalog_1",
       quickbooksItemId: "qbo_item_9"
@@ -564,6 +568,7 @@ describe("quickbooks billing sync hardening", () => {
       sku: "FE-ANNUAL",
       itemType: "Service",
       active: false,
+      taxable: false,
       unitPrice: 110,
       incomeAccountId: "income_1",
       incomeAccountName: null,
@@ -580,6 +585,7 @@ describe("quickbooks billing sync hardening", () => {
           Sku: "FE-ANNUAL",
           Type: "Service",
           Active: true,
+          SalesTaxCodeRef: { value: "TAX" },
           UnitPrice: 95,
           SyncToken: "2",
           IncomeAccountRef: { value: "income_1" }
@@ -592,6 +598,7 @@ describe("quickbooks billing sync hardening", () => {
           Sku: "FE-ANNUAL",
           Type: "Service",
           Active: false,
+          SalesTaxCodeRef: { value: "NON" },
           UnitPrice: 110,
           IncomeAccountRef: { value: "income_1" }
         }
@@ -607,6 +614,7 @@ describe("quickbooks billing sync hardening", () => {
         sku: "FE-ANNUAL",
         itemType: "Service",
         unitPrice: 110,
+        taxable: false,
         active: false
       }
     );
@@ -621,10 +629,105 @@ describe("quickbooks billing sync hardening", () => {
         unitPrice: 110
       })
     });
+    expect(fetchMock.mock.calls[1]?.[1]?.body).toContain("\"SalesTaxCodeRef\":{\"value\":\"NON\"}");
     expect(result).toEqual(expect.objectContaining({
       id: "catalog_1",
       quickbooksItemId: "qbo_item_9",
       active: false
+    }));
+  });
+
+  it("creates a direct QuickBooks invoice from synced catalog items", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.customerCompany.findFirst.mockResolvedValue({
+      id: "customer_1",
+      name: "Walk-In Counter Sale",
+      contactName: null,
+      billingEmail: "billing@example.com",
+      phone: "555-1212",
+      billingAddressLine1: null,
+      billingAddressLine2: null,
+      billingCity: null,
+      billingState: null,
+      billingPostalCode: null,
+      billingCountry: null,
+      serviceAddressLine1: null,
+      serviceAddressLine2: null,
+      serviceCity: null,
+      serviceState: null,
+      servicePostalCode: null,
+      serviceCountry: null,
+      notes: null
+    });
+    prismaMock.customerCompany.findUnique.mockResolvedValue({
+      quickbooksCustomerId: "qb_customer_1"
+    });
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([
+      {
+        id: "catalog_1",
+        quickbooksItemId: "qb_item_1",
+        name: "Fire Extinguisher Recharge",
+        taxable: true
+      }
+    ]);
+    prismaMock.auditLog.create.mockResolvedValue(undefined);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({
+        Customer: {
+          Id: "qb_customer_1",
+          SyncToken: "2",
+          DisplayName: "Walk-In Counter Sale",
+          PrimaryEmailAddr: { Address: "billing@example.com" }
+        }
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        Customer: {
+          Id: "qb_customer_1",
+          SyncToken: "3",
+          DisplayName: "Walk-In Counter Sale",
+          PrimaryEmailAddr: { Address: "billing@example.com" }
+        }
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        Invoice: {
+          Id: "invoice_direct_1",
+          DocNumber: "INV-401"
+        }
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        Invoice: {
+          Id: "invoice_direct_1",
+          DocNumber: "INV-401"
+        }
+      }));
+
+    const { createDirectQuickBooksInvoice } = await import("../quickbooks");
+
+    const result = await createDirectQuickBooksInvoice(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        customerCompanyId: "customer_1",
+        issueDate: "2026-04-10",
+        dueDate: "2026-05-10",
+        memo: "Counter sale",
+        sendEmail: false,
+        lineItems: [
+          {
+            catalogItemId: "catalog_1",
+            description: "Fire Extinguisher Recharge",
+            quantity: 2,
+            unitPrice: 85,
+            taxable: true
+          }
+        ]
+      }
+    );
+
+    expect(fetchMock.mock.calls[2]?.[1]?.body).toContain("\"TaxCodeRef\":{\"value\":\"TAX\"}");
+    expect(result).toEqual(expect.objectContaining({
+      invoiceId: "invoice_direct_1",
+      invoiceNumber: "INV-401"
     }));
   });
 

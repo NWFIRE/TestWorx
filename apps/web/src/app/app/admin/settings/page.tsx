@@ -7,7 +7,6 @@ import {
   canManageBilling,
   getPaginatedTenantComplianceReportingFeeSettings,
   getPaginatedTenantCustomerCompanySettings,
-  getPaginatedTenantQuickBooksCatalogSettings,
   getQuickBooksItemMappingSettings,
   getPaginatedTenantServiceFeeSettings,
   getQuoteReminderSettings,
@@ -22,7 +21,6 @@ import { BrandLoader } from "@/app/brand-loader";
 import {
   createCustomerCompanyAction,
   createComplianceReportingFeeRuleAction,
-  createQuickBooksCatalogItemAction,
   createServiceFeeRuleAction,
   deleteComplianceReportingFeeRuleAction,
   deleteServiceFeeRuleAction,
@@ -38,7 +36,6 @@ import {
   updateCustomerCompanyAction,
   updateComplianceReportingFeeRuleAction,
   updateQuoteReminderSettingsAction,
-  updateQuickBooksCatalogItemAction,
   updateDefaultServiceFeeAction,
   updateServiceFeeRuleAction,
   updateTenantBrandingAction
@@ -46,7 +43,6 @@ import {
 import { CustomerManagementCard } from "./customer-management-card";
 import { BillingPlansSection } from "./billing-plans-section";
 import { ComplianceReportingFeeSettingsCard } from "./compliance-reporting-fee-settings-card";
-import { QuickBooksCatalogManagementCard } from "./quickbooks-catalog-management-card";
 import { QuickBooksItemMappingCard } from "./quickbooks-item-mapping-card";
 import { QuoteReminderSettingsCard } from "./quote-reminder-settings-card";
 import { ServiceFeeSettingsCard } from "./service-fee-settings-card";
@@ -177,65 +173,6 @@ async function CustomersSection({
       notice={notice}
       pagination={data.pagination}
       updateCustomerAction={updateCustomerCompanyAction}
-    />
-  );
-}
-
-async function CatalogSection({
-  actor,
-  page,
-  search,
-  itemType,
-  status,
-  connection,
-  notice
-}: {
-  actor: { userId: string; role: string; tenantId: string };
-  page: number;
-  search: string;
-  itemType: string;
-  status: "all" | "active" | "inactive";
-  connection: Awaited<ReturnType<typeof getTenantQuickBooksConnectionSettings>>;
-  notice?: string | null;
-}) {
-  let data: Awaited<ReturnType<typeof getPaginatedTenantQuickBooksCatalogSettings>>;
-
-  try {
-    data = await getPaginatedTenantQuickBooksCatalogSettings(actor, {
-      page,
-      search,
-      itemType,
-      status
-    });
-  } catch (error) {
-    return (
-      <LazySectionCard
-        actionHref={buildSettingsHref({ catalogOpen: "1" }, { catalogOpen: 1 })}
-        actionLabel="Try again"
-        description={error instanceof Error ? error.message : "Unable to load products and services right now."}
-        eyebrow="QuickBooks products and services"
-        title="Products and services could not be loaded"
-        tone="error"
-      />
-    );
-  }
-
-  return (
-    <QuickBooksCatalogManagementCard
-      activeItemCount={data.activeCount}
-      configured={connection.config.enabled}
-      connected={connection.tenant.connected}
-      createCatalogItemAction={createQuickBooksCatalogItemAction}
-      filteredItemCount={data.filteredItemCount}
-      filters={data.filters}
-      importedItemCount={data.itemCount}
-      itemTypes={data.itemTypes}
-      items={data.items}
-      modeMismatch={connection.tenant.modeMismatch}
-      notice={notice}
-      reconnectRequired={connection.tenant.reconnectRequired}
-      updateCatalogItemAction={updateQuickBooksCatalogItemAction}
-      inactiveItemCount={data.inactiveCount}
     />
   );
 }
@@ -383,11 +320,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   const params = searchParams ? await searchParams : {};
   const actor = { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId };
 
-  const catalogSearch = readSearchParam(params, "qboSearch");
-  const catalogItemType = readSearchParam(params, "qboType");
-  const catalogStatusRaw = readSearchParam(params, "qboStatus", "all");
-  const catalogStatus = catalogStatusRaw === "active" || catalogStatusRaw === "inactive" ? catalogStatusRaw : "all";
-  const catalogPage = readPositiveInt(readSearchParam(params, "qboPage", "1"), 1);
   const customersPage = readPositiveInt(readSearchParam(params, "customersPage", "1"), 1);
   const customersQuery = readSearchParam(params, "customersQuery");
   const feesPage = readPositiveInt(readSearchParam(params, "feesPage", "1"), 1);
@@ -412,14 +344,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
     : typeof params.customers === "string"
       ? decodeURIComponent(params.customers)
       : null;
-  const catalogNotice = Array.isArray(params.catalog)
-    ? params.catalog[0]
-    : typeof params.catalog === "string"
-      ? decodeURIComponent(params.catalog)
-      : null;
-
   const customersOpen = isSectionOpen(params, "customersOpen", customerNotice);
-  const catalogOpen = isSectionOpen(params, "catalogOpen", catalogNotice);
   const feesOpen = isSectionOpen(params, "feesOpen");
   const complianceFeesOpen = isSectionOpen(params, "complianceFeesOpen");
   const mappingsOpen = isSectionOpen(params, "mappingsOpen", quickBooksNotice);
@@ -428,7 +353,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   return (
     <AppPageShell density="wide">
       <PageHeader
-        description="Manage subscription readiness, billing contacts, branding, catalog mappings, and service fee rules from one quieter settings workspace."
+        description="Manage subscription readiness, billing contacts, branding, customer records, and service fee rules from one quieter settings workspace."
         eyebrow="Tenant settings"
         title="Billing and branding"
         contentWidth="full"
@@ -511,39 +436,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
             supportReference={quickBooksSettings.supportReference}
           />
           <div className="grid gap-6 xl:grid-cols-2">
-            <SettingsDisclosureCard
-              description="Load the QuickBooks catalog only when needed, with paginated results, filters, and independent loading and error states."
-              desktopSpan="fullWhenOpen"
-              eyebrow="QuickBooks products and services"
-              initialOpen={catalogOpen}
-              openLabel="Open products and services"
-              queryKey="catalogOpen"
-              title="Create and edit billing catalog items"
-            >
-              <Suspense
-                key={`catalog-${catalogPage}-${catalogSearch}-${catalogItemType}-${catalogStatus}`}
-                fallback={
-                  <LazySectionCard
-                    actionHref={buildSettingsHref(params, { catalogOpen: 1, qboPage: catalogPage, qboSearch: catalogSearch || null, qboType: catalogItemType || null, qboStatus: catalogStatus })}
-                    actionLabel="Reload section"
-                    description="Loading the current products and services page..."
-                    eyebrow="QuickBooks products and services"
-                    title="Create and edit billing catalog items"
-                    tone="loading"
-                  />
-                }
-              >
-                <CatalogSection
-                  actor={actor}
-                  connection={quickBooksSettings}
-                  itemType={catalogItemType}
-                  notice={catalogNotice}
-                  page={catalogPage}
-                  search={catalogSearch}
-                  status={catalogStatus}
-                />
-              </Suspense>
-            </SettingsDisclosureCard>
             <SettingsDisclosureCard
               description="Review stored QuickBooks item ids for each internal billing code, fix inactive references, and confirm suggested matches without loading the full section until you need it."
               desktopSpan="fullWhenOpen"

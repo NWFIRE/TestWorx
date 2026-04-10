@@ -802,6 +802,7 @@ model QuickBooksCatalogItem {
   sku                String?
   itemType           String
   active             Boolean  @default(true)
+  taxable            Boolean  @default(false)
   unitPrice          Float?
   incomeAccountId    String?
   incomeAccountName  String?

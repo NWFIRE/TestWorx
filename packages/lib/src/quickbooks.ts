@@ -109,6 +109,7 @@ type QuickBooksCatalogListItem = {
   sku: string | null;
   itemType: string;
   active: boolean;
+  taxable: boolean;
   unitPrice: number | null;
   importedAt: Date;
 };
@@ -221,7 +222,37 @@ export const quickBooksCatalogItemInputSchema = z.object({
   sku: z.string().trim().max(100).optional().transform((value) => value || undefined),
   itemType: z.enum(["Service", "NonInventory"]).default("Service"),
   unitPrice: z.number().finite().nonnegative().nullable(),
+  taxable: z.boolean().default(false),
   active: z.boolean().default(true)
+});
+
+const directQuickBooksInvoiceLineInputSchema = z.object({
+  catalogItemId: z.string().trim().min(1, "Select a product or service."),
+  description: z.string().trim().min(1, "Line item description is required."),
+  quantity: z.number().finite().positive("Quantity must be greater than zero."),
+  unitPrice: z.number().finite().nonnegative("Unit price must be zero or greater."),
+  taxable: z.boolean().default(false)
+});
+
+export const directQuickBooksInvoiceInputSchema = z.object({
+  customerCompanyId: z.string().trim().optional(),
+  walkInCustomerName: z.string().trim().optional(),
+  walkInCustomerEmail: z.string().trim().email("Enter a valid billing email.").optional().or(z.literal("")),
+  walkInCustomerPhone: z.string().trim().optional(),
+  siteLabel: z.string().trim().optional(),
+  issueDate: z.string().trim().min(1, "Issue date is required."),
+  dueDate: z.string().trim().optional(),
+  memo: z.string().trim().optional(),
+  sendEmail: z.boolean().default(false),
+  lineItems: z.array(directQuickBooksInvoiceLineInputSchema).min(1, "Add at least one invoice line.")
+}).superRefine((value, context) => {
+  if (!value.customerCompanyId && !value.walkInCustomerName?.trim()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Select an existing customer or enter a walk-in customer name.",
+      path: ["walkInCustomerName"]
+    });
+  }
 });
 
 class QuickBooksRequestError extends Error {
@@ -1102,6 +1133,14 @@ function normalizeQuickBooksCatalogItem(item: unknown) {
   const incomeAccountRef = item && typeof item === "object"
     ? ((item as Record<string, unknown>).IncomeAccountRef as Record<string, unknown> | undefined)
     : undefined;
+  const salesTaxCodeRef = item && typeof item === "object"
+    ? ((item as Record<string, unknown>).SalesTaxCodeRef as Record<string, unknown> | undefined)
+    : undefined;
+  const salesTaxCode = readQuickBooksStringField(salesTaxCodeRef, "value")
+    ?? readQuickBooksStringField(salesTaxCodeRef, "name")
+    ?? readQuickBooksStringField(item, "SalesTaxCode")
+    ?? readQuickBooksStringField(item, "TaxCodeRef");
+  const taxable = salesTaxCode ? salesTaxCode.trim().toUpperCase() === "TAX" : false;
 
   return {
     quickbooksItemId,
@@ -1109,6 +1148,7 @@ function normalizeQuickBooksCatalogItem(item: unknown) {
     sku: readQuickBooksStringField(item, "Sku"),
     itemType,
     active: readQuickBooksBooleanField(item, "Active") ?? true,
+    taxable,
     syncToken: readQuickBooksStringField(item, "SyncToken"),
     unitPrice: readQuickBooksNumberField(item, "UnitPrice"),
     incomeAccountId: readQuickBooksStringField(incomeAccountRef, "value"),
@@ -1142,6 +1182,7 @@ async function upsertTenantQuickBooksCatalogItem(input: {
     sku: normalizedItem.sku,
     itemType: normalizedItem.itemType,
     active: normalizedItem.active,
+    taxable: normalizedItem.taxable,
     unitPrice: normalizedItem.unitPrice,
     incomeAccountId: normalizedItem.incomeAccountId,
     incomeAccountName: normalizedItem.incomeAccountName,
@@ -1669,6 +1710,94 @@ async function resolveQuickBooksCustomer(connection: QuickBooksTenantConnection,
     where: { id: summary.customerCompanyId },
     data: { quickbooksCustomerId: createdCustomerId }
   });
+
+  return createdCustomerId;
+}
+
+async function resolveQuickBooksInvoiceCustomer(connection: QuickBooksTenantConnection, summary: {
+  customerCompanyId?: string | null;
+  customerName: string;
+  billingEmail: string | null;
+  phone: string | null;
+  siteName: string;
+  billingAddressLine1?: string | null;
+  billingAddressLine2?: string | null;
+  billingCity?: string | null;
+  billingState?: string | null;
+  billingPostalCode?: string | null;
+  billingCountry?: string | null;
+  notes?: string | null;
+}) {
+  const customerCompanyId = summary.customerCompanyId?.trim();
+  if (customerCompanyId) {
+    return resolveQuickBooksCustomer(connection, {
+      customerCompanyId,
+      customerName: summary.customerName,
+      billingEmail: summary.billingEmail,
+      phone: summary.phone,
+      siteName: summary.siteName,
+      billingAddressLine1: summary.billingAddressLine1,
+      billingAddressLine2: summary.billingAddressLine2,
+      billingCity: summary.billingCity,
+      billingState: summary.billingState,
+      billingPostalCode: summary.billingPostalCode,
+      billingCountry: summary.billingCountry,
+      notes: summary.notes
+    });
+  }
+
+  const existingCustomer = await fetchQuickBooksCustomerByDisplayName(connection, summary.customerName);
+  if (existingCustomer?.quickbooksCustomerId) {
+    const updated = await quickBooksApiRequest<{ Customer?: unknown }>(connection, {
+      path: "/customer",
+      method: "POST",
+      searchParams: new URLSearchParams({ operation: "update" }),
+      body: {
+        Id: existingCustomer.quickbooksCustomerId,
+        SyncToken: existingCustomer.syncToken,
+        sparse: true,
+        ...buildQuickBooksCustomerPayload({
+          customerName: summary.customerName,
+          billingEmail: summary.billingEmail,
+          phone: summary.phone,
+          siteName: summary.siteName,
+          billingAddressLine1: summary.billingAddressLine1,
+          billingAddressLine2: summary.billingAddressLine2,
+          billingCity: summary.billingCity,
+          billingState: summary.billingState,
+          billingPostalCode: summary.billingPostalCode,
+          billingCountry: summary.billingCountry,
+          notes: summary.notes
+        })
+      }
+    });
+
+    const updatedCustomer = (await normalizeQuickBooksCustomer(connection, updated.Customer)) ?? existingCustomer;
+    return updatedCustomer.quickbooksCustomerId;
+  }
+
+  const created = await quickBooksApiRequest<{ Customer?: { Id: string } }>(connection, {
+    path: "/customer",
+    method: "POST",
+    body: buildQuickBooksCustomerPayload({
+      customerName: summary.customerName,
+      billingEmail: summary.billingEmail,
+      phone: summary.phone,
+      siteName: summary.siteName,
+      billingAddressLine1: summary.billingAddressLine1,
+      billingAddressLine2: summary.billingAddressLine2,
+      billingCity: summary.billingCity,
+      billingState: summary.billingState,
+      billingPostalCode: summary.billingPostalCode,
+      billingCountry: summary.billingCountry,
+      notes: summary.notes
+    })
+  });
+
+  const createdCustomerId = created.Customer?.Id;
+  if (!createdCustomerId) {
+    throw new Error("QuickBooks did not return a customer id.");
+  }
 
   return createdCustomerId;
 }
@@ -2218,6 +2347,7 @@ function toQuickBooksInvoiceLine(input: {
   unitPrice: number;
   qbItemId: string;
   qbItemName?: string;
+  taxable?: boolean;
 }) {
   return {
     Amount: input.amount,
@@ -2229,6 +2359,9 @@ function toQuickBooksInvoiceLine(input: {
       ItemRef: {
         value: input.qbItemId,
         ...(input.qbItemName ? { name: input.qbItemName } : {})
+      },
+      TaxCodeRef: {
+        value: input.taxable ? "TAX" : "NON"
       }
     }
   };
@@ -2326,16 +2459,17 @@ export async function getPaginatedTenantQuickBooksCatalogSettings(actor: ActorCo
           skip: (page - 1) * limit,
           take: limit,
           select: {
-            id: true,
-            quickbooksItemId: true,
-            name: true,
-            sku: true,
-            itemType: true,
-            active: true,
-            unitPrice: true,
-            importedAt: true
-          }
-        }),
+          id: true,
+          quickbooksItemId: true,
+          name: true,
+          sku: true,
+          itemType: true,
+          active: true,
+          taxable: true,
+          unitPrice: true,
+          importedAt: true
+        }
+      }),
         prisma.quickBooksCatalogItem.count({
           where: catalogWhere
         }),
@@ -2390,6 +2524,7 @@ export async function getPaginatedTenantQuickBooksCatalogSettings(actor: ActorCo
           sku: true,
           itemType: true,
           active: true,
+          taxable: true,
           unitPrice: true,
           importedAt: true
         }
@@ -2668,6 +2803,53 @@ export async function getTenantQuickBooksConnectionStatus(actor: ActorContext) {
   };
 }
 
+export async function getQuickBooksDirectInvoiceFormOptions(actor: ActorContext) {
+  const parsedActor = parseActor(actor);
+  if (!canManageQuickBooksSync(parsedActor.role)) {
+    throw new Error("Only administrators can create direct invoices.");
+  }
+
+  const [connection, customers, catalogItems] = await Promise.all([
+    getTenantQuickBooksConnectionStatus(actor),
+    prisma.customerCompany.findMany({
+      where: {
+        tenantId: parsedActor.tenantId as string,
+        isActive: true
+      },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        contactName: true,
+        billingEmail: true,
+        phone: true
+      }
+    }),
+    prisma.quickBooksCatalogItem.findMany({
+      where: {
+        tenantId: parsedActor.tenantId as string,
+        active: true
+      },
+      orderBy: [{ name: "asc" }],
+      select: {
+        id: true,
+        quickbooksItemId: true,
+        name: true,
+        sku: true,
+        itemType: true,
+        taxable: true,
+        unitPrice: true
+      }
+    })
+  ]);
+
+  return {
+    connection,
+    customers,
+    catalogItems
+  };
+}
+
 export async function completeQuickBooksConnection(actor: ActorContext, input: { code: string; realmId: string }) {
   const parsedActor = parseActor(actor);
   if (!canManageQuickBooksConnection(parsedActor.role)) {
@@ -2829,6 +3011,7 @@ export async function importQuickBooksCatalogItems(actor: ActorContext) {
     sku: string | null;
     itemType: string;
     active: boolean;
+    taxable: boolean;
     unitPrice: number | null;
     incomeAccountId: string | null;
     incomeAccountName: string | null;
@@ -2881,6 +3064,7 @@ export async function importQuickBooksCatalogItems(actor: ActorContext) {
             sku: item.sku,
             itemType: item.itemType,
             active: item.active,
+            taxable: item.taxable,
             unitPrice: item.unitPrice,
             incomeAccountId: item.incomeAccountId,
             incomeAccountName: item.incomeAccountName,
@@ -2972,6 +3156,7 @@ export async function createQuickBooksCatalogItem(actor: ActorContext, input: z.
         Type: parsedInput.itemType,
         Active: parsedInput.active,
         IncomeAccountRef: { value: incomeAccountId },
+        SalesTaxCodeRef: { value: parsedInput.taxable ? "TAX" : "NON" },
         ...(parsedInput.sku ? { Sku: parsedInput.sku } : {}),
         ...(parsedInput.unitPrice !== null ? { UnitPrice: parsedInput.unitPrice } : {})
       }
@@ -2996,6 +3181,7 @@ export async function createQuickBooksCatalogItem(actor: ActorContext, input: z.
           name: localItem.name,
           sku: localItem.sku,
           unitPrice: localItem.unitPrice,
+          taxable: localItem.taxable,
           active: localItem.active
         }
       }
@@ -3081,6 +3267,7 @@ export async function updateQuickBooksCatalogItem(actor: ActorContext, input: z.
         Type: normalizedCurrentItem.itemType,
         Active: parsedInput.active,
         IncomeAccountRef: { value: incomeAccountId },
+        SalesTaxCodeRef: { value: parsedInput.taxable ? "TAX" : "NON" },
         Sku: parsedInput.sku ?? "",
         ...(parsedInput.unitPrice !== null ? { UnitPrice: parsedInput.unitPrice } : {})
       }
@@ -3105,6 +3292,7 @@ export async function updateQuickBooksCatalogItem(actor: ActorContext, input: z.
           name: updatedLocalItem.name,
           sku: updatedLocalItem.sku,
           unitPrice: updatedLocalItem.unitPrice,
+          taxable: updatedLocalItem.taxable,
           active: updatedLocalItem.active
         }
       }
@@ -3503,7 +3691,8 @@ export async function syncQuoteToQuickBooksEstimate(actor: ActorContext, quoteId
         quantity: line.quantity,
         unitPrice: line.unitPrice,
         qbItemId,
-        qbItemName
+        qbItemName,
+        taxable: line.taxable
       }));
     }
 
@@ -3638,6 +3827,230 @@ export async function syncQuoteToQuickBooksEstimate(actor: ActorContext, quoteId
       entityId: quote.id
     });
 
+    throw normalizedError;
+  }
+}
+
+export async function createDirectQuickBooksInvoice(
+  actor: ActorContext,
+  input: z.infer<typeof directQuickBooksInvoiceInputSchema>
+) {
+  const parsedActor = parseActor(actor);
+  if (!canManageQuickBooksSync(parsedActor.role)) {
+    throw new Error("Only administrators can create direct invoices.");
+  }
+
+  const parsedInput = directQuickBooksInvoiceInputSchema.parse(input);
+  const tenant = await getTenantQuickBooksConnection(parsedActor.tenantId as string);
+  const connectionStatus = assertQuickBooksConnectionUsable(tenant, "creating invoices");
+  const issueDate = new Date(parsedInput.issueDate);
+  if (Number.isNaN(issueDate.getTime())) {
+    throw new Error("Issue date is invalid.");
+  }
+  const dueDate = parsedInput.dueDate ? new Date(parsedInput.dueDate) : null;
+  if (parsedInput.dueDate && (!dueDate || Number.isNaN(dueDate.getTime()))) {
+    throw new Error("Due date is invalid.");
+  }
+
+  const selectedCustomer = parsedInput.customerCompanyId
+    ? await prisma.customerCompany.findFirst({
+        where: {
+          id: parsedInput.customerCompanyId,
+          tenantId: parsedActor.tenantId as string
+        },
+        select: {
+          id: true,
+          name: true,
+          contactName: true,
+          billingEmail: true,
+          phone: true,
+          billingAddressLine1: true,
+          billingAddressLine2: true,
+          billingCity: true,
+          billingState: true,
+          billingPostalCode: true,
+          billingCountry: true,
+          serviceAddressLine1: true,
+          serviceAddressLine2: true,
+          serviceCity: true,
+          serviceState: true,
+          servicePostalCode: true,
+          serviceCountry: true,
+          notes: true
+        }
+      })
+    : null;
+
+  if (parsedInput.customerCompanyId && !selectedCustomer) {
+    throw new Error("Customer not found.");
+  }
+
+  const catalogItems = await prisma.quickBooksCatalogItem.findMany({
+    where: {
+      tenantId: parsedActor.tenantId as string,
+      id: { in: parsedInput.lineItems.map((line) => line.catalogItemId) },
+      active: true
+    },
+    select: {
+      id: true,
+      quickbooksItemId: true,
+      name: true,
+      taxable: true
+    }
+  });
+
+  const catalogById = new Map(catalogItems.map((item) => [item.id, item] as const));
+  if (!parsedInput.lineItems.every((line) => catalogById.has(line.catalogItemId))) {
+    throw new Error("One or more selected products or services are missing or inactive.");
+  }
+
+  try {
+    const customerName = selectedCustomer?.name ?? parsedInput.walkInCustomerName?.trim() ?? "";
+    const customerId = await resolveQuickBooksInvoiceCustomer(tenant, {
+      customerCompanyId: selectedCustomer?.id ?? null,
+      customerName,
+      billingEmail: selectedCustomer?.billingEmail ?? (parsedInput.walkInCustomerEmail?.trim() || null),
+      phone: selectedCustomer?.phone ?? (parsedInput.walkInCustomerPhone?.trim() || null),
+      siteName: parsedInput.siteLabel?.trim() || selectedCustomer?.name || customerName,
+      billingAddressLine1: selectedCustomer?.billingAddressLine1 ?? selectedCustomer?.serviceAddressLine1 ?? null,
+      billingAddressLine2: selectedCustomer?.billingAddressLine2 ?? selectedCustomer?.serviceAddressLine2 ?? null,
+      billingCity: selectedCustomer?.billingCity ?? selectedCustomer?.serviceCity ?? null,
+      billingState: selectedCustomer?.billingState ?? selectedCustomer?.serviceState ?? null,
+      billingPostalCode: selectedCustomer?.billingPostalCode ?? selectedCustomer?.servicePostalCode ?? null,
+      billingCountry: selectedCustomer?.billingCountry ?? selectedCustomer?.serviceCountry ?? null,
+      notes: selectedCustomer?.notes ?? null
+    });
+
+    const invoiceLines = parsedInput.lineItems.map((line) => {
+      const catalogItem = catalogById.get(line.catalogItemId);
+      if (!catalogItem) {
+        throw new Error("Selected product or service is no longer available.");
+      }
+
+      return toQuickBooksInvoiceLine({
+        amount: Number((line.quantity * line.unitPrice).toFixed(2)),
+        description: line.description,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        qbItemId: catalogItem.quickbooksItemId,
+        qbItemName: catalogItem.name,
+        taxable: line.taxable
+      });
+    });
+
+    const invoiceResponse = await quickBooksApiRequest<{ Invoice?: unknown }>(tenant, {
+      path: "/invoice",
+      method: "POST",
+      body: {
+        CustomerRef: { value: customerId },
+        TxnDate: issueDate.toISOString().slice(0, 10),
+        ...(dueDate ? { DueDate: dueDate.toISOString().slice(0, 10) } : {}),
+        ...(parsedInput.memo?.trim() ? { CustomerMemo: { value: parsedInput.memo.trim() } } : {}),
+        Line: invoiceLines
+      }
+    });
+
+    const createdInvoice = normalizeQuickBooksInvoiceRecord(invoiceResponse.Invoice);
+    const responseDocNumber = readQuickBooksDocNumber(invoiceResponse.Invoice);
+    if (!createdInvoice && !responseDocNumber) {
+      throw new Error("QuickBooks returned an incomplete invoice response.");
+    }
+
+    const verifiedInvoice = await fetchQuickBooksInvoice(tenant, {
+      invoiceId: createdInvoice?.id ?? null,
+      docNumber: responseDocNumber ?? null
+    });
+    if (!verifiedInvoice) {
+      throw new Error("QuickBooks did not verify the created invoice.");
+    }
+
+    let sendResult: QuickBooksInvoiceSendResult | null = null;
+    const sendToEmail = selectedCustomer?.billingEmail ?? (parsedInput.walkInCustomerEmail?.trim() || null);
+    if (parsedInput.sendEmail && sendToEmail) {
+      try {
+        const sendParams = new URLSearchParams();
+        sendParams.set("sendTo", sendToEmail);
+        await quickBooksApiRequest<Record<string, unknown>>(tenant, {
+          path: `/invoice/${verifiedInvoice.id}/send`,
+          method: "POST",
+          searchParams: sendParams
+        });
+
+        sendResult = {
+          summaryId: "direct_invoice",
+          inspectionId: "direct_invoice",
+          invoiceId: verifiedInvoice.id,
+          sendStatus: "sent",
+          sentTo: sendToEmail,
+          error: null
+        };
+      } catch (error) {
+        const normalizedError = normalizeQuickBooksError({
+          error,
+          fallbackOperation: "billing.direct_send",
+          connectionMode: tenant.quickbooksConnectionMode
+        });
+        sendResult = {
+          summaryId: "direct_invoice",
+          inspectionId: "direct_invoice",
+          invoiceId: verifiedInvoice.id,
+          sendStatus: "send_failed",
+          sentTo: sendToEmail,
+          error: normalizedError.message
+        };
+      }
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        tenantId: parsedActor.tenantId as string,
+        actorUserId: parsedActor.userId,
+        action: "billing.quickbooks_direct_invoice_created",
+        entityType: "Tenant",
+        entityId: parsedActor.tenantId as string,
+        metadata: {
+          invoiceId: verifiedInvoice.id,
+          invoiceNumber: verifiedInvoice.docNumber ?? responseDocNumber ?? null,
+          customerId,
+          customerName,
+          source: selectedCustomer ? "existing_customer" : "walk_in",
+          issueDate: issueDate.toISOString().slice(0, 10),
+          dueDate: dueDate ? dueDate.toISOString().slice(0, 10) : null,
+          sendEmail: parsedInput.sendEmail,
+          sendStatus: sendResult?.sendStatus ?? "not_sent",
+          connectionMode: connectionStatus.appMode
+        } satisfies JsonObject
+      }
+    });
+
+    return {
+      invoiceId: verifiedInvoice.id,
+      invoiceNumber: verifiedInvoice.docNumber ?? responseDocNumber ?? null,
+      invoiceUrl: buildQuickBooksInvoiceAppUrl(verifiedInvoice.id, connectionStatus.appMode),
+      customerName,
+      sendStatus: sendResult?.sendStatus ?? "not_sent",
+      sendError: sendResult?.error ?? null,
+      sentTo: sendResult?.sentTo ?? null
+    };
+  } catch (error) {
+    const normalizedError = normalizeQuickBooksError({
+      error,
+      fallbackOperation: "billing.direct_create",
+      connectionMode: tenant.quickbooksConnectionMode
+    });
+    await createQuickBooksFailureAuditLog({
+      tenantId: parsedActor.tenantId as string,
+      actorUserId: parsedActor.userId,
+      action: "quickbooks.direct_invoice_failed",
+      operation: normalizedError.operation,
+      message: normalizedError.message,
+      httpStatus: normalizedError.httpStatus,
+      intuitTid: normalizedError.intuitTid,
+      rawBody: normalizedError.rawBody,
+      connectionMode: tenant.quickbooksConnectionMode,
+      entityType: "Tenant",
+      entityId: parsedActor.tenantId as string
+    });
     throw normalizedError;
   }
 }

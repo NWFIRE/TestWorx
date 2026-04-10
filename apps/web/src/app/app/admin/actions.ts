@@ -10,6 +10,7 @@ import {
   createInspection,
   clearBillingSummaryItemCatalogLink,
   clearBillingSummaryItemGroupCatalogLink,
+  createDirectQuickBooksInvoice,
   deleteInspection,
   importCustomerSiteCsv,
   createInspectionAmendment,
@@ -755,6 +756,57 @@ export async function clearBillingSummaryItemCatalogLinkAction(
     return { error: null, success: "Billing item link cleared." };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unable to clear billing item link.", success: null };
+  }
+}
+
+export async function createDirectQuickBooksInvoiceAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { ok: false, error: "Unauthorized", message: null, invoice: null };
+  }
+
+  try {
+    const lineItemsJson = String(formData.get("lineItemsJson") ?? "[]");
+    const parsedLineItems = JSON.parse(lineItemsJson) as Array<{
+      catalogItemId: string;
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      taxable: boolean;
+    }>;
+
+    const result = await createDirectQuickBooksInvoice(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      {
+        customerCompanyId: String(formData.get("customerCompanyId") ?? "").trim() || undefined,
+        walkInCustomerName: String(formData.get("walkInCustomerName") ?? "").trim() || undefined,
+        walkInCustomerEmail: String(formData.get("walkInCustomerEmail") ?? "").trim() || undefined,
+        walkInCustomerPhone: String(formData.get("walkInCustomerPhone") ?? "").trim() || undefined,
+        siteLabel: String(formData.get("siteLabel") ?? "").trim() || undefined,
+        issueDate: String(formData.get("issueDate") ?? "").trim(),
+        dueDate: String(formData.get("dueDate") ?? "").trim() || undefined,
+        memo: String(formData.get("memo") ?? "").trim() || undefined,
+        sendEmail: formData.get("sendEmail") === "on",
+        lineItems: parsedLineItems
+      }
+    );
+
+    revalidatePath("/app/admin/billing");
+    return {
+      ok: true,
+      error: null,
+      message: result.sendStatus === "sent"
+        ? "Invoice created and sent from QuickBooks."
+        : "Invoice created in QuickBooks.",
+      invoice: result
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Unable to create invoice.",
+      message: null,
+      invoice: null
+    };
   }
 }
 

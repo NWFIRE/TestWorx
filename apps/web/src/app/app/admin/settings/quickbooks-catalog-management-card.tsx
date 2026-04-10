@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
+import { ActionButton } from "@/app/action-button";
+import { useToast } from "@/app/toast-provider";
 import { buildSettingsHref } from "./settings-query";
 
 const initialState = { error: null as string | null, success: null as string | null };
@@ -22,6 +24,7 @@ type QuickBooksCatalogManagementCardProps = {
     sku: string | null;
     itemType: string;
     active: boolean;
+    taxable: boolean;
     unitPrice: number | null;
     importedAt: Date;
   }>;
@@ -40,7 +43,8 @@ type QuickBooksCatalogManagementCardProps = {
     totalPages: number;
   };
   createCatalogItemAction: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
-  updateCatalogItemAction: (formData: FormData) => Promise<void>;
+  updateCatalogItemAction: (formData: FormData) => Promise<{ ok: boolean; error: string | null; success: string | null }>;
+  importCatalogAction?: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
   notice?: string | null;
 };
 
@@ -58,9 +62,14 @@ export function QuickBooksCatalogManagementCard({
   filters,
   createCatalogItemAction,
   updateCatalogItemAction,
+  importCatalogAction,
   notice
 }: QuickBooksCatalogManagementCardProps) {
   const [createState, createFormAction, createPending] = useActionState(createCatalogItemAction, initialState);
+  const [importState, importFormAction, importPending] = useActionState(importCatalogAction ?? (async () => initialState), initialState);
+  const [pendingItemId, setPendingItemId] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const { showToast } = useToast();
   const canManageCatalog = configured && connected && !reconnectRequired && !modeMismatch;
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -85,7 +94,7 @@ export function QuickBooksCatalogManagementCard({
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">QuickBooks products and services</p>
         <h3 className="mt-2 text-2xl font-semibold text-ink">Create and edit billing catalog items</h3>
-        <p className="mt-2 text-sm text-slate-500">Use this for the QuickBooks service catalog TradeWorx relies on during invoice sync. Changes write through to QuickBooks first, then refresh the local tenant catalog safely.</p>
+        <p className="mt-2 text-sm text-slate-500">Manage the synced QuickBooks products and services catalog TradeWorx uses for quotes, billing, and direct invoice creation.</p>
       </div>
 
       <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
@@ -100,8 +109,17 @@ export function QuickBooksCatalogManagementCard({
       <div>
         <p className="text-sm uppercase tracking-[0.18em] text-slate-500">Imported QuickBooks products and services</p>
         <h4 className="mt-1 text-lg font-semibold text-ink">{importedItemCount} item{importedItemCount === 1 ? "" : "s"} imported</h4>
-        <p className="mt-2 text-sm text-slate-500">TradeWorx loads this catalog only when you open the section, then keeps the current view paginated so the page stays responsive as your QuickBooks company grows.</p>
+        <p className="mt-2 text-sm text-slate-500">TradeWorx keeps the current view paginated so the page stays responsive as your QuickBooks company grows.</p>
         <p className="mt-2 text-sm text-slate-500">Showing {filteredItemCount} item{filteredItemCount === 1 ? "" : "s"} in the current view.</p>
+        {importCatalogAction ? (
+          <form action={importFormAction} className="mt-4">
+            <ActionButton pending={importPending} pendingLabel="Refreshing catalog..." tone="secondary" type="submit">
+              Refresh from QuickBooks
+            </ActionButton>
+          </form>
+        ) : null}
+        {importState.error ? <p className="mt-3 text-sm text-rose-600">{importState.error}</p> : null}
+        {importState.success ? <p className="mt-3 text-sm text-emerald-600">{importState.success}</p> : null}
 
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600">
@@ -183,16 +201,22 @@ export function QuickBooksCatalogManagementCard({
             <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="catalogItemUnitPrice" min="0" name="unitPrice" placeholder="95.00" step="0.01" type="number" />
           </div>
         </div>
-        <label className="mt-4 flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          <input className="h-5 w-5 rounded border-slate-300" defaultChecked name="active" type="checkbox" />
-          Item is active
-        </label>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            <input className="h-5 w-5 rounded border-slate-300" defaultChecked name="active" type="checkbox" />
+            Item is active
+          </label>
+          <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            <input className="h-5 w-5 rounded border-slate-300" name="taxable" type="checkbox" />
+            Taxable item
+          </label>
+        </div>
         {createState.error ? <p className="mt-3 text-sm text-rose-600">{createState.error}</p> : null}
         {createState.success ? <p className="mt-3 text-sm text-emerald-600">{createState.success}</p> : null}
         {notice ? <p className="mt-3 text-sm text-slateblue">{notice}</p> : null}
-        <button className="mt-4 inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={!canManageCatalog || createPending} type="submit">
-          {createPending ? "Saving item..." : "Add product or service"}
-        </button>
+        <ActionButton className="mt-4" disabled={!canManageCatalog} pending={createPending} pendingLabel="Saving item..." tone="primary" type="submit">
+          Add product or service
+        </ActionButton>
       </form>
 
       <div className="space-y-4">
@@ -223,7 +247,7 @@ export function QuickBooksCatalogManagementCard({
                   TradeWorx leaves this QuickBooks item type read-only for safety. Service and NonInventory items can be edited here.
                 </div>
               ) : (
-                <form action={updateCatalogItemAction} className="space-y-4">
+                <form className="space-y-4">
                   <input name="catalogItemId" type="hidden" value={item.id} />
                   <input name="itemType" type="hidden" value={item.itemType} />
                   <input name="catalogOpen" type="hidden" value="1" />
@@ -244,14 +268,43 @@ export function QuickBooksCatalogManagementCard({
                       <label className="mb-2 block text-sm font-medium text-slate-600">Unit price</label>
                       <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={item.unitPrice ?? ""} min="0" name="unitPrice" step="0.01" type="number" />
                     </div>
-                    <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600 md:self-end">
-                      <input className="h-5 w-5 rounded border-slate-300" defaultChecked={item.active} name="active" type="checkbox" />
-                      Item is active
-                    </label>
+                    <div className="grid gap-3 md:self-end">
+                      <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                        <input className="h-5 w-5 rounded border-slate-300" defaultChecked={item.active} name="active" type="checkbox" />
+                        Item is active
+                      </label>
+                      <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                        <input className="h-5 w-5 rounded border-slate-300" defaultChecked={item.taxable} name="taxable" type="checkbox" />
+                        Taxable item
+                      </label>
+                    </div>
                   </div>
-                  <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-60" disabled={!canManageCatalog} type="submit">
+                  <ActionButton
+                    disabled={!canManageCatalog}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      const form = event.currentTarget.form;
+                      if (!form) {
+                        return;
+                      }
+                      const formData = new FormData(form);
+                      setPendingItemId(item.id);
+                      startTransition(async () => {
+                        const result = await updateCatalogItemAction(formData);
+                        if (result.ok && result.success) {
+                          showToast({ title: result.success, tone: "success" });
+                        } else if (result.error) {
+                          showToast({ title: result.error, tone: "error" });
+                        }
+                        setPendingItemId(null);
+                      });
+                    }}
+                    pending={isPending && pendingItemId === item.id}
+                    pendingLabel="Saving item..."
+                    type="button"
+                  >
                     Save product or service
-                  </button>
+                  </ActionButton>
                 </form>
               )}
             </div>

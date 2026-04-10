@@ -59,6 +59,15 @@ const adminNavItems: AppNavItem[] = [
     tone: "emerald"
   },
   {
+    href: "/app/admin/parts-and-services",
+    label: "Parts and Services",
+    shortLabel: "Catalog",
+    abbreviation: "PS",
+    icon: "grid",
+    description: "QuickBooks products, services, and invoice items",
+    tone: "blue"
+  },
+  {
     href: "/app/admin/team",
     label: "Team and Portal Access",
     shortLabel: "Team",
@@ -73,7 +82,7 @@ const adminNavItems: AppNavItem[] = [
     shortLabel: "Settings",
     abbreviation: "SF",
     icon: "settings",
-    description: "Catalog, customers, and service fees",
+    description: "Branding, customers, and service fees",
     tone: "slate"
   }
 ];
