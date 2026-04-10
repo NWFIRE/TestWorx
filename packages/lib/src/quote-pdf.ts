@@ -292,15 +292,13 @@ function getStatusPresentation(theme: Theme, status: string) {
   };
 }
 
-function renderPageChrome(
+function renderPageHeader(
   input: QuotePdfInput,
   page: PDFPage,
   theme: Theme,
   boldFont: PDFFont,
   regularFont: PDFFont,
-  logo: PDFImage | null,
-  pageNumber: number,
-  totalPages: number
+  logo: PDFImage | null
 ) {
   const branding = resolveTenantBranding({
     tenantName: input.tenant.name,
@@ -386,6 +384,15 @@ function renderPageChrome(
     metaY -= 27;
   }
 
+}
+
+function renderPageFooter(
+  page: PDFPage,
+  theme: Theme,
+  regularFont: PDFFont,
+  pageNumber: number,
+  totalPages: number
+) {
   page.drawLine({
     start: { x: PAGE_MARGIN, y: PAGE_MARGIN + 9 },
     end: { x: PAGE_WIDTH - PAGE_MARGIN, y: PAGE_MARGIN + 9 },
@@ -404,9 +411,15 @@ function renderPageChrome(
 
 function addPage(
   pdfDoc: PDFDocument,
-  pageNumber: number
+  pageNumber: number,
+  input: QuotePdfInput,
+  theme: Theme,
+  boldFont: PDFFont,
+  regularFont: PDFFont,
+  logo: PDFImage | null
 ) {
   const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+  renderPageHeader(input, page, theme, boldFont, regularFont, logo);
   return { page, y: BODY_TOP, pageNumber };
 }
 
@@ -424,7 +437,7 @@ function ensureSpace(
     return state;
   }
 
-  return addPage(pdfDoc, state.pageNumber + 1);
+  return addPage(pdfDoc, state.pageNumber + 1, input, theme, boldFont, regularFont, logo);
 }
 
 function drawSectionTitle(state: PageState, title: string, subtitle: string | undefined, theme: Theme, boldFont: PDFFont, regularFont: PDFFont) {
@@ -511,6 +524,7 @@ function renderHero(state: PageState, input: QuotePdfInput, theme: Theme, boldFo
   });
 
   state.y -= cardHeight + SECTION_GAP;
+  return state;
 }
 
 function renderOverview(state: PageState, input: QuotePdfInput, theme: Theme, boldFont: PDFFont, regularFont: PDFFont) {
@@ -567,6 +581,7 @@ function renderOverview(state: PageState, input: QuotePdfInput, theme: Theme, bo
   }
 
   state.y -= totalHeight + SECTION_GAP;
+  return state;
 }
 
 function drawLineItemHeader(page: PDFPage, y: number, theme: Theme, boldFont: PDFFont) {
@@ -679,9 +694,19 @@ function renderLineItems(
   }
 
   state.y -= 8;
+  return state;
 }
 
-function renderTotals(state: PageState, input: QuotePdfInput, theme: Theme, boldFont: PDFFont, regularFont: PDFFont) {
+function renderTotals(
+  state: PageState,
+  pdfDoc: PDFDocument,
+  input: QuotePdfInput,
+  theme: Theme,
+  boldFont: PDFFont,
+  regularFont: PDFFont,
+  logo: PDFImage | null
+) {
+  state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, 168);
   const width = 240;
   const x = PAGE_WIDTH - PAGE_MARGIN - width;
   drawRect(state.page, x, state.y, width, 136, theme.surface, theme.line);
@@ -723,6 +748,7 @@ function renderTotals(state: PageState, input: QuotePdfInput, theme: Theme, bold
   }
 
   state.y -= 152;
+  return state;
 }
 
 function renderTerms(
@@ -812,16 +838,26 @@ function renderTerms(
     drawParagraph(state.page, regularFont, noteText, PAGE_MARGIN + 12, state.y - 36, CONTENT_WIDTH - 24, 9, theme.ink, 4);
     state.y -= noteHeight + CARD_GAP;
   }
+  return state;
 }
 
-function renderHostedLink(state: PageState, input: QuotePdfInput, theme: Theme, boldFont: PDFFont, regularFont: PDFFont) {
+function renderHostedLink(
+  state: PageState,
+  pdfDoc: PDFDocument,
+  input: QuotePdfInput,
+  theme: Theme,
+  boldFont: PDFFont,
+  regularFont: PDFFont,
+  logo: PDFImage | null
+) {
   if (!input.quote.hostedQuoteUrl) {
-    return;
+    return state;
   }
 
   const copy = "Use the secure proposal link below to review the latest scope, confirm pricing, download the PDF, and approve online.";
   const urlHeight = measureParagraphHeight(regularFont, input.quote.hostedQuoteUrl, CONTENT_WIDTH - 24, 8, 3);
   const height = 48 + measureParagraphHeight(regularFont, copy, CONTENT_WIDTH - 24, 9, 4) + urlHeight;
+  state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, height + CARD_GAP);
 
   drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, height, theme.softSurface, theme.line);
   state.page.drawText("REVIEW PROPOSAL ONLINE", {
@@ -834,6 +870,7 @@ function renderHostedLink(state: PageState, input: QuotePdfInput, theme: Theme, 
   const afterCopy = drawParagraph(state.page, regularFont, copy, PAGE_MARGIN + 12, state.y - 36, CONTENT_WIDTH - 24, 9, theme.ink, 4);
   drawParagraph(state.page, regularFont, input.quote.hostedQuoteUrl, PAGE_MARGIN + 12, afterCopy - 8, CONTENT_WIDTH - 24, 8, theme.primary, 3);
   state.y -= height + CARD_GAP;
+  return state;
 }
 
 export async function generateQuotePdf(input: QuotePdfInput) {
@@ -848,20 +885,20 @@ export async function generateQuotePdf(input: QuotePdfInput) {
   const theme = buildTheme(branding.primaryColor, branding.accentColor);
   const logo = await embedImage(pdfDoc, branding.logoDataUrl);
 
-  let state = addPage(pdfDoc, 1);
-  renderHero(state, input, theme, boldFont, regularFont);
+  let state = addPage(pdfDoc, 1, input, theme, boldFont, regularFont, logo);
+  state = renderHero(state, input, theme, boldFont, regularFont);
   drawSectionTitle(state, "Proposal Summary", "Customer, contact, and location details for this project proposal.", theme, boldFont, regularFont);
-  renderOverview(state, input, theme, boldFont, regularFont);
-  renderLineItems(state, pdfDoc, input, theme, boldFont, regularFont, logo);
-  renderTotals(state, input, theme, boldFont, regularFont);
+  state = renderOverview(state, input, theme, boldFont, regularFont);
+  state = renderLineItems(state, pdfDoc, input, theme, boldFont, regularFont, logo);
+  state = renderTotals(state, pdfDoc, input, theme, boldFont, regularFont, logo);
   state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, 120);
-  renderTerms(state, pdfDoc, input, theme, boldFont, regularFont, logo);
+  state = renderTerms(state, pdfDoc, input, theme, boldFont, regularFont, logo);
   state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, 90);
-  renderHostedLink(state, input, theme, boldFont, regularFont);
+  state = renderHostedLink(state, pdfDoc, input, theme, boldFont, regularFont, logo);
 
   const totalPages = pdfDoc.getPageCount();
   pdfDoc.getPages().forEach((page, index) => {
-    renderPageChrome(input, page, theme, boldFont, regularFont, logo, index + 1, totalPages);
+    renderPageFooter(page, theme, regularFont, index + 1, totalPages);
   });
 
   return pdfDoc.save();
