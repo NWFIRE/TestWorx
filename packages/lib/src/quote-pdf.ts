@@ -78,6 +78,10 @@ const HEADER_HEIGHT = 104;
 const FOOTER_HEIGHT = 28;
 const BODY_TOP = PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT - 18;
 const MIN_CONTENT_Y = PAGE_MARGIN + FOOTER_HEIGHT + 12;
+const SECTION_GAP = 22;
+const CARD_GAP = 14;
+const SUBSECTION_GAP = 16;
+const LINE_ITEM_ROW_GAP = 8;
 
 function hexToRgb(hex: string, fallback: { r: number; g: number; b: number }) {
   const normalized = hex.replace("#", "").trim();
@@ -123,7 +127,7 @@ function money(value: number) {
 
 function normalizeDisplay(value: string | null | undefined) {
   const trimmed = (value ?? "").trim();
-  return trimmed.length > 0 ? trimmed : "-";
+  return trimmed.length > 0 ? trimmed : "";
 }
 
 function wrapText(font: PDFFont, text: string, maxWidth: number, size: number) {
@@ -249,7 +253,8 @@ function renderPageChrome(
   boldFont: PDFFont,
   regularFont: PDFFont,
   logo: PDFImage | null,
-  pageNumber: number
+  pageNumber: number,
+  totalPages: number
 ) {
   const branding = resolveTenantBranding({
     tenantName: input.tenant.name,
@@ -307,7 +312,7 @@ function renderPageChrome(
   const metaRows: Array<[string, string]> = [
     ["Proposal", input.quote.quoteNumber],
     ["Issued", formatDate(input.quote.issuedAt)],
-    ["Page", String(pageNumber)]
+    ["Expires", formatDate(input.quote.expiresAt)]
   ];
   let metaY = top - 39;
   for (const [label, value] of metaRows) {
@@ -331,14 +336,13 @@ function renderPageChrome(
     metaY -= 23;
   }
 
-  page.drawText(branding.legalBusinessName || input.tenant.name, {
-    x: PAGE_MARGIN,
-    y: PAGE_MARGIN - 2,
-    size: 8,
-    font: regularFont,
-    color: theme.softText
+  page.drawLine({
+    start: { x: PAGE_MARGIN, y: PAGE_MARGIN + 9 },
+    end: { x: PAGE_WIDTH - PAGE_MARGIN, y: PAGE_MARGIN + 9 },
+    thickness: 1,
+    color: theme.line
   });
-  const pageLabel = `Page ${pageNumber}`;
+  const pageLabel = `Page ${pageNumber} of ${totalPages}`;
   page.drawText(pageLabel, {
     x: PAGE_WIDTH - PAGE_MARGIN - regularFont.widthOfTextAtSize(pageLabel, 8),
     y: PAGE_MARGIN - 2,
@@ -350,15 +354,9 @@ function renderPageChrome(
 
 function addPage(
   pdfDoc: PDFDocument,
-  input: QuotePdfInput,
-  theme: Theme,
-  boldFont: PDFFont,
-  regularFont: PDFFont,
-  logo: PDFImage | null,
   pageNumber: number
 ) {
   const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-  renderPageChrome(input, page, theme, boldFont, regularFont, logo, pageNumber);
   return { page, y: BODY_TOP, pageNumber };
 }
 
@@ -376,7 +374,7 @@ function ensureSpace(
     return state;
   }
 
-  return addPage(pdfDoc, input, theme, boldFont, regularFont, logo, state.pageNumber + 1);
+  return addPage(pdfDoc, state.pageNumber + 1);
 }
 
 function drawSectionTitle(state: PageState, title: string, subtitle: string | undefined, theme: Theme, boldFont: PDFFont, regularFont: PDFFont) {
@@ -388,11 +386,11 @@ function drawSectionTitle(state: PageState, title: string, subtitle: string | un
     color: theme.ink
   });
 
-  let y = state.y - 16;
+  let y = state.y - 20;
   if (subtitle) {
-    y = drawParagraph(state.page, regularFont, subtitle, PAGE_MARGIN, y, CONTENT_WIDTH, 8.5, theme.softText, 3) - 6;
+    y = drawParagraph(state.page, regularFont, subtitle, PAGE_MARGIN, y, CONTENT_WIDTH, 8.5, theme.softText, 4) - 8;
   } else {
-    y -= 6;
+    y -= 8;
   }
 
   state.page.drawLine({
@@ -402,7 +400,7 @@ function drawSectionTitle(state: PageState, title: string, subtitle: string | un
     color: theme.line
   });
 
-  state.y = y - 14;
+  state.y = y - 18;
 }
 
 function renderHero(state: PageState, input: QuotePdfInput, theme: Theme, boldFont: PDFFont, regularFont: PDFFont) {
@@ -462,27 +460,27 @@ function renderHero(state: PageState, input: QuotePdfInput, theme: Theme, boldFo
     color: theme.muted
   });
 
-  state.y -= cardHeight + 20;
+  state.y -= cardHeight + SECTION_GAP;
 }
 
 function renderOverview(state: PageState, input: QuotePdfInput, theme: Theme, boldFont: PDFFont, regularFont: PDFFont) {
   const summary = [
-    { label: "Customer", value: input.customerCompany.name },
-    { label: "Contact", value: input.customerCompany.contactName ?? input.quote.recipientEmail ?? input.customerCompany.billingEmail ?? "-" },
-    { label: "Phone", value: input.customerCompany.phone ?? "-" },
-    { label: "Site", value: input.site?.name ?? "-" },
+    { label: "Customer", value: normalizeDisplay(input.customerCompany.name) },
+    { label: "Contact", value: normalizeDisplay(input.customerCompany.contactName ?? input.quote.recipientEmail ?? input.customerCompany.billingEmail) },
+    { label: "Phone", value: normalizeDisplay(input.customerCompany.phone) },
+    { label: "Site", value: normalizeDisplay(input.site?.name) },
     {
       label: "Site address",
-      value: [
+      value: normalizeDisplay([
         input.site?.addressLine1,
         input.site?.addressLine2,
         [input.site?.city, input.site?.state, input.site?.postalCode].filter(Boolean).join(" ")
-      ].filter(Boolean).join(", ") || "-"
+      ].filter(Boolean).join(", "))
     },
     { label: "Issue date", value: formatDate(input.quote.issuedAt) },
     { label: "Expiration", value: formatDate(input.quote.expiresAt) },
     { label: "Proposal ID", value: input.quote.quoteNumber }
-  ];
+  ].filter((item) => item.value);
 
   const gap = 12;
   const columns = 2;
@@ -491,10 +489,10 @@ function renderOverview(state: PageState, input: QuotePdfInput, theme: Theme, bo
   for (let index = 0; index < summary.length; index += columns) {
     const items = summary.slice(index, index + columns);
     rowHeights.push(
-      items.reduce((maxHeight, item) => Math.max(maxHeight, 34 + measureParagraphHeight(regularFont, item.value, columnWidth - 20, 10, 3)), 54)
+      items.reduce((maxHeight, item) => Math.max(maxHeight, 38 + measureParagraphHeight(regularFont, item.value, columnWidth - 20, 10, 4)), 62)
     );
   }
-  const totalHeight = rowHeights.reduce((sum, height) => sum + height, 0) + gap * Math.max(rowHeights.length - 1, 0) + 16;
+  const totalHeight = rowHeights.reduce((sum, height) => sum + height, 0) + gap * Math.max(rowHeights.length - 1, 0) + 20;
 
   drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, totalHeight, theme.surface, theme.line);
   let y = state.y - 10;
@@ -507,22 +505,22 @@ function renderOverview(state: PageState, input: QuotePdfInput, theme: Theme, bo
       drawRect(state.page, x, y, columnWidth, rowHeight, theme.softSurface, theme.line);
       state.page.drawText(item.label.toUpperCase(), {
         x: x + 10,
-        y: y - 14,
+        y: y - 16,
         size: 7,
         font: boldFont,
         color: theme.softText
       });
-      drawParagraph(state.page, regularFont, item.value, x + 10, y - 28, columnWidth - 20, 10, theme.ink, 3);
+      drawParagraph(state.page, regularFont, item.value, x + 10, y - 32, columnWidth - 20, 10, theme.ink, 4);
     });
     y -= rowHeight + gap;
     rowIndex += 1;
   }
 
-  state.y -= totalHeight + 18;
+  state.y -= totalHeight + SECTION_GAP;
 }
 
 function drawLineItemHeader(page: PDFPage, y: number, theme: Theme, boldFont: PDFFont) {
-  drawRect(page, PAGE_MARGIN, y, CONTENT_WIDTH, 24, theme.softSurface, theme.line);
+  drawRect(page, PAGE_MARGIN, y, CONTENT_WIDTH, 28, theme.softSurface, theme.line);
   const columns = [
     { label: "Service", x: PAGE_MARGIN + 12 },
     { label: "Qty", x: PAGE_MARGIN + 326 },
@@ -533,7 +531,7 @@ function drawLineItemHeader(page: PDFPage, y: number, theme: Theme, boldFont: PD
   for (const column of columns) {
     page.drawText(column.label, {
       x: column.x,
-      y: y - 15,
+      y: y - 17,
       size: 7.5,
       font: boldFont,
       color: theme.muted
@@ -554,7 +552,7 @@ function renderLineItems(
   state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, 120);
   drawSectionTitle(state, "Scope and Pricing", "Clear, customer-ready pricing for the work included in this proposal.", theme, boldFont, regularFont);
   for (const group of groupedLineItems) {
-    state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, 70);
+    state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, 88);
     drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, 24, theme.softSurface, theme.line);
     state.page.drawText(group.title, {
       x: PAGE_MARGIN + 12,
@@ -563,15 +561,15 @@ function renderLineItems(
       font: boldFont,
       color: theme.primary
     });
-    state.y -= 24;
+    state.y -= 24 + LINE_ITEM_ROW_GAP;
     drawLineItemHeader(state.page, state.y, theme, boldFont);
-    state.y -= 24;
+    state.y -= 28;
 
     for (const [index, line] of group.items.entries()) {
       const description = line.description ?? "-";
-      const descriptionHeight = line.description ? measureParagraphHeight(regularFont, description, 290, 8.5, 2) : 0;
-      const rowHeight = Math.max(40, 24 + descriptionHeight);
-      state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, rowHeight + 12);
+      const descriptionHeight = line.description ? measureParagraphHeight(regularFont, description, 290, 8.5, 3) : 0;
+      const rowHeight = Math.max(46, 28 + descriptionHeight);
+      state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, rowHeight + 18);
       if (state.y === BODY_TOP) {
         drawSectionTitle(state, "Scope and Pricing", "Continued proposal line items.", theme, boldFont, regularFont);
         drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, 24, theme.softSurface, theme.line);
@@ -582,21 +580,21 @@ function renderLineItems(
           font: boldFont,
           color: theme.primary
         });
-        state.y -= 24;
+        state.y -= 24 + LINE_ITEM_ROW_GAP;
         drawLineItemHeader(state.page, state.y, theme, boldFont);
-        state.y -= 24;
+        state.y -= 28;
       }
 
       drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, rowHeight, index % 2 === 0 ? theme.surface : theme.softSurface, theme.line);
       state.page.drawText(line.title, {
         x: PAGE_MARGIN + 12,
-        y: state.y - 16,
+        y: state.y - 18,
         size: 9.5,
         font: boldFont,
         color: theme.ink
       });
       if (line.description) {
-        drawParagraph(state.page, regularFont, description, PAGE_MARGIN + 12, state.y - 29, 290, 8.5, theme.muted, 2);
+        drawParagraph(state.page, regularFont, description, PAGE_MARGIN + 12, state.y - 33, 290, 8.5, theme.muted, 3);
       }
 
       const qtyText = String(line.quantity ?? 1);
@@ -604,39 +602,39 @@ function renderLineItems(
       const totalText = money(line.total ?? 0);
       state.page.drawText(qtyText, {
         x: PAGE_MARGIN + 350 - regularFont.widthOfTextAtSize(qtyText, 9),
-        y: state.y - 16,
+        y: state.y - 18,
         size: 9,
         font: regularFont,
         color: theme.ink
       });
       state.page.drawText(unitText, {
         x: PAGE_MARGIN + 450 - regularFont.widthOfTextAtSize(unitText, 9),
-        y: state.y - 16,
+        y: state.y - 18,
         size: 9,
         font: regularFont,
         color: theme.ink
       });
       state.page.drawText(totalText, {
         x: PAGE_MARGIN + CONTENT_WIDTH - 12 - boldFont.widthOfTextAtSize(totalText, 9.5),
-        y: state.y - 16,
+        y: state.y - 18,
         size: 9.5,
         font: boldFont,
         color: theme.ink
       });
 
-      state.y -= rowHeight;
+      state.y -= rowHeight + LINE_ITEM_ROW_GAP;
     }
 
-    state.y -= 12;
+    state.y -= SUBSECTION_GAP;
   }
 
-  state.y -= 18;
+  state.y -= 8;
 }
 
 function renderTotals(state: PageState, input: QuotePdfInput, theme: Theme, boldFont: PDFFont, regularFont: PDFFont) {
   const width = 240;
   const x = PAGE_WIDTH - PAGE_MARGIN - width;
-  drawRect(state.page, x, state.y, width, 108, theme.surface, theme.line);
+  drawRect(state.page, x, state.y, width, 116, theme.surface, theme.line);
   drawRect(state.page, x, state.y, width, 6, theme.primary, theme.primary, 0);
 
   const rows: Array<[string, string, boolean]> = [
@@ -644,14 +642,14 @@ function renderTotals(state: PageState, input: QuotePdfInput, theme: Theme, bold
     ["Tax", money(input.quote.taxAmount), false],
     ["Proposal Total", money(input.quote.total), true]
   ];
-  let y = state.y - 22;
+  let y = state.y - 24;
   for (const [label, value, isTotal] of rows) {
     const font = isTotal ? boldFont : regularFont;
     const size = isTotal ? 11.5 : 9.5;
     if (isTotal) {
       state.page.drawLine({
-        start: { x: x + 14, y: y + 9 },
-        end: { x: x + width - 14, y: y + 9 },
+        start: { x: x + 14, y: y + 10 },
+        end: { x: x + width - 14, y: y + 10 },
         thickness: 1,
         color: theme.line
       });
@@ -670,10 +668,10 @@ function renderTotals(state: PageState, input: QuotePdfInput, theme: Theme, bold
       font,
       color: theme.ink
     });
-    y -= isTotal ? 28 : 22;
+    y -= isTotal ? 30 : 24;
   }
 
-  state.y -= 124;
+  state.y -= 132;
 }
 
 function renderTerms(
@@ -690,43 +688,43 @@ function renderTerms(
   drawSectionTitle(state, terms.title, "Clear project terms, scope boundaries, and approval expectations for this proposal.", theme, boldFont, regularFont);
 
   if (terms.intro) {
-    const introHeight = 24 + measureParagraphHeight(regularFont, terms.intro, CONTENT_WIDTH - 20, 9.5, 3);
-    state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, introHeight + 12);
+    const introHeight = 30 + measureParagraphHeight(regularFont, terms.intro, CONTENT_WIDTH - 24, 9.5, 4);
+    state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, introHeight + CARD_GAP);
     drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, introHeight, theme.surface, theme.line);
-    drawParagraph(state.page, regularFont, terms.intro, PAGE_MARGIN + 10, state.y - 15, CONTENT_WIDTH - 20, 9.5, theme.ink, 3);
-    state.y -= introHeight + 12;
+    drawParagraph(state.page, regularFont, terms.intro, PAGE_MARGIN + 12, state.y - 18, CONTENT_WIDTH - 24, 9.5, theme.ink, 4);
+    state.y -= introHeight + CARD_GAP;
   }
 
-  const emphasisHeight = 34 + measureParagraphHeight(regularFont, terms.emphasisBody, CONTENT_WIDTH - 20, 9.5, 3);
-  state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, emphasisHeight + 14);
+  const emphasisHeight = 40 + measureParagraphHeight(regularFont, terms.emphasisBody, CONTENT_WIDTH - 24, 9.5, 4);
+  state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, emphasisHeight + CARD_GAP);
   drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, emphasisHeight, theme.accentSurface, theme.line);
   state.page.drawText(terms.emphasisTitle.toUpperCase(), {
     x: PAGE_MARGIN + 12,
-    y: state.y - 15,
+    y: state.y - 18,
     size: 7.5,
     font: boldFont,
     color: theme.accentText
   });
-  drawParagraph(state.page, regularFont, terms.emphasisBody, PAGE_MARGIN + 12, state.y - 31, CONTENT_WIDTH - 24, 9.5, theme.ink, 3);
-  state.y -= emphasisHeight + 14;
+  drawParagraph(state.page, regularFont, terms.emphasisBody, PAGE_MARGIN + 12, state.y - 36, CONTENT_WIDTH - 24, 9.5, theme.ink, 4);
+  state.y -= emphasisHeight + CARD_GAP;
 
   for (const section of terms.sections) {
-    const bodyHeight = (section.body ?? []).reduce((sum, paragraph) => sum + measureParagraphHeight(regularFont, paragraph, CONTENT_WIDTH - 24, 9, 3) + 8, 0);
-    const bulletHeight = (section.bullets ?? []).reduce((sum, bullet) => sum + measureParagraphHeight(regularFont, bullet, CONTENT_WIDTH - 44, 9, 3) + 6, 0);
-    const sectionHeight = Math.max(58, 28 + bodyHeight + bulletHeight);
-    state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, sectionHeight + 12);
+    const bodyHeight = (section.body ?? []).reduce((sum, paragraph) => sum + measureParagraphHeight(regularFont, paragraph, CONTENT_WIDTH - 32, 9, 4) + 10, 0);
+    const bulletHeight = (section.bullets ?? []).reduce((sum, bullet) => sum + measureParagraphHeight(regularFont, bullet, CONTENT_WIDTH - 52, 9, 4) + 10, 0);
+    const sectionHeight = Math.max(66, 34 + bodyHeight + bulletHeight);
+    state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, sectionHeight + CARD_GAP);
     drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, sectionHeight, theme.surface, theme.line);
     state.page.drawText(section.title.toUpperCase(), {
       x: PAGE_MARGIN + 12,
-      y: state.y - 15,
+      y: state.y - 18,
       size: 7.5,
       font: boldFont,
       color: theme.muted
     });
 
-    let y = state.y - 31;
+    let y = state.y - 38;
     for (const paragraph of section.body ?? []) {
-      y = drawParagraph(state.page, regularFont, paragraph, PAGE_MARGIN + 12, y, CONTENT_WIDTH - 24, 9, theme.ink, 3) - 5;
+      y = drawParagraph(state.page, regularFont, paragraph, PAGE_MARGIN + 12, y, CONTENT_WIDTH - 24, 9, theme.ink, 4) - 8;
     }
 
     for (const bullet of section.bullets ?? []) {
@@ -736,26 +734,26 @@ function renderTerms(
         size: 1.8,
         color: theme.softText
       });
-      y = drawParagraph(state.page, regularFont, bullet, PAGE_MARGIN + 24, y + 8, CONTENT_WIDTH - 44, 9, theme.ink, 3) - 2;
+      y = drawParagraph(state.page, regularFont, bullet, PAGE_MARGIN + 24, y + 8, CONTENT_WIDTH - 44, 9, theme.ink, 4) - 6;
     }
 
-    state.y -= sectionHeight + 12;
+    state.y -= sectionHeight + CARD_GAP;
   }
 
   if (input.quote.customerNotes?.trim()) {
     const noteText = input.quote.customerNotes.trim();
-    const noteHeight = 28 + measureParagraphHeight(regularFont, noteText, CONTENT_WIDTH - 24, 9, 3);
-    state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, noteHeight + 12);
+    const noteHeight = 32 + measureParagraphHeight(regularFont, noteText, CONTENT_WIDTH - 24, 9, 4);
+    state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, noteHeight + CARD_GAP);
     drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, noteHeight, theme.softSurface, theme.line);
     state.page.drawText("ADDITIONAL QUOTE NOTES", {
       x: PAGE_MARGIN + 12,
-      y: state.y - 15,
+      y: state.y - 18,
       size: 7.5,
       font: boldFont,
       color: theme.muted
     });
-    drawParagraph(state.page, regularFont, noteText, PAGE_MARGIN + 12, state.y - 31, CONTENT_WIDTH - 24, 9, theme.ink, 3);
-    state.y -= noteHeight + 12;
+    drawParagraph(state.page, regularFont, noteText, PAGE_MARGIN + 12, state.y - 36, CONTENT_WIDTH - 24, 9, theme.ink, 4);
+    state.y -= noteHeight + CARD_GAP;
   }
 }
 
@@ -765,20 +763,20 @@ function renderHostedLink(state: PageState, input: QuotePdfInput, theme: Theme, 
   }
 
   const copy = "Use the secure proposal link below to review the latest scope, confirm pricing, download the PDF, and approve online.";
-  const urlHeight = measureParagraphHeight(regularFont, input.quote.hostedQuoteUrl, CONTENT_WIDTH - 24, 8, 2);
-  const height = 44 + measureParagraphHeight(regularFont, copy, CONTENT_WIDTH - 24, 9, 3) + urlHeight;
+  const urlHeight = measureParagraphHeight(regularFont, input.quote.hostedQuoteUrl, CONTENT_WIDTH - 24, 8, 3);
+  const height = 48 + measureParagraphHeight(regularFont, copy, CONTENT_WIDTH - 24, 9, 4) + urlHeight;
 
   drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, height, theme.softSurface, theme.line);
   state.page.drawText("REVIEW PROPOSAL ONLINE", {
     x: PAGE_MARGIN + 12,
-    y: state.y - 15,
+    y: state.y - 18,
     size: 7.5,
     font: boldFont,
     color: theme.primary
   });
-  const afterCopy = drawParagraph(state.page, regularFont, copy, PAGE_MARGIN + 12, state.y - 31, CONTENT_WIDTH - 24, 9, theme.ink, 3);
-  drawParagraph(state.page, regularFont, input.quote.hostedQuoteUrl, PAGE_MARGIN + 12, afterCopy - 8, CONTENT_WIDTH - 24, 8, theme.primary, 2);
-  state.y -= height + 10;
+  const afterCopy = drawParagraph(state.page, regularFont, copy, PAGE_MARGIN + 12, state.y - 36, CONTENT_WIDTH - 24, 9, theme.ink, 4);
+  drawParagraph(state.page, regularFont, input.quote.hostedQuoteUrl, PAGE_MARGIN + 12, afterCopy - 8, CONTENT_WIDTH - 24, 8, theme.primary, 3);
+  state.y -= height + CARD_GAP;
 }
 
 export async function generateQuotePdf(input: QuotePdfInput) {
@@ -793,7 +791,7 @@ export async function generateQuotePdf(input: QuotePdfInput) {
   const theme = buildTheme(branding.primaryColor, branding.accentColor);
   const logo = await embedImage(pdfDoc, branding.logoDataUrl);
 
-  let state = addPage(pdfDoc, input, theme, boldFont, regularFont, logo, 1);
+  let state = addPage(pdfDoc, 1);
   renderHero(state, input, theme, boldFont, regularFont);
   drawSectionTitle(state, "Proposal Summary", "Customer, contact, and location details for this project proposal.", theme, boldFont, regularFont);
   renderOverview(state, input, theme, boldFont, regularFont);
@@ -803,6 +801,11 @@ export async function generateQuotePdf(input: QuotePdfInput) {
   renderTerms(state, pdfDoc, input, theme, boldFont, regularFont, logo);
   state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, 90);
   renderHostedLink(state, input, theme, boldFont, regularFont);
+
+  const totalPages = pdfDoc.getPageCount();
+  pdfDoc.getPages().forEach((page, index) => {
+    renderPageChrome(input, page, theme, boldFont, regularFont, logo, index + 1, totalPages);
+  });
 
   return pdfDoc.save();
 }
