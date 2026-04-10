@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 
 import { resolveTenantBranding } from "./branding";
+import { buildQuotePresentationLineItems, buildQuoteProjectSummary, groupQuotePresentationLineItems } from "./quote-presentation";
 import { getQuoteTermsContent } from "./quote-terms";
 import { decodeStoredFile } from "./storage";
 
@@ -408,7 +409,7 @@ function renderHero(state: PageState, input: QuotePdfInput, theme: Theme, boldFo
   const customerLine = input.site?.name && input.site.name !== "-"
     ? `${input.customerCompany.name} - ${input.site.name}`
     : input.customerCompany.name;
-  const intro = "Review the proposed scope, pricing, and project terms below. This proposal is designed for quick customer review and digital approval.";
+  const intro = buildQuoteProjectSummary(input.lineItems);
   const cardHeight = 120;
 
   drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, cardHeight, theme.softSurface, theme.line);
@@ -426,7 +427,7 @@ function renderHero(state: PageState, input: QuotePdfInput, theme: Theme, boldFo
     font: boldFont,
     color: theme.ink
   });
-  drawParagraph(state.page, regularFont, intro, PAGE_MARGIN + 16, state.y - 64, CONTENT_WIDTH - 210, 9.5, theme.muted, 3);
+  drawParagraph(state.page, regularFont, intro, PAGE_MARGIN + 16, state.y - 64, CONTENT_WIDTH - 210, 10, theme.muted, 3);
 
   const status = getStatusPresentation(theme, input.quote.status);
   const chipWidth = Math.max(76, boldFont.widthOfTextAtSize(status.label, 8) + 22);
@@ -549,60 +550,84 @@ function renderLineItems(
   regularFont: PDFFont,
   logo: PDFImage | null
 ) {
+  const groupedLineItems = groupQuotePresentationLineItems(buildQuotePresentationLineItems(input.lineItems));
   state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, 120);
   drawSectionTitle(state, "Scope and Pricing", "Clear, customer-ready pricing for the work included in this proposal.", theme, boldFont, regularFont);
-  drawLineItemHeader(state.page, state.y, theme, boldFont);
-  state.y -= 24;
-
-  for (const [index, line] of input.lineItems.entries()) {
-    const description = normalizeDisplay(line.description);
-    const descriptionHeight = description === "-" ? 0 : measureParagraphHeight(regularFont, description, 290, 8.5, 2);
-    const rowHeight = Math.max(40, 24 + descriptionHeight);
-    state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, rowHeight + 12);
-    if (state.y === BODY_TOP) {
-      drawSectionTitle(state, "Scope and Pricing", "Continued proposal line items.", theme, boldFont, regularFont);
-      drawLineItemHeader(state.page, state.y, theme, boldFont);
-      state.y -= 24;
-    }
-
-    drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, rowHeight, index % 2 === 0 ? theme.surface : theme.softSurface, theme.line);
-    state.page.drawText(line.title, {
+  for (const group of groupedLineItems) {
+    state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, 70);
+    drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, 24, theme.softSurface, theme.line);
+    state.page.drawText(group.title, {
       x: PAGE_MARGIN + 12,
-      y: state.y - 16,
-      size: 9.5,
+      y: state.y - 15,
+      size: 8,
       font: boldFont,
-      color: theme.ink
+      color: theme.primary
     });
-    if (description !== "-") {
-      drawParagraph(state.page, regularFont, description, PAGE_MARGIN + 12, state.y - 29, 290, 8.5, theme.muted, 2);
+    state.y -= 24;
+    drawLineItemHeader(state.page, state.y, theme, boldFont);
+    state.y -= 24;
+
+    for (const [index, line] of group.items.entries()) {
+      const description = line.description ?? "-";
+      const descriptionHeight = line.description ? measureParagraphHeight(regularFont, description, 290, 8.5, 2) : 0;
+      const rowHeight = Math.max(40, 24 + descriptionHeight);
+      state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, rowHeight + 12);
+      if (state.y === BODY_TOP) {
+        drawSectionTitle(state, "Scope and Pricing", "Continued proposal line items.", theme, boldFont, regularFont);
+        drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, 24, theme.softSurface, theme.line);
+        state.page.drawText(group.title, {
+          x: PAGE_MARGIN + 12,
+          y: state.y - 15,
+          size: 8,
+          font: boldFont,
+          color: theme.primary
+        });
+        state.y -= 24;
+        drawLineItemHeader(state.page, state.y, theme, boldFont);
+        state.y -= 24;
+      }
+
+      drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, rowHeight, index % 2 === 0 ? theme.surface : theme.softSurface, theme.line);
+      state.page.drawText(line.title, {
+        x: PAGE_MARGIN + 12,
+        y: state.y - 16,
+        size: 9.5,
+        font: boldFont,
+        color: theme.ink
+      });
+      if (line.description) {
+        drawParagraph(state.page, regularFont, description, PAGE_MARGIN + 12, state.y - 29, 290, 8.5, theme.muted, 2);
+      }
+
+      const qtyText = String(line.quantity ?? 1);
+      const unitText = money(line.unitPrice ?? 0);
+      const totalText = money(line.total ?? 0);
+      state.page.drawText(qtyText, {
+        x: PAGE_MARGIN + 350 - regularFont.widthOfTextAtSize(qtyText, 9),
+        y: state.y - 16,
+        size: 9,
+        font: regularFont,
+        color: theme.ink
+      });
+      state.page.drawText(unitText, {
+        x: PAGE_MARGIN + 450 - regularFont.widthOfTextAtSize(unitText, 9),
+        y: state.y - 16,
+        size: 9,
+        font: regularFont,
+        color: theme.ink
+      });
+      state.page.drawText(totalText, {
+        x: PAGE_MARGIN + CONTENT_WIDTH - 12 - boldFont.widthOfTextAtSize(totalText, 9.5),
+        y: state.y - 16,
+        size: 9.5,
+        font: boldFont,
+        color: theme.ink
+      });
+
+      state.y -= rowHeight;
     }
 
-    const qtyText = String(line.quantity);
-    const unitText = money(line.unitPrice);
-    const totalText = money(line.total);
-    state.page.drawText(qtyText, {
-      x: PAGE_MARGIN + 350 - regularFont.widthOfTextAtSize(qtyText, 9),
-      y: state.y - 16,
-      size: 9,
-      font: regularFont,
-      color: theme.ink
-    });
-    state.page.drawText(unitText, {
-      x: PAGE_MARGIN + 450 - regularFont.widthOfTextAtSize(unitText, 9),
-      y: state.y - 16,
-      size: 9,
-      font: regularFont,
-      color: theme.ink
-    });
-    state.page.drawText(totalText, {
-      x: PAGE_MARGIN + CONTENT_WIDTH - 12 - boldFont.widthOfTextAtSize(totalText, 9.5),
-      y: state.y - 16,
-      size: 9.5,
-      font: boldFont,
-      color: theme.ink
-    });
-
-    state.y -= rowHeight;
+    state.y -= 12;
   }
 
   state.y -= 18;

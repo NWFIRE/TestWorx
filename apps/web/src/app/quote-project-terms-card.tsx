@@ -15,8 +15,7 @@ export function QuoteProjectTermsCard({
     <section className={`rounded-[24px] border border-slate-200 bg-white p-5 sm:p-6 ${className}`}>
       <div className="flex flex-col gap-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Project Terms</p>
-          <h3 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">{terms.title}</h3>
+          <h3 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">{terms.title}</h3>
           {terms.intro ? <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">{terms.intro}</p> : null}
         </div>
 

@@ -14,6 +14,7 @@ export * from "./pilot-readiness";
 export * from "./quickbooks";
 export * from "./quote-pdf";
 export * from "./quote-email";
+export * from "./quote-presentation";
 export * from "./quote-terms";
 export * from "./quotes";
 export * from "./report-calculations";
