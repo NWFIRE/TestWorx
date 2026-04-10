@@ -74,12 +74,12 @@ const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
 const PAGE_MARGIN = 36;
 const CONTENT_WIDTH = PAGE_WIDTH - PAGE_MARGIN * 2;
-const HEADER_HEIGHT = 104;
+const HEADER_HEIGHT = 112;
 const FOOTER_HEIGHT = 28;
 const BODY_TOP = PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT - 18;
 const MIN_CONTENT_Y = PAGE_MARGIN + FOOTER_HEIGHT + 12;
 const SECTION_GAP = 22;
-const CARD_GAP = 14;
+const CARD_GAP = 16;
 const SUBSECTION_GAP = 16;
 const LINE_ITEM_ROW_GAP = 8;
 const PDF_TEXT_LINE_GAP = 4;
@@ -206,14 +206,15 @@ function drawBulletList(
   itemGap = 8
 ) {
   const bulletX = x;
-  const textX = x + 14;
-  const textWidth = Math.max(0, maxWidth - 14);
+  const bulletColumnWidth = 16;
+  const textX = x + bulletColumnWidth;
+  const textWidth = Math.max(0, maxWidth - bulletColumnWidth);
   let cursorY = y;
 
   for (const bullet of bullets) {
     const lines = wrapText(font, bullet, textWidth, size);
     page.drawCircle({
-      x: bulletX + 4,
+      x: bulletX + 6,
       y: cursorY - size / 2 + 1,
       size: 1.7,
       color: bulletColor
@@ -359,13 +360,13 @@ function renderPageChrome(
     ["Issued", formatDate(input.quote.issuedAt)],
     ["Expires", formatDate(input.quote.expiresAt)]
   ];
-  const metaCardWidth = 132;
-  const metaCardHeight = 58;
+  const metaCardWidth = 148;
+  const metaCardHeight = 92;
   const metaCardX = rightX - metaCardWidth;
-  const metaCardTop = top - 12;
+  const metaCardTop = top - 14;
   drawRect(page, metaCardX, metaCardTop, metaCardWidth, metaCardHeight, theme.softSurface, theme.line);
 
-  let metaY = metaCardTop - 13;
+  let metaY = metaCardTop - 18;
   for (const [label, value] of metaRows) {
     const x = metaCardX + 12;
     page.drawText(label, {
@@ -377,12 +378,12 @@ function renderPageChrome(
     });
     page.drawText(value, {
       x,
-      y: metaY - 11,
+      y: metaY - 13,
       size: 8.5,
       font: boldFont,
       color: theme.ink
     });
-    metaY -= 18;
+    metaY -= 27;
   }
 
   page.drawLine({
@@ -683,7 +684,7 @@ function renderLineItems(
 function renderTotals(state: PageState, input: QuotePdfInput, theme: Theme, boldFont: PDFFont, regularFont: PDFFont) {
   const width = 240;
   const x = PAGE_WIDTH - PAGE_MARGIN - width;
-  drawRect(state.page, x, state.y, width, 126, theme.surface, theme.line);
+  drawRect(state.page, x, state.y, width, 136, theme.surface, theme.line);
   drawRect(state.page, x, state.y, width, 6, theme.primary, theme.primary, 0);
 
   const rows: Array<[string, string, boolean]> = [
@@ -691,18 +692,18 @@ function renderTotals(state: PageState, input: QuotePdfInput, theme: Theme, bold
     ["Tax", money(input.quote.taxAmount), false],
     ["Proposal Total", money(input.quote.total), true]
   ];
-  let y = state.y - 24;
+  let y = state.y - 26;
   for (const [label, value, isTotal] of rows) {
     const font = isTotal ? boldFont : regularFont;
     const size = isTotal ? 11.5 : 9.5;
     if (isTotal) {
       state.page.drawLine({
-        start: { x: x + 14, y: y + 16 },
-        end: { x: x + width - 14, y: y + 16 },
+        start: { x: x + 14, y: y + 20 },
+        end: { x: x + width - 14, y: y + 20 },
         thickness: 1,
         color: theme.line
       });
-      y -= 8;
+      y -= 12;
     }
     state.page.drawText(label, {
       x: x + 14,
@@ -718,10 +719,10 @@ function renderTotals(state: PageState, input: QuotePdfInput, theme: Theme, bold
       font,
       color: theme.ink
     });
-    y -= isTotal ? 34 : 24;
+    y -= isTotal ? 36 : 26;
   }
 
-  state.y -= 142;
+  state.y -= 152;
 }
 
 function renderTerms(
@@ -760,8 +761,8 @@ function renderTerms(
 
   for (const section of terms.sections) {
     const bodyHeight = (section.body ?? []).reduce((sum, paragraph) => sum + measureParagraphHeight(regularFont, paragraph, CONTENT_WIDTH - 32, 9, PDF_TEXT_LINE_GAP) + 12, 0);
-    const bulletHeight = (section.bullets ?? []).reduce((sum, bullet) => sum + measureParagraphHeight(regularFont, bullet, CONTENT_WIDTH - 50, 9, PDF_TEXT_LINE_GAP) + 8, 0);
-    const sectionHeight = Math.max(74, 38 + bodyHeight + bulletHeight);
+    const bulletHeight = (section.bullets ?? []).reduce((sum, bullet) => sum + measureParagraphHeight(regularFont, bullet, CONTENT_WIDTH - 48, 9, PDF_TEXT_LINE_GAP) + 12, 0);
+    const sectionHeight = Math.max(82, 42 + bodyHeight + bulletHeight);
     state = ensureSpace(state, pdfDoc, input, theme, boldFont, regularFont, logo, sectionHeight + CARD_GAP);
     drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, sectionHeight, theme.surface, theme.line);
     state.page.drawText(section.title.toUpperCase(), {
@@ -772,7 +773,7 @@ function renderTerms(
       color: theme.muted
     });
 
-    let y = state.y - 40;
+    let y = state.y - 42;
     for (const paragraph of section.body ?? []) {
       y = drawParagraph(state.page, regularFont, paragraph, PAGE_MARGIN + PDF_SECTION_INSET, y, CONTENT_WIDTH - 24, 9, theme.ink, PDF_TEXT_LINE_GAP) - 10;
     }
@@ -789,8 +790,8 @@ function renderTerms(
         theme.ink,
         theme.softText,
         PDF_TEXT_LINE_GAP,
-        8
-      ) - 2;
+        10
+      ) - 4;
     }
 
     state.y -= sectionHeight + CARD_GAP;
