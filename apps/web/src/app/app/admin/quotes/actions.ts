@@ -13,6 +13,7 @@ import {
   clearQuoteLineItemQuickBooksMapping,
   createQuote,
   deleteQuote,
+  getQuoteDetail,
   quoteInputSchema,
   getQuoteReminderSettings,
   saveQuoteLineItemQuickBooksMapping,
@@ -92,6 +93,10 @@ function getActor(session: QuoteActionSession): ActorContext {
   };
 }
 
+async function getQuoteDetailForAction(session: QuoteActionSession, quoteId: string) {
+  return getQuoteDetail(getActor(session), quoteId);
+}
+
 export async function createQuoteAction(formData: FormData) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -115,7 +120,7 @@ export async function updateQuoteAction(formData: FormData) {
   const session = await auth();
   const quoteId = String(formData.get("quoteId") ?? "");
   if (!session?.user?.tenantId || !quoteId) {
-    redirect("/login");
+    return { ok: false, error: "Unauthorized", message: null, detail: null };
   }
 
   try {
@@ -123,12 +128,11 @@ export async function updateQuoteAction(formData: FormData) {
     await updateQuote(getActor(getQuoteActionSession(session)), quoteId, parsed);
     revalidatePath("/app/admin/quotes");
     revalidatePath(`/app/admin/quotes/${quoteId}`);
-    redirect(quoteDetailHref(quoteId, { quote: "saved" }));
+    const actionSession = getQuoteActionSession(session);
+    const detail = await getQuoteDetailForAction(actionSession, quoteId);
+    return { ok: true, error: null, message: "Proposal updated", detail };
   } catch (error) {
-    if (isRedirectError(error)) {
-      throw error;
-    }
-    redirect(quoteDetailHref(quoteId, { error: error instanceof Error ? error.message : "Unable to update quote." }));
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to update quote.", message: null, detail: null };
   }
 }
 
@@ -164,11 +168,12 @@ export async function sendQuoteAction(formData: FormData) {
   const session = await auth();
   const quoteId = String(formData.get("quoteId") ?? "");
   if (!session?.user?.tenantId || !quoteId) {
-    redirect("/login");
+    return { ok: false, error: "Unauthorized", message: null, detail: null };
   }
 
   try {
-    await sendQuote(getActor(getQuoteActionSession(session)), quoteId, {
+    const actionSession = getQuoteActionSession(session);
+    await sendQuote(getActor(actionSession), quoteId, {
       recipientEmail: String(formData.get("recipientEmail") ?? "").trim() || null,
       subject: String(formData.get("subject") ?? "").trim() || null,
       message: String(formData.get("message") ?? "").trim() || null
@@ -176,12 +181,10 @@ export async function sendQuoteAction(formData: FormData) {
     revalidatePath("/app/admin/quotes");
     revalidatePath(`/app/admin/quotes/${quoteId}`);
     revalidatePath("/app/customer");
-    redirect(quoteDetailHref(quoteId, { delivery: "sent" }));
+    const detail = await getQuoteDetailForAction(actionSession, quoteId);
+    return { ok: true, error: null, message: "Quote sent", detail };
   } catch (error) {
-    if (isRedirectError(error)) {
-      throw error;
-    }
-    redirect(quoteDetailHref(quoteId, { delivery: error instanceof Error ? error.message : "Unable to send quote." }));
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to send quote.", message: null, detail: null };
   }
 }
 
@@ -189,19 +192,18 @@ export async function syncQuoteAction(formData: FormData) {
   const session = await auth();
   const quoteId = String(formData.get("quoteId") ?? "");
   if (!session?.user?.tenantId || !quoteId) {
-    redirect("/login");
+    return { ok: false, error: "Unauthorized", message: null, detail: null };
   }
 
   try {
-    await syncQuoteToQuickBooksEstimate(getActor(getQuoteActionSession(session)), quoteId);
+    const actionSession = getQuoteActionSession(session);
+    await syncQuoteToQuickBooksEstimate(getActor(actionSession), quoteId);
     revalidatePath("/app/admin/quotes");
     revalidatePath(`/app/admin/quotes/${quoteId}`);
-    redirect(quoteDetailHref(quoteId, { quickbooks: "synced" }));
+    const detail = await getQuoteDetailForAction(actionSession, quoteId);
+    return { ok: true, error: null, message: "Quote synced to QuickBooks", detail };
   } catch (error) {
-    if (isRedirectError(error)) {
-      throw error;
-    }
-    redirect(quoteDetailHref(quoteId, { quickbooks: error instanceof Error ? error.message : "Quote sync failed." }));
+    return { ok: false, error: error instanceof Error ? error.message : "Quote sync failed.", message: null, detail: null };
   }
 }
 
@@ -213,11 +215,12 @@ export async function saveQuoteLineItemMappingAction(formData: FormData) {
   const internalName = String(formData.get("internalName") ?? "").trim();
   const qbItemId = String(formData.get("qbItemId") ?? "").trim();
   if (!session?.user?.tenantId || !quoteId || !lineItemId || !internalCode || !internalName || !qbItemId) {
-    redirect("/login");
+    return { ok: false, error: "Unauthorized", message: null, detail: null };
   }
 
   try {
-    await saveQuoteLineItemQuickBooksMapping(getActor(getQuoteActionSession(session)), {
+    const actionSession = getQuoteActionSession(session);
+    await saveQuoteLineItemQuickBooksMapping(getActor(actionSession), {
       quoteId,
       lineItemId,
       internalCode,
@@ -226,13 +229,15 @@ export async function saveQuoteLineItemMappingAction(formData: FormData) {
     });
     revalidatePath("/app/admin/quotes");
     revalidatePath(`/app/admin/quotes/${quoteId}`);
-    redirect(quoteDetailHref(quoteId, { quickbooks: `${internalName} mapped successfully.` }));
+    const detail = await getQuoteDetailForAction(actionSession, quoteId);
+    return { ok: true, error: null, message: `${internalName} mapped`, detail };
   } catch (error) {
-    if (isRedirectError(error)) {
-      throw error;
-    }
-    redirect(quoteDetailHref(quoteId, { quickbooks: error instanceof Error ? error.message : "Unable to save QuickBooks mapping." }));
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to save QuickBooks mapping.", message: null, detail: null };
   }
+}
+
+export async function saveQuoteLineItemMappingFormAction(formData: FormData) {
+  await saveQuoteLineItemMappingAction(formData);
 }
 
 export async function clearQuoteLineItemMappingAction(formData: FormData) {
@@ -241,24 +246,27 @@ export async function clearQuoteLineItemMappingAction(formData: FormData) {
   const lineItemId = String(formData.get("lineItemId") ?? "");
   const internalCode = String(formData.get("internalCode") ?? "").trim();
   if (!session?.user?.tenantId || !quoteId || !lineItemId || !internalCode) {
-    redirect("/login");
+    return { ok: false, error: "Unauthorized", message: null, detail: null };
   }
 
   try {
-    await clearQuoteLineItemQuickBooksMapping(getActor(getQuoteActionSession(session)), {
+    const actionSession = getQuoteActionSession(session);
+    await clearQuoteLineItemQuickBooksMapping(getActor(actionSession), {
       quoteId,
       lineItemId,
       internalCode
     });
     revalidatePath("/app/admin/quotes");
     revalidatePath(`/app/admin/quotes/${quoteId}`);
-    redirect(quoteDetailHref(quoteId, { quickbooks: `${internalCode} mapping cleared.` }));
+    const detail = await getQuoteDetailForAction(actionSession, quoteId);
+    return { ok: true, error: null, message: "QuickBooks mapping cleared", detail };
   } catch (error) {
-    if (isRedirectError(error)) {
-      throw error;
-    }
-    redirect(quoteDetailHref(quoteId, { quickbooks: error instanceof Error ? error.message : "Unable to clear QuickBooks mapping." }));
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to clear QuickBooks mapping.", message: null, detail: null };
   }
+}
+
+export async function clearQuoteLineItemMappingFormAction(formData: FormData) {
+  await clearQuoteLineItemMappingAction(formData);
 }
 
 export async function updateQuoteStatusAction(formData: FormData) {
@@ -266,25 +274,24 @@ export async function updateQuoteStatusAction(formData: FormData) {
   const quoteId = String(formData.get("quoteId") ?? "");
   const status = String(formData.get("status") ?? "") as QuoteStatus;
   if (!session?.user?.tenantId || !quoteId) {
-    redirect("/login");
+    return { ok: false, error: "Unauthorized", message: null, detail: null };
   }
 
   if (!Object.values(QuoteStatus).includes(status)) {
-    redirect(quoteDetailHref(quoteId, { error: "Select a valid quote status." }));
+    return { ok: false, error: "Select a valid quote status.", message: null, detail: null };
   }
 
   try {
-    await updateQuoteStatus(getActor(getQuoteActionSession(session)), quoteId, status, {
+    const actionSession = getQuoteActionSession(session);
+    await updateQuoteStatus(getActor(actionSession), quoteId, status, {
       note: String(formData.get("note") ?? "").trim() || null
     });
     revalidatePath("/app/admin/quotes");
     revalidatePath(`/app/admin/quotes/${quoteId}`);
-    redirect(quoteDetailHref(quoteId, { status: "updated" }));
+    const detail = await getQuoteDetailForAction(actionSession, quoteId);
+    return { ok: true, error: null, message: "Quote status updated", detail };
   } catch (error) {
-    if (isRedirectError(error)) {
-      throw error;
-    }
-    redirect(quoteDetailHref(quoteId, { error: error instanceof Error ? error.message : "Unable to update quote status." }));
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to update quote status.", message: null, detail: null };
   }
 }
 
@@ -314,19 +321,18 @@ export async function regenerateQuoteLinkAction(formData: FormData) {
   const session = await auth();
   const quoteId = String(formData.get("quoteId") ?? "");
   if (!session?.user?.tenantId || !quoteId) {
-    redirect("/login");
+    return { ok: false, error: "Unauthorized", message: null, detail: null };
   }
 
   try {
-    await regenerateQuoteAccessToken(getActor(getQuoteActionSession(session)), quoteId);
+    const actionSession = getQuoteActionSession(session);
+    await regenerateQuoteAccessToken(getActor(actionSession), quoteId);
     revalidatePath("/app/admin/quotes");
     revalidatePath(`/app/admin/quotes/${quoteId}`);
-    redirect(quoteDetailHref(quoteId, { status: "hosted_link_refreshed" }));
+    const detail = await getQuoteDetailForAction(actionSession, quoteId);
+    return { ok: true, error: null, message: "Hosted quote link refreshed", detail };
   } catch (error) {
-    if (isRedirectError(error)) {
-      throw error;
-    }
-    redirect(quoteDetailHref(quoteId, { error: error instanceof Error ? error.message : "Unable to refresh hosted quote link." }));
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to refresh hosted quote link.", message: null, detail: null };
   }
 }
 
@@ -334,19 +340,18 @@ export async function sendQuoteReminderNowAction(formData: FormData) {
   const session = await auth();
   const quoteId = String(formData.get("quoteId") ?? "");
   if (!session?.user?.tenantId || !quoteId) {
-    redirect("/login");
+    return { ok: false, error: "Unauthorized", message: null, detail: null };
   }
 
   try {
-    await sendQuoteReminderNow(getActor(getQuoteActionSession(session)), quoteId);
+    const actionSession = getQuoteActionSession(session);
+    await sendQuoteReminderNow(getActor(actionSession), quoteId);
     revalidatePath("/app/admin/quotes");
     revalidatePath(`/app/admin/quotes/${quoteId}`);
-    redirect(quoteDetailHref(quoteId, { status: "reminder_sent" }));
+    const detail = await getQuoteDetailForAction(actionSession, quoteId);
+    return { ok: true, error: null, message: "Reminder sent", detail };
   } catch (error) {
-    if (isRedirectError(error)) {
-      throw error;
-    }
-    redirect(quoteDetailHref(quoteId, { error: error instanceof Error ? error.message : "Unable to send reminder." }));
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to send reminder.", message: null, detail: null };
   }
 }
 
@@ -355,19 +360,19 @@ export async function updateQuoteReminderControlAction(formData: FormData) {
   const quoteId = String(formData.get("quoteId") ?? "");
   const action = String(formData.get("reminderAction") ?? "") as "pause" | "resume" | "disable" | "enable";
   if (!session?.user?.tenantId || !quoteId) {
-    redirect("/login");
+    return { ok: false, error: "Unauthorized", message: null, detail: null };
   }
 
   try {
-    await updateQuoteReminderControl(getActor(getQuoteActionSession(session)), quoteId, action);
+    const actionSession = getQuoteActionSession(session);
+    await updateQuoteReminderControl(getActor(actionSession), quoteId, action);
     revalidatePath("/app/admin/quotes");
     revalidatePath(`/app/admin/quotes/${quoteId}`);
-    redirect(quoteDetailHref(quoteId, { status: `reminders_${action}` }));
+    const detail = await getQuoteDetailForAction(actionSession, quoteId);
+    const label = action === "pause" ? "Reminders paused" : action === "resume" ? "Reminders resumed" : action === "disable" ? "Reminders disabled" : "Reminders enabled";
+    return { ok: true, error: null, message: label, detail };
   } catch (error) {
-    if (isRedirectError(error)) {
-      throw error;
-    }
-    redirect(quoteDetailHref(quoteId, { error: error instanceof Error ? error.message : "Unable to update reminders." }));
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to update reminders.", message: null, detail: null };
   }
 }
 

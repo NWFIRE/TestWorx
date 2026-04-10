@@ -1,6 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
+
+import { ActionButton } from "@/app/action-button";
+import { useToast } from "@/app/toast-provider";
 
 type QuoteCatalogItem = {
   code: string;
@@ -79,21 +82,27 @@ function toCurrency(value: number) {
 export function QuoteEditorForm({
   action,
   submitLabel,
+  submitPendingLabel,
   customers,
   sites,
   catalog,
   initialValue,
-  quoteId
+  quoteId,
+  onResult
 }: {
-  action: (formData: FormData) => void | Promise<void>;
+  action: (formData: FormData) => Promise<unknown>;
   submitLabel: string;
+  submitPendingLabel?: string;
   customers: CustomerOption[];
   sites: SiteOption[];
   catalog: QuoteCatalogItem[];
   initialValue: QuoteFormValue;
   quoteId?: string;
+  onResult?: (result: unknown) => void;
 }) {
   const [value, setValue] = useState<QuoteFormValue>(initialValue);
+  const [pending, startTransition] = useTransition();
+  const { showToast } = useToast();
 
   const availableSites = useMemo(
     () => sites.filter((site) => !value.customerCompanyId || site.customerCompanyId === value.customerCompanyId),
@@ -137,7 +146,25 @@ export function QuoteEditorForm({
   }
 
   return (
-    <form action={action} className="grid gap-6 xl:grid-cols-[1.45fr_0.75fr]">
+    <form
+      className="grid gap-6 xl:grid-cols-[1.45fr_0.75fr]"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        startTransition(async () => {
+          const result = await action(formData);
+          if (result && typeof result === "object" && "ok" in result) {
+            const actionResult = result as { ok?: boolean; message?: string | null; error?: string | null };
+            if (actionResult.ok) {
+              showToast({ title: actionResult.message ?? "Quote updated", tone: "success" });
+            } else if (actionResult.error) {
+              showToast({ title: actionResult.error, tone: "error" });
+            }
+          }
+          onResult?.(result);
+        });
+      }}
+    >
       {quoteId ? <input name="quoteId" type="hidden" value={quoteId} /> : null}
       <input name="lineItemsJson" type="hidden" value={JSON.stringify(value.lineItems)} />
 
@@ -481,9 +508,9 @@ export function QuoteEditorForm({
           <p className="mt-3 text-sm leading-7 text-white/75">
             Line items use stable internal codes so sending, QuickBooks sync, and operational conversion stay aligned.
           </p>
-          <button className="mt-6 inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100" type="submit">
+          <ActionButton className="mt-6 min-h-12 w-full bg-white text-slate-950 hover:bg-slate-100" pending={pending} pendingLabel={submitPendingLabel ?? "Saving..."} type="submit">
             {submitLabel}
-          </button>
+          </ActionButton>
         </section>
       </aside>
     </form>

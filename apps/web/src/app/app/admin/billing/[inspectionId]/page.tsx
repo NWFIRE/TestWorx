@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { buildQuickBooksInvoiceAppUrl, getAdminBillingSummaryDetail, getTenantQuickBooksConnectionStatus } from "@testworx/lib";
+import { getAdminBillingSummaryDetail, getTenantQuickBooksConnectionStatus } from "@testworx/lib";
 
 import { BillingSummaryStatusActions } from "../billing-summary-status-actions";
 import { BillingItemMatchPanel } from "../../billing-item-match-panel";
@@ -125,11 +125,9 @@ function describeAutomaticFeeSource(item: {
 }
 
 export default async function BillingSummaryDetailPage({
-  params,
-  searchParams
+  params
 }: {
   params: Promise<{ inspectionId: string }>;
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -140,7 +138,6 @@ export default async function BillingSummaryDetailPage({
   }
 
   const { inspectionId } = await params;
-  const resolvedSearchParams = searchParams ? await searchParams : {};
   const [summary, quickBooksConnection] = await Promise.all([
     getAdminBillingSummaryDetail({
       userId: session.user.id,
@@ -160,28 +157,11 @@ export default async function BillingSummaryDetailPage({
 
   const groupedEntries = Object.entries(summary.reviewGroupedItems) as Array<[keyof typeof categoryLabels, typeof summary.reviewGroupedItems[keyof typeof summary.reviewGroupedItems]]>;
   const isInvoiced = summary.status === "invoiced";
-  const verifiedQuickBooksInvoiceId = summary.quickbooksInvoiceId && ["synced", "sent"].includes(summary.quickbooksSyncStatus ?? "")
-    ? summary.quickbooksInvoiceId
-    : null;
   const canUseQuickBooksActions = quickBooksConnection.connection.connected;
   const summaryQuickBooksMode = summary.quickbooksConnectionMode === "sandbox" || summary.quickbooksConnectionMode === "live"
     ? summary.quickbooksConnectionMode
     : null;
   const summaryModeMismatch = Boolean(summaryQuickBooksMode && summaryQuickBooksMode !== quickBooksConnection.connection.appMode);
-  const hasVerifiedQuickBooksInvoice = Boolean(verifiedQuickBooksInvoiceId);
-  const quickBooksNoticeRaw = Array.isArray(resolvedSearchParams.quickbooks) ? resolvedSearchParams.quickbooks[0] : resolvedSearchParams.quickbooks;
-  const billingNoticeRaw = Array.isArray(resolvedSearchParams.billing) ? resolvedSearchParams.billing[0] : resolvedSearchParams.billing;
-  const quickBooksNotice = quickBooksNoticeRaw === "success"
-    ? "Invoice synced to QuickBooks."
-    : quickBooksNoticeRaw === "sent"
-      ? "Invoice synced and sent from QuickBooks."
-      : quickBooksNoticeRaw
-      ? decodeURIComponent(quickBooksNoticeRaw)
-      : null;
-  const quickBooksNoticeTone = quickBooksNoticeRaw === "success" || quickBooksNoticeRaw === "sent"
-    ? "success"
-    : "warning";
-  const billingNotice = billingNoticeRaw ? decodeURIComponent(billingNoticeRaw) : null;
 
   return (
     <AppPageShell density="wide">
@@ -214,16 +194,6 @@ export default async function BillingSummaryDetailPage({
       {isInvoiced ? (
         <div className="rounded-[2rem] border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm text-emerald-800 shadow-panel">
           This inspection has been marked invoiced. Billing line edits and review notes are locked until you move the summary back to review.
-        </div>
-      ) : null}
-      {quickBooksNotice ? (
-        <div className={`rounded-[2rem] px-6 py-4 text-sm shadow-panel ${quickBooksNoticeTone === "success" ? "border border-emerald-200 bg-emerald-50 text-emerald-800" : "border border-amber-200 bg-amber-50 text-amber-800"}`}>
-          {quickBooksNotice}
-        </div>
-      ) : null}
-      {billingNotice ? (
-        <div className="rounded-[2rem] border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm text-emerald-800 shadow-panel">
-          {billingNotice}
         </div>
       ) : null}
       {!canUseQuickBooksActions ? (
@@ -348,26 +318,22 @@ export default async function BillingSummaryDetailPage({
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Summary status</p>
             <h3 className="mt-1 text-2xl font-semibold text-ink">{summary.status}</h3>
-            <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600">
-              <p>QuickBooks app mode: <span className="font-semibold text-ink">{quickBooksConnection.connection.appModeLabel}</span></p>
-              <p className="mt-2">Connected company: <span className="font-semibold text-ink">{quickBooksConnection.tenant.quickbooksCompanyName ?? "Not connected"}</span></p>
-              <p className="mt-2">Connected realm: <span className="font-semibold text-ink">{quickBooksConnection.tenant.quickbooksRealmId ?? "Not connected"}</span></p>
-              <p>QuickBooks sync: <span className="font-semibold text-ink">{summary.quickbooksSyncStatus ?? "not_synced"}</span></p>
-              <p className="mt-2">Invoice number: <span className="font-semibold text-ink">{summary.quickbooksInvoiceNumber ?? "Not synced"}</span></p>
-              <p className="mt-2">Invoice id: <span className="font-semibold text-ink">{summary.quickbooksInvoiceId ?? "Not synced"}</span></p>
-              <p className="mt-2">Invoice mode: <span className="font-semibold text-ink">{summaryQuickBooksMode ? (summaryQuickBooksMode === "sandbox" ? "Sandbox" : "Live") : "Not recorded"}</span></p>
-              <p className="mt-2">Synced at: <span className="font-semibold text-ink">{summary.quickbooksSyncedAt ? summary.quickbooksSyncedAt.toLocaleString() : "Not synced"}</span></p>
-              <p className="mt-2">QuickBooks send: <span className="font-semibold text-ink">{summary.quickbooksSendStatus ?? "not_sent"}</span></p>
-              <p className="mt-2">Sent at: <span className="font-semibold text-ink">{summary.quickbooksSentAt ? summary.quickbooksSentAt.toLocaleString() : "Not sent"}</span></p>
-              {summary.quickbooksSyncError ? <p className="mt-2 text-rose-700">Last sync error: {summary.quickbooksSyncError}</p> : null}
-              {summary.quickbooksSendError ? <p className="mt-2 text-amber-700">Last send note: {summary.quickbooksSendError}</p> : null}
-            </div>
             <BillingSummaryStatusActions
               canUseQuickBooksActions={canUseQuickBooksActions}
+              connectedCompany={quickBooksConnection.tenant.quickbooksCompanyName}
+              connectedRealm={quickBooksConnection.tenant.quickbooksRealmId}
               hasMissingPrices={summary.metrics.missingPriceCount > 0}
-              hasVerifiedQuickBooksInvoice={hasVerifiedQuickBooksInvoice}
               inspectionId={summary.inspectionId}
+              quickbooksAppModeLabel={quickBooksConnection.connection.appModeLabel}
+              quickbooksInvoiceId={summary.quickbooksInvoiceId}
+              quickbooksInvoiceNumber={summary.quickbooksInvoiceNumber}
+              quickbooksMode={summaryQuickBooksMode}
+              quickbooksSendError={summary.quickbooksSendError}
+              quickbooksSentAt={summary.quickbooksSentAt}
               quickbooksSendStatus={summary.quickbooksSendStatus === "sent" || summary.quickbooksSendStatus === "send_failed" || summary.quickbooksSendStatus === "send_skipped" ? summary.quickbooksSendStatus : "not_sent"}
+              quickbooksSyncError={summary.quickbooksSyncError}
+              quickbooksSyncedAt={summary.quickbooksSyncedAt}
+              quickbooksSyncStatus={summary.quickbooksSyncStatus}
               sendQuickBooksInvoiceAction={sendQuickBooksInvoiceAction}
               summaryId={summary.id}
               summaryModeMismatch={summaryModeMismatch}
@@ -375,11 +341,6 @@ export default async function BillingSummaryDetailPage({
               syncBillingSummaryToQuickBooksAction={syncBillingSummaryToQuickBooksAction}
               updateBillingSummaryStatusAction={updateBillingSummaryStatusAction}
             />
-            {verifiedQuickBooksInvoiceId && !summaryModeMismatch && canUseQuickBooksActions ? (
-              <a className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={buildQuickBooksInvoiceAppUrl(verifiedQuickBooksInvoiceId, summaryQuickBooksMode)} rel="noreferrer" target="_blank">
-                Open in QuickBooks
-              </a>
-            ) : null}
           </div>
 
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">

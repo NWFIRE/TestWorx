@@ -1,12 +1,9 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import { QuoteStatus } from "@prisma/client";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import {
-  buildQuoteEmailDefaultMessage,
-  buildQuoteEmailSubject,
   getQuoteDetail,
   getQuoteStatusTone,
   getQuoteSyncTone,
@@ -17,28 +14,25 @@ import {
 
 import { AppPageShell, PageHeader, SectionCard, StatusBadge, WorkspaceSplit } from "../../operations-ui";
 import {
-  clearQuoteLineItemMappingAction,
+  clearQuoteLineItemMappingFormAction,
   convertQuoteAction,
   deleteQuoteAction,
-  regenerateQuoteLinkAction,
-  saveQuoteLineItemMappingAction,
-  sendQuoteReminderNowAction,
-  sendQuoteAction,
-  syncQuoteAction,
-  updateQuoteAction,
-  updateQuoteReminderControlAction,
-  updateQuoteStatusAction
+  saveQuoteLineItemMappingFormAction,
+  updateQuoteAction
 } from "../actions";
-import { CopyQuoteLinkButton } from "../copy-quote-link-button";
 import { DeleteQuoteCard } from "../delete-quote-card";
 import { QuoteEditorForm } from "../quote-editor-form";
+import { QuoteQuickBooksSyncCard } from "../quote-quickbooks-sync-card";
+import { QuoteReminderAutomationCard } from "../quote-reminder-automation-card";
+import { QuoteSendCard } from "../quote-send-card";
+import { QuoteStatusControlCard } from "../quote-status-control-card";
 
 export default async function QuoteDetailPage({
   params,
   searchParams
 }: {
   params: Promise<{ quoteId: string }>;
-  searchParams?: Promise<{ from?: string; quote?: string; delivery?: string; quickbooks?: string; status?: string; error?: string }>;
+  searchParams?: Promise<{ from?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -54,6 +48,7 @@ export default async function QuoteDetailPage({
   if (!detail) {
     redirect("/app/admin/quotes");
   }
+
   const companyName = resolveTenantBranding({
     tenantName: detail.tenant.name,
     branding: detail.tenant.branding,
@@ -61,10 +56,6 @@ export default async function QuoteDetailPage({
   }).legalBusinessName;
 
   const returnHref = paramsData.from?.startsWith("/app/") ? paramsData.from : "/app/admin/quotes";
-  const feedback = paramsData.error ?? paramsData.quote ?? paramsData.delivery ?? paramsData.quickbooks ?? paramsData.status ?? null;
-  const feedbackTone = paramsData.error || (paramsData.delivery && paramsData.delivery !== "sent") || (paramsData.quickbooks && paramsData.quickbooks !== "synced")
-    ? "rose"
-    : "emerald";
 
   return (
     <AppPageShell density="wide">
@@ -76,14 +67,14 @@ export default async function QuoteDetailPage({
         actions={
           <>
             <a
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               href={`/api/quotes/${detail.id}/pdf`}
               target="_blank"
             >
               Download PDF
             </a>
             <Link
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               href={returnHref}
             >
               Back to quotes
@@ -91,12 +82,6 @@ export default async function QuoteDetailPage({
           </>
         }
       />
-
-      {feedback ? (
-        <div className={`rounded-[24px] border px-5 py-4 text-sm ${feedbackTone === "rose" ? "border-rose-200 bg-rose-50 text-rose-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
-          {feedback}
-        </div>
-      ) : null}
 
       <WorkspaceSplit variant="content-heavy">
         <div className="space-y-6">
@@ -156,6 +141,7 @@ export default async function QuoteDetailPage({
             quoteId={detail.id}
             sites={detail.formOptions.sites}
             submitLabel="Save quote updates"
+            submitPendingLabel="Saving..."
           />
 
           <SectionCard>
@@ -245,11 +231,11 @@ export default async function QuoteDetailPage({
                         <p className="mt-3 text-sm text-slate-500">No QuickBooks item is mapped for this line yet.</p>
                       )}
                       {line.currentQuickBooksItem ? (
-                        <form action={clearQuoteLineItemMappingAction} className="mt-4">
+                        <form action={clearQuoteLineItemMappingFormAction} className="mt-4">
                           <input name="quoteId" type="hidden" value={detail.id} />
                           <input name="lineItemId" type="hidden" value={line.id} />
                           <input name="internalCode" type="hidden" value={line.internalCode} />
-                          <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50" type="submit">
+                          <button className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50" type="submit">
                             Clear mapping
                           </button>
                         </form>
@@ -262,7 +248,7 @@ export default async function QuoteDetailPage({
                       ) : (
                         <div className="mt-3 space-y-3">
                           {line.mappingState.suggestions.slice(0, 5).map((suggestion) => (
-                            <form key={`${line.id}-${suggestion.qbItemId}`} action={saveQuoteLineItemMappingAction} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+                            <form key={`${line.id}-${suggestion.qbItemId}`} action={saveQuoteLineItemMappingFormAction} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
                               <input name="quoteId" type="hidden" value={detail.id} />
                               <input name="lineItemId" type="hidden" value={line.id} />
                               <input name="internalCode" type="hidden" value={line.internalCode} />
@@ -270,9 +256,9 @@ export default async function QuoteDetailPage({
                               <input name="qbItemId" type="hidden" value={suggestion.qbItemId} />
                               <div className="min-w-0">
                                 <p className="font-medium text-slate-950">{suggestion.qbItemName}</p>
-                                <p className="mt-1 break-all text-xs text-slate-500">ID {suggestion.qbItemId} - Score {suggestion.score}</p>
+                                <p className="mt-1 break-all text-xs text-slate-500">ID {suggestion.qbItemId} • Score {suggestion.score}</p>
                               </div>
-                              <button className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" type="submit">
+                              <button className="pressable pressable-filled inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" type="submit">
                                 Use this item
                               </button>
                             </form>
@@ -288,139 +274,34 @@ export default async function QuoteDetailPage({
         </div>
 
         <aside className="space-y-6">
-          <SectionCard>
-            <h2 className="text-xl font-semibold text-slate-950">Reminder automation</h2>
-            <p className="mt-2 text-sm text-slate-500">Control quote follow-up without interrupting the hosted approval workflow. Automatic reminders stop when quotes are approved, declined, cancelled, expired, or converted.</p>
-            <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-600">
-              <p><span className="font-semibold text-slate-950">Automation:</span> {detail.remindersPausedAt ? "Paused" : detail.remindersEnabled ? "Enabled" : "Disabled"}</p>
-              <p><span className="font-semibold text-slate-950">Next reminder:</span> {detail.nextReminderAt ? format(detail.nextReminderAt, "MMM d, yyyy h:mm a") : "—"}</p>
-              <p><span className="font-semibold text-slate-950">Reminder stage:</span> {detail.reminderStage ?? "—"}</p>
-              <p><span className="font-semibold text-slate-950">Last reminder:</span> {detail.lastReminderAt ? format(detail.lastReminderAt, "MMM d, yyyy h:mm a") : "—"}</p>
-            </div>
-            <div className="mt-4 grid gap-3">
-              <form action={sendQuoteReminderNowAction}>
-                <input name="quoteId" type="hidden" value={detail.id} />
-                <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" type="submit">
-                  Send reminder now
-                </button>
-              </form>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <form action={updateQuoteReminderControlAction}>
-                  <input name="quoteId" type="hidden" value={detail.id} />
-                  <input name="reminderAction" type="hidden" value={detail.remindersPausedAt ? "resume" : "pause"} />
-                  <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="submit">
-                    {detail.remindersPausedAt ? "Resume reminders" : "Pause reminders"}
-                  </button>
-                </form>
-                <form action={updateQuoteReminderControlAction}>
-                  <input name="quoteId" type="hidden" value={detail.id} />
-                  <input name="reminderAction" type="hidden" value={detail.remindersEnabled ? "disable" : "enable"} />
-                  <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="submit">
-                    {detail.remindersEnabled ? "Disable reminders" : "Enable reminders"}
-                  </button>
-                </form>
-              </div>
-            </div>
-            <div className="mt-4 space-y-3">
-              <p className="text-sm font-semibold text-slate-950">Reminder history</p>
-              {detail.reminderDispatches.length === 0 ? (
-                <p className="text-sm text-slate-500">No reminder activity recorded yet.</p>
-              ) : detail.reminderDispatches.map((dispatch) => (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4" key={dispatch.id}>
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-slate-950">{dispatch.reminderType.replaceAll("_", " ")}</p>
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{dispatch.status}</p>
-                  </div>
-                  <p className="mt-1 text-sm text-slate-500">Recipient: {dispatch.recipientEmail ?? "—"}</p>
-                  <p className="mt-1 text-sm text-slate-500">Sent: {dispatch.sentAt ? format(dispatch.sentAt, "MMM d, yyyy h:mm a") : dispatch.attemptedAt ? format(dispatch.attemptedAt, "MMM d, yyyy h:mm a") : "—"}</p>
-                  {dispatch.error ? <p className="mt-1 text-sm text-rose-600">{dispatch.error}</p> : null}
-                </div>
-              ))}
-            </div>
-          </SectionCard>
+          <QuoteReminderAutomationCard
+            lastReminderAt={detail.lastReminderAt}
+            nextReminderAt={detail.nextReminderAt}
+            quoteId={detail.id}
+            reminderDispatches={detail.reminderDispatches}
+            reminderStage={detail.reminderStage}
+            remindersEnabled={detail.remindersEnabled}
+            remindersPausedAt={detail.remindersPausedAt}
+          />
 
-          <SectionCard>
-            <h2 className="text-xl font-semibold text-slate-950">Send quote</h2>
-            <p className="mt-2 text-sm text-slate-500">Email the customer a secure hosted quote link with the branded PDF attached. The email CTA opens the online approval experience first.</p>
-            <form action={sendQuoteAction} className="mt-4 space-y-3">
-              <input name="quoteId" type="hidden" value={detail.id} />
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Recipient</span>
-                <input className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900" defaultValue={detail.recipientEmail ?? ""} name="recipientEmail" type="email" />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Subject</span>
-                <input className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900" defaultValue={detail.deliverySubject ?? buildQuoteEmailSubject({ companyName, quoteNumber: detail.quoteNumber })} name="subject" />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Message</span>
-                <textarea className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" defaultValue={detail.deliveryBody ?? buildQuoteEmailDefaultMessage()} name="message" />
-              </label>
-              <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" type="submit">
-                {detail.sentAt ? "Resend quote" : "Send quote"}
-              </button>
-            </form>
-            {detail.hostedQuoteUrl ? (
-              <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Hosted quote link</p>
-                <p className="break-all text-sm text-slate-600">{detail.hostedQuoteUrl}</p>
-                <div className="flex flex-wrap gap-3">
-                  <CopyQuoteLinkButton href={detail.hostedQuoteUrl} />
-                  <a className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" href={detail.hostedQuoteUrl} rel="noreferrer" target="_blank">
-                    Open hosted quote
-                  </a>
-                </div>
-              </div>
-            ) : null}
-            <form action={regenerateQuoteLinkAction} className="mt-4">
-              <input name="quoteId" type="hidden" value={detail.id} />
-              <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="submit">
-                Regenerate secure link
-              </button>
-            </form>
-          </SectionCard>
+          <QuoteSendCard
+            companyName={companyName}
+            deliveryBody={detail.deliveryBody}
+            deliverySubject={detail.deliverySubject}
+            hostedQuoteUrl={detail.hostedQuoteUrl}
+            quoteId={detail.id}
+            quoteNumber={detail.quoteNumber}
+            recipientEmail={detail.recipientEmail}
+            sentAt={detail.sentAt}
+          />
 
-          <SectionCard>
-            <h2 className="text-xl font-semibold text-slate-950">QuickBooks sync</h2>
-            <p className="mt-2 text-sm text-slate-500">Sync this quote as a QuickBooks estimate using stored item ids and the cached item catalog.</p>
-            <form action={syncQuoteAction} className="mt-4">
-              <input name="quoteId" type="hidden" value={detail.id} />
-              <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="submit">
-                {detail.quickbooksEstimateId ? "Resync estimate" : "Sync to QuickBooks"}
-              </button>
-            </form>
-            {detail.lineItems.some((line) => line.mappingState.status === "needs_mapping") ? (
-              <div className="mt-4 space-y-2 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm text-amber-800">
-                <p className="font-semibold">QuickBooks mapping attention</p>
-                {detail.lineItems
-                  .filter((line) => line.mappingState.status === "needs_mapping")
-                  .map((line) => (
-                    <p key={line.id}>
-                      {line.title}: {line.mappingState.reason?.replaceAll("_", " ") ?? "needs mapping"}
-                      {line.mappingState.suggestions.length > 0 ? ` • Suggestions: ${line.mappingState.suggestions.slice(0, 3).map((item) => item.qbItemName).join(", ")}` : ""}
-                    </p>
-                  ))}
-              </div>
-            ) : null}
-          </SectionCard>
+          <QuoteQuickBooksSyncCard
+            lineItems={detail.lineItems}
+            quickbooksEstimateId={detail.quickbooksEstimateId}
+            quoteId={detail.id}
+          />
 
-          <SectionCard>
-            <h2 className="text-xl font-semibold text-slate-950">Manual status control</h2>
-            <form action={updateQuoteStatusAction} className="mt-4 space-y-3">
-              <input name="quoteId" type="hidden" value={detail.id} />
-              <select className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900" defaultValue={detail.status} name="status">
-                {Object.values(QuoteStatus).map((status) => (
-                  <option key={status} value={status}>
-                    {quoteStatusLabels[status]}
-                  </option>
-                ))}
-              </select>
-              <textarea className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" name="note" placeholder="Optional note for the audit trail" />
-              <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="submit">
-                Update quote status
-              </button>
-            </form>
-          </SectionCard>
+          <QuoteStatusControlCard quoteId={detail.id} status={detail.status} />
 
           <SectionCard>
             <h2 className="text-xl font-semibold text-slate-950">Convert to work</h2>
@@ -428,7 +309,7 @@ export default async function QuoteDetailPage({
             <form action={convertQuoteAction} className="mt-4">
               <input name="quoteId" type="hidden" value={detail.id} />
               <button
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40"
+                className="pressable pressable-filled inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40"
                 disabled={detail.effectiveStatus !== "approved" || Boolean(detail.convertedInspectionId)}
                 type="submit"
               >

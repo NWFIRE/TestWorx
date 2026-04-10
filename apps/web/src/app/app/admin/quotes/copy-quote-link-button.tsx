@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/app/toast-provider";
+import { ActionButton } from "@/app/action-button";
 
 export function CopyQuoteLinkButton({
   href
@@ -8,24 +10,23 @@ export function CopyQuoteLinkButton({
   href: string;
 }) {
   const [copied, setCopied] = useState(false);
+  const { showToast } = useToast();
 
   async function handleCopy() {
     try {
       await navigator.clipboard.writeText(href);
       setCopied(true);
+      showToast({ title: "Hosted quote link copied", tone: "success" });
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
       setCopied(false);
+      showToast({ title: "Unable to copy link", tone: "error" });
     }
   }
 
   return (
-    <button
-      className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-      onClick={handleCopy}
-      type="button"
-    >
+    <ActionButton onClick={handleCopy}>
       {copied ? "Link copied" : "Copy hosted link"}
-    </button>
+    </ActionButton>
   );
 }

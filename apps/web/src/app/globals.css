@@ -28,6 +28,35 @@ body {
   overflow-x: hidden;
 }
 
+@keyframes brand-loader-spin {
+  from {
+    transform: rotate(0deg) scale(0.98);
+    opacity: 0.92;
+  }
+
+  50% {
+    transform: rotate(180deg) scale(1);
+    opacity: 1;
+  }
+
+  to {
+    transform: rotate(360deg) scale(0.98);
+    opacity: 0.92;
+  }
+}
+
+@keyframes toast-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @layer components {
   .pressable,
   .pressable-icon,
@@ -113,6 +142,15 @@ body {
   .link-brand {
     color: var(--tenant-primary);
   }
+
+  .brand-loader-mark {
+    animation: brand-loader-spin 900ms linear infinite;
+    transform-origin: center;
+  }
+
+  .toast-card {
+    animation: toast-fade-in 180ms ease-out;
+  }
 }
 
 @keyframes login-fade-up {
@@ -163,6 +201,11 @@ body {
   .login-fade-up-delay-1,
   .login-fade-up-delay-2 {
     opacity: 1;
+    animation: none;
+  }
+
+  .brand-loader-mark,
+  .toast-card {
     animation: none;
   }
 }

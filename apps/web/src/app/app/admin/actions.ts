@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 
 import { auth } from "@/auth";
@@ -18,6 +17,7 @@ import {
   customInspectionSiteOptionValue,
   ensureGenericInspectionSite,
   genericInspectionSiteOptionValue,
+  getAdminBillingSummaryDetail,
   getCustomerSiteImportTemplateCsv,
   uploadInspectionDocument,
   parseCreateInspectionFormData,
@@ -533,7 +533,7 @@ export async function updateBillingSummaryStatusAction(formData: FormData) {
   const status = String(formData.get("status") ?? "") as "draft" | "reviewed" | "invoiced";
   const inspectionId = String(formData.get("inspectionId") ?? "");
   if (!session?.user?.tenantId || !summaryId || !status || !inspectionId) {
-    return;
+    return { ok: false, error: "Unauthorized", message: null, detail: null };
   }
 
   await updateBillingSummaryStatus(
@@ -545,7 +545,18 @@ export async function updateBillingSummaryStatusAction(formData: FormData) {
   revalidatePath("/app/admin");
   revalidatePath("/app/admin/billing");
   revalidatePath(`/app/admin/billing/${inspectionId}`);
-  redirect(`/app/admin/billing/${inspectionId}?billing=${encodeURIComponent(`Billing summary marked ${status.replaceAll("_", " ")}.`)}`);
+
+  const detail = await getAdminBillingSummaryDetail(
+    { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+    inspectionId
+  );
+
+  return {
+    ok: true,
+    error: null,
+    message: `Billing summary marked ${status.replaceAll("_", " ")}.`,
+    detail
+  };
 }
 
 export async function updateBillingSummaryNotesAction(formData: FormData) {
@@ -751,7 +762,7 @@ export async function syncBillingSummaryToQuickBooksAction(formData: FormData) {
   const session = await auth();
   const inspectionId = String(formData.get("inspectionId") ?? "");
   if (!session?.user?.tenantId || !inspectionId) {
-    return;
+    return { ok: false, error: "Unauthorized", message: null, detail: null };
   }
 
   try {
@@ -763,21 +774,37 @@ export async function syncBillingSummaryToQuickBooksAction(formData: FormData) {
     revalidatePath("/app/admin");
     revalidatePath("/app/admin/billing");
     revalidatePath(`/app/admin/billing/${inspectionId}`);
-    const quickbooksNotice = result.quickbooksSendStatus === "sent"
-      ? "sent"
+
+    const detail = await getAdminBillingSummaryDetail(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      inspectionId
+    );
+
+    const message = result.quickbooksSendStatus === "sent"
+      ? "Invoice synced and sent from QuickBooks."
       : result.quickbooksSendStatus === "send_skipped"
-        ? encodeURIComponent(result.quickbooksSendError ?? "Invoice synced to QuickBooks, but email send was skipped.")
+        ? result.quickbooksSendError ?? "Invoice synced to QuickBooks, but email send was skipped."
         : result.quickbooksSendStatus === "send_failed"
-          ? encodeURIComponent(result.quickbooksSendError ?? "Invoice synced to QuickBooks, but email send failed.")
-          : "success";
-    redirect(`/app/admin/billing/${inspectionId}?quickbooks=${quickbooksNotice}`);
+          ? result.quickbooksSendError ?? "Invoice synced to QuickBooks, but email send failed."
+          : "Invoice synced to QuickBooks.";
+
+    return {
+      ok: true,
+      error: null,
+      message,
+      detail
+    };
   } catch (error) {
     if (isRedirectError(error)) {
       throw error;
     }
 
-    const message = error instanceof Error ? error.message : "QuickBooks sync failed.";
-    redirect(`/app/admin/billing/${inspectionId}?quickbooks=${encodeURIComponent(message)}`);
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "QuickBooks sync failed.",
+      message: null,
+      detail: null
+    };
   }
 }
 
@@ -785,7 +812,7 @@ export async function sendQuickBooksInvoiceAction(formData: FormData) {
   const session = await auth();
   const inspectionId = String(formData.get("inspectionId") ?? "");
   if (!session?.user?.tenantId || !inspectionId) {
-    return;
+    return { ok: false, error: "Unauthorized", message: null, detail: null };
   }
 
   try {
@@ -797,16 +824,28 @@ export async function sendQuickBooksInvoiceAction(formData: FormData) {
     revalidatePath("/app/admin");
     revalidatePath("/app/admin/billing");
     revalidatePath(`/app/admin/billing/${inspectionId}`);
-    const quickbooksNotice = result.sendStatus === "sent"
-      ? "sent"
-      : encodeURIComponent(result.error ?? "QuickBooks email send was skipped.");
-    redirect(`/app/admin/billing/${inspectionId}?quickbooks=${quickbooksNotice}`);
+
+    const detail = await getAdminBillingSummaryDetail(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      inspectionId
+    );
+
+    return {
+      ok: true,
+      error: null,
+      message: result.sendStatus === "sent" ? "Invoice sent from QuickBooks." : result.error ?? "QuickBooks email send was skipped.",
+      detail
+    };
   } catch (error) {
     if (isRedirectError(error)) {
       throw error;
     }
 
-    const message = error instanceof Error ? error.message : "QuickBooks send failed.";
-    redirect(`/app/admin/billing/${inspectionId}?quickbooks=${encodeURIComponent(message)}`);
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "QuickBooks send failed.",
+      message: null,
+      detail: null
+    };
   }
 }
