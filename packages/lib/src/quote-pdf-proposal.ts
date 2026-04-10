@@ -489,7 +489,33 @@ function renderProposalHero(
 
   const leftWidth = 334;
   const rightWidth = CONTENT_WIDTH - leftWidth - 16;
-  const heroHeight = 158;
+  const leftBodyHeight =
+    24 +
+    11 +
+    18 +
+    15 +
+    18 +
+    measureTextHeight(
+      regularFont,
+      "This proposal includes the scoped work, customer-facing pricing, and project terms needed for review and approval.",
+      leftWidth - CARD_PADDING * 2,
+      9.5
+    );
+  const rightBodyHeight =
+    22 +
+    8 +
+    34 +
+    22 +
+    9.5 +
+    18 +
+    measureTextHeight(
+      regularFont,
+      "Review the proposal details below. Once approved, work can move into scheduling and delivery.",
+      rightWidth - CARD_PADDING * 2,
+      8.5,
+      3
+    );
+  const heroHeight = Math.max(176, CARD_PADDING * 2 + leftBodyHeight, CARD_PADDING * 2 + rightBodyHeight);
 
   drawPanel(state.page, PAGE_MARGIN, state.cursorY, leftWidth, heroHeight, theme.panel, theme.line);
   drawPanel(state.page, PAGE_MARGIN + leftWidth + 16, state.cursorY, rightWidth, heroHeight, theme.primary, theme.primary);
@@ -602,7 +628,23 @@ function renderSummaryAndTotals(
   }));
   const summaryHeight =
     22 + summaryRows.reduce((sum, row) => sum + row.height, 0) + Math.max(0, summaryRows.length - 1) * 10;
-  const totalCardHeight = 180;
+  const pricingSummaryTextHeight = measureTextHeight(
+    regularFont,
+    "A clean view of subtotal, tax, and final proposal total.",
+    totalWidth - CARD_PADDING * 2,
+    8.5
+  );
+  const totalsRowsHeight = 22 + 22;
+  const proposalTotalBoxHeight = 58;
+  const totalCardHeight =
+    20 +
+    18 +
+    pricingSummaryTextHeight +
+    22 +
+    totalsRowsHeight +
+    18 +
+    proposalTotalBoxHeight +
+    20;
   const blockHeight = Math.max(summaryHeight, totalCardHeight);
 
   drawPanel(state.page, PAGE_MARGIN, state.cursorY, summaryWidth, blockHeight, theme.paper, theme.line);
@@ -664,7 +706,7 @@ function renderSummaryAndTotals(
 
   const totalsX = PAGE_MARGIN + summaryWidth + 16 + CARD_PADDING;
   const totalsWidth = totalWidth - CARD_PADDING * 2;
-  let rowY = state.cursorY - 72;
+  let rowY = state.cursorY - 78;
   for (const [label, value] of [
     ["Subtotal", formatMoney(input.quote.subtotal)],
     ["Tax", formatMoney(input.quote.taxAmount)]
@@ -687,10 +729,11 @@ function renderSummaryAndTotals(
   }
 
   drawDivider(state.page, totalsX, rowY - 2, totalsWidth, theme.line);
-  drawPanel(state.page, totalsX, rowY - 14, totalsWidth, 58, theme.paper, theme.line);
+  const proposalTotalTop = rowY - 18;
+  drawPanel(state.page, totalsX, proposalTotalTop, totalsWidth, proposalTotalBoxHeight, theme.paper, theme.line);
   state.page.drawText("Proposal Total", {
     x: totalsX + 14,
-    y: rowY - 34,
+    y: proposalTotalTop - 28,
     size: 10.5,
     font: boldFont,
     color: theme.heading
@@ -698,7 +741,7 @@ function renderSummaryAndTotals(
   const totalValue = formatMoney(input.quote.total);
   state.page.drawText(totalValue, {
     x: totalsX + totalsWidth - 14 - boldFont.widthOfTextAtSize(totalValue, 15),
-    y: rowY - 38,
+    y: proposalTotalTop - 32,
     size: 15,
     font: boldFont,
     color: theme.heading
