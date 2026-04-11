@@ -120,6 +120,7 @@ export default async function QuoteDetailPage({
               siteId: detail.siteId ?? "",
               contactName: detail.contactName ?? "",
               recipientEmail: detail.recipientEmail ?? "",
+              proposalType: detail.proposalType ?? "",
               issuedAt: detail.issuedAt.toISOString().slice(0, 10),
               expiresAt: detail.expiresAt ? detail.expiresAt.toISOString().slice(0, 10) : "",
               internalNotes: detail.internalNotes ?? "",
@@ -139,6 +140,7 @@ export default async function QuoteDetailPage({
               }))
             }}
             quoteId={detail.id}
+            proposalTypes={detail.formOptions.proposalTypes}
             sites={detail.formOptions.sites}
             submitLabel="Save quote updates"
             submitPendingLabel="Saving..."

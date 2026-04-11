@@ -157,6 +157,29 @@ const inspectionQuoteCatalog = [
 
 export const quoteCatalog = inspectionQuoteCatalog;
 const quickBooksQuoteCodePrefix = "QBO_ITEM:";
+export const quoteProposalTypeValues = [
+  "fire_alarm",
+  "fire_sprinkler",
+  "kitchen_suppression",
+  "fire_extinguisher",
+  "industrial_suppression",
+  "emergency_exit_lighting",
+  "general_fire_protection"
+] as const;
+export type QuoteProposalType = (typeof quoteProposalTypeValues)[number];
+export const quoteProposalTypeLabels: Record<QuoteProposalType, string> = {
+  fire_alarm: "Fire Alarm System",
+  fire_sprinkler: "Fire Sprinkler System",
+  kitchen_suppression: "Kitchen Suppression System",
+  fire_extinguisher: "Fire Extinguisher Service",
+  industrial_suppression: "Industrial Suppression System",
+  emergency_exit_lighting: "Emergency and Exit Lighting",
+  general_fire_protection: "General Fire Protection"
+};
+export const quoteProposalTypes = quoteProposalTypeValues.map((value) => ({
+  value,
+  label: quoteProposalTypeLabels[value]
+}));
 
 export const quoteLineItemInputSchema = z.object({
   id: z.string().trim().optional(),
@@ -177,6 +200,7 @@ export const quoteInputSchema = z.object({
   siteId: z.string().trim().optional().nullable(),
   contactName: z.string().trim().max(160).optional().nullable(),
   recipientEmail: z.string().trim().email("Enter a valid recipient email.").optional().nullable(),
+  proposalType: z.enum(quoteProposalTypeValues).optional().nullable(),
   issuedAt: z.coerce.date(),
   expiresAt: z.union([z.coerce.date(), z.null()]).optional().nullable(),
   internalNotes: z.string().trim().max(4000).optional().nullable(),
@@ -981,6 +1005,7 @@ export async function getQuoteFormOptions(actor: ActorContext) {
   return {
     customers,
     sites,
+    proposalTypes: quoteProposalTypes,
     catalog: [
       ...quoteCatalog.map((item) => ({
         ...item,
@@ -1059,6 +1084,7 @@ export async function createQuote(actor: ActorContext, input: QuoteInput) {
       siteId: normalizeNullableString(parsedInput.siteId),
       contactName: normalizeNullableString(parsedInput.contactName),
       recipientEmail: normalizeNullableString(parsedInput.recipientEmail),
+      proposalType: parsedInput.proposalType ?? null,
       issuedAt: parsedInput.issuedAt,
       expiresAt,
       status: QuoteStatus.draft,
@@ -1118,6 +1144,7 @@ export async function updateQuote(actor: ActorContext, quoteId: string, input: Q
       siteId: normalizeNullableString(parsedInput.siteId),
       contactName: normalizeNullableString(parsedInput.contactName),
       recipientEmail: normalizeNullableString(parsedInput.recipientEmail),
+      proposalType: parsedInput.proposalType ?? null,
       issuedAt: parsedInput.issuedAt,
       expiresAt,
       subtotal: totals.subtotal,
@@ -1566,6 +1593,7 @@ export async function getAuthorizedQuotePdf(actor: ActorContext, quoteId: string
     quote: {
       quoteNumber: quote.quoteNumber,
       recipientEmail: quote.recipientEmail,
+      proposalType: quote.proposalType,
       issuedAt: quote.issuedAt,
       expiresAt: quote.expiresAt,
       status: quote.status,
@@ -2568,6 +2596,7 @@ export async function getPublicQuotePdfByAccessToken(token: string) {
     quote: {
       quoteNumber: quote.quoteNumber,
       recipientEmail: quote.recipientEmail,
+      proposalType: quote.proposalType,
       issuedAt: quote.issuedAt,
       expiresAt: quote.expiresAt,
       status: quote.status,

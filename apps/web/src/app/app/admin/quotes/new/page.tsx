@@ -51,6 +51,7 @@ export default async function NewQuotePage({
           siteId: "",
           contactName: "",
           recipientEmail: "",
+          proposalType: "",
           issuedAt: new Date().toISOString().slice(0, 10),
           expiresAt: addDays(new Date(), DEFAULT_QUOTE_EXPIRATION_DAYS).toISOString().slice(0, 10),
           internalNotes: "",
@@ -70,6 +71,7 @@ export default async function NewQuotePage({
             }
           ]
         }}
+        proposalTypes={options.proposalTypes}
         sites={options.sites}
         submitLabel="Save draft quote"
       />

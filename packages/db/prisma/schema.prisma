@@ -420,6 +420,7 @@ model Quote {
   siteId                  String?
   contactName             String?
   recipientEmail          String?
+  proposalType            String?
   status                  QuoteStatus         @default(draft)
   syncStatus              QuoteSyncStatus     @default(not_synced)
   deliveryStatus          QuoteDeliveryStatus @default(not_sent)

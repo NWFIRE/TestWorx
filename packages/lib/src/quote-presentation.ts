@@ -9,6 +9,16 @@ type QuotePresentationLineItemInput = {
   id?: string;
 };
 
+const quoteProposalTypeLabels = {
+  fire_alarm: "Fire Alarm System",
+  fire_sprinkler: "Fire Sprinkler System",
+  kitchen_suppression: "Kitchen Suppression System",
+  fire_extinguisher: "Fire Extinguisher Service",
+  industrial_suppression: "Industrial Suppression System",
+  emergency_exit_lighting: "Emergency and Exit Lighting",
+  general_fire_protection: "General Fire Protection"
+} as const;
+
 export type QuotePresentationLineItem = {
   id?: string;
   title: string;
@@ -135,8 +145,19 @@ function inferProposalAction(lineItems: QuotePresentationLineItemInput[]) {
   return "Proposal";
 }
 
-export function buildQuoteProjectSummary(lineItems: QuotePresentationLineItemInput[]) {
-  const domain = inferProposalDomain(lineItems);
+function resolveProposalDomain(
+  lineItems: QuotePresentationLineItemInput[],
+  proposalType?: string | null
+) {
+  const explicit = proposalType ? quoteProposalTypeLabels[proposalType as keyof typeof quoteProposalTypeLabels] : null;
+  return explicit ?? inferProposalDomain(lineItems);
+}
+
+export function buildQuoteProjectSummary(
+  lineItems: QuotePresentationLineItemInput[],
+  proposalType?: string | null
+) {
+  const domain = resolveProposalDomain(lineItems, proposalType);
   const action = inferProposalAction(lineItems);
   return action === "Proposal" ? domain : `${domain} ${action}`;
 }

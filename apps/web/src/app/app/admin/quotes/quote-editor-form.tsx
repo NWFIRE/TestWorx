@@ -32,6 +32,11 @@ type SiteOption = {
   customerCompanyId: string;
 };
 
+type QuoteProposalTypeOption = {
+  value: string;
+  label: string;
+};
+
 type QuoteLineValue = {
   id?: string;
   internalCode: string;
@@ -50,6 +55,7 @@ type QuoteFormValue = {
   siteId: string;
   contactName: string;
   recipientEmail: string;
+  proposalType: string;
   issuedAt: string;
   expiresAt: string;
   internalNotes: string;
@@ -86,6 +92,7 @@ export function QuoteEditorForm({
   customers,
   sites,
   catalog,
+  proposalTypes,
   initialValue,
   quoteId,
   onResult
@@ -96,6 +103,7 @@ export function QuoteEditorForm({
   customers: CustomerOption[];
   sites: SiteOption[];
   catalog: QuoteCatalogItem[];
+  proposalTypes: QuoteProposalTypeOption[];
   initialValue: QuoteFormValue;
   quoteId?: string;
   onResult?: (result: unknown) => void;
@@ -233,6 +241,23 @@ export function QuoteEditorForm({
                 type="email"
                 value={value.recipientEmail}
               />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-slate-700">Quote type</span>
+              <select
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
+                name="proposalType"
+                onChange={(event) => setValue((current) => ({ ...current, proposalType: event.target.value }))}
+                value={value.proposalType}
+              >
+                <option value="">Auto-detect from line items</option>
+                {proposalTypes.map((proposalType) => (
+                  <option key={proposalType.value} value={proposalType.value}>
+                    {proposalType.label}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label className="block">

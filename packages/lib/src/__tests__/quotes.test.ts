@@ -181,6 +181,7 @@ describe("quotes", () => {
         siteId: "site_1",
         contactName: "Alyssa Reed",
         recipientEmail: "alyssa@example.com",
+        proposalType: "kitchen_suppression",
         issuedAt: new Date("2026-04-06T12:00:00.000Z"),
         expiresAt: new Date("2026-04-30T12:00:00.000Z"),
         internalNotes: "Internal note",
@@ -208,6 +209,7 @@ describe("quotes", () => {
         status: QuoteStatus.draft,
         syncStatus: QuoteSyncStatus.not_synced,
         deliveryStatus: QuoteDeliveryStatus.not_sent,
+        proposalType: "kitchen_suppression",
         subtotal: 105,
         total: 115,
         lineItems: {
@@ -488,6 +490,11 @@ describe("quotes", () => {
           quickbooksItemId: "qb_service_1",
           unitPrice: 185
         })
+      ])
+    );
+    expect(result.proposalTypes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ value: "kitchen_suppression", label: "Kitchen Suppression System" })
       ])
     );
   });

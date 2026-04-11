@@ -18,6 +18,7 @@ export type QuotePdfInput = {
   quote: {
     quoteNumber: string;
     recipientEmail: string | null;
+    proposalType?: string | null;
     issuedAt: Date;
     expiresAt: Date | null;
     status: string;
@@ -482,7 +483,7 @@ function renderProposalHero(
   regularFont: PDFFont
 ) {
   const status = getStatusPresentation(theme, input.quote.status);
-  const summaryLine = buildQuoteProjectSummary(input.lineItems);
+  const summaryLine = buildQuoteProjectSummary(input.lineItems, input.quote.proposalType);
   const customerLine = input.site?.name
     ? `${input.customerCompany.name} · ${input.site.name}`
     : input.customerCompany.name;
@@ -630,7 +631,7 @@ function renderSummaryAndTotals(
     22 + summaryRows.reduce((sum, row) => sum + row.height, 0) + Math.max(0, summaryRows.length - 1) * 10;
   const pricingSummaryTextHeight = 0;
   const totalsRowsHeight = 22 + 22;
-  const proposalTotalBoxHeight = 58;
+  const proposalTotalBoxHeight = 72;
   const totalCardHeight =
     20 +
     18 +
@@ -717,11 +718,11 @@ function renderSummaryAndTotals(
   }
 
   drawDivider(state.page, totalsX, rowY - 2, totalsWidth, theme.line);
-  const proposalTotalTop = rowY - 18;
+  const proposalTotalTop = rowY - 20;
   drawPanel(state.page, totalsX, proposalTotalTop, totalsWidth, proposalTotalBoxHeight, theme.paper, theme.line);
   state.page.drawText("Proposal Total", {
     x: totalsX + 14,
-    y: proposalTotalTop - 28,
+    y: proposalTotalTop - 22,
     size: 10.5,
     font: boldFont,
     color: theme.heading
@@ -729,7 +730,7 @@ function renderSummaryAndTotals(
   const totalValue = formatMoney(input.quote.total);
   state.page.drawText(totalValue, {
     x: totalsX + totalsWidth - 14 - boldFont.widthOfTextAtSize(totalValue, 15),
-    y: proposalTotalTop - 32,
+    y: proposalTotalTop - 46,
     size: 15,
     font: boldFont,
     color: theme.heading
@@ -1200,6 +1201,7 @@ export async function generateProposalQuotePdf(input: QuotePdfInput) {
   let state = addPage(pdfDoc, 1, theme, branding, input.quote, boldFont, regularFont, logo);
   renderProposalHero(state, input, theme, boldFont, regularFont);
   renderSummaryAndTotals(state, input, theme, boldFont, regularFont);
+  state = addPage(pdfDoc, state.pageNumber + 1, theme, branding, input.quote, boldFont, regularFont, logo);
   renderPricingTable(state, input, theme, boldFont, regularFont, pdfDoc, branding, logo);
   renderTerms(state, input, theme, boldFont, regularFont, pdfDoc, branding, logo);
   renderApproval(state, input, theme, boldFont, regularFont, pdfDoc, branding, logo);

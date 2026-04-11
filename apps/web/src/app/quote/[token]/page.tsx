@@ -165,7 +165,7 @@ export default async function HostedQuotePage({
   ].filter(Boolean).join(", ");
   const customerFacingLineItems = buildQuotePresentationLineItems(quote.lineItems);
   const groupedLineItems = groupQuotePresentationLineItems(customerFacingLineItems);
-  const summaryLine = buildQuoteProjectSummary(quote.lineItems);
+  const summaryLine = buildQuoteProjectSummary(quote.lineItems, quote.proposalType);
   const actionMessage = quote.canRespond
     ? "Please review the proposal details below before approving. A 30% deposit is required before planning, engineering, or design submittals begin."
     : result.accessState === "approved"
