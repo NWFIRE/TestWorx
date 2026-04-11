@@ -259,8 +259,8 @@ function getStatusPresentation(theme: Theme, status: string) {
   if (normalized === "approved") {
     return { label: "Approved", fill: theme.successPanel, text: theme.successText };
   }
-  if (normalized === "sent" || normalized === "viewed") {
-    return { label: normalized === "viewed" ? "Viewed" : "Sent", fill: theme.accentPanel, text: theme.accentText };
+  if (normalized === "sent") {
+    return { label: "Sent", fill: theme.accentPanel, text: theme.accentText };
   }
   if (normalized === "expired" || normalized === "declined" || normalized === "cancelled") {
     return {
@@ -628,12 +628,7 @@ function renderSummaryAndTotals(
   }));
   const summaryHeight =
     22 + summaryRows.reduce((sum, row) => sum + row.height, 0) + Math.max(0, summaryRows.length - 1) * 10;
-  const pricingSummaryTextHeight = measureTextHeight(
-    regularFont,
-    "A clean view of subtotal, tax, and final proposal total.",
-    totalWidth - CARD_PADDING * 2,
-    8.5
-  );
+  const pricingSummaryTextHeight = 0;
   const totalsRowsHeight = 22 + 22;
   const proposalTotalBoxHeight = 58;
   const totalCardHeight =
@@ -696,17 +691,10 @@ function renderSummaryAndTotals(
     font: boldFont,
     color: theme.heading
   });
-  state.page.drawText("A clean view of subtotal, tax, and final proposal total.", {
-    x: PAGE_MARGIN + summaryWidth + 16 + CARD_PADDING,
-    y: state.cursorY - 38,
-    size: 8.5,
-    font: regularFont,
-    color: theme.muted
-  });
 
   const totalsX = PAGE_MARGIN + summaryWidth + 16 + CARD_PADDING;
   const totalsWidth = totalWidth - CARD_PADDING * 2;
-  let rowY = state.cursorY - 78;
+  let rowY = state.cursorY - 58;
   for (const [label, value] of [
     ["Subtotal", formatMoney(input.quote.subtotal)],
     ["Tax", formatMoney(input.quote.taxAmount)]
@@ -797,7 +785,7 @@ function renderPricingTable(
   drawSectionHeader(
     state,
     "Scope & Pricing",
-    "This proposal includes the labor, materials, and services listed below.",
+    null,
     theme,
     boldFont,
     regularFont
@@ -990,7 +978,7 @@ function renderTerms(
   drawSectionHeader(
     state,
     terms.title,
-    "Project scope boundaries, commercial assumptions, and approval expectations.",
+    null,
     theme,
     boldFont,
     regularFont
