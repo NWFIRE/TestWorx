@@ -1203,6 +1203,7 @@ export async function generateProposalQuotePdf(input: QuotePdfInput) {
   renderSummaryAndTotals(state, input, theme, boldFont, regularFont);
   state = addPage(pdfDoc, state.pageNumber + 1, theme, branding, input.quote, boldFont, regularFont, logo);
   renderPricingTable(state, input, theme, boldFont, regularFont, pdfDoc, branding, logo);
+  state = addPage(pdfDoc, state.pageNumber + 1, theme, branding, input.quote, boldFont, regularFont, logo);
   renderTerms(state, input, theme, boldFont, regularFont, pdfDoc, branding, logo);
   renderApproval(state, input, theme, boldFont, regularFont, pdfDoc, branding, logo);
 
