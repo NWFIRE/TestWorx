@@ -11,7 +11,7 @@ import { QuoteEditorForm } from "../quote-editor-form";
 export default async function NewQuotePage({
   searchParams
 }: {
-  searchParams?: Promise<{ error?: string }>;
+  searchParams?: Promise<{ error?: string; customerCompanyId?: string; siteId?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -23,6 +23,13 @@ export default async function NewQuotePage({
 
   const params = searchParams ? await searchParams : {};
   const options = await getQuoteFormOptions({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId });
+  const requestedCustomerId = typeof params.customerCompanyId === "string" ? params.customerCompanyId : "";
+  const requestedSiteId = typeof params.siteId === "string" ? params.siteId : "";
+  const resolvedCustomerId = options.customers.some((customer) => customer.id === requestedCustomerId) ? requestedCustomerId : "";
+  const resolvedSiteId = options.sites.some((site) => site.id === requestedSiteId && site.customerCompanyId === resolvedCustomerId)
+    ? requestedSiteId
+    : "";
+  const selectedCustomer = options.customers.find((customer) => customer.id === resolvedCustomerId);
 
   return (
     <AppPageShell>
@@ -42,10 +49,10 @@ export default async function NewQuotePage({
         catalog={options.catalog}
         customers={options.customers}
         initialValue={{
-          customerCompanyId: "",
-          siteId: "",
-          contactName: "",
-          recipientEmail: "",
+          customerCompanyId: resolvedCustomerId,
+          siteId: resolvedSiteId,
+          contactName: selectedCustomer?.contactName ?? "",
+          recipientEmail: selectedCustomer?.billingEmail ?? "",
           proposalType: "",
           issuedAt: new Date().toISOString().slice(0, 10),
           expiresAt: addDays(new Date(), DEFAULT_QUOTE_EXPIRATION_DAYS).toISOString().slice(0, 10),

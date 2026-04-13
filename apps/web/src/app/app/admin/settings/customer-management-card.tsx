@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { KeyboardEvent, ReactNode } from "react";
@@ -544,6 +545,12 @@ export function CustomerManagementCard({
                     {customer.quickbooksCustomerId ? `QuickBooks linked (${customer.quickbooksCustomerId})` : "Not linked to QuickBooks yet"}
                   </p>
                 </div>
+                <Link
+                  className="pressable inline-flex min-h-10 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slateblue transition hover:border-slate-300 hover:bg-slate-50"
+                  href={`/app/admin/clients/${customer.id}`}
+                >
+                  Open profile
+                </Link>
               </div>
               <form action={updateCustomerAction} className="space-y-4">
                 <input name="customerCompanyId" type="hidden" value={customer.id} />

@@ -9,7 +9,11 @@ import { AppPageShell, PageHeader } from "../../operations-ui";
 import { createDirectQuickBooksInvoiceAction } from "../../actions";
 import { DirectInvoiceForm } from "./direct-invoice-form";
 
-export default async function CreateBillingInvoicePage() {
+export default async function CreateBillingInvoicePage({
+  searchParams
+}: {
+  searchParams?: Promise<{ customerCompanyId?: string }>;
+}) {
   const session = await auth();
   if (!session?.user?.tenantId) {
     redirect("/login");
@@ -18,11 +22,14 @@ export default async function CreateBillingInvoicePage() {
     redirect("/app/admin/billing");
   }
 
+  const params = searchParams ? await searchParams : {};
   const options = await getQuickBooksDirectInvoiceFormOptions({
     userId: session.user.id,
     role: session.user.role,
     tenantId: session.user.tenantId
   });
+  const requestedCustomerId = typeof params.customerCompanyId === "string" ? params.customerCompanyId : "";
+  const resolvedCustomerId = options.customers.some((customer) => customer.id === requestedCustomerId) ? requestedCustomerId : "";
 
   return (
     <AppPageShell density="wide">
@@ -56,7 +63,7 @@ export default async function CreateBillingInvoicePage() {
         customers={options.customers}
         proposalTypes={quoteProposalTypes}
         initialValue={{
-          customerCompanyId: "",
+          customerCompanyId: resolvedCustomerId,
           walkInMode: false,
           walkInCustomerName: "",
           walkInCustomerEmail: "",

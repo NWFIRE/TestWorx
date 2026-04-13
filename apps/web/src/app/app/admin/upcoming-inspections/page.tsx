@@ -41,7 +41,7 @@ function taskDueLabel(task: { dueDate?: Date | null; dueMonth?: string | null })
 export default async function UpcomingInspectionsPage({
   searchParams
 }: {
-  searchParams?: Promise<{ month?: string }>;
+  searchParams?: Promise<{ month?: string; customerCompanyId?: string; siteId?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -65,6 +65,12 @@ export default async function UpcomingInspectionsPage({
       monthsAhead: 6
     }
   );
+  const requestedCustomerId = typeof params.customerCompanyId === "string" ? params.customerCompanyId : "";
+  const requestedSiteId = typeof params.siteId === "string" ? params.siteId : "";
+  const resolvedCustomerId = data.customers.some((customer) => customer.id === requestedCustomerId) ? requestedCustomerId : "";
+  const resolvedSiteId = data.sites.some((site) => site.id === requestedSiteId && site.customerCompanyId === resolvedCustomerId)
+    ? requestedSiteId
+    : "";
 
   return (
     <AppPageShell density="wide">
@@ -246,7 +252,9 @@ export default async function UpcomingInspectionsPage({
             technicians={data.technicians}
             initialValues={{
               inspectionMonth: data.startMonth,
-              scheduledStart: `${data.startMonth}-01T09:00`
+              scheduledStart: `${data.startMonth}-01T09:00`,
+              customerCompanyId: resolvedCustomerId || undefined,
+              siteId: resolvedSiteId || undefined
             }}
             workflowNote="Create a new inspection directly inside the planning month you are reviewing. Service lines can still carry their own due month and assignment details."
             allowDocumentUpload

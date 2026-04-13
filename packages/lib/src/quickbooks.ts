@@ -105,6 +105,22 @@ type QuickBooksInvoiceRecord = {
   docNumber: string | null;
 };
 
+type QuickBooksCustomerInvoiceHistoryEntry = {
+  invoiceId: string;
+  invoiceNumber: string | null;
+  invoiceDate: Date | null;
+  dueDate: Date | null;
+  totalAmount: number;
+  balanceDue: number;
+  paidAmount: number;
+  paymentStatus: "paid" | "partial" | "open" | "overdue";
+  statusLabel: string;
+  memo: string | null;
+  lastUpdatedAt: Date | null;
+  lineItemSummary: string[];
+  invoiceUrl: string;
+};
+
 type QuickBooksCatalogListItem = {
   id: string;
   quickbooksItemId: string;
@@ -895,6 +911,95 @@ async function fetchQuickBooksInvoice(connection: QuickBooksTenantConnection, in
   }
 
   return null;
+}
+
+function readQuickBooksDate(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function readQuickBooksNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function normalizeQuickBooksInvoiceHistoryEntry(
+  invoice: unknown,
+  mode: QuickBooksConnectionMode | null
+): QuickBooksCustomerInvoiceHistoryEntry | null {
+  if (!invoice || typeof invoice !== "object") {
+    return null;
+  }
+
+  const record = invoice as Record<string, unknown>;
+  const id = typeof record.Id === "string" && record.Id.trim() ? record.Id.trim() : null;
+  if (!id) {
+    return null;
+  }
+
+  const invoiceNumber = readQuickBooksDocNumber(invoice);
+  const invoiceDate = readQuickBooksDate(record.TxnDate);
+  const dueDate = readQuickBooksDate(record.DueDate);
+  const totalAmount = readQuickBooksNumber(record.TotalAmt);
+  const balanceDue = readQuickBooksNumber(record.Balance);
+  const paidAmount = Math.max(0, Number((totalAmount - balanceDue).toFixed(2)));
+  const memo =
+    typeof record.PrivateNote === "string" && record.PrivateNote.trim()
+      ? record.PrivateNote.trim()
+      : typeof (record.CustomerMemo as { value?: unknown } | undefined)?.value === "string" &&
+          String((record.CustomerMemo as { value?: unknown }).value).trim()
+        ? String((record.CustomerMemo as { value?: unknown }).value).trim()
+        : null;
+  const lastUpdatedAt = readQuickBooksDate((record.MetaData as { LastUpdatedTime?: unknown } | undefined)?.LastUpdatedTime);
+  const now = new Date();
+  const paymentStatus: QuickBooksCustomerInvoiceHistoryEntry["paymentStatus"] =
+    balanceDue <= 0
+      ? "paid"
+      : balanceDue < totalAmount
+        ? "partial"
+        : dueDate && dueDate.getTime() < now.getTime()
+          ? "overdue"
+          : "open";
+  const statusLabel =
+    paymentStatus === "paid"
+      ? "Paid"
+      : paymentStatus === "partial"
+        ? "Partially paid"
+        : paymentStatus === "overdue"
+          ? "Overdue"
+          : "Open";
+  const lineItemSummary = Array.isArray(record.Line)
+    ? (record.Line as Array<Record<string, unknown>>)
+        .map((line) => (typeof line.Description === "string" ? line.Description.trim() : ""))
+        .filter(Boolean)
+        .slice(0, 4)
+    : [];
+
+  return {
+    invoiceId: id,
+    invoiceNumber,
+    invoiceDate,
+    dueDate,
+    totalAmount,
+    balanceDue,
+    paidAmount,
+    paymentStatus,
+    statusLabel,
+    memo,
+    lastUpdatedAt,
+    lineItemSummary,
+    invoiceUrl: buildQuickBooksInvoiceAppUrl(id, mode)
+  };
 }
 
 async function fetchQuickBooksEstimate(connection: QuickBooksTenantConnection, input: {
@@ -2958,6 +3063,105 @@ export async function getTenantQuickBooksConnectionStatus(actor: ActorContext) {
     },
     connection: status
   };
+}
+
+export async function getQuickBooksCustomerInvoiceHistory(actor: ActorContext, customerCompanyId: string) {
+  const parsedActor = parseActor(actor);
+  if (!canManageQuickBooksSync(parsedActor.role)) {
+    throw new Error("Only administrators can view QuickBooks customer invoice history.");
+  }
+
+  const [tenant, customer] = await Promise.all([
+    getTenantQuickBooksConnection(parsedActor.tenantId as string),
+    prisma.customerCompany.findFirst({
+      where: {
+        id: customerCompanyId,
+        tenantId: parsedActor.tenantId as string
+      },
+      select: {
+        id: true,
+        name: true,
+        quickbooksCustomerId: true
+      }
+    })
+  ]);
+
+  if (!customer) {
+    throw new Error("Customer not found.");
+  }
+
+  const validatedStatus = await validateQuickBooksConnectionStatus(tenant);
+  if (!validatedStatus.status.connected) {
+    return {
+      connection: validatedStatus.status,
+      customerLinked: Boolean(customer.quickbooksCustomerId),
+      customerQuickBooksId: customer.quickbooksCustomerId,
+      invoices: [],
+      lastSyncedAt: null,
+      syncError: validatedStatus.status.guidance ?? validatedStatus.status.validationError
+    };
+  }
+
+  if (!customer.quickbooksCustomerId) {
+    return {
+      connection: validatedStatus.status,
+      customerLinked: false,
+      customerQuickBooksId: null,
+      invoices: [],
+      lastSyncedAt: null,
+      syncError: "This client is not linked to a QuickBooks customer yet."
+    };
+  }
+
+  try {
+    const queryResponse = await quickBooksApiRequest<{ QueryResponse?: { Invoice?: unknown[] } }>(tenant, {
+      path: "/query",
+      searchParams: new URLSearchParams({
+        query: `select * from Invoice where CustomerRef = '${qboQueryEscape(customer.quickbooksCustomerId)}' orderby TxnDate desc startposition 1 maxresults 50`
+      })
+    });
+    const invoices = (queryResponse.QueryResponse?.Invoice ?? [])
+      .map((invoice) => normalizeQuickBooksInvoiceHistoryEntry(invoice, validatedStatus.status.appMode))
+      .filter((invoice): invoice is QuickBooksCustomerInvoiceHistoryEntry => Boolean(invoice))
+      .sort((left, right) => (right.invoiceDate?.getTime() ?? 0) - (left.invoiceDate?.getTime() ?? 0));
+
+    return {
+      connection: validatedStatus.status,
+      customerLinked: true,
+      customerQuickBooksId: customer.quickbooksCustomerId,
+      invoices,
+      lastSyncedAt: new Date(),
+      syncError: null
+    };
+  } catch (error) {
+    const normalizedError = normalizeQuickBooksError({
+      error,
+      fallbackOperation: "customer.invoice_history",
+      connectionMode: tenant.quickbooksConnectionMode
+    });
+    await createQuickBooksFailureAuditLog({
+      tenantId: parsedActor.tenantId as string,
+      actorUserId: parsedActor.userId,
+      action: "quickbooks.customer_invoice_history_failed",
+      operation: normalizedError.operation,
+      message: normalizedError.message,
+      httpStatus: normalizedError.httpStatus,
+      intuitTid: normalizedError.intuitTid,
+      rawBody: normalizedError.rawBody,
+      connectionMode: tenant.quickbooksConnectionMode,
+      entityType: "CustomerCompany",
+      entityId: customerCompanyId
+    });
+
+    return {
+      connection: validatedStatus.status,
+      customerLinked: true,
+      customerQuickBooksId: customer.quickbooksCustomerId,
+      invoices: [],
+      lastSyncedAt: null,
+      syncError: normalizedError.message
+    };
+  }
 }
 
 export async function getQuickBooksDirectInvoiceFormOptions(actor: ActorContext) {
