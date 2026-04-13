@@ -795,9 +795,13 @@ export async function createDirectQuickBooksInvoiceAction(formData: FormData) {
     return {
       ok: true,
       error: null,
-      message: result.sendStatus === "sent"
-        ? "Invoice created and sent from QuickBooks."
-        : "Invoice created in QuickBooks.",
+      message: result.invoiceNumber
+        ? result.sendStatus === "sent"
+          ? `Invoice ${result.invoiceNumber} created and sent from QuickBooks.`
+          : `Invoice ${result.invoiceNumber} created in QuickBooks.`
+        : result.sendStatus === "sent"
+          ? "Invoice created and sent from QuickBooks."
+          : "Invoice created in QuickBooks.",
       invoice: result
     };
   } catch (error) {

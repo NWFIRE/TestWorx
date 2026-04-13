@@ -724,6 +724,8 @@ describe("quickbooks billing sync hardening", () => {
       }
     );
 
+    const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    expect(createInvoiceBody).not.toHaveProperty("DocNumber");
     expect(fetchMock.mock.calls[2]?.[1]?.body).toContain("\"TaxCodeRef\":{\"value\":\"TAX\"}");
     expect(result).toEqual(expect.objectContaining({
       invoiceId: "invoice_direct_1",

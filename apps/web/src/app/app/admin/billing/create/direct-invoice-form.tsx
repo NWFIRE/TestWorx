@@ -381,17 +381,17 @@ export function DirectInvoiceForm({
         <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.04)]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Invoice total</p>
           <p className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-slate-950">{toCurrency(subtotal)}</p>
-          <p className="mt-3 text-sm text-slate-500">This direct invoice creates in QuickBooks immediately and keeps the page stable while it runs.</p>
+          <p className="mt-3 text-sm text-slate-500">QuickBooks assigns the live invoice number at creation time, and TradeWorx shows that assigned number immediately after success.</p>
         </section>
 
         {createdInvoice ? (
           <section className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-6 text-emerald-900 shadow-[0_12px_36px_rgba(16,185,129,0.08)]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700">Created</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700">QuickBooks invoice number</p>
             <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">
-              {createdInvoice.invoiceNumber ?? "QuickBooks invoice created"}
+              {createdInvoice.invoiceNumber ?? "Assigned by QuickBooks"}
             </h3>
             <p className="mt-3 text-sm">
-              Created for {createdInvoice.customerName}.
+              Created in QuickBooks for {createdInvoice.customerName}.
               {createdInvoice.sendStatus === "sent" && createdInvoice.sentTo ? ` Sent to ${createdInvoice.sentTo}.` : ""}
               {createdInvoice.sendError ? ` ${createdInvoice.sendError}` : ""}
             </p>
