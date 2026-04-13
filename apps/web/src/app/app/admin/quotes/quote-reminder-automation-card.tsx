@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { format } from "date-fns";
+import { formatQuoteReminderStage, quoteReminderTypeLabels } from "@testworx/lib";
 
 import { ActionButton } from "@/app/action-button";
 import { useToast } from "@/app/toast-provider";
@@ -89,7 +90,7 @@ export function QuoteReminderAutomationCard({
       <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-600">
         <p><span className="font-semibold text-slate-950">Automation:</span> {state.remindersPausedAt ? "Paused" : state.remindersEnabled ? "Enabled" : "Disabled"}</p>
         <p><span className="font-semibold text-slate-950">Next reminder:</span> {formatDateTime(state.nextReminderAt)}</p>
-        <p><span className="font-semibold text-slate-950">Reminder stage:</span> {state.reminderStage ?? "—"}</p>
+        <p><span className="font-semibold text-slate-950">Reminder stage:</span> {formatQuoteReminderStage(state.reminderStage)}</p>
         <p><span className="font-semibold text-slate-950">Last reminder:</span> {formatDateTime(state.lastReminderAt)}</p>
       </div>
       <div className="mt-4 grid gap-3">
@@ -112,7 +113,7 @@ export function QuoteReminderAutomationCard({
         ) : state.reminderDispatches.map((dispatch) => (
           <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4" key={dispatch.id}>
             <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold text-slate-950">{dispatch.reminderType.replaceAll("_", " ")}</p>
+              <p className="text-sm font-semibold text-slate-950">{quoteReminderTypeLabels[dispatch.reminderType as keyof typeof quoteReminderTypeLabels] ?? dispatch.reminderType.replaceAll("_", " ")}</p>
               <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{dispatch.status}</p>
             </div>
             <p className="mt-1 text-sm text-slate-500">Recipient: {dispatch.recipientEmail ?? "—"}</p>

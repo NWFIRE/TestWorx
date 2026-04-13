@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import {
+  formatQuoteReminderStage,
   getQuoteStatusTone,
   getQuoteWorkspaceData,
   quoteStatusLabels,
@@ -189,9 +190,9 @@ export default async function QuotesPage({
                     </div>
                     <div className="grid gap-3 pt-1 md:grid-cols-4">
                       <p className="text-sm text-slate-600">Reminders: <span className="font-semibold text-slate-950">{formatReminderStatus(quote.reminderStatus)}</span></p>
-                      <p className="text-sm text-slate-600">Next reminder: <span className="font-semibold text-slate-950">{quote.nextReminderAt ? format(quote.nextReminderAt, "MMM d, yyyy") : "â€”"}</span></p>
-                      <p className="text-sm text-slate-600">Last reminder: <span className="font-semibold text-slate-950">{quote.lastReminderAt ? format(quote.lastReminderAt, "MMM d, yyyy") : "â€”"}</span></p>
-                      <p className="text-sm text-slate-600">Reminder stage: <span className="font-semibold capitalize text-slate-950">{quote.reminderStage ? quote.reminderStage.replaceAll("_", " ") : "â€”"}</span></p>
+                      <p className="text-sm text-slate-600">Next reminder: <span className="font-semibold text-slate-950">{quote.nextReminderAt ? format(quote.nextReminderAt, "MMM d, yyyy") : "—"}</span></p>
+                      <p className="text-sm text-slate-600">Last reminder: <span className="font-semibold text-slate-950">{quote.lastReminderAt ? format(quote.lastReminderAt, "MMM d, yyyy") : "—"}</span></p>
+                      <p className="text-sm text-slate-600">Reminder stage: <span className="font-semibold text-slate-950">{formatQuoteReminderStage(quote.reminderStage)}</span></p>
                     </div>
                   </div>
 

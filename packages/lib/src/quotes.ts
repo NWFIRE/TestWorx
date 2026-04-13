@@ -254,6 +254,28 @@ export const quoteReminderTypeLabels = {
   [quoteReminderTypeValues.manual_follow_up]: "Manual follow-up"
 } satisfies Record<QuoteReminderType, string>;
 
+export const quoteReminderStageLabels = {
+  sent_not_viewed_first: "Awaiting first review",
+  sent_not_viewed_second: "Second review follow-up scheduled",
+  viewed_pending_first: "Viewed, awaiting approval",
+  viewed_pending_second: "Approval follow-up scheduled",
+  expiring_soon: "Expiring soon",
+  expired_follow_up: "Expired follow-up scheduled",
+  paused: "Paused",
+  disabled: "Disabled",
+  expired_closed: "Expired"
+} as const satisfies Record<string, string>;
+
+export function formatQuoteReminderStage(stage: string | null | undefined) {
+  const normalized = normalizeNullableString(stage);
+  if (!normalized) {
+    return "—";
+  }
+
+  return quoteReminderStageLabels[normalized as keyof typeof quoteReminderStageLabels]
+    ?? normalized.replaceAll("_", " ").replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
 const quoteReminderTemplateKeys = [
   "sentNotViewed",
   "viewedPending",

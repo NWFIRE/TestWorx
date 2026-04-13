@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import {
+  formatQuoteReminderStage,
   getQuoteDetail,
   getQuoteStatusTone,
   getQuoteSyncTone,
@@ -181,7 +182,7 @@ export default async function QuoteDetailPage({
                   {detail.remindersPausedAt ? "Paused" : !detail.remindersEnabled ? "Disabled" : detail.nextReminderAt ? `Next ${format(detail.nextReminderAt, "MMM d, yyyy h:mm a")}` : "No reminder scheduled"}
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
-                  Stage {detail.reminderStage ?? "—"} • Last sent {detail.lastReminderAt ? format(detail.lastReminderAt, "MMM d, yyyy h:mm a") : "—"} • {detail.reminderCount} reminder{detail.reminderCount === 1 ? "" : "s"}
+                  Stage {formatQuoteReminderStage(detail.reminderStage)} • Last sent {detail.lastReminderAt ? format(detail.lastReminderAt, "MMM d, yyyy h:mm a") : "—"} • {detail.reminderCount} reminder{detail.reminderCount === 1 ? "" : "s"}
                 </p>
               </div>
             </div>
