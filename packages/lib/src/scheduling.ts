@@ -3100,6 +3100,106 @@ export async function getAdminDashboardData(actor: ActorContext) {
   };
 }
 
+function resolvePlanningMonthStart(startMonth?: string | null) {
+  if (startMonth && /^\d{4}-\d{2}$/.test(startMonth)) {
+    const parsed = new Date(`${startMonth}-01T00:00:00`);
+    if (!Number.isNaN(parsed.getTime())) {
+      return startOfMonth(parsed);
+    }
+  }
+
+  return startOfMonth(new Date());
+}
+
+export async function getAdminUpcomingInspectionsData(
+  actor: ActorContext,
+  input?: {
+    startMonth?: string | null;
+    monthsAhead?: number;
+  }
+) {
+  const parsedActor = parseActor(actor);
+  if (!["tenant_admin", "office_admin", "platform_admin"].includes(parsedActor.role)) {
+    throw new Error("Only administrators can access upcoming inspections.");
+  }
+
+  const tenantId = parsedActor.tenantId as string;
+  const monthStart = resolvePlanningMonthStart(input?.startMonth ?? null);
+  const monthsAhead = Math.min(Math.max(input?.monthsAhead ?? 6, 1), 12);
+  const rangeEnd = addMonths(monthStart, monthsAhead);
+
+  const [customers, sites, technicians, inspections] = await Promise.all([
+    prisma.customerCompany.findMany({ where: { tenantId }, orderBy: { name: "asc" } }),
+    prisma.site.findMany({ where: { tenantId }, orderBy: { name: "asc" } }),
+    prisma.user.findMany({ where: { tenantId, role: "technician" }, orderBy: { name: "asc" } }),
+    prisma.inspection.findMany({
+      where: {
+        tenantId,
+        status: { in: [...activeOperationalInspectionStatuses] },
+        scheduledStart: {
+          gte: monthStart,
+          lt: rangeEnd
+        }
+      },
+      include: {
+        site: true,
+        customerCompany: true,
+        assignedTechnician: true,
+        technicianAssignments: { include: { technician: true } },
+        tasks: { include: { recurrence: true, report: true, assignedTechnician: true } }
+      },
+      orderBy: [{ scheduledStart: "asc" }]
+    })
+  ]);
+
+  const mappedInspections = inspections.map((inspection) => ({
+    ...inspection,
+    tasks: withInspectionTaskDisplayLabels(inspection.tasks),
+    ...getInspectionDisplayLabels({
+      siteName: inspection.site.name,
+      customerName: inspection.customerCompany.name
+    }),
+    displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
+    assignedTechnicianNames: formatAssignedTechnicianNames({
+      assignedTechnician: inspection.assignedTechnician,
+      technicianAssignments: readTechnicianNameAssignments(inspection)
+    })
+  }));
+
+  const months = Array.from({ length: monthsAhead }, (_, index) => {
+    const currentMonthStart = addMonths(monthStart, index);
+    const currentMonthEnd = endOfMonth(currentMonthStart);
+    const monthKey = format(currentMonthStart, "yyyy-MM");
+    const monthInspections = mappedInspections.filter(
+      (inspection) => inspection.scheduledStart >= currentMonthStart && inspection.scheduledStart <= currentMonthEnd
+    );
+
+    return {
+      monthKey,
+      monthLabel: format(currentMonthStart, "MMMM yyyy"),
+      inspectionCount: monthInspections.length,
+      priorityCount: monthInspections.filter((inspection) => inspection.isPriority).length,
+      unassignedCount: monthInspections.filter((inspection) => inspection.assignedTechnicianNames.length === 0).length,
+      inspections: monthInspections
+    };
+  });
+
+  return {
+    startMonth: format(monthStart, "yyyy-MM"),
+    monthsAhead,
+    customers: customers.map((customer) => ({ id: customer.id, name: customer.name })),
+    sites: sites.map((site) => ({ id: site.id, name: site.name, city: site.city, customerCompanyId: site.customerCompanyId })),
+    technicians: technicians.map((technician) => ({ id: technician.id, name: technician.name })),
+    summary: {
+      totalUpcomingInspections: mappedInspections.length,
+      priorityInspections: mappedInspections.filter((inspection) => inspection.isPriority).length,
+      unassignedInspections: mappedInspections.filter((inspection) => inspection.assignedTechnicianNames.length === 0).length,
+      monthCount: months.length
+    },
+    months
+  };
+}
+
 export async function getAdminSchedulingQueueData(
   actor: ActorContext,
   input?: {

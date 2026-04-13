@@ -50,6 +50,15 @@ const adminNavItems: AppNavItem[] = [
     tone: "slate"
   },
   {
+    href: "/app/admin/upcoming-inspections",
+    label: "Upcoming Inspections",
+    shortLabel: "Upcoming",
+    abbreviation: "UI",
+    icon: "calendar",
+    description: "Month-by-month planning and future inspection scheduling",
+    tone: "blue"
+  },
+  {
     href: "/app/admin/quotes",
     label: "Quotes",
     shortLabel: "Quotes",

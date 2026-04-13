@@ -158,6 +158,7 @@ export async function createInspectionAction(_: { error: string | null; success:
       );
     }
     revalidatePath("/app/admin");
+    revalidatePath("/app/admin/upcoming-inspections");
     revalidatePath("/app/admin/amendments");
     revalidatePath(`/app/admin/inspections/${inspection.id}`);
     revalidatePath("/app/tech");
