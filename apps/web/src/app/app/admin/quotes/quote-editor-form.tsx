@@ -85,6 +85,16 @@ function toCurrency(value: number) {
   }).format(value || 0);
 }
 
+function formatCatalogOptionLabel(item: QuoteCatalogItem) {
+  if (item.source === "quickbooks") {
+    const typeLabel = item.quickbooksItemType ? ` · ${item.quickbooksItemType}` : "";
+    const priceLabel = item.unitPrice !== null && item.unitPrice !== undefined ? ` · $${item.unitPrice.toFixed(2)}` : "";
+    return `${item.title}${typeLabel}${priceLabel}`;
+  }
+
+  return `${item.title} (${item.code})`;
+}
+
 export function QuoteEditorForm({
   action,
   submitLabel,
@@ -109,6 +119,13 @@ export function QuoteEditorForm({
   onResult?: (result: unknown) => void;
 }) {
   const [value, setValue] = useState<QuoteFormValue>(initialValue);
+  const [catalogQueries, setCatalogQueries] = useState<string[]>(() =>
+    initialValue.lineItems.map((line) => {
+      const matchedCatalogItem = catalog.find((item) => item.code === line.internalCode);
+      return matchedCatalogItem ? formatCatalogOptionLabel(matchedCatalogItem) : line.title;
+    })
+  );
+  const [activeCatalogIndex, setActiveCatalogIndex] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
   const { showToast } = useToast();
 
@@ -141,8 +158,72 @@ export function QuoteEditorForm({
     }));
   }
 
+  function setCatalogQuery(index: number, query: string) {
+    setCatalogQueries((current) => current.map((value, queryIndex) => (queryIndex === index ? query : value)));
+  }
+
+  function appendLine() {
+    setValue((current) => ({ ...current, lineItems: [...current.lineItems, emptyLine()] }));
+    setCatalogQueries((current) => [...current, ""]);
+    setActiveCatalogIndex(value.lineItems.length);
+  }
+
+  function removeLine(index: number) {
+    setValue((current) => ({
+      ...current,
+      lineItems: current.lineItems.filter((_, lineIndex) => lineIndex !== index)
+    }));
+    setCatalogQueries((current) => current.filter((_, queryIndex) => queryIndex !== index));
+    setActiveCatalogIndex((current) => {
+      if (current === null) {
+        return null;
+      }
+      if (current === index) {
+        return null;
+      }
+      return current > index ? current - 1 : current;
+    });
+  }
+
+  function moveLine(index: number, direction: -1 | 1) {
+    setValue((current) => {
+      const swapIndex = index + direction;
+      const next = [...current.lineItems];
+      const currentLine = next[index];
+      const adjacentLine = next[swapIndex];
+      if (!currentLine || !adjacentLine) {
+        return current;
+      }
+      next[index] = adjacentLine;
+      next[swapIndex] = currentLine;
+      return { ...current, lineItems: next };
+    });
+    setCatalogQueries((current) => {
+      const swapIndex = index + direction;
+      const next = [...current];
+      const currentQuery = next[index];
+      const adjacentQuery = next[swapIndex];
+      if (currentQuery === undefined || adjacentQuery === undefined) {
+        return current;
+      }
+      next[index] = adjacentQuery;
+      next[swapIndex] = currentQuery;
+      return next;
+    });
+    setActiveCatalogIndex((current) => {
+      if (current === index) {
+        return index + direction;
+      }
+      if (current === index + direction) {
+        return index;
+      }
+      return current;
+    });
+  }
+
   function applyCatalogSelection(index: number, code: string) {
     const match = catalog.find((item) => item.code === code);
+    setCatalogQuery(index, match ? formatCatalogOptionLabel(match) : "");
     updateLine(index, {
       internalCode: code,
       title: match?.title ?? "",
@@ -151,6 +232,7 @@ export function QuoteEditorForm({
       inspectionType: match?.inspectionType ?? null,
       category: match?.category ?? null
     });
+    setActiveCatalogIndex(null);
   }
 
   return (
@@ -216,7 +298,7 @@ export function QuoteEditorForm({
                 <option value="">No site selected</option>
                 {availableSites.map((site) => (
                   <option key={site.id} value={site.id}>
-                    {site.name}{site.city ? ` — ${site.city}` : ""}
+                    {site.name}{site.city ? ` - ${site.city}` : ""}
                   </option>
                 ))}
               </select>
@@ -285,56 +367,96 @@ export function QuoteEditorForm({
         </section>
 
         <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.04)]">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Line items</h2>
-              <p className="mt-1 text-sm text-slate-500">Choose from internal services or imported QuickBooks products and services, then refine description, pricing, and quantity.</p>
-            </div>
-            <button
-              className="inline-flex min-h-11 items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-              onClick={(event) => {
-                event.preventDefault();
-                setValue((current) => ({ ...current, lineItems: [...current.lineItems, emptyLine()] }));
-              }}
-              type="button"
-            >
-              Add line item
-            </button>
+          <div className="mb-4">
+            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Line items</h2>
+            <p className="mt-1 text-sm text-slate-500">Type to search TradeWorx services and imported QuickBooks products, then refine description, pricing, and quantity.</p>
           </div>
 
           <div className="space-y-4">
             {value.lineItems.map((line, index) => {
               const lineTotal = Math.max(0, line.quantity * line.unitPrice - line.discountAmount);
+              const normalizedQuery = (catalogQueries[index] ?? "").trim().toLowerCase();
+              const filteredCatalog = normalizedQuery.length === 0
+                ? catalog.slice(0, 8)
+                : catalog.filter((item) => {
+                    const haystack = [
+                      item.title,
+                      item.code,
+                      item.description,
+                      item.quickbooksItemType,
+                      item.quickbooksItemId,
+                      item.category,
+                      item.inspectionTypeLabel
+                    ]
+                      .filter(Boolean)
+                      .join(" ")
+                      .toLowerCase();
+                    return haystack.includes(normalizedQuery);
+                  }).slice(0, 8);
+              const showCatalogResults = activeCatalogIndex === index && filteredCatalog.length > 0;
+
               return (
                 <div key={line.id ?? `${line.internalCode}-${index}`} className="rounded-[24px] border border-slate-200/80 bg-slate-50/70 p-4">
                   <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_0.7fr_0.7fr_auto]">
-                    <label className="block">
-                      <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Service code</span>
-                      <select
-                        className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
-                        onChange={(event) => applyCatalogSelection(index, event.target.value)}
-                        value={line.internalCode}
-                      >
-                        <option value="">Select service</option>
-                        <optgroup label="TradeWorx services">
-                          {catalog.filter((item) => item.source !== "quickbooks").map((item) => (
-                            <option key={item.code} value={item.code}>
-                              {item.title} ({item.code})
-                            </option>
+                    <div className="relative">
+                      <label className="block">
+                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Item search</span>
+                        <input
+                          className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
+                          onBlur={() => {
+                            window.setTimeout(() => setActiveCatalogIndex((current) => (current === index ? null : current)), 120);
+                          }}
+                          onChange={(event) => {
+                            const nextQuery = event.target.value;
+                            setCatalogQuery(index, nextQuery);
+                            setActiveCatalogIndex(index);
+
+                            if (!nextQuery.trim()) {
+                              updateLine(index, {
+                                internalCode: "",
+                                inspectionType: null,
+                                category: null
+                              });
+                            }
+                          }}
+                          onFocus={() => setActiveCatalogIndex(index)}
+                          placeholder="Type to search products and services"
+                          value={catalogQueries[index] ?? ""}
+                        />
+                      </label>
+                      {showCatalogResults ? (
+                        <div className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_44px_rgba(15,23,42,0.14)]">
+                          {filteredCatalog.map((item) => (
+                            <button
+                              key={item.code}
+                              className="flex w-full items-start justify-between gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
+                              onMouseDown={(event) => {
+                                event.preventDefault();
+                                applyCatalogSelection(index, item.code);
+                              }}
+                              type="button"
+                            >
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-slate-900">{item.title}</p>
+                                <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                                  {item.source === "quickbooks"
+                                    ? `${item.quickbooksItemType ?? "QuickBooks item"}${item.description ? ` · ${item.description}` : ""}`
+                                    : `${item.code}${item.description ? ` · ${item.description}` : ""}`}
+                                </p>
+                              </div>
+                              <div className="shrink-0 text-right">
+                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                  {item.source === "quickbooks" ? "QuickBooks" : "TradeWorx"}
+                                </p>
+                                {item.unitPrice !== null && item.unitPrice !== undefined ? (
+                                  <p className="mt-1 text-sm font-semibold text-slate-700">{toCurrency(item.unitPrice)}</p>
+                                ) : null}
+                              </div>
+                            </button>
                           ))}
-                        </optgroup>
-                        <optgroup label="QuickBooks products and services">
-                          {catalog.filter((item) => item.source === "quickbooks").map((item) => (
-                            <option key={item.code} value={item.code}>
-                              {item.title}
-                              {item.quickbooksItemType ? ` (${item.quickbooksItemType}` : ""}
-                              {item.unitPrice !== null && item.unitPrice !== undefined ? ` • $${item.unitPrice.toFixed(2)}` : ""}
-                              {item.quickbooksItemType ? ")" : ""}
-                            </option>
-                          ))}
-                        </optgroup>
-                      </select>
-                    </label>
+                        </div>
+                      ) : null}
+                    </div>
 
                     <label className="block">
                       <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Title</span>
@@ -372,10 +494,7 @@ export function QuoteEditorForm({
                         className="inline-flex min-h-11 items-center rounded-2xl border border-rose-200 bg-white px-4 py-3 text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
                         onClick={(event) => {
                           event.preventDefault();
-                          setValue((current) => ({
-                            ...current,
-                            lineItems: current.lineItems.filter((_, lineIndex) => lineIndex !== index)
-                          }));
+                          removeLine(index);
                         }}
                         type="button"
                       >
@@ -425,17 +544,7 @@ export function QuoteEditorForm({
                         disabled={index === 0}
                         onClick={(event) => {
                           event.preventDefault();
-                          setValue((current) => {
-                            const next = [...current.lineItems];
-                            const currentLine = next[index];
-                            const previousLine = next[index - 1];
-                            if (!currentLine || !previousLine) {
-                              return current;
-                            }
-                            next[index - 1] = currentLine;
-                            next[index] = previousLine;
-                            return { ...current, lineItems: next };
-                          });
+                          moveLine(index, -1);
                         }}
                         type="button"
                       >
@@ -446,17 +555,7 @@ export function QuoteEditorForm({
                         disabled={index === value.lineItems.length - 1}
                         onClick={(event) => {
                           event.preventDefault();
-                          setValue((current) => {
-                            const next = [...current.lineItems];
-                            const currentLine = next[index];
-                            const nextLine = next[index + 1];
-                            if (!currentLine || !nextLine) {
-                              return current;
-                            }
-                            next[index] = nextLine;
-                            next[index + 1] = currentLine;
-                            return { ...current, lineItems: next };
-                          });
+                          moveLine(index, 1);
                         }}
                         type="button"
                       >
@@ -469,6 +568,21 @@ export function QuoteEditorForm({
                     <p className="mt-3 text-sm text-slate-500">
                       Converts into operational work as <span className="font-medium text-slate-700">{catalog.find((item) => item.code === line.internalCode)?.inspectionTypeLabel ?? line.inspectionType}</span>.
                     </p>
+                  ) : null}
+
+                  {index === value.lineItems.length - 1 ? (
+                    <div className="mt-4 flex justify-start">
+                      <button
+                        className="inline-flex min-h-11 items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          appendLine();
+                        }}
+                        type="button"
+                      >
+                        Add line item
+                      </button>
+                    </div>
                   ) : null}
                 </div>
               );
