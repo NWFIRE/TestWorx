@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { SearchInput } from "@/app/search-input";
 
 type MatchCandidate = {
   catalogItemId: string;
@@ -35,6 +36,7 @@ const initialSearchState: SearchState = {
 };
 
 const initialActionState: ActionState = { error: null, success: null };
+const LIVE_SEARCH_DEBOUNCE_MS = 250;
 
 function confidenceLabel(confidence: number) {
   if (confidence >= 0.96) {
@@ -129,13 +131,34 @@ export function BillingItemMatchPanel({
   });
   const [linkState, linkFormAction] = useActionState(linkAction, initialActionState);
   const [clearState, clearFormAction] = useActionState(clearAction, initialActionState);
-  const [searchNonce, setSearchNonce] = useState(0);
+  const [searchQuery, setSearchQuery] = useState(itemDescription);
 
   useEffect(() => {
     if (linkState.success || clearState.success) {
       router.refresh();
     }
   }, [clearState.success, linkState.success, router]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      const formData = new FormData();
+      formData.set("summaryId", summaryId);
+      formData.set("itemId", itemId);
+      for (const candidateId of itemIds ?? []) {
+        formData.append("itemIds", candidateId);
+      }
+      formData.set("searchNonce", String(Date.now()));
+      formData.set("query", searchQuery || itemDescription);
+      formData.set("page", "1");
+      searchFormAction(formData);
+    }, LIVE_SEARCH_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [itemDescription, itemId, itemIds, open, searchFormAction, searchQuery, summaryId]);
 
   const results = useMemo(() => {
     if (searchState.hasSearched) {
@@ -178,26 +201,19 @@ export function BillingItemMatchPanel({
 
       {open ? (
         <div className="mt-4 space-y-4">
-          <form action={searchFormAction} className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <form action={searchFormAction} className="grid gap-3">
             <input name="summaryId" type="hidden" value={summaryId} />
             <input name="itemId" type="hidden" value={itemId} />
             {(itemIds ?? []).map((candidateId) => (
               <input key={candidateId} name="itemIds" type="hidden" value={candidateId} />
             ))}
-            <input name="searchNonce" type="hidden" value={searchNonce} />
-            <input
-              className="min-h-11 flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
-              defaultValue={searchState.query || itemDescription}
-              name="query"
+            <input name="searchNonce" type="hidden" value="" />
+            <SearchInput
+              onChange={(event) => setSearchQuery(event.target.value)}
+              onClear={() => setSearchQuery("")}
               placeholder="Search products and services"
+              value={searchQuery}
             />
-            <button
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
-              onClick={() => setSearchNonce((value) => value + 1)}
-              type="submit"
-            >
-              Search
-            </button>
           </form>
 
           {searchState.error ? <p className="text-sm text-rose-600">{searchState.error}</p> : null}

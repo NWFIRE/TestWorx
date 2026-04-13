@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 
 import { ActionButton } from "@/app/action-button";
+import { SearchInput } from "@/app/search-input";
 import { useToast } from "@/app/toast-provider";
 
 type QuoteCatalogItem = {
@@ -401,8 +402,8 @@ export function QuoteEditorForm({
                     <div className="relative">
                       <label className="block">
                         <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Item search</span>
-                        <input
-                          className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
+                        <SearchInput
+                          clearable={false}
                           onBlur={() => {
                             window.setTimeout(() => setActiveCatalogIndex((current) => (current === index ? null : current)), 120);
                           }}

@@ -5,6 +5,7 @@ import { useActionState, useState, useTransition } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import { ActionButton } from "@/app/action-button";
+import { LiveUrlSearchInput } from "@/app/live-url-search-input";
 import { useToast } from "@/app/toast-provider";
 import { buildSettingsHref } from "./settings-query";
 
@@ -141,7 +142,13 @@ export function QuickBooksCatalogManagementCard({
           <div className="grid gap-4 lg:grid-cols-[1.3fr_0.9fr_0.8fr_auto]">
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="qboSearch">Search name, SKU, or QBO item id</label>
-              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={filters.search} id="qboSearch" name="qboSearch" placeholder="FE-ANNUAL or Battery replacement" />
+              <LiveUrlSearchInput
+                id="qboSearch"
+                initialValue={filters.search}
+                paramKey="qboSearch"
+                placeholder="FE-ANNUAL or Battery replacement"
+                resetPageKeys={["qboPage"]}
+              />
             </div>
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="qboType">Item type</label>

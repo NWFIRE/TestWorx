@@ -30,15 +30,18 @@ const templateSections = [
 
 export function QuoteReminderSettingsCard({
   values,
-  action
+  action,
+  embedded = false
 }: {
   values: QuoteReminderSettingsValues;
   action: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
+  embedded?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  const containerClass = embedded ? "space-y-5" : "space-y-5 rounded-[2rem] bg-white p-6 shadow-panel";
 
   return (
-    <form action={formAction} className="space-y-5 rounded-[2rem] bg-white p-6 shadow-panel">
+    <form action={formAction} className={containerClass}>
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Quote reminders</p>
         <h3 className="mt-2 text-2xl font-semibold text-ink">Automated follow-up</h3>

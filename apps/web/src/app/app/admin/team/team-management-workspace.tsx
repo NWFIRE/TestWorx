@@ -3,6 +3,8 @@
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 import { BrandLoader } from "@/app/brand-loader";
+import { LiveUrlSearchInput } from "@/app/live-url-search-input";
+import { SearchInput } from "@/app/search-input";
 import { customerAllowanceKeys, internalAllowanceKeys, type TeamAllowanceMap } from "@testworx/lib";
 
 import {
@@ -587,8 +589,8 @@ function AsyncUserLookupSection({
               <label className="mb-2 block text-sm font-medium text-slate-600">
                 {kind === "internal" ? "Internal Members" : "Portal Users"}
               </label>
-              <input
-                className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slateblue"
+              <SearchInput
+                busy={loading && items.length === 0}
                 onChange={(event) => setQuery(event.target.value)}
                 onFocus={() => {
                   setOpen(true);
@@ -718,7 +720,11 @@ export function TeamManagementWorkspace({
         title="Filters"
       >
         <form className="grid w-full gap-3 lg:grid-cols-[1.5fr_1fr_1fr_auto]" method="get">
-          <input className="rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slateblue" defaultValue={filters.query} name="q" placeholder="Search people, email, customer" />
+          <LiveUrlSearchInput
+            initialValue={filters.query}
+            paramKey="q"
+            placeholder="Search people, email, customer"
+          />
           <select className="rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slateblue" defaultValue={filters.status} name="status">
             <option value="all">All statuses</option>
             <option value="active">Active</option>

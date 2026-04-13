@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import type { KeyboardEvent, ReactNode } from "react";
 
 import { BrandLoader } from "@/app/brand-loader";
+import { SearchInput } from "@/app/search-input";
 
 const initialState = { error: null as string | null, success: null as string | null };
 const paymentTermsOptions = [
@@ -451,7 +452,6 @@ export function CustomerManagementCard({
   const currentQuery = activeQuery;
   const currentPagination = customerPagination;
   const currentCustomers = customerRows;
-  const hasSearch = Boolean(queryInput.trim());
   const summaryLabel = currentQuery
     ? `${currentPagination.totalCount} match${currentPagination.totalCount === 1 ? "" : "es"}`
     : `${currentPagination.totalCount} configured`;
@@ -498,25 +498,15 @@ export function CustomerManagementCard({
           ) : null}
         </div>
 
-        <div className="grid gap-3 rounded-[1.5rem] border border-slate-200 p-4 lg:grid-cols-[1.3fr_auto]">
-          <div className="relative">
-            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-slate-400">Search</span>
-            <input
-              className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-20 pr-4 text-sm text-slate-900 outline-none transition focus:border-slateblue"
-              onChange={(event) => setQueryInput(event.target.value)}
-              onKeyDown={handleSearchKeyDown}
-              placeholder="Search customer name, contact, billing email, or phone"
-              value={queryInput}
-            />
-          </div>
-          <button
-            className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!hasSearch && !currentQuery}
-            onClick={clearSearch}
-            type="button"
-          >
-            Clear
-          </button>
+        <div className="rounded-[1.5rem] border border-slate-200 p-4">
+          <SearchInput
+            busy={isLoadingResults}
+            onChange={(event) => setQueryInput(event.target.value)}
+            onClear={clearSearch}
+            onKeyDown={handleSearchKeyDown}
+            placeholder="Search customer name, contact, billing email, or phone"
+            value={queryInput}
+          />
         </div>
 
         {searchError ? (

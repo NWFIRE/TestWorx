@@ -23,7 +23,9 @@ import {
   SectionCard,
   StatusBadge
 } from "../operations-ui";
+import { LiveUrlSearchInput } from "@/app/live-url-search-input";
 import { QuoteReminderSettingsCard } from "../settings/quote-reminder-settings-card";
+import { SettingsDisclosureCard } from "../settings/settings-disclosure-card";
 import { updateQuoteReminderSettingsAction } from "./actions";
 
 function formatReminderStatus(status: string) {
@@ -137,16 +139,21 @@ export default async function QuotesPage({
         ))}
       </FilterBar>
 
-      <SectionCard>
-        <QuoteReminderSettingsCard action={updateQuoteReminderSettingsAction} values={quoteReminderSettings} />
-      </SectionCard>
+      <SettingsDisclosureCard
+        description="Open the reminder automation settings only when you need to adjust follow-up timing or templates."
+        eyebrow="Quote reminders"
+        openLabel="Open reminder settings"
+        queryKey="quoteRemindersOpen"
+        title="Reminder automation"
+      >
+        <QuoteReminderSettingsCard action={updateQuoteReminderSettingsAction} embedded values={quoteReminderSettings} />
+      </SettingsDisclosureCard>
 
       <SectionCard>
         <form action="/app/admin/quotes" className="grid gap-3 lg:grid-cols-[1.2fr_0.9fr_auto]">
-          <input
-            className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
-            defaultValue={query}
-            name="query"
+          <LiveUrlSearchInput
+            initialValue={query}
+            paramKey="query"
             placeholder="Search quote number, customer, site, or service"
           />
           <select className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900" defaultValue={selectedSync} name="syncStatus">
