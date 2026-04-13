@@ -21,6 +21,7 @@ import { buildQuoteEmailDefaultMessage, buildQuoteEmailSubject } from "./quote-e
 import { getDefaultQuoteExpirationDate } from "./quote-terms";
 import { inspectionTypeRegistry } from "./report-config";
 import { generateQuotePdf } from "./quote-pdf";
+import { resolveServiceFeeForLocationTx } from "./service-fees";
 import {
   resolveQuickBooksItemForBilling,
   saveQuickBooksItemMappingForCode,
@@ -67,6 +68,8 @@ type NormalizedQuoteLineItem = {
   inspectionType: InspectionType | null;
   category: string | null;
 };
+
+type QuoteLineItemDraft = QuoteInput["lineItems"][number];
 
 const inspectionQuoteCatalog = [
   {
@@ -157,6 +160,7 @@ const inspectionQuoteCatalog = [
 
 export const quoteCatalog = inspectionQuoteCatalog;
 const quickBooksQuoteCodePrefix = "QBO_ITEM:";
+const autoQuoteServiceFeeCategory = "service_fee";
 export const quoteProposalTypeValues = [
   "fire_alarm",
   "fire_sprinkler",
@@ -631,6 +635,104 @@ async function normalizeQuoteLineItems(tenantId: string, lineItems: QuoteInput["
   return normalized;
 }
 
+function isAutoManagedQuoteServiceFeeLine(line: QuoteLineItemDraft) {
+  return normalizeNullableString(line.category) === autoQuoteServiceFeeCategory
+    && line.internalCode.trim().toUpperCase().startsWith("SERVICE_FEE");
+}
+
+async function resolveQuoteServiceFeeLocation(input: {
+  tenantId: string;
+  customerCompanyId: string;
+  siteId?: string | null;
+}) {
+  if (input.siteId) {
+    const site = await prisma.site.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        id: input.siteId
+      },
+      select: {
+        id: true,
+        city: true,
+        state: true,
+        postalCode: true
+      }
+    });
+
+    if (site) {
+      return {
+        customerCompanyId: input.customerCompanyId,
+        siteId: site.id,
+        location: {
+          city: site.city,
+          state: site.state,
+          postalCode: site.postalCode
+        }
+      };
+    }
+  }
+
+  const customer = await prisma.customerCompany.findFirst({
+    where: {
+      tenantId: input.tenantId,
+      id: input.customerCompanyId
+    },
+    select: {
+      serviceCity: true,
+      serviceState: true,
+      servicePostalCode: true
+    }
+  });
+
+  return {
+    customerCompanyId: input.customerCompanyId,
+    siteId: null,
+    location: {
+      city: customer?.serviceCity ?? null,
+      state: customer?.serviceState ?? null,
+      postalCode: customer?.servicePostalCode ?? null
+    }
+  };
+}
+
+async function buildQuoteLineItemsForSave(input: {
+  tenantId: string;
+  customerCompanyId: string;
+  siteId?: string | null;
+  lineItems: QuoteInput["lineItems"];
+}) {
+  const baseLineItems = input.lineItems.filter((line) => !isAutoManagedQuoteServiceFeeLine(line));
+  const serviceFeeContext = await resolveQuoteServiceFeeLocation({
+    tenantId: input.tenantId,
+    customerCompanyId: input.customerCompanyId,
+    siteId: input.siteId
+  });
+  const serviceFee = await resolveServiceFeeForLocationTx(prisma, {
+    tenantId: input.tenantId,
+    customerCompanyId: serviceFeeContext.customerCompanyId,
+    siteId: serviceFeeContext.siteId,
+    location: serviceFeeContext.location
+  });
+
+  const quoteLineItems: QuoteInput["lineItems"] = [...baseLineItems];
+
+  if ((serviceFee.unitPrice ?? 0) > 0) {
+    quoteLineItems.push({
+      internalCode: serviceFee.code,
+      title: "Service Fee",
+      description: "Automatically assessed from the selected location.",
+      quantity: 1,
+      unitPrice: serviceFee.unitPrice ?? 0,
+      discountAmount: 0,
+      taxable: false,
+      inspectionType: null,
+      category: autoQuoteServiceFeeCategory
+    });
+  }
+
+  return normalizeQuoteLineItems(input.tenantId, quoteLineItems);
+}
+
 async function buildNextQuoteNumber(tenantId: string) {
   const count = await prisma.quote.count({ where: { tenantId } });
   return `Q-${new Date().getFullYear()}-${String(count + 1).padStart(4, "0")}`;
@@ -1093,7 +1195,12 @@ export async function createQuote(actor: ActorContext, input: QuoteInput) {
   assertAdminRole(parsedActor.role);
   const parsedInput = quoteInputSchema.parse(input);
 
-  const lineItems = await normalizeQuoteLineItems(parsedActor.tenantId as string, parsedInput.lineItems);
+  const lineItems = await buildQuoteLineItemsForSave({
+    tenantId: parsedActor.tenantId as string,
+    customerCompanyId: parsedInput.customerCompanyId,
+    siteId: parsedInput.siteId,
+    lineItems: parsedInput.lineItems
+  });
   const totals = calculateQuoteTotals(lineItems, parsedInput.taxAmount);
   const quoteNumber = await buildNextQuoteNumber(parsedActor.tenantId as string);
   const expiresAt = parsedInput.expiresAt ?? getDefaultQuoteExpirationDate(parsedInput.issuedAt);
@@ -1155,7 +1262,12 @@ export async function updateQuote(actor: ActorContext, quoteId: string, input: Q
     throw new Error("Quote not found.");
   }
 
-  const lineItems = await normalizeQuoteLineItems(parsedActor.tenantId as string, parsedInput.lineItems);
+  const lineItems = await buildQuoteLineItemsForSave({
+    tenantId: parsedActor.tenantId as string,
+    customerCompanyId: parsedInput.customerCompanyId,
+    siteId: parsedInput.siteId,
+    lineItems: parsedInput.lineItems
+  });
   const totals = calculateQuoteTotals(lineItems, parsedInput.taxAmount);
   const expiresAt = parsedInput.expiresAt ?? getDefaultQuoteExpirationDate(parsedInput.issuedAt);
 

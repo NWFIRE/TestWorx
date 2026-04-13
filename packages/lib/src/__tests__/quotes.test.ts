@@ -59,6 +59,10 @@ const { prismaMock, sendQuoteEmailMock, sendQuoteReminderEmailMock, syncQuoteToQ
   generateQuotePdfMock: vi.fn()
 }));
 
+const { resolveServiceFeeForLocationTxMock } = vi.hoisted(() => ({
+  resolveServiceFeeForLocationTxMock: vi.fn()
+}));
+
 vi.mock("@testworx/db", () => ({
   prisma: prismaMock
 }));
@@ -88,6 +92,10 @@ vi.mock("../scheduling", () => ({
 
 vi.mock("../quote-pdf", () => ({
   generateQuotePdf: generateQuotePdfMock
+}));
+
+vi.mock("../service-fees", () => ({
+  resolveServiceFeeForLocationTx: resolveServiceFeeForLocationTxMock
 }));
 
 import {
@@ -158,6 +166,11 @@ describe("quotes", () => {
     saveQuickBooksItemMappingForCodeMock.mockResolvedValue(undefined);
     clearQuickBooksItemMappingForCodeMock.mockResolvedValue(undefined);
     generateQuotePdfMock.mockResolvedValue(new Uint8Array([1, 2, 3]));
+    resolveServiceFeeForLocationTxMock.mockResolvedValue({
+      code: "SERVICE_FEE",
+      unitPrice: null,
+      source: "default"
+    });
     sendQuoteReminderEmailMock.mockResolvedValue({
       sent: true,
       provider: "resend",
@@ -224,6 +237,83 @@ describe("quotes", () => {
       })
     }));
     expect(prismaMock.auditLog.create).toHaveBeenCalled();
+  });
+
+  it("automatically adds the location-based service fee when creating a quote", async () => {
+    prismaMock.quote.count.mockResolvedValue(6);
+    prismaMock.quote.create.mockResolvedValue({
+      id: "quote_4",
+      quoteNumber: "Q-2026-0007"
+    });
+    prismaMock.site.findFirst.mockResolvedValue({
+      id: "site_1",
+      city: "Oklahoma City",
+      state: "OK",
+      postalCode: "73102"
+    });
+    resolveServiceFeeForLocationTxMock.mockResolvedValue({
+      code: "SERVICE_FEE_OKC",
+      unitPrice: 22.5,
+      source: "city_state_rule"
+    });
+
+    await createQuote(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        contactName: "Alyssa Reed",
+        recipientEmail: "alyssa@example.com",
+        issuedAt: new Date("2026-04-06T12:00:00.000Z"),
+        expiresAt: null,
+        internalNotes: null,
+        customerNotes: null,
+        taxAmount: 0,
+        lineItems: [
+          {
+            internalCode: "EXTINGUISHER_ANNUAL",
+            title: "Fire extinguisher annual inspection",
+            description: "Annual field inspection and tagging",
+            quantity: 1,
+            unitPrice: 55,
+            discountAmount: 0,
+            taxable: false,
+            inspectionType: "fire_extinguisher",
+            category: "inspection"
+          }
+        ]
+      }
+    );
+
+    expect(resolveServiceFeeForLocationTxMock).toHaveBeenCalledWith(
+      prismaMock,
+      expect.objectContaining({
+        tenantId: "tenant_1",
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        location: {
+          city: "Oklahoma City",
+          state: "OK",
+          postalCode: "73102"
+        }
+      })
+    );
+    expect(prismaMock.quote.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        subtotal: 77.5,
+        total: 77.5,
+        lineItems: {
+          create: expect.arrayContaining([
+            expect.objectContaining({
+              internalCode: "SERVICE_FEE_OKC",
+              title: "Service Fee",
+              category: "service_fee",
+              unitPrice: 22.5
+            })
+          ])
+        }
+      })
+    }));
   });
 
   it("persists the direct QuickBooks item id when a quote line is selected from the imported catalog", async () => {
