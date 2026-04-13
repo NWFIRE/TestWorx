@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
@@ -30,6 +29,7 @@ export default async function CustomerQuoteDetailPage({
   return (
     <AppPageShell density="wide">
       <PageHeader
+        backNavigation={{ label: "Back to portal", fallbackHref: "/app/customer" }}
         eyebrow="Customer quote"
         title={quote.quoteNumber}
         description="Review quoted work, totals, and the current approval state from one place."
@@ -44,9 +44,6 @@ export default async function CustomerQuoteDetailPage({
                 Open hosted quote
               </a>
             ) : null}
-            <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" href="/app/customer">
-              Back to portal
-            </Link>
           </>
         }
       />

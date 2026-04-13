@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { getCustomerInspectionPacketDetail } from "@testworx/lib";
+import { PageBackControl } from "@/app/page-back-control";
 
 import { InspectionPacketCard } from "../../../inspection-packet-card";
 
@@ -36,18 +37,13 @@ export default async function CustomerInspectionPacketPage({
       <div className="rounded-[2rem] bg-white p-6 shadow-panel">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
+            <PageBackControl fallbackHref="/app/customer" label="Back to portal" />
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Inspection packet</p>
             <h2 className="mt-2 text-3xl font-semibold text-ink">{detail.inspection.site.name}</h2>
             <p className="mt-3 text-slate-500">
               {detail.inspection.customerCompany.name} | {format(detail.inspection.scheduledStart, "MMM d, yyyy h:mm a")}
             </p>
           </div>
-          <Link
-            className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
-            href="/app/customer"
-          >
-            Back to portal
-          </Link>
         </div>
       </div>
 

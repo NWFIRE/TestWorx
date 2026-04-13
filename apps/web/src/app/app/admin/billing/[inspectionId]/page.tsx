@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { PageBackControl } from "@/app/page-back-control";
 import { getAdminBillingSummaryDetail, getTenantQuickBooksConnectionStatus } from "@testworx/lib";
 
 import { BillingSummaryStatusActions } from "../billing-summary-status-actions";
@@ -168,15 +169,13 @@ export default async function BillingSummaryDetailPage({
       <div className="rounded-[2rem] bg-white p-6 shadow-panel">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
+            <PageBackControl className="mb-2" fallbackHref="/app/admin/billing" label="Back to billing" />
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing detail</p>
             <h2 className="mt-2 text-3xl font-semibold text-ink">{summary.customerName}</h2>
             <p className="mt-3 text-slate-500">{summary.siteName} | {format(summary.inspectionDate, "MMM d, yyyy h:mm a")} | Technician: {summary.technicianName ?? "Unassigned"}</p>
             <p className="mt-2 text-slate-500">Reports: {summary.reportTypes.length > 0 ? summary.reportTypes.map((type: BillingSummaryDetail["reportTypes"][number]) => type.replaceAll("_", " ")).join(", ") : "Inspection-level billing only"}</p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Link className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href="/app/admin/billing">
-              Back to billing list
-            </Link>
             <Link className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={`/app/admin/inspections/${summary.inspectionId}?from=${encodeURIComponent("/app/admin/billing")}`}>
               View inspection
             </Link>

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { addDays } from "date-fns";
 
@@ -28,14 +27,10 @@ export default async function NewQuotePage({
   return (
     <AppPageShell>
       <PageHeader
+        backNavigation={{ label: "Back to quotes", fallbackHref: "/app/admin/quotes" }}
         eyebrow="Quotes"
         title="Create quote"
         description="Build a draft quote with structured line items, branded totals, and the QuickBooks mapping context needed for clean sync."
-        actions={
-          <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" href="/app/admin/quotes">
-            Back to quotes
-          </Link>
-        }
       />
 
       {params.error ? (

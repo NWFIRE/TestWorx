@@ -48,14 +48,7 @@ export default async function AdminReportsQueuePage({
   return (
     <AppPageShell>
       <PageHeader
-        actions={
-          <Link
-            className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-            href="/app/admin"
-          >
-            Back to dashboard
-          </Link>
-        }
+        backNavigation={{ label: "Back to admin", fallbackHref: "/app/admin" }}
         description="Move directly into completed inspections that still need office review before final billing or follow-up."
         eyebrow="Reports / review"
         title="Awaiting office review"

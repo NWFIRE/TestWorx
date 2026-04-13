@@ -69,6 +69,7 @@ export default async function UpcomingInspectionsPage({
   return (
     <AppPageShell density="wide">
       <PageHeader
+        backNavigation={{ label: "Back to admin", fallbackHref: "/app/admin" }}
         eyebrow="Scheduling / planning"
         title="Upcoming inspections"
         description="Plan the next several months of inspections with a month-by-month view of what is already scheduled, what still needs assignment, and where new work should be added."
@@ -79,12 +80,6 @@ export default async function UpcomingInspectionsPage({
               href="/app/admin/scheduling"
             >
               Open scheduling queue
-            </Link>
-            <Link
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-              href="/app/admin"
-            >
-              Back to dashboard
             </Link>
           </div>
         }

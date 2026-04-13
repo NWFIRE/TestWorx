@@ -61,6 +61,7 @@ export default async function QuoteDetailPage({
   return (
     <AppPageShell density="wide">
       <PageHeader
+        backNavigation={{ label: "Back to quotes", fallbackHref: returnHref }}
         eyebrow="Quotes"
         title={detail.quoteNumber}
         description="Manage delivery, QuickBooks sync, approval, and operational conversion from one quote workspace."
@@ -74,12 +75,6 @@ export default async function QuoteDetailPage({
             >
               Download PDF
             </a>
-            <Link
-              className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              href={returnHref}
-            >
-              Back to quotes
-            </Link>
           </>
         }
       />

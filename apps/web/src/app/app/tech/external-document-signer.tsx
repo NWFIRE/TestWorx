@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 import { BrandLoader } from "@/app/brand-loader";
+import { PageBackControl } from "@/app/page-back-control";
 
 const initialState = { error: null as string | null, success: null as string | null };
 
@@ -232,7 +233,8 @@ function PdfMarkupPage({
 export function ExternalDocumentSigner({
   inspectionId,
   document: inspectionDocument,
-  action
+  action,
+  backNavigation
 }: {
   inspectionId: string;
   document: {
@@ -245,6 +247,10 @@ export function ExternalDocumentSigner({
     signedStorageKey: string | null;
   };
   action: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
+  backNavigation?: {
+    label?: string;
+    fallbackHref: string;
+  };
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const [signerName, setSignerName] = useState("");
@@ -350,6 +356,9 @@ export function ExternalDocumentSigner({
   return (
     <div className="space-y-6">
       <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+        {backNavigation ? (
+          <PageBackControl className="mb-2" fallbackHref={backNavigation.fallbackHref} label={backNavigation.label} />
+        ) : null}
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">External document</p>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h2 className="text-3xl font-semibold text-ink">{inspectionDocument.label || inspectionDocument.fileName}</h2>

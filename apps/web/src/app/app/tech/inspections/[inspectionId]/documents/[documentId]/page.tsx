@@ -36,6 +36,7 @@ export default async function TechnicianInspectionDocumentPage({
   return (
     <ExternalDocumentSigner
       action={signInspectionDocumentAction}
+      backNavigation={{ fallbackHref: `/app/tech/inspections/${inspectionId}`, label: "Back to inspection" }}
       document={{
         id: detail.document.id,
         label: detail.document.label,

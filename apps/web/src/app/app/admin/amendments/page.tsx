@@ -85,14 +85,7 @@ export default async function AdminAmendmentsPage({
   return (
     <AppPageShell>
       <PageHeader
-        actions={(
-          <Link
-            className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-            href="/app/admin"
-          >
-            Back to scheduling
-          </Link>
-        )}
+        backNavigation={{ label: "Back to admin", fallbackHref: "/app/admin" }}
         description="Review completed visits, confirm the packet is complete, and respond to technician requests for the next inspection without dropping into the full edit workspace."
         eyebrow="Post-visit review"
         title="Inspection review and next-step requests"

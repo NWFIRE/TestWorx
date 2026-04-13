@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { PageBackControl } from "@/app/page-back-control";
 
 type Tone =
   | "slate"
@@ -59,7 +60,8 @@ export function PageHeader({
   description,
   actions,
   className,
-  contentWidth = "wide"
+  contentWidth = "wide",
+  backNavigation
 }: {
   eyebrow?: string;
   title: string;
@@ -67,6 +69,10 @@ export function PageHeader({
   actions?: ReactNode;
   className?: string;
   contentWidth?: "default" | "wide" | "full";
+  backNavigation?: {
+    label?: string;
+    fallbackHref: string;
+  };
 }) {
   const widthClass =
     contentWidth === "full"
@@ -79,6 +85,11 @@ export function PageHeader({
     <SectionCard className={className}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className={widthClass}>
+          {backNavigation ? (
+            <div className="mb-2">
+              <PageBackControl fallbackHref={backNavigation.fallbackHref} label={backNavigation.label} />
+            </div>
+          ) : null}
           {eyebrow ? (
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--tenant-primary)]">
               {eyebrow}

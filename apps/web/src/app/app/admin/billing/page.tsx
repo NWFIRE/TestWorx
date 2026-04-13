@@ -174,6 +174,7 @@ export default async function AdminBillingPage({
   return (
     <AppPageShell>
       <PageHeader
+        backNavigation={{ label: "Back to admin", fallbackHref: "/app/admin" }}
         actions={
           <div className="flex flex-wrap gap-3">
             <Link
@@ -181,12 +182,6 @@ export default async function AdminBillingPage({
               href="/app/admin/billing/create"
             >
               Create invoice
-            </Link>
-            <Link
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-              href="/app/admin"
-            >
-              Back to scheduling
             </Link>
           </div>
         }

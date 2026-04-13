@@ -116,14 +116,7 @@ export default async function AdminSchedulingQueuePage({
   return (
     <AppPageShell>
       <PageHeader
-        actions={
-          <Link
-            className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-            href="/app/admin"
-          >
-            Back to dashboard
-          </Link>
-        }
+        backNavigation={{ label: "Back to admin", fallbackHref: "/app/admin" }}
         description="Filter the inspection workflow by status so dispatch, follow-up, completed, invoiced, and cancelled work can be reviewed without losing context."
         eyebrow="Scheduling / dispatch"
         title="Inspection management"

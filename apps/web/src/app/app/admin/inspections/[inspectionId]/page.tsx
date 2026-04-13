@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { PageBackControl } from "@/app/page-back-control";
 import {
   buildInspectionPacketDocuments,
   editableInspectionStatuses,
@@ -95,6 +96,26 @@ function resolveInspectionOrigin(value: string | undefined) {
 
 function resolveInspectionMode(value: string | undefined) {
   return value === "review" ? "review" : "workspace";
+}
+
+function resolveInspectionBackLabel(originPath: string) {
+  if (originPath.startsWith("/app/admin/billing")) {
+    return "Back to billing";
+  }
+
+  if (originPath.startsWith("/app/admin/reports")) {
+    return "Back to review";
+  }
+
+  if (originPath.startsWith("/app/admin/amendments")) {
+    return "Back to inspections";
+  }
+
+  if (originPath.startsWith("/app/admin/scheduling")) {
+    return "Back to scheduling";
+  }
+
+  return "Back to admin";
 }
 
 export default async function EditInspectionPage({
@@ -256,9 +277,11 @@ export default async function EditInspectionPage({
         customerName: inspectionView.outgoingAmendment.replacementInspection.customerCompany.name
       })
     : null;
+  const backLabel = resolveInspectionBackLabel(originPath);
   return (
     <section className="space-y-6">
       <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+        <PageBackControl className="mb-2" fallbackHref={originPath} label={backLabel} />
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">{isReviewMode ? "Inspection review" : "Inspection editor"}</p>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h2 className="text-3xl font-semibold text-ink">{inspectionDisplay.primaryTitle}</h2>
