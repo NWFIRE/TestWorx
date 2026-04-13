@@ -254,6 +254,7 @@ model Tenant {
   quotes                    Quote[]
   quoteLineItems            QuoteLineItem[]
   quoteReminderDispatches   QuoteReminderDispatch[]
+  emailReminderSendLogs     EmailReminderSendLog[]
 }
 
 model User {
@@ -292,6 +293,7 @@ model User {
   createdQuotes       Quote[]                  @relation("QuoteCreatedBy")
   updatedQuotes       Quote[]                  @relation("QuoteUpdatedBy")
   pausedQuoteReminders Quote[]                @relation("QuoteRemindersPausedBy")
+  sentEmailReminderLogs EmailReminderSendLog[] @relation("EmailReminderSentBy")
 }
 
 model CustomerCompany {
@@ -331,6 +333,7 @@ model CustomerCompany {
   serviceFeeRules           ServiceFeeRule[]
   accountInvitations        AccountInvitation[]
   quotes                    Quote[]
+  emailReminderSendLogs     EmailReminderSendLog[]
 }
 
 model Site {
@@ -561,6 +564,35 @@ model QuoteReminderDispatch {
   @@index([tenantId, quoteId])
   @@index([tenantId, status])
   @@index([tenantId, reminderType])
+}
+
+model EmailReminderSendLog {
+  id                String          @id @default(cuid())
+  tenantId          String
+  customerCompanyId String
+  sentByUserId      String
+  templateKey       String
+  recipientEmail    String
+  dueMonth          String?
+  siteSummary       String?
+  subjectSnapshot   String
+  bodySnapshot      String
+  inspectionTypes   String[]        @default([])
+  divisions         String[]        @default([])
+  messageId         String?
+  provider          String?         @default("resend")
+  providerReason    String?
+  providerError     String?
+  sentAt            DateTime        @default(now())
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  tenant            Tenant          @relation(fields: [tenantId], references: [id])
+  customerCompany   CustomerCompany @relation(fields: [customerCompanyId], references: [id])
+  sentBy            User            @relation("EmailReminderSentBy", fields: [sentByUserId], references: [id])
+
+  @@index([tenantId, sentAt])
+  @@index([tenantId, dueMonth])
+  @@index([tenantId, customerCompanyId, sentAt])
 }
 
 model InspectionTechnicianAssignment {

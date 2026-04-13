@@ -105,6 +105,13 @@ function NavIcon({
           <path {...shared} d="M17.5 8.5a2.5 2.5 0 1 1 0 5M6.5 13.5a2.5 2.5 0 1 1 0-5" />
         </svg>
       );
+    case "mail":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <rect {...shared} x="3" y="6" width="18" height="12" rx="2.5" />
+          <path {...shared} d="M4 8.5 12 14l8-5.5" />
+        </svg>
+      );
     default:
       return (
         <span aria-hidden="true" className={className}>

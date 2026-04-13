@@ -1,0 +1,196 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const prismaMock = {
+  inspectionTask: {
+    findMany: vi.fn()
+  },
+  emailReminderSendLog: {
+    findMany: vi.fn(),
+    createMany: vi.fn()
+  },
+  tenant: {
+    findFirst: vi.fn()
+  },
+  auditLog: {
+    create: vi.fn()
+  }
+};
+
+const sendInspectionReminderEmailMock = vi.fn();
+
+vi.mock("@testworx/db", () => ({
+  prisma: prismaMock
+}));
+
+vi.mock("../account-email", () => ({
+  sendInspectionReminderEmail: sendInspectionReminderEmailMock
+}));
+
+describe("email reminders", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+  });
+
+  it("merges reminder templates without leaving unresolved placeholders", async () => {
+    const { mergeEmailReminderTemplate } = await import("../email-reminders");
+
+    const merged = mergeEmailReminderTemplate(
+      "Hello {{customerName}},\n\nCall {{companyPhone}}\n{{companyEmail}}",
+      {
+        customerName: "",
+        companyName: "Northwest Fire",
+        companyPhone: "580-540-3119",
+        companyEmail: "hello@example.com"
+      }
+    );
+
+    expect(merged).toContain("Hello,");
+    expect(merged).toContain("580-540-3119");
+    expect(merged).toContain("hello@example.com");
+    expect(merged).not.toContain("{{");
+  });
+
+  it("returns customer-level reminder candidates with recent send state", async () => {
+    prismaMock.inspectionTask.findMany.mockResolvedValue([
+      {
+        id: "task_1",
+        inspectionType: "fire_alarm",
+        inspection: {
+          id: "inspection_1",
+          customerCompanyId: "customer_1",
+          customerCompany: {
+            id: "customer_1",
+            name: "Klemme Construction",
+            contactName: "Brett Klemme",
+            billingEmail: "office@klemme.com"
+          },
+          site: {
+            id: "site_1",
+            name: "Main Campus",
+            city: "Tulsa",
+            addressLine1: "123 Main St"
+          }
+        }
+      },
+      {
+        id: "task_2",
+        inspectionType: "kitchen_suppression",
+        inspection: {
+          id: "inspection_2",
+          customerCompanyId: "customer_1",
+          customerCompany: {
+            id: "customer_1",
+            name: "Klemme Construction",
+            contactName: "Brett Klemme",
+            billingEmail: "office@klemme.com"
+          },
+          site: {
+            id: "site_2",
+            name: "South Kitchen",
+            city: "Tulsa",
+            addressLine1: "456 Elm St"
+          }
+        }
+      }
+    ]);
+    prismaMock.emailReminderSendLog.findMany
+      .mockResolvedValueOnce([
+        {
+          customerCompanyId: "customer_1",
+          sentAt: new Date("2026-04-10T15:00:00.000Z")
+        }
+      ])
+      .mockResolvedValueOnce([]);
+    prismaMock.tenant.findFirst.mockResolvedValue({
+      id: "tenant_1",
+      name: "Northwest Fire & Safety",
+      billingEmail: "billing@nwfireandsafety.com",
+      branding: {
+        legalBusinessName: "Northwest Fire & Safety",
+        phone: "580-540-3119",
+        email: "accounting@nwfireandsafety.com"
+      }
+    });
+
+    const { getEmailReminderWorkspaceData } = await import("../email-reminders");
+    const result = await getEmailReminderWorkspaceData(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { dueMonth: "2026-04", query: "klemme" }
+    );
+
+    expect(result.summary.candidateCount).toBe(1);
+    expect(result.recipients[0]?.customerName).toBe("Klemme Construction");
+    expect(result.recipients[0]?.inspectionTypeLabels).toEqual(["Fire alarm", "Kitchen suppression"]);
+    expect(result.recipients[0]?.lastSentAt).toBe("2026-04-10T15:00:00.000Z");
+  });
+
+  it("sends merged reminder emails and stores snapshots in the send log", async () => {
+    prismaMock.tenant.findFirst.mockResolvedValue({
+      id: "tenant_1",
+      name: "Northwest Fire & Safety",
+      billingEmail: "billing@nwfireandsafety.com",
+      branding: {
+        legalBusinessName: "Northwest Fire & Safety",
+        phone: "580-540-3119",
+        email: "accounting@nwfireandsafety.com"
+      }
+    });
+    prismaMock.inspectionTask.findMany.mockResolvedValue([
+      {
+        id: "task_1",
+        inspectionType: "fire_alarm",
+        inspection: {
+          id: "inspection_1",
+          customerCompanyId: "customer_1",
+          customerCompany: {
+            id: "customer_1",
+            name: "Klemme Construction",
+            contactName: "Brett Klemme",
+            billingEmail: "office@klemme.com"
+          },
+          site: {
+            id: "site_1",
+            name: "Main Campus",
+            city: "Tulsa",
+            addressLine1: "123 Main St"
+          }
+        }
+      }
+    ]);
+    sendInspectionReminderEmailMock.mockResolvedValue({
+      sent: true,
+      provider: "resend",
+      messageId: "msg_1",
+      error: null,
+      reason: "sent"
+    });
+
+    const { sendManualEmailReminders } = await import("../email-reminders");
+    const result = await sendManualEmailReminders(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        dueMonth: "2026-04",
+        customerCompanyIds: ["customer_1"],
+        templateKey: "inspection_due_this_month",
+        subject: "Your Fire Inspection Is Due This Month",
+        body: "Hello {{customerName}},\n\nPlease contact {{companyName}} at {{companyPhone}}."
+      }
+    );
+
+    expect(result.sentCount).toBe(1);
+    expect(sendInspectionReminderEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+      recipientEmail: "office@klemme.com",
+      subjectLine: "Your Fire Inspection Is Due This Month"
+    }));
+    expect(prismaMock.emailReminderSendLog.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [
+        expect.objectContaining({
+          customerCompanyId: "customer_1",
+          subjectSnapshot: "Your Fire Inspection Is Due This Month"
+        })
+      ]
+    }));
+    expect(prismaMock.auditLog.create).toHaveBeenCalled();
+  });
+});

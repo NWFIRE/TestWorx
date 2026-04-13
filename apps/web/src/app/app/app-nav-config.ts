@@ -3,7 +3,7 @@ export type AppNavItem = {
   label: string;
   shortLabel: string;
   abbreviation: string;
-  icon?: "calendar" | "branch" | "alert" | "invoice" | "settings" | "grid" | "clipboard" | "portal" | "team";
+  icon?: "calendar" | "branch" | "alert" | "invoice" | "settings" | "grid" | "clipboard" | "portal" | "team" | "mail";
   description?: string;
   tone?: "blue" | "amber" | "emerald" | "violet" | "slate";
   matchMode?: "exact" | "prefix";
@@ -48,6 +48,15 @@ const adminNavItems: AppNavItem[] = [
     icon: "team",
     description: "Customer records, billing profiles, and QuickBooks links",
     tone: "slate"
+  },
+  {
+    href: "/app/admin/email-reminders",
+    label: "Email Reminders",
+    shortLabel: "Email Reminders",
+    abbreviation: "ER",
+    icon: "mail",
+    description: "Prepare and send branded customer reminder emails",
+    tone: "blue"
   },
   {
     href: "/app/admin/upcoming-inspections",

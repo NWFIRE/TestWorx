@@ -6,6 +6,7 @@ export * from "./compliance-reporting-fees";
 export * from "./customer-companies";
 export * from "./customer-import";
 export * from "./deficiency-service";
+export * from "./email-reminders";
 export * from "./env";
 export * from "./inspection-billing";
 export * from "./inspection-archive";
