@@ -41,6 +41,15 @@ const adminNavItems: AppNavItem[] = [
     tone: "amber"
   },
   {
+    href: "/app/admin/clients",
+    label: "Clients",
+    shortLabel: "Clients",
+    abbreviation: "CL",
+    icon: "team",
+    description: "Customer records, billing profiles, and QuickBooks links",
+    tone: "slate"
+  },
+  {
     href: "/app/admin/quotes",
     label: "Quotes",
     shortLabel: "Quotes",
@@ -82,7 +91,7 @@ const adminNavItems: AppNavItem[] = [
     shortLabel: "Settings",
     abbreviation: "SF",
     icon: "settings",
-    description: "Branding, customers, and service fees",
+    description: "Branding, billing, and service fee rules",
     tone: "slate"
   }
 ];

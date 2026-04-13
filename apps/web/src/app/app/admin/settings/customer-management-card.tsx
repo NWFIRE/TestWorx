@@ -354,7 +354,6 @@ export function CustomerManagementCard({
 
   const syncCustomersUrl = useCallback((page: number, query: string) => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("customersOpen", "1");
     params.set("customersPage", String(page));
     if (query) {
       params.set("customersQuery", query);
@@ -377,7 +376,7 @@ export function CustomerManagementCard({
     setSearchError(null);
 
     try {
-      const url = new URL("/api/admin/settings/customers", window.location.origin);
+      const url = new URL("/api/admin/clients/customers", window.location.origin);
       url.searchParams.set("page", String(page));
       if (trimmedQuery) {
         url.searchParams.set("query", trimmedQuery);
@@ -558,7 +557,6 @@ export function CustomerManagementCard({
               </div>
               <form action={updateCustomerAction} className="space-y-4">
                 <input name="customerCompanyId" type="hidden" value={customer.id} />
-                <input name="customersOpen" type="hidden" value="1" />
                 <input name="customersPage" type="hidden" value={String(currentPagination.page)} />
                 <input name="customersQuery" type="hidden" value={currentQuery} />
                 <CustomerProfileFields customer={customer} formIdPrefix={`customer-${customer.id}`} />

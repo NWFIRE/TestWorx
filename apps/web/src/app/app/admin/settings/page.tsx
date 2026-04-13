@@ -6,7 +6,6 @@ import { auth } from "@/auth";
 import {
   canManageBilling,
   getPaginatedTenantComplianceReportingFeeSettings,
-  getPaginatedTenantCustomerCompanySettings,
   getQuickBooksItemMappingSettings,
   getPaginatedTenantServiceFeeSettings,
   getTenantBillingSettings,
@@ -32,13 +31,11 @@ import {
   openBillingPortalAction,
   startQuickBooksConnectAction,
   startBillingCheckoutAction,
-  updateCustomerCompanyAction,
   updateComplianceReportingFeeRuleAction,
   updateDefaultServiceFeeAction,
   updateServiceFeeRuleAction,
   updateTenantBrandingAction
 } from "./actions";
-import { CustomerManagementCard } from "./customer-management-card";
 import { BillingPlansSection } from "./billing-plans-section";
 import { ComplianceReportingFeeSettingsCard } from "./compliance-reporting-fee-settings-card";
 import { QuickBooksItemMappingCard } from "./quickbooks-item-mapping-card";
@@ -131,46 +128,6 @@ function LazySectionCard({
         </Link>
       </div>
     </div>
-  );
-}
-
-async function CustomersSection({
-  actor,
-  page,
-  notice,
-  query
-}: {
-  actor: { userId: string; role: string; tenantId: string };
-  page: number;
-  notice?: string | null;
-  query?: string;
-}) {
-  let data: Awaited<ReturnType<typeof getPaginatedTenantCustomerCompanySettings>>;
-
-  try {
-    data = await getPaginatedTenantCustomerCompanySettings(actor, { page, limit: 10, query });
-  } catch (error) {
-    return (
-      <LazySectionCard
-        actionHref={buildSettingsHref({ customersOpen: "1" }, { customersOpen: 1 })}
-        actionLabel="Try again"
-        description={error instanceof Error ? error.message : "Unable to load customers right now."}
-        eyebrow="Customer companies"
-        title="Customers could not be loaded"
-        tone="error"
-      />
-    );
-  }
-
-  return (
-    <CustomerManagementCard
-      createCustomerAction={createCustomerCompanyAction}
-      customers={data.customers}
-      filters={data.filters}
-      notice={notice}
-      pagination={data.pagination}
-      updateCustomerAction={updateCustomerCompanyAction}
-    />
   );
 }
 
@@ -317,8 +274,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   const params = searchParams ? await searchParams : {};
   const actor = { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId };
 
-  const customersPage = readPositiveInt(readSearchParam(params, "customersPage", "1"), 1);
-  const customersQuery = readSearchParam(params, "customersQuery");
   const feesPage = readPositiveInt(readSearchParam(params, "feesPage", "1"), 1);
   const feeEditor = readSearchParam(params, "feeEditor") || null;
   const complianceFeePage = readPositiveInt(readSearchParam(params, "complianceFeePage", "1"), 1);
@@ -335,12 +290,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
     : typeof params.quickbooks === "string"
       ? decodeURIComponent(params.quickbooks)
       : null;
-  const customerNotice = Array.isArray(params.customers)
-    ? params.customers[0]
-    : typeof params.customers === "string"
-      ? decodeURIComponent(params.customers)
-      : null;
-  const customersOpen = isSectionOpen(params, "customersOpen", customerNotice);
   const feesOpen = isSectionOpen(params, "feesOpen");
   const complianceFeesOpen = isSectionOpen(params, "complianceFeesOpen");
   const mappingsOpen = isSectionOpen(params, "mappingsOpen", quickBooksNotice);
@@ -348,7 +297,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   return (
     <AppPageShell density="wide">
       <PageHeader
-        description="Manage subscription readiness, billing contacts, branding, customer records, and service fee rules from one quieter settings workspace."
+        description="Manage subscription readiness, billing contacts, branding, and service fee rules from one quieter settings workspace."
         eyebrow="Tenant settings"
         title="Billing and branding"
         contentWidth="full"
@@ -382,31 +331,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
       <WorkspaceSplit variant="balanced">
         <div className="space-y-6">
           <TenantBrandingForm action={updateTenantBrandingAction} values={{ ...brandingSettings.branding, billingEmail: brandingSettings.billingEmail }} />
-          <SettingsDisclosureCard
-            description="Load customer companies only when you need them, with a paginated current-customer list and its own empty and error states."
-            desktopSpan="fullWhenOpen"
-            eyebrow="Customer companies"
-            initialOpen={customersOpen}
-            openLabel="Open customers"
-            queryKey="customersOpen"
-            title="Create and edit current customers"
-          >
-            <Suspense
-              key={`customers-${customersPage}-${customersQuery}`}
-              fallback={
-                <LazySectionCard
-                  actionHref={buildSettingsHref(params, { customersOpen: 1, customersPage: 1, customersQuery: customersQuery || null })}
-                  actionLabel="Reload section"
-                  description="Loading the current customer page..."
-                  eyebrow="Customer companies"
-                  title="Create and edit current customers"
-                  tone="loading"
-                />
-              }
-            >
-              <CustomersSection actor={actor} notice={customerNotice} page={customersPage} query={customersQuery} />
-            </Suspense>
-          </SettingsDisclosureCard>
           <QuickBooksSettingsCard
             companyName={quickBooksSettings.tenant.quickbooksCompanyName}
             configured={quickBooksSettings.config.enabled}
