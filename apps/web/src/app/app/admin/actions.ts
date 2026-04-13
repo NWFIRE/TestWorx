@@ -765,27 +765,30 @@ export async function createDirectQuickBooksInvoiceAction(formData: FormData) {
     return { ok: false, error: "Unauthorized", message: null, invoice: null };
   }
 
-  try {
-    const lineItemsJson = String(formData.get("lineItemsJson") ?? "[]");
-    const parsedLineItems = JSON.parse(lineItemsJson) as Array<{
-      catalogItemId: string;
-      description: string;
-      quantity: number;
+    try {
+      const lineItemsJson = String(formData.get("lineItemsJson") ?? "[]");
+      const proposalType = String(formData.get("proposalType") ?? "").trim() || undefined;
+      const parsedLineItems = JSON.parse(lineItemsJson) as Array<{
+        catalogItemId: string;
+        description: string;
+        quantity: number;
       unitPrice: number;
       taxable: boolean;
     }>;
 
-    const result = await createDirectQuickBooksInvoice(
-      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-      {
-        customerCompanyId: String(formData.get("customerCompanyId") ?? "").trim() || undefined,
-        walkInCustomerName: String(formData.get("walkInCustomerName") ?? "").trim() || undefined,
-        walkInCustomerEmail: String(formData.get("walkInCustomerEmail") ?? "").trim() || undefined,
-        walkInCustomerPhone: String(formData.get("walkInCustomerPhone") ?? "").trim() || undefined,
-        siteLabel: String(formData.get("siteLabel") ?? "").trim() || undefined,
-        issueDate: String(formData.get("issueDate") ?? "").trim(),
-        dueDate: String(formData.get("dueDate") ?? "").trim() || undefined,
-        memo: String(formData.get("memo") ?? "").trim() || undefined,
+      const result = await createDirectQuickBooksInvoice(
+        { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+        {
+          customerCompanyId: String(formData.get("customerCompanyId") ?? "").trim() || undefined,
+          walkInMode: formData.get("walkInMode") === "on",
+          walkInCustomerName: String(formData.get("walkInCustomerName") ?? "").trim() || undefined,
+          walkInCustomerEmail: String(formData.get("walkInCustomerEmail") ?? "").trim() || undefined,
+          walkInCustomerPhone: String(formData.get("walkInCustomerPhone") ?? "").trim() || undefined,
+          siteLabel: String(formData.get("siteLabel") ?? "").trim() || undefined,
+          proposalType: proposalType as Parameters<typeof createDirectQuickBooksInvoice>[1]["proposalType"],
+          issueDate: String(formData.get("issueDate") ?? "").trim(),
+          dueDate: String(formData.get("dueDate") ?? "").trim() || undefined,
+          memo: String(formData.get("memo") ?? "").trim() || undefined,
         sendEmail: formData.get("sendEmail") === "on",
         lineItems: parsedLineItems
       }

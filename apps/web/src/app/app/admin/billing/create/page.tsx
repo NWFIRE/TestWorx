@@ -3,7 +3,7 @@ import { addDays } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getQuickBooksDirectInvoiceFormOptions } from "@testworx/lib";
+import { getQuickBooksDirectInvoiceFormOptions, quoteProposalTypes } from "@testworx/lib";
 
 import { AppPageShell, PageHeader } from "../../operations-ui";
 import { createDirectQuickBooksInvoiceAction } from "../../actions";
@@ -59,12 +59,15 @@ export default async function CreateBillingInvoicePage() {
         action={createDirectQuickBooksInvoiceAction}
         catalogItems={options.catalogItems}
         customers={options.customers}
+        proposalTypes={quoteProposalTypes}
         initialValue={{
           customerCompanyId: "",
+          walkInMode: false,
           walkInCustomerName: "",
           walkInCustomerEmail: "",
           walkInCustomerPhone: "",
           siteLabel: "",
+          proposalType: "",
           issueDate: new Date().toISOString().slice(0, 10),
           dueDate: addDays(new Date(), 30).toISOString().slice(0, 10),
           memo: "",

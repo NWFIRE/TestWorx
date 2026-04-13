@@ -32,12 +32,19 @@ type InvoiceLineValue = {
   taxable: boolean;
 };
 
+type ProposalTypeOption = {
+  value: string;
+  label: string;
+};
+
 type DirectInvoiceFormValue = {
   customerCompanyId: string;
+  walkInMode: boolean;
   walkInCustomerName: string;
   walkInCustomerEmail: string;
   walkInCustomerPhone: string;
   siteLabel: string;
+  proposalType: string;
   issueDate: string;
   dueDate: string;
   memo: string;
@@ -77,6 +84,7 @@ export function DirectInvoiceForm({
   action,
   customers,
   catalogItems,
+  proposalTypes,
   initialValue
 }: {
   action: (formData: FormData) => Promise<{
@@ -87,6 +95,7 @@ export function DirectInvoiceForm({
   }>;
   customers: CustomerOption[];
   catalogItems: CatalogOption[];
+  proposalTypes: ProposalTypeOption[];
   initialValue: DirectInvoiceFormValue;
 }) {
   const [value, setValue] = useState(initialValue);
@@ -116,7 +125,9 @@ export function DirectInvoiceForm({
     });
   }
 
+  const isSelectedCustomerWalkIn = Boolean(value.customerCompanyId) && value.walkInMode;
   const isWalkIn = !value.customerCompanyId;
+  const shouldSkipAutomaticFees = isWalkIn || isSelectedCustomerWalkIn;
 
   return (
     <form
@@ -157,6 +168,7 @@ export function DirectInvoiceForm({
                   setValue((current) => ({
                     ...current,
                     customerCompanyId: event.target.value,
+                    walkInMode: event.target.value ? current.walkInMode : false,
                     walkInCustomerName: event.target.value ? "" : current.walkInCustomerName,
                     walkInCustomerEmail: event.target.value ? "" : current.walkInCustomerEmail,
                     walkInCustomerPhone: event.target.value ? "" : current.walkInCustomerPhone,
@@ -179,6 +191,40 @@ export function DirectInvoiceForm({
                 ))}
               </select>
             </label>
+
+            {value.customerCompanyId ? (
+              <>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-slate-700">Invoice type</span>
+                  <select
+                    className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
+                    name="proposalType"
+                    onChange={(event) => setValue((current) => ({ ...current, proposalType: event.target.value }))}
+                    value={value.proposalType}
+                  >
+                    <option value="">Select invoice type</option>
+                    {proposalTypes.map((proposalType) => (
+                      <option key={proposalType.value} value={proposalType.value}>
+                        {proposalType.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    Used to apply the correct automatic compliance reporting fee when this invoice is tied to a customer.
+                  </p>
+                </label>
+
+                <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                  <input
+                    checked={value.walkInMode}
+                    name="walkInMode"
+                    onChange={(event) => setValue((current) => ({ ...current, walkInMode: event.target.checked }))}
+                    type="checkbox"
+                  />
+                  Treat this invoice as Walk-In and skip automatic service and compliance fees
+                </label>
+              </>
+            ) : null}
 
             {isWalkIn ? (
               <>
@@ -381,6 +427,11 @@ export function DirectInvoiceForm({
         <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.04)]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Invoice total</p>
           <p className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-slate-950">{toCurrency(subtotal)}</p>
+          <p className="mt-3 text-sm text-slate-500">
+            {shouldSkipAutomaticFees
+              ? "Walk-in invoices skip automatic service and compliance fee rules."
+              : "Customer invoices apply service-fee and compliance rules during creation when they match the selected customer and invoice type."}
+          </p>
           <p className="mt-3 text-sm text-slate-500">QuickBooks assigns the live invoice number at creation time, and TradeWorx shows that assigned number immediately after success.</p>
         </section>
 

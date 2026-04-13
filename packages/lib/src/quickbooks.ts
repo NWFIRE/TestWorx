@@ -1,13 +1,15 @@
-import { InspectionStatus, type Prisma } from "@prisma/client";
+import { ComplianceReportingDivision, InspectionStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@testworx/db";
 import { z } from "zod";
 
 import type { ActorContext } from "@testworx/types";
 import { actorContextSchema } from "@testworx/types";
 
+import { resolveComplianceReportingFeeTx } from "./compliance-reporting-fees";
 import { assertEnvForFeature, getOptionalQuickBooksEnv, getServerEnv } from "./env";
 import type { JsonObject } from "./json-types";
 import { assertTenantContext } from "./permissions";
+import { resolveServiceFeeForLocationTx } from "./service-fees";
 
 type QuickBooksTokenResponse = {
   access_token: string;
@@ -234,12 +236,25 @@ const directQuickBooksInvoiceLineInputSchema = z.object({
   taxable: z.boolean().default(false)
 });
 
+export const directInvoiceProposalTypeValues = [
+  "fire_alarm",
+  "fire_sprinkler",
+  "kitchen_suppression",
+  "fire_extinguisher",
+  "industrial_suppression",
+  "emergency_exit_lighting",
+  "general_fire_protection"
+] as const;
+export type DirectInvoiceProposalType = (typeof directInvoiceProposalTypeValues)[number];
+
 export const directQuickBooksInvoiceInputSchema = z.object({
   customerCompanyId: z.string().trim().optional(),
+  walkInMode: z.boolean().default(false),
   walkInCustomerName: z.string().trim().optional(),
   walkInCustomerEmail: z.string().trim().email("Enter a valid billing email.").optional().or(z.literal("")),
   walkInCustomerPhone: z.string().trim().optional(),
   siteLabel: z.string().trim().optional(),
+  proposalType: z.enum(directInvoiceProposalTypeValues).optional().nullable(),
   issueDate: z.string().trim().min(1, "Issue date is required."),
   dueDate: z.string().trim().optional(),
   memo: z.string().trim().optional(),
@@ -251,6 +266,14 @@ export const directQuickBooksInvoiceInputSchema = z.object({
       code: z.ZodIssueCode.custom,
       message: "Select an existing customer or enter a walk-in customer name.",
       path: ["walkInCustomerName"]
+    });
+  }
+
+  if (value.customerCompanyId && !value.walkInMode && !value.proposalType) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Select an invoice type for automatic fee rules.",
+      path: ["proposalType"]
     });
   }
 });
@@ -1800,6 +1823,139 @@ async function resolveQuickBooksInvoiceCustomer(connection: QuickBooksTenantConn
   }
 
   return createdCustomerId;
+}
+
+function mapDirectInvoiceProposalTypeToComplianceDivision(
+  proposalType: DirectInvoiceProposalType | null | undefined
+): ComplianceReportingDivision | null {
+  switch (proposalType) {
+    case "fire_alarm":
+      return ComplianceReportingDivision.fire_alarm;
+    case "fire_sprinkler":
+      return ComplianceReportingDivision.fire_sprinkler;
+    case "kitchen_suppression":
+      return ComplianceReportingDivision.kitchen_suppression;
+    default:
+      return null;
+  }
+}
+
+async function resolveMappedCatalogTaxable(input: {
+  tenantId: string;
+  quickbooksItemId: string;
+}) {
+  const mappedCatalogItem = await prisma.quickBooksCatalogItem.findFirst({
+    where: {
+      tenantId: input.tenantId,
+      quickbooksItemId: input.quickbooksItemId
+    },
+    select: {
+      taxable: true
+    }
+  });
+
+  return mappedCatalogItem?.taxable ?? false;
+}
+
+async function buildDirectInvoiceAutomaticFeeLines(input: {
+  tenantId: string;
+  integrationId: string;
+  customerCompanyId: string;
+  proposalType: DirectInvoiceProposalType | null | undefined;
+  location: {
+    city?: string | null;
+    state?: string | null;
+    postalCode?: string | null;
+  };
+}) {
+  const lines: Array<ReturnType<typeof toQuickBooksInvoiceLine>> = [];
+
+  const serviceFee = await resolveServiceFeeForLocationTx(prisma, {
+    tenantId: input.tenantId,
+    customerCompanyId: input.customerCompanyId,
+    location: input.location
+  });
+
+  if ((serviceFee.unitPrice ?? 0) > 0) {
+    const resolvedServiceItem = await resolveQuickBooksItemForBilling({
+      tenantId: input.tenantId,
+      integrationId: input.integrationId,
+      billingCode: serviceFee.code,
+      displayName: "Service Fee"
+    });
+
+    if (resolvedServiceItem.status !== "mapped") {
+      throw new Error(buildQuickBooksBillingCodeMappingError({
+        billingCode: serviceFee.code,
+        description: "Service Fee",
+        resolvedReason: resolvedServiceItem.reason,
+        suggestions: resolvedServiceItem.suggestions
+      }));
+    }
+
+    lines.push(toQuickBooksInvoiceLine({
+      amount: Number(serviceFee.unitPrice!.toFixed(2)),
+      description: "Service Fee",
+      quantity: 1,
+      unitPrice: serviceFee.unitPrice!,
+      qbItemId: resolvedServiceItem.qbItemId,
+      qbItemName: resolvedServiceItem.qbItemName,
+      taxable: await resolveMappedCatalogTaxable({
+        tenantId: input.tenantId,
+        quickbooksItemId: resolvedServiceItem.qbItemId
+      })
+    }));
+  }
+
+  const complianceDivision = mapDirectInvoiceProposalTypeToComplianceDivision(input.proposalType);
+  if (!complianceDivision) {
+    return lines;
+  }
+
+  const complianceFee = await resolveComplianceReportingFeeTx(prisma, {
+    tenantId: input.tenantId,
+    division: complianceDivision,
+    location: {
+      city: input.location.city,
+      state: input.location.state
+    }
+  });
+
+  if (!complianceFee.matched || complianceFee.feeAmount <= 0) {
+    return lines;
+  }
+
+  const complianceCode = `COMPLIANCE_REPORTING_FEE_${complianceDivision.toUpperCase()}`;
+  const resolvedComplianceItem = await resolveQuickBooksItemForBilling({
+    tenantId: input.tenantId,
+    integrationId: input.integrationId,
+    billingCode: complianceCode,
+    displayName: "Compliance Reporting Fee"
+  });
+
+  if (resolvedComplianceItem.status !== "mapped") {
+    throw new Error(buildQuickBooksBillingCodeMappingError({
+      billingCode: complianceCode,
+      description: "Compliance Reporting Fee",
+      resolvedReason: resolvedComplianceItem.reason,
+      suggestions: resolvedComplianceItem.suggestions
+    }));
+  }
+
+  lines.push(toQuickBooksInvoiceLine({
+    amount: Number(complianceFee.feeAmount.toFixed(2)),
+    description: "Compliance Reporting Fee",
+    quantity: 1,
+    unitPrice: complianceFee.feeAmount,
+    qbItemId: resolvedComplianceItem.qbItemId,
+    qbItemName: resolvedComplianceItem.qbItemName,
+    taxable: await resolveMappedCatalogTaxable({
+      tenantId: input.tenantId,
+      quickbooksItemId: resolvedComplianceItem.qbItemId
+    })
+  }));
+
+  return lines;
 }
 
 export async function importQuickBooksCustomers(actor: ActorContext) {
@@ -3879,11 +4035,14 @@ export async function createDirectQuickBooksInvoice(
           notes: true
         }
       })
-    : null;
+      : null;
 
   if (parsedInput.customerCompanyId && !selectedCustomer) {
     throw new Error("Customer not found.");
   }
+
+  const shouldSkipAutomaticFees = parsedInput.walkInMode || !selectedCustomer;
+  const integrationId = getQuickBooksIntegrationId(tenant);
 
   const catalogItems = await prisma.quickBooksCatalogItem.findMany({
     where: {
@@ -3921,11 +4080,11 @@ export async function createDirectQuickBooksInvoice(
       notes: selectedCustomer?.notes ?? null
     });
 
-    const invoiceLines = parsedInput.lineItems.map((line) => {
-      const catalogItem = catalogById.get(line.catalogItemId);
-      if (!catalogItem) {
-        throw new Error("Selected product or service is no longer available.");
-      }
+      const invoiceLines = parsedInput.lineItems.map((line) => {
+        const catalogItem = catalogById.get(line.catalogItemId);
+        if (!catalogItem) {
+          throw new Error("Selected product or service is no longer available.");
+        }
 
       return toQuickBooksInvoiceLine({
         amount: Number((line.quantity * line.unitPrice).toFixed(2)),
@@ -3934,11 +4093,26 @@ export async function createDirectQuickBooksInvoice(
         unitPrice: line.unitPrice,
         qbItemId: catalogItem.quickbooksItemId,
         qbItemName: catalogItem.name,
-        taxable: line.taxable
+          taxable: line.taxable
+        });
       });
-    });
 
-    const invoiceResponse = await quickBooksApiRequest<{ Invoice?: unknown }>(tenant, {
+      if (selectedCustomer && !shouldSkipAutomaticFees) {
+        const automaticFeeLines = await buildDirectInvoiceAutomaticFeeLines({
+          tenantId: parsedActor.tenantId as string,
+          integrationId,
+          customerCompanyId: selectedCustomer.id,
+          proposalType: parsedInput.proposalType ?? null,
+          location: {
+            city: selectedCustomer.serviceCity ?? selectedCustomer.billingCity ?? null,
+            state: selectedCustomer.serviceState ?? selectedCustomer.billingState ?? null,
+            postalCode: selectedCustomer.servicePostalCode ?? selectedCustomer.billingPostalCode ?? null
+          }
+        });
+        invoiceLines.push(...automaticFeeLines);
+      }
+
+      const invoiceResponse = await quickBooksApiRequest<{ Invoice?: unknown }>(tenant, {
       path: "/invoice",
       method: "POST",
       body: {
@@ -4009,14 +4183,16 @@ export async function createDirectQuickBooksInvoice(
         entityType: "Tenant",
         entityId: parsedActor.tenantId as string,
         metadata: {
-          invoiceId: verifiedInvoice.id,
-          invoiceNumber: verifiedInvoice.docNumber ?? responseDocNumber ?? null,
-          customerId,
-          customerName,
-          source: selectedCustomer ? "existing_customer" : "walk_in",
-          issueDate: issueDate.toISOString().slice(0, 10),
-          dueDate: dueDate ? dueDate.toISOString().slice(0, 10) : null,
-          sendEmail: parsedInput.sendEmail,
+            invoiceId: verifiedInvoice.id,
+            invoiceNumber: verifiedInvoice.docNumber ?? responseDocNumber ?? null,
+            customerId,
+            customerName,
+            source: shouldSkipAutomaticFees ? "walk_in" : "existing_customer",
+            automaticFeesApplied: selectedCustomer && !shouldSkipAutomaticFees,
+            proposalType: parsedInput.proposalType ?? null,
+            issueDate: issueDate.toISOString().slice(0, 10),
+            dueDate: dueDate ? dueDate.toISOString().slice(0, 10) : null,
+            sendEmail: parsedInput.sendEmail,
           sendStatus: sendResult?.sendStatus ?? "not_sent",
           connectionMode: connectionStatus.appMode
         } satisfies JsonObject

@@ -47,9 +47,8 @@ export const serviceFeeRuleInputSchema = z.object({
 
 type ServiceFeeMatchContext = {
   tenantId: string;
-  inspectionId: string;
-  customerCompanyId: string;
-  siteId: string;
+  customerCompanyId: string | null;
+  siteId: string | null;
   city: string;
   state: string;
   postalCode: string;
@@ -108,7 +107,7 @@ function getRuleSource(rule: {
   return "city_state_rule" as const;
 }
 
-async function getServiceFeeMatchContextTx(tx: Prisma.TransactionClient | typeof prisma, input: {
+async function getInspectionServiceFeeMatchContextTx(tx: Prisma.TransactionClient | typeof prisma, input: {
   tenantId: string;
   inspectionId: string;
 }) {
@@ -134,7 +133,6 @@ async function getServiceFeeMatchContextTx(tx: Prisma.TransactionClient | typeof
 
   return {
     tenantId: input.tenantId,
-    inspectionId: inspection.id,
     customerCompanyId: inspection.customerCompanyId,
     siteId: inspection.siteId,
     city: normalizeText(inspection.site.city),
@@ -143,18 +141,17 @@ async function getServiceFeeMatchContextTx(tx: Prisma.TransactionClient | typeof
   } satisfies ServiceFeeMatchContext;
 }
 
-export async function resolveInspectionServiceFeeTx(tx: Prisma.TransactionClient | typeof prisma, input: {
-  tenantId: string;
-  inspectionId: string;
-}) {
-  const [context, tenant, rules] = await Promise.all([
-    getServiceFeeMatchContextTx(tx, input),
+async function resolveServiceFeeForMatchContextTx(
+  tx: Prisma.TransactionClient | typeof prisma,
+  context: ServiceFeeMatchContext
+) {
+  const [tenant, rules] = await Promise.all([
     tx.tenant.findUnique({
-      where: { id: input.tenantId },
+      where: { id: context.tenantId },
       select: { defaultServiceFeeCode: true, defaultServiceFeeUnitPrice: true }
     }),
     tx.serviceFeeRule.findMany({
-      where: { tenantId: input.tenantId, isActive: true },
+      where: { tenantId: context.tenantId, isActive: true },
       select: {
         id: true,
         customerCompanyId: true,
@@ -192,6 +189,37 @@ export async function resolveInspectionServiceFeeTx(tx: Prisma.TransactionClient
     unitPrice: tenant?.defaultServiceFeeUnitPrice ?? null,
     source: "default"
   } satisfies ResolvedInspectionServiceFee;
+}
+
+export async function resolveInspectionServiceFeeTx(tx: Prisma.TransactionClient | typeof prisma, input: {
+  tenantId: string;
+  inspectionId: string;
+}) {
+  const context = await getInspectionServiceFeeMatchContextTx(tx, input);
+  return resolveServiceFeeForMatchContextTx(tx, context);
+}
+
+export async function resolveServiceFeeForLocationTx(
+  tx: Prisma.TransactionClient | typeof prisma,
+  input: {
+    tenantId: string;
+    customerCompanyId?: string | null;
+    siteId?: string | null;
+    location: {
+      city?: string | null;
+      state?: string | null;
+      postalCode?: string | null;
+    };
+  }
+) {
+  return resolveServiceFeeForMatchContextTx(tx, {
+    tenantId: input.tenantId,
+    customerCompanyId: input.customerCompanyId ?? null,
+    siteId: input.siteId ?? null,
+    city: normalizeText(input.location.city),
+    state: normalizeText(input.location.state),
+    postalCode: normalizeZip(input.location.postalCode)
+  });
 }
 
 export async function getTenantServiceFeeSettings(actor: ActorContext) {

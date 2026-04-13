@@ -18,6 +18,12 @@ const prismaMock = {
   site: {
     findFirst: vi.fn()
   },
+  serviceFeeRule: {
+    findMany: vi.fn()
+  },
+  complianceReportingFeeRule: {
+    findFirst: vi.fn()
+  },
   quickBooksCatalogItem: {
     findMany: vi.fn(),
     findFirst: vi.fn(),
@@ -198,6 +204,8 @@ describe("quickbooks billing sync hardening", () => {
     prismaMock.quickBooksItemCache.upsert.mockResolvedValue(undefined);
     prismaMock.quickBooksItemCache.createMany.mockResolvedValue({ count: 0 });
     prismaMock.quickBooksItemCache.deleteMany.mockResolvedValue({ count: 0 });
+    prismaMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    prismaMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
     prismaMock.quoteLineItem.findMany.mockResolvedValue([]);
     prismaMock.inspectionBillingSummary.findMany.mockResolvedValue([]);
     prismaMock.quickBooksItemMap.upsert.mockResolvedValue(undefined);
@@ -708,6 +716,7 @@ describe("quickbooks billing sync hardening", () => {
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
       {
         customerCompanyId: "customer_1",
+        walkInMode: true,
         issueDate: "2026-04-10",
         dueDate: "2026-05-10",
         memo: "Counter sale",
@@ -731,6 +740,188 @@ describe("quickbooks billing sync hardening", () => {
       invoiceId: "invoice_direct_1",
       invoiceNumber: "INV-401"
     }));
+  });
+
+  it("applies service and compliance fee rules for customer invoices", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue({
+      ...buildTenantConnection(),
+      defaultServiceFeeCode: "SERVICE_FEE",
+      defaultServiceFeeUnitPrice: 20
+    });
+    prismaMock.customerCompany.findFirst.mockResolvedValue({
+      id: "customer_1",
+      name: "Klemme Construction",
+      contactName: "Brett Klemme",
+      billingEmail: "billing@klemme.example",
+      phone: "580-555-0199",
+      billingAddressLine1: "100 Main St",
+      billingAddressLine2: null,
+      billingCity: "Tulsa",
+      billingState: "OK",
+      billingPostalCode: "74103",
+      billingCountry: null,
+      serviceAddressLine1: "100 Main St",
+      serviceAddressLine2: null,
+      serviceCity: "Tulsa",
+      serviceState: "OK",
+      servicePostalCode: "74103",
+      serviceCountry: null,
+      notes: null
+    });
+    prismaMock.customerCompany.findUnique.mockResolvedValue({
+      quickbooksCustomerId: "qb_customer_1"
+    });
+    prismaMock.serviceFeeRule.findMany.mockResolvedValue([
+      {
+        id: "service_rule_1",
+        customerCompanyId: "customer_1",
+        siteId: null,
+        city: null,
+        state: null,
+        zipCode: null,
+        feeCode: "SERVICE_FEE_LOCAL",
+        unitPrice: 95,
+        priority: 100
+      }
+    ]);
+    prismaMock.complianceReportingFeeRule.findFirst.mockResolvedValue({
+      id: "compliance_rule_1",
+      city: "Tulsa",
+      county: null,
+      state: "OK",
+      feeAmount: 18
+    });
+    prismaMock.quickBooksItemMap.findUnique.mockImplementation(async (input: {
+      where: { tenantId_integrationId_internalCode: { internalCode: string } };
+    }) => {
+      const code = input.where.tenantId_integrationId_internalCode.internalCode;
+      if (code === "SERVICE_FEE_LOCAL") {
+        return {
+          id: "mapping_service_fee",
+          tenantId: "tenant_1",
+          integrationId: "realm_1",
+          internalCode: "SERVICE_FEE_LOCAL",
+          internalName: "Service Fee",
+          qbItemId: "qb_fee_item",
+          qbItemName: "Service Fee",
+          qbItemType: "Service",
+          qbSyncToken: "1",
+          qbActive: true,
+          matchSource: "manual"
+        };
+      }
+      if (code === "COMPLIANCE_REPORTING_FEE_KITCHEN_SUPPRESSION") {
+        return {
+          id: "mapping_compliance_fee",
+          tenantId: "tenant_1",
+          integrationId: "realm_1",
+          internalCode: "COMPLIANCE_REPORTING_FEE_KITCHEN_SUPPRESSION",
+          internalName: "Compliance Reporting Fee",
+          qbItemId: "qb_compliance_item",
+          qbItemName: "Compliance Reporting Fee",
+          qbItemType: "Service",
+          qbSyncToken: "1",
+          qbActive: true,
+          matchSource: "manual"
+        };
+      }
+      return null;
+    });
+    prismaMock.quickBooksItemCache.findUnique.mockImplementation(async (input: {
+      where: { tenantId_integrationId_qbItemId: { qbItemId: string } };
+    }) => ({
+      id: `cache_${input.where.tenantId_integrationId_qbItemId.qbItemId}`,
+      tenantId: "tenant_1",
+      integrationId: "realm_1",
+      qbItemId: input.where.tenantId_integrationId_qbItemId.qbItemId,
+      qbItemName: input.where.tenantId_integrationId_qbItemId.qbItemId === "qb_fee_item" ? "Service Fee" : "Compliance Reporting Fee",
+      normalizedName: "fee",
+      qbItemType: "Service",
+      qbActive: true,
+      qbSyncToken: "1",
+      rawJson: {}
+    }));
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([
+      {
+        id: "catalog_1",
+        quickbooksItemId: "qb_item_1",
+        name: "Kitchen suppression inspection",
+        taxable: true
+      }
+    ]);
+    prismaMock.quickBooksCatalogItem.findFirst.mockImplementation(async (input: {
+      where: { quickbooksItemId: string };
+    }) => {
+      if (input.where.quickbooksItemId === "qb_fee_item") {
+        return { taxable: false };
+      }
+      if (input.where.quickbooksItemId === "qb_compliance_item") {
+        return { taxable: false };
+      }
+      return null;
+    });
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({
+        Customer: {
+          Id: "qb_customer_1",
+          SyncToken: "2",
+          DisplayName: "Klemme Construction",
+          PrimaryEmailAddr: { Address: "billing@klemme.example" }
+        }
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        Customer: {
+          Id: "qb_customer_1",
+          SyncToken: "3",
+          DisplayName: "Klemme Construction",
+          PrimaryEmailAddr: { Address: "billing@klemme.example" }
+        }
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        Invoice: {
+          Id: "invoice_direct_2",
+          DocNumber: "INV-402"
+        }
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        Invoice: {
+          Id: "invoice_direct_2",
+          DocNumber: "INV-402"
+        }
+      }));
+
+    const { createDirectQuickBooksInvoice } = await import("../quickbooks");
+
+    await createDirectQuickBooksInvoice(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        customerCompanyId: "customer_1",
+        walkInMode: false,
+        proposalType: "kitchen_suppression",
+        issueDate: "2026-04-10",
+        dueDate: "2026-05-10",
+        memo: "Kitchen system service",
+        sendEmail: false,
+        lineItems: [
+          {
+            catalogItemId: "catalog_1",
+            description: "Kitchen suppression inspection",
+            quantity: 1,
+            unitPrice: 4187.08,
+            taxable: true
+          }
+        ]
+      }
+    );
+
+    const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    expect(createInvoiceBody.Line).toHaveLength(3);
+    expect(createInvoiceBody.Line.map((line: { Description: string }) => line.Description)).toEqual([
+      "Kitchen suppression inspection",
+      "Service Fee",
+      "Compliance Reporting Fee"
+    ]);
   });
 
   it("blocks catalog access when the stored QuickBooks connection mode does not match the app mode", async () => {
