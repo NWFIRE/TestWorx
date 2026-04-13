@@ -16,6 +16,7 @@ import {
 } from "./compliance-reporting-fees";
 import { resolveInspectionServiceFeeTx } from "./service-fees";
 import { saveQuickBooksItemMappingForCode } from "./quickbooks";
+import { syncInspectionArchiveStateTx } from "./inspection-archive";
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -1753,8 +1754,8 @@ export async function updateBillingSummaryStatus(actor: ActorContext, summaryId:
       ? InspectionStatus.completed
       : null;
   if (resetQuickBooksFields) {
-    await prisma.$transaction([
-      prisma.$executeRaw`
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
         UPDATE "InspectionBillingSummary"
         SET "status" = ${status},
             "quickbooksSyncStatus" = 'not_synced',
@@ -1766,38 +1767,46 @@ export async function updateBillingSummaryStatus(actor: ActorContext, summaryId:
             "quickbooksSyncError" = NULL,
             "updatedAt" = NOW()
         WHERE "id" = ${summary.id}
-      `,
-      ...(nextInspectionStatus
-        ? [
-            prisma.inspection.update({
-              where: { id: summary.inspectionId },
-              data: nextInspectionStatus === "completed"
-                ? { status: nextInspectionStatus, isPriority: false, priorityClearedAt: new Date() }
-                : { status: nextInspectionStatus }
-            })
-          ]
-        : [])
-    ]);
-    return;
-  }
+      `;
 
-  await prisma.$transaction([
-    prisma.$executeRaw`
-      UPDATE "InspectionBillingSummary"
-      SET "status" = ${status}, "updatedAt" = NOW()
-      WHERE "id" = ${summary.id}
-    `,
-    ...(nextInspectionStatus
-      ? [
-        prisma.inspection.update({
+      if (nextInspectionStatus) {
+        await tx.inspection.update({
           where: { id: summary.inspectionId },
           data: nextInspectionStatus === "completed"
             ? { status: nextInspectionStatus, isPriority: false, priorityClearedAt: new Date() }
             : { status: nextInspectionStatus }
-        })
-      ]
-      : [])
-  ]);
+        });
+
+        await syncInspectionArchiveStateTx(tx, {
+          tenantId: summary.tenantId,
+          inspectionId: summary.inspectionId
+        });
+      }
+    });
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`
+      UPDATE "InspectionBillingSummary"
+      SET "status" = ${status}, "updatedAt" = NOW()
+      WHERE "id" = ${summary.id}
+    `;
+
+    if (nextInspectionStatus) {
+      await tx.inspection.update({
+          where: { id: summary.inspectionId },
+          data: nextInspectionStatus === "completed"
+            ? { status: nextInspectionStatus, isPriority: false, priorityClearedAt: new Date() }
+            : { status: nextInspectionStatus }
+        });
+
+      await syncInspectionArchiveStateTx(tx, {
+        tenantId: summary.tenantId,
+        inspectionId: summary.inspectionId
+      });
+    }
+  });
 }
 
 export async function updateBillingSummaryNotes(actor: ActorContext, summaryId: string, notes: string) {

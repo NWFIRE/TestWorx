@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import {
+  activeOperationalInspectionStatuses,
   formatInspectionClassificationLabel,
   formatInspectionStatusLabel,
   getAdminSchedulingQueueData,
@@ -90,12 +91,13 @@ export default async function AdminSchedulingQueuePage({
 
   const params = searchParams ? await searchParams : {};
   const requestedStatuses = normalizeInspectionStatusFilters(typeof params.status === "string" ? params.status : null);
+  const effectiveStatuses = requestedStatuses.length ? requestedStatuses : [...activeOperationalInspectionStatuses];
   const requestedClassifications = normalizeInspectionClassificationFilters(typeof params.classification === "string" ? params.classification : null);
   const requestedPriority = normalizeInspectionPriorityFilter(typeof params.priority === "string" ? params.priority : null);
-  const activeStatusParam = requestedStatuses.length ? requestedStatuses.join(",") : "all";
+  const activeStatusParam = effectiveStatuses.join(",");
   const activeClassificationParam = requestedClassifications.length ? requestedClassifications.join(",") : "all";
   const currentPath = buildSchedulingHref({
-    statuses: requestedStatuses,
+    statuses: requestedStatuses.length ? requestedStatuses : undefined,
     classifications: requestedClassifications,
     priority: requestedPriority
   });
@@ -107,7 +109,7 @@ export default async function AdminSchedulingQueuePage({
       tenantId: session.user.tenantId
     },
     {
-      statuses: requestedStatuses,
+      statuses: effectiveStatuses,
       classifications: requestedClassifications,
       priority: requestedPriority
     }
@@ -117,7 +119,7 @@ export default async function AdminSchedulingQueuePage({
     <AppPageShell>
       <PageHeader
         backNavigation={{ label: "Back to admin", fallbackHref: "/app/admin" }}
-        description="Filter the inspection workflow by status so dispatch, follow-up, completed, invoiced, and cancelled work can be reviewed without losing context."
+        description="Stay focused on active dispatch work by default, then opt into a specific status when you need to review something outside the live operational queue."
         eyebrow="Scheduling / dispatch"
         title="Inspection management"
       />
@@ -152,12 +154,12 @@ export default async function AdminSchedulingQueuePage({
         <FilterChipLink
           active={requestedStatuses.length === 0 && requestedClassifications.length === 0 && requestedPriority === "all"}
           href="/app/admin/scheduling"
-          label="All inspections"
+          label="Active inspections"
           tone="slate"
         />
         {statusOptions.map((option) => (
           <FilterChipLink
-            active={requestedStatuses.length > 0 && activeStatusParam === option.value}
+            active={activeStatusParam === option.value}
             href={buildSchedulingHref({
               statuses: [option.value],
               classifications: requestedClassifications,

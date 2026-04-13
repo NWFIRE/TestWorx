@@ -18,6 +18,7 @@ import { assertTenantEntitlementForTenant } from "./billing";
 import type { JsonInputValue, JsonObject } from "./json-types";
 import { getDefaultInspectionRecurrenceFrequency, inspectionTypeRegistry } from "./report-config";
 import { deleteStoredFile } from "./storage";
+import { syncInspectionArchiveStateTx } from "./inspection-archive";
 
 const inspectionTypeEnum = z.enum(Object.keys(inspectionTypeRegistry) as [keyof typeof inspectionTypeRegistry, ...(keyof typeof inspectionTypeRegistry)[]]);
 export const inspectionClassificationValues = [
@@ -1927,6 +1928,17 @@ export async function updateInspectionStatus(
       generatedInspectionsCount = generatedInspections.length;
     }
 
+    await syncInspectionArchiveStateTx(tx, {
+      tenantId,
+      inspectionId,
+      completedAtOverride: status === InspectionStatus.completed
+        ? inspection.completedAt ?? new Date()
+        : null,
+      archivedAtOverride: status === InspectionStatus.completed || status === InspectionStatus.invoiced
+        ? inspection.archivedAt ?? inspection.completedAt ?? new Date()
+        : null
+    });
+
     await createAuditLog(tx, {
       tenantId,
       actorUserId: parsedActor.userId,
@@ -2036,6 +2048,13 @@ export async function completeInspectionWithCloseoutRequest(
           actorUserId: parsedActor.userId,
           inspection
         });
+
+    await syncInspectionArchiveStateTx(tx, {
+      tenantId,
+      inspectionId,
+      completedAtOverride: inspection.completedAt ?? new Date(),
+      archivedAtOverride: inspection.archivedAt ?? inspection.completedAt ?? new Date()
+    });
 
     let closeoutRequestId: string | null = null;
     if (parsedRequest.requestType !== "none") {

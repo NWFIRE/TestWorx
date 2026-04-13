@@ -287,6 +287,7 @@ export async function updateInspectionStatusAdminAction(
     revalidatePath("/app/admin/reports");
     revalidatePath("/app/admin/amendments");
     revalidatePath("/app/admin/billing");
+    revalidatePath("/app/admin/archive");
     revalidatePath("/app/deficiencies");
     revalidatePath("/app/tech");
     revalidatePath(`/app/admin/inspections/${inspectionId}`);
@@ -546,6 +547,7 @@ export async function updateBillingSummaryStatusAction(formData: FormData) {
 
   revalidatePath("/app/admin");
   revalidatePath("/app/admin/billing");
+  revalidatePath("/app/admin/archive");
   revalidatePath(`/app/admin/billing/${inspectionId}`);
 
   const detail = await getAdminBillingSummaryDetail(
@@ -833,6 +835,7 @@ export async function syncBillingSummaryToQuickBooksAction(formData: FormData) {
 
     revalidatePath("/app/admin");
     revalidatePath("/app/admin/billing");
+    revalidatePath("/app/admin/archive");
     revalidatePath(`/app/admin/billing/${inspectionId}`);
 
     const detail = await getAdminBillingSummaryDetail(

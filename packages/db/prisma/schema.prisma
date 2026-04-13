@@ -384,6 +384,19 @@ model Inspection {
     priorityClearedAt     DateTime?
     classificationUpdatedAt DateTime?
     status                InspectionStatus        @default(to_be_completed)
+    completedAt           DateTime?
+    archivedAt            DateTime?
+    archiveCustomerName   String?
+    archiveSiteName       String?
+    archiveSiteAddress    String?
+    archiveSiteCity       String?
+    archiveTechnicianName String?
+    archiveResultStatus   String?
+    archiveInspectionTypes String[]              @default([])
+    archiveDivisions      String[]               @default([])
+    archiveHasDeficiencies Boolean               @default(false)
+    archiveDeficiencyCount Int                   @default(0)
+    archiveHasReport      Boolean                @default(false)
     scheduledStart        DateTime
     scheduledEnd          DateTime?
     notes                 String?
@@ -410,6 +423,12 @@ model Inspection {
 
     @@index([tenantId, inspectionClassification])
     @@index([tenantId, isPriority])
+    @@index([tenantId, archivedAt])
+    @@index([tenantId, completedAt])
+    @@index([tenantId, archiveCustomerName])
+    @@index([tenantId, archiveSiteName])
+    @@index([tenantId, archiveSiteCity])
+    @@index([tenantId, archiveTechnicianName])
   }
 
 model Quote {

@@ -8,6 +8,7 @@ export * from "./customer-import";
 export * from "./deficiency-service";
 export * from "./env";
 export * from "./inspection-billing";
+export * from "./inspection-archive";
 export * from "./inspection-documents";
 export * from "./permissions";
 export * from "./pilot-readiness";

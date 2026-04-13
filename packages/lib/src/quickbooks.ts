@@ -7,6 +7,7 @@ import { actorContextSchema } from "@testworx/types";
 
 import { resolveComplianceReportingFeeTx } from "./compliance-reporting-fees";
 import { assertEnvForFeature, getOptionalQuickBooksEnv, getServerEnv } from "./env";
+import { syncInspectionArchiveStateTx } from "./inspection-archive";
 import type { JsonObject } from "./json-types";
 import { assertTenantContext } from "./permissions";
 import { resolveServiceFeeForLocationTx } from "./service-fees";
@@ -3616,8 +3617,8 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
       throw new Error(`QuickBooks did not verify invoice ${createdDocNumber ?? docNumber} after creation.`);
     }
 
-    await prisma.$transaction([
-      prisma.inspectionBillingSummary.update({
+    await prisma.$transaction(async (tx) => {
+      await tx.inspectionBillingSummary.update({
         where: { id: summary.id },
         data: {
           status: "invoiced",
@@ -3632,12 +3633,16 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
           quickbooksSentAt: null,
           quickbooksSendError: null
         }
-      }),
-      prisma.inspection.update({
+      });
+      await tx.inspection.update({
         where: { id: summary.inspectionId },
         data: { status: InspectionStatus.invoiced }
-      })
-    ]);
+      });
+      await syncInspectionArchiveStateTx(tx, {
+        tenantId: parsedActor.tenantId as string,
+        inspectionId: summary.inspectionId
+      });
+    });
 
     await prisma.auditLog.create({
       data: {

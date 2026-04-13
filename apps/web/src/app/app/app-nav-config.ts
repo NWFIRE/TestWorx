@@ -59,6 +59,15 @@ const adminNavItems: AppNavItem[] = [
     tone: "blue"
   },
   {
+    href: "/app/admin/archive",
+    label: "Inspection Archive",
+    shortLabel: "Archive",
+    abbreviation: "AR",
+    icon: "clipboard",
+    description: "Completed inspection history, reports, and documents",
+    tone: "slate"
+  },
+  {
     href: "/app/admin/quotes",
     label: "Quotes",
     shortLabel: "Quotes",
