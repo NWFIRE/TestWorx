@@ -377,16 +377,20 @@ export async function updateQuoteReminderControlAction(formData: FormData) {
   }
 }
 
-export async function updateQuoteReminderSettingsAction(formData: FormData) {
+export async function updateQuoteReminderSettingsAction(
+  _: { error: string | null; success: string | null },
+  formData: FormData
+) {
   const session = await auth();
   if (!session?.user?.tenantId) {
-    redirect("/login");
+    return { error: "Unauthorized", success: null };
   }
 
-  const currentSettings = await getQuoteReminderSettings(getActor(getQuoteActionSession(session)));
+  const actor = getActor(getQuoteActionSession(session));
+  const currentSettings = await getQuoteReminderSettings(actor);
 
   try {
-    await updateQuoteReminderSettings(getActor(getQuoteActionSession(session)), {
+    await updateQuoteReminderSettings(actor, {
       enabled: formData.get("enabled") === "on",
       sentNotViewedFirstBusinessDays: Number(formData.get("sentNotViewedFirstBusinessDays") ?? currentSettings.sentNotViewedFirstBusinessDays),
       sentNotViewedSecondBusinessDays: Number(formData.get("sentNotViewedSecondBusinessDays") ?? currentSettings.sentNotViewedSecondBusinessDays),
@@ -415,13 +419,12 @@ export async function updateQuoteReminderSettingsAction(formData: FormData) {
         }
       }
     });
-    revalidatePath("/app/admin/settings");
     revalidatePath("/app/admin/quotes");
-    redirect("/app/admin/settings?quoteReminders=updated");
+    return { error: null, success: "Reminder settings saved." };
   } catch (error) {
-    if (isRedirectError(error)) {
-      throw error;
-    }
-    redirect(`/app/admin/settings?quoteReminders=${encodeURIComponent(error instanceof Error ? error.message : "Unable to update quote reminders.")}`);
+    return {
+      error: error instanceof Error ? error.message : "Unable to update quote reminders.",
+      success: null
+    };
   }
 }

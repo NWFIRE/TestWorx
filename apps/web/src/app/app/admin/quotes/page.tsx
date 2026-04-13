@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import {
   formatQuoteReminderStage,
+  getQuoteReminderSettings,
   getQuoteStatusTone,
   getQuoteWorkspaceData,
   quoteStatusLabels,
@@ -22,6 +23,8 @@ import {
   SectionCard,
   StatusBadge
 } from "../operations-ui";
+import { QuoteReminderSettingsCard } from "../settings/quote-reminder-settings-card";
+import { updateQuoteReminderSettingsAction } from "./actions";
 
 function formatReminderStatus(status: string) {
   switch (status) {
@@ -89,10 +92,15 @@ export default async function QuotesPage({
   const selectedSync = syncOptions.some((option) => option.value === params.syncStatus) ? params.syncStatus ?? "all" : "all";
   const query = typeof params.query === "string" ? params.query : "";
 
-  const quotes = await getQuoteWorkspaceData(
-    { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-    { status: selectedStatus, syncStatus: selectedSync, query }
-  );
+  const actor = { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId };
+
+  const [quotes, quoteReminderSettings] = await Promise.all([
+    getQuoteWorkspaceData(
+      actor,
+      { status: selectedStatus, syncStatus: selectedSync, query }
+    ),
+    getQuoteReminderSettings(actor)
+  ]);
 
   return (
     <AppPageShell>
@@ -128,6 +136,10 @@ export default async function QuotesPage({
           />
         ))}
       </FilterBar>
+
+      <SectionCard>
+        <QuoteReminderSettingsCard action={updateQuoteReminderSettingsAction} values={quoteReminderSettings} />
+      </SectionCard>
 
       <SectionCard>
         <form action="/app/admin/quotes" className="grid gap-3 lg:grid-cols-[1.2fr_0.9fr_auto]">

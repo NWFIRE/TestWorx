@@ -9,7 +9,6 @@ import {
   getPaginatedTenantCustomerCompanySettings,
   getQuickBooksItemMappingSettings,
   getPaginatedTenantServiceFeeSettings,
-  getQuoteReminderSettings,
   getTenantBillingSettings,
   getTenantBrandingSettings,
   getTenantQuickBooksConnectionSettings
@@ -35,7 +34,6 @@ import {
   startBillingCheckoutAction,
   updateCustomerCompanyAction,
   updateComplianceReportingFeeRuleAction,
-  updateQuoteReminderSettingsAction,
   updateDefaultServiceFeeAction,
   updateServiceFeeRuleAction,
   updateTenantBrandingAction
@@ -44,7 +42,6 @@ import { CustomerManagementCard } from "./customer-management-card";
 import { BillingPlansSection } from "./billing-plans-section";
 import { ComplianceReportingFeeSettingsCard } from "./compliance-reporting-fee-settings-card";
 import { QuickBooksItemMappingCard } from "./quickbooks-item-mapping-card";
-import { QuoteReminderSettingsCard } from "./quote-reminder-settings-card";
 import { ServiceFeeSettingsCard } from "./service-fee-settings-card";
 import { QuickBooksSettingsCard } from "./quickbooks-settings-card";
 import { SettingsDisclosureCard } from "./settings-disclosure-card";
@@ -327,11 +324,10 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   const complianceFeePage = readPositiveInt(readSearchParam(params, "complianceFeePage", "1"), 1);
   const complianceFeeEditor = readSearchParam(params, "complianceFeeEditor") || null;
 
-  const [billingSettings, brandingSettings, quickBooksSettings, quoteReminderSettings] = await Promise.all([
+  const [billingSettings, brandingSettings, quickBooksSettings] = await Promise.all([
     getTenantBillingSettings(actor),
     getTenantBrandingSettings(actor),
-    getTenantQuickBooksConnectionSettings(actor),
-    getQuoteReminderSettings(actor)
+    getTenantQuickBooksConnectionSettings(actor)
   ]);
   const canManageSubscription = canManageBilling(session.user.role);
   const quickBooksNotice = Array.isArray(params.quickbooks)
@@ -348,7 +344,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   const feesOpen = isSectionOpen(params, "feesOpen");
   const complianceFeesOpen = isSectionOpen(params, "complianceFeesOpen");
   const mappingsOpen = isSectionOpen(params, "mappingsOpen", quickBooksNotice);
-  const quoteRemindersOpen = isSectionOpen(params, "quoteRemindersOpen");
 
   return (
     <AppPageShell density="wide">
@@ -510,17 +505,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
               >
                 <ComplianceReportingFeesSection activeEditor={complianceFeeEditor} actor={actor} page={complianceFeePage} />
               </Suspense>
-            </SettingsDisclosureCard>
-            <SettingsDisclosureCard
-              description="Review reminder timing, enable or disable automated follow-up, and update the customer-facing email templates only when you need them."
-              desktopSpan="fullWhenOpen"
-              eyebrow="Quote reminders"
-              initialOpen={quoteRemindersOpen}
-              openLabel="Open quote reminders"
-              queryKey="quoteRemindersOpen"
-              title="Automated follow-up"
-            >
-              <QuoteReminderSettingsCard action={updateQuoteReminderSettingsAction} values={quoteReminderSettings} />
             </SettingsDisclosureCard>
             <SectionCard>
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing settings</p>
