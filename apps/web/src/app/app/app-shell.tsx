@@ -364,7 +364,7 @@ export function AppShell({
   const closeDrawer = () => setDrawerOpen(false);
 
   return (
-    <div className="min-h-[100dvh] bg-paper lg:flex">
+    <div className="min-h-[100dvh] bg-paper lg:flex lg:h-[100dvh] lg:overflow-hidden">
       {navItems.length > 0 ? (
         <aside
           aria-label="Primary navigation"
@@ -448,7 +448,7 @@ export function AppShell({
         </>
       ) : null}
 
-      <div className="flex min-h-[100dvh] min-w-0 flex-1 flex-col">
+      <div className="flex min-h-[100dvh] min-w-0 flex-1 flex-col lg:h-[100dvh] lg:min-h-0">
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
           <div
             className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8"
@@ -486,7 +486,7 @@ export function AppShell({
         </header>
 
         <main
-          className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8"
+          className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:overflow-y-auto lg:px-8"
           style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
         >
           <div className="mx-auto w-full max-w-[1700px] min-w-0">{children}</div>
