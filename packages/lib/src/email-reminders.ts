@@ -548,6 +548,7 @@ export async function getEmailReminderWorkspaceData(
     inspectionType?: string;
     division?: string;
     page?: number;
+    customerCompanyIds?: string[];
   }
 ) {
   const parsedActor = parseActor(actor);
@@ -559,11 +560,13 @@ export async function getEmailReminderWorkspaceData(
   const customers = await fetchRecipientCustomers({
     tenantId,
     query: input?.query?.trim() ?? "",
-    hasValidEmail: input?.hasValidEmail ?? "all"
+    hasValidEmail: input?.hasValidEmail ?? "all",
+    customerCompanyIds: input?.customerCompanyIds
   });
   const taskRows = await fetchRecipientTaskRows({
     tenantId,
     dueMonth,
+    customerCompanyIds: input?.customerCompanyIds,
     inspectionType: input?.inspectionType ?? "",
     division: input?.division ?? ""
   });

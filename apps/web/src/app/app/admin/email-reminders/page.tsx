@@ -31,6 +31,10 @@ export default async function EmailRemindersPage({
   }
 
   const params = searchParams ? await searchParams : {};
+  const initialCustomerCompanyIds =
+    typeof params.customerCompanyId === "string" && params.customerCompanyId.trim()
+      ? [params.customerCompanyId.trim()]
+      : [];
   const data = await getEmailReminderWorkspaceData(
     {
       userId: session.user.id,
@@ -45,7 +49,8 @@ export default async function EmailRemindersPage({
         : undefined,
       inspectionType: typeof params.inspectionType === "string" ? params.inspectionType : undefined,
       division: typeof params.division === "string" ? params.division : undefined,
-      page: typeof params.page === "string" ? Number(params.page) : undefined
+      page: typeof params.page === "string" ? Number(params.page) : undefined,
+      customerCompanyIds: initialCustomerCompanyIds
     }
   );
 
@@ -60,9 +65,7 @@ export default async function EmailRemindersPage({
       />
       <EmailRemindersWorkspace
         data={data}
-        initialCustomerCompanyIds={
-          typeof params.customerCompanyId === "string" && params.customerCompanyId ? [params.customerCompanyId] : []
-        }
+        initialCustomerCompanyIds={initialCustomerCompanyIds}
         initialTemplateKey={typeof params.templateKey === "string" ? params.templateKey : undefined}
         sendAction={sendEmailRemindersAction}
       />
