@@ -62,8 +62,6 @@ We appreciate the opportunity to help keep your property safe and compliant.
 
 Best regards,
 {{companyName}}
-{{companyPhone}}
-{{companyEmail}}
 
 If your inspection has already been completed or scheduled, please disregard this message.`
   }
