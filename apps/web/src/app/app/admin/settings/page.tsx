@@ -358,7 +358,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
             supportReference={quickBooksSettings.supportReference}
           />
         </div>
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid items-start gap-6 lg:grid-cols-2">
           <SettingsDisclosureCard
             description="Review stored QuickBooks item ids for each internal billing code, fix inactive references, and confirm suggested matches without loading the full section until you need it."
             desktopSpan="fullWhenOpen"
@@ -434,7 +434,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
               <ComplianceReportingFeesSection activeEditor={complianceFeeEditor} actor={actor} page={complianceFeePage} />
             </Suspense>
           </SettingsDisclosureCard>
-          <SectionCard>
+          <SectionCard className="self-start">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing settings</p>
             <h3 className="mt-2 text-2xl font-semibold text-ink">Current subscription</h3>
             <p className="mt-3 text-sm text-slate-500">Plan: {billingSettings.tenant.subscriptionPlan?.name ?? "Not assigned"}</p>

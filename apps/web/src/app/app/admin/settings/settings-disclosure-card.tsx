@@ -61,7 +61,7 @@ export function SettingsDisclosureCard({
         : "";
 
   return (
-    <div className={`rounded-[2rem] border border-slate-200 bg-white shadow-panel ${spanClass}`}>
+    <div className={`self-start rounded-[2rem] border border-slate-200 bg-white shadow-panel ${spanClass}`}>
       <div className="flex flex-wrap items-start justify-between gap-4 p-6">
         <div className="max-w-2xl">
           <p className="text-sm uppercase tracking-[0.25em] text-slate-500">{eyebrow}</p>
