@@ -37,10 +37,10 @@ export function AcceptInviteForm({
   );
 
   return (
-    <form action={formAction} className="space-y-5 rounded-3xl bg-white p-8 shadow-panel">
+    <form action={formAction} className="space-y-5 rounded-3xl bg-white p-5 shadow-panel sm:p-8">
       <input name="token" type="hidden" value={token} />
 
-      <div className="grid gap-4 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+      <div className="grid gap-4 rounded-3xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
         <div>
           <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Workspace invite</p>
           <h2 className="mt-2 text-2xl font-semibold text-ink">{invite.tenant.name}</h2>
@@ -50,13 +50,13 @@ export function AcceptInviteForm({
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Email</p>
-            <p className="mt-1 text-sm font-medium text-slate-900">{invite.email}</p>
+            <p className="mt-1 break-all text-sm font-medium leading-5 text-slate-900">{invite.email}</p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Suggested name</p>
-            <p className="mt-1 text-sm font-medium text-slate-900">{invite.name ?? "Add your name below"}</p>
+            <p className="mt-1 break-words text-sm font-medium leading-5 text-slate-900">{invite.name ?? "Add your name below"}</p>
           </div>
         </div>
       </div>

@@ -22,22 +22,22 @@ export default async function AcceptInvitePage({
 
   return (
     <main
-      className="min-h-screen px-6 py-10"
+      className="min-h-screen px-4 py-6 sm:px-6 sm:py-10"
       style={{
         backgroundImage:
           "radial-gradient(circle at top, rgb(var(--tenant-primary-rgb) / 0.15), transparent 35%), linear-gradient(135deg, #F8FAFC, #E2E8F0)"
       }}
     >
       <div className="mx-auto grid min-h-[85vh] max-w-6xl gap-10 lg:grid-cols-[1.05fr_0.95fr]">
-        <section className="flex flex-col justify-between rounded-[2rem] bg-slateblue p-8 text-white shadow-panel">
+        <section className="flex flex-col justify-between rounded-[2rem] bg-slateblue p-6 text-white shadow-panel sm:p-8">
           <div className="space-y-6">
             <span className="inline-flex rounded-full border border-white/25 px-3 py-1 text-xs uppercase tracking-[0.3em] text-white/70">TradeWorx</span>
-            <h1 className="max-w-xl text-4xl font-semibold leading-tight md:text-5xl">Join your workspace with a secure invite.</h1>
+            <h1 className="max-w-xl text-3xl font-semibold leading-tight sm:text-4xl md:text-5xl">Join your workspace with a secure invite.</h1>
             <p className="max-w-2xl text-base text-white/75 md:text-lg">
               Finish account setup, create your password, and step directly into your company workspace without extra admin back-and-forth.
             </p>
           </div>
-          <div className="rounded-3xl bg-white/10 p-6 backdrop-blur">
+          <div className="rounded-3xl bg-white/10 p-5 backdrop-blur sm:p-6">
             <p className="text-sm font-semibold uppercase tracking-[0.25em] text-white/60">Onboarding</p>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-white/75">
               Invite links are single-use and expire automatically. If your link has expired, ask your administrator to resend it from the Team and Portal Access workspace.
