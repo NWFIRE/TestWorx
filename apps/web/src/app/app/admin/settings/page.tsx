@@ -359,104 +359,108 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
           />
         </div>
         <div className="grid items-start gap-6 lg:grid-cols-2">
-          <SettingsDisclosureCard
-            description="Review stored QuickBooks item ids for each internal billing code, fix inactive references, and confirm suggested matches without loading the full section until you need it."
-            desktopSpan="fullWhenOpen"
-            eyebrow="QuickBooks item mappings"
-            initialOpen={mappingsOpen}
-            openLabel="Open item mappings"
-            queryKey="mappingsOpen"
-            title="Map billable codes to QuickBooks items"
-          >
-            <Suspense
-              key="quickbooks-mappings"
-              fallback={
-                <LazySectionCard
-                  actionHref={buildSettingsHref(params, { mappingsOpen: 1 })}
-                  actionLabel="Reload section"
-                  description="Loading stored QuickBooks mappings and suggested matches..."
-                  eyebrow="QuickBooks item mappings"
-                  title="Map billable codes to QuickBooks items"
-                  tone="loading"
-                />
-              }
+          <div className="space-y-6">
+            <SettingsDisclosureCard
+              description="Review stored QuickBooks item ids for each internal billing code, fix inactive references, and confirm suggested matches without loading the full section until you need it."
+              desktopSpan="fullWhenOpen"
+              eyebrow="QuickBooks item mappings"
+              initialOpen={mappingsOpen}
+              openLabel="Open item mappings"
+              queryKey="mappingsOpen"
+              title="Map billable codes to QuickBooks items"
             >
-              <QuickBooksMappingsSection actor={actor} notice={quickBooksNotice} />
-            </Suspense>
-          </SettingsDisclosureCard>
-          <SettingsDisclosureCard
-            description="Load service fee rules only when you open the section. Rules stay paginated and keep their own loading, empty, and error states."
-            desktopSpan="fullWhenOpen"
-            eyebrow="Inspection service fees"
-            initialOpen={feesOpen}
-            openLabel="Open service fee rules"
-            queryKey="feesOpen"
-            title="Default fee and location rules"
-          >
-            <Suspense
-              key={`fees-${feesPage}`}
-              fallback={
-                <LazySectionCard
-                  actionHref={buildSettingsHref(params, { feesOpen: 1, feesPage })}
-                  actionLabel="Reload section"
-                  description="Loading the current service fee rules page..."
-                  eyebrow="Inspection service fees"
-                  title="Default fee and location rules"
-                  tone="loading"
-                />
-              }
+              <Suspense
+                key="quickbooks-mappings"
+                fallback={
+                  <LazySectionCard
+                    actionHref={buildSettingsHref(params, { mappingsOpen: 1 })}
+                    actionLabel="Reload section"
+                    description="Loading stored QuickBooks mappings and suggested matches..."
+                    eyebrow="QuickBooks item mappings"
+                    title="Map billable codes to QuickBooks items"
+                    tone="loading"
+                  />
+                }
+              >
+                <QuickBooksMappingsSection actor={actor} notice={quickBooksNotice} />
+              </Suspense>
+            </SettingsDisclosureCard>
+            <SettingsDisclosureCard
+              description="Load jurisdiction-based compliance reporting fees only when needed. Rules stay paginated and automatically drive matching compliance fee lines in billing."
+              desktopSpan="fullWhenOpen"
+              eyebrow="Compliance reporting fees"
+              initialOpen={complianceFeesOpen}
+              openLabel="Open compliance reporting fees"
+              queryKey="complianceFeesOpen"
+              title="Jurisdiction-based reporting fees"
             >
-              <ServiceFeesSection activeEditor={feeEditor} actor={actor} page={feesPage} />
-            </Suspense>
-          </SettingsDisclosureCard>
-          <SettingsDisclosureCard
-            description="Load jurisdiction-based compliance reporting fees only when needed. Rules stay paginated and automatically drive matching compliance fee lines in billing."
-            desktopSpan="fullWhenOpen"
-            eyebrow="Compliance reporting fees"
-            initialOpen={complianceFeesOpen}
-            openLabel="Open compliance reporting fees"
-            queryKey="complianceFeesOpen"
-            title="Jurisdiction-based reporting fees"
-          >
-            <Suspense
-              key={`compliance-fees-${complianceFeePage}`}
-              fallback={
-                <LazySectionCard
-                  actionHref={buildSettingsHref(params, { complianceFeesOpen: 1, complianceFeePage })}
-                  actionLabel="Reload section"
-                  description="Loading the current compliance reporting fee rules page..."
-                  eyebrow="Compliance reporting fees"
-                  title="Jurisdiction-based reporting fees"
-                  tone="loading"
-                />
-              }
+              <Suspense
+                key={`compliance-fees-${complianceFeePage}`}
+                fallback={
+                  <LazySectionCard
+                    actionHref={buildSettingsHref(params, { complianceFeesOpen: 1, complianceFeePage })}
+                    actionLabel="Reload section"
+                    description="Loading the current compliance reporting fee rules page..."
+                    eyebrow="Compliance reporting fees"
+                    title="Jurisdiction-based reporting fees"
+                    tone="loading"
+                  />
+                }
+              >
+                <ComplianceReportingFeesSection activeEditor={complianceFeeEditor} actor={actor} page={complianceFeePage} />
+              </Suspense>
+            </SettingsDisclosureCard>
+          </div>
+          <div className="space-y-6">
+            <SettingsDisclosureCard
+              description="Load service fee rules only when you open the section. Rules stay paginated and keep their own loading, empty, and error states."
+              desktopSpan="fullWhenOpen"
+              eyebrow="Inspection service fees"
+              initialOpen={feesOpen}
+              openLabel="Open service fee rules"
+              queryKey="feesOpen"
+              title="Default fee and location rules"
             >
-              <ComplianceReportingFeesSection activeEditor={complianceFeeEditor} actor={actor} page={complianceFeePage} />
-            </Suspense>
-          </SettingsDisclosureCard>
-          <SectionCard className="self-start">
-            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing settings</p>
-            <h3 className="mt-2 text-2xl font-semibold text-ink">Current subscription</h3>
-            <p className="mt-3 text-sm text-slate-500">Plan: {billingSettings.tenant.subscriptionPlan?.name ?? "Not assigned"}</p>
-            <p className="mt-2 text-sm text-slate-500">Billing email: {billingSettings.tenant.billingEmail ?? "Not set"}</p>
-            <p className="mt-2 text-sm text-slate-500">Stripe status: {billingSettings.tenant.stripeSubscriptionStatus ?? "Not connected"}</p>
-            <p className="mt-2 text-sm text-slate-500">Current period end: {billingSettings.tenant.stripeCurrentPeriodEndsAt ? new Date(billingSettings.tenant.stripeCurrentPeriodEndsAt).toLocaleDateString() : "Not synced yet"}</p>
-            <p className="mt-2 text-sm text-slate-500">Cancel at period end: {billingSettings.tenant.stripeCancelAtPeriodEnd ? "Yes" : "No"}</p>
-            <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              <p>{billingSettings.config.enabled ? "Stripe is configured and ready for checkout sessions." : "Stripe env vars are not fully configured yet. Plan selection is shown, but checkout buttons are disabled until env configuration is completed."}</p>
-              <p className="mt-2">Webhook sync: {billingSettings.config.webhookConfigured ? "Configured" : "Missing STRIPE_WEBHOOK_SECRET"}</p>
-              <p className="mt-2">Advanced recurrence: {billingSettings.entitlements.advancedRecurrence ? "Enabled" : "Upgrade required"}</p>
-              <p className="mt-2">Uploaded inspection PDFs: {billingSettings.entitlements.uploadedInspectionPdfs ? "Enabled" : "Upgrade required"}</p>
-              {!canManageSubscription ? <p className="mt-2">Subscription checkout and Stripe portal access remain limited to tenant admins.</p> : null}
-            </div>
-            {canManageSubscription ? (
-              <form action={openBillingPortalAction} className="mt-4">
-                <button className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-50" disabled={!billingSettings.config.enabled || !billingSettings.tenant.stripeCustomerId} type="submit">
-                  Open Stripe billing portal
-                </button>
-              </form>
-            ) : null}
-          </SectionCard>
+              <Suspense
+                key={`fees-${feesPage}`}
+                fallback={
+                  <LazySectionCard
+                    actionHref={buildSettingsHref(params, { feesOpen: 1, feesPage })}
+                    actionLabel="Reload section"
+                    description="Loading the current service fee rules page..."
+                    eyebrow="Inspection service fees"
+                    title="Default fee and location rules"
+                    tone="loading"
+                  />
+                }
+              >
+                <ServiceFeesSection activeEditor={feeEditor} actor={actor} page={feesPage} />
+              </Suspense>
+            </SettingsDisclosureCard>
+            <SectionCard className="self-start">
+              <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing settings</p>
+              <h3 className="mt-2 text-2xl font-semibold text-ink">Current subscription</h3>
+              <p className="mt-3 text-sm text-slate-500">Plan: {billingSettings.tenant.subscriptionPlan?.name ?? "Not assigned"}</p>
+              <p className="mt-2 text-sm text-slate-500">Billing email: {billingSettings.tenant.billingEmail ?? "Not set"}</p>
+              <p className="mt-2 text-sm text-slate-500">Stripe status: {billingSettings.tenant.stripeSubscriptionStatus ?? "Not connected"}</p>
+              <p className="mt-2 text-sm text-slate-500">Current period end: {billingSettings.tenant.stripeCurrentPeriodEndsAt ? new Date(billingSettings.tenant.stripeCurrentPeriodEndsAt).toLocaleDateString() : "Not synced yet"}</p>
+              <p className="mt-2 text-sm text-slate-500">Cancel at period end: {billingSettings.tenant.stripeCancelAtPeriodEnd ? "Yes" : "No"}</p>
+              <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                <p>{billingSettings.config.enabled ? "Stripe is configured and ready for checkout sessions." : "Stripe env vars are not fully configured yet. Plan selection is shown, but checkout buttons are disabled until env configuration is completed."}</p>
+                <p className="mt-2">Webhook sync: {billingSettings.config.webhookConfigured ? "Configured" : "Missing STRIPE_WEBHOOK_SECRET"}</p>
+                <p className="mt-2">Advanced recurrence: {billingSettings.entitlements.advancedRecurrence ? "Enabled" : "Upgrade required"}</p>
+                <p className="mt-2">Uploaded inspection PDFs: {billingSettings.entitlements.uploadedInspectionPdfs ? "Enabled" : "Upgrade required"}</p>
+                {!canManageSubscription ? <p className="mt-2">Subscription checkout and Stripe portal access remain limited to tenant admins.</p> : null}
+              </div>
+              {canManageSubscription ? (
+                <form action={openBillingPortalAction} className="mt-4">
+                  <button className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-50" disabled={!billingSettings.config.enabled || !billingSettings.tenant.stripeCustomerId} type="submit">
+                    Open Stripe billing portal
+                  </button>
+                </form>
+              ) : null}
+            </SectionCard>
+          </div>
         </div>
       </WorkspaceSplit>
       <BillingPlansSection
