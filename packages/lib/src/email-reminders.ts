@@ -4,13 +4,14 @@ import type { ActorContext, InspectionType } from "@testworx/types";
 import { actorContextSchema } from "@testworx/types";
 import { z } from "zod";
 
-import { sendInspectionReminderEmail } from "./account-email";
+import { sendCustomerBrandedEmail } from "./account-email";
 import { resolveTenantBranding } from "./branding";
 import { mapInspectionTypeToComplianceReportingDivision } from "./compliance-reporting-fees";
 import { assertTenantContext } from "./permissions";
 import { inspectionTypeRegistry } from "./report-config";
 
-const emailReminderTemplateKey = "inspection_due_this_month";
+const inspectionReminderTemplateKey = "inspection_due_this_month";
+const customerWelcomeTemplateKey = "customer_welcome";
 const emailReminderPageSize = 20;
 const liveInspectionStatuses = [
   InspectionStatus.to_be_completed,
@@ -41,13 +42,23 @@ export type EmailReminderTemplateDefinition = {
   label: string;
   subject: string;
   body: string;
+  category: "reminder" | "welcome";
+  previewEyebrow: string;
+  previewTitle: string;
+  previewFooter?: string;
+  sendSuccessLabel: string;
 };
 
 export const emailReminderTemplateDefinitions: EmailReminderTemplateDefinition[] = [
   {
-    key: emailReminderTemplateKey,
+    key: inspectionReminderTemplateKey,
     label: "Inspection due this month",
     subject: "Your Fire Inspection Is Due This Month",
+    category: "reminder",
+    previewEyebrow: "Inspection reminder",
+    previewTitle: "Your fire inspection is due this month",
+    previewFooter: "If your inspection has already been completed or scheduled, please disregard this message.",
+    sendSuccessLabel: "reminder email",
     body: `Hello {{customerName}},
 
 This is a reminder that your fire system inspection is due this month.
@@ -64,8 +75,44 @@ Best regards,
 {{companyName}}
 
 If your inspection has already been completed or scheduled, please disregard this message.`
+  },
+  {
+    key: customerWelcomeTemplateKey,
+    label: "Customer Welcome Email",
+    subject: "Welcome to {{companyName}}",
+    category: "welcome",
+    previewEyebrow: "Customer welcome",
+    previewTitle: "Welcome to {{companyName}}",
+    sendSuccessLabel: "welcome email",
+    body: `Hello {{customerName}},
+
+Welcome to {{companyName}} - we're glad to have the opportunity to support your property.
+
+Our team specializes in fire and life safety systems, and we're here to ensure your inspections, service, and compliance needs are handled with consistency and attention to detail.
+
+You can expect a streamlined experience with clear communication, organized reporting, and reliable scheduling as we work together.
+
+A member of our team may be reaching out to coordinate upcoming service or introduce themselves as your point of contact. If you have a preferred schedule, site-specific instructions, or any immediate questions, feel free to reply to this email and we'll take care of the rest.
+
+We look forward to working with you.
+
+Best regards,
+{{companyName}}
+{{companyPhone}}
+{{companyEmail}}
+
+If there is anything you would like us to be aware of regarding your property or systems, please don't hesitate to let us know.`
   }
 ];
+
+function getEmailTemplateDefinition(templateKey: string) {
+  const fallbackTemplate = emailReminderTemplateDefinitions[0];
+  if (!fallbackTemplate) {
+    throw new Error("Email templates are not configured.");
+  }
+
+  return emailReminderTemplateDefinitions.find((template) => template.key === templateKey) ?? fallbackTemplate;
+}
 
 const sendManualEmailRemindersInputSchema = z.object({
   dueMonth: z.string().regex(/^\d{4}-\d{2}$/),
@@ -146,6 +193,10 @@ function humanizeValue(value: string) {
 function normalizeReminderText(value: string) {
   return value
     .replace(/\r\n/g, "\n")
+    .replaceAll("â€™", "'")
+    .replaceAll("â€”", "-")
+    .replaceAll("’", "'")
+    .replaceAll("—", "-")
     .replace(/Hello\s+,/g, "Hello,")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -640,6 +691,7 @@ export async function getEmailReminderWorkspaceData(
       recipientEmail: entry.recipientEmail,
       subjectSnapshot: entry.subjectSnapshot,
       templateKey: entry.templateKey,
+      templateLabel: getEmailTemplateDefinition(entry.templateKey).label,
       sentAt: entry.sentAt.toISOString(),
       sentByName: entry.sentBy.name,
       dueMonth: entry.dueMonth,
@@ -656,6 +708,7 @@ export async function sendManualEmailReminders(
   const parsedActor = parseActor(actor);
   ensureAdmin(parsedActor);
   const parsedInput = sendManualEmailRemindersInputSchema.parse(input);
+  const template = getEmailTemplateDefinition(parsedInput.templateKey);
 
   const tenantId = parsedActor.tenantId as string;
   const tenant = await prisma.tenant.findFirst({
@@ -695,7 +748,7 @@ export async function sendManualEmailReminders(
   }).filter((recipient) => parsedInput.customerCompanyIds.includes(recipient.customerCompanyId));
 
   if (recipients.length === 0) {
-    throw new Error("No eligible reminder recipients were found for the selected customers.");
+    throw new Error("No eligible email recipients were found for the selected customers.");
   }
 
   const logsToCreate: Array<Prisma.EmailReminderSendLogCreateManyInput> = [];
@@ -716,12 +769,15 @@ export async function sendManualEmailReminders(
     });
     const mergedSubject = mergeEmailReminderTemplate(parsedInput.subject, mergeFields);
     const mergedBody = mergeEmailReminderTemplate(parsedInput.body, mergeFields);
-    const delivery = await sendInspectionReminderEmail({
+    const delivery = await sendCustomerBrandedEmail({
       recipientEmail: recipient.recipientEmail,
       recipientName: recipient.customerName || "Customer",
       tenantName: tenant.name,
       subjectLine: mergedSubject,
       bodyText: mergedBody,
+      eyebrow: template.previewEyebrow,
+      title: mergeEmailReminderTemplate(template.previewTitle, mergeFields),
+      footer: template.previewFooter,
       branding: {
         companyName: branding.legalBusinessName,
         phone: branding.phone,
@@ -745,12 +801,12 @@ export async function sendManualEmailReminders(
       sentByUserId: parsedActor.userId,
       templateKey: parsedInput.templateKey,
       recipientEmail: recipient.recipientEmail,
-      dueMonth: parsedInput.dueMonth,
-      siteSummary: recipient.siteSummary,
+      dueMonth: template.category === "reminder" ? parsedInput.dueMonth : null,
+      siteSummary: template.category === "reminder" ? recipient.siteSummary : null,
       subjectSnapshot: mergedSubject,
       bodySnapshot: mergedBody,
-      inspectionTypes: recipient.inspectionTypes,
-      divisions: recipient.divisions,
+      inspectionTypes: template.category === "reminder" ? recipient.inspectionTypes : [],
+      divisions: template.category === "reminder" ? recipient.divisions : [],
       messageId: delivery.messageId,
       provider: delivery.provider,
       providerReason: delivery.reason,
@@ -769,10 +825,11 @@ export async function sendManualEmailReminders(
     data: {
       tenantId,
       actorUserId: parsedActor.userId,
-      action: "email_reminder.manual_send",
+      action: template.category === "welcome" ? "customer_email.manual_send" : "email_reminder.manual_send",
       entityType: "EmailReminderSendLog",
-      entityId: parsedInput.dueMonth,
+      entityId: parsedInput.templateKey,
       metadata: {
+        templateKey: parsedInput.templateKey,
         dueMonth: parsedInput.dueMonth,
         sentCount,
         failedCount,
@@ -782,6 +839,7 @@ export async function sendManualEmailReminders(
   });
 
   return {
+    templateLabel: template.sendSuccessLabel,
     sentCount,
     failedCount,
     totalCount: recipients.length

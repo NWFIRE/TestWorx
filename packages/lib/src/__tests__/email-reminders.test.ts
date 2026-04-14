@@ -19,14 +19,14 @@ const prismaMock = {
   }
 };
 
-const sendInspectionReminderEmailMock = vi.fn();
+const sendCustomerBrandedEmailMock = vi.fn();
 
 vi.mock("@testworx/db", () => ({
   prisma: prismaMock
 }));
 
 vi.mock("../account-email", () => ({
-  sendInspectionReminderEmail: sendInspectionReminderEmailMock
+  sendCustomerBrandedEmail: sendCustomerBrandedEmailMock
 }));
 
 describe("email reminders", () => {
@@ -285,7 +285,7 @@ describe("email reminders", () => {
         }
       }
     ]);
-    sendInspectionReminderEmailMock.mockResolvedValue({
+    sendCustomerBrandedEmailMock.mockResolvedValue({
       sent: true,
       provider: "resend",
       messageId: "msg_1",
@@ -306,7 +306,7 @@ describe("email reminders", () => {
     );
 
     expect(result.sentCount).toBe(1);
-    expect(sendInspectionReminderEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+    expect(sendCustomerBrandedEmailMock).toHaveBeenCalledWith(expect.objectContaining({
       recipientEmail: "office@klemme.com",
       subjectLine: "Your Fire Inspection Is Due This Month"
     }));
@@ -351,7 +351,7 @@ describe("email reminders", () => {
         email: "accounting@nwfireandsafety.com"
       }
     });
-    sendInspectionReminderEmailMock.mockResolvedValue({
+    sendCustomerBrandedEmailMock.mockResolvedValue({
       sent: true,
       provider: "resend",
       messageId: "msg_2",
@@ -372,8 +372,90 @@ describe("email reminders", () => {
     );
 
     expect(result.sentCount).toBe(1);
-    expect(sendInspectionReminderEmailMock).toHaveBeenCalledWith(
+    expect(sendCustomerBrandedEmailMock).toHaveBeenCalledWith(
       expect.objectContaining({ recipientEmail: "hello@walkin.test" })
+    );
+  });
+
+  it("supports the customer welcome template with branded sends and clean logging", async () => {
+    prismaMock.customerCompany.findMany.mockResolvedValue([
+      {
+        id: "customer_3",
+        name: "Baptist Village",
+        contactName: "Holly Rider",
+        billingEmail: "hrider@baptistvillage.org",
+        phone: "580-249-2600",
+        serviceAddressLine1: "300 Baptist Village Dr",
+        serviceCity: "Enid",
+        serviceState: "OK",
+        servicePostalCode: "73703",
+        billingAddressLine1: "300 Baptist Village Dr",
+        billingCity: "Enid",
+        billingState: "OK",
+        billingPostalCode: "73703",
+        sites: []
+      }
+    ]);
+    prismaMock.inspectionTask.findMany.mockResolvedValue([]);
+    prismaMock.tenant.findFirst.mockResolvedValue({
+      id: "tenant_1",
+      name: "Northwest Fire & Safety",
+      billingEmail: "billing@nwfireandsafety.com",
+      branding: {
+        legalBusinessName: "Northwest Fire & Safety",
+        phone: "580-540-3119",
+        email: "accounting@nwfireandsafety.com"
+      }
+    });
+    sendCustomerBrandedEmailMock.mockResolvedValue({
+      sent: true,
+      provider: "resend",
+      messageId: "msg_welcome",
+      error: null,
+      reason: "sent"
+    });
+    prismaMock.emailReminderSendLog.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    const { getEmailReminderWorkspaceData, sendManualEmailReminders } = await import("../email-reminders");
+    const workspace = await getEmailReminderWorkspaceData(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { dueMonth: "2026-04" }
+    );
+
+    expect(workspace.templates.map((template) => template.key)).toContain("customer_welcome");
+
+    const result = await sendManualEmailReminders(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        dueMonth: "2026-04",
+        customerCompanyIds: ["customer_3"],
+        templateKey: "customer_welcome",
+        subject: "Welcome to {{companyName}}",
+        body: "Hello {{customerName}},\n\nReach us at {{companyPhone}} or {{companyEmail}}."
+      }
+    );
+
+    expect(result.templateLabel).toBe("welcome email");
+    expect(sendCustomerBrandedEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientEmail: "hrider@baptistvillage.org",
+        eyebrow: "Customer welcome",
+        subjectLine: "Welcome to Northwest Fire & Safety",
+        title: "Welcome to Northwest Fire & Safety"
+      })
+    );
+    expect(prismaMock.emailReminderSendLog.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({
+            templateKey: "customer_welcome",
+            dueMonth: null,
+            siteSummary: null,
+            inspectionTypes: [],
+            divisions: []
+          })
+        ]
+      })
     );
   });
 });

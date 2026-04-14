@@ -10,14 +10,16 @@ import { EmailRemindersWorkspace } from "./email-reminders-workspace";
 export default async function EmailRemindersPage({
   searchParams
 }: {
-  searchParams?: Promise<{
-    query?: string;
-    dueMonth?: string;
-    hasValidEmail?: "all" | "yes" | "no";
-    inspectionType?: string;
-    division?: string;
-    page?: string;
-  }>;
+      searchParams?: Promise<{
+        query?: string;
+        dueMonth?: string;
+        hasValidEmail?: "all" | "yes" | "no";
+        inspectionType?: string;
+        division?: string;
+        page?: string;
+        templateKey?: string;
+        customerCompanyId?: string;
+      }>;
 }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -53,10 +55,17 @@ export default async function EmailRemindersPage({
         backNavigation={{ fallbackHref: "/app/admin", label: "Back to admin" }}
         eyebrow="Customer communications"
         title="Email Reminders"
-        description="Prepare and send branded customer reminder emails."
+        description="Prepare, review, and send branded customer emails with premium company presentation."
         contentWidth="full"
       />
-      <EmailRemindersWorkspace data={data} sendAction={sendEmailRemindersAction} />
+      <EmailRemindersWorkspace
+        data={data}
+        initialCustomerCompanyIds={
+          typeof params.customerCompanyId === "string" && params.customerCompanyId ? [params.customerCompanyId] : []
+        }
+        initialTemplateKey={typeof params.templateKey === "string" ? params.templateKey : undefined}
+        sendAction={sendEmailRemindersAction}
+      />
     </AppPageShell>
   );
 }

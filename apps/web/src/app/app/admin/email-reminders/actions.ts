@@ -29,8 +29,8 @@ export async function sendEmailRemindersAction(input: {
       error: null,
       message:
         result.failedCount > 0
-          ? `Sent ${result.sentCount} reminder${result.sentCount === 1 ? "" : "s"}. ${result.failedCount} could not be delivered.`
-          : `Sent ${result.sentCount} reminder${result.sentCount === 1 ? "" : "s"}.`,
+          ? `Sent ${result.sentCount} ${result.templateLabel}${result.sentCount === 1 ? "" : "s"}. ${result.failedCount} could not be delivered.`
+          : `Sent ${result.sentCount} ${result.templateLabel}${result.sentCount === 1 ? "" : "s"}.`,
       summary: result
     };
   } catch (error) {

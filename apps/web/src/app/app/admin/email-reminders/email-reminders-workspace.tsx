@@ -46,6 +46,11 @@ type WorkspaceData = {
     label: string;
     subject: string;
     body: string;
+    category: "reminder" | "welcome";
+    previewEyebrow: string;
+    previewTitle: string;
+    previewFooter?: string;
+    sendSuccessLabel: string;
   }>;
   options: {
     dueMonths: Array<{ value: string; label: string }>;
@@ -77,6 +82,7 @@ type WorkspaceData = {
     recipientEmail: string;
     subjectSnapshot: string;
     templateKey: string;
+    templateLabel: string;
     sentAt: Date | string;
     sentByName: string;
     dueMonth: string | null;
@@ -124,9 +130,13 @@ function toPreviewParagraphs(text: string) {
 
 export function EmailRemindersWorkspace({
   data,
+  initialCustomerCompanyIds = [],
+  initialTemplateKey,
   sendAction
 }: {
   data: WorkspaceData;
+  initialCustomerCompanyIds?: string[];
+  initialTemplateKey?: string;
   sendAction: (input: {
     dueMonth: string;
     customerCompanyIds: string[];
@@ -137,7 +147,7 @@ export function EmailRemindersWorkspace({
     ok: boolean;
     error: string | null;
     message: string | null;
-    summary: { sentCount: number; failedCount: number; totalCount: number } | null;
+    summary: { templateLabel: string; sentCount: number; failedCount: number; totalCount: number } | null;
   }>;
 }) {
   const router = useRouter();
@@ -145,15 +155,23 @@ export function EmailRemindersWorkspace({
   const searchParams = useSearchParams();
   const { showToast } = useToast();
   const [pending, startTransition] = useTransition();
-  const defaultTemplate = data.templates[0];
+  const defaultTemplate = data.templates.find((template) => template.key === initialTemplateKey) ?? data.templates[0];
   const [templateKey, setTemplateKey] = useState(defaultTemplate?.key ?? "");
   const [subject, setSubject] = useState(defaultTemplate?.subject ?? "");
   const [body, setBody] = useState(defaultTemplate?.body ?? "");
-  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>(
+    initialCustomerCompanyIds.filter((customerCompanyId) =>
+      data.recipients.some((recipient) => recipient.customerCompanyId === customerCompanyId)
+    )
+  );
 
   const selectedRecipients = useMemo(
     () => data.recipients.filter((recipient) => selectedCustomerIds.includes(recipient.customerCompanyId)),
     [data.recipients, selectedCustomerIds]
+  );
+  const activeTemplate = useMemo(
+    () => data.templates.find((template) => template.key === templateKey) ?? defaultTemplate,
+    [data.templates, defaultTemplate, templateKey]
   );
   const sampleRecipient = selectedRecipients[0] ?? data.recipients[0] ?? null;
   const previewFields = useMemo(
@@ -167,6 +185,10 @@ export function EmailRemindersWorkspace({
   );
   const previewSubject = useMemo(() => mergePreviewTemplate(subject, previewFields), [previewFields, subject]);
   const previewBody = useMemo(() => mergePreviewTemplate(body, previewFields), [body, previewFields]);
+  const previewTitle = useMemo(
+    () => mergePreviewTemplate(activeTemplate?.previewTitle ?? "", previewFields),
+    [activeTemplate, previewFields]
+  );
   const allVisibleSelected = data.recipients.length > 0 && data.recipients.every((recipient) => selectedCustomerIds.includes(recipient.customerCompanyId));
 
   function navigateToPage(nextPage: number) {
@@ -180,7 +202,7 @@ export function EmailRemindersWorkspace({
       <section className="grid gap-3 md:grid-cols-3">
         <KPIStatCard
           label="Candidates"
-          note="Customers with active inspection work due in the selected month."
+          note="Customers available in the current communications view."
           tone="blue"
           value={data.summary.candidateCount}
         />
@@ -192,14 +214,14 @@ export function EmailRemindersWorkspace({
         />
         <KPIStatCard
           label="Recent Outreach"
-          note="Customers in this month view that already received a reminder."
+          note="Customers in this view that already received a recent customer email."
           tone="slate"
           value={data.summary.sentRecently}
         />
       </section>
 
       <FilterBar
-        description="Search the due-this-month customer list and refine who should receive a manual inspection reminder."
+        description="Search customers, refine the current list, and prepare a branded email without leaving the workspace."
         title="Recipient filters"
       >
         <LiveUrlSearchInput
@@ -244,9 +266,9 @@ export function EmailRemindersWorkspace({
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Recipients</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Due this month</h2>
+              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Customer list</h2>
               <p className="mt-2 text-sm text-slate-500">
-                Select one or more customers, review the shared draft, and send polished reminder emails manually.
+                Select one or more customers, review the shared draft, and send polished customer emails manually.
               </p>
             </div>
             {data.recipients.length > 0 ? (
@@ -265,7 +287,7 @@ export function EmailRemindersWorkspace({
 
           {data.recipients.length === 0 ? (
             <EmptyState
-              description="No reminder candidates matched the current filters. Try another month or widen the search."
+              description="No customers matched the current filters. Try another month or widen the search."
               title="No recipients found"
             />
           ) : (
@@ -306,7 +328,9 @@ export function EmailRemindersWorkspace({
                           <p className="text-sm font-semibold text-slate-950">{recipient.customerName}</p>
                           <p className="mt-1 truncate text-sm text-slate-500">{recipient.recipientEmail ?? "No billing email on file"}</p>
                           <p className="mt-1 text-xs text-slate-400">
-                            {recipient.taskCount} due service line{recipient.taskCount === 1 ? "" : "s"}
+                            {recipient.taskCount > 0
+                              ? `${recipient.taskCount} due service line${recipient.taskCount === 1 ? "" : "s"}`
+                              : "No due service lines in this month view"}
                           </p>
                         </div>
                         <div className="min-w-0">
@@ -362,7 +386,7 @@ export function EmailRemindersWorkspace({
           <SectionCard className="space-y-5">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Compose</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Reminder draft</h2>
+              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Customer email draft</h2>
               <p className="mt-2 text-sm text-slate-500">
                 One shared draft is merged individually per selected customer at send time.
               </p>
@@ -418,7 +442,7 @@ export function EmailRemindersWorkspace({
             <ActionButton
               className="w-full"
               pending={pending}
-              pendingLabel="Sending reminders..."
+              pendingLabel={`Sending ${activeTemplate?.sendSuccessLabel ?? "emails"}...`}
               tone="primary"
               onClick={() => {
                 if (selectedRecipients.length === 0) {
@@ -436,18 +460,18 @@ export function EmailRemindersWorkspace({
                   });
 
                   if (result.ok) {
-                    showToast({ title: result.message ?? "Reminder emails sent", tone: "success" });
+                    showToast({ title: result.message ?? "Customer emails sent", tone: "success" });
                     setSelectedCustomerIds([]);
                     router.refresh();
                     return;
                   }
 
-                  showToast({ title: result.error ?? "Unable to send reminder emails.", tone: "error" });
+                  showToast({ title: result.error ?? "Unable to send customer emails.", tone: "error" });
                 });
               }}
               type="button"
             >
-              Send reminder emails
+              {activeTemplate ? `Send ${activeTemplate.sendSuccessLabel}${selectedRecipients.length === 1 ? "" : "s"}` : "Send customer emails"}
             </ActionButton>
           </SectionCard>
 
@@ -480,8 +504,10 @@ export function EmailRemindersWorkspace({
                       {data.branding.legalBusinessName || data.tenantName}
                     </div>
                   </div>
-                  <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.24em] opacity-80">Inspection reminder</p>
-                  <h4 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">Your fire inspection is due this month</h4>
+                  <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.24em] opacity-80">
+                    {activeTemplate?.previewEyebrow ?? "Customer email"}
+                  </p>
+                  <h4 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">{previewTitle || "Customer email"}</h4>
                 </div>
                 <div className="space-y-4 px-6 py-6">
                   <div>
@@ -497,6 +523,7 @@ export function EmailRemindersWorkspace({
                     <p className="font-semibold text-slate-900">{data.branding.legalBusinessName || data.tenantName}</p>
                     <p>{[data.branding.phone, data.branding.email, data.branding.website].filter(Boolean).join(" • ")}</p>
                   </div>
+                  {activeTemplate?.previewFooter ? <p className="text-xs leading-6 text-slate-500">{activeTemplate.previewFooter}</p> : null}
                 </div>
               </div>
             </div>
@@ -510,8 +537,8 @@ export function EmailRemindersWorkspace({
 
             {data.recentHistory.length === 0 ? (
               <EmptyState
-                description="Reminder sends will start appearing here once the first batch goes out."
-                title="No reminder history yet"
+                description="Customer email activity will start appearing here once the first batch goes out."
+                title="No customer email history yet"
               />
             ) : (
               <div className="space-y-3">
@@ -522,7 +549,7 @@ export function EmailRemindersWorkspace({
                         <p className="text-sm font-semibold text-slate-950">{entry.customerName}</p>
                         <p className="mt-1 text-sm text-slate-500">{entry.recipientEmail}</p>
                         <p className="mt-1 text-xs text-slate-400">
-                          {entry.dueMonth ? `Due month ${entry.dueMonth}` : "No due month"} • Sent by {entry.sentByName}
+                          {entry.templateLabel}{entry.dueMonth ? ` - due month ${entry.dueMonth}` : ""} - Sent by {entry.sentByName}
                         </p>
                       </div>
                       <StatusBadge

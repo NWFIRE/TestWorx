@@ -8,7 +8,7 @@ import type { KeyboardEvent, ReactNode } from "react";
 import { BrandLoader } from "@/app/brand-loader";
 import { SearchInput } from "@/app/search-input";
 
-const initialState = { error: null as string | null, success: null as string | null };
+const initialState = { error: null as string | null, success: null as string | null, customerCompanyId: null as string | null };
 const paymentTermsOptions = [
   { value: "due_on_receipt", label: "Due at time of service" },
   { value: "net_15", label: "Net 15" },
@@ -72,9 +72,9 @@ type CustomerManagementCardProps = {
   pagination: CustomerPagination;
   filters: CustomerFilters;
   createCustomerAction: (
-    _: { error: string | null; success: string | null },
+    _: { error: string | null; success: string | null; customerCompanyId?: string | null },
     formData: FormData
-  ) => Promise<{ error: string | null; success: string | null }>;
+  ) => Promise<{ error: string | null; success: string | null; customerCompanyId?: string | null }>;
   notice?: string | null;
 };
 
@@ -501,6 +501,22 @@ export function CustomerManagementCard({
             <CustomerProfileFields formIdPrefix="create-customer" />
             {createState.error ? <p className="text-sm text-rose-600">{createState.error}</p> : null}
             {createState.success ? <p className="text-sm text-emerald-600">{createState.success}</p> : null}
+            {createState.success && createState.customerCompanyId ? (
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue transition hover:border-slate-300 hover:bg-slate-50"
+                  href={`/app/admin/email-reminders?customerCompanyId=${encodeURIComponent(createState.customerCompanyId)}&templateKey=customer_welcome`}
+                >
+                  Send welcome email
+                </Link>
+                <Link
+                  className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue transition hover:border-slate-300 hover:bg-slate-50"
+                  href={`/app/admin/clients/${encodeURIComponent(createState.customerCompanyId)}`}
+                >
+                  Open profile
+                </Link>
+              </div>
+            ) : null}
             {notice ? <p className="text-sm text-slateblue">{notice}</p> : null}
             <button className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={createPending} type="submit">
               {createPending ? "Saving customer..." : "Add customer"}

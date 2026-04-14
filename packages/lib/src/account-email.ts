@@ -68,6 +68,15 @@ type QuoteReminderEmailPayload = BaseEmailPayload & {
   expiresAt?: Date | null;
 };
 
+type BrandedCustomerEmailPayload = BaseEmailPayload & {
+  subjectLine: string;
+  bodyText: string;
+  eyebrow: string;
+  title: string;
+  footer?: string;
+  branding: EmailShellBranding;
+};
+
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
@@ -330,14 +339,23 @@ export async function sendInspectionReminderEmail(payload: BaseEmailPayload & {
   bodyText: string;
   branding: EmailShellBranding;
 }) {
+  return sendCustomerBrandedEmail({
+    ...payload,
+    eyebrow: "Inspection reminder",
+    title: "Your fire inspection is due this month",
+    footer: "If your inspection has already been completed or scheduled, please disregard this message."
+  });
+}
+
+export async function sendCustomerBrandedEmail(payload: BrandedCustomerEmailPayload) {
   return sendWithResend({
     to: payload.recipientEmail,
     subject: payload.subjectLine,
     html: buildBrandedShell({
-      eyebrow: "Inspection reminder",
-      title: "Your fire inspection is due this month",
+      eyebrow: payload.eyebrow,
+      title: payload.title,
       body: textToHtmlParagraphs(payload.bodyText),
-      footer: "If your inspection has already been completed or scheduled, please disregard this message.",
+      footer: payload.footer,
       branding: payload.branding
     })
   });

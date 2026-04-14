@@ -52,12 +52,12 @@ function buildClientProfileHref(customerCompanyId: string, values: Record<string
 }
 
 export async function createCustomerCompanyAction(
-  _: { error: string | null; success: string | null },
+  _: { error: string | null; success: string | null; customerCompanyId?: string | null },
   formData: FormData
 ) {
   const session = await auth();
   if (!session?.user?.tenantId) {
-    return { error: "Unauthorized", success: null };
+    return { error: "Unauthorized", success: null, customerCompanyId: null };
   }
 
   const parsed = customerCompanyInputSchema.safeParse({
@@ -90,7 +90,7 @@ export async function createCustomerCompanyAction(
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid customer input.", success: null };
+    return { error: parsed.error.issues[0]?.message ?? "Invalid customer input.", success: null, customerCompanyId: null };
   }
 
   try {
@@ -103,10 +103,15 @@ export async function createCustomerCompanyAction(
     revalidatePath("/app/admin/billing");
     return {
       error: null,
-      success: buildCustomerResultMessage(result, `${result.customer.name} created.`)
+      success: buildCustomerResultMessage(result, `${result.customer.name} created.`),
+      customerCompanyId: result.customer.id
     };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Unable to create customer.", success: null };
+    return {
+      error: error instanceof Error ? error.message : "Unable to create customer.",
+      success: null,
+      customerCompanyId: null
+    };
   }
 }
 
