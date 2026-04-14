@@ -8,6 +8,7 @@ import { auth } from "@/auth";
 import {
   createCustomerCompany,
   customerCompanyInputSchema,
+  deleteCustomerCompany,
   updateCustomerCompany
 } from "@testworx/lib";
 
@@ -257,5 +258,46 @@ export async function updateCustomerCompanyProfileAction(formData: FormData) {
       edit: "1",
       customer: error instanceof Error ? error.message : "Unable to update customer."
     }));
+  }
+}
+
+export async function deleteCustomerCompanyAction(
+  _: { error: string | null; success: string | null; redirectTo: string | null },
+  formData: FormData
+) {
+  const session = await auth();
+  const customerCompanyId = String(formData.get("customerCompanyId") ?? "").trim();
+
+  if (!session?.user?.tenantId || !customerCompanyId) {
+    return { error: "Unauthorized", success: null, redirectTo: null };
+  }
+
+  try {
+    const result = await deleteCustomerCompany(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      customerCompanyId
+    );
+
+    revalidatePath("/app/admin");
+    revalidatePath("/app/admin/clients");
+    revalidatePath(`/app/admin/clients/${customerCompanyId}`);
+    revalidatePath("/app/admin/billing");
+    revalidatePath("/app/admin/quotes");
+    revalidatePath("/app/admin/email-reminders");
+    revalidatePath("/app/admin/upcoming-inspections");
+
+    return {
+      error: null,
+      success: `${result.name} deleted.`,
+      redirectTo: buildClientsHref({
+        customers: `${result.name} deleted.`
+      })
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Unable to delete customer.",
+      success: null,
+      redirectTo: null
+    };
   }
 }

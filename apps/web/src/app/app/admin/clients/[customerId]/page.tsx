@@ -5,8 +5,9 @@ import { getClientProfileData } from "@testworx/lib";
 
 import { AppPageShell, PageHeader, SectionCard } from "../../operations-ui";
 import { ClientProfileWorkspace } from "../client-profile-workspace";
-import { updateCustomerCompanyProfileAction } from "../actions";
+import { deleteCustomerCompanyAction, updateCustomerCompanyProfileAction } from "../actions";
 import { CustomerProfileFields } from "../../settings/customer-management-card";
+import { DeleteCustomerCard } from "../delete-customer-card";
 
 export default async function ClientProfilePage({
   params,
@@ -113,6 +114,15 @@ export default async function ClientProfilePage({
       ) : null}
 
       <ClientProfileWorkspace data={data} />
+
+      {!isEditing ? (
+        <DeleteCustomerCard
+          action={deleteCustomerCompanyAction}
+          customerCompanyId={data.customer.id}
+          customerName={data.customer.name}
+          redirectTo="/app/admin/clients"
+        />
+      ) : null}
     </AppPageShell>
   );
 }

@@ -256,6 +256,51 @@ type CustomerCompanySyncResult = {
   quickBooksSynced: boolean;
 };
 
+type CustomerCompanyDeleteResult = {
+  id: string;
+  name: string;
+};
+
+function formatDeleteCount(count: number, singular: string, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function buildCustomerDeleteBlockedMessage(name: string, counts: {
+  users: number;
+  sites: number;
+  inspections: number;
+  quotes: number;
+  billingSummaries: number;
+}) {
+  const blockers: string[] = [];
+
+  if (counts.users > 0) {
+    blockers.push(formatDeleteCount(counts.users, "linked user"));
+  }
+
+  if (counts.sites > 0) {
+    blockers.push(formatDeleteCount(counts.sites, "site"));
+  }
+
+  if (counts.inspections > 0) {
+    blockers.push(formatDeleteCount(counts.inspections, "inspection"));
+  }
+
+  if (counts.quotes > 0) {
+    blockers.push(formatDeleteCount(counts.quotes, "quote"));
+  }
+
+  if (counts.billingSummaries > 0) {
+    blockers.push(formatDeleteCount(counts.billingSummaries, "billing record"));
+  }
+
+  if (blockers.length === 0) {
+    return null;
+  }
+
+  return `Cannot delete ${name} yet. Remove or move the linked ${blockers.join(", ")} first.`;
+}
+
 export async function getTenantCustomerCompanySettings(actor: ActorContext) {
   const result = await getPaginatedTenantCustomerCompanySettings(actor, { page: 1, limit: 5000 });
   return result.customers;
@@ -571,5 +616,126 @@ export async function updateCustomerCompany(
   return {
     customer: refreshedCustomer ?? customer,
     ...syncResult
+  };
+}
+
+export async function deleteCustomerCompany(
+  actor: ActorContext,
+  customerCompanyId: string
+): Promise<CustomerCompanyDeleteResult> {
+  const parsedActor = parseActor(actor);
+  ensureTenantAdmin(parsedActor);
+  const tenantId = parsedActor.tenantId as string;
+
+  const existing = await prisma.customerCompany.findFirst({
+    where: {
+      id: customerCompanyId,
+      tenantId
+    },
+    select: {
+      id: true,
+      name: true,
+      quickbooksCustomerId: true
+    }
+  });
+
+  if (!existing) {
+    throw new Error("Customer not found.");
+  }
+
+  const [users, sites, inspections, quotes, billingSummaries] = await Promise.all([
+    prisma.user.count({
+      where: {
+        tenantId,
+        customerCompanyId: existing.id
+      }
+    }),
+    prisma.site.count({
+      where: {
+        tenantId,
+        customerCompanyId: existing.id
+      }
+    }),
+    prisma.inspection.count({
+      where: {
+        tenantId,
+        customerCompanyId: existing.id
+      }
+    }),
+    prisma.quote.count({
+      where: {
+        tenantId,
+        customerCompanyId: existing.id
+      }
+    }),
+    prisma.inspectionBillingSummary.count({
+      where: {
+        tenantId,
+        customerCompanyId: existing.id
+      }
+    })
+  ]);
+
+  const blockedMessage = buildCustomerDeleteBlockedMessage(existing.name, {
+    users,
+    sites,
+    inspections,
+    quotes,
+    billingSummaries
+  });
+
+  if (blockedMessage) {
+    throw new Error(blockedMessage);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.serviceFeeRule.deleteMany({
+      where: {
+        tenantId,
+        customerCompanyId: existing.id
+      }
+    });
+
+    await tx.emailReminderSendLog.deleteMany({
+      where: {
+        tenantId,
+        customerCompanyId: existing.id
+      }
+    });
+
+    await tx.accountInvitation.updateMany({
+      where: {
+        tenantId,
+        customerCompanyId: existing.id
+      },
+      data: {
+        customerCompanyId: null
+      }
+    });
+
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        actorUserId: parsedActor.userId,
+        action: "customer.company_deleted",
+        entityType: "CustomerCompany",
+        entityId: existing.id,
+        metadata: {
+          name: existing.name,
+          quickbooksCustomerId: existing.quickbooksCustomerId
+        }
+      }
+    });
+
+    await tx.customerCompany.delete({
+      where: {
+        id: existing.id
+      }
+    });
+  });
+
+  return {
+    id: existing.id,
+    name: existing.name
   };
 }

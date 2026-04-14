@@ -417,6 +417,12 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
                 href={`/app/admin/clients/${encodeURIComponent(data.customer.id)}?edit=1`}
                 label="Edit customer"
               />
+              <Link
+                className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100"
+                href="#delete-customer"
+              >
+                Delete customer
+              </Link>
             </div>
           </div>
         </div>
