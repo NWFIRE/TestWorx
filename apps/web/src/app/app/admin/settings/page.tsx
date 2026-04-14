@@ -354,83 +354,84 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
             realmId={quickBooksSettings.tenant.quickbooksRealmId}
             supportReference={quickBooksSettings.supportReference}
           />
-          <div className="grid gap-6 xl:grid-cols-2">
-            <SettingsDisclosureCard
-              description="Review stored QuickBooks item ids for each internal billing code, fix inactive references, and confirm suggested matches without loading the full section until you need it."
-              desktopSpan="fullWhenOpen"
-              eyebrow="QuickBooks item mappings"
-              initialOpen={mappingsOpen}
-              openLabel="Open item mappings"
-              queryKey="mappingsOpen"
-              title="Map billable codes to QuickBooks items"
+        </div>
+        <div className="grid gap-6 xl:grid-cols-2">
+          <SettingsDisclosureCard
+            description="Review stored QuickBooks item ids for each internal billing code, fix inactive references, and confirm suggested matches without loading the full section until you need it."
+            desktopSpan="fullWhenOpen"
+            eyebrow="QuickBooks item mappings"
+            initialOpen={mappingsOpen}
+            openLabel="Open item mappings"
+            queryKey="mappingsOpen"
+            title="Map billable codes to QuickBooks items"
+          >
+            <Suspense
+              key="quickbooks-mappings"
+              fallback={
+                <LazySectionCard
+                  actionHref={buildSettingsHref(params, { mappingsOpen: 1 })}
+                  actionLabel="Reload section"
+                  description="Loading stored QuickBooks mappings and suggested matches..."
+                  eyebrow="QuickBooks item mappings"
+                  title="Map billable codes to QuickBooks items"
+                  tone="loading"
+                />
+              }
             >
-              <Suspense
-                key="quickbooks-mappings"
-                fallback={
-                  <LazySectionCard
-                    actionHref={buildSettingsHref(params, { mappingsOpen: 1 })}
-                    actionLabel="Reload section"
-                    description="Loading stored QuickBooks mappings and suggested matches..."
-                    eyebrow="QuickBooks item mappings"
-                    title="Map billable codes to QuickBooks items"
-                    tone="loading"
-                  />
-                }
-              >
-                <QuickBooksMappingsSection actor={actor} notice={quickBooksNotice} />
-              </Suspense>
-            </SettingsDisclosureCard>
-            <SettingsDisclosureCard
-              description="Load service fee rules only when you open the section. Rules stay paginated and keep their own loading, empty, and error states."
-              desktopSpan="fullWhenOpen"
-              eyebrow="Inspection service fees"
-              initialOpen={feesOpen}
-              openLabel="Open service fee rules"
-              queryKey="feesOpen"
-              title="Default fee and location rules"
+              <QuickBooksMappingsSection actor={actor} notice={quickBooksNotice} />
+            </Suspense>
+          </SettingsDisclosureCard>
+          <SettingsDisclosureCard
+            description="Load service fee rules only when you open the section. Rules stay paginated and keep their own loading, empty, and error states."
+            desktopSpan="fullWhenOpen"
+            eyebrow="Inspection service fees"
+            initialOpen={feesOpen}
+            openLabel="Open service fee rules"
+            queryKey="feesOpen"
+            title="Default fee and location rules"
+          >
+            <Suspense
+              key={`fees-${feesPage}`}
+              fallback={
+                <LazySectionCard
+                  actionHref={buildSettingsHref(params, { feesOpen: 1, feesPage })}
+                  actionLabel="Reload section"
+                  description="Loading the current service fee rules page..."
+                  eyebrow="Inspection service fees"
+                  title="Default fee and location rules"
+                  tone="loading"
+                />
+              }
             >
-              <Suspense
-                key={`fees-${feesPage}`}
-                fallback={
-                  <LazySectionCard
-                    actionHref={buildSettingsHref(params, { feesOpen: 1, feesPage })}
-                    actionLabel="Reload section"
-                    description="Loading the current service fee rules page..."
-                    eyebrow="Inspection service fees"
-                    title="Default fee and location rules"
-                    tone="loading"
-                  />
-                }
-              >
-                <ServiceFeesSection activeEditor={feeEditor} actor={actor} page={feesPage} />
-              </Suspense>
-            </SettingsDisclosureCard>
-            <SettingsDisclosureCard
-              description="Load jurisdiction-based compliance reporting fees only when needed. Rules stay paginated and automatically drive matching compliance fee lines in billing."
-              desktopSpan="fullWhenOpen"
-              eyebrow="Compliance reporting fees"
-              initialOpen={complianceFeesOpen}
-              openLabel="Open compliance reporting fees"
-              queryKey="complianceFeesOpen"
-              title="Jurisdiction-based reporting fees"
+              <ServiceFeesSection activeEditor={feeEditor} actor={actor} page={feesPage} />
+            </Suspense>
+          </SettingsDisclosureCard>
+          <SettingsDisclosureCard
+            description="Load jurisdiction-based compliance reporting fees only when needed. Rules stay paginated and automatically drive matching compliance fee lines in billing."
+            desktopSpan="fullWhenOpen"
+            eyebrow="Compliance reporting fees"
+            initialOpen={complianceFeesOpen}
+            openLabel="Open compliance reporting fees"
+            queryKey="complianceFeesOpen"
+            title="Jurisdiction-based reporting fees"
+          >
+            <Suspense
+              key={`compliance-fees-${complianceFeePage}`}
+              fallback={
+                <LazySectionCard
+                  actionHref={buildSettingsHref(params, { complianceFeesOpen: 1, complianceFeePage })}
+                  actionLabel="Reload section"
+                  description="Loading the current compliance reporting fee rules page..."
+                  eyebrow="Compliance reporting fees"
+                  title="Jurisdiction-based reporting fees"
+                  tone="loading"
+                />
+              }
             >
-              <Suspense
-                key={`compliance-fees-${complianceFeePage}`}
-                fallback={
-                  <LazySectionCard
-                    actionHref={buildSettingsHref(params, { complianceFeesOpen: 1, complianceFeePage })}
-                    actionLabel="Reload section"
-                    description="Loading the current compliance reporting fee rules page..."
-                    eyebrow="Compliance reporting fees"
-                    title="Jurisdiction-based reporting fees"
-                    tone="loading"
-                  />
-                }
-              >
-                <ComplianceReportingFeesSection activeEditor={complianceFeeEditor} actor={actor} page={complianceFeePage} />
-              </Suspense>
-            </SettingsDisclosureCard>
-            <SectionCard>
+              <ComplianceReportingFeesSection activeEditor={complianceFeeEditor} actor={actor} page={complianceFeePage} />
+            </Suspense>
+          </SettingsDisclosureCard>
+          <SectionCard>
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing settings</p>
             <h3 className="mt-2 text-2xl font-semibold text-ink">Current subscription</h3>
             <p className="mt-3 text-sm text-slate-500">Plan: {billingSettings.tenant.subscriptionPlan?.name ?? "Not assigned"}</p>
@@ -452,8 +453,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
                 </button>
               </form>
             ) : null}
-            </SectionCard>
-          </div>
+          </SectionCard>
         </div>
       </WorkspaceSplit>
       <BillingPlansSection
