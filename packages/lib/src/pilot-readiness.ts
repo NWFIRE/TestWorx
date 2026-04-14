@@ -1,27 +1,27 @@
 import { getServerEnv } from "./env";
 import { privateBlobStoreRequiredMessage } from "./storage";
 
-export type PilotReadinessLevel = "ready" | "action_required" | "optional";
-export type PilotReadinessSeverity = "critical" | "recommended" | "optional";
+export type SystemReadinessLevel = "ready" | "action_required" | "optional";
+export type SystemReadinessSeverity = "critical" | "recommended" | "optional";
 
-export type PilotReadinessCheck = {
+export type SystemReadinessCheck = {
   id: string;
   label: string;
-  level: PilotReadinessLevel;
-  severity: PilotReadinessSeverity;
+  level: SystemReadinessLevel;
+  severity: SystemReadinessSeverity;
   detail: string;
 };
 
-export type PilotReadinessStatus = {
-  readyForPilot: boolean;
+export type SystemReadinessStatus = {
+  ready: boolean;
   summary: string;
   criticalCount: number;
   recommendedCount: number;
   optionalCount: number;
-  checks: PilotReadinessCheck[];
+  checks: SystemReadinessCheck[];
 };
 
-type PilotReadinessInput = {
+type SystemReadinessInput = {
   stripeConfigured?: boolean;
   stripeWebhookConfigured?: boolean;
   quickBooksConfigured?: boolean;
@@ -51,16 +51,16 @@ function isSecureRemoteUrl(value: string) {
 function buildCheck(
   id: string,
   label: string,
-  level: PilotReadinessLevel,
-  severity: PilotReadinessSeverity,
+  level: SystemReadinessLevel,
+  severity: SystemReadinessSeverity,
   detail: string
-): PilotReadinessCheck {
+): SystemReadinessCheck {
   return { id, label, level, severity, detail };
 }
 
-export function evaluatePilotReadiness(input: PilotReadinessInput = {}): PilotReadinessStatus {
+export function evaluateSystemReadiness(input: SystemReadinessInput = {}): SystemReadinessStatus {
   const env = getServerEnv();
-  const checks: PilotReadinessCheck[] = [];
+  const checks: SystemReadinessCheck[] = [];
 
   const deploymentReady = isSecureRemoteUrl(env.APP_URL) && isSecureRemoteUrl(env.NEXTAUTH_URL);
   checks.push(
@@ -77,7 +77,7 @@ export function evaluatePilotReadiness(input: PilotReadinessInput = {}): PilotRe
           "Public app URL",
           "action_required",
           "critical",
-          "APP_URL and NEXTAUTH_URL still need to point at your real HTTPS domain before technicians can rely on the app in the field."
+          "APP_URL and NEXTAUTH_URL still need to point at your real HTTPS domain before the app is fully ready for production use."
         )
   );
 
@@ -96,7 +96,7 @@ export function evaluatePilotReadiness(input: PilotReadinessInput = {}): PilotRe
           "Durable report media storage",
           "action_required",
           "critical",
-          `Report media is still using inline/demo storage. Switch to Vercel Blob with a real token before pilot use so field photos and PDFs stay durable. ${privateBlobStoreRequiredMessage}`
+          `Report media is still using inline/demo storage. Switch to Vercel Blob with a real token so field photos and PDFs stay durable. ${privateBlobStoreRequiredMessage}`
         )
   );
 
@@ -122,7 +122,7 @@ export function evaluatePilotReadiness(input: PilotReadinessInput = {}): PilotRe
           "QuickBooks invoice sync",
           "optional",
           "optional",
-          "QuickBooks is not fully configured yet. This does not block a field pilot unless you need accounting sync immediately."
+          "QuickBooks is not fully configured yet. This can remain optional unless you need accounting sync immediately."
         )
   );
 
@@ -141,14 +141,14 @@ export function evaluatePilotReadiness(input: PilotReadinessInput = {}): PilotRe
             "Stripe subscription billing",
             "action_required",
             "optional",
-            "Stripe keys exist, but webhook sync is still incomplete. This only matters if you need customer subscription billing during the pilot."
+            "Stripe keys exist, but webhook sync is still incomplete. This only matters if you need customer subscription billing now."
           )
       : buildCheck(
           "stripe",
           "Stripe subscription billing",
           "optional",
           "optional",
-          "Stripe is not configured yet. Safe to defer if your pilot is internal-only."
+          "Stripe is not configured yet. Safe to defer if subscription billing is not in use yet."
         )
   );
 
@@ -157,16 +157,19 @@ export function evaluatePilotReadiness(input: PilotReadinessInput = {}): PilotRe
   const optionalCount = checks.filter((check) => check.level !== "ready" && check.severity === "optional").length;
 
   return {
-    readyForPilot: criticalCount === 0,
+    ready: criticalCount === 0,
     summary:
       criticalCount === 0
         ? recommendedCount === 0
-          ? "Pilot-ready from an app infrastructure standpoint."
-          : "Core pilot blockers are cleared, with a few recommended follow-ups remaining."
-        : "Pilot blockers still need attention before daily field use.",
+          ? "System configuration is ready."
+          : "Core system configuration is ready, with a few recommended follow-ups remaining."
+        : "Configuration updates are still required before the system is fully ready.",
     criticalCount,
     recommendedCount,
     optionalCount,
     checks
   };
 }
+
+// Backward-compatible alias for any internal callers not yet updated.
+export const evaluatePilotReadiness = evaluateSystemReadiness;

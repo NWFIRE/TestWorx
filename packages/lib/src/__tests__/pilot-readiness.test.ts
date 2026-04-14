@@ -1,29 +1,30 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { evaluatePilotReadiness, resetServerEnvForTests } from "..";
+import { evaluateSystemReadiness, resetServerEnvForTests } from "..";
 
-describe("evaluatePilotReadiness", () => {
+describe("evaluateSystemReadiness", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     resetServerEnvForTests();
   });
 
-  it("flags localhost urls and inline storage as critical pilot blockers", () => {
+  it("flags localhost urls and inline storage as critical readiness issues", () => {
     vi.stubEnv("DATABASE_URL", "postgresql://example");
     vi.stubEnv("AUTH_SECRET", "1234567890123456");
     vi.stubEnv("NEXTAUTH_URL", "http://localhost:3000");
     vi.stubEnv("APP_URL", "http://localhost:3000");
     vi.stubEnv("STORAGE_DRIVER", "inline");
 
-    const result = evaluatePilotReadiness();
+    const result = evaluateSystemReadiness();
 
-    expect(result.readyForPilot).toBe(false);
+    expect(result.ready).toBe(false);
     expect(result.criticalCount).toBe(2);
     expect(result.checks.find((check) => check.id === "deployment")?.level).toBe("action_required");
     expect(result.checks.find((check) => check.id === "storage")?.level).toBe("action_required");
+    expect(result.summary).toMatch(/configuration updates are still required/i);
   });
 
-  it("marks core pilot checks ready with https urls and blob storage", () => {
+  it("marks core readiness checks ready with https urls and blob storage", () => {
     vi.stubEnv("DATABASE_URL", "postgresql://example");
     vi.stubEnv("AUTH_SECRET", "1234567890123456");
     vi.stubEnv("NEXTAUTH_URL", "https://app.testworx.com");
@@ -31,7 +32,7 @@ describe("evaluatePilotReadiness", () => {
     vi.stubEnv("STORAGE_DRIVER", "vercel_blob");
     vi.stubEnv("BLOB_READ_WRITE_TOKEN", "vercel_blob_rw_123");
 
-    const result = evaluatePilotReadiness({
+    const result = evaluateSystemReadiness({
       stripeConfigured: true,
       stripeWebhookConfigured: true,
       quickBooksConfigured: true,
@@ -40,15 +41,16 @@ describe("evaluatePilotReadiness", () => {
       quickBooksReconnectRequired: false
     });
 
-    expect(result.readyForPilot).toBe(true);
+    expect(result.ready).toBe(true);
     expect(result.criticalCount).toBe(0);
     expect(result.checks.find((check) => check.id === "deployment")?.level).toBe("ready");
     expect(result.checks.find((check) => check.id === "storage")?.level).toBe("ready");
     expect(result.checks.find((check) => check.id === "storage")?.detail).toMatch(/private Vercel Blob store/i);
     expect(result.checks.find((check) => check.id === "quickbooks")?.level).toBe("ready");
+    expect(result.summary).toMatch(/system configuration is ready/i);
   });
 
-  it("treats quickbooks and stripe as non-critical for an internal pilot", () => {
+  it("treats quickbooks and stripe as non-critical when core readiness is intact", () => {
     vi.stubEnv("DATABASE_URL", "postgresql://example");
     vi.stubEnv("AUTH_SECRET", "1234567890123456");
     vi.stubEnv("NEXTAUTH_URL", "https://app.testworx.com");
@@ -56,7 +58,7 @@ describe("evaluatePilotReadiness", () => {
     vi.stubEnv("STORAGE_DRIVER", "vercel_blob");
     vi.stubEnv("BLOB_READ_WRITE_TOKEN", "vercel_blob_rw_123");
 
-    const result = evaluatePilotReadiness({
+    const result = evaluateSystemReadiness({
       stripeConfigured: false,
       quickBooksConfigured: true,
       quickBooksConnected: false,
@@ -64,7 +66,7 @@ describe("evaluatePilotReadiness", () => {
       quickBooksReconnectRequired: true
     });
 
-    expect(result.readyForPilot).toBe(true);
+    expect(result.ready).toBe(true);
     expect(result.criticalCount).toBe(0);
     expect(result.recommendedCount).toBe(1);
     expect(result.optionalCount).toBe(1);

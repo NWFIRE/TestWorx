@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@testworx/db";
-import { assertEnvForFeature, evaluatePilotReadiness, getOptionalQuickBooksEnv, getOptionalStripeEnv, getServerEnv } from "@testworx/lib";
+import { assertEnvForFeature, evaluateSystemReadiness, getOptionalQuickBooksEnv, getOptionalStripeEnv, getServerEnv } from "@testworx/lib";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,7 @@ export async function GET() {
 
     const stripe = getOptionalStripeEnv();
     const quickbooks = getOptionalQuickBooksEnv();
-    const pilotReadiness = evaluatePilotReadiness({
+    const readiness = evaluateSystemReadiness({
       stripeConfigured: Boolean(stripe.STRIPE_SECRET_KEY && stripe.STRIPE_PUBLISHABLE_KEY),
       stripeWebhookConfigured: Boolean(stripe.STRIPE_WEBHOOK_SECRET && stripe.STRIPE_SECRET_KEY && stripe.STRIPE_PUBLISHABLE_KEY),
       quickBooksConfigured: Boolean(quickbooks.QUICKBOOKS_CLIENT_ID && quickbooks.QUICKBOOKS_CLIENT_SECRET),
@@ -33,7 +33,7 @@ export async function GET() {
       database: {
         connected: true
       },
-      pilotReadiness
+      readiness
     });
   } catch (error) {
     return NextResponse.json(
