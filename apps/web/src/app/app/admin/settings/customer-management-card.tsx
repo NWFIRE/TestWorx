@@ -152,7 +152,7 @@ function CustomerFieldGroup({
   );
 }
 
-function CustomerProfileFields({
+export function CustomerProfileFields({
   customer,
   formIdPrefix
 }: {

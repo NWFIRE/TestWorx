@@ -36,6 +36,21 @@ function buildClientsHref(values: Record<string, string | null | undefined>) {
   return query ? `/app/admin/clients?${query}` : "/app/admin/clients";
 }
 
+function buildClientProfileHref(customerCompanyId: string, values: Record<string, string | null | undefined>) {
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(values)) {
+    if (value) {
+      params.set(key, value);
+    }
+  }
+
+  const query = params.toString();
+  return query
+    ? `/app/admin/clients/${encodeURIComponent(customerCompanyId)}?${query}`
+    : `/app/admin/clients/${encodeURIComponent(customerCompanyId)}`;
+}
+
 export async function createCustomerCompanyAction(
   _: { error: string | null; success: string | null },
   formData: FormData
@@ -164,6 +179,78 @@ export async function updateCustomerCompanyAction(formData: FormData) {
       customersPage,
       customersQuery: customersQuery || null,
       customers: error instanceof Error ? error.message : "Unable to update customer."
+    }));
+  }
+}
+
+export async function updateCustomerCompanyProfileAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    redirect("/login");
+  }
+
+  const customerCompanyId = String(formData.get("customerCompanyId") ?? "").trim();
+  if (!customerCompanyId) {
+    redirect("/app/admin/clients");
+  }
+
+  const parsed = customerCompanyInputSchema.safeParse({
+    customerCompanyId,
+    name: String(formData.get("name") ?? ""),
+    contactName: String(formData.get("contactName") ?? ""),
+    billingEmail: String(formData.get("billingEmail") ?? ""),
+    phone: String(formData.get("phone") ?? ""),
+    isTaxExempt: formData.get("isTaxExempt") === "on",
+    serviceAddressLine1: String(formData.get("serviceAddressLine1") ?? ""),
+    serviceAddressLine2: String(formData.get("serviceAddressLine2") ?? ""),
+    serviceCity: String(formData.get("serviceCity") ?? ""),
+    serviceState: String(formData.get("serviceState") ?? ""),
+    servicePostalCode: String(formData.get("servicePostalCode") ?? ""),
+    serviceCountry: String(formData.get("serviceCountry") ?? ""),
+    billingAddressSameAsService: formData.get("billingAddressSameAsService") === "on",
+    billingAddressLine1: String(formData.get("billingAddressLine1") ?? ""),
+    billingAddressLine2: String(formData.get("billingAddressLine2") ?? ""),
+    billingCity: String(formData.get("billingCity") ?? ""),
+    billingState: String(formData.get("billingState") ?? ""),
+    billingPostalCode: String(formData.get("billingPostalCode") ?? ""),
+    billingCountry: String(formData.get("billingCountry") ?? ""),
+    notes: String(formData.get("notes") ?? ""),
+    isActive: formData.get("isActive") === "on",
+    paymentTermsCode: String(formData.get("paymentTermsCode") ?? "due_on_receipt"),
+    customPaymentTermsLabel: String(formData.get("customPaymentTermsLabel") ?? ""),
+    customPaymentTermsDays: (() => {
+      const raw = String(formData.get("customPaymentTermsDays") ?? "").trim();
+      return raw ? Number(raw) : undefined;
+    })()
+  });
+
+  if (!parsed.success) {
+    redirect(buildClientProfileHref(customerCompanyId, {
+      edit: "1",
+      customer: parsed.error.issues[0]?.message ?? "Invalid customer input."
+    }));
+  }
+
+  try {
+    const result = await updateCustomerCompany(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      parsed.data
+    );
+    revalidatePath("/app/admin");
+    revalidatePath("/app/admin/clients");
+    revalidatePath(`/app/admin/clients/${customerCompanyId}`);
+    revalidatePath("/app/admin/billing");
+    redirect(buildClientProfileHref(customerCompanyId, {
+      customer: buildCustomerResultMessage(result, `${result.customer.name} updated.`)
+    }));
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
+    redirect(buildClientProfileHref(customerCompanyId, {
+      edit: "1",
+      customer: error instanceof Error ? error.message : "Unable to update customer."
     }));
   }
 }

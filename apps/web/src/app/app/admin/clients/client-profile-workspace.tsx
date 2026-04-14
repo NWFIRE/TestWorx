@@ -414,7 +414,7 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
                 View invoices
               </button>
               <QuickActionLink
-                href={`/app/admin/clients?customersQuery=${encodeURIComponent(data.customer.name)}`}
+                href={`/app/admin/clients/${encodeURIComponent(data.customer.id)}?edit=1`}
                 label="Edit customer"
               />
             </div>
