@@ -98,8 +98,6 @@ We look forward to working with you.
 
 Best regards,
 {{companyName}}
-{{companyPhone}}
-{{companyEmail}}
 
 If there is anything you would like us to be aware of regarding your property or systems, please don't hesitate to let us know.`
   }
