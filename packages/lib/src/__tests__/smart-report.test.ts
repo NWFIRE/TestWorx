@@ -461,6 +461,28 @@ describe("smart report foundations", () => {
 
     expect(normalizedCustomNotificationRow.applianceType).toBe("other");
     expect(normalizedCustomNotificationRow.applianceTypeCustom).toBe("wall_speaker_custom");
+
+    const normalizedCustomInitiatingDeviceRow = applyRepeaterRowSmartUpdate(
+      template,
+      "initiating-devices",
+      "initiatingDevices",
+      {
+        assetId: "",
+        assetTag: "",
+        deviceType: "relay_module_custom",
+        deviceTypeOther: "",
+        location: "FACP room",
+        serialNumber: "Address 21 / Zone 4",
+        functionalTestResult: "pass",
+        physicalCondition: "good",
+        sensitivityOrOperationResult: "pass",
+        comments: ""
+      },
+      "deviceType"
+    );
+
+    expect(normalizedCustomInitiatingDeviceRow.deviceType).toBe("other");
+    expect(normalizedCustomInitiatingDeviceRow.deviceTypeOther).toBe("relay_module_custom");
   });
 
   it("recomputes fire alarm counts and deficiency rollups while enforcing repeater validation", () => {

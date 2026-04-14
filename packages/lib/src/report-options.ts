@@ -674,9 +674,12 @@ const alarmDeviceTypes: ReportOption[] = [
   { label: "Pull station", value: "pull_station" },
   { label: "Duct detector", value: "duct_detector" },
   { label: "Monitor module", value: "monitor_module" },
+  { label: "Control module", value: "control_module" },
+  { label: "Relay module", value: "relay_module" },
   { label: "Waterflow switch", value: "waterflow_switch" },
   { label: "Tamper switch", value: "tamper_switch" },
-  { label: "Beam detector", value: "beam_detector" }
+  { label: "Beam detector", value: "beam_detector" },
+  { label: "Other", value: "other" }
 ];
 
 const alarmNotificationApplianceTypes: ReportOption[] = [

@@ -860,7 +860,26 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
                 ]
               },
               { id: "assetTag", label: "Asset tag", type: "text", placeholder: "FAI-101", prefill: [{ source: "asset", key: "assetTag" }, { source: "priorField", sectionId: "initiating-devices", fieldId: "assetTag" }] },
-              { id: "deviceType", label: "Device type", type: "select", optionProvider: "alarmDeviceTypes", prefill: [{ source: "assetMetadata", key: "deviceType" }, { source: "priorField", sectionId: "initiating-devices", fieldId: "deviceType" }] },
+              {
+                id: "deviceType",
+                label: "Device type",
+                type: "select",
+                optionProvider: "alarmDeviceTypes",
+                customValueFieldId: "deviceTypeOther",
+                customValueTrigger: "other",
+                prefill: [
+                  { source: "assetMetadata", key: "deviceType" },
+                  { source: "priorField", sectionId: "initiating-devices", fieldId: "deviceType" },
+                  { source: "priorAnyField", sectionId: "initiating-devices", fieldIds: ["deviceTypeOther"], value: "other" }
+                ]
+              },
+              {
+                id: "deviceTypeOther",
+                label: "Custom device type",
+                type: "text",
+                placeholder: "Enter initiating device type",
+                visibleWhen: { fieldId: "deviceType", values: ["other"] }
+              },
               { id: "location", label: "Device location", type: "text", placeholder: "Lobby north exit", prefill: [{ source: "assetMetadata", key: "location" }, { source: "priorField", sectionId: "initiating-devices", fieldId: "location" }, { source: "siteDefault", key: "siteName" }] },
               { id: "serialNumber", label: "Address / zone", type: "text", placeholder: "Address 17 / Zone 3", prefill: [{ source: "assetMetadata", key: "serialNumber" }, { source: "priorField", sectionId: "initiating-devices", fieldId: "serialNumber" }] },
               { id: "functionalTestResult", label: "Functional test result", type: "select", optionProvider: "deviceFunctionalResultOptions", prefill: [{ source: "priorField", sectionId: "initiating-devices", fieldId: "functionalTestResult" }, { source: "reportDefault", value: "pass" }] },
