@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getPaginatedTenantCustomerCompanySettings } from "@testworx/lib";
+import { getPaginatedTenantCustomerCompanyDirectory } from "@testworx/lib";
 
 import { AppPageShell, KPIStatCard, PageHeader } from "../operations-ui";
 import { CustomerManagementCard } from "../settings/customer-management-card";
-import { createCustomerCompanyAction, updateCustomerCompanyAction } from "./actions";
+import { createCustomerCompanyAction } from "./actions";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -46,14 +46,11 @@ export default async function ClientsPage({
       ? decodeURIComponent(params.customers)
       : null;
 
-  const data = await getPaginatedTenantCustomerCompanySettings(actor, {
+  const data = await getPaginatedTenantCustomerCompanyDirectory(actor, {
     page: customersPage,
     limit: 10,
     query: customersQuery
   });
-
-  const activeOnPage = data.customers.filter((customer) => customer.isActive).length;
-  const quickBooksLinkedOnPage = data.customers.filter((customer) => customer.quickbooksCustomerId).length;
 
   return (
     <AppPageShell density="wide">
@@ -79,15 +76,15 @@ export default async function ClientsPage({
         />
         <KPIStatCard
           label="Active on page"
-          note="Customers currently marked active in this page snapshot."
+          note="Customer profiles available to open from this page of results."
           tone="emerald"
-          value={activeOnPage}
+          value={data.pagination.totalCount}
         />
         <KPIStatCard
-          label="QuickBooks linked"
-          note="Current-page clients already connected to QuickBooks customers."
+          label="Profiles"
+          note="Open a customer profile for full contact, site, billing, and history details."
           tone="violet"
-          value={quickBooksLinkedOnPage}
+          value={data.pagination.overallCount}
         />
       </section>
 
@@ -97,7 +94,6 @@ export default async function ClientsPage({
         filters={data.filters}
         notice={customerNotice}
         pagination={data.pagination}
-        updateCustomerAction={updateCustomerCompanyAction}
       />
     </AppPageShell>
   );

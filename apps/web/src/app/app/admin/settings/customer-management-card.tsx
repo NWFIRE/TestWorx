@@ -21,6 +21,10 @@ const LIVE_SEARCH_DEBOUNCE_MS = 250;
 type CustomerRecord = {
   id: string;
   name: string;
+};
+
+type CustomerProfileSeed = Partial<{
+  name: string | null;
   contactName: string | null;
   billingEmail: string | null;
   phone: string | null;
@@ -43,8 +47,7 @@ type CustomerRecord = {
   paymentTermsCode: string;
   customPaymentTermsLabel: string | null;
   customPaymentTermsDays: number | null;
-  quickbooksCustomerId: string | null;
-};
+}>;
 
 type CustomerPagination = {
   page: number;
@@ -72,7 +75,6 @@ type CustomerManagementCardProps = {
     _: { error: string | null; success: string | null },
     formData: FormData
   ) => Promise<{ error: string | null; success: string | null }>;
-  updateCustomerAction: (formData: FormData) => Promise<void>;
   notice?: string | null;
 };
 
@@ -102,7 +104,7 @@ type CustomerFormValues = {
   customPaymentTermsDays: string;
 };
 
-function toFormValues(customer?: CustomerRecord): CustomerFormValues {
+function toFormValues(customer?: CustomerProfileSeed): CustomerFormValues {
   return {
     name: customer?.name ?? "",
     contactName: customer?.contactName ?? "",
@@ -154,7 +156,7 @@ function CustomerProfileFields({
   customer,
   formIdPrefix
 }: {
-  customer?: CustomerRecord;
+  customer?: CustomerProfileSeed;
   formIdPrefix: string;
 }) {
   const [billingAddressSameAsService, setBillingAddressSameAsService] = useState(
@@ -229,11 +231,18 @@ function CustomerProfileFields({
         </div>
       </CustomerFieldGroup>
 
-      <CustomerFieldGroup
-        title="Billing address"
-        description="Use a separate billing address when invoices need to route somewhere other than the service location."
-      >
-        <label className="mb-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700">
+      <section className="rounded-[1.25rem] border border-slate-200/80 bg-slate-50/70 p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-ink">Billing address</p>
+            <p className="mt-1 text-sm text-slate-500">
+              {billingAddressSameAsService
+                ? "Billing address matches the service location."
+                : "Use a separate billing address when invoices need to route somewhere other than the service location."}
+            </p>
+          </div>
+        </div>
+        <label className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700">
           <input
             className="h-4 w-4 rounded border-slate-300 text-slateblue focus:ring-slateblue"
             defaultChecked={billingAddressSameAsService}
@@ -243,33 +252,35 @@ function CustomerProfileFields({
           />
           Billing address same as service address
         </label>
-        <div className="grid gap-4 md:grid-cols-2">
+        {billingAddressSameAsService ? null : (
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-billingAddressLine1`}>Billing address line 1</label>
-            <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 disabled:bg-slate-100 disabled:text-slate-400" defaultValue={initialValues.billingAddressLine1} disabled={billingAddressSameAsService} id={`${formIdPrefix}-billingAddressLine1`} name="billingAddressLine1" />
+            <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" defaultValue={initialValues.billingAddressLine1} id={`${formIdPrefix}-billingAddressLine1`} name="billingAddressLine1" />
           </div>
           <div className="md:col-span-2">
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-billingAddressLine2`}>Billing address line 2</label>
-            <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 disabled:bg-slate-100 disabled:text-slate-400" defaultValue={initialValues.billingAddressLine2} disabled={billingAddressSameAsService} id={`${formIdPrefix}-billingAddressLine2`} name="billingAddressLine2" />
+            <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" defaultValue={initialValues.billingAddressLine2} id={`${formIdPrefix}-billingAddressLine2`} name="billingAddressLine2" />
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-billingCity`}>Billing city</label>
-            <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 disabled:bg-slate-100 disabled:text-slate-400" defaultValue={initialValues.billingCity} disabled={billingAddressSameAsService} id={`${formIdPrefix}-billingCity`} name="billingCity" />
+            <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" defaultValue={initialValues.billingCity} id={`${formIdPrefix}-billingCity`} name="billingCity" />
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-billingState`}>Billing state / region</label>
-            <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 disabled:bg-slate-100 disabled:text-slate-400" defaultValue={initialValues.billingState} disabled={billingAddressSameAsService} id={`${formIdPrefix}-billingState`} name="billingState" />
+            <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" defaultValue={initialValues.billingState} id={`${formIdPrefix}-billingState`} name="billingState" />
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-billingPostalCode`}>Billing postal code</label>
-            <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 disabled:bg-slate-100 disabled:text-slate-400" defaultValue={initialValues.billingPostalCode} disabled={billingAddressSameAsService} id={`${formIdPrefix}-billingPostalCode`} name="billingPostalCode" />
+            <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" defaultValue={initialValues.billingPostalCode} id={`${formIdPrefix}-billingPostalCode`} name="billingPostalCode" />
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-billingCountry`}>Billing country</label>
-            <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 disabled:bg-slate-100 disabled:text-slate-400" defaultValue={initialValues.billingCountry} disabled={billingAddressSameAsService} id={`${formIdPrefix}-billingCountry`} name="billingCountry" />
+            <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" defaultValue={initialValues.billingCountry} id={`${formIdPrefix}-billingCountry`} name="billingCountry" />
           </div>
-        </div>
-      </CustomerFieldGroup>
+          </div>
+        )}
+      </section>
 
       <CustomerFieldGroup
         title="Billing and payment settings"
@@ -330,7 +341,6 @@ export function CustomerManagementCard({
   pagination,
   filters,
   createCustomerAction,
-  updateCustomerAction,
   notice
 }: CustomerManagementCardProps) {
   const [createState, createFormAction, createPending] = useActionState(createCustomerAction, initialState);
@@ -342,6 +352,7 @@ export function CustomerManagementCard({
   const [activeQuery, setActiveQuery] = useState(filters.query);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const requestSequenceRef = useRef(0);
   const activeAbortRef = useRef<AbortController | null>(null);
   const hydratedRef = useRef(false);
@@ -353,6 +364,12 @@ export function CustomerManagementCard({
     setActiveQuery(filters.query);
     hydratedRef.current = true;
   }, [customers, filters.query, pagination]);
+
+  useEffect(() => {
+    if (createState.error || createState.success || notice) {
+      setIsCreateOpen(true);
+    }
+  }, [createState.error, createState.success, notice]);
 
   const syncCustomersUrl = useCallback((page: number, query: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -461,23 +478,36 @@ export function CustomerManagementCard({
     <div className="space-y-6 rounded-[2rem] bg-white p-6 shadow-panel">
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Customer companies</p>
-        <h3 className="mt-2 text-2xl font-semibold text-ink">Create and edit current customers</h3>
-        <p className="mt-2 text-sm text-slate-500">Maintain complete customer records for scheduling, field operations, billing, and QuickBooks sync without replacing any existing tenant data.</p>
+        <h3 className="mt-2 text-2xl font-semibold text-ink">Browse and add customer companies</h3>
+        <p className="mt-2 text-sm text-slate-500">Keep this page focused on discovery, then open the full client profile when you need operational, billing, and account detail.</p>
       </div>
 
-      <form action={createFormAction} className="space-y-4 rounded-[1.5rem] border border-slate-200 p-5">
-        <div>
-          <p className="text-sm uppercase tracking-[0.18em] text-slate-500">New customer</p>
-          <h4 className="mt-1 text-lg font-semibold text-ink">Add a customer company</h4>
-        </div>
-        <CustomerProfileFields formIdPrefix="create-customer" />
-        {createState.error ? <p className="text-sm text-rose-600">{createState.error}</p> : null}
-        {createState.success ? <p className="text-sm text-emerald-600">{createState.success}</p> : null}
-        {notice ? <p className="text-sm text-slateblue">{notice}</p> : null}
-        <button className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={createPending} type="submit">
-          {createPending ? "Saving customer..." : "Add customer"}
+      <section className="rounded-[1.5rem] border border-slate-200 p-5">
+        <button
+          className="pressable flex w-full items-center justify-between gap-4 text-left"
+          onClick={() => setIsCreateOpen((current) => !current)}
+          type="button"
+        >
+          <div>
+            <p className="text-sm uppercase tracking-[0.18em] text-slate-500">New customer</p>
+            <h4 className="mt-1 text-lg font-semibold text-ink">Add a customer company</h4>
+            <p className="mt-2 text-sm text-slate-500">Open the intake form only when you need to add a new customer.</p>
+          </div>
+          <span className="text-sm font-semibold text-slateblue">{isCreateOpen ? "Collapse" : "Expand"}</span>
         </button>
-      </form>
+
+        {isCreateOpen ? (
+          <form action={createFormAction} className="mt-5 space-y-4 border-t border-slate-200 pt-5">
+            <CustomerProfileFields formIdPrefix="create-customer" />
+            {createState.error ? <p className="text-sm text-rose-600">{createState.error}</p> : null}
+            {createState.success ? <p className="text-sm text-emerald-600">{createState.success}</p> : null}
+            {notice ? <p className="text-sm text-slateblue">{notice}</p> : null}
+            <button className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={createPending} type="submit">
+              {createPending ? "Saving customer..." : "Add customer"}
+            </button>
+          </form>
+        ) : null}
+      </section>
 
       <div className="space-y-4">
         <div>
@@ -523,27 +553,10 @@ export function CustomerManagementCard({
         ) : (
           currentCustomers.map((customer) => (
             <div key={customer.id} className="rounded-[1.5rem] border border-slate-200 p-5">
-              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-lg font-semibold text-ink">{customer.name}</p>
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${customer.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
-                      {customer.isActive ? "Active" : "Inactive"}
-                    </span>
-                    {customer.isTaxExempt ? (
-                      <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-800">
-                        Tax exempt
-                      </span>
-                    ) : null}
-                    {customer.paymentTermsCode === "due_on_receipt" ? (
-                      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-800">
-                        Due on site
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {customer.quickbooksCustomerId ? `QuickBooks linked (${customer.quickbooksCustomerId})` : "Not linked to QuickBooks yet"}
-                  </p>
+                  <p className="text-lg font-semibold text-ink">{customer.name}</p>
+                  <p className="mt-1 text-sm text-slate-500">Open the profile to view contact details, locations, billing, and customer history.</p>
                 </div>
                 <Link
                   className="pressable inline-flex min-h-10 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slateblue transition hover:border-slate-300 hover:bg-slate-50"
@@ -552,15 +565,6 @@ export function CustomerManagementCard({
                   Open profile
                 </Link>
               </div>
-              <form action={updateCustomerAction} className="space-y-4">
-                <input name="customerCompanyId" type="hidden" value={customer.id} />
-                <input name="customersPage" type="hidden" value={String(currentPagination.page)} />
-                <input name="customersQuery" type="hidden" value={currentQuery} />
-                <CustomerProfileFields customer={customer} formIdPrefix={`customer-${customer.id}`} />
-                <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" type="submit">
-                  Save customer
-                </button>
-              </form>
             </div>
           ))
         )}

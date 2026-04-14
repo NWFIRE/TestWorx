@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { getPaginatedTenantCustomerCompanySettings } from "@testworx/lib";
+import { getPaginatedTenantCustomerCompanyDirectory } from "@testworx/lib";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const query = searchParams.get("query") ?? "";
 
   try {
-    const result = await getPaginatedTenantCustomerCompanySettings(
+    const result = await getPaginatedTenantCustomerCompanyDirectory(
       {
         userId: session.user.id,
         role: session.user.role,

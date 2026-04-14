@@ -125,6 +125,58 @@ describe("email reminders", () => {
     expect(result.recipients[0]?.lastSentAt).toBe("2026-04-10T15:00:00.000Z");
   });
 
+  it("uses the customer address when site context is empty", async () => {
+    prismaMock.inspectionTask.findMany.mockResolvedValue([
+      {
+        id: "task_1",
+        inspectionType: "fire_alarm",
+        inspection: {
+          id: "inspection_1",
+          customerCompanyId: "customer_1",
+          customerCompany: {
+            id: "customer_1",
+            name: "Acme Tower",
+            contactName: "Jordan Lee",
+            billingEmail: "billing@acme.test",
+            serviceAddressLine1: "500 Service Ave",
+            serviceCity: "Tulsa",
+            serviceState: "OK",
+            servicePostalCode: "74103",
+            billingAddressLine1: "PO Box 12",
+            billingCity: "Tulsa",
+            billingState: "OK",
+            billingPostalCode: "74101"
+          },
+          site: {
+            id: "site_1",
+            name: "",
+            city: null,
+            addressLine1: null
+          }
+        }
+      }
+    ]);
+    prismaMock.emailReminderSendLog.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    prismaMock.tenant.findFirst.mockResolvedValue({
+      id: "tenant_1",
+      name: "Northwest Fire & Safety",
+      billingEmail: "billing@nwfireandsafety.com",
+      branding: {
+        legalBusinessName: "Northwest Fire & Safety",
+        phone: "580-540-3119",
+        email: "accounting@nwfireandsafety.com"
+      }
+    });
+
+    const { getEmailReminderWorkspaceData } = await import("../email-reminders");
+    const result = await getEmailReminderWorkspaceData(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { dueMonth: "2026-04" }
+    );
+
+    expect(result.recipients[0]?.siteSummary).toBe("500 Service Ave, Tulsa OK 74103");
+  });
+
   it("sends merged reminder emails and stores snapshots in the send log", async () => {
     prismaMock.tenant.findFirst.mockResolvedValue({
       id: "tenant_1",

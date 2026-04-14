@@ -124,6 +124,20 @@ function formatListSummary(values: string[]) {
   return `${values[0]}, ${values[1]}, +${values.length - 2} more`;
 }
 
+function formatAddressSummary(input: {
+  line1?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+}) {
+  const parts = [
+    input.line1?.trim(),
+    [input.city?.trim(), input.state?.trim(), input.postalCode?.trim()].filter(Boolean).join(" ").trim()
+  ].filter(Boolean);
+
+  return parts.join(", ");
+}
+
 function humanizeValue(value: string) {
   return value
     .split("_")
@@ -286,7 +300,15 @@ async function fetchRecipientTaskRows(input: {
               id: true,
               name: true,
               contactName: true,
-              billingEmail: true
+              billingEmail: true,
+              serviceAddressLine1: true,
+              serviceCity: true,
+              serviceState: true,
+              servicePostalCode: true,
+              billingAddressLine1: true,
+              billingCity: true,
+              billingState: true,
+              billingPostalCode: true
             }
           },
           site: {
@@ -314,7 +336,14 @@ function buildRecipientRows(input: {
     const customer = task.inspection.customerCompany;
     const customerId = customer.id;
     const existing = grouped.get(customerId);
-    const siteName = task.inspection.site.name;
+    const siteName =
+      task.inspection.site.name?.trim() ||
+      formatAddressSummary({
+        line1: customer.serviceAddressLine1 ?? customer.billingAddressLine1,
+        city: customer.serviceCity ?? customer.billingCity,
+        state: customer.serviceState ?? customer.billingState,
+        postalCode: customer.servicePostalCode ?? customer.billingPostalCode
+      });
     const inspectionType = task.inspectionType;
     const division = mapInspectionTypeToComplianceReportingDivision(inspectionType) ?? inspectionType;
 

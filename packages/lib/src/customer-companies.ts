@@ -49,6 +49,11 @@ const customerCompanySelect = {
   updatedAt: true
 } as const;
 
+const customerCompanyDirectorySelect = {
+  id: true,
+  name: true
+} as const;
+
 type SelectedCustomerCompany = {
   id: string;
   name: string;
@@ -77,6 +82,11 @@ type SelectedCustomerCompany = {
   quickbooksCustomerId: string | null;
   createdAt: Date;
   updatedAt: Date;
+};
+
+type SelectedCustomerCompanyDirectoryEntry = {
+  id: string;
+  name: string;
 };
 
 function parseActor(actor: ActorContext) {
@@ -308,6 +318,80 @@ export async function getPaginatedTenantCustomerCompanySettings(
           skip: (safePage - 1) * limit,
           take: limit,
           select: customerCompanySelect
+        });
+
+  return {
+    customers: pagedCustomers,
+    pagination: {
+      page: safePage,
+      limit,
+      totalCount,
+      totalPages,
+      overallCount: query ? overallCountRaw : totalCount
+    },
+    filters: {
+      query
+    }
+  };
+}
+
+export async function getPaginatedTenantCustomerCompanyDirectory(
+  actor: ActorContext,
+  input?: {
+    page?: number;
+    limit?: number;
+    query?: string | null;
+  }
+) {
+  const parsedActor = parseActor(actor);
+  ensureTenantAdmin(parsedActor);
+  const page = Math.max(input?.page ?? 1, 1);
+  const limit = Math.min(Math.max(input?.limit ?? 10, 1), 100);
+  const tenantId = parsedActor.tenantId as string;
+  const query = (input?.query ?? "").trim();
+  const where = {
+    tenantId,
+    ...(query
+      ? {
+          OR: [
+            { name: { contains: query, mode: "insensitive" as const } },
+            { contactName: { contains: query, mode: "insensitive" as const } },
+            { billingEmail: { contains: query, mode: "insensitive" as const } },
+            { phone: { contains: query, mode: "insensitive" as const } }
+          ]
+        }
+      : {})
+  };
+
+  const [totalCount, customers, overallCountRaw] = await Promise.all([
+    prisma.customerCompany.count({
+      where
+    }),
+    prisma.customerCompany.findMany({
+      where,
+      orderBy: [{ name: "asc" }, { createdAt: "asc" }],
+      skip: (page - 1) * limit,
+      take: limit,
+      select: customerCompanyDirectorySelect
+    }),
+    query
+      ? prisma.customerCompany.count({
+          where: { tenantId }
+        })
+      : Promise.resolve(0)
+  ]);
+
+  const totalPages = Math.max(Math.ceil(totalCount / limit), 1);
+  const safePage = Math.min(page, totalPages);
+  const pagedCustomers: SelectedCustomerCompanyDirectoryEntry[] =
+    safePage === page
+      ? customers
+      : await prisma.customerCompany.findMany({
+          where,
+          orderBy: [{ name: "asc" }, { createdAt: "asc" }],
+          skip: (safePage - 1) * limit,
+          take: limit,
+          select: customerCompanyDirectorySelect
         });
 
   return {
