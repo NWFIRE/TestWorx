@@ -285,11 +285,13 @@ function NavSection({
 export function AppShell({
   children,
   role,
+  allowances,
   user,
   signOutAction
 }: {
   children: React.ReactNode;
   role: string;
+  allowances?: Record<string, boolean> | null;
   user: {
     name: string | null;
     email: string | null;
@@ -297,8 +299,8 @@ export function AppShell({
   signOutAction: () => Promise<void>;
 }) {
   const pathname = usePathname();
-  const navItems = useMemo(() => getAppNavItemsForRole(role), [role]);
-  const currentItem = useMemo(() => getCurrentAppNavItem(role, pathname), [pathname, role]);
+  const navItems = useMemo(() => getAppNavItemsForRole(role, allowances), [allowances, role]);
+  const currentItem = useMemo(() => getCurrentAppNavItem(role, pathname, allowances), [allowances, pathname, role]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);

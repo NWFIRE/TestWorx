@@ -8,6 +8,7 @@ import {
   getQuoteDetail,
   getQuoteStatusTone,
   getQuoteSyncTone,
+  hasQuoteManagementAccess,
   quoteStatusLabels,
   quoteSyncStatusLabels,
   resolveTenantBranding
@@ -39,13 +40,21 @@ export default async function QuoteDetailPage({
   if (!session?.user?.tenantId) {
     redirect("/login");
   }
-  if (!["tenant_admin", "office_admin", "platform_admin"].includes(session.user.role)) {
+  if (!hasQuoteManagementAccess({ role: session.user.role, allowances: session.user.allowances ?? null })) {
     redirect("/app");
   }
 
   const { quoteId } = await params;
   const paramsData = searchParams ? await searchParams : {};
-  const detail = await getQuoteDetail({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, quoteId);
+  const detail = await getQuoteDetail(
+    {
+      userId: session.user.id,
+      role: session.user.role,
+      tenantId: session.user.tenantId,
+      allowances: session.user.allowances ?? null
+    },
+    quoteId
+  );
   if (!detail) {
     redirect("/app/admin/quotes");
   }

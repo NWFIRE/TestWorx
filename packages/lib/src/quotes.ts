@@ -32,7 +32,6 @@ import {
 import { createInspection } from "./scheduling";
 import { assertTenantContext } from "./permissions";
 
-const adminRoles = ["platform_admin", "tenant_admin", "office_admin"] as const;
 const quoteStatusValues = Object.values(QuoteStatus);
 const quoteSyncStatusValues = Object.values(QuoteSyncStatus);
 const closedQuoteStatuses: QuoteStatus[] = [QuoteStatus.approved, QuoteStatus.declined, QuoteStatus.converted, QuoteStatus.cancelled];
@@ -221,9 +220,24 @@ function parseActor(actor: ActorContext) {
   return parsed;
 }
 
-function assertAdminRole(role: string) {
-  if (!adminRoles.includes(role as (typeof adminRoles)[number])) {
-    throw new Error("Only administrators can manage quotes.");
+export function hasQuoteManagementAccess(input: {
+  role: string;
+  allowances?: Record<string, boolean> | null;
+}) {
+  if (input.role === "platform_admin" || input.role === "tenant_admin") {
+    return true;
+  }
+
+  if (input.role === "office_admin") {
+    return input.allowances?.quoteAccess ?? true;
+  }
+
+  return input.allowances?.quoteAccess ?? false;
+}
+
+function assertQuoteManagementAccess(actor: Pick<ActorContext, "role" | "allowances">) {
+  if (!hasQuoteManagementAccess({ role: actor.role, allowances: actor.allowances })) {
+    throw new Error("Your account does not have quote access.");
   }
 }
 
@@ -1087,7 +1101,7 @@ async function loadQuoteReferenceMaps(
 
 export async function getQuoteFormOptions(actor: ActorContext) {
   const parsedActor = parseActor(actor);
-  assertAdminRole(parsedActor.role);
+  assertQuoteManagementAccess(parsedActor);
 
   const [customers, sites, quickBooksCatalogItems] = await Promise.all([
     prisma.customerCompany.findMany({
@@ -1154,13 +1168,13 @@ export async function getQuoteFormOptions(actor: ActorContext) {
 
 export async function getQuoteReminderSettings(actor: ActorContext) {
   const parsedActor = parseActor(actor);
-  assertAdminRole(parsedActor.role);
+  assertQuoteManagementAccess(parsedActor);
   return getTenantQuoteReminderSettingsByTenantId(parsedActor.tenantId as string);
 }
 
 export async function updateQuoteReminderSettings(actor: ActorContext, input: QuoteReminderSettingsInput) {
   const parsedActor = parseActor(actor);
-  assertAdminRole(parsedActor.role);
+  assertQuoteManagementAccess(parsedActor);
   const parsedInput = quoteReminderSettingsInputSchema.parse(input);
 
   await prisma.tenant.update({
@@ -1192,7 +1206,7 @@ export async function updateQuoteReminderSettings(actor: ActorContext, input: Qu
 
 export async function createQuote(actor: ActorContext, input: QuoteInput) {
   const parsedActor = parseActor(actor);
-  assertAdminRole(parsedActor.role);
+  assertQuoteManagementAccess(parsedActor);
   const parsedInput = quoteInputSchema.parse(input);
 
   const lineItems = await buildQuoteLineItemsForSave({
@@ -1247,7 +1261,7 @@ export async function createQuote(actor: ActorContext, input: QuoteInput) {
 
 export async function updateQuote(actor: ActorContext, quoteId: string, input: QuoteInput) {
   const parsedActor = parseActor(actor);
-  assertAdminRole(parsedActor.role);
+  assertQuoteManagementAccess(parsedActor);
   const parsedInput = quoteInputSchema.parse(input);
   const existing = await prisma.quote.findFirst({
     where: { id: quoteId, tenantId: parsedActor.tenantId as string },
@@ -1313,7 +1327,7 @@ export async function updateQuote(actor: ActorContext, quoteId: string, input: Q
 
 export async function deleteQuote(actor: ActorContext, quoteId: string) {
   const parsedActor = parseActor(actor);
-  assertAdminRole(parsedActor.role);
+  assertQuoteManagementAccess(parsedActor);
 
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, tenantId: parsedActor.tenantId as string },
@@ -1370,7 +1384,7 @@ export async function saveQuoteLineItemQuickBooksMapping(actor: ActorContext, in
   qbItemId: string;
 }) {
   const parsedActor = parseActor(actor);
-  assertAdminRole(parsedActor.role);
+  assertQuoteManagementAccess(parsedActor);
 
   const lineItem = await prisma.quoteLineItem.findFirst({
     where: {
@@ -1420,7 +1434,7 @@ export async function clearQuoteLineItemQuickBooksMapping(actor: ActorContext, i
   internalCode: string;
 }) {
   const parsedActor = parseActor(actor);
-  assertAdminRole(parsedActor.role);
+  assertQuoteManagementAccess(parsedActor);
 
   const lineItem = await prisma.quoteLineItem.findFirst({
     where: {
@@ -1468,7 +1482,7 @@ export async function getQuoteWorkspaceData(
   }
 ) {
   const parsedActor = parseActor(actor);
-  assertAdminRole(parsedActor.role);
+  assertQuoteManagementAccess(parsedActor);
   const quotes = await prisma.quote.findMany({
     where: { tenantId: parsedActor.tenantId as string },
     include: {
@@ -1528,7 +1542,7 @@ export async function getQuoteWorkspaceData(
 
 export async function getQuoteDetail(actor: ActorContext, quoteId: string) {
   const parsedActor = parseActor(actor);
-  assertAdminRole(parsedActor.role);
+  assertQuoteManagementAccess(parsedActor);
 
   const [quote, auditLogs, formOptions, reminderSettings, reminderDispatches] = await Promise.all([
     getQuoteByIdForTenant(parsedActor.tenantId as string, quoteId),
@@ -1772,7 +1786,7 @@ export async function getAuthorizedQuotePdf(actor: ActorContext, quoteId: string
 
 export async function sendQuote(actor: ActorContext, quoteId: string, input?: { recipientEmail?: string | null; subject?: string | null; message?: string | null }) {
   const parsedActor = parseActor(actor);
-  assertAdminRole(parsedActor.role);
+  assertQuoteManagementAccess(parsedActor);
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, tenantId: parsedActor.tenantId as string },
     include: {
@@ -2153,7 +2167,7 @@ export async function updateQuoteReminderControl(
   action: "pause" | "resume" | "disable" | "enable"
 ) {
   const parsedActor = parseActor(actor);
-  assertAdminRole(parsedActor.role);
+  assertQuoteManagementAccess(parsedActor);
 
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, tenantId: parsedActor.tenantId as string },
@@ -2211,7 +2225,7 @@ export async function updateQuoteReminderControl(
 
 export async function sendQuoteReminderNow(actor: ActorContext, quoteId: string) {
   const parsedActor = parseActor(actor);
-  assertAdminRole(parsedActor.role);
+  assertQuoteManagementAccess(parsedActor);
 
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, tenantId: parsedActor.tenantId as string },
@@ -2352,7 +2366,7 @@ export async function updateQuoteStatus(
   options?: { note?: string | null }
 ) {
   const parsedActor = parseActor(actor);
-  assertAdminRole(parsedActor.role);
+  assertQuoteManagementAccess(parsedActor);
 
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, tenantId: parsedActor.tenantId as string },
@@ -2399,7 +2413,7 @@ function defaultConversionStart() {
 
 export async function convertQuoteToInspection(actor: ActorContext, quoteId: string) {
   const parsedActor = parseActor(actor);
-  assertAdminRole(parsedActor.role);
+  assertQuoteManagementAccess(parsedActor);
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, tenantId: parsedActor.tenantId as string },
     include: { lineItems: { orderBy: { sortOrder: "asc" } } }
@@ -2570,7 +2584,7 @@ export async function getCustomerQuoteDetail(actor: ActorContext, quoteId: strin
 
 export async function regenerateQuoteAccessToken(actor: ActorContext, quoteId: string) {
   const parsedActor = parseActor(actor);
-  assertAdminRole(parsedActor.role);
+  assertQuoteManagementAccess(parsedActor);
 
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, tenantId: parsedActor.tenantId as string },

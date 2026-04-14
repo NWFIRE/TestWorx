@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import {
   formatQuoteReminderStage,
   getQuoteReminderSettings,
+  hasQuoteManagementAccess,
   getQuoteStatusTone,
   getQuoteWorkspaceData,
   quoteStatusLabels,
@@ -85,7 +86,7 @@ export default async function QuotesPage({
   if (!session?.user?.tenantId) {
     redirect("/login");
   }
-  if (!["tenant_admin", "office_admin", "platform_admin"].includes(session.user.role)) {
+  if (!hasQuoteManagementAccess({ role: session.user.role, allowances: session.user.allowances ?? null })) {
     redirect("/app");
   }
 
@@ -94,7 +95,12 @@ export default async function QuotesPage({
   const selectedSync = syncOptions.some((option) => option.value === params.syncStatus) ? params.syncStatus ?? "all" : "all";
   const query = typeof params.query === "string" ? params.query : "";
 
-  const actor = { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId };
+  const actor = {
+    userId: session.user.id,
+    role: session.user.role,
+    tenantId: session.user.tenantId,
+    allowances: session.user.allowances ?? null
+  };
 
   const [quotes, quoteReminderSettings] = await Promise.all([
     getQuoteWorkspaceData(

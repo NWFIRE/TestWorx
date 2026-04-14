@@ -3,7 +3,8 @@ import { z } from "zod";
 export const actorContextSchema = z.object({
   userId: z.string().min(1),
   role: z.string().min(1),
-  tenantId: z.string().nullable()
+  tenantId: z.string().nullable(),
+  allowances: z.record(z.string(), z.boolean()).nullable().optional()
 });
 
 export type ActorContext = z.infer<typeof actorContextSchema>;

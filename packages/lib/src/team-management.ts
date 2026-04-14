@@ -100,6 +100,7 @@ function getDefaultAllowancesForRole(role: (typeof userRoleOptions)[number]): Te
   const base: TeamAllowanceMap = {
     accountAdmin: false,
     schedulingAccess: false,
+    quoteAccess: false,
     billingAccess: false,
     settingsAccess: false,
     reportReviewAccess: false,
@@ -120,6 +121,7 @@ function getDefaultAllowancesForRole(role: (typeof userRoleOptions)[number]): Te
         ...base,
         accountAdmin: true,
         schedulingAccess: true,
+        quoteAccess: true,
         billingAccess: true,
         settingsAccess: true,
         reportReviewAccess: true,

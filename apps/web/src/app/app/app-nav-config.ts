@@ -10,6 +10,20 @@ export type AppNavItem = {
   matchPrefixes?: string[];
 };
 
+type InternalAllowances = Record<string, boolean> | null | undefined;
+
+function hasQuoteAccessForRole(role: string, allowances?: InternalAllowances) {
+  if (role === "platform_admin" || role === "tenant_admin") {
+    return true;
+  }
+
+  if (role === "office_admin") {
+    return allowances?.quoteAccess ?? true;
+  }
+
+  return allowances?.quoteAccess ?? false;
+}
+
 const adminNavItems: AppNavItem[] = [
   {
     href: "/app/admin",
@@ -166,8 +180,21 @@ const navByRole: Record<string, AppNavItem[]> = {
   ]
 };
 
-export function getAppNavItemsForRole(role: string) {
-  return navByRole[role] ?? [];
+export function getAppNavItemsForRole(role: string, allowances?: InternalAllowances) {
+  const baseItems = navByRole[role] ?? [];
+
+  if (role === "technician" && hasQuoteAccessForRole(role, allowances)) {
+    return [
+      ...baseItems,
+      adminNavItems.find((item) => item.href === "/app/admin/quotes")
+    ].filter(Boolean) as AppNavItem[];
+  }
+
+  if (!hasQuoteAccessForRole(role, allowances)) {
+    return baseItems.filter((item) => item.href !== "/app/admin/quotes");
+  }
+
+  return baseItems;
 }
 
 export function isAppNavItemActive(pathname: string, item: AppNavItem) {
@@ -188,6 +215,6 @@ export function isAppNavItemActive(pathname: string, item: AppNavItem) {
   return pathname.startsWith(`${item.href}/`);
 }
 
-export function getCurrentAppNavItem(role: string, pathname: string) {
-  return getAppNavItemsForRole(role).find((item) => isAppNavItemActive(pathname, item)) ?? null;
+export function getCurrentAppNavItem(role: string, pathname: string, allowances?: InternalAllowances) {
+  return getAppNavItemsForRole(role, allowances).find((item) => isAppNavItemActive(pathname, item)) ?? null;
 }

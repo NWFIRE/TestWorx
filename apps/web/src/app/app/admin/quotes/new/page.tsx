@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { addDays } from "date-fns";
 
 import { auth } from "@/auth";
-import { DEFAULT_QUOTE_EXPIRATION_DAYS, getQuoteFormOptions } from "@testworx/lib";
+import { DEFAULT_QUOTE_EXPIRATION_DAYS, getQuoteFormOptions, hasQuoteManagementAccess } from "@testworx/lib";
 
 import { AppPageShell, PageHeader } from "../../operations-ui";
 import { createQuoteAction } from "../actions";
@@ -17,12 +17,17 @@ export default async function NewQuotePage({
   if (!session?.user?.tenantId) {
     redirect("/login");
   }
-  if (!["tenant_admin", "office_admin", "platform_admin"].includes(session.user.role)) {
+  if (!hasQuoteManagementAccess({ role: session.user.role, allowances: session.user.allowances ?? null })) {
     redirect("/app");
   }
 
   const params = searchParams ? await searchParams : {};
-  const options = await getQuoteFormOptions({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId });
+  const options = await getQuoteFormOptions({
+    userId: session.user.id,
+    role: session.user.role,
+    tenantId: session.user.tenantId,
+    allowances: session.user.allowances ?? null
+  });
   const requestedCustomerId = typeof params.customerCompanyId === "string" ? params.customerCompanyId : "";
   const requestedSiteId = typeof params.siteId === "string" ? params.siteId : "";
   const resolvedCustomerId = options.customers.some((customer) => customer.id === requestedCustomerId) ? requestedCustomerId : "";

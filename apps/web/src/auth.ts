@@ -31,7 +31,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
         try {
           const user = await prisma.user.findUnique({
-            where: { email: parsed.data.email.toLowerCase() }
+            where: { email: parsed.data.email.toLowerCase() },
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              role: true,
+              tenantId: true,
+              isActive: true,
+              passwordHash: true,
+              allowances: true
+            }
           });
 
           if (!user || !user.isActive) {
@@ -53,7 +63,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             email: user.email,
             name: user.name,
             role: user.role,
-            tenantId: user.tenantId
+            tenantId: user.tenantId,
+            allowances:
+              user.allowances && typeof user.allowances === "object" && !Array.isArray(user.allowances)
+                ? (user.allowances as Record<string, boolean>)
+                : null
           };
         } catch (error) {
           console.error("Credentials authorize failed", error);
@@ -65,9 +79,32 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     jwt: async ({ token, user }) => {
       if (user) {
-        const authUser = user as typeof user & { role: string; tenantId: string | null };
+        const authUser = user as typeof user & {
+          role: string;
+          tenantId: string | null;
+          allowances?: Record<string, boolean> | null;
+        };
         token.role = authUser.role;
         token.tenantId = authUser.tenantId;
+        token.allowances = authUser.allowances ?? null;
+      } else if (token.sub) {
+        const currentUser = await prisma.user.findUnique({
+          where: { id: token.sub },
+          select: {
+            role: true,
+            tenantId: true,
+            allowances: true
+          }
+        });
+
+        if (currentUser) {
+          token.role = currentUser.role;
+          token.tenantId = currentUser.tenantId;
+          token.allowances =
+            currentUser.allowances && typeof currentUser.allowances === "object" && !Array.isArray(currentUser.allowances)
+              ? (currentUser.allowances as Record<string, boolean>)
+              : null;
+        }
       }
       return token;
     },
@@ -76,6 +113,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.id = token.sub ?? "";
         session.user.role = String(token.role ?? "");
         session.user.tenantId = (token.tenantId as string | null) ?? null;
+        session.user.allowances =
+          token.allowances && typeof token.allowances === "object" && !Array.isArray(token.allowances)
+            ? (token.allowances as Record<string, boolean>)
+            : null;
       }
       return session;
     }

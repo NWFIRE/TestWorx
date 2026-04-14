@@ -12,7 +12,12 @@ export async function GET(_: Request, { params }: { params: Promise<{ quoteId: s
   try {
     const { quoteId } = await params;
     const pdf = await getAuthorizedQuotePdf(
-      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      {
+        userId: session.user.id,
+        role: session.user.role,
+        tenantId: session.user.tenantId,
+        allowances: session.user.allowances ?? null
+      },
       quoteId
     );
 

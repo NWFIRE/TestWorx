@@ -69,6 +69,7 @@ type QuoteActionSession = {
     id: string;
     role: ActorContext["role"];
     tenantId: string;
+    allowances: ActorContext["allowances"];
   };
 };
 
@@ -81,7 +82,8 @@ function getQuoteActionSession(session: Session | null): QuoteActionSession {
     user: {
       id: session.user.id,
       role: session.user.role as ActorContext["role"],
-      tenantId: session.user.tenantId
+      tenantId: session.user.tenantId,
+      allowances: session.user.allowances ?? null
     }
   };
 }
@@ -90,7 +92,8 @@ function getActor(session: QuoteActionSession): ActorContext {
   return {
     userId: session.user.id,
     role: session.user.role,
-    tenantId: session.user.tenantId
+    tenantId: session.user.tenantId,
+    allowances: session.user.allowances ?? null
   };
 }
 

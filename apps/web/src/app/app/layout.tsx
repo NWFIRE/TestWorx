@@ -39,6 +39,7 @@ export default async function AppLayout({ children }: Readonly<{ children: React
     <div className="min-h-screen bg-slate-100">
       <MobilePullToRefresh />
       <AppShell
+        allowances={session.user.allowances ?? null}
         role={session.user.role}
         signOutAction={signOutAction}
         user={{ email: session.user.email ?? null, name: session.user.name ?? null }}
