@@ -328,7 +328,10 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
           value={feesOpen ? "Open" : "Ready"}
         />
       </section>
-      <WorkspaceSplit variant="balanced">
+      <WorkspaceSplit
+        className="lg:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.95fr)] 2xl:grid-cols-[minmax(0,1.22fr)_minmax(24rem,0.88fr)]"
+        variant="balanced"
+      >
         <div className="space-y-6">
           <TenantBrandingForm action={updateTenantBrandingAction} values={{ ...brandingSettings.branding, billingEmail: brandingSettings.billingEmail }} />
           <QuickBooksSettingsCard
@@ -355,7 +358,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
             supportReference={quickBooksSettings.supportReference}
           />
         </div>
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-2">
           <SettingsDisclosureCard
             description="Review stored QuickBooks item ids for each internal billing code, fix inactive references, and confirm suggested matches without loading the full section until you need it."
             desktopSpan="fullWhenOpen"
