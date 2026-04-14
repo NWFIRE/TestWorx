@@ -194,6 +194,90 @@ function buildReminderTextSearch(query: string): Prisma.InspectionTaskWhereInput
   };
 }
 
+function buildCustomerReminderSearch(query: string): Prisma.CustomerCompanyWhereInput | undefined {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  return {
+    OR: [
+      { name: { contains: trimmed, mode: "insensitive" } },
+      { contactName: { contains: trimmed, mode: "insensitive" } },
+      { billingEmail: { contains: trimmed, mode: "insensitive" } },
+      { phone: { contains: trimmed, mode: "insensitive" } },
+      { serviceAddressLine1: { contains: trimmed, mode: "insensitive" } },
+      { serviceCity: { contains: trimmed, mode: "insensitive" } },
+      { billingAddressLine1: { contains: trimmed, mode: "insensitive" } },
+      { billingCity: { contains: trimmed, mode: "insensitive" } },
+      { sites: { some: { name: { contains: trimmed, mode: "insensitive" } } } },
+      { sites: { some: { addressLine1: { contains: trimmed, mode: "insensitive" } } } },
+      { sites: { some: { city: { contains: trimmed, mode: "insensitive" } } } }
+    ]
+  };
+}
+
+async function fetchRecipientCustomers(input: {
+  tenantId: string;
+  query?: string;
+  hasValidEmail?: "all" | "yes" | "no";
+  customerCompanyIds?: string[];
+}) {
+  const andFilters: Prisma.CustomerCompanyWhereInput[] = [{ tenantId: input.tenantId }];
+  const textSearch = buildCustomerReminderSearch(input.query ?? "");
+  if (textSearch) {
+    andFilters.push(textSearch);
+  }
+
+  if (input.customerCompanyIds?.length) {
+    andFilters.push({ id: { in: input.customerCompanyIds } });
+  }
+
+  if (input.hasValidEmail === "yes") {
+    andFilters.push({ billingEmail: { not: null } });
+    andFilters.push({ NOT: { billingEmail: "" } });
+  }
+
+  if (input.hasValidEmail === "no") {
+    andFilters.push({
+      OR: [{ billingEmail: null }, { billingEmail: "" }]
+    });
+  }
+
+  const where = andFilters.length === 1 ? andFilters[0] : { AND: andFilters };
+
+  return prisma.customerCompany.findMany({
+    where,
+    orderBy: [{ name: "asc" }, { createdAt: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      contactName: true,
+      billingEmail: true,
+      phone: true,
+      serviceAddressLine1: true,
+      serviceCity: true,
+      serviceState: true,
+      servicePostalCode: true,
+      billingAddressLine1: true,
+      billingCity: true,
+      billingState: true,
+      billingPostalCode: true,
+      sites: {
+        select: {
+          id: true,
+          name: true,
+          addressLine1: true,
+          city: true,
+          state: true,
+          postalCode: true
+        },
+        orderBy: [{ name: "asc" }, { createdAt: "asc" }]
+      }
+    }
+  });
+}
+
 function buildRecipientBaseWhere(input: {
   tenantId: string;
   dueMonth: string;
@@ -327,10 +411,53 @@ async function fetchRecipientTaskRows(input: {
 
 function buildRecipientRows(input: {
   dueMonth: string;
+  customers: Awaited<ReturnType<typeof fetchRecipientCustomers>>;
   taskRows: Awaited<ReturnType<typeof fetchRecipientTaskRows>>;
   lastSentByCustomerId: Map<string, Date>;
+  restrictToTaskMatches?: boolean;
 }) {
-  const grouped = new Map<string, EmailReminderRecipientRow>();
+  const grouped = new Map<string, EmailReminderRecipientRow>(
+    input.customers.map((customer) => {
+      const siteNames = uniqueStrings([
+        ...customer.sites.map(
+          (site) =>
+            site.name?.trim() ||
+            formatAddressSummary({
+              line1: site.addressLine1,
+              city: site.city,
+              state: site.state,
+              postalCode: site.postalCode
+            })
+        ),
+        formatAddressSummary({
+          line1: customer.serviceAddressLine1 ?? customer.billingAddressLine1,
+          city: customer.serviceCity ?? customer.billingCity,
+          state: customer.serviceState ?? customer.billingState,
+          postalCode: customer.servicePostalCode ?? customer.billingPostalCode
+        })
+      ]);
+
+      const baseSiteNames = siteNames.length > 0 ? siteNames : ["No site context"];
+
+      return [
+        customer.id,
+        {
+          customerCompanyId: customer.id,
+          customerName: customer.name,
+          recipientEmail: customer.billingEmail?.trim() || null,
+          hasValidEmail: Boolean(customer.billingEmail?.trim()),
+          dueMonth: input.dueMonth,
+          siteSummary: formatListSummary(baseSiteNames),
+          siteNames: baseSiteNames,
+          inspectionTypes: [],
+          inspectionTypeLabels: [],
+          divisions: [],
+          lastSentAt: input.lastSentByCustomerId.get(customer.id) ?? null,
+          taskCount: 0
+        } satisfies EmailReminderRecipientRow
+      ];
+    })
+  );
 
   for (const task of input.taskRows) {
     const customer = task.inspection.customerCompany;
@@ -348,23 +475,6 @@ function buildRecipientRows(input: {
     const division = mapInspectionTypeToComplianceReportingDivision(inspectionType) ?? inspectionType;
 
     if (!existing) {
-      const siteNames = uniqueStrings([siteName]);
-      const inspectionTypes = [inspectionType];
-      const divisions = uniqueStrings([division]);
-      grouped.set(customerId, {
-        customerCompanyId: customerId,
-        customerName: customer.name,
-        recipientEmail: customer.billingEmail?.trim() || null,
-        hasValidEmail: Boolean(customer.billingEmail?.trim()),
-        dueMonth: input.dueMonth,
-        siteSummary: formatListSummary(siteNames),
-        siteNames,
-        inspectionTypes,
-        inspectionTypeLabels: inspectionTypes.map((value) => inspectionTypeRegistry[value]?.label ?? humanizeValue(value)),
-        divisions,
-        lastSentAt: input.lastSentByCustomerId.get(customerId) ?? null,
-        taskCount: 1
-      });
       continue;
     }
 
@@ -378,7 +488,8 @@ function buildRecipientRows(input: {
     existing.divisions = uniqueStrings([...existing.divisions, division]);
   }
 
-  return [...grouped.values()].sort((left, right) => left.customerName.localeCompare(right.customerName));
+  const rows = [...grouped.values()].sort((left, right) => left.customerName.localeCompare(right.customerName));
+  return input.restrictToTaskMatches ? rows.filter((row) => row.taskCount > 0) : rows;
 }
 
 export async function getEmailReminderWorkspaceData(
@@ -398,16 +509,19 @@ export async function getEmailReminderWorkspaceData(
   const tenantId = parsedActor.tenantId as string;
   const dueMonth = normalizeMonthKey(input?.dueMonth);
   const page = Number.isFinite(input?.page) && (input?.page ?? 1) > 0 ? Math.floor(input?.page ?? 1) : 1;
+  const customers = await fetchRecipientCustomers({
+    tenantId,
+    query: input?.query?.trim() ?? "",
+    hasValidEmail: input?.hasValidEmail ?? "all"
+  });
   const taskRows = await fetchRecipientTaskRows({
     tenantId,
     dueMonth,
-    query: input?.query?.trim() ?? "",
-    hasValidEmail: input?.hasValidEmail ?? "all",
     inspectionType: input?.inspectionType ?? "",
     division: input?.division ?? ""
   });
 
-  const customerIds = uniqueStrings(taskRows.map((task) => task.inspection.customerCompanyId));
+  const customerIds = uniqueStrings(customers.map((customer) => customer.id));
   const logs = customerIds.length
     ? await prisma.emailReminderSendLog.findMany({
         where: {
@@ -431,8 +545,10 @@ export async function getEmailReminderWorkspaceData(
 
   const allRecipients = buildRecipientRows({
     dueMonth,
+    customers,
     taskRows,
-    lastSentByCustomerId
+    lastSentByCustomerId,
+    restrictToTaskMatches: Boolean(input?.inspectionType || input?.division)
   });
   const pagedRecipients = allRecipients.slice((page - 1) * emailReminderPageSize, page * emailReminderPageSize);
   const tenant = await prisma.tenant.findFirst({
@@ -569,14 +685,19 @@ export async function sendManualEmailReminders(
     dueMonth: parsedInput.dueMonth,
     customerCompanyIds: parsedInput.customerCompanyIds
   });
+  const customers = await fetchRecipientCustomers({
+    tenantId,
+    customerCompanyIds: parsedInput.customerCompanyIds
+  });
   const recipients = buildRecipientRows({
     dueMonth: parsedInput.dueMonth,
+    customers,
     taskRows,
     lastSentByCustomerId: new Map()
   }).filter((recipient) => parsedInput.customerCompanyIds.includes(recipient.customerCompanyId));
 
   if (recipients.length === 0) {
-    throw new Error("No eligible reminder recipients were found for the selected month.");
+    throw new Error("No eligible reminder recipients were found for the selected customers.");
   }
 
   const logsToCreate: Array<Prisma.EmailReminderSendLogCreateManyInput> = [];

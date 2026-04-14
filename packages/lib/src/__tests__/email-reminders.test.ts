@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMock = {
+  customerCompany: {
+    findMany: vi.fn()
+  },
   inspectionTask: {
     findMany: vi.fn()
   },
@@ -52,6 +55,33 @@ describe("email reminders", () => {
   });
 
   it("returns customer-level reminder candidates with recent send state", async () => {
+    prismaMock.customerCompany.findMany.mockResolvedValue([
+      {
+        id: "customer_1",
+        name: "Klemme Construction",
+        contactName: "Brett Klemme",
+        billingEmail: "office@klemme.com",
+        phone: "555-1111",
+        serviceAddressLine1: "123 Main St",
+        serviceCity: "Tulsa",
+        serviceState: "OK",
+        servicePostalCode: "74101",
+        billingAddressLine1: "123 Main St",
+        billingCity: "Tulsa",
+        billingState: "OK",
+        billingPostalCode: "74101",
+        sites: [
+          {
+            id: "site_1",
+            name: "Main Campus",
+            addressLine1: "123 Main St",
+            city: "Tulsa",
+            state: "OK",
+            postalCode: "74101"
+          }
+        ]
+      }
+    ]);
     prismaMock.inspectionTask.findMany.mockResolvedValue([
       {
         id: "task_1",
@@ -126,6 +156,24 @@ describe("email reminders", () => {
   });
 
   it("uses the customer address when site context is empty", async () => {
+    prismaMock.customerCompany.findMany.mockResolvedValue([
+      {
+        id: "customer_1",
+        name: "Acme Tower",
+        contactName: "Jordan Lee",
+        billingEmail: "billing@acme.test",
+        phone: "555-1111",
+        serviceAddressLine1: "500 Service Ave",
+        serviceCity: "Tulsa",
+        serviceState: "OK",
+        servicePostalCode: "74103",
+        billingAddressLine1: "PO Box 12",
+        billingCity: "Tulsa",
+        billingState: "OK",
+        billingPostalCode: "74101",
+        sites: []
+      }
+    ]);
     prismaMock.inspectionTask.findMany.mockResolvedValue([
       {
         id: "task_1",
@@ -178,6 +226,33 @@ describe("email reminders", () => {
   });
 
   it("sends merged reminder emails and stores snapshots in the send log", async () => {
+    prismaMock.customerCompany.findMany.mockResolvedValue([
+      {
+        id: "customer_1",
+        name: "Klemme Construction",
+        contactName: "Brett Klemme",
+        billingEmail: "office@klemme.com",
+        phone: "555-1111",
+        serviceAddressLine1: "123 Main St",
+        serviceCity: "Tulsa",
+        serviceState: "OK",
+        servicePostalCode: "74101",
+        billingAddressLine1: "123 Main St",
+        billingCity: "Tulsa",
+        billingState: "OK",
+        billingPostalCode: "74101",
+        sites: [
+          {
+            id: "site_1",
+            name: "Main Campus",
+            addressLine1: "123 Main St",
+            city: "Tulsa",
+            state: "OK",
+            postalCode: "74101"
+          }
+        ]
+      }
+    ]);
     prismaMock.tenant.findFirst.mockResolvedValue({
       id: "tenant_1",
       name: "Northwest Fire & Safety",
@@ -244,5 +319,61 @@ describe("email reminders", () => {
       ]
     }));
     expect(prismaMock.auditLog.create).toHaveBeenCalled();
+  });
+
+  it("allows manual sends for customers without due task matches", async () => {
+    prismaMock.customerCompany.findMany.mockResolvedValue([
+      {
+        id: "customer_2",
+        name: "Walk-In Client",
+        contactName: null,
+        billingEmail: "hello@walkin.test",
+        phone: null,
+        serviceAddressLine1: "88 Main St",
+        serviceCity: "Tulsa",
+        serviceState: "OK",
+        servicePostalCode: "74102",
+        billingAddressLine1: "88 Main St",
+        billingCity: "Tulsa",
+        billingState: "OK",
+        billingPostalCode: "74102",
+        sites: []
+      }
+    ]);
+    prismaMock.inspectionTask.findMany.mockResolvedValue([]);
+    prismaMock.tenant.findFirst.mockResolvedValue({
+      id: "tenant_1",
+      name: "Northwest Fire & Safety",
+      billingEmail: "billing@nwfireandsafety.com",
+      branding: {
+        legalBusinessName: "Northwest Fire & Safety",
+        phone: "580-540-3119",
+        email: "accounting@nwfireandsafety.com"
+      }
+    });
+    sendInspectionReminderEmailMock.mockResolvedValue({
+      sent: true,
+      provider: "resend",
+      messageId: "msg_2",
+      error: null,
+      reason: "sent"
+    });
+
+    const { sendManualEmailReminders } = await import("../email-reminders");
+    const result = await sendManualEmailReminders(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        dueMonth: "2026-04",
+        customerCompanyIds: ["customer_2"],
+        templateKey: "inspection_due_this_month",
+        subject: "Your Fire Inspection Is Due This Month",
+        body: "Hello {{customerName}},\n\nWe will reach out soon."
+      }
+    );
+
+    expect(result.sentCount).toBe(1);
+    expect(sendInspectionReminderEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({ recipientEmail: "hello@walkin.test" })
+    );
   });
 });
