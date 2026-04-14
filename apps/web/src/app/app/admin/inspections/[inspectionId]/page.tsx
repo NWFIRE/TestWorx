@@ -85,6 +85,10 @@ function formatStatusFromAuditValue(value: unknown) {
   return formatInspectionStatusLabel(value as Parameters<typeof formatInspectionStatusLabel>[0]);
 }
 
+function inspectionTaskLabel(task: { inspectionType: string; customDisplayLabel?: string | null }) {
+  return task.customDisplayLabel?.trim() || formatInspectionTaskTypeLabel(task.inspectionType as InspectionType);
+}
+
 function resolveInspectionOrigin(value: string | undefined) {
   const candidate = (value ?? "").trim();
   if (!candidate.startsWith("/app/") || candidate.startsWith("/app/admin/inspections/")) {
@@ -454,7 +458,7 @@ export default async function EditInspectionPage({
                 {inspectionView.tasks.map((task: InspectionTask) => (
                   <div key={task.id} className="rounded-2xl border border-slate-200 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-ink">{formatInspectionTaskTypeLabel(task.inspectionType)}</p>
+                      <p className="text-sm font-semibold text-ink">{inspectionTaskLabel(task)}</p>
                       <StatusBadge
                         label={task.report?.status === "finalized" ? "Finalized" : "Draft"}
                         tone={task.report?.status === "finalized" ? "emerald" : "amber"}
@@ -503,7 +507,7 @@ export default async function EditInspectionPage({
                   <div key={task.id} className="rounded-2xl border border-slate-200 p-4">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-ink">{formatInspectionTaskTypeLabel(task.inspectionType)}</p>
+                        <p className="text-sm font-semibold text-ink">{inspectionTaskLabel(task)}</p>
                         <p className="mt-1 text-sm text-slate-500">
                           {task.report?.finalizedAt
                             ? `Finalized ${format(task.report.finalizedAt, "MMM d, yyyy h:mm a")}`
@@ -522,7 +526,7 @@ export default async function EditInspectionPage({
                         <AdminReportDeleteButton
                           inspectionId={inspection.id}
                           inspectionTaskId={task.id}
-                          taskLabel={formatInspectionTaskTypeLabel(task.inspectionType)}
+                          taskLabel={inspectionTaskLabel(task)}
                         />
                       </div>
                     </div>
@@ -587,7 +591,7 @@ export default async function EditInspectionPage({
             reports={inspectionView.tasks.map((task: InspectionTask) => ({
               taskId: task.id,
               inspectionType: task.inspectionType,
-              displayLabel: formatInspectionTaskTypeLabel(task.inspectionType),
+              displayLabel: inspectionTaskLabel(task),
               report: task.report ? {
                 id: task.report.id,
                 status: task.report.status,
@@ -626,7 +630,7 @@ export default async function EditInspectionPage({
                   <div key={task.id} className="rounded-2xl border border-slate-200 p-4">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-ink">{formatInspectionTaskTypeLabel(task.inspectionType)}</p>
+                        <p className="text-sm font-semibold text-ink">{inspectionTaskLabel(task)}</p>
                         <p className="mt-1 text-sm text-slate-500">
                           {isAddedTask
                             ? "Added after the original inspection was scheduled."
@@ -643,7 +647,7 @@ export default async function EditInspectionPage({
                       <RemoveReportTypeButton
                         inspectionId={inspection.id}
                         inspectionTaskId={task.id}
-                        taskLabel={formatInspectionTaskTypeLabel(task.inspectionType)}
+                        taskLabel={inspectionTaskLabel(task)}
                       />
                     </div>
                   </div>

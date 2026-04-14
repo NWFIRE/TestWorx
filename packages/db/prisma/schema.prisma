@@ -615,6 +615,7 @@ model InspectionTask {
   tenantId       String
   inspectionId   String
   inspectionType InspectionType
+  customDisplayLabel String?
   addedByUserId  String?
   assignedTechnicianId String?
   dueMonth       String?

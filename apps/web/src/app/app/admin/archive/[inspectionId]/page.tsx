@@ -3,12 +3,7 @@ import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import {
-  formatInspectionTaskTypeLabel,
-  getAdminInspectionArchiveDetail,
-  getInspectionStatusTone,
-  inspectionStatusLabels
-} from "@testworx/lib";
+import { getAdminInspectionArchiveDetail, getInspectionStatusTone, inspectionStatusLabels } from "@testworx/lib";
 
 import { InspectionPacketCard } from "../../../inspection-packet-card";
 import { AppPageShell, PageHeader, SectionCard, StatusBadge, WorkspaceSplit } from "../../operations-ui";
@@ -171,7 +166,7 @@ export default async function InspectionArchiveDetailPage({
               <p>Inspection #: <span className="font-semibold text-slate-950">{detail.inspectionNumber}</span></p>
               <p>Archived: <span className="font-semibold text-slate-950">{format(detail.archivedAt, "MMM d, yyyy h:mm a")}</span></p>
               <p>Snapshot city: <span className="font-semibold text-slate-950">{detail.snapshot.city}</span></p>
-              <p>Task mix: <span className="font-semibold text-slate-950">{detail.tasks.map((task) => formatInspectionTaskTypeLabel(task.inspectionType)).join(", ")}</span></p>
+              <p>Task mix: <span className="font-semibold text-slate-950">{detail.tasks.map((task) => task.inspectionTypeLabel).join(", ")}</span></p>
             </div>
           </SectionCard>
 

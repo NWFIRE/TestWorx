@@ -286,6 +286,32 @@ describe("recurrence logic", () => {
     ]);
   });
 
+  it("prefers a custom display label over the generated duplicate label", () => {
+    expect(withInspectionTaskDisplayLabels([
+      { id: "task_1", inspectionType: "kitchen_suppression", customDisplayLabel: "Kitchen Hood Line A" },
+      { id: "task_2", inspectionType: "kitchen_suppression" },
+      { id: "task_3", inspectionType: "kitchen_suppression", customDisplayLabel: "Kitchen Hood Line C" }
+    ])).toEqual([
+      {
+        id: "task_1",
+        inspectionType: "kitchen_suppression",
+        customDisplayLabel: "Kitchen Hood Line A",
+        displayLabel: "Kitchen Hood Line A"
+      },
+      {
+        id: "task_2",
+        inspectionType: "kitchen_suppression",
+        displayLabel: "Kitchen suppression 2"
+      },
+      {
+        id: "task_3",
+        inspectionType: "kitchen_suppression",
+        customDisplayLabel: "Kitchen Hood Line C",
+        displayLabel: "Kitchen Hood Line C"
+      }
+    ]);
+  });
+
   it("defaults kitchen and industrial suppression to semi-annual recurrence", () => {
     expect(getDefaultInspectionRecurrenceFrequency("kitchen_suppression")).toBe("SEMI_ANNUAL");
     expect(getDefaultInspectionRecurrenceFrequency("industrial_suppression")).toBe("SEMI_ANNUAL");

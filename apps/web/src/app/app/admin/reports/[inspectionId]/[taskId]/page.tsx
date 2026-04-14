@@ -52,6 +52,8 @@ export default async function AdminReportCorrectionPage({ params }: { params: Pr
         canEdit: report.permissions.canEdit || adminOverrideForFinalized,
         canFinalize: report.permissions.canFinalize || adminOverrideForFinalized,
         inspectionTypeLabel: report.task.displayLabel ?? report.template.label,
+        defaultInspectionTypeLabel: report.template.label,
+        customInspectionTypeLabel: report.task.customDisplayLabel ?? null,
         siteName: report.inspection.site.name,
         customerName: report.inspection.customerCompany.name,
         scheduledDateLabel: format(report.inspection.scheduledStart, "MMM d, yyyy h:mm a"),

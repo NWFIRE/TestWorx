@@ -315,7 +315,7 @@ async function getAuthorizedReport(actor: ActorContext, inspectionId: string, ta
           customerCompany: true,
           tenant: true,
           technicianAssignments: { select: { technicianId: true } },
-          tasks: { select: { id: true, inspectionType: true } }
+          tasks: { select: { id: true, inspectionType: true, customDisplayLabel: true } }
         }
       },
       task: true,
@@ -802,6 +802,7 @@ async function persistReportDraftTransaction(input: {
   parsedActor: ReturnType<typeof parseActor>;
   report: PersistableReportRecord;
   draft: ReportDraft;
+  taskDisplayLabel?: string | null;
   nextStatus?: ReportStatus;
 }) {
   const tenantId = input.parsedActor.tenantId as string;
@@ -813,6 +814,11 @@ async function persistReportDraftTransaction(input: {
       autosaveVersion: { increment: 1 },
       status: input.nextStatus ?? reportStatuses.draft
     }
+  });
+
+  await input.tx.inspectionTask.update({
+    where: { id: input.report.inspectionTaskId },
+    data: { customDisplayLabel: input.taskDisplayLabel ?? null }
   });
 
   await input.tx.attachment.deleteMany({ where: { inspectionReportId: input.report.id, tenantId, kind: AttachmentKind.photo } });
@@ -954,6 +960,7 @@ export async function getInspectionReportDraft(actor: ActorContext, inspectionId
     inspection: report.inspection,
     task: {
       ...report.task,
+      customDisplayLabel: report.task.customDisplayLabel ?? null,
       displayLabel: reportTask?.displayLabel ?? resolvedTemplate.label
     },
     template: resolvedTemplate,
@@ -1096,7 +1103,11 @@ export async function reopenCompletedReportForCorrection(actor: ActorContext, in
   return reopened;
 }
 
-export async function saveReportDraft(actor: ActorContext, input: { inspectionReportId: string; contentJson: unknown }) {
+export async function saveReportDraft(actor: ActorContext, input: {
+  inspectionReportId: string;
+  contentJson: unknown;
+  taskDisplayLabel?: string | null;
+}) {
   const { parsedActor, report } = await getAuthorizedEditableReport(actor, input.inspectionReportId);
 
   if (!canEditReport(parsedActor.role, report.status)) {
@@ -1125,6 +1136,7 @@ export async function saveReportDraft(actor: ActorContext, input: { inspectionRe
     existingSignatureKeys: report.signatures.map((signature) => signature.imageDataUrl)
   });
   const parsedDraft = persisted.draft;
+  const nextTaskDisplayLabel = input.taskDisplayLabel?.trim() || null;
 
   const updatedReport = await prisma.$transaction((tx) =>
     persistReportDraftTransaction({
@@ -1132,6 +1144,7 @@ export async function saveReportDraft(actor: ActorContext, input: { inspectionRe
       parsedActor,
       report,
       draft: parsedDraft,
+      taskDisplayLabel: nextTaskDisplayLabel,
       nextStatus: reportStatuses.draft
     })
   );
@@ -1145,7 +1158,11 @@ function buildGeneratedPdfName(report: { inspection: { customerCompany: { name: 
   return `${slugifyFileName(report.inspection.customerCompany.name)}-${slugifyFileName(report.inspection.site.name)}-${slugifyFileName(report.task.inspectionType)}-report.pdf`;
 }
 
-export async function finalizeInspectionReport(actor: ActorContext, input: { inspectionReportId: string; contentJson: unknown }) {
+export async function finalizeInspectionReport(actor: ActorContext, input: {
+  inspectionReportId: string;
+  contentJson: unknown;
+  taskDisplayLabel?: string | null;
+}) {
   const { parsedActor, report } = await getAuthorizedEditableReport(actor, input.inspectionReportId);
 
   if (!canFinalizeReport(parsedActor.role, report.status)) {
@@ -1168,6 +1185,7 @@ export async function finalizeInspectionReport(actor: ActorContext, input: { ins
 
   const validatedDraft = validateDraftForTemplate(input.contentJson, report.task.inspectionType, assets);
   validateFinalizationDraft(validatedDraft, assets);
+  const nextTaskDisplayLabel = input.taskDisplayLabel?.trim() || null;
   const staleStorageKeys = new Set<string>();
   let priorGeneratedKeys: string[] = [];
 
@@ -1201,6 +1219,7 @@ export async function finalizeInspectionReport(actor: ActorContext, input: { ins
       parsedActor,
       report: transactionalReport,
       draft: persisted.draft,
+      taskDisplayLabel: nextTaskDisplayLabel,
       nextStatus: reportStatuses.draft
     });
 

@@ -323,7 +323,7 @@ export async function getAdminInspectionArchiveData(
         site: { select: { id: true, name: true, city: true, addressLine1: true, state: true } },
         assignedTechnician: { select: { id: true, name: true } },
         technicianAssignments: { include: { technician: { select: { id: true, name: true } } } },
-        tasks: { select: { id: true, inspectionType: true } },
+        tasks: { select: { id: true, inspectionType: true, customDisplayLabel: true } },
         reports: { select: { id: true, status: true, finalizedAt: true } },
         convertedFromQuotes: { select: { id: true, quoteNumber: true } }
       }
@@ -401,8 +401,10 @@ export async function getAdminInspectionArchiveData(
       inspectionTypes: row.archiveInspectionTypes.length
         ? row.archiveInspectionTypes
         : row.tasks.map((task) => task.inspectionType),
-      inspectionTypeLabels: (row.archiveInspectionTypes.length ? row.archiveInspectionTypes : row.tasks.map((task) => task.inspectionType))
-        .map((inspectionType) => inspectionTypeRegistry[inspectionType as InspectionType]?.label ?? inspectionType.replaceAll("_", " ")),
+      inspectionTypeLabels: row.archiveInspectionTypes.length
+        ? row.archiveInspectionTypes
+            .map((inspectionType) => inspectionTypeRegistry[inspectionType as InspectionType]?.label ?? inspectionType.replaceAll("_", " "))
+        : row.tasks.map((task) => task.customDisplayLabel?.trim() || (inspectionTypeRegistry[task.inspectionType]?.label ?? task.inspectionType.replaceAll("_", " "))),
       divisions: row.archiveDivisions.length
         ? row.archiveDivisions
         : uniqueStrings(row.tasks.map((task) => mapInspectionTypeToComplianceReportingDivision(task.inspectionType) ?? task.inspectionType.replaceAll("_", " "))),
@@ -525,7 +527,7 @@ export async function getAdminInspectionArchiveDetail(actor: ActorContext, inspe
     tasks: inspection.tasks.map((task) => ({
       id: task.id,
       inspectionType: task.inspectionType,
-      inspectionTypeLabel: inspectionTypeRegistry[task.inspectionType].label,
+      inspectionTypeLabel: task.customDisplayLabel?.trim() || inspectionTypeRegistry[task.inspectionType].label,
       reportId: task.report?.id ?? null,
       reportStatus: task.report?.status ?? null,
       finalizedAt: task.report?.finalizedAt ?? null

@@ -348,7 +348,11 @@ export function buildInspectionTaskDisplayLabel(input: {
   return `${baseLabel} ${input.occurrenceIndex}`;
 }
 
-export function withInspectionTaskDisplayLabels<T extends { id: string; inspectionType: keyof typeof inspectionTypeRegistry }>(tasks: T[]) {
+export function withInspectionTaskDisplayLabels<T extends {
+  id: string;
+  inspectionType: keyof typeof inspectionTypeRegistry;
+  customDisplayLabel?: string | null;
+}>(tasks: T[]) {
   const totals = new Map<keyof typeof inspectionTypeRegistry, number>();
   const seen = new Map<keyof typeof inspectionTypeRegistry, number>();
 
@@ -362,11 +366,13 @@ export function withInspectionTaskDisplayLabels<T extends { id: string; inspecti
 
     return {
       ...task,
-      displayLabel: buildInspectionTaskDisplayLabel({
-        inspectionType: task.inspectionType,
-        occurrenceIndex,
-        totalOccurrences: totals.get(task.inspectionType) ?? 1
-      })
+      displayLabel:
+        task.customDisplayLabel?.trim() ||
+        buildInspectionTaskDisplayLabel({
+          inspectionType: task.inspectionType,
+          occurrenceIndex,
+          totalOccurrences: totals.get(task.inspectionType) ?? 1
+        })
     };
   });
 }

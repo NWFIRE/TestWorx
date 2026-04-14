@@ -18,6 +18,8 @@ type EditorData = {
   canEdit: boolean;
   canFinalize: boolean;
   inspectionTypeLabel: string;
+  defaultInspectionTypeLabel: string;
+  customInspectionTypeLabel?: string | null;
   siteName: string;
   customerName: string;
   scheduledDateLabel: string;
@@ -152,6 +154,7 @@ function toTechnicianFacingSaveMessage(message: string | null | undefined, actio
 
 export function ReportEditor({ data }: { data: EditorData }) {
   const [draft, setDraft] = useState<ReportDraft>(data.draft);
+  const [taskDisplayLabel, setTaskDisplayLabel] = useState(data.customInspectionTypeLabel ?? "");
   const [activeSectionId, setActiveSectionId] = useState<string>(data.draft.activeSectionId ?? data.template.sections[0]?.id ?? "");
   const [saveState, setSaveState] = useState(data.reportStatus === "finalized" ? "Finalized" : "Saved");
   const [showPreview, setShowPreview] = useState(false);
@@ -248,7 +251,11 @@ export function ReportEditor({ data }: { data: EditorData }) {
       const response = await fetch("/api/reports/autosave", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inspectionReportId: data.reportId, contentJson: nextDraft })
+        body: JSON.stringify({
+          inspectionReportId: data.reportId,
+          contentJson: nextDraft,
+          taskDisplayLabel
+        })
       });
 
       const payload = await response.json();
@@ -274,7 +281,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
     } finally {
       saveInFlightRef.current = false;
     }
-  }, [data.canEdit, data.reportId, data.reportStatus, persistBackup]);
+  }, [data.canEdit, data.reportId, data.reportStatus, persistBackup, taskDisplayLabel]);
 
   useEffect(() => {
     saveDraftRef.current = saveDraft;
@@ -630,7 +637,11 @@ export function ReportEditor({ data }: { data: EditorData }) {
     const response = await fetch("/api/reports/finalize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inspectionReportId: data.reportId, contentJson: latestDraftRef.current })
+      body: JSON.stringify({
+        inspectionReportId: data.reportId,
+        contentJson: latestDraftRef.current,
+        taskDisplayLabel
+      })
     });
     const payload = await response.json();
 
@@ -676,10 +687,34 @@ export function ReportEditor({ data }: { data: EditorData }) {
     <div className="space-y-4 pb-36 sm:space-y-6 md:pb-32 lg:pb-8">
       <div className="overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel sm:rounded-[2rem] sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">{data.inspectionTypeLabel}</p>
-            <h2 className="mt-2 text-3xl font-semibold text-ink">{data.siteName}</h2>
-            <p className="mt-2 text-sm text-slate-500">{data.customerName} | {data.scheduledDateLabel}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">{data.defaultInspectionTypeLabel}</p>
+            <h2 className="mt-2 text-3xl font-semibold text-ink">
+              {(taskDisplayLabel.trim() || data.defaultInspectionTypeLabel)}
+            </h2>
+            <p className="mt-2 text-sm text-slate-500">{data.siteName} | {data.customerName} | {data.scheduledDateLabel}</p>
+            {data.canEdit && data.reportStatus !== "finalized" ? (
+              <div className="mt-4 max-w-xl">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500" htmlFor={`report-name-${data.reportId}`}>
+                  Custom report name
+                </label>
+                <input
+                  className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base font-medium tracking-[-0.02em] text-ink"
+                  id={`report-name-${data.reportId}`}
+                  onChange={(event) => {
+                    setTaskDisplayLabel(event.target.value);
+                    setDirty(true);
+                    setSaveState("Unsaved changes");
+                    setFinalizeErrorMessage(null);
+                  }}
+                  placeholder={data.defaultInspectionTypeLabel}
+                  value={taskDisplayLabel}
+                />
+                <p className="mt-2 text-sm text-slate-500">
+                  Leave blank to use the default report name for this service line.
+                </p>
+              </div>
+            ) : null}
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
             <p className="text-slate-500">Save state</p>

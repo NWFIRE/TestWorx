@@ -64,6 +64,8 @@ export default async function TechnicianReportPage({ params }: { params: Promise
         canEdit: report.permissions.canEdit,
         canFinalize: report.permissions.canFinalize,
         inspectionTypeLabel: report.task.displayLabel ?? report.template.label,
+        defaultInspectionTypeLabel: report.template.label,
+        customInspectionTypeLabel: report.task.customDisplayLabel ?? null,
         siteName: inspectionDisplay.primaryTitle,
         customerName: inspectionDisplay.secondaryTitle || report.inspection.customerCompany.name,
         scheduledDateLabel: format(report.inspection.scheduledStart, "MMM d, yyyy h:mm a"),

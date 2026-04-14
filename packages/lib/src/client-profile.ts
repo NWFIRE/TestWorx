@@ -71,6 +71,10 @@ function buildQuoteStatusLabel(status: QuoteStatus) {
   return quoteStatusLabels[status] ?? humanizeValue(status);
 }
 
+function buildInspectionTaskHistoryLabel(task: { inspectionType: InspectionType; customDisplayLabel?: string | null }) {
+  return task.customDisplayLabel?.trim() || buildInspectionTypeLabel(task.inspectionType);
+}
+
 export async function getClientProfileData(actor: ActorContext, customerCompanyId: string) {
   const parsedActor = parseActor(actor);
   ensureAdmin(parsedActor);
@@ -109,7 +113,7 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
         site: { select: { id: true, name: true, city: true } },
         assignedTechnician: { select: { id: true, name: true } },
         technicianAssignments: { include: { technician: { select: { id: true, name: true } } } },
-        tasks: { select: { id: true, inspectionType: true } },
+        tasks: { select: { id: true, inspectionType: true, customDisplayLabel: true } },
         reports: { select: { id: true, finalizedAt: true, status: true } },
         deficiencies: { select: { id: true } },
         billingSummary: {
@@ -248,7 +252,7 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
         ?? "Unassigned",
       inspectionTypes: inspection.tasks.map((task) => ({
         value: task.inspectionType,
-        label: buildInspectionTypeLabel(task.inspectionType)
+        label: buildInspectionTaskHistoryLabel(task)
       })),
       reportLink: inspection.tasks[0] ? `/app/admin/reports/${inspection.id}/${inspection.tasks[0].id}` : null,
       inspectionLink: `/app/admin/inspections/${inspection.id}`,
@@ -270,7 +274,7 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
         inspection.assignedTechnician?.name
         ?? inspection.technicianAssignments.map((assignment) => assignment.technician?.name).filter(Boolean).join(", ")
         ?? "Unassigned",
-      summary: inspection.tasks.map((task) => buildInspectionTypeLabel(task.inspectionType)).join(", "),
+      summary: inspection.tasks.map((task) => buildInspectionTaskHistoryLabel(task)).join(", "),
       inspectionLink: `/app/admin/inspections/${inspection.id}`
     }));
 
