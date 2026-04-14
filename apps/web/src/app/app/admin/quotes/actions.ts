@@ -37,6 +37,57 @@ function parseLineItems(formData: FormData) {
   }
 }
 
+function normalizeOptionalString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeOptionalNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return 0;
+    }
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+}
+
+function isBlankQuoteLineItem(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const lineItem = value as Record<string, unknown>;
+  const hasMeaningfulText = [
+    normalizeOptionalString(lineItem.internalCode),
+    normalizeOptionalString(lineItem.title),
+    normalizeOptionalString(lineItem.description),
+    normalizeOptionalString(lineItem.inspectionType),
+    normalizeOptionalString(lineItem.category)
+  ].some(Boolean);
+
+  if (hasMeaningfulText) {
+    return false;
+  }
+
+  return (
+    normalizeOptionalNumber(lineItem.quantity) === 1 &&
+    normalizeOptionalNumber(lineItem.unitPrice) === 0 &&
+    normalizeOptionalNumber(lineItem.discountAmount) === 0 &&
+    lineItem.taxable !== true
+  );
+}
+
+function sanitizeLineItems(lineItems: unknown[]) {
+  return lineItems.filter((lineItem) => !isBlankQuoteLineItem(lineItem));
+}
+
 function parseQuoteFormData(formData: FormData) {
   return quoteInputSchema.parse({
     customerCompanyId: String(formData.get("customerCompanyId") ?? ""),
@@ -49,7 +100,7 @@ function parseQuoteFormData(formData: FormData) {
     internalNotes: String(formData.get("internalNotes") ?? "").trim() || null,
     customerNotes: String(formData.get("customerNotes") ?? "").trim() || null,
     taxAmount: Number(formData.get("taxAmount") ?? "0"),
-    lineItems: parseLineItems(formData)
+    lineItems: sanitizeLineItems(parseLineItems(formData))
   });
 }
 
