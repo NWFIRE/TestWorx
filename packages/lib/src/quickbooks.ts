@@ -526,6 +526,15 @@ function normalizeQuickBooksError(input: {
   });
 }
 
+function isQuickBooksDuplicateCustomerNameError(error: unknown) {
+  if (!(error instanceof QuickBooksRequestError)) {
+    return false;
+  }
+
+  const haystack = `${error.message}\n${error.rawBody ?? ""}`;
+  return /Duplicate Name Exists Error|\"code\":\"6240\"|\"code\":6240|code\":\"6240\"|code\":6240/i.test(haystack);
+}
+
 async function createQuickBooksFailureAuditLog(input: QuickBooksFailureLogInput) {
   await prisma.auditLog.create({
     data: {
@@ -2307,6 +2316,25 @@ export async function syncTradeWorxCustomerCompanyToQuickBooks(actor: ActorConte
   });
 
   try {
+    const customerPayload = buildQuickBooksCustomerPayload({
+      customerName: customer.name,
+      billingEmail: customer.billingEmail,
+      phone: customer.phone,
+      siteName: primarySite?.name ?? null,
+      billingAddressLine1: customer.billingAddressLine1 ?? customer.serviceAddressLine1 ?? primarySite?.addressLine1 ?? null,
+      billingAddressLine2: customer.billingAddressLine2 ?? customer.serviceAddressLine2 ?? primarySite?.addressLine2 ?? null,
+      billingCity: customer.billingCity ?? customer.serviceCity ?? primarySite?.city ?? null,
+      billingState: customer.billingState ?? customer.serviceState ?? primarySite?.state ?? null,
+      billingPostalCode: customer.billingPostalCode ?? customer.servicePostalCode ?? primarySite?.postalCode ?? null,
+      billingCountry: customer.billingCountry ?? customer.serviceCountry ?? null,
+      serviceAddressLine1: customer.serviceAddressLine1 ?? primarySite?.addressLine1 ?? null,
+      serviceAddressLine2: customer.serviceAddressLine2 ?? primarySite?.addressLine2 ?? null,
+      serviceCity: customer.serviceCity ?? primarySite?.city ?? null,
+      serviceState: customer.serviceState ?? primarySite?.state ?? null,
+      servicePostalCode: customer.servicePostalCode ?? primarySite?.postalCode ?? null,
+      serviceCountry: customer.serviceCountry ?? null,
+      notes: customer.notes ?? null
+    });
     const existingCustomer = customer.quickbooksCustomerId
       ? await fetchQuickBooksCustomerById(tenant, customer.quickbooksCustomerId).catch(() => null)
       : await fetchQuickBooksCustomerByDisplayName(tenant, customer.name);
@@ -2323,56 +2351,52 @@ export async function syncTradeWorxCustomerCompanyToQuickBooks(actor: ActorConte
           Id: existingCustomer.quickbooksCustomerId,
           SyncToken: existingCustomer.syncToken,
           sparse: true,
-          ...buildQuickBooksCustomerPayload({
-            customerName: customer.name,
-            billingEmail: customer.billingEmail,
-            phone: customer.phone,
-            siteName: primarySite?.name ?? null,
-            billingAddressLine1: customer.billingAddressLine1 ?? customer.serviceAddressLine1 ?? primarySite?.addressLine1 ?? null,
-            billingAddressLine2: customer.billingAddressLine2 ?? customer.serviceAddressLine2 ?? primarySite?.addressLine2 ?? null,
-            billingCity: customer.billingCity ?? customer.serviceCity ?? primarySite?.city ?? null,
-            billingState: customer.billingState ?? customer.serviceState ?? primarySite?.state ?? null,
-            billingPostalCode: customer.billingPostalCode ?? customer.servicePostalCode ?? primarySite?.postalCode ?? null,
-            billingCountry: customer.billingCountry ?? customer.serviceCountry ?? null,
-            serviceAddressLine1: customer.serviceAddressLine1 ?? primarySite?.addressLine1 ?? null,
-            serviceAddressLine2: customer.serviceAddressLine2 ?? primarySite?.addressLine2 ?? null,
-            serviceCity: customer.serviceCity ?? primarySite?.city ?? null,
-            serviceState: customer.serviceState ?? primarySite?.state ?? null,
-            servicePostalCode: customer.servicePostalCode ?? primarySite?.postalCode ?? null,
-            serviceCountry: customer.serviceCountry ?? null,
-            notes: customer.notes ?? null
-          })
+          ...customerPayload
         }
       });
 
       quickbooksCustomerId = (await normalizeQuickBooksCustomer(tenant, updated.Customer))?.quickbooksCustomerId ?? existingCustomer.quickbooksCustomerId;
     } else {
       syncStrategy = "created";
-      const created = await quickBooksApiRequest<{ Customer?: unknown }>(tenant, {
-        path: "/customer",
-        method: "POST",
-        body: buildQuickBooksCustomerPayload({
-          customerName: customer.name,
-          billingEmail: customer.billingEmail,
-          phone: customer.phone,
-          siteName: primarySite?.name ?? null,
-          billingAddressLine1: customer.billingAddressLine1 ?? customer.serviceAddressLine1 ?? primarySite?.addressLine1 ?? null,
-          billingAddressLine2: customer.billingAddressLine2 ?? customer.serviceAddressLine2 ?? primarySite?.addressLine2 ?? null,
-          billingCity: customer.billingCity ?? customer.serviceCity ?? primarySite?.city ?? null,
-          billingState: customer.billingState ?? customer.serviceState ?? primarySite?.state ?? null,
-          billingPostalCode: customer.billingPostalCode ?? customer.servicePostalCode ?? primarySite?.postalCode ?? null,
-          billingCountry: customer.billingCountry ?? customer.serviceCountry ?? null,
-          serviceAddressLine1: customer.serviceAddressLine1 ?? primarySite?.addressLine1 ?? null,
-          serviceAddressLine2: customer.serviceAddressLine2 ?? primarySite?.addressLine2 ?? null,
-          serviceCity: customer.serviceCity ?? primarySite?.city ?? null,
-          serviceState: customer.serviceState ?? primarySite?.state ?? null,
-          servicePostalCode: customer.servicePostalCode ?? primarySite?.postalCode ?? null,
-          serviceCountry: customer.serviceCountry ?? null,
-          notes: customer.notes ?? null
-        })
-      });
+      try {
+        const created = await quickBooksApiRequest<{ Customer?: unknown }>(tenant, {
+          path: "/customer",
+          method: "POST",
+          body: customerPayload
+        });
 
-      quickbooksCustomerId = (await normalizeQuickBooksCustomer(tenant, created.Customer))?.quickbooksCustomerId ?? null;
+        quickbooksCustomerId = (await normalizeQuickBooksCustomer(tenant, created.Customer))?.quickbooksCustomerId ?? null;
+      } catch (error) {
+        const normalizedError = normalizeQuickBooksError({
+          error,
+          fallbackOperation: "customer.sync",
+          connectionMode: tenant.quickbooksConnectionMode
+        });
+
+        if (!isQuickBooksDuplicateCustomerNameError(normalizedError)) {
+          throw normalizedError;
+        }
+
+        const duplicateCustomer = await fetchQuickBooksCustomerByDisplayName(tenant, customer.name);
+        if (!duplicateCustomer?.quickbooksCustomerId) {
+          throw new Error(`QuickBooks already has a customer named ${customer.name}. Link or rename that QuickBooks customer and try again.`);
+        }
+
+        syncStrategy = "display_name";
+        const updated = await quickBooksApiRequest<{ Customer?: unknown }>(tenant, {
+          path: "/customer",
+          method: "POST",
+          searchParams: new URLSearchParams({ operation: "update" }),
+          body: {
+            Id: duplicateCustomer.quickbooksCustomerId,
+            SyncToken: duplicateCustomer.syncToken,
+            sparse: true,
+            ...customerPayload
+          }
+        });
+
+        quickbooksCustomerId = (await normalizeQuickBooksCustomer(tenant, updated.Customer))?.quickbooksCustomerId ?? duplicateCustomer.quickbooksCustomerId;
+      }
     }
 
     if (!quickbooksCustomerId) {
