@@ -77,6 +77,8 @@ type BrandedCustomerEmailPayload = BaseEmailPayload & {
   branding: EmailShellBranding;
 };
 
+const NO_REPLY_FROM_EMAIL = "noreply@tradeworx.net";
+
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
@@ -185,9 +187,16 @@ function buildShell({
   });
 }
 
-async function sendWithResend(input: { to: string; subject: string; html: string; attachments?: EmailAttachment[] }): Promise<TransactionalEmailDeliveryResult> {
+async function sendWithResend(input: {
+  to: string;
+  subject: string;
+  html: string;
+  attachments?: EmailAttachment[];
+  from?: string | null;
+}): Promise<TransactionalEmailDeliveryResult> {
   const env = getOptionalEmailEnv();
-  if (!env.RESEND_API_KEY || !env.RESEND_FROM_EMAIL) {
+  const fromEmail = input.from?.trim() || null;
+  if (!env.RESEND_API_KEY || !fromEmail) {
     return {
       sent: false,
       provider: "resend",
@@ -201,7 +210,7 @@ async function sendWithResend(input: { to: string; subject: string; html: string
 
   try {
     const result = await resend.emails.send({
-      from: env.RESEND_FROM_EMAIL,
+      from: fromEmail,
       to: input.to,
       subject: input.subject,
       html: input.html,
@@ -245,6 +254,7 @@ export async function sendWorkspaceInviteEmail(payload: WorkspaceInviteEmailPayl
     : `${payload.tenantName} invited you to TradeWorx`;
 
   return sendWithResend({
+    from: NO_REPLY_FROM_EMAIL,
     to: payload.recipientEmail,
     subject,
     html: buildShell({
@@ -266,6 +276,7 @@ export async function sendWorkspaceInviteEmail(payload: WorkspaceInviteEmailPayl
 
 export async function sendWorkspacePasswordResetEmail(payload: PasswordResetEmailPayload) {
   return sendWithResend({
+    from: NO_REPLY_FROM_EMAIL,
     to: payload.recipientEmail,
     subject: `Reset your ${payload.tenantName} TradeWorx password`,
     html: buildShell({
@@ -284,6 +295,7 @@ export async function sendWorkspacePasswordResetEmail(payload: PasswordResetEmai
 }
 
 export async function sendQuoteEmail(payload: QuoteEmailPayload) {
+  const env = getOptionalEmailEnv();
   const greeting = buildQuoteEmailGreeting(payload.recipientName);
   const proposalMessage = payload.messageBody.trim() || buildQuoteEmailDefaultMessage();
   const proposalWindow = payload.expiresAt
@@ -292,6 +304,7 @@ export async function sendQuoteEmail(payload: QuoteEmailPayload) {
   const companySignoff = payload.tenantName.trim();
 
   return sendWithResend({
+    from: env.RESEND_FROM_EMAIL,
     to: payload.recipientEmail,
     subject: payload.subjectLine,
     attachments: [payload.attachment],
@@ -314,7 +327,9 @@ export async function sendQuoteEmail(payload: QuoteEmailPayload) {
 }
 
 export async function sendQuoteReminderEmail(payload: QuoteReminderEmailPayload) {
+  const env = getOptionalEmailEnv();
   return sendWithResend({
+    from: env.RESEND_FROM_EMAIL,
     to: payload.recipientEmail,
     subject: payload.subjectLine,
     html: buildShell({
@@ -349,6 +364,7 @@ export async function sendInspectionReminderEmail(payload: BaseEmailPayload & {
 
 export async function sendCustomerBrandedEmail(payload: BrandedCustomerEmailPayload) {
   return sendWithResend({
+    from: NO_REPLY_FROM_EMAIL,
     to: payload.recipientEmail,
     subject: payload.subjectLine,
     html: buildBrandedShell({
