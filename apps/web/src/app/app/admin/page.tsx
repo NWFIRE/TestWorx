@@ -276,7 +276,7 @@ export default async function AdminPage({
       tenantId: session.user.tenantId
     }),
     getAdminSchedulingQueueData(actor, { statuses: ["to_be_completed", "scheduled", "in_progress", "follow_up_required"] }),
-    getAdminReportReviewQueueData(actor, { status: "awaiting-review" }),
+    getAdminReportReviewQueueData(actor),
     getAdminDeficiencyDashboardData(
       actor,
       { status: "open" }

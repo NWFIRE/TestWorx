@@ -3,11 +3,13 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { LiveUrlSelectFilter } from "@/app/live-url-select-filter";
 import { getAdminReportReviewQueueData } from "@testworx/lib";
 
 import {
   AppPageShell,
   EmptyState,
+  FilterBar,
   KPIStatCard,
   PageHeader,
   SectionCard,
@@ -22,7 +24,7 @@ function taskDisplayLabel(task: { inspectionType: string; displayLabel?: string 
 export default async function AdminReportsQueuePage({
   searchParams
 }: {
-  searchParams?: Promise<{ status?: string }>;
+  searchParams?: Promise<{ month?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -33,8 +35,8 @@ export default async function AdminReportsQueuePage({
   }
 
   const params = searchParams ? await searchParams : {};
-  const status = typeof params.status === "string" ? params.status : "awaiting-review";
-  const currentPath = `/app/admin/reports?status=${encodeURIComponent(status)}`;
+  const month = typeof params.month === "string" ? params.month : undefined;
+  const currentPath = month ? `/app/admin/reports?month=${encodeURIComponent(month)}` : "/app/admin/reports";
 
   const data = await getAdminReportReviewQueueData(
     {
@@ -42,16 +44,16 @@ export default async function AdminReportsQueuePage({
       role: session.user.role,
       tenantId: session.user.tenantId
     },
-    { status }
+    { month }
   );
 
   return (
     <AppPageShell>
       <PageHeader
         backNavigation={{ label: "Back to admin", fallbackHref: "/app/admin" }}
-        description="Move directly into completed inspections that still need office review before final billing or follow-up."
+        description="Review completed inspections for the selected month before final billing or follow-up."
         eyebrow="Reports / review"
-        title="Awaiting office review"
+        title="Inspection review"
       />
 
       <WorkQueueNav activeKey="review" />
@@ -59,17 +61,24 @@ export default async function AdminReportsQueuePage({
       <section className="grid gap-3 md:grid-cols-2">
         <KPIStatCard
           label="Awaiting review"
-          note="Completed inspections still needing office review or downstream action."
+          note="Completed inspections in the selected month still needing office review or downstream action."
           tone="blue"
           value={data.counts.awaitingReview}
         />
         <KPIStatCard
           label="Completed reports"
-          note="Completed inspections with finalized reports available for office access."
+          note="Completed inspections in the selected month with finalized reports ready for office access."
           tone="slate"
           value={data.counts.completed}
         />
       </section>
+
+      <FilterBar
+        description="The review queue defaults to the current month. Switch months to review older completed inspections."
+        title="Review filters"
+      >
+        <LiveUrlSelectFilter options={data.options.months} paramKey="month" value={data.filters.month} />
+      </FilterBar>
 
       <SectionCard>
         <div className="flex items-end justify-between gap-4">
@@ -77,8 +86,8 @@ export default async function AdminReportsQueuePage({
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
               Review queue
             </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-              Completed inspections awaiting office review
+            <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">
+              Completed inspections
             </h2>
           </div>
           <p className="text-sm text-slate-500">
@@ -86,37 +95,37 @@ export default async function AdminReportsQueuePage({
           </p>
         </div>
 
-        <div className="mt-5 space-y-4">
+        <div className="mt-4 space-y-3">
           {data.inspections.length === 0 ? (
             <EmptyState
-              description="No completed inspections are currently waiting on office review."
-              title="Review queue is clear"
+              description="No completed inspections were found for the selected month."
+              title="Nothing to review"
             />
           ) : (
             data.inspections.map((inspection) => (
               <div
                 key={inspection.id}
-                className="rounded-[24px] border border-slate-200/80 bg-slate-50/70 p-5 transition hover:border-slate-300 hover:bg-white"
+                className="rounded-[22px] border border-slate-200/80 bg-slate-50/70 p-4 transition hover:border-slate-300 hover:bg-white"
               >
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                  <div className="space-y-3">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="space-y-2.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-lg font-semibold text-slate-950">
+                      <p className="text-base font-semibold text-slate-950">
                         {inspection.primaryTitle ?? inspection.site.name}
                       </p>
                       <StatusBadge label={inspection.billingStatus ?? "not invoiced"} tone="blue" />
                     </div>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm leading-5 text-slate-500">
                       {inspection.secondaryTitle ?? inspection.customerCompany.name} •{" "}
-                      {format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}
+                      {format(inspection.completedAt ?? inspection.scheduledStart, "MMM d, yyyy")}
                     </p>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm leading-5 text-slate-500">
                       Assigned: {inspection.assignedTechnicianNames.join(", ") || "Shared queue"}
                     </p>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                    <div className="grid gap-2.5 md:grid-cols-2">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-600">
                         <p className="font-medium text-slate-800">Reviewable report types</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
+                        <div className="mt-2 flex flex-wrap gap-1.5">
                           {inspection.reviewTasks.map((task) => (
                             <span
                               key={task.id}
@@ -127,13 +136,13 @@ export default async function AdminReportsQueuePage({
                           ))}
                         </div>
                       </div>
-                      <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-600">
                         <p>Billing status: {inspection.billingStatus ?? "Not started"}</p>
                         <p className="mt-1">Finalized reports: {inspection.reviewTasks.length}</p>
                       </div>
                     </div>
                   </div>
-                  <div className="flex min-w-64 flex-col gap-3">
+                  <div className="flex min-w-56 flex-col gap-2.5">
                     {inspection.reviewTasks[0] ? (
                       <Link
                         className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white"

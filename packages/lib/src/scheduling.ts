@@ -1,4 +1,4 @@
-import { addMonths, endOfMonth, endOfWeek, format, isAfter, isSameDay, startOfDay, startOfMonth } from "date-fns";
+import { addMonths, endOfMonth, endOfWeek, format, isAfter, isSameDay, startOfDay, startOfMonth, subMonths } from "date-fns";
 import {
   InspectionClassification,
   InspectionCloseoutRequestStatus,
@@ -3310,7 +3310,7 @@ export async function getAdminSchedulingQueueData(
 
 export async function getAdminReportReviewQueueData(
   actor: ActorContext,
-  input?: { status?: string }
+  input?: { month?: string }
 ) {
   const parsedActor = parseActor(actor);
   if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
@@ -3318,10 +3318,22 @@ export async function getAdminReportReviewQueueData(
   }
 
   const tenantId = parsedActor.tenantId as string;
-  const requestedStatus = (input?.status ?? "awaiting-review").trim().toLowerCase();
+  const currentMonthStart = startOfMonth(new Date());
+  const requestedMonth = (input?.month ?? format(currentMonthStart, "yyyy-MM")).trim();
+  const monthStart = /^\d{4}-\d{2}$/.test(requestedMonth)
+    ? startOfMonth(new Date(`${requestedMonth}-01T00:00:00.000Z`))
+    : currentMonthStart;
+  const monthEnd = endOfMonth(monthStart);
 
   const inspections = await prisma.inspection.findMany({
-    where: { tenantId, status: { in: [...completedOperationalInspectionStatuses] } },
+    where: {
+      tenantId,
+      status: InspectionStatus.completed,
+      completedAt: {
+        gte: monthStart,
+        lte: monthEnd
+      }
+    },
     include: {
       site: true,
       customerCompany: true,
@@ -3367,19 +3379,26 @@ export async function getAdminReportReviewQueueData(
     })
     .filter((inspection) => inspection.reviewTasks.length > 0);
 
-  const queue = requestedStatus === "awaiting-review"
-    ? mapped.filter((inspection) => inspection.billingStatus !== "invoiced")
-    : mapped;
+  const monthOptions = Array.from({ length: 12 }, (_, index) => {
+    const monthDate = subMonths(currentMonthStart, index);
+    return {
+      value: format(monthDate, "yyyy-MM"),
+      label: format(monthDate, "MMMM yyyy")
+    };
+  });
 
   return {
     filters: {
-      status: requestedStatus
+      month: format(monthStart, "yyyy-MM")
     },
     counts: {
       awaitingReview: mapped.filter((inspection) => inspection.billingStatus !== "invoiced").length,
       completed: mapped.length
     },
-    inspections: queue
+    options: {
+      months: monthOptions
+    },
+    inspections: mapped
   };
 }
 
