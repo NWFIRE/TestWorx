@@ -28,7 +28,7 @@ const reviewOptions = [
   { value: "pending_follow_up_request", label: "Pending requests" },
   { value: "approved_created", label: "Approved / created" },
   { value: "dismissed", label: "Dismissed" },
-  { value: "has_amendment_linkage", label: "Has amendment linkage" }
+  { value: "has_amendment_linkage", label: "Has linked visit history" }
 ] as const;
 
 function formatAuditAction(value: string) {
@@ -38,7 +38,7 @@ function formatAuditAction(value: string) {
 function getRelationshipSummary(item: ReviewItem) {
   if (item.originalAmendment) {
     return {
-      label: "Replacement for",
+      label: "Updated from",
       inspectionId: item.originalAmendment.inspection.id,
       href: `/app/admin/inspections/${item.originalAmendment.inspection.id}`,
       siteName: item.originalAmendment.inspection.site.name,
@@ -48,7 +48,7 @@ function getRelationshipSummary(item: ReviewItem) {
 
   if (item.outgoingAmendment) {
     return {
-      label: "Superseded by",
+      label: "Updated by",
       inspectionId: item.outgoingAmendment.replacementInspection.id,
       href: `/app/admin/inspections/${item.outgoingAmendment.replacementInspection.id}`,
       siteName: item.outgoingAmendment.replacementInspection.site.name,
@@ -88,7 +88,7 @@ export default async function AdminAmendmentsPage({
         backNavigation={{ label: "Back to admin", fallbackHref: "/app/admin" }}
         description="Review completed visits, confirm the packet is complete, and respond to technician requests for the next inspection without dropping into the full edit workspace."
         eyebrow="Post-visit review"
-        title="Inspection review and next-step requests"
+        title="Visit review and next-step requests"
       />
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -111,15 +111,15 @@ export default async function AdminAmendmentsPage({
           value={data.filterCounts.approved_created}
         />
         <KPIStatCard
-          label="Amendment linkage"
-          note="Historical amendment relationships still tied to these visits."
+          label="Linked visit history"
+          note="Historical visit relationships still tied to these visits."
           tone="amber"
           value={data.filterCounts.has_amendment_linkage}
         />
       </section>
 
       <FilterBar
-        description="Filter the review queue by technician request state and inspection readiness instead of amendment lifecycle."
+        description="Filter the review queue by technician request state, readiness, and linked visit history."
         title="Review filters"
       >
         {reviewOptions.map((option) => (
@@ -242,7 +242,7 @@ export default async function AdminAmendmentsPage({
                       {relationship ? (
                         <div className="rounded-2xl border border-slate-200 bg-white p-4">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                            Historical amendment linkage
+                            Linked visit history
                           </p>
                           <p className="mt-2 text-sm text-slate-700">
                             {relationship.label}: {relationship.siteName}

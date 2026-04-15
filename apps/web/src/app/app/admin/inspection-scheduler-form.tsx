@@ -2,6 +2,7 @@
 
 import type { ChangeEvent, ReactNode } from "react";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { CustomerOption, SiteOption, TechnicianOption } from "@testworx/types";
 import {
   customInspectionSiteName,
@@ -30,7 +31,17 @@ type EditableInspectionStatus = (typeof editableInspectionStatuses)[number];
 type InspectionClassification = (typeof inspectionClassificationValues)[number];
 const statusOptions = editableInspectionStatuses;
 const inspectionClassificationOptions = inspectionClassificationValues;
-const initialState = { error: null as string | null, success: null as string | null };
+type InspectionSchedulerFormState = {
+  error: string | null;
+  success: string | null;
+  redirectTo?: string | null;
+};
+
+const initialState: InspectionSchedulerFormState = {
+  error: null,
+  success: null,
+  redirectTo: null
+};
 const inspectionTypeOptions = Object.keys(inspectionTypeRegistry) as InspectionType[];
 const serviceSchedulingOptions: InspectionTaskSchedulingStatus[] = [
   "due_now",
@@ -171,9 +182,13 @@ export function InspectionSchedulerForm({
   allowCustomOneTimeSite = false,
   onSuccess,
   toastResults = true,
-  showInlineSuccess = false
+  showInlineSuccess = false,
+  protectedSaveMode = false,
+  protectedSaveTitle = "This visit already has work recorded",
+  protectedSaveDescription = "To keep records accurate, your changes will create a new visit instead of changing the original one.",
+  protectedSaveConfirmLabel = "Save as new visit"
 }: {
-  action: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
+  action: (_: InspectionSchedulerFormState, formData: FormData) => Promise<InspectionSchedulerFormState>;
   title: string;
   submitLabel: string;
   customers: CustomerOption[];
@@ -190,7 +205,12 @@ export function InspectionSchedulerForm({
   onSuccess?: () => void;
   toastResults?: boolean;
   showInlineSuccess?: boolean;
+  protectedSaveMode?: boolean;
+  protectedSaveTitle?: string;
+  protectedSaveDescription?: string;
+  protectedSaveConfirmLabel?: string;
 }) {
+  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const lastErrorRef = useRef<string | null>(null);
   const lastSuccessRef = useRef<string | null>(null);
@@ -214,6 +234,7 @@ export function InspectionSchedulerForm({
   const [startManuallyEdited, setStartManuallyEdited] = useState(Boolean(initialValues?.scheduledStart));
   const [serviceLines, setServiceLines] = useState<ServiceLineDraft[]>(() => buildInitialServiceLines(initialValues));
   const [newestServiceLineId, setNewestServiceLineId] = useState<string | null>(null);
+  const [showProtectedSaveConfirm, setShowProtectedSaveConfirm] = useState(false);
   const serviceLineRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const filteredSites = useMemo(
     () => sites.filter((site) => !selectedCustomerId || site.customerCompanyId === selectedCustomerId),
@@ -314,6 +335,14 @@ export function InspectionSchedulerForm({
     onSuccess?.();
   }, [onSuccess, showToast, state.success, toastResults]);
 
+  useEffect(() => {
+    if (!state.redirectTo) {
+      return;
+    }
+
+    router.push(state.redirectTo);
+  }, [router, state.redirectTo]);
+
   return (
     <form action={formAction} className="min-w-0 overflow-hidden space-y-5 rounded-[1.5rem] bg-white p-4 shadow-panel sm:space-y-6 sm:rounded-[2rem] sm:p-6" ref={formRef}>
       {initialValues?.inspectionId ? <input name="inspectionId" type="hidden" value={initialValues.inspectionId} /> : null}
@@ -321,7 +350,7 @@ export function InspectionSchedulerForm({
       <input name="inspectionClassification" type="hidden" value={inspectionClassification} />
       <input name="isPriority" type="hidden" value={isPriority ? "on" : ""} />
       <div>
-        <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500 sm:text-sm sm:tracking-[0.25em]">Scheduling workflow</p>
+        <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500 sm:text-sm sm:tracking-[0.25em]">Visit details</p>
         <h3 className="mt-2 text-xl font-semibold text-ink sm:text-2xl">{title}</h3>
         {banner ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-5 text-amber-900">{banner}</p> : null}
         {workflowNote ? <p className="mt-3 text-sm leading-5 text-slate-500">{workflowNote}</p> : null}
@@ -728,7 +757,7 @@ export function InspectionSchedulerForm({
       {reasonLabel ? (
       <div className="min-w-0">
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="reason">{reasonLabel}</label>
-          <textarea className="min-h-24 w-full rounded-2xl border border-slate-200 px-4 py-3.5" id="reason" name="reason" placeholder="Explain why this follow-up or amendment is needed" required={reasonRequired} />
+          <textarea className="min-h-24 w-full rounded-2xl border border-slate-200 px-4 py-3.5" id="reason" name="reason" placeholder="Share any context the next visit should keep with it" required={reasonRequired} />
         </div>
       ) : null}
       {allowDocumentUpload ? (
@@ -758,9 +787,48 @@ export function InspectionSchedulerForm({
       ) : null}
       {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
       {showInlineSuccess && state.success ? <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{state.success}</p> : null}
-      <button className="w-full rounded-2xl bg-ember px-5 py-3 text-base font-semibold text-white disabled:opacity-60" disabled={pending} type="submit">
-        {pending ? "Saving schedule..." : submitLabel}
-      </button>
+      {protectedSaveMode && showProtectedSaveConfirm ? (
+        <div className="space-y-4 rounded-[1.5rem] border border-amber-200 bg-amber-50 px-5 py-5">
+          <div>
+            <p className="text-sm font-semibold text-amber-950">{protectedSaveTitle}</p>
+            <p className="mt-2 text-sm leading-6 text-amber-900">{protectedSaveDescription}</p>
+            <p className="mt-2 text-sm text-amber-800">The original visit stays in history.</p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-ember px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
+              disabled={pending}
+              type="submit"
+            >
+              {pending ? "Saving new visit..." : protectedSaveConfirmLabel}
+            </button>
+            <button
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              disabled={pending}
+              onClick={() => setShowProtectedSaveConfirm(false)}
+              type="button"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          className="w-full rounded-2xl bg-ember px-5 py-3 text-base font-semibold text-white disabled:opacity-60"
+          disabled={pending}
+          onClick={(event) => {
+            if (!protectedSaveMode) {
+              return;
+            }
+
+            event.preventDefault();
+            setShowProtectedSaveConfirm(true);
+          }}
+          type="submit"
+        >
+          {pending ? "Saving schedule..." : submitLabel}
+        </button>
+      )}
     </form>
   );
 }

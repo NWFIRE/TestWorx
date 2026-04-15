@@ -153,7 +153,7 @@ function buildAlertItems(data: AdminDashboardData, inspectionNotice?: string) {
   ).length;
   if (amendedCount > 0) {
     alerts.push(
-      `${amendedCount} active inspection${amendedCount === 1 ? "" : "s"} were recently amended and should be double-checked before dispatch.`
+      `${amendedCount} active inspection${amendedCount === 1 ? "" : "s"} ha${amendedCount === 1 ? "s" : "ve"} linked visit updates that should be double-checked before dispatch.`
     );
   }
 

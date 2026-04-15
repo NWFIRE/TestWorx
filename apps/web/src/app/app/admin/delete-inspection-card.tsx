@@ -45,7 +45,7 @@ export function DeleteInspectionCard({
       <p className="text-sm uppercase tracking-[0.25em] text-rose-700">Danger zone</p>
       <h3 className="mt-2 text-2xl font-semibold text-ink">Delete inspection</h3>
       <p className="mt-3 text-sm text-rose-900">
-        Admins can permanently delete inspections that are not tied to amendment history or invoicing/QuickBooks records. Owned
+        Admins can permanently delete inspections that are not tied to linked visit history or invoicing/QuickBooks records. Owned
         reports, attachments, signatures, deficiencies, and inspection documents are removed with the inspection.
       </p>
       {state.error ? <p className="mt-4 rounded-2xl border border-rose-200 bg-white px-4 py-3 text-sm text-rose-700">{state.error}</p> : null}

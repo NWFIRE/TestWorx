@@ -54,10 +54,27 @@ const lifecycleBadgeStyles: Record<string, string> = {
 };
 
 function formatLifecycleLabel(lifecycle: string) {
-  return lifecycle.replaceAll("_", " ");
+  switch (lifecycle) {
+    case "replacement":
+      return "Updated visit";
+    case "superseded":
+      return "Original visit";
+    case "amended":
+      return "Current visit";
+    default:
+      return "Original visit";
+  }
 }
 
 function formatAuditAction(action: string) {
+  if (action === "inspection.amendment_created") {
+    return "new visit created";
+  }
+
+  if (action === "inspection.amendment_replacement_created") {
+    return "updated visit linked";
+  }
+
   return action.replaceAll(".", " ").replaceAll("_", " ");
 }
 
@@ -309,7 +326,7 @@ export default async function EditInspectionPage({
             ? "Review status, report completion, signatures, documents, and technician-requested next steps from one focused operational workspace."
             : "Coordinate assignment, status, recurrence mix, scheduling details, and customer-facing outputs for this visit from one focused workspace."}
         </p>
-        {inspectionView.hasStartedWork ? <p className="mt-3 text-sm text-amber-700">Started work is protected. Changes here create an audited follow-up visit instead of rewriting history.</p> : null}
+        {inspectionView.hasStartedWork ? <p className="mt-3 text-sm text-amber-700">This visit already has work recorded. Changes here will create a new visit so the original stays in history.</p> : null}
         {isDueAtTimeOfServiceCustomer(inspection.customerCompany) ? (
           <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
             <p className="font-semibold uppercase tracking-[0.16em]">Payment due at time of service</p>
@@ -318,29 +335,29 @@ export default async function EditInspectionPage({
         ) : null}
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <div className="rounded-2xl border border-slate-200 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Visit relationship</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Visit history</p>
             {inspectionView.originalAmendment ? (
               <>
-                <p className="mt-2 text-sm text-slate-700">This is a replacement visit created from an earlier inspection.</p>
+                <p className="mt-2 text-sm text-slate-700">This is the updated visit linked to an earlier original visit.</p>
                 <Link className="mt-3 inline-flex text-sm font-semibold text-slateblue" href={`/app/admin/inspections/${inspectionView.originalAmendment.inspection.id}?from=${encodeURIComponent(originPath)}`}>
-                  View original inspection
+                  Open original visit
                 </Link>
               </>
             ) : inspectionView.outgoingAmendment ? (
               <>
-                <p className="mt-2 text-sm text-slate-700">This visit has been superseded by an amended follow-up visit.</p>
+                <p className="mt-2 text-sm text-slate-700">This original visit now has a newer linked visit.</p>
                 <Link className="mt-3 inline-flex text-sm font-semibold text-slateblue" href={`/app/admin/inspections/${inspectionView.outgoingAmendment.replacementInspection.id}?from=${encodeURIComponent(originPath)}`}>
-                  View replacement inspection
+                  Open updated visit
                 </Link>
               </>
             ) : (
-              <p className="mt-2 text-sm text-slate-700">This inspection is currently the active original visit.</p>
+              <p className="mt-2 text-sm text-slate-700">This visit is currently the active original visit.</p>
             )}
           </div>
           <div className="rounded-2xl border border-slate-200 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Amendment reason</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Visit note</p>
             <p className="mt-2 text-sm text-slate-700">
-              {inspectionView.originalAmendment?.reason ?? inspectionView.outgoingAmendment?.reason ?? "No amendment reason recorded for this inspection yet."}
+              {inspectionView.originalAmendment?.reason ?? inspectionView.outgoingAmendment?.reason ?? "No linked visit note has been recorded for this inspection yet."}
             </p>
           </div>
         </div>
@@ -404,17 +421,16 @@ export default async function EditInspectionPage({
         {!isReviewMode ? (
         <InspectionSchedulerForm
           action={inspectionView.hasStartedWork ? amendInspectionAction : updateInspectionAction}
-          title={inspectionView.hasStartedWork ? "Create amended follow-up visit" : "Edit inspection"}
-          submitLabel={inspectionView.hasStartedWork ? "Create amended visit" : "Save changes"}
-          banner={inspectionView.hasStartedWork ? `This inspection already has ${inspectionView.reportActivityCount ?? 0} report activity markers. Saving here will create a new scheduled follow-up visit and preserve the existing inspection exactly as-is.` : undefined}
+          title="Edit visit"
+          submitLabel="Save changes"
+          banner={inspectionView.hasStartedWork ? `This visit already has ${inspectionView.reportActivityCount ?? 0} work marker${(inspectionView.reportActivityCount ?? 0) === 1 ? "" : "s"}. Saving here will create a new visit and leave the original visit unchanged.` : undefined}
           workflowNote={inspectionView.hasStartedWork
-            ? "The original visit and its report history stay intact. The new replacement visit becomes the schedulable follow-up for dispatch."
-            : "Use this form for normal schedule edits. Once field work begins, the workflow switches to an audited amendment instead of rewriting the original visit."}
-          reasonLabel={inspectionView.hasStartedWork ? "Amendment reason" : undefined}
-          reasonRequired={Boolean(inspectionView.hasStartedWork)}
+            ? "The original visit and its report history stay intact. The new visit carries these updates forward for dispatch."
+            : "Use this form for normal visit edits. Once field work begins, the system protects the original visit and creates a new one when needed."}
           customers={dashboardData.customers}
           sites={dashboardData.sites}
           technicians={dashboardData.technicians}
+          protectedSaveMode={Boolean(inspectionView.hasStartedWork)}
           initialValues={{
             inspectionId: inspection.id,
             customerCompanyId: inspection.customerCompanyId,
@@ -538,10 +554,10 @@ export default async function EditInspectionPage({
             </div>
           ) : null}
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
-            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Lifecycle timeline</p>
+            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Visit history</p>
             <div className="mt-4 space-y-4">
               <div className="rounded-2xl border border-slate-200 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Current visit</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Current visit</p>
                 <p className="mt-2 text-sm font-semibold text-ink">{inspectionDisplay.primaryTitle}</p>
                 <p className="mt-1 text-sm text-slate-500">
                   {inspectionDisplay.secondaryTitle ? `${inspectionDisplay.secondaryTitle} | ` : ""}{format(inspectionView.scheduledStart, "MMM d, yyyy h:mm a")}
@@ -550,7 +566,7 @@ export default async function EditInspectionPage({
               </div>
               {inspectionView.originalAmendment ? (
                 <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-800">Replaces original visit</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-800">Original visit</p>
                   <p className="mt-2 text-sm text-blue-900">{inspectionView.originalAmendment.reason}</p>
                   <p className="mt-2 text-sm text-blue-800">
                     {originalInspectionDisplay?.primaryTitle} {originalInspectionDisplay?.secondaryTitle ? `| ${originalInspectionDisplay.secondaryTitle}` : ""} on {format(inspectionView.originalAmendment.inspection.scheduledStart, "MMM d, yyyy h:mm a")}
@@ -562,13 +578,13 @@ export default async function EditInspectionPage({
               ) : null}
               {inspectionView.outgoingAmendment ? (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-900">Superseded by replacement visit</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-900">Updated visit</p>
                   <p className="mt-2 text-sm text-amber-900">{inspectionView.outgoingAmendment.reason}</p>
                   <p className="mt-2 text-sm text-amber-800">
                     {replacementInspectionDisplay?.primaryTitle} {replacementInspectionDisplay?.secondaryTitle ? `| ${replacementInspectionDisplay.secondaryTitle}` : ""} on {format(inspectionView.outgoingAmendment.replacementInspection.scheduledStart, "MMM d, yyyy h:mm a")}
                   </p>
                   <Link className="mt-3 inline-flex text-sm font-semibold text-slateblue" href={`/app/admin/inspections/${inspectionView.outgoingAmendment.replacementInspection.id}?from=${encodeURIComponent(originPath)}`}>
-                    Open replacement visit
+                    Open updated visit
                   </Link>
                 </div>
               ) : null}
@@ -703,10 +719,7 @@ export default async function EditInspectionPage({
                   {metadata && "reason" in metadata ? <p className="mt-2 text-sm text-slate-700">{String(metadata.reason ?? "")}</p> : null}
                   {metadata && "note" in metadata && String(metadata.note ?? "").trim() ? <p className="mt-2 text-sm text-slate-700">{String(metadata.note ?? "")}</p> : null}
                   {metadata && "replacementInspectionId" in metadata ? (
-                    <p className="mt-2 text-sm text-slate-500">Replacement visit id: {String(metadata.replacementInspectionId ?? "")}</p>
-                  ) : null}
-                  {metadata && "amendmentType" in metadata ? (
-                    <p className="mt-1 text-sm text-slate-500">Type: {String(metadata.amendmentType ?? "").replaceAll("_", " ")}</p>
+                    <p className="mt-2 text-sm text-slate-500">Updated visit id: {String(metadata.replacementInspectionId ?? "")}</p>
                   ) : null}
                 </div>
               );}) : <p className="text-sm text-slate-500">No audit entries are recorded for this inspection yet.</p>}

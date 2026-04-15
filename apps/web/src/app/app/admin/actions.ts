@@ -123,7 +123,10 @@ function readExternalDocumentFiles(formData: FormData) {
     .filter((value): value is File => value instanceof File && value.size > 0);
 }
 
-export async function createInspectionAction(_: { error: string | null; success: string | null }, formData: FormData) {
+export async function createInspectionAction(
+  _: { error: string | null; success: string | null; redirectTo?: string | null },
+  formData: FormData
+) {
   const session = await auth();
   if (!session?.user?.tenantId) {
     return { error: "Unauthorized", success: null };
@@ -165,9 +168,9 @@ export async function createInspectionAction(_: { error: string | null; success:
     revalidatePath(`/app/admin/inspections/${inspection.id}`);
     revalidatePath("/app/tech");
     revalidatePath("/app/customer");
-    return { error: null, success: `Inspection created successfully for ${inspection.scheduledStart.toLocaleString()}.` };
+    return { error: null, success: `Inspection created successfully for ${inspection.scheduledStart.toLocaleString()}.`, redirectTo: null };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Unable to create inspection.", success: null };
+    return { error: error instanceof Error ? error.message : "Unable to create inspection.", success: null, redirectTo: null };
   }
 }
 
@@ -231,7 +234,10 @@ export async function importCustomerSiteCsvAction(_: { error: string | null; suc
   }
 }
 
-export async function updateInspectionAction(_: { error: string | null; success: string | null }, formData: FormData) {
+export async function updateInspectionAction(
+  _: { error: string | null; success: string | null; redirectTo?: string | null },
+  formData: FormData
+) {
   const session = await auth();
   const inspectionId = String(formData.get("inspectionId") ?? "");
   if (!session?.user?.tenantId || !inspectionId) {
@@ -251,9 +257,9 @@ export async function updateInspectionAction(_: { error: string | null; success:
     revalidatePath("/app/admin/amendments");
     revalidatePath(`/app/admin/inspections/${inspectionId}`);
     revalidatePath("/app/tech");
-    return { error: null, success: "Inspection updated successfully." };
+    return { error: null, success: "Visit updated successfully.", redirectTo: null };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Unable to update inspection.", success: null };
+    return { error: error instanceof Error ? error.message : "Unable to update inspection.", success: null, redirectTo: null };
   }
 }
 
@@ -407,23 +413,28 @@ export async function uploadInspectionPdfAction(_: { error: string | null; succe
 }
 
 
-export async function amendInspectionAction(_: { error: string | null; success: string | null }, formData: FormData) {
+export async function amendInspectionAction(
+  _: { error: string | null; success: string | null; redirectTo?: string | null },
+  formData: FormData
+) {
   const session = await auth();
   const inspectionId = String(formData.get("inspectionId") ?? "");
-  const reason = String(formData.get("reason") ?? "");
+  const reason =
+    String(formData.get("reason") ?? "").trim() ||
+    "Created a new visit after work had already been recorded on the original visit.";
   if (!session?.user?.tenantId || !inspectionId) {
-    return { error: "Unauthorized", success: null };
+    return { error: "Unauthorized", success: null, redirectTo: null };
   }
 
   const parsed = parseUpdateInspectionFormData(formData);
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid form input.", success: null };
+    return { error: parsed.error.issues[0]?.message ?? "Invalid form input.", success: null, redirectTo: null };
   }
 
   try {
     const actor = { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId };
     const resolvedInput = await resolveInspectionSiteSelection(actor, parsed.data, formData);
-    await createInspectionAmendment(
+    const newVisit = await createInspectionAmendment(
       actor,
       inspectionId,
       { ...resolvedInput, reason }
@@ -431,10 +442,15 @@ export async function amendInspectionAction(_: { error: string | null; success: 
     revalidatePath("/app/admin");
     revalidatePath("/app/admin/amendments");
     revalidatePath(`/app/admin/inspections/${inspectionId}`);
+    revalidatePath(`/app/admin/inspections/${newVisit.id}`);
     revalidatePath("/app/tech");
-    return { error: null, success: "Amended inspection created successfully." };
+    return {
+      error: null,
+      success: "New visit created.",
+      redirectTo: `/app/admin/inspections/${newVisit.id}?from=${encodeURIComponent("/app/admin/inspections")}`
+    };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Unable to create amendment.", success: null };
+    return { error: error instanceof Error ? error.message : "Unable to create a new visit.", success: null, redirectTo: null };
   }
 }
 

@@ -1004,7 +1004,7 @@ export async function deleteInspection(actor: ActorContext, inspectionId: string
   }
 
   const blockedReason = inspection.amendments.length > 0 || inspection.replacementAmendments.length > 0
-    ? "This inspection is linked to amendment history and cannot be deleted."
+    ? "This inspection is linked to visit history and cannot be deleted."
     : hasRiskyInspectionAccountingState({
         billingStatus: inspection.billingSummary?.status,
         quickbooksInvoiceId: inspection.billingSummary?.quickbooksInvoiceId,
@@ -2490,7 +2490,7 @@ function buildInspectionSnapshot(input: {
 export async function createInspectionAmendment(actor: ActorContext, inspectionId: string, input: z.infer<typeof scheduleInspectionSchema> & { reason: string }) {
   const parsedActor = parseActor(actor);
   if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
-    throw new Error("Only office administrators can amend started inspections.");
+    throw new Error("Only office administrators can create a new visit from a started inspection.");
   }
 
   const tenantId = parsedActor.tenantId as string;
@@ -2500,7 +2500,7 @@ export async function createInspectionAmendment(actor: ActorContext, inspectionI
 
   const reason = input.reason.trim();
   if (reason.length < 8) {
-    throw new Error("Provide a brief amendment reason so the change history is understandable.");
+    throw new Error("Add a short note so the visit history stays understandable.");
   }
 
   return prisma.$transaction(async (tx) => {
@@ -2525,13 +2525,13 @@ export async function createInspectionAmendment(actor: ActorContext, inspectionI
     });
 
     if (priorAmendment) {
-      throw new Error("This inspection already has an amendment. Update the replacement inspection instead of creating another replacement visit.");
+      throw new Error("This visit already has a newer linked visit. Update that newer visit instead.");
     }
 
     const reportActivityCount = await getInspectionReportActivityCount(tx, tenantId, inspectionId);
     const hasStartedWork = !isInspectionInUnstartedState(existing.status) || reportActivityCount > 0;
     if (!hasStartedWork) {
-      throw new Error("Use the standard edit workflow until inspection work has started.");
+      throw new Error("This visit can still be edited directly.");
     }
 
     const { customerCompany, site, assignedTechnicianIds, primaryAssignedTechnicianId } = await validateSchedulingReferences(tx, tenantId, input);
@@ -2574,7 +2574,7 @@ export async function createInspectionAmendment(actor: ActorContext, inspectionI
 
       const comparablePrevious = { ...previousSnapshot, inspectionId: null, status: InspectionStatus.to_be_completed };
       if (JSON.stringify(comparablePrevious) === JSON.stringify({ ...replacementSnapshot, inspectionId: null })) {
-      throw new Error("No scheduling changes were detected for this amendment.");
+      throw new Error("No visit changes were detected.");
     }
 
       const replacementInspection = await tx.inspection.create({
