@@ -215,7 +215,7 @@ function InspectionListCard({
         <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
           {title}
         </h3>
-        <p className="mt-1 text-sm text-slate-500">{description}</p>
+        <p className="mt-1 text-sm text-[color:var(--text-secondary)]">{description}</p>
       </div>
 
       <div className="mt-5 space-y-3">
@@ -230,27 +230,27 @@ function InspectionListCard({
             return (
               <div
                 key={inspection.id}
-                className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 transition hover:border-slate-300 hover:bg-white"
+                className="rounded-2xl border border-[color:rgb(203_215_230_/_0.92)] bg-[color:rgb(248_250_252_/_0.96)] p-4 transition hover:border-[color:var(--border-strong)] hover:bg-white"
               >
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
                     <div className="text-sm font-semibold text-slate-900">
                       {inspection.primaryTitle ?? inspection.site.name}
                     </div>
-                    <div className="mt-1 text-sm leading-6 text-slate-500">
+                    <div className="mt-1 text-sm leading-6 text-[color:var(--text-secondary)]">
                       {inspection.secondaryTitle ?? inspection.customerCompany.name} •{" "}
                       {format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}
                     </div>
-                    <div className="mt-1 text-sm leading-6 text-slate-500">
+                    <div className="mt-1 text-sm leading-6 text-[color:var(--text-muted)]">
                       {inspection.tasks.map((task) => taskDisplayLabel(task)).join(", ") ||
                         "Inspection workflow"}
                     </div>
-                    <div className="mt-1 text-sm leading-6 text-slate-500">
+                    <div className="mt-1 text-sm leading-6 text-[color:var(--text-muted)]">
                       Next due: {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}
                     </div>
                   </div>
                   <Link
-                    className="inline-flex rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                    className="inline-flex rounded-2xl border border-[color:var(--border-default)] bg-white px-4 py-2.5 text-sm font-medium text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
                     href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(detailHrefBase)}`}
                   >
                     {ctaLabel}
@@ -358,7 +358,7 @@ export default async function AdminDashboardPage({
   ];
 
   return (
-    <div className="min-h-screen bg-[#f4f7fb] text-slate-900">
+    <div className="min-h-screen bg-paper text-slate-900">
       <div className="py-5 lg:py-6">
         <AppPageShell density="wide">
           <div className="lg:hidden">
@@ -383,14 +383,14 @@ export default async function AdminDashboardPage({
               actions={
                 <>
                   <div className="relative min-w-[280px] flex-1">
-                    <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--text-tertiary)]" />
                     <input
                       placeholder="Search inspections, reports, customers"
-                      className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-11 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-slateblue focus:ring-4 focus:ring-slateblue/10"
+                      className="field-contrast h-12 w-full rounded-2xl border bg-white px-11 text-sm outline-none transition-all duration-200"
                     />
                   </div>
                   <Link
-                    className="inline-flex h-12 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                    className="inline-flex h-12 items-center gap-2 rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-medium text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
                     href="/app/deficiencies"
                   >
                     <Bell className="h-4 w-4" />
@@ -414,15 +414,15 @@ export default async function AdminDashboardPage({
           <div className="lg:hidden">
             <SectionCard className="space-y-4">
               <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--text-tertiary)]" />
                 <input
                   placeholder="Search inspections, reports, customers"
-                  className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-11 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-slateblue focus:ring-4 focus:ring-slateblue/10"
+                  className="field-contrast h-12 w-full rounded-2xl border bg-white px-11 text-sm outline-none transition-all duration-200"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Link
-                  className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  className="inline-flex h-12 items-center justify-center rounded-2xl border border-[color:var(--border-default)] bg-white text-sm font-medium text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-subtle)]"
                   href="/app/deficiencies"
                 >
                   Alerts
@@ -489,12 +489,12 @@ export default async function AdminDashboardPage({
                       <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
                         Today&apos;s field schedule
                       </h3>
-                      <p className="mt-1 text-sm text-slate-500">
+                      <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
                         Live operational work ordered for quick scanning and action.
                       </p>
                     </div>
                     <Link
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 text-slate-700 transition hover:bg-slate-50 lg:h-10 lg:w-auto lg:gap-2 lg:px-3.5 lg:text-sm lg:font-medium"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[color:var(--border-default)] text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-subtle)] lg:h-10 lg:w-auto lg:gap-2 lg:px-3.5 lg:text-sm lg:font-medium"
                       href="/app/admin/amendments"
                     >
                       <CalendarDays className="h-4 w-4" />
@@ -513,14 +513,14 @@ export default async function AdminDashboardPage({
                         <Link
                           key={item.id}
                           href={`/app/admin/inspections/${item.id}?from=${encodeURIComponent("/app/admin/dashboard")}`}
-                          className="block rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 transition hover:border-slate-300 hover:bg-white"
+                          className="block rounded-2xl border border-[color:rgb(203_215_230_/_0.92)] bg-[color:rgb(248_250_252_/_0.96)] p-4 transition hover:border-[color:var(--border-strong)] hover:bg-white"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <div className="text-sm font-semibold text-slate-900">
                                 {item.primaryTitle ?? item.site.name}
                               </div>
-                              <div className="mt-1 text-sm leading-6 text-slate-500">
+                              <div className="mt-1 text-sm leading-6 text-[color:var(--text-secondary)]">
                                 {formatScheduleDetail(item)}
                               </div>
                             </div>
@@ -561,7 +561,7 @@ export default async function AdminDashboardPage({
                           href={item.href}
                           className="flex gap-3 rounded-2xl p-1 transition hover:bg-slate-50"
                         >
-                          <div className="mt-1 rounded-full bg-slate-100 p-2 text-slate-700">
+                            <div className="mt-1 rounded-full border border-[color:var(--border-subtle)] bg-[color:var(--surface-muted)] p-2 text-slate-700">
                             <Wrench className="h-4 w-4" />
                           </div>
                           <div className="min-w-0 flex-1">
@@ -571,7 +571,7 @@ export default async function AdminDashboardPage({
                               </div>
                               <StatusBadge label={item.tag} tone="slate" />
                             </div>
-                            <div className="mt-1 text-sm leading-6 text-slate-500">{item.meta}</div>
+                            <div className="mt-1 text-sm leading-6 text-[color:var(--text-secondary)]">{item.meta}</div>
                           </div>
                         </Link>
                       ))
@@ -617,7 +617,7 @@ export default async function AdminDashboardPage({
                     alerts.map((alert) => (
                       <div
                         key={alert}
-                        className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4 text-sm leading-6 text-slate-700"
+                        className="rounded-2xl border border-amber-200 bg-amber-50/85 p-4 text-sm leading-6 text-slate-800"
                       >
                         {alert}
                       </div>
@@ -632,7 +632,7 @@ export default async function AdminDashboardPage({
                     <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
                       Revenue pipeline
                     </h3>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
                       Operational work that is closest to billing completion.
                     </p>
                   </div>
@@ -650,9 +650,9 @@ export default async function AdminDashboardPage({
                     <div key={bar.label}>
                       <div className="mb-2 flex items-center justify-between text-sm">
                         <span className="font-medium text-slate-700">{bar.label}</span>
-                        <span className="text-slate-500">{bar.value}%</span>
+                        <span className="text-[color:var(--text-muted)]">{bar.value}%</span>
                       </div>
-                      <div className="h-2.5 rounded-full bg-slate-100">
+                      <div className="h-2.5 rounded-full bg-[color:var(--surface-muted)]">
                         <div
                           className={`h-2.5 rounded-full ${bar.tone}`}
                           style={{ width: `${Math.max(bar.value, 4)}%` }}

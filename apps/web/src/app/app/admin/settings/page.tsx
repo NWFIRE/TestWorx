@@ -109,21 +109,21 @@ function LazySectionCard({
   const toneClasses = tone === "error"
     ? "border-rose-200 bg-rose-50"
     : tone === "loading"
-      ? "border-slate-200 bg-slate-50"
-      : "border-slate-200 bg-white";
+      ? "border-[color:var(--border-default)] bg-[color:var(--surface-subtle)]"
+      : "border-[color:var(--border-default)] bg-white";
 
   return (
       <div className={`rounded-[2rem] border p-6 shadow-panel ${toneClasses}`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-2xl">
-            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">{eyebrow}</p>
+            <p className="text-sm uppercase tracking-[0.25em] text-[color:var(--text-secondary)]">{eyebrow}</p>
             <h3 className="mt-2 text-2xl font-semibold text-ink">{title}</h3>
-            <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
+            <div className="mt-2 flex items-center gap-2 text-sm text-[color:var(--text-muted)]">
               {tone === "loading" ? <BrandLoader label={description} size="sm" tone="muted" /> : null}
               <p>{description}</p>
             </div>
           </div>
-        <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={actionHref}>
+        <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 py-3 text-sm font-semibold text-slateblue" href={actionHref}>
           {actionLabel}
         </Link>
       </div>
@@ -438,14 +438,14 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
               </Suspense>
             </SettingsDisclosureCard>
             <SectionCard className="self-start">
-              <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing settings</p>
+              <p className="text-sm uppercase tracking-[0.25em] text-[color:var(--text-secondary)]">Billing settings</p>
               <h3 className="mt-2 text-2xl font-semibold text-ink">Current subscription</h3>
-              <p className="mt-3 text-sm text-slate-500">Plan: {billingSettings.tenant.subscriptionPlan?.name ?? "Not assigned"}</p>
-              <p className="mt-2 text-sm text-slate-500">Billing email: {billingSettings.tenant.billingEmail ?? "Not set"}</p>
-              <p className="mt-2 text-sm text-slate-500">Stripe status: {billingSettings.tenant.stripeSubscriptionStatus ?? "Not connected"}</p>
-              <p className="mt-2 text-sm text-slate-500">Current period end: {billingSettings.tenant.stripeCurrentPeriodEndsAt ? new Date(billingSettings.tenant.stripeCurrentPeriodEndsAt).toLocaleDateString() : "Not synced yet"}</p>
-              <p className="mt-2 text-sm text-slate-500">Cancel at period end: {billingSettings.tenant.stripeCancelAtPeriodEnd ? "Yes" : "No"}</p>
-              <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              <p className="mt-3 text-sm text-[color:var(--text-secondary)]">Plan: {billingSettings.tenant.subscriptionPlan?.name ?? "Not assigned"}</p>
+              <p className="mt-2 text-sm text-[color:var(--text-secondary)]">Billing email: {billingSettings.tenant.billingEmail ?? "Not set"}</p>
+              <p className="mt-2 text-sm text-[color:var(--text-secondary)]">Stripe status: {billingSettings.tenant.stripeSubscriptionStatus ?? "Not connected"}</p>
+              <p className="mt-2 text-sm text-[color:var(--text-secondary)]">Current period end: {billingSettings.tenant.stripeCurrentPeriodEndsAt ? new Date(billingSettings.tenant.stripeCurrentPeriodEndsAt).toLocaleDateString() : "Not synced yet"}</p>
+              <p className="mt-2 text-sm text-[color:var(--text-secondary)]">Cancel at period end: {billingSettings.tenant.stripeCancelAtPeriodEnd ? "Yes" : "No"}</p>
+              <div className="mt-4 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] px-4 py-3 text-sm text-[color:var(--text-secondary)]">
                 <p>{billingSettings.config.enabled ? "Stripe is configured and ready for checkout sessions." : "Stripe env vars are not fully configured yet. Plan selection is shown, but checkout buttons are disabled until env configuration is completed."}</p>
                 <p className="mt-2">Webhook sync: {billingSettings.config.webhookConfigured ? "Configured" : "Missing STRIPE_WEBHOOK_SECRET"}</p>
                 <p className="mt-2">Advanced recurrence: {billingSettings.entitlements.advancedRecurrence ? "Enabled" : "Upgrade required"}</p>
@@ -454,7 +454,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
               </div>
               {canManageSubscription ? (
                 <form action={openBillingPortalAction} className="mt-4">
-                  <button className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-50" disabled={!billingSettings.config.enabled || !billingSettings.tenant.stripeCustomerId} type="submit">
+                  <button className="w-full rounded-2xl border border-[color:var(--border-default)] bg-white px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-50" disabled={!billingSettings.config.enabled || !billingSettings.tenant.stripeCustomerId} type="submit">
                     Open Stripe billing portal
                   </button>
                 </form>

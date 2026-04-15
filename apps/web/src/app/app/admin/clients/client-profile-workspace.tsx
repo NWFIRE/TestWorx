@@ -144,7 +144,7 @@ function QuickActionLink({
         "pressable inline-flex min-h-11 items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
         tone === "primary"
           ? "btn-brand-primary border border-transparent"
-          : "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+          : "border border-[color:var(--border-default)] bg-white text-[color:var(--text-secondary)] hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
       )}
       href={href}
     >
@@ -163,10 +163,10 @@ function SummaryMetric({
   note: string;
 }) {
   return (
-    <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/70 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+    <div className="rounded-[24px] border border-[color:rgb(203_215_230_/_0.92)] bg-[color:rgb(248_250_252_/_0.96)] p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">{label}</p>
       <p className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-slate-950">{value}</p>
-      <p className="mt-2 text-sm text-slate-500">{note}</p>
+      <p className="mt-2 text-sm text-[color:var(--text-muted)]">{note}</p>
     </div>
   );
 }
@@ -180,8 +180,8 @@ function DetailField({
 }) {
   return (
     <div className="space-y-1">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
-      <p className="text-sm leading-6 text-slate-700">{value}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">{label}</p>
+      <p className="text-sm leading-6 text-[color:var(--text-secondary)]">{value}</p>
     </div>
   );
 }
@@ -201,7 +201,7 @@ function TabButton({
         "pressable inline-flex min-h-10 items-center rounded-full border px-4 py-2 text-sm font-semibold transition",
         active
           ? "border-[var(--tenant-primary)] bg-[var(--tenant-primary)] text-[var(--tenant-primary-contrast)]"
-          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+          : "border-[color:var(--border-default)] bg-white text-[color:var(--text-secondary)] hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
       )}
       onClick={onClick}
       type="button"
@@ -224,7 +224,7 @@ function SectionHeader({
     <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">{title}</h2>
-        <p className="mt-2 text-sm text-slate-500">{description}</p>
+        <p className="mt-2 text-sm text-[color:var(--text-muted)]">{description}</p>
       </div>
       {children ? <div className="flex flex-wrap items-center gap-3">{children}</div> : null}
     </div>
@@ -375,7 +375,7 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
             <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
               {data.customer.name}
             </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-[color:var(--text-secondary)]">
               One complete account workspace for operational history, billing visibility, site context, and customer communication.
             </p>
 
@@ -407,7 +407,7 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
                 label="Send email"
               />
               <button
-                className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 py-3 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
                 onClick={() => setActiveTab("billing")}
                 type="button"
               >

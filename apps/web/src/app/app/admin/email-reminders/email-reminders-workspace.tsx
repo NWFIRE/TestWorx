@@ -265,14 +265,14 @@ export function EmailRemindersWorkspace({
         <SectionCard className="space-y-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Recipients</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">Recipients</p>
               <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Customer list</h2>
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-[color:var(--text-muted)]">
                 Select one or more customers, review the shared draft, and send polished customer emails manually.
               </p>
             </div>
             {data.recipients.length > 0 ? (
-              <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              <label className="flex items-center gap-3 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] px-4 py-3 text-sm text-[color:var(--text-secondary)]">
                 <input
                   checked={allVisibleSelected}
                   onChange={(event) =>
@@ -292,22 +292,22 @@ export function EmailRemindersWorkspace({
             />
           ) : (
             <>
-              <div className="overflow-hidden rounded-[24px] border border-slate-200/80">
-                <div className="hidden grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] gap-4 border-b border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 md:grid">
+              <div className="overflow-hidden rounded-[24px] border border-[color:rgb(203_215_230_/_0.92)] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
+                <div className="hidden grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] gap-4 border-b border-[color:rgb(220_229_240_/_0.9)] bg-[color:rgb(248_250_252_/_0.98)] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)] md:grid">
                   <span>Select</span>
                   <span>Customer</span>
                   <span>Site context</span>
                   <span>Service lines</span>
                   <span>Status</span>
                 </div>
-                <div className="divide-y divide-slate-200">
+                <div className="divide-y divide-[color:rgb(220_229_240_/_0.9)]">
                   {data.recipients.map((recipient) => {
                     const selected = selectedCustomerIds.includes(recipient.customerCompanyId);
 
                     return (
                       <label
                         className={`grid gap-4 px-4 py-4 transition md:grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] ${
-                          selected ? "bg-[var(--tenant-primary-soft)]" : "bg-white hover:bg-slate-50"
+                          selected ? "bg-[var(--tenant-primary-soft)]" : "bg-white hover:bg-[color:var(--surface-subtle)]"
                         }`}
                         key={recipient.customerCompanyId}
                       >
@@ -326,27 +326,27 @@ export function EmailRemindersWorkspace({
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-slate-950">{recipient.customerName}</p>
-                          <p className="mt-1 truncate text-sm text-slate-500">{recipient.recipientEmail ?? "No billing email on file"}</p>
-                          <p className="mt-1 text-xs text-slate-400">
+                          <p className="mt-1 truncate text-sm text-[color:var(--text-secondary)]">{recipient.recipientEmail ?? "No billing email on file"}</p>
+                          <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
                             {recipient.taskCount > 0
                               ? `${recipient.taskCount} due service line${recipient.taskCount === 1 ? "" : "s"}`
                               : "No due service lines in this month view"}
                           </p>
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate text-sm text-slate-700">{recipient.siteSummary}</p>
-                          <p className="mt-1 text-xs text-slate-400">{recipient.dueMonth}</p>
+                          <p className="truncate text-sm text-[color:var(--text-secondary)]">{recipient.siteSummary}</p>
+                          <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">{recipient.dueMonth}</p>
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate text-sm text-slate-700">{recipient.inspectionTypeLabels.join(", ")}</p>
-                          <p className="mt-1 truncate text-xs text-slate-400">{recipient.divisions.join(", ")}</p>
+                          <p className="truncate text-sm text-[color:var(--text-secondary)]">{recipient.inspectionTypeLabels.join(", ")}</p>
+                          <p className="mt-1 truncate text-xs text-[color:var(--text-tertiary)]">{recipient.divisions.join(", ")}</p>
                         </div>
                         <div className="flex min-w-[8rem] flex-col items-start gap-2">
                           <StatusBadge
                             label={recipient.hasValidEmail ? "Ready" : "Missing email"}
                             tone={recipient.hasValidEmail ? "emerald" : "amber"}
                           />
-                          <p className="text-xs text-slate-400">Last sent: {formatDateTime(recipient.lastSentAt)}</p>
+                          <p className="text-xs text-[color:var(--text-tertiary)]">Last sent: {formatDateTime(recipient.lastSentAt)}</p>
                         </div>
                       </label>
                     );

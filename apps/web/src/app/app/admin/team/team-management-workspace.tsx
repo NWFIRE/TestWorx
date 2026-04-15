@@ -158,7 +158,7 @@ function ResultCallout({ error, success, url, urlLabel }: { error?: string | nul
 function CopyButton({ value, label }: { value: string; label: string }) {
   return (
     <button
-      className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slateblue"
+      className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[color:var(--border-default)] bg-white px-3 py-2 text-sm font-semibold text-slateblue"
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(value);
@@ -191,7 +191,7 @@ function AllowanceFieldset({
   return (
     <div className="grid gap-2 sm:grid-cols-2">
       {allowanceKeys.map((key) => (
-        <label key={key} className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+        <label key={key} className="flex min-h-11 items-center gap-3 rounded-xl border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] px-3 py-2 text-sm text-[color:var(--text-secondary)]">
           <input className="h-4 w-4 rounded border-slate-300" defaultChecked={values[key as keyof TeamAllowanceMap]} name={key} type="checkbox" />
           <span>{labelMap[key]}</span>
         </label>
@@ -218,26 +218,26 @@ function InviteFormCard({
   const defaultAllowances = useMemo<TeamAllowanceMap>(() => getRoleDefaultAllowances(selectedRole), [selectedRole]);
 
   return (
-    <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
+    <div className="rounded-[2rem] border border-[color:var(--border-default)] bg-white p-6 shadow-panel">
       <div className="max-w-2xl">
-        <p className="text-sm uppercase tracking-[0.24em] text-slate-400">{customerMode ? "Customer portal access" : "Team invites"}</p>
+        <p className="text-sm uppercase tracking-[0.24em] text-[color:var(--text-tertiary)]">{customerMode ? "Customer portal access" : "Team invites"}</p>
         <h2 className="mt-2 text-2xl font-semibold text-ink">{title}</h2>
-        <p className="mt-2 text-sm text-slate-500">{description}</p>
+        <p className="mt-2 text-sm text-[color:var(--text-muted)]">{description}</p>
       </div>
       <form action={formAction} className="mt-5 space-y-4">
         <div className="grid gap-4 lg:grid-cols-3">
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-600">Name</label>
-            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slateblue" name="name" required />
+            <label className="mb-2 block text-sm font-medium text-[color:var(--text-secondary)]">Name</label>
+            <input className="field-contrast w-full rounded-2xl border px-4 py-3 text-sm outline-none" name="name" required />
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-600">Email</label>
-            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slateblue" name="email" required type="email" />
+            <label className="mb-2 block text-sm font-medium text-[color:var(--text-secondary)]">Email</label>
+            <input className="field-contrast w-full rounded-2xl border px-4 py-3 text-sm outline-none" name="email" required type="email" />
           </div>
           {customerMode ? (
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-600">Customer company</label>
-              <select className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slateblue" name="customerCompanyId" required>
+              <label className="mb-2 block text-sm font-medium text-[color:var(--text-secondary)]">Customer company</label>
+              <select className="field-contrast w-full rounded-2xl border px-4 py-3 text-sm outline-none" name="customerCompanyId" required>
                 <option value="">Select customer</option>
                 {customerCompanies.map((customer) => (
                   <option key={customer.id} value={customer.id}>{customer.name}</option>
@@ -246,9 +246,9 @@ function InviteFormCard({
             </div>
           ) : (
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-600">Role</label>
+              <label className="mb-2 block text-sm font-medium text-[color:var(--text-secondary)]">Role</label>
               <select
-                className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slateblue"
+                className="field-contrast w-full rounded-2xl border px-4 py-3 text-sm outline-none"
                 name="role"
                 onChange={(event) => setSelectedRole(event.target.value as "tenant_admin" | "office_admin" | "technician")}
                 value={selectedRole}
@@ -262,7 +262,7 @@ function InviteFormCard({
         </div>
 
         <div>
-          <p className="mb-2 text-sm font-medium text-slate-600">Allowances</p>
+          <p className="mb-2 text-sm font-medium text-[color:var(--text-secondary)]">Allowances</p>
           <AllowanceFieldset
             key={`${customerMode ? "customer" : "internal"}-${selectedRole}`}
             allowanceKeys={customerMode ? customerAllowanceKeys : internalAllowanceKeys}
@@ -275,7 +275,7 @@ function InviteFormCard({
           <button className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-5 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={pending} type="submit">
             {pending ? "Creating invite..." : customerMode ? "Create portal invite" : "Create team invite"}
           </button>
-          <p className="text-sm text-slate-500">The system will send a secure email invite automatically. A fallback link appears only if delivery fails.</p>
+          <p className="text-sm text-[color:var(--text-muted)]">The system will send a secure email invite automatically. A fallback link appears only if delivery fails.</p>
         </div>
       </form>
       <div className="mt-4">

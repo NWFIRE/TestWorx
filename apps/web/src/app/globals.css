@@ -4,15 +4,32 @@
 
 :root {
   color-scheme: light;
+  --app-bg: #F3F6FB;
+  --surface-base: #FFFFFF;
+  --surface-subtle: #F8FAFC;
+  --surface-muted: #F1F5F9;
+  --surface-strong: #EAF0F7;
+  --sidebar-bg: #EEF3F9;
+  --sidebar-header-bg: #F7FAFD;
+  --border-subtle: #DCE5F0;
+  --border-default: #CBD7E6;
+  --border-strong: #B8C8DC;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+  --text-tertiary: #7A879B;
+  --focus-ring: rgb(30 58 95 / 0.18);
+  --shadow-soft: 0 16px 38px rgba(15, 23, 42, 0.06);
+  --shadow-panel: 0 22px 48px rgba(15, 23, 42, 0.08);
   --tenant-primary: #1E3A5F;
   --tenant-primary-rgb: 30 58 95;
-  --tenant-primary-soft: rgb(30 58 95 / 0.08);
-  --tenant-primary-border: rgb(30 58 95 / 0.24);
+  --tenant-primary-soft: rgb(30 58 95 / 0.1);
+  --tenant-primary-border: rgb(30 58 95 / 0.28);
   --tenant-primary-contrast: #FFFFFF;
   --tenant-accent: #C2410C;
   --tenant-accent-rgb: 194 65 12;
-  --tenant-accent-soft: rgb(194 65 12 / 0.1);
-  --tenant-accent-border: rgb(194 65 12 / 0.24);
+  --tenant-accent-soft: rgb(194 65 12 / 0.12);
+  --tenant-accent-border: rgb(194 65 12 / 0.28);
   --tenant-accent-contrast: #FFFFFF;
 }
 
@@ -26,6 +43,30 @@ body {
   font-family: ui-sans-serif, system-ui, sans-serif;
   min-height: 100dvh;
   overflow-x: hidden;
+}
+
+::selection {
+  background: rgb(var(--tenant-primary-rgb) / 0.16);
+  color: var(--text-primary);
+}
+
+@layer base {
+  body {
+    background: var(--app-bg);
+    color: var(--text-primary);
+  }
+
+  input,
+  select,
+  textarea {
+    color: var(--text-primary);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--text-tertiary);
+    opacity: 1;
+  }
 }
 
 @keyframes brand-loader-presence {
@@ -120,6 +161,7 @@ body {
   .btn-brand-secondary {
     border-color: var(--tenant-primary-border);
     color: var(--tenant-primary);
+    background-color: var(--surface-base);
   }
 
   .btn-brand-secondary:hover {
@@ -141,6 +183,35 @@ body {
 
   .link-brand {
     color: var(--tenant-primary);
+  }
+
+  .surface-card {
+    background-color: var(--surface-base);
+    border-color: rgb(203 215 230 / 0.9);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .surface-subtle {
+    background-color: var(--surface-subtle);
+    border-color: var(--border-subtle);
+  }
+
+  .field-contrast {
+    background-color: var(--surface-base);
+    border-color: var(--border-default);
+    color: var(--text-primary);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.02);
+  }
+
+  .field-contrast:hover {
+    border-color: var(--border-strong);
+  }
+
+  .field-contrast:focus,
+  .field-contrast:focus-visible {
+    border-color: rgb(var(--tenant-primary-rgb) / 0.38);
+    box-shadow: 0 0 0 4px var(--focus-ring);
+    outline: none;
   }
 
   .brand-loader {

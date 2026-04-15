@@ -90,13 +90,13 @@ export function buildTenantBrandingCss(branding: TenantBranding) {
   return {
     "--tenant-primary": primaryColor,
     "--tenant-primary-rgb": primaryRgb,
-    "--tenant-primary-soft": `rgb(${primaryRgb} / 0.08)`,
-    "--tenant-primary-border": `rgb(${primaryRgb} / 0.24)`,
+    "--tenant-primary-soft": `rgb(${primaryRgb} / 0.1)`,
+    "--tenant-primary-border": `rgb(${primaryRgb} / 0.28)`,
     "--tenant-primary-contrast": getReadableForeground(primaryColor),
     "--tenant-accent": accentColor,
     "--tenant-accent-rgb": accentRgb,
-    "--tenant-accent-soft": `rgb(${accentRgb} / 0.1)`,
-    "--tenant-accent-border": `rgb(${accentRgb} / 0.24)`,
+    "--tenant-accent-soft": `rgb(${accentRgb} / 0.12)`,
+    "--tenant-accent-border": `rgb(${accentRgb} / 0.28)`,
     "--tenant-accent-contrast": getReadableForeground(accentColor)
   } as Record<string, string>;
 }

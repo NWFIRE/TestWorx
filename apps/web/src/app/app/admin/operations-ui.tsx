@@ -15,11 +15,11 @@ function cn(...classes: Array<string | false | null | undefined>) {
 }
 
 const toneClasses: Record<Tone, string> = {
-  slate: "border-slate-200 bg-slate-50 text-slate-700",
+  slate: "border-[color:var(--border-default)] bg-[color:var(--surface-muted)] text-slate-700",
   blue: "badge-brand-primary",
-  emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  amber: "border-amber-200 bg-amber-50 text-amber-700",
-  rose: "border-rose-200 bg-rose-50 text-rose-700",
+  emerald: "border-emerald-300 bg-emerald-50 text-emerald-800",
+  amber: "border-amber-300 bg-amber-50 text-amber-800",
+  rose: "border-rose-300 bg-rose-50 text-rose-800",
   violet: "badge-brand-accent"
 };
 
@@ -45,7 +45,7 @@ export function SectionCard({
   return (
     <section
       className={cn(
-        "rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_12px_36px_rgba(15,23,42,0.04)] lg:p-6",
+        "rounded-[28px] border border-[color:rgb(203_215_230_/_0.92)] bg-[color:var(--surface-base)] p-5 shadow-[0_16px_38px_rgba(15,23,42,0.06)] lg:p-6",
         className
       )}
     >
@@ -98,7 +98,7 @@ export function PageHeader({
           <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-950 md:text-4xl">
             {title}
           </h1>
-          <p className="mt-3 text-sm leading-6 text-slate-500 md:text-base">{description}</p>
+          <p className="mt-3 text-sm leading-6 text-[color:var(--text-secondary)] md:text-base">{description}</p>
         </div>
         {actions ? <div className="flex flex-wrap items-center gap-3">{actions}</div> : null}
       </div>
@@ -141,10 +141,10 @@ export function KPIStatCard({
   tone?: Tone;
 }) {
   const content = (
-    <div className="flex h-full flex-col justify-between gap-4 rounded-[24px] border border-slate-200/80 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)] lg:p-5">
+    <div className="flex h-full flex-col justify-between gap-4 rounded-[24px] border border-[color:rgb(203_215_230_/_0.92)] bg-[color:var(--surface-base)] p-4 shadow-[0_14px_34px_rgba(15,23,42,0.06)] lg:p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs font-medium leading-5 text-slate-500 lg:text-sm">{label}</div>
+          <div className="text-xs font-medium leading-5 text-[color:var(--text-secondary)] lg:text-sm">{label}</div>
           <div className="mt-2 text-[28px] font-semibold tracking-[-0.05em] text-slate-950 lg:mt-3 lg:text-3xl lg:tracking-[-0.04em]">
             {value}
           </div>
@@ -153,7 +153,7 @@ export function KPIStatCard({
           <div className={cn("rounded-2xl border p-2.5", toneClasses[tone])}>{icon}</div>
         ) : null}
       </div>
-      <div className="text-xs leading-5 text-slate-500 lg:text-sm">{note}</div>
+      <div className="text-xs leading-5 text-[color:var(--text-muted)] lg:text-sm">{note}</div>
     </div>
   );
 
@@ -186,10 +186,10 @@ export function FilterBar({
     <SectionCard className={className}>
       {title ? (
         <div className="mb-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">
             {title}
           </p>
-          {description ? <p className="mt-2 text-sm text-slate-500">{description}</p> : null}
+          {description ? <p className="mt-2 text-sm text-[color:var(--text-muted)]">{description}</p> : null}
         </div>
       ) : null}
       <div className="flex flex-wrap gap-3">{children}</div>
@@ -272,7 +272,7 @@ export function FilterChipLink({
         "pressable pressable-row inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-semibold transition",
         active
           ? activeClass
-          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+          : "border-[color:var(--border-default)] bg-[color:var(--surface-base)] text-[color:var(--text-secondary)] hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
       )}
       href={href}
     >
@@ -325,12 +325,12 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "rounded-[24px] border border-dashed border-slate-200 bg-slate-50/70 px-5 py-8 text-center",
+        "rounded-[24px] border border-dashed border-[color:var(--border-default)] bg-[color:rgb(248_250_252_/_0.95)] px-5 py-8 text-center",
         className
       )}
     >
       <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-      <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-500">{description}</p>
+      <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-[color:var(--text-muted)]">{description}</p>
     </div>
   );
 }

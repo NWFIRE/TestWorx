@@ -243,10 +243,10 @@ export default async function AdminInspectionsPage({
       <SectionCard className="sticky top-4 z-10">
         <div className="flex flex-col gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">
               Inspection Filters
             </p>
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-2 text-sm text-[color:var(--text-muted)]">
               Search by customer, site, address, or inspection id and keep the queue tight for daily office work.
             </p>
           </div>
@@ -272,7 +272,7 @@ export default async function AdminInspectionsPage({
             queueData.filters.technicianId) ? (
             <div className="flex justify-end">
               <Link
-                className="inline-flex min-h-10 items-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                className="inline-flex min-h-10 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
                 href="/app/admin/inspections"
               >
                 Clear filters
@@ -285,14 +285,14 @@ export default async function AdminInspectionsPage({
       <SectionCard>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">
               Operational List
             </p>
             <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
               Fast inspection management
             </h2>
           </div>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-[color:var(--text-muted)]">
             {queueData.inspections.length} inspection{queueData.inspections.length === 1 ? "" : "s"}
           </p>
         </div>
@@ -305,8 +305,8 @@ export default async function AdminInspectionsPage({
             />
           </div>
         ) : (
-          <div className="mt-5 overflow-hidden rounded-[24px] border border-slate-200/80">
-            <div className="hidden bg-slate-50/80 px-5 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 lg:grid lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_0.7fr_0.7fr_0.7fr_0.9fr_0.9fr_0.6fr] lg:gap-4">
+          <div className="mt-5 overflow-hidden rounded-[24px] border border-[color:rgb(203_215_230_/_0.92)] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
+            <div className="hidden bg-[color:rgb(248_250_252_/_0.98)] px-5 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)] lg:grid lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_0.7fr_0.7fr_0.7fr_0.9fr_0.9fr_0.6fr] lg:gap-4">
               <span>Customer</span>
               <span>Location</span>
               <span>Type</span>
@@ -317,7 +317,7 @@ export default async function AdminInspectionsPage({
               <span>Actions</span>
             </div>
 
-            <div className="divide-y divide-slate-200/80">
+            <div className="divide-y divide-[color:rgb(220_229_240_/_0.9)]">
               {queueData.inspections.map((inspection) => {
                 const nextDue = pickEarliestNextDueAt(
                   inspection.tasks.map((task) => task.recurrence?.nextDueAt)
@@ -334,7 +334,7 @@ export default async function AdminInspectionsPage({
                 return (
                   <div
                     key={inspection.id}
-                    className="grid gap-3 px-5 py-4 transition hover:bg-slate-50/70 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_0.7fr_0.7fr_0.7fr_0.9fr_0.9fr_0.6fr] lg:items-center lg:gap-4"
+                    className="grid gap-3 px-5 py-4 transition hover:bg-[color:rgb(248_250_252_/_0.96)] lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_0.7fr_0.7fr_0.7fr_0.9fr_0.9fr_0.6fr] lg:items-center lg:gap-4"
                   >
                     <div className="min-w-0">
                       <Link
@@ -343,17 +343,17 @@ export default async function AdminInspectionsPage({
                       >
                         {inspection.secondaryTitle ?? inspection.customerCompany.name}
                       </Link>
-                      <p className="mt-1 text-sm text-slate-500 lg:hidden">
+                      <p className="mt-1 text-sm text-[color:var(--text-secondary)] lg:hidden">
                         {locationLabel}
                       </p>
-                      <p className="mt-1 text-xs text-slate-400">
+                      <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
                         {inspection.tasks.map((task) => taskDisplayLabel(task)).join(", ") || "Inspection workflow"}
                       </p>
                     </div>
 
                     <div className="min-w-0">
-                      <p className="truncate text-sm text-slate-700">{locationLabel}</p>
-                      <p className="mt-1 text-xs text-slate-400">
+                      <p className="truncate text-sm text-[color:var(--text-secondary)]">{locationLabel}</p>
+                      <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
                         Next due: {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}
                       </p>
                     </div>
@@ -373,7 +373,7 @@ export default async function AdminInspectionsPage({
                     </div>
 
                     <div className="text-sm text-slate-700">
-                      {inspection.isPriority ? <PriorityBadge /> : <span className="text-sm text-slate-400">Normal</span>}
+                      {inspection.isPriority ? <PriorityBadge /> : <span className="text-sm text-[color:var(--text-tertiary)]">Normal</span>}
                     </div>
 
                     <div className="text-sm text-slate-700">
@@ -386,7 +386,7 @@ export default async function AdminInspectionsPage({
 
                     <div className="flex justify-start lg:justify-end">
                       <Link
-                        className="inline-flex min-h-10 items-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                        className="inline-flex min-h-10 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
                         href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`}
                       >
                         Open

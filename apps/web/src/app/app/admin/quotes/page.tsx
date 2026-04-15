@@ -162,7 +162,7 @@ export default async function QuotesPage({
             paramKey="query"
             placeholder="Search quote number, customer, site, or service"
           />
-          <select className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900" defaultValue={selectedSync} name="syncStatus">
+          <select className="field-contrast h-12 rounded-2xl border bg-white px-4 text-sm outline-none" defaultValue={selectedSync} name="syncStatus">
             {syncOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -170,7 +170,7 @@ export default async function QuotesPage({
             ))}
           </select>
           <input name="status" type="hidden" value={selectedStatus} />
-          <button className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="submit">
+          <button className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 py-3 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-subtle)]" type="submit">
             Apply filters
           </button>
         </form>
@@ -180,9 +180,9 @@ export default async function QuotesPage({
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Quote queue</h2>
-            <p className="mt-1 text-sm text-slate-500">Monitor sent, approved, expired, and converted work without losing QuickBooks context.</p>
+            <p className="mt-1 text-sm text-[color:var(--text-secondary)]">Monitor sent, approved, expired, and converted work without losing QuickBooks context.</p>
           </div>
-          <p className="text-sm text-slate-500">{quotes.length} quote{quotes.length === 1 ? "" : "s"}</p>
+          <p className="text-sm text-[color:var(--text-muted)]">{quotes.length} quote{quotes.length === 1 ? "" : "s"}</p>
         </div>
 
         {quotes.length === 0 ? (
@@ -190,7 +190,7 @@ export default async function QuotesPage({
         ) : (
           <div className="space-y-4">
             {quotes.map((quote) => (
-              <div key={quote.id} className="rounded-[24px] border border-slate-200/80 bg-slate-50/70 p-5 transition hover:border-slate-300 hover:bg-white">
+              <div key={quote.id} className="rounded-[24px] border border-[color:rgb(203_215_230_/_0.92)] bg-[color:rgb(248_250_252_/_0.96)] p-5 transition hover:border-[color:var(--border-strong)] hover:bg-white">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
@@ -198,7 +198,7 @@ export default async function QuotesPage({
                       <StatusBadge label={quoteStatusLabels[quote.effectiveStatus]} tone={getQuoteStatusTone(quote.effectiveStatus)} />
                       <StatusBadge label={quoteSyncStatusLabels[quote.syncStatus]} tone={getQuoteSyncTone(quote.syncStatus)} />
                     </div>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-[color:var(--text-secondary)]">
                       {quote.customerCompany.name}{quote.site ? ` • ${quote.site.name}` : ""} • Issued {format(quote.issuedAt, "MMM d, yyyy")}
                     </p>
                     <div className="grid gap-3 pt-1 md:grid-cols-4">
@@ -222,7 +222,7 @@ export default async function QuotesPage({
                   </div>
 
                   <Link
-                    className="inline-flex rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                    className="inline-flex rounded-2xl border border-[color:var(--border-default)] bg-white px-4 py-3 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
                     href={`/app/admin/quotes/${quote.id}?from=${encodeURIComponent(buildHref({ status: selectedStatus, syncStatus: selectedSync, query }))}`}
                   >
                     Open quote

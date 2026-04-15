@@ -301,9 +301,9 @@ export default async function EditInspectionPage({
   const backLabel = resolveInspectionBackLabel(originPath);
   return (
     <section className="space-y-6">
-      <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+      <div className="rounded-[2rem] border border-[color:rgb(203_215_230_/_0.92)] bg-white p-6 shadow-panel">
         <PageBackControl className="mb-2" fallbackHref={originPath} label={backLabel} />
-        <p className="text-sm uppercase tracking-[0.25em] text-slate-500">
+        <p className="text-sm uppercase tracking-[0.25em] text-[color:var(--text-secondary)]">
           {isReviewMode ? "Inspection review command center" : "Inspection command center"}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -320,7 +320,7 @@ export default async function EditInspectionPage({
             </Link>
           ) : null}
         </div>
-        <p className="mt-3 text-slate-500">
+        <p className="mt-3 text-[color:var(--text-secondary)]">
           {inspectionDisplay.secondaryTitle ? `${inspectionDisplay.secondaryTitle} | ` : ""}
           {isReviewMode
             ? "Review status, report completion, signatures, documents, and technician-requested next steps from one focused operational workspace."
@@ -334,8 +334,8 @@ export default async function EditInspectionPage({
           </div>
         ) : null}
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Visit history</p>
+          <div className="rounded-2xl border border-[color:var(--border-default)] bg-[color:rgb(248_250_252_/_0.96)] p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">Visit history</p>
             {inspectionView.originalAmendment ? (
               <>
                 <p className="mt-2 text-sm text-slate-700">This is the updated visit linked to an earlier original visit.</p>
@@ -354,20 +354,20 @@ export default async function EditInspectionPage({
               <p className="mt-2 text-sm text-slate-700">This visit is currently the active original visit.</p>
             )}
           </div>
-          <div className="rounded-2xl border border-slate-200 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Visit note</p>
-            <p className="mt-2 text-sm text-slate-700">
+          <div className="rounded-2xl border border-[color:var(--border-default)] bg-[color:rgb(248_250_252_/_0.96)] p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">Visit note</p>
+            <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
               {inspectionView.originalAmendment?.reason ?? inspectionView.outgoingAmendment?.reason ?? "No linked visit note has been recorded for this inspection yet."}
             </p>
           </div>
         </div>
-        <div className="mt-4 rounded-2xl border border-slate-200 p-4">
+        <div className="mt-4 rounded-2xl border border-[color:var(--border-default)] bg-[color:rgb(248_250_252_/_0.98)] p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Deficiencies found</p>
-              <p className="mt-2 text-sm text-slate-700">{inspectionView.deficiencyCount ?? 0} persisted deficiency record{(inspectionView.deficiencyCount ?? 0) === 1 ? "" : "s"} linked to this inspection.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">Deficiencies found</p>
+              <p className="mt-2 text-sm text-[color:var(--text-secondary)]">{inspectionView.deficiencyCount ?? 0} persisted deficiency record{(inspectionView.deficiencyCount ?? 0) === 1 ? "" : "s"} linked to this inspection.</p>
             </div>
-            <Link className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href="/app/deficiencies">
+            <Link className="inline-flex rounded-2xl border border-[color:var(--border-default)] bg-white px-4 py-3 text-sm font-semibold text-slateblue" href="/app/deficiencies">
               Open deficiency center
             </Link>
           </div>
@@ -412,7 +412,7 @@ export default async function EditInspectionPage({
             label={formatInspectionStatusLabel((inspectionView.displayStatus ?? inspection.status) as Parameters<typeof formatInspectionStatusLabel>[0])}
             tone={getInspectionStatusTone((inspectionView.displayStatus ?? inspection.status) as Parameters<typeof getInspectionStatusTone>[0])}
           />
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-[color:var(--text-muted)]">
             Current inspection status for scheduling, review, billing, and follow-up queues.
           </p>
         </div>

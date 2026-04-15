@@ -164,8 +164,8 @@ function NavItem({
       aria-label={item.label}
       className={`pressable pressable-row group relative flex min-h-[44px] min-w-0 items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-sm outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2 motion-reduce:transition-none before:absolute before:bottom-1.5 before:left-0 before:top-1.5 before:w-0.5 before:rounded-full before:opacity-0 ${
         active
-          ? "bg-[var(--tenant-primary-soft)] text-slate-950 before:opacity-100"
-          : "text-slate-600 hover:bg-white hover:text-slate-900"
+          ? "bg-[var(--tenant-primary-soft)] text-slate-950 before:opacity-100 shadow-[inset_0_0_0_1px_var(--tenant-primary-border)]"
+          : "text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-base)] hover:text-slate-950"
       } ${tone.activeBar} ${collapsed ? "justify-center px-2" : ""} ${compact ? "min-h-[48px]" : ""}`}
       href={item.href}
       onClick={onNavigate}
@@ -173,7 +173,7 @@ function NavItem({
     >
       <span
         aria-hidden="true"
-        className={`flex h-5 w-5 shrink-0 items-center justify-center ${active ? tone.activeIcon : "text-slate-400 group-hover:text-slate-700"}`}
+        className={`flex h-5 w-5 shrink-0 items-center justify-center ${active ? tone.activeIcon : "text-slate-500 group-hover:text-slate-800"}`}
       >
         <NavIcon className="h-5 w-5" icon={item.icon} />
       </span>
@@ -205,7 +205,7 @@ function BrandBlock({
       </div>
       {!collapsed ? (
         <div className="min-w-0 overflow-hidden">
-          <p className="truncate text-[13px] font-semibold uppercase tracking-[0.24em] text-slate-600">TradeWorx</p>
+          <p className="truncate text-[13px] font-bold uppercase tracking-[0.26em] text-slate-800">TradeWorx</p>
         </div>
       ) : null}
     </div>
@@ -229,7 +229,7 @@ function NavSection({
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <nav aria-label="Primary navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
         {!collapsed ? (
-          <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Core workflows</p>
+          <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--text-tertiary)]">Core workflows</p>
         ) : null}
         <div className="space-y-1.5">
           {navItems.map((item) => (
@@ -343,17 +343,17 @@ export function AppShell({
       {navItems.length > 0 ? (
         <aside
           aria-label="Primary navigation"
-          className={`hidden overflow-hidden border-r border-slate-200 bg-[#f5f7fb] transition-[width] duration-200 motion-reduce:transition-none lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col ${
+          className={`hidden overflow-hidden border-r border-[color:var(--border-default)] bg-[color:var(--sidebar-bg)] transition-[width] duration-200 motion-reduce:transition-none lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col ${
             sidebarCollapsed ? "lg:w-[72px]" : "lg:w-64"
           }`}
         >
-          <div className={`border-b border-slate-200 bg-[#f8fafc] ${sidebarCollapsed ? "px-2 py-2.5" : "px-4 py-3"}`}>
+          <div className={`border-b border-[color:var(--border-default)] bg-[color:var(--sidebar-header-bg)] ${sidebarCollapsed ? "px-2 py-2.5" : "px-4 py-3"}`}>
             <div className={`flex items-start ${sidebarCollapsed ? "justify-center" : "justify-between gap-3"}`}>
               <BrandBlock collapsed={sidebarCollapsed} />
               {!sidebarCollapsed ? (
                 <button
                   aria-label="Collapse sidebar"
-                  className="pressable pressable-icon inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 outline-none transition-colors hover:bg-white hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
+                  className="pressable pressable-icon inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[color:var(--text-muted)] outline-none transition-colors hover:bg-white hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
                   onClick={() => setSidebarCollapsed(true)}
                   type="button"
                 >
@@ -365,7 +365,7 @@ export function AppShell({
               <div className="mt-2 flex justify-center">
                 <button
                   aria-label="Expand sidebar"
-                  className="pressable pressable-icon inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 outline-none transition-colors hover:bg-white hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
+                  className="pressable pressable-icon inline-flex h-9 w-9 items-center justify-center rounded-lg text-[color:var(--text-muted)] outline-none transition-colors hover:bg-white hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
                   onClick={() => setSidebarCollapsed(false)}
                   type="button"
                 >
@@ -390,7 +390,7 @@ export function AppShell({
           <aside
             aria-label="Primary navigation"
             aria-modal={drawerOpen}
-            className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[min(320px,86vw)] flex-col overflow-hidden border-r border-slate-200 bg-[#f5f7fb] shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none lg:hidden ${
+            className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[min(320px,86vw)] flex-col overflow-hidden border-r border-[color:var(--border-default)] bg-[color:var(--sidebar-bg)] shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none lg:hidden ${
               drawerOpen ? "translate-x-0 visible" : "-translate-x-full invisible"
             }`}
             ref={drawerRef}
@@ -400,11 +400,11 @@ export function AppShell({
               paddingBottom: "max(0rem, env(safe-area-inset-bottom))"
             }}
           >
-            <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-[#f8fafc] px-4 py-4">
+            <div className="flex items-center justify-between gap-3 border-b border-[color:var(--border-default)] bg-[color:var(--sidebar-header-bg)] px-4 py-4">
               <BrandBlock collapsed={false} />
               <button
                 aria-label="Close navigation"
-                className="pressable pressable-icon inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 outline-none transition-colors hover:bg-white hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
+                className="pressable pressable-icon inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[color:var(--text-muted)] outline-none transition-colors hover:bg-white hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
                 onClick={closeDrawer}
                 type="button"
               >
@@ -423,7 +423,7 @@ export function AppShell({
       ) : null}
 
       <div className="flex min-h-[100dvh] min-w-0 flex-1 flex-col lg:h-[100dvh] lg:min-h-0">
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <header className="sticky top-0 z-30 border-b border-[color:var(--border-default)] bg-white/96 backdrop-blur">
           <div
             className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8"
             style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
@@ -432,7 +432,7 @@ export function AppShell({
               {navItems.length > 0 ? (
                 <button
                   aria-label="Open navigation"
-                  className="pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-600 outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2 lg:hidden"
+                  className="pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-[color:var(--border-default)] bg-white px-3 text-sm font-semibold text-[color:var(--text-secondary)] outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2 lg:hidden"
                   onClick={() => setDrawerOpen(true)}
                   ref={menuButtonRef}
                   type="button"
@@ -441,17 +441,17 @@ export function AppShell({
                 </button>
               ) : null}
               <div className="min-w-0">
-                <p className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Workspace</p>
+                <p className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--text-tertiary)]">Workspace</p>
                 <h1 className="truncate text-lg font-semibold text-ink">{currentItem?.label ?? user.name ?? "Workspace"}</h1>
               </div>
             </div>
             <div className="flex min-w-0 items-center gap-3">
-              <div className="hidden min-w-0 text-right text-sm text-slate-500 sm:block">
+              <div className="hidden min-w-0 text-right text-sm text-[color:var(--text-muted)] sm:block">
                 <p className="truncate">{user.email}</p>
                 <p className="truncate capitalize">{role.replaceAll("_", " ")}</p>
               </div>
               <form action={signOutAction}>
-                <button className="pressable min-h-11 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2" type="submit">
+                <button className="pressable min-h-11 rounded-xl border border-[color:var(--border-default)] bg-white px-4 py-2 text-sm font-medium text-[color:var(--text-secondary)] outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2" type="submit">
                   Sign out
                 </button>
               </form>
