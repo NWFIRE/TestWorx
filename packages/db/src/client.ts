@@ -10,19 +10,20 @@ function readOptionalEnv(name: string) {
 }
 
 function resolvePrismaRuntimeUrl() {
+  const explicitRuntimeUrl =
+    readOptionalEnv("PRISMA_RUNTIME_DATABASE_URL") ?? readOptionalEnv("POSTGRES_PRISMA_URL");
   const pooledUrl = readOptionalEnv("DATABASE_URL");
   const unpooledUrl =
     readOptionalEnv("DATABASE_URL_UNPOOLED") ?? readOptionalEnv("POSTGRES_URL_NON_POOLING");
-  const productionRuntime =
-    process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
 
-  // Prefer the direct Neon host in production when both URLs are present.
-  // This avoids pooler-specific reachability issues for Prisma runtime queries.
-  if (productionRuntime && pooledUrl?.includes("-pooler.") && unpooledUrl) {
-    return unpooledUrl;
+  if (explicitRuntimeUrl) {
+    return explicitRuntimeUrl;
   }
 
-  return pooledUrl;
+  // Runtime app traffic should prefer the pooled connection.
+  // Direct/unpooled connections remain useful as a fallback when no pooled URL exists
+  // and for migration scripts that instantiate Prisma separately.
+  return pooledUrl ?? unpooledUrl;
 }
 
 const prismaRuntimeUrl = resolvePrismaRuntimeUrl();
