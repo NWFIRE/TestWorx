@@ -210,8 +210,7 @@ function BrandBlock({
       </div>
       {!collapsed ? (
         <div className="min-w-0 overflow-hidden">
-          <p className="truncate text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">TradeWorx</p>
-          <p className="truncate text-sm font-semibold text-slate-950">Fire inspection operations</p>
+          <p className="truncate text-[13px] font-semibold uppercase tracking-[0.24em] text-slate-600">TradeWorx</p>
         </div>
       ) : null}
     </div>
