@@ -64,8 +64,25 @@ function getGreetingName(name?: string | null) {
   return name?.trim().split(/\s+/)[0] || "there";
 }
 
-function getGreetingByHour(date: Date) {
-  const hour = date.getHours();
+function getGreetingByHour(date: Date, timezone?: string | null) {
+  let hour = date.getHours();
+
+  if (timezone) {
+    try {
+      const formattedHour = new Intl.DateTimeFormat("en-US", {
+        hour: "numeric",
+        hour12: false,
+        timeZone: timezone
+      }).format(date);
+      const parsedHour = Number(formattedHour);
+      if (Number.isFinite(parsedHour)) {
+        hour = parsedHour;
+      }
+    } catch {
+      // Fall back to the server/runtime hour if the tenant timezone is invalid.
+    }
+  }
+
   if (hour < 12) {
     return "Good morning";
   }
@@ -285,7 +302,7 @@ export default async function AdminDashboardPage({
     ? params.inspection[0]
     : params.inspection;
 
-  const greeting = getGreetingByHour(new Date());
+  const greeting = getGreetingByHour(new Date(), data.timezone);
   const firstName = getGreetingName(session.user.name);
   const openInspectionCount = schedulingQueueData.inspections.length;
   const reportsAwaitingReview = reportReviewData.counts.awaitingReview;

@@ -3016,7 +3016,11 @@ export async function getAdminDashboardData(actor: ActorContext) {
 
   const tenantId = parsedActor.tenantId as string;
 
-  const [customers, sites, technicians, activeInspections, completedInspections, siteCount, unassignedInspections, totalInspections, completedInspectionCount] = await Promise.all([
+  const [tenant, customers, sites, technicians, activeInspections, completedInspections, siteCount, unassignedInspections, totalInspections, completedInspectionCount] = await Promise.all([
+    prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { timezone: true }
+    }),
     prisma.customerCompany.findMany({ where: { tenantId }, orderBy: { name: "asc" } }),
     prisma.site.findMany({ where: { tenantId }, orderBy: { name: "asc" } }),
     prisma.user.findMany({ where: { tenantId, role: "technician" }, orderBy: { name: "asc" } }),
@@ -3112,6 +3116,7 @@ export async function getAdminDashboardData(actor: ActorContext) {
   }
 
   return {
+    timezone: tenant?.timezone ?? "America/Chicago",
     customers: customers.map((customer) => ({ id: customer.id, name: customer.name })),
     sites: sites.map((site) => ({ id: site.id, name: site.name, city: site.city, customerCompanyId: site.customerCompanyId })),
     technicians: technicians.map((technician) => ({ id: technician.id, name: technician.name })),
