@@ -266,18 +266,6 @@ function NavSection({
           ))}
         </div>
       </nav>
-      <div className={`shrink-0 px-4 pb-5 pt-3 ${collapsed ? "px-2" : ""}`}>
-        {!collapsed ? (
-          <div className="border-t border-slate-200 pt-4 text-xs text-slate-500">
-            <p className="font-semibold uppercase tracking-[0.14em] text-slate-400">Today</p>
-            <p className="mt-2 leading-5">Keep dispatch moving, clear exceptions, and finish billing review without leaving the workspace.</p>
-          </div>
-        ) : (
-          <div className="flex justify-center">
-            <div className="h-px w-8 rounded-full bg-slate-200" aria-hidden="true" />
-          </div>
-        )}
-      </div>
     </div>
   );
 }
