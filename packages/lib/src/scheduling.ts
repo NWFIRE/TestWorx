@@ -615,6 +615,8 @@ function inspectionStatusFromFilterValue(value: string): InspectionFilterStatus[
       return [];
     case "open":
       return [...activeOperationalInspectionStatuses];
+    case "archived":
+      return [InspectionStatus.completed, InspectionStatus.invoiced, InspectionStatus.cancelled];
     default:
       return inspectionFilterStatuses.includes(value.trim().toLowerCase() as InspectionFilterStatus)
         ? [value.trim().toLowerCase() as InspectionFilterStatus]
@@ -3231,6 +3233,8 @@ export async function getAdminSchedulingQueueData(
     statuses?: string[] | InspectionFilterStatus[];
     classifications?: string[] | InspectionClassificationValue[];
     priority?: InspectionPriorityFilterValue;
+    query?: string | null;
+    technicianId?: string | null;
   }
 ) {
   const parsedActor = parseActor(actor);
@@ -3242,6 +3246,8 @@ export async function getAdminSchedulingQueueData(
   const requestedStatuses = normalizeInspectionStatusFilters(input?.statuses ?? []);
   const requestedClassifications = normalizeInspectionClassificationFilters(input?.classifications ?? []);
   const requestedPriority = normalizeInspectionPriorityFilter(input?.priority);
+  const requestedQuery = (input?.query ?? "").trim();
+  const requestedTechnicianId = (input?.technicianId ?? "").trim();
   const statusFilter = requestedStatuses.length
     ? { in: requestedStatuses as InspectionStatus[] }
     : undefined;
@@ -3251,13 +3257,37 @@ export async function getAdminSchedulingQueueData(
   const priorityFilter = requestedPriority === "all"
     ? undefined
     : requestedPriority === "priority";
+  const searchFilter = requestedQuery
+    ? {
+        OR: [
+          { id: { contains: requestedQuery, mode: "insensitive" as const } },
+          { customerCompany: { name: { contains: requestedQuery, mode: "insensitive" as const } } },
+          { site: { name: { contains: requestedQuery, mode: "insensitive" as const } } },
+          { site: { addressLine1: { contains: requestedQuery, mode: "insensitive" as const } } },
+          { site: { addressLine2: { contains: requestedQuery, mode: "insensitive" as const } } },
+          { site: { city: { contains: requestedQuery, mode: "insensitive" as const } } },
+          { site: { postalCode: { contains: requestedQuery, mode: "insensitive" as const } } }
+        ]
+      }
+    : undefined;
+  const technicianFilter = requestedTechnicianId
+    ? {
+        OR: [
+          { assignedTechnicianId: requestedTechnicianId },
+          { technicianAssignments: { some: { technicianId: requestedTechnicianId } } },
+          { tasks: { some: { assignedTechnicianId: requestedTechnicianId } } }
+        ]
+      }
+    : undefined;
 
   const inspections = await prisma.inspection.findMany({
     where: {
       tenantId,
       ...(statusFilter ? { status: statusFilter } : {}),
       ...(classificationFilter ? { inspectionClassification: classificationFilter } : {}),
-      ...(typeof priorityFilter === "boolean" ? { isPriority: priorityFilter } : {})
+      ...(typeof priorityFilter === "boolean" ? { isPriority: priorityFilter } : {}),
+      ...(searchFilter ? searchFilter : {}),
+      ...(technicianFilter ? technicianFilter : {})
     },
     include: {
       site: true,
@@ -3293,12 +3323,31 @@ export async function getAdminSchedulingQueueData(
     };
   }).filter((inspection) => inspection.tasks.length > 0);
 
+  const technicianOptions = await prisma.user.findMany({
+    where: {
+      tenantId,
+      role: "technician",
+      isActive: true
+    },
+    select: {
+      id: true,
+      name: true
+    },
+    orderBy: [{ name: "asc" }]
+  });
+
   return {
     filters: {
       statuses: requestedStatuses,
       classifications: requestedClassifications,
-      priority: requestedPriority
+      priority: requestedPriority,
+      query: requestedQuery,
+      technicianId: requestedTechnicianId
     },
+    technicians: technicianOptions.map((technician) => ({
+      value: technician.id,
+      label: technician.name
+    })),
     counts: {
       toBeCompleted: mapped.filter((inspection) => inspection.status === InspectionStatus.to_be_completed).length,
       scheduled: mapped.filter((inspection) => inspection.status === InspectionStatus.scheduled).length,

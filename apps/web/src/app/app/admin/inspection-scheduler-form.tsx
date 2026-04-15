@@ -20,6 +20,8 @@ import {
   inspectionTypeRegistry
 } from "@testworx/lib";
 
+import { useToast } from "@/app/toast-provider";
+
 type InspectionType = keyof typeof inspectionTypeRegistry;
 type RecurrenceFrequency = "ONCE" | "MONTHLY" | "QUARTERLY" | "SEMI_ANNUAL" | "ANNUAL";
 type InspectionTaskSchedulingStatus = (typeof inspectionTaskSchedulingStatuses)[number];
@@ -60,7 +62,7 @@ type ServiceLineDraft = {
   notes: string;
 };
 
-type InitialValues = {
+export type InspectionSchedulerFormInitialValues = {
   inspectionId?: string;
   customerCompanyId?: string;
   siteId?: string;
@@ -93,7 +95,7 @@ function createServiceLineDraft(
   };
 }
 
-function buildInitialServiceLines(initialValues?: InitialValues) {
+function buildInitialServiceLines(initialValues?: InspectionSchedulerFormInitialValues) {
   const inspectionMonth =
     initialValues?.inspectionMonth ??
     (initialValues?.scheduledStart ? initialValues.scheduledStart.slice(0, 7) : new Date().toISOString().slice(0, 7));
@@ -166,7 +168,10 @@ export function InspectionSchedulerForm({
   reasonRequired,
   allowDocumentUpload = false,
   autoSelectGenericSiteOnCustomerChange = false,
-  allowCustomOneTimeSite = false
+  allowCustomOneTimeSite = false,
+  onSuccess,
+  toastResults = true,
+  showInlineSuccess = false
 }: {
   action: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
   title: string;
@@ -174,7 +179,7 @@ export function InspectionSchedulerForm({
   customers: CustomerOption[];
   sites: SiteOption[];
   technicians: TechnicianOption[];
-  initialValues?: InitialValues;
+  initialValues?: InspectionSchedulerFormInitialValues;
   banner?: string;
   workflowNote?: string;
   reasonLabel?: string;
@@ -182,9 +187,15 @@ export function InspectionSchedulerForm({
   allowDocumentUpload?: boolean;
   autoSelectGenericSiteOnCustomerChange?: boolean;
   allowCustomOneTimeSite?: boolean;
+  onSuccess?: () => void;
+  toastResults?: boolean;
+  showInlineSuccess?: boolean;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+  const lastErrorRef = useRef<string | null>(null);
+  const lastSuccessRef = useRef<string | null>(null);
   const isCreateWorkflow = !initialValues?.inspectionId && !reasonLabel;
+  const { showToast } = useToast();
   const [selectedCustomerId, setSelectedCustomerId] = useState(initialValues?.customerCompanyId ?? "");
   const [selectedSiteId, setSelectedSiteId] = useState(initialValues?.siteId ?? "");
   const [inspectionClassification, setInspectionClassification] = useState<InspectionClassification>(
@@ -283,6 +294,25 @@ export function InspectionSchedulerForm({
 
     return () => cancelAnimationFrame(nextFrame);
   }, [newestServiceLineId]);
+
+  useEffect(() => {
+    if (!toastResults || !state.error || lastErrorRef.current === state.error) {
+      return;
+    }
+
+    lastErrorRef.current = state.error;
+    showToast({ title: state.error, tone: "error" });
+  }, [showToast, state.error, toastResults]);
+
+  useEffect(() => {
+    if (!toastResults || !state.success || lastSuccessRef.current === state.success) {
+      return;
+    }
+
+    lastSuccessRef.current = state.success;
+    showToast({ title: state.success, tone: "success" });
+    onSuccess?.();
+  }, [onSuccess, showToast, state.success, toastResults]);
 
   return (
     <form action={formAction} className="min-w-0 overflow-hidden space-y-5 rounded-[1.5rem] bg-white p-4 shadow-panel sm:space-y-6 sm:rounded-[2rem] sm:p-6" ref={formRef}>
@@ -727,7 +757,7 @@ export function InspectionSchedulerForm({
         </div>
       ) : null}
       {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
-      {state.success ? <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{state.success}</p> : null}
+      {showInlineSuccess && state.success ? <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{state.success}</p> : null}
       <button className="w-full rounded-2xl bg-ember px-5 py-3 text-base font-semibold text-white disabled:opacity-60" disabled={pending} type="submit">
         {pending ? "Saving schedule..." : submitLabel}
       </button>

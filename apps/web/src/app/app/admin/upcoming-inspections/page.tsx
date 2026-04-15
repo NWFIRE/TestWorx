@@ -12,8 +12,6 @@ import {
   pickEarliestNextDueAt
 } from "@testworx/lib";
 
-import { createInspectionAction } from "../actions";
-import { InspectionSchedulerForm } from "../inspection-scheduler-form";
 import {
   AppPageShell,
   EmptyState,
@@ -75,17 +73,17 @@ export default async function UpcomingInspectionsPage({
   return (
     <AppPageShell density="wide">
       <PageHeader
-        backNavigation={{ label: "Back to admin", fallbackHref: "/app/admin" }}
-        eyebrow="Scheduling / planning"
+        backNavigation={{ label: "Back to dashboard", fallbackHref: "/app/admin/dashboard" }}
+        eyebrow="Forward planning"
         title="Upcoming inspections"
         description="Plan the next several months of inspections with a month-by-month view of what is already scheduled, what still needs assignment, and where new work should be added."
         actions={
           <div className="flex flex-wrap gap-3">
             <Link
               className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-              href="/app/admin/scheduling"
+              href="/app/admin/inspections"
             >
-              Open scheduling queue
+              Open inspections
             </Link>
           </div>
         }
@@ -152,7 +150,7 @@ export default async function UpcomingInspectionsPage({
                 </div>
                 <Link
                   className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white"
-                  href={`/app/admin/upcoming-inspections?month=${month.monthKey}#schedule-inspection`}
+                  href={`/app/admin/inspections?create=1&month=${month.monthKey}`}
                 >
                   Add inspection to {month.monthLabel}
                 </Link>
@@ -242,26 +240,31 @@ export default async function UpcomingInspectionsPage({
           ))}
         </div>
 
-        <div id="schedule-inspection">
-          <InspectionSchedulerForm
-            action={createInspectionAction}
-            title={`Add inspection for ${data.months[0]?.monthLabel ?? "this month"}`}
-            submitLabel="Create inspection"
-            customers={data.customers}
-            sites={data.sites}
-            technicians={data.technicians}
-            initialValues={{
-              inspectionMonth: data.startMonth,
-              scheduledStart: `${data.startMonth}-01T09:00`,
-              customerCompanyId: resolvedCustomerId || undefined,
-              siteId: resolvedSiteId || undefined
-            }}
-            workflowNote="Create a new inspection directly inside the planning month you are reviewing. Service lines can still carry their own due month and assignment details."
-            allowDocumentUpload
-            autoSelectGenericSiteOnCustomerChange
-            allowCustomOneTimeSite
-          />
-        </div>
+        <SectionCard>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Create from inspections
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+            Keep creation in one place
+          </h2>
+          <p className="mt-2 text-sm text-slate-500">
+            Inspection creation now lives in the Inspections workspace so office teams have one consistent command surface for new work.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Link
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white"
+              href={`/app/admin/inspections?create=1&month=${data.startMonth}${resolvedCustomerId ? `&customerCompanyId=${encodeURIComponent(resolvedCustomerId)}` : ""}${resolvedSiteId ? `&siteId=${encodeURIComponent(resolvedSiteId)}` : ""}`}
+            >
+              Open inspection creation
+            </Link>
+            <Link
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              href="/app/admin/inspections"
+            >
+              Open inspections
+            </Link>
+          </div>
+        </SectionCard>
       </WorkspaceSplit>
     </AppPageShell>
   );

@@ -362,7 +362,7 @@ export async function convertQuoteAction(formData: FormData) {
     revalidatePath("/app/admin/quotes");
     revalidatePath(`/app/admin/quotes/${quoteId}`);
     revalidatePath("/app/admin");
-    revalidatePath("/app/admin/scheduling");
+    revalidatePath("/app/admin/inspections");
     redirect(`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(`/app/admin/quotes/${quoteId}`)}`);
   } catch (error) {
     if (isRedirectError(error)) {

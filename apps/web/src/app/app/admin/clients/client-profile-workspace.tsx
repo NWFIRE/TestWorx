@@ -399,7 +399,7 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
                 label="Create invoice"
               />
               <QuickActionLink
-                href={`/app/admin/upcoming-inspections?customerCompanyId=${encodeURIComponent(data.customer.id)}#schedule-inspection`}
+                href={`/app/admin/inspections?create=1&customerCompanyId=${encodeURIComponent(data.customer.id)}`}
                 label="Schedule inspection"
               />
               <QuickActionLink

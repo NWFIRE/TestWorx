@@ -198,11 +198,11 @@ export function FilterBar({
 }
 
 const workQueueItems = [
-  { key: "all", label: "All work", href: "/app/admin", tone: "slate" as const },
+  { key: "all", label: "Dashboard", href: "/app/admin/dashboard", tone: "slate" as const },
   {
     key: "open",
-    label: "Open inspections",
-    href: "/app/admin/scheduling?status=to_be_completed,scheduled,in_progress,follow_up_required",
+    label: "Inspections",
+    href: "/app/admin/inspections?status=open",
     tone: "blue" as const
   },
   {

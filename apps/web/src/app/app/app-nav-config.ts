@@ -26,15 +26,26 @@ function hasQuoteAccessForRole(role: string, allowances?: InternalAllowances) {
 
 const adminNavItems: AppNavItem[] = [
   {
-    href: "/app/admin",
-    label: "Scheduling / Dispatch",
-    shortLabel: "Scheduling",
-    abbreviation: "SD",
+    href: "/app/admin/dashboard",
+    label: "Dashboard",
+    shortLabel: "Dashboard",
+    abbreviation: "DB",
     icon: "calendar",
-    description: "Visits, assignment, and active queue",
+    description: "Operational overview, priorities, and work visibility",
     tone: "blue",
     matchMode: "exact",
-    matchPrefixes: ["/app/admin/scheduling", "/app/admin/inspections", "/app/admin/reports"]
+    matchPrefixes: ["/app/admin", "/app/admin/dashboard"]
+  },
+  {
+    href: "/app/admin/inspections",
+    label: "Inspections",
+    shortLabel: "Inspections",
+    abbreviation: "IN",
+    icon: "clipboard",
+    description: "Create, filter, and manage inspection work",
+    tone: "blue",
+    matchMode: "exact",
+    matchPrefixes: ["/app/admin/inspections", "/app/admin/scheduling"]
   },
   {
     href: "/app/admin/amendments",

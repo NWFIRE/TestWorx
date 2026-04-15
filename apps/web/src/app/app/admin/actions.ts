@@ -44,7 +44,7 @@ import {
 export { getCustomerSiteImportTemplateCsv };
 
 function resolveInspectionDeleteRedirectTarget(input: string | null | undefined) {
-  const fallback = "/app/admin?inspection=deleted";
+  const fallback = "/app/admin/dashboard?inspection=deleted";
   const candidate = (input ?? "").trim();
   if (!candidate.startsWith("/app/")) {
     return fallback;
@@ -158,6 +158,8 @@ export async function createInspectionAction(_: { error: string | null; success:
       );
     }
     revalidatePath("/app/admin");
+    revalidatePath("/app/admin/dashboard");
+    revalidatePath("/app/admin/inspections");
     revalidatePath("/app/admin/upcoming-inspections");
     revalidatePath("/app/admin/amendments");
     revalidatePath(`/app/admin/inspections/${inspection.id}`);
@@ -188,6 +190,8 @@ export async function deleteInspectionAction(
     );
 
     revalidatePath("/app/admin");
+    revalidatePath("/app/admin/dashboard");
+    revalidatePath("/app/admin/inspections");
     revalidatePath("/app/admin/amendments");
     revalidatePath("/app/admin/billing");
     revalidatePath("/app/tech");
@@ -283,7 +287,8 @@ export async function updateInspectionStatusAdminAction(
     );
 
     revalidatePath("/app/admin");
-    revalidatePath("/app/admin/scheduling");
+    revalidatePath("/app/admin/dashboard");
+    revalidatePath("/app/admin/inspections");
     revalidatePath("/app/admin/reports");
     revalidatePath("/app/admin/amendments");
     revalidatePath("/app/admin/billing");

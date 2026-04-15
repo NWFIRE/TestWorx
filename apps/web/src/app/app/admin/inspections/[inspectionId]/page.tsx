@@ -92,7 +92,7 @@ function inspectionTaskLabel(task: { inspectionType: string; customDisplayLabel?
 function resolveInspectionOrigin(value: string | undefined) {
   const candidate = (value ?? "").trim();
   if (!candidate.startsWith("/app/") || candidate.startsWith("/app/admin/inspections/")) {
-    return "/app/admin";
+    return "/app/admin/dashboard";
   }
 
   return candidate;
@@ -115,11 +115,11 @@ function resolveInspectionBackLabel(originPath: string) {
     return "Back to inspections";
   }
 
-  if (originPath.startsWith("/app/admin/scheduling")) {
-    return "Back to scheduling";
+  if (originPath.startsWith("/app/admin/inspections") || originPath.startsWith("/app/admin/scheduling")) {
+    return "Back to inspections";
   }
 
-  return "Back to admin";
+  return "Back to dashboard";
 }
 
 export default async function EditInspectionPage({
@@ -148,7 +148,7 @@ export default async function EditInspectionPage({
   ]);
 
   if (!inspection) {
-    redirect("/app/admin");
+    redirect("/app/admin/dashboard");
   }
 
   const [attachments, documents] = await Promise.all([
@@ -286,7 +286,9 @@ export default async function EditInspectionPage({
     <section className="space-y-6">
       <div className="rounded-[2rem] bg-white p-6 shadow-panel">
         <PageBackControl className="mb-2" fallbackHref={originPath} label={backLabel} />
-        <p className="text-sm uppercase tracking-[0.25em] text-slate-500">{isReviewMode ? "Inspection review" : "Inspection editor"}</p>
+        <p className="text-sm uppercase tracking-[0.25em] text-slate-500">
+          {isReviewMode ? "Inspection review command center" : "Inspection command center"}
+        </p>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h2 className="text-3xl font-semibold text-ink">{inspectionDisplay.primaryTitle}</h2>
           <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${lifecycleBadgeStyles[inspectionView.lifecycle ?? "original"]}`}>
@@ -304,8 +306,8 @@ export default async function EditInspectionPage({
         <p className="mt-3 text-slate-500">
           {inspectionDisplay.secondaryTitle ? `${inspectionDisplay.secondaryTitle} | ` : ""}
           {isReviewMode
-            ? "Review the current status, report completion, signatures, documents, and any technician-requested next-step work before deciding what needs to happen next."
-            : "Adjust assignment, status, recurrence mix, scheduling details, and customer-facing PDF delivery for this visit."}
+            ? "Review status, report completion, signatures, documents, and technician-requested next steps from one focused operational workspace."
+            : "Coordinate assignment, status, recurrence mix, scheduling details, and customer-facing outputs for this visit from one focused workspace."}
         </p>
         {inspectionView.hasStartedWork ? <p className="mt-3 text-sm text-amber-700">Started work is protected. Changes here create an audited follow-up visit instead of rewriting history.</p> : null}
         {isDueAtTimeOfServiceCustomer(inspection.customerCompany) ? (
