@@ -1,13 +1,35 @@
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 
-import { generateInspectionReportPdf } from "../pdf-report";
+import { buildPdfPhotoCaption, formatPdfAddress, generateInspectionReportPdf } from "../pdf-report";
 import { buildDataUrlStorageKey, decodeStoredFile } from "../storage";
 
 const tinyPngBytes = Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII=", "base64"));
 const tinyPngDataUrl = buildDataUrlStorageKey({ mimeType: "image/png", bytes: tinyPngBytes });
 
 describe("pdf generation workflow", () => {
+  it("formats shared PDF customer-facing helpers cleanly", () => {
+    expect(buildPdfPhotoCaption(0)).toBe("Inspection photo 1");
+    expect(
+      formatPdfAddress({
+        addressLine1: null,
+        addressLine2: null,
+        city: null,
+        state: null,
+        postalCode: null,
+        fallback: "No fixed service address on file"
+      })
+    ).toBe("No fixed service address on file");
+    expect(
+      formatPdfAddress({
+        addressLine1: "100 State St",
+        city: "Chicago",
+        state: "IL",
+        postalCode: "60601"
+      })
+    ).toBe("100 State St, Chicago, IL 60601");
+  });
+
   it("generates a branded inspection report PDF payload", async () => {
     const bytes = await generateInspectionReportPdf({
       tenant: {

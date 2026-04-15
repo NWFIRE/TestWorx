@@ -56,15 +56,27 @@ type PdfTheme = {
 type KeyValueRow = { label: string; value: string };
 type TableColumn = { key: string; label: string; width: number };
 type TableRow = Record<string, string>;
+type MetricCard = {
+  label: string;
+  value: string;
+  supportingText?: string;
+  tone: "pass" | "fail" | "warn" | "neutral";
+};
 
 const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
 const PAGE_MARGIN = 36;
 const CONTENT_WIDTH = PAGE_WIDTH - PAGE_MARGIN * 2;
-const HEADER_HEIGHT = 96;
-const FOOTER_HEIGHT = 30;
-const BODY_TOP = PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT - 18;
+const HEADER_HEIGHT = 108;
+const FOOTER_HEIGHT = 28;
+const BODY_TOP = PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT - 20;
 const MIN_CONTENT_Y = PAGE_MARGIN + FOOTER_HEIGHT + 12;
+const SECTION_SPACING = 18;
+const DEFAULT_EMPTY_COPY = "Not provided";
+const NO_SITE_ADDRESS_COPY = "No fixed service address on file";
+const NO_NOTES_COPY = "No notes provided";
+const NO_PHOTOS_COPY = "No inspection photos included";
+const NO_SIGNATURE_COPY = "Not captured";
 
 function hexToRgb(hex: string, fallback: { r: number; g: number; b: number }) {
   const normalized = hex.replace("#", "").trim();
@@ -98,6 +110,52 @@ function buildTheme(primaryHex?: string | null, accentHex?: string | null): PdfT
     warnBg: rgb(0.994, 0.972, 0.91),
     warnText: rgb(0.56, 0.39, 0.04)
   };
+}
+
+function cleanCustomerFacingText(value: unknown) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  const normalized = String(value).replace(/\s+/g, " ").trim();
+  if (!normalized || /^(undefined|null|unknown|n\/a|na|[-–—]+|â€”|â€¦)$/i.test(normalized)) {
+    return "";
+  }
+
+  return normalized;
+}
+
+function withFallback(value: string, fallback: string) {
+  return cleanCustomerFacingText(value) || fallback;
+}
+
+function joinPresentValues(values: Array<string | null | undefined>, separator: string) {
+  return values.map((value) => cleanCustomerFacingText(value)).filter(Boolean).join(separator);
+}
+
+function formatCityStatePostal(city?: string | null, state?: string | null, postalCode?: string | null) {
+  const locality = joinPresentValues([city, state], ", ");
+  return joinPresentValues([locality, postalCode ?? null], " ");
+}
+
+export function formatPdfAddress(input: {
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  fallback?: string;
+}) {
+  const address = joinPresentValues(
+    [
+      input.addressLine1 ?? null,
+      input.addressLine2 ?? null,
+      formatCityStatePostal(input.city, input.state, input.postalCode)
+    ],
+    ", "
+  );
+
+  return address || input.fallback || "";
 }
 
 function formatDateTime(value: Date | string | null | undefined) {
@@ -149,14 +207,14 @@ function normalizeDisplayValue(value: ReportPrimitiveValue | undefined) {
   }
 
   if (typeof value === "string" && (value.startsWith("blob:") || value.startsWith("data:image/"))) {
-    return "Attached";
+    return "Included";
   }
 
   if (typeof value === "string") {
-    return humanizeText(value);
+    return cleanCustomerFacingText(humanizeText(value));
   }
 
-  return String(value);
+  return cleanCustomerFacingText(String(value));
 }
 
 function isOtherOptionValue(value: unknown) {
@@ -296,6 +354,140 @@ function getReportTitle(input: PdfInput) {
   return metadata.subtitle || `${humanizeText(input.task.inspectionType)} Inspection Report`;
 }
 
+function getCustomerFacingReportState(input: PdfInput) {
+  return input.report.finalizedAt ? "Finalized" : "Draft";
+}
+
+function getCustomerFacingOutcomeLabel(input: PdfInput, deficiencyTotal: number) {
+  if (!input.report.finalizedAt) {
+    return deficiencyTotal > 0 ? "Deficiencies Found" : "In Review";
+  }
+
+  return deficiencyTotal > 0 ? "Deficiencies Found" : "Passed";
+}
+
+export function buildPdfPhotoCaption(index: number) {
+  return `Inspection photo ${index + 1}`;
+}
+
+function renderPremiumPageChrome(
+  page: PDFPage,
+  input: PdfInput,
+  branding: ReturnType<typeof resolveTenantBranding>,
+  theme: PdfTheme,
+  boldFont: PDFFont,
+  regularFont: PDFFont,
+  logoEmbedded: PDFImage | null,
+  pageNumber: number
+) {
+  const headerTop = PAGE_HEIGHT - PAGE_MARGIN;
+  const leftX = PAGE_MARGIN;
+  const rightZoneWidth = 210;
+  const leftZoneWidth = CONTENT_WIDTH - rightZoneWidth - 18;
+  const rightZoneX = PAGE_MARGIN + leftZoneWidth + 18;
+  const logoBox = 44;
+  const companyName = branding.legalBusinessName || input.tenant.name;
+  const contactLine = joinPresentValues([branding.phone, branding.email, branding.website], " | ");
+  const addressLine = formatPdfAddress({
+    addressLine1: branding.addressLine1,
+    city: branding.city,
+    state: branding.state,
+    postalCode: branding.postalCode
+  });
+  const reportTitle = getReportTitle(input);
+  const headerMeta = [
+    `Report ID ${input.report.id}`,
+    formatDate(input.inspection.scheduledStart) ? `Service date ${formatDate(input.inspection.scheduledStart)}` : "",
+    `Page ${pageNumber}`
+  ].filter(Boolean).join(" | ");
+  const contextMeta = joinPresentValues(
+    [
+      input.customerCompany.name,
+      getCustomerFacingSiteLabel(input.site.name) ?? "",
+      input.report.technicianName ?? ""
+    ],
+    " | "
+  );
+
+  if (logoEmbedded) {
+    const scaled = logoEmbedded.scale(1);
+    const ratio = Math.min(logoBox / scaled.width, logoBox / scaled.height, 1);
+    const width = scaled.width * ratio;
+    const height = scaled.height * ratio;
+    page.drawImage(logoEmbedded, {
+      x: leftX,
+      y: headerTop - 8 - height,
+      width,
+      height
+    });
+  } else {
+    drawRect(page, leftX, headerTop - 4, logoBox, logoBox, theme.softSurface, theme.line, 1);
+    page.drawText(companyName.split(/\s+/).map((part) => part[0] ?? "").slice(0, 2).join("").toUpperCase(), {
+      x: leftX + 13,
+      y: headerTop - 34,
+      size: 18,
+      font: boldFont,
+      color: theme.primary
+    });
+  }
+
+  drawParagraph(page, boldFont, companyName, leftX + 58, headerTop - 12, leftZoneWidth - 58, 14, theme.ink, 3, 2);
+  if (contactLine) {
+    drawParagraph(page, regularFont, contactLine, leftX + 58, headerTop - 32, leftZoneWidth - 58, 8.5, theme.softText, 3, 2);
+  }
+  if (addressLine) {
+    drawParagraph(page, regularFont, addressLine, leftX + 58, headerTop - 45, leftZoneWidth - 58, 8, theme.softText, 3, 2);
+  }
+
+  drawParagraph(page, boldFont, reportTitle, rightZoneX, headerTop - 12, rightZoneWidth, 16, theme.ink, 3, 2);
+  drawParagraph(page, regularFont, headerMeta, rightZoneX, headerTop - 36, rightZoneWidth, 8.5, theme.softText, 3, 2);
+  if (contextMeta) {
+    drawParagraph(page, regularFont, contextMeta, rightZoneX, headerTop - 49, rightZoneWidth, 8, theme.softText, 3, 2);
+  }
+
+  page.drawLine({
+    start: { x: rightZoneX - 10, y: headerTop - 4 },
+    end: { x: rightZoneX - 10, y: PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT + 10 },
+    thickness: 1,
+    color: theme.line
+  });
+
+  page.drawLine({
+    start: { x: PAGE_MARGIN, y: PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT },
+    end: { x: PAGE_WIDTH - PAGE_MARGIN, y: PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT },
+    thickness: 1,
+    color: theme.line
+  });
+
+  page.drawText(companyName, {
+    x: PAGE_MARGIN,
+    y: PAGE_MARGIN - 2,
+    size: 8,
+    font: regularFont,
+    color: theme.softText
+  });
+
+  const footerReference = joinPresentValues([getCustomerFacingReportState(input), input.report.id], " | ");
+  if (footerReference) {
+    page.drawText(footerReference, {
+      x: PAGE_MARGIN + 150,
+      y: PAGE_MARGIN - 2,
+      size: 8,
+      font: regularFont,
+      color: theme.softText
+    });
+  }
+
+  const pageLabel = `Page ${pageNumber}`;
+  page.drawText(pageLabel, {
+    x: PAGE_WIDTH - PAGE_MARGIN - regularFont.widthOfTextAtSize(pageLabel, 8),
+    y: PAGE_MARGIN - 2,
+    size: 8,
+    font: regularFont,
+    color: theme.softText
+  });
+}
+
 function renderPageChrome(
   page: PDFPage,
   input: PdfInput,
@@ -419,7 +611,7 @@ function addPage(
   pageNumber: number
 ) {
   const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-  renderPageChrome(page, input, branding, theme, boldFont, regularFont, logoEmbedded, pageNumber);
+  renderPremiumPageChrome(page, input, branding, theme, boldFont, regularFont, logoEmbedded, pageNumber);
   return { page, y: BODY_TOP, pageNumber };
 }
 
@@ -442,17 +634,18 @@ function ensureSpace(
 }
 
 function drawSectionTitle(state: PageState, title: string, subtitle: string | undefined, theme: PdfTheme, boldFont: PDFFont, regularFont: PDFFont) {
+  drawRect(state.page, PAGE_MARGIN, state.y + 2, 4, 28, theme.accent);
   state.page.drawText(title, {
-    x: PAGE_MARGIN,
+    x: PAGE_MARGIN + 12,
     y: state.y,
-    size: 13,
+    size: 12.5,
     font: boldFont,
     color: theme.ink
   });
 
   let nextY = state.y - 16;
   if (subtitle) {
-    nextY = drawParagraph(state.page, regularFont, subtitle, PAGE_MARGIN, nextY, CONTENT_WIDTH, 8.5, theme.softText, 3) - 6;
+    nextY = drawParagraph(state.page, regularFont, subtitle, PAGE_MARGIN + 12, nextY, CONTENT_WIDTH - 12, 8.5, theme.softText, 3, 3) - 6;
   } else {
     nextY -= 4;
   }
@@ -510,66 +703,87 @@ function statusVariant(status: string): "pass" | "fail" | "warn" | "neutral" {
 function renderKpiStrip(
   state: PageState,
   preview: ReturnType<typeof buildReportPreview>,
+  input: PdfInput,
   theme: PdfTheme,
   boldFont: PDFFont,
   regularFont: PDFFont
 ) {
-  const gap = 10;
-  const cardWidth = (CONTENT_WIDTH - gap * 2) / 3;
-  const cardHeight = 68;
   const deficiencyTotal = preview.deficiencyCount + preview.manualDeficiencyCount;
-  const kpis = [
+  const cards: MetricCard[] = [
     {
-      label: "Result",
-      value: deficiencyTotal > 0 ? "FAIL" : "PASS",
+      label: "Document",
+      value: getCustomerFacingReportState(input),
+      supportingText: input.report.finalizedAt ? formatDateTime(input.report.finalizedAt) || "Completed" : "Awaiting finalization",
+      tone: input.report.finalizedAt ? "pass" : "warn"
+    },
+    {
+      label: "Outcome",
+      value: getCustomerFacingOutcomeLabel(input, deficiencyTotal),
+      supportingText: deficiencyTotal > 0 ? "Customer follow-up may be required" : "No deficiencies recorded",
       tone: deficiencyTotal > 0 ? "fail" as const : "pass" as const
     },
     {
       label: "Deficiencies",
-      value: String(deficiencyTotal),
+      value: deficiencyTotal === 0 ? "None" : String(deficiencyTotal),
+      supportingText: deficiencyTotal === 1 ? "1 issue recorded" : `${deficiencyTotal} issues recorded`,
       tone: deficiencyTotal > 0 ? "fail" as const : "neutral" as const
     },
     {
-      label: "Completion",
-      value: `${Math.round(preview.reportCompletion * 100)}%`,
-      tone: preview.reportCompletion >= 1 ? "pass" as const : "warn" as const
+      label: "Service date",
+      value: withFallback(formatDate(input.inspection.scheduledStart), DEFAULT_EMPTY_COPY),
+      supportingText: input.report.technicianName ? `Technician ${input.report.technicianName}` : "Technician not assigned",
+      tone: "neutral"
     }
   ];
 
-  kpis.forEach((kpi, index) => {
+  renderMetricCards(state, cards, theme, boldFont, regularFont, 4);
+}
+
+function renderMetricCards(
+  state: PageState,
+  cards: MetricCard[],
+  theme: PdfTheme,
+  boldFont: PDFFont,
+  regularFont: PDFFont,
+  columns?: number
+) {
+  const gap = 10;
+  const count = Math.max(1, columns ?? cards.length);
+  const cardWidth = (CONTENT_WIDTH - gap * (count - 1)) / count;
+  const cardHeight = 74;
+
+  cards.forEach((card, index) => {
     const x = PAGE_MARGIN + index * (cardWidth + gap);
-    const toneBg = kpi.tone === "pass"
+    const toneBg = card.tone === "pass"
       ? theme.passBg
-      : kpi.tone === "fail"
+      : card.tone === "fail"
         ? theme.failBg
-        : kpi.tone === "warn"
+        : card.tone === "warn"
           ? theme.warnBg
-          : theme.surface;
-    const toneText = kpi.tone === "pass"
+          : theme.softSurface;
+    const toneText = card.tone === "pass"
       ? theme.passText
-      : kpi.tone === "fail"
+      : card.tone === "fail"
         ? theme.failText
-        : kpi.tone === "warn"
+        : card.tone === "warn"
           ? theme.warnText
           : theme.primary;
+
     drawRect(state.page, x, state.y, cardWidth, cardHeight, toneBg, theme.line, 1);
-    state.page.drawText(kpi.label.toUpperCase(), {
-      x: x + cardWidth / 2 - boldFont.widthOfTextAtSize(kpi.label.toUpperCase(), 7) / 2,
-      y: state.y - 16,
+    state.page.drawText(card.label.toUpperCase(), {
+      x: x + 10,
+      y: state.y - 14,
       size: 7,
       font: boldFont,
       color: theme.softText
     });
-    state.page.drawText(kpi.value, {
-      x: x + cardWidth / 2 - boldFont.widthOfTextAtSize(kpi.value, kpi.label === "Result" ? 22 : 20) / 2,
-      y: state.y - 44,
-      size: kpi.label === "Result" ? 22 : 20,
-      font: boldFont,
-      color: toneText
-    });
+    drawParagraph(state.page, boldFont, card.value, x + 10, state.y - 30, cardWidth - 20, 15, toneText, 3, 2);
+    if (card.supportingText) {
+      drawParagraph(state.page, regularFont, card.supportingText, x + 10, state.y - 54, cardWidth - 20, 8, theme.muted, 3, 2);
+    }
   });
 
-  state.y -= cardHeight + 18;
+  state.y -= cardHeight + SECTION_SPACING;
 }
 
 function renderKeyValueGrid(
@@ -1155,7 +1369,7 @@ async function renderPhotos(
 ) {
   if (input.photos.length === 0) {
     drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, 52, theme.surface, theme.line, 1);
-    state.page.drawText("No photos attached", {
+    state.page.drawText(NO_PHOTOS_COPY, {
       x: PAGE_MARGIN + 12,
       y: state.y - 24,
       size: 10,
@@ -1172,7 +1386,7 @@ async function renderPhotos(
   let rowTop = state.y;
   let rowHeight = 0;
 
-  for (const photo of input.photos) {
+  for (const [index, photo] of input.photos.entries()) {
     const embeddedPhoto = await embedImage(pdfDoc, photo.storageKey);
     if (!embeddedPhoto) {
       continue;
@@ -1182,7 +1396,7 @@ async function renderPhotos(
     const ratio = Math.min((cardWidth - 20) / scaled.width, 120 / scaled.height, 1);
     const width = scaled.width * ratio;
     const height = scaled.height * ratio;
-    const cardHeight = 150;
+    const cardHeight = 158;
 
     if (column === 0) {
       state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, cardHeight + 12);
@@ -1198,7 +1412,7 @@ async function renderPhotos(
       width,
       height
     });
-    drawParagraph(state.page, boldFont, photo.fileName, x + 10, rowTop - 132, cardWidth - 20, 8.5, theme.ink, 2, 2);
+    drawParagraph(state.page, boldFont, buildPdfPhotoCaption(index), x + 10, rowTop - 138, cardWidth - 20, 8.5, theme.ink, 2, 2);
 
     column += 1;
     if (column === 2) {
@@ -1224,34 +1438,34 @@ async function renderSignatures(
   regularFont: PDFFont,
   logoEmbedded: PDFImage | null
 ) {
-  state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 160);
+  state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 168);
   const gap = 12;
   const cardWidth = (CONTENT_WIDTH - gap) / 2;
   const cards = [
-    { title: "Technician", value: input.technicianSignature },
-    { title: "Customer", value: input.customerSignature }
+    { title: "Technician signature", value: input.technicianSignature },
+    { title: "Customer signature", value: input.customerSignature }
   ];
 
   cards.forEach((card, index) => {
     const x = PAGE_MARGIN + index * (cardWidth + gap);
-    drawRect(state.page, x, state.y, cardWidth, 132, theme.surface, theme.line, 1);
+    drawRect(state.page, x, state.y, cardWidth, 140, theme.surface, theme.line, 1);
     state.page.drawText(card.title, {
       x: x + 12,
-      y: state.y - 16,
-      size: 10.5,
+      y: state.y - 14,
+      size: 7,
       font: boldFont,
-      color: theme.ink
+      color: theme.softText
     });
 
     if (card.value) {
-      state.page.drawText(card.value.signerName, {
+      state.page.drawText(withFallback(card.value.signerName, DEFAULT_EMPTY_COPY), {
         x: x + 12,
         y: state.y - 34,
         size: 9.5,
         font: regularFont,
         color: theme.ink
       });
-      state.page.drawText(formatDateTime(card.value.signedAt), {
+      state.page.drawText(withFallback(formatDateTime(card.value.signedAt), DEFAULT_EMPTY_COPY), {
         x: x + 12,
         y: state.y - 48,
         size: 8,
@@ -1282,13 +1496,13 @@ async function renderSignatures(
     const ratio = Math.min((cardWidth - 24) / scaled.width, 44 / scaled.height, 1);
     state.page.drawImage(embeddedSignature, {
       x: x + 12,
-      y: state.y - 112,
+      y: state.y - 118,
       width: scaled.width * ratio,
       height: scaled.height * ratio
     });
   }
 
-  state.y -= 148;
+  state.y -= 156;
   return state;
 }
 
@@ -1310,7 +1524,7 @@ export async function generateInspectionReportPdf(input: PdfInput) {
 
   let state = addPage(pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 1);
 
-  renderKpiStrip(state, preview, theme, boldFont, regularFont);
+  renderKpiStrip(state, preview, input, theme, boldFont, regularFont);
 
   drawSectionTitle(state, "Summary", "Client, site, technician, and code context for this inspection.", theme, boldFont, regularFont);
   renderInspectionOverview(state, input, pdfMetadata, theme, boldFont, regularFont);
