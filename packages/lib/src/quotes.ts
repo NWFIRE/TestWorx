@@ -741,7 +741,7 @@ async function buildQuoteLineItemsForSave(input: {
     quoteLineItems.push({
       internalCode: serviceFee.code,
       title: "Service Fee",
-      description: "Automatically assessed from the selected location.",
+      description: null,
       quantity: 1,
       unitPrice: serviceFee.unitPrice ?? 0,
       discountAmount: 0,
