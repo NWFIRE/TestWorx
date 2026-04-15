@@ -198,21 +198,20 @@ function BrandBlock({
 }) {
   return (
     <div className={`flex min-w-0 items-center gap-3 overflow-hidden ${collapsed ? "justify-center" : ""}`}>
-      <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_6px_20px_rgba(15,23,42,0.05)]">
+      <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_6px_20px_rgba(15,23,42,0.05)]">
         <Image
           alt="TradeWorx"
           className="object-contain p-1"
           fill
           priority
-          sizes="40px"
+          sizes="36px"
           src="/icon.png"
         />
       </div>
       {!collapsed ? (
         <div className="min-w-0 overflow-hidden">
           <p className="truncate text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">TradeWorx</p>
-          <p className="truncate text-[15px] font-semibold text-slate-950">Fire inspection operations</p>
-          <p className="truncate text-[12px] text-slate-500">Dispatch, field execution, and customer readiness</p>
+          <p className="truncate text-sm font-semibold text-slate-950">Fire inspection operations</p>
         </div>
       ) : null}
     </div>
@@ -220,14 +219,12 @@ function BrandBlock({
 }
 
 function NavSection({
-  currentItem,
   collapsed,
   compact,
   navItems,
   pathname,
   onNavigate
 }: {
-  currentItem: AppNavItem | null;
   collapsed: boolean;
   compact: boolean;
   navItems: AppNavItem[];
@@ -236,20 +233,7 @@ function NavSection({
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className={`min-w-0 px-4 pb-4 pt-5 ${collapsed ? "px-2 text-center" : ""}`}>
-        {!collapsed ? (
-          <div className="border-b border-slate-200 pb-4">
-            <p className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Workspace</p>
-            <p className="mt-2 truncate text-sm font-semibold text-slate-900">{currentItem?.label ?? "Workspace"}</p>
-            <p className="mt-1 truncate text-xs text-slate-500">Dispatch, inspection, billing, and settings workflows</p>
-          </div>
-        ) : (
-          <div className="flex justify-center">
-            <div className="h-px w-8 rounded-full bg-slate-200" aria-hidden="true" />
-          </div>
-        )}
-      </div>
-      <nav aria-label="Primary navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+      <nav aria-label="Primary navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
         {!collapsed ? (
           <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Core workflows</p>
         ) : null}
@@ -369,7 +353,7 @@ export function AppShell({
             sidebarCollapsed ? "lg:w-[72px]" : "lg:w-64"
           }`}
         >
-          <div className={`border-b border-slate-200 bg-[#f8fafc] ${sidebarCollapsed ? "px-2 py-3" : "px-4 py-4"}`}>
+          <div className={`border-b border-slate-200 bg-[#f8fafc] ${sidebarCollapsed ? "px-2 py-2.5" : "px-4 py-3"}`}>
             <div className={`flex items-start ${sidebarCollapsed ? "justify-center" : "justify-between gap-3"}`}>
               <BrandBlock collapsed={sidebarCollapsed} />
               {!sidebarCollapsed ? (
@@ -384,7 +368,7 @@ export function AppShell({
               ) : null}
             </div>
             {sidebarCollapsed ? (
-              <div className="mt-3 flex justify-center">
+              <div className="mt-2 flex justify-center">
                 <button
                   aria-label="Expand sidebar"
                   className="pressable pressable-icon inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 outline-none transition-colors hover:bg-white hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
@@ -396,7 +380,7 @@ export function AppShell({
               </div>
             ) : null}
           </div>
-          <NavSection collapsed={sidebarCollapsed} compact={false} currentItem={currentItem} navItems={navItems} pathname={pathname} />
+          <NavSection collapsed={sidebarCollapsed} compact={false} navItems={navItems} pathname={pathname} />
         </aside>
       ) : null}
 
@@ -436,7 +420,6 @@ export function AppShell({
             <NavSection
               collapsed={false}
               compact={true}
-              currentItem={currentItem}
               navItems={navItems}
               onNavigate={closeDrawer}
               pathname={pathname}
