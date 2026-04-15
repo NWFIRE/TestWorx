@@ -368,7 +368,7 @@ export default async function AdminDashboardPage({
                   <Bell className="h-4 w-4" />
                 </Link>
               }
-              description="High-level visibility into today’s work, review readiness, and urgent follow-up without dropping into execution screens."
+              description=""
               eyebrow="Dashboard"
               title={`${greeting}, ${firstName}.`}
               contentWidth="full"
@@ -401,7 +401,7 @@ export default async function AdminDashboardPage({
                   </Link>
                 </>
               }
-              description="High-level visibility into today’s work, review readiness, and urgent follow-up without dropping into execution screens."
+              description=""
               eyebrow="Dashboard"
               title={`${greeting}, ${firstName}.`}
               contentWidth="full"
