@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CustomerOption, SiteOption, TechnicianOption } from "@testworx/types";
 
 import { createInspectionAction } from "../actions";
@@ -26,11 +26,25 @@ export function InspectionCreatePanel({
   initialValues?: InspectionSchedulerFormInitialValues;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [open, setOpen] = useState(initialOpen);
 
   useEffect(() => {
     setOpen(initialOpen);
   }, [initialOpen]);
+
+  function updateCreateQueryParam(nextOpen: boolean) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextOpen) {
+      params.set("create", "1");
+    } else {
+      params.delete("create");
+    }
+
+    const nextSearch = params.toString();
+    router.replace(nextSearch ? `${pathname}?${nextSearch}` : pathname, { scroll: false });
+  }
 
   if (!open && !showTrigger) {
     return null;
@@ -50,7 +64,11 @@ export function InspectionCreatePanel({
         {showTrigger ? (
           <button
             className="inline-flex min-h-12 items-center rounded-2xl bg-slateblue px-5 text-sm font-semibold text-white shadow-[0_12px_24px_rgb(var(--tenant-primary-rgb)_/_0.2)] transition duration-150 hover:brightness-110 active:scale-[0.99]"
-            onClick={() => setOpen((current) => !current)}
+            onClick={() => {
+              const nextOpen = !open;
+              setOpen(nextOpen);
+              updateCreateQueryParam(nextOpen);
+            }}
             type="button"
           >
             {open ? "Close create inspection" : "+ Create Inspection"}
@@ -58,7 +76,10 @@ export function InspectionCreatePanel({
         ) : (
           <button
             className="inline-flex min-h-11 items-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-            onClick={() => setOpen(false)}
+            onClick={() => {
+              setOpen(false);
+              updateCreateQueryParam(false);
+            }}
             type="button"
           >
             Close
@@ -75,6 +96,7 @@ export function InspectionCreatePanel({
           customers={customers}
           onSuccess={() => {
             setOpen(false);
+            updateCreateQueryParam(false);
             router.refresh();
           }}
           sites={sites}
