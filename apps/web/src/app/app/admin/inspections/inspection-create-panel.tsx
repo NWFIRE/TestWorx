@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CustomerOption, SiteOption, TechnicianOption } from "@testworx/types";
 
@@ -27,6 +27,10 @@ export function InspectionCreatePanel({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(initialOpen);
+
+  useEffect(() => {
+    setOpen(initialOpen);
+  }, [initialOpen]);
 
   if (!open && !showTrigger) {
     return null;
