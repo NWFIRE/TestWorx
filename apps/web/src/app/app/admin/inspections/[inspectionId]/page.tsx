@@ -419,40 +419,90 @@ export default async function EditInspectionPage({
       </div>
       <WorkspaceSplit variant={isReviewMode ? "balanced" : "content-heavy"}>
         {!isReviewMode ? (
-        <InspectionSchedulerForm
-          action={inspectionView.hasStartedWork ? amendInspectionAction : updateInspectionAction}
-          title="Edit visit"
-          submitLabel="Save changes"
-          banner={inspectionView.hasStartedWork ? `This visit already has ${inspectionView.reportActivityCount ?? 0} work marker${(inspectionView.reportActivityCount ?? 0) === 1 ? "" : "s"}. Saving here will create a new visit and leave the original visit unchanged.` : undefined}
-          workflowNote={inspectionView.hasStartedWork
-            ? "The original visit and its report history stay intact. The new visit carries these updates forward for dispatch."
-            : "Use this form for normal visit edits. Once field work begins, the system protects the original visit and creates a new one when needed."}
-          customers={dashboardData.customers}
-          sites={dashboardData.sites}
-          technicians={dashboardData.technicians}
-          protectedSaveMode={Boolean(inspectionView.hasStartedWork)}
-          initialValues={{
-            inspectionId: inspection.id,
-            customerCompanyId: inspection.customerCompanyId,
-            siteId: inspection.siteId,
-            inspectionClassification: inspection.inspectionClassification,
-            isPriority: inspection.isPriority,
-            inspectionMonth: format(inspection.scheduledStart, "yyyy-MM"),
-            scheduledStart: toDateTimeLocal(inspection.scheduledStart),
-            scheduledEnd: toDateTimeLocal(inspection.scheduledEnd),
-            status: inspection.status,
-            notes: inspection.notes ?? "",
-            tasks: inspectionView.tasks.map((task: InspectionTask) => ({
-              inspectionType: task.inspectionType,
-              frequency: task.recurrence?.frequency ?? getDefaultInspectionRecurrenceFrequency(task.inspectionType),
-              assignedTechnicianId: task.assignedTechnicianId ?? inspection.assignedTechnicianId ?? "",
-              dueMonth: task.dueMonth ?? format(inspection.scheduledStart, "yyyy-MM"),
-              dueDate: task.dueDate ? format(task.dueDate, "yyyy-MM-dd") : "",
-              schedulingStatus: (task.schedulingStatus as SchedulingStatus | null) ?? "scheduled_now",
-              notes: task.notes ?? ""
-            }))
-          }}
-        />
+          <div className="space-y-6">
+            <InspectionStatusUpdateCard
+              action={updateInspectionStatusAdminAction}
+              currentStatus={inspection.status}
+              inspectionId={inspection.id}
+              key={`${inspection.id}:${inspection.status}:${isReviewMode ? "review" : "workspace"}`}
+            />
+            <InspectionReportCorrectionsCard
+              action={reopenCompletedReportAction}
+              inspectionId={inspection.id}
+              reports={inspectionView.tasks.map((task: InspectionTask) => ({
+                taskId: task.id,
+                inspectionType: task.inspectionType,
+                displayLabel: inspectionTaskLabel(task),
+                report: task.report ? {
+                  id: task.report.id,
+                  status: task.report.status,
+                  finalizedAt: task.report.finalizedAt?.toISOString() ?? null,
+                  correctionState: task.report.correctionState,
+                  correctionReason: task.report.correctionReason,
+                  correctionRequestedAt: task.report.correctionRequestedAt?.toISOString() ?? null,
+                  correctionResolvedAt: task.report.correctionResolvedAt?.toISOString() ?? null,
+                  correctionRequestedBy: task.report.correctionRequestedBy,
+                  correctionResolvedBy: task.report.correctionResolvedBy,
+                  correctionEvents: task.report.correctionEvents.map((event: CorrectionEvent) => ({
+                    ...event,
+                    createdAt: event.createdAt.toISOString()
+                  }))
+                } : null
+              }))}
+            />
+            <details className="group rounded-[2rem] bg-white p-6 shadow-panel">
+              <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Visit details</p>
+                  <h3 className="mt-2 text-2xl font-semibold text-ink">Update schedule, scope, and assignments</h3>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Open this section when you need to change the visit itself. Core correction tools stay above for faster day-to-day admin work.
+                  </p>
+                </div>
+                <span className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition group-open:rotate-180">
+                  <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 20 20">
+                    <path d="m5 7.5 5 5 5-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+                  </svg>
+                </span>
+              </summary>
+              <div className="mt-5 border-t border-slate-200 pt-5">
+                <InspectionSchedulerForm
+                  action={inspectionView.hasStartedWork ? amendInspectionAction : updateInspectionAction}
+                  title="Edit visit"
+                  submitLabel="Save changes"
+                  banner={inspectionView.hasStartedWork ? `This visit already has ${inspectionView.reportActivityCount ?? 0} work marker${(inspectionView.reportActivityCount ?? 0) === 1 ? "" : "s"}. Saving here will create a new visit and leave the original visit unchanged.` : undefined}
+                  workflowNote={inspectionView.hasStartedWork
+                    ? "The original visit and its report history stay intact. The new visit carries these updates forward for dispatch."
+                    : "Use this form for normal visit edits. Once field work begins, the system protects the original visit and creates a new one when needed."}
+                  customers={dashboardData.customers}
+                  sites={dashboardData.sites}
+                  technicians={dashboardData.technicians}
+                  protectedSaveMode={Boolean(inspectionView.hasStartedWork)}
+                  initialValues={{
+                    inspectionId: inspection.id,
+                    customerCompanyId: inspection.customerCompanyId,
+                    siteId: inspection.siteId,
+                    inspectionClassification: inspection.inspectionClassification,
+                    isPriority: inspection.isPriority,
+                    inspectionMonth: format(inspection.scheduledStart, "yyyy-MM"),
+                    scheduledStart: toDateTimeLocal(inspection.scheduledStart),
+                    scheduledEnd: toDateTimeLocal(inspection.scheduledEnd),
+                    status: inspection.status,
+                    notes: inspection.notes ?? "",
+                    tasks: inspectionView.tasks.map((task: InspectionTask) => ({
+                      inspectionType: task.inspectionType,
+                      frequency: task.recurrence?.frequency ?? getDefaultInspectionRecurrenceFrequency(task.inspectionType),
+                      assignedTechnicianId: task.assignedTechnicianId ?? inspection.assignedTechnicianId ?? "",
+                      dueMonth: task.dueMonth ?? format(inspection.scheduledStart, "yyyy-MM"),
+                      dueDate: task.dueDate ? format(task.dueDate, "yyyy-MM-dd") : "",
+                      schedulingStatus: (task.schedulingStatus as SchedulingStatus | null) ?? "scheduled_now",
+                      notes: task.notes ?? ""
+                    }))
+                  }}
+                />
+              </div>
+            </details>
+          </div>
         ) : (
           <div className="space-y-6">
             <div className="rounded-[2rem] bg-white p-6 shadow-panel">
@@ -510,12 +560,6 @@ export default async function EditInspectionPage({
                 : "Inspection packet not ready"
             }
             showCustomerVisibility
-          />
-          <InspectionStatusUpdateCard
-            action={updateInspectionStatusAdminAction}
-            currentStatus={inspection.status}
-            inspectionId={inspection.id}
-            key={`${inspection.id}:${inspection.status}:${isReviewMode ? "review" : "workspace"}`}
           />
           {isReviewMode ? (
             <div className="rounded-[2rem] bg-white p-6 shadow-panel">
@@ -600,32 +644,6 @@ export default async function EditInspectionPage({
               signedAt: document.signedAt?.toISOString() ?? null
             }))}
             inspectionId={inspection.id}
-          />
-          ) : null}
-          {!isReviewMode ? (
-          <InspectionReportCorrectionsCard
-            action={reopenCompletedReportAction}
-            inspectionId={inspection.id}
-            reports={inspectionView.tasks.map((task: InspectionTask) => ({
-              taskId: task.id,
-              inspectionType: task.inspectionType,
-              displayLabel: inspectionTaskLabel(task),
-              report: task.report ? {
-                id: task.report.id,
-                status: task.report.status,
-                finalizedAt: task.report.finalizedAt?.toISOString() ?? null,
-                correctionState: task.report.correctionState,
-                correctionReason: task.report.correctionReason,
-                correctionRequestedAt: task.report.correctionRequestedAt?.toISOString() ?? null,
-                correctionResolvedAt: task.report.correctionResolvedAt?.toISOString() ?? null,
-                correctionRequestedBy: task.report.correctionRequestedBy,
-                correctionResolvedBy: task.report.correctionResolvedBy,
-                correctionEvents: task.report.correctionEvents.map((event: CorrectionEvent) => ({
-                  ...event,
-                  createdAt: event.createdAt.toISOString()
-                }))
-              } : null
-            }))}
           />
           ) : null}
           {!isReviewMode ? (
