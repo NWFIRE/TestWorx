@@ -579,6 +579,13 @@ function buildQuickBooksQuoteCatalogCode(qbItemId: string) {
   return `${quickBooksQuoteCodePrefix}${qbItemId}`;
 }
 
+function buildQuickBooksQuoteCatalogDescription(item: {
+  sku: string | null;
+}) {
+  const sku = normalizeNullableString(item.sku);
+  return sku ? `SKU ${sku}` : "";
+}
+
 function resolveDirectQuickBooksItemId(code: string) {
   return code.startsWith(quickBooksQuoteCodePrefix) ? code.slice(quickBooksQuoteCodePrefix.length) : null;
 }
@@ -1153,7 +1160,7 @@ export async function getQuoteFormOptions(actor: ActorContext) {
       ...quickBooksCatalogItems.map((item) => ({
         code: buildQuickBooksQuoteCatalogCode(item.quickbooksItemId),
         title: item.name,
-        description: item.sku ? `QuickBooks ${item.itemType}${item.sku ? ` • SKU ${item.sku}` : ""}` : `QuickBooks ${item.itemType}`,
+        description: buildQuickBooksQuoteCatalogDescription(item),
         category: item.itemType.toLowerCase(),
         inspectionType: null,
         inspectionTypeLabel: null,
