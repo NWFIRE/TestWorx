@@ -180,11 +180,6 @@ function NavItem({
       {!collapsed ? (
         <span className="min-w-0 flex-1">
           <span className={`block truncate text-sm font-medium ${active ? "font-semibold text-slate-950" : ""}`}>{item.shortLabel}</span>
-          {item.description ? (
-            <span className={`mt-0.5 block truncate text-xs ${active ? "text-slate-600" : "text-slate-400 group-hover:text-slate-500"}`}>
-              {item.description}
-            </span>
-          ) : null}
         </span>
       ) : null}
     </Link>
