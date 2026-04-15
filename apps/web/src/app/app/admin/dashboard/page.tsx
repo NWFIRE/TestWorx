@@ -314,6 +314,9 @@ export default async function AdminDashboardPage({
   const todayItems = data.activeInspections.slice(0, 3);
   const activityItems = buildActivityItems(data.completedInspections);
   const billingPipeline = calculateBillingPipeline(data.completedInspections);
+  const archivedInspectionItems = data.completedInspections.filter(
+    (inspection) => inspection.status === "invoiced" || inspection.billingStatus === "invoiced"
+  );
 
   const statCards = [
     {
@@ -589,10 +592,10 @@ export default async function AdminDashboardPage({
                 />
                 <InspectionListCard
                   title="Completed archive"
-                  description="Recently completed visits that are ready for office follow-up, billing, or customer delivery."
+                  description="Only fully completed and invoiced work is kept in this archive for office reference and customer delivery."
                   detailHrefBase="/app/admin/dashboard"
-                  inspections={data.completedInspections.slice(0, 6)}
-                  emptyText="No completed inspections yet."
+                  inspections={archivedInspectionItems.slice(0, 6)}
+                  emptyText="No fully completed and invoiced inspections are archived yet."
                   emptyTitle="No completed archive items"
                   ctaLabel="View inspection"
                 />
