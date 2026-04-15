@@ -13,6 +13,7 @@ import {
   type ReportFieldDefinition,
   type ReportPrimitiveValue
 } from "./report-config";
+import { getCustomerFacingSiteLabel } from "./scheduling";
 import { decodeStoredFile } from "./storage";
 
 type PdfInput = {
@@ -872,9 +873,10 @@ function renderInspectionOverview(
   boldFont: PDFFont,
   regularFont: PDFFont
 ) {
+  const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name);
   renderKeyValueGrid(state, [
     { label: "Customer", value: input.customerCompany.name },
-    { label: "Site", value: input.site.name },
+    { label: "Site", value: customerFacingSiteName ?? "â€”" },
     { label: "Inspection date", value: formatDate(input.inspection.scheduledStart) },
     { label: "Completion", value: input.report.finalizedAt ? formatDateTime(input.report.finalizedAt) : "—" },
     { label: "Technician", value: input.report.technicianName ?? "—" },
@@ -889,6 +891,10 @@ function renderSummaryContext(
   boldFont: PDFFont,
   regularFont: PDFFont
 ) {
+  const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name);
+  const customerFacingSiteAddress = customerFacingSiteName
+    ? [input.site.addressLine1, input.site.addressLine2, [input.site.city, input.site.state, input.site.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ")
+    : null;
   renderKeyValueGrid(state, [
     { label: "Inspection status", value: humanizeText(input.inspection.status) },
     { label: "Scheduled window", value: input.inspection.scheduledEnd ? `${formatDateTime(input.inspection.scheduledStart)} — ${formatDateTime(input.inspection.scheduledEnd)}` : formatDateTime(input.inspection.scheduledStart) },

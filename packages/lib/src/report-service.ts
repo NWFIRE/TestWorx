@@ -12,6 +12,7 @@ import { assertTenantContext } from "./permissions";
 import { generateInspectionReportPdf } from "./pdf-report";
 import { resolveReportTemplate } from "./report-config";
 import {
+  getCustomerFacingSiteLabel,
   getInspectionAssignedTechnicianIds,
   isActiveOperationalInspectionStatus,
   isTechnicianAssignedToInspection,
@@ -1259,10 +1260,19 @@ export async function finalizeInspectionReport(actor: ActorContext, input: {
     const technicianSignature = finalized.signatures.find((signature) => signature.kind === SignatureKind.technician) ?? null;
     const customerSignature = finalized.signatures.find((signature) => signature.kind === SignatureKind.customer) ?? null;
     const photoAttachments = finalized.attachments.filter((attachment) => attachment.kind === AttachmentKind.photo);
+    const customerFacingSiteName = getCustomerFacingSiteLabel(finalized.inspection.site.name);
     const pdfBytes = await generateInspectionReportPdf({
       tenant: { name: finalized.tenant.name, branding: finalized.tenant.branding },
       customerCompany: finalized.inspection.customerCompany,
-      site: finalized.inspection.site,
+      site: {
+        ...finalized.inspection.site,
+        name: customerFacingSiteName ?? "",
+        addressLine1: customerFacingSiteName ? finalized.inspection.site.addressLine1 : "",
+        addressLine2: customerFacingSiteName ? finalized.inspection.site.addressLine2 : null,
+        city: customerFacingSiteName ? finalized.inspection.site.city : "",
+        state: customerFacingSiteName ? finalized.inspection.site.state : "",
+        postalCode: customerFacingSiteName ? finalized.inspection.site.postalCode : ""
+      },
       inspection: finalized.inspection,
       task: finalized.task,
       report: { id: finalized.id, finalizedAt, technicianName: finalized.technician?.name ?? null },

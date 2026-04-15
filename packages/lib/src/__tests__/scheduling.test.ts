@@ -4,6 +4,7 @@ import { InspectionClassification, InspectionStatus } from "@prisma/client";
 import {
   defaultScheduledStartForMonth,
   genericInspectionSiteOptionValue,
+  getCustomerFacingSiteLabel,
   getInspectionDisplayLabels,
   getDefaultInspectionRecurrenceFrequency,
   withInspectionTaskDisplayLabels,
@@ -398,5 +399,10 @@ describe("month defaults and past-due status", () => {
       primaryTitle: "Main Campus",
       secondaryTitle: "NW Fire"
     });
+  });
+
+  it("hides the generic site label from customer-facing displays", () => {
+    expect(getCustomerFacingSiteLabel("General / No Fixed Site")).toBeNull();
+    expect(getCustomerFacingSiteLabel("Main Campus")).toBe("Main Campus");
   });
 });

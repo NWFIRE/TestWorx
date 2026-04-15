@@ -6,6 +6,7 @@ import {
   buildQuotePresentationLineItems,
   buildQuoteProjectSummary,
   buildTenantBrandingCss,
+  getCustomerFacingSiteLabel,
   getHostedQuoteDetailByToken,
   getQuoteStatusTone,
   groupQuotePresentationLineItems,
@@ -158,11 +159,14 @@ export default async function HostedQuotePage({
         ? "amber"
         : "blue";
   const companyContact = [branding.phone, branding.email].filter(Boolean).join("  |  ");
-  const locationLine = [
-    quote.site?.addressLine1,
-    quote.site?.addressLine2,
-    [quote.site?.city, quote.site?.state, quote.site?.postalCode].filter(Boolean).join(" ")
-  ].filter(Boolean).join(", ");
+  const customerFacingSiteName = getCustomerFacingSiteLabel(quote.site?.name);
+  const locationLine = customerFacingSiteName
+    ? [
+        quote.site?.addressLine1,
+        quote.site?.addressLine2,
+        [quote.site?.city, quote.site?.state, quote.site?.postalCode].filter(Boolean).join(" ")
+      ].filter(Boolean).join(", ")
+    : "";
   const customerFacingLineItems = buildQuotePresentationLineItems(quote.lineItems);
   const groupedLineItems = groupQuotePresentationLineItems(customerFacingLineItems);
   const summaryLine = buildQuoteProjectSummary(quote.lineItems, quote.proposalType);
@@ -234,7 +238,7 @@ export default async function HostedQuotePage({
                 hostedState={result.accessState}
                 hostedStateTone={hostedStateTone}
                 phone={quote.customerCompany.phone}
-                projectName={quote.site?.name ?? null}
+                projectName={customerFacingSiteName}
                 quoteStatus={quote.effectiveStatus}
                 quoteStatusTone={quoteStatusTone}
                 summaryLine={summaryLine}
@@ -288,10 +292,10 @@ export default async function HostedQuotePage({
                       <p className="mt-2 text-sm font-semibold text-slate-950">{quote.customerCompany.phone}</p>
                     </div>
                   ) : null}
-                  {quote.site?.name ? (
+                  {customerFacingSiteName ? (
                     <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Project / Site</p>
-                      <p className="mt-2 text-sm font-semibold text-slate-950">{quote.site.name}</p>
+                      <p className="mt-2 text-sm font-semibold text-slate-950">{customerFacingSiteName}</p>
                       {locationLine ? <p className="mt-1 text-sm text-slate-600">{locationLine}</p> : null}
                     </div>
                   ) : null}

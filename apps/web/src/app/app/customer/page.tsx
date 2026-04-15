@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { buildTenantBrandingCss, getCustomerPortalData, getCustomerQuoteList, inspectionTypeRegistry, quoteStatusLabels } from "@testworx/lib";
+import { buildTenantBrandingCss, getCustomerFacingSiteLabel, getCustomerPortalData, getCustomerQuoteList, inspectionTypeRegistry, quoteStatusLabels } from "@testworx/lib";
 
 function getInspectionTypeLabel(inspectionType: keyof typeof inspectionTypeRegistry) {
   return inspectionTypeRegistry[inspectionType]?.label ?? inspectionType.replaceAll("_", " ");
@@ -56,7 +56,7 @@ export default async function CustomerPage() {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-lg font-semibold text-ink">{inspection.site.name}</p>
+                    <p className="text-lg font-semibold text-ink">{getCustomerFacingSiteLabel(inspection.site.name) ?? data.tenantName}</p>
                     <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Finalized</span>
                   </div>
                   <p className="mt-1 text-sm text-slate-500">
@@ -93,7 +93,7 @@ export default async function CustomerPage() {
                     <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">{quoteStatusLabels[quote.effectiveStatus]}</span>
                   </div>
                   <p className="mt-1 text-sm text-slate-500">
-                    {quote.site?.name ?? data.tenantName} | Issued {format(quote.issuedAt, "MMM d, yyyy")}
+                    {getCustomerFacingSiteLabel(quote.site?.name) ?? data.tenantName} | Issued {format(quote.issuedAt, "MMM d, yyyy")}
                   </p>
                   <p className="mt-1 text-sm text-slate-500">Total ${quote.total.toFixed(2)}</p>
                 </div>

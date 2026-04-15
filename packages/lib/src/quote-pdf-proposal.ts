@@ -7,6 +7,7 @@ import {
   groupQuotePresentationLineItems
 } from "./quote-presentation";
 import { getQuoteTermsContent } from "./quote-terms";
+import { getCustomerFacingSiteLabel } from "./scheduling";
 import { decodeStoredFile } from "./storage";
 
 export type QuotePdfInput = {
@@ -467,7 +468,7 @@ function buildSummaryFields(input: QuotePdfInput) {
 
   return [
     { label: "Customer", value: normalizeText(input.customerCompany.name) },
-    { label: "Project / Site", value: normalizeText(input.site?.name) },
+    { label: "Project / Site", value: normalizeText(getCustomerFacingSiteLabel(input.site?.name)) },
     { label: "Contact", value: normalizeText(input.customerCompany.contactName || input.quote.recipientEmail || input.customerCompany.billingEmail) },
     { label: "Phone", value: normalizeText(input.customerCompany.phone) },
     { label: "Site Address", value: siteAddress },
@@ -484,10 +485,18 @@ function renderProposalHero(
 ) {
   const status = getStatusPresentation(theme, input.quote.status);
   const summaryLine = buildQuoteProjectSummary(input.lineItems, input.quote.proposalType);
-  const customerLine = input.site?.name
+  const customerFacingSiteName = getCustomerFacingSiteLabel(input.site?.name);
+  const customerDisplayLine = customerFacingSiteName
+    ? `${input.customerCompany.name} - ${customerFacingSiteName}`
+    : input.customerCompany.name;
+  void customerDisplayLine;
+  const customerLine = customerDisplayLine;
+  /*
     ? `${input.customerCompany.name} · ${input.site.name}`
     : input.customerCompany.name;
 
+  */
+  void customerLine;
   const leftWidth = 334;
   const rightWidth = CONTENT_WIDTH - leftWidth - 16;
   const leftBodyHeight =
@@ -529,7 +538,7 @@ function renderProposalHero(
     color: theme.heading
   });
 
-  state.page.drawText(customerLine, {
+  state.page.drawText(customerDisplayLine, {
     x: PAGE_MARGIN + CARD_PADDING,
     y: state.cursorY - 46,
     size: 11,

@@ -29,7 +29,7 @@ import {
   syncQuoteToQuickBooksEstimate,
   validateMappedQbItem
 } from "./quickbooks";
-import { createInspection } from "./scheduling";
+import { createInspection, getCustomerFacingSiteLabel } from "./scheduling";
 import { assertTenantContext } from "./permissions";
 
 const quoteStatusValues = Object.values(QuoteStatus);
@@ -67,6 +67,29 @@ type NormalizedQuoteLineItem = {
   inspectionType: InspectionType | null;
   category: string | null;
 };
+
+function toCustomerFacingQuoteSite<T extends {
+  name: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  city: string | null;
+  state: string | null;
+  postalCode: string | null;
+}>(site: T | null) {
+  if (!site) {
+    return null;
+  }
+
+  const customerFacingSiteName = getCustomerFacingSiteLabel(site.name);
+  if (!customerFacingSiteName) {
+    return null;
+  }
+
+  return {
+    ...site,
+    name: customerFacingSiteName
+  };
+}
 
 type QuoteLineItemDraft = QuoteInput["lineItems"][number];
 
@@ -1764,16 +1787,18 @@ export async function getAuthorizedQuotePdf(actor: ActorContext, quoteId: string
       billingEmail: quote.recipientEmail ?? customerCompany?.billingEmail ?? null,
       phone: customerCompany?.phone ?? null
     },
-    site: site
-      ? {
-          name: site.name,
-          addressLine1: site.addressLine1,
-          addressLine2: site.addressLine2,
-          city: site.city,
-          state: site.state,
-          postalCode: site.postalCode
-        }
-      : null,
+    site: toCustomerFacingQuoteSite(
+      site
+        ? {
+            name: site.name,
+            addressLine1: site.addressLine1,
+            addressLine2: site.addressLine2,
+            city: site.city,
+            state: site.state,
+            postalCode: site.postalCode
+          }
+        : null
+    ),
     lineItems: quote.lineItems.map((line) => ({
       title: line.title,
       description: line.description,
@@ -2767,16 +2792,18 @@ export async function getPublicQuotePdfByAccessToken(token: string) {
       billingEmail: quote.recipientEmail ?? quote.customerCompany.billingEmail ?? null,
       phone: quote.customerCompany.phone ?? null
     },
-    site: quote.site
-      ? {
-          name: quote.site.name,
-          addressLine1: quote.site.addressLine1,
-          addressLine2: quote.site.addressLine2,
-          city: quote.site.city,
-          state: quote.site.state,
-          postalCode: quote.site.postalCode
-        }
-      : null,
+    site: toCustomerFacingQuoteSite(
+      quote.site
+        ? {
+            name: quote.site.name,
+            addressLine1: quote.site.addressLine1,
+            addressLine2: quote.site.addressLine2,
+            city: quote.site.city,
+            state: quote.site.state,
+            postalCode: quote.site.postalCode
+          }
+        : null
+    ),
     lineItems: quote.lineItems.map((line) => ({
       title: line.title,
       description: line.description,

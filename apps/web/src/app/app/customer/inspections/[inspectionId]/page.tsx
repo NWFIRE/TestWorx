@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getCustomerInspectionPacketDetail } from "@testworx/lib";
+import { getCustomerFacingSiteLabel, getCustomerInspectionPacketDetail } from "@testworx/lib";
 import { PageBackControl } from "@/app/page-back-control";
 
 import { InspectionPacketCard } from "../../../inspection-packet-card";
@@ -32,6 +32,8 @@ export default async function CustomerInspectionPacketPage({
     notFound();
   }
 
+  const customerFacingSiteName = getCustomerFacingSiteLabel(detail.inspection.site.name);
+
   return (
     <section className="space-y-6">
       <div className="rounded-[2rem] bg-white p-6 shadow-panel">
@@ -39,7 +41,7 @@ export default async function CustomerInspectionPacketPage({
           <div>
             <PageBackControl fallbackHref="/app/customer" label="Back to portal" />
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Inspection packet</p>
-            <h2 className="mt-2 text-3xl font-semibold text-ink">{detail.inspection.site.name}</h2>
+            <h2 className="mt-2 text-3xl font-semibold text-ink">{customerFacingSiteName ?? detail.inspection.customerCompany.name}</h2>
             <p className="mt-3 text-slate-500">
               {detail.inspection.customerCompany.name} | {format(detail.inspection.scheduledStart, "MMM d, yyyy h:mm a")}
             </p>

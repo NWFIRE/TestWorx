@@ -217,7 +217,12 @@ export function InspectionSchedulerForm({
   const isCreateWorkflow = !initialValues?.inspectionId && !reasonLabel;
   const { showToast } = useToast();
   const [selectedCustomerId, setSelectedCustomerId] = useState(initialValues?.customerCompanyId ?? "");
-  const [selectedSiteId, setSelectedSiteId] = useState(initialValues?.siteId ?? "");
+  const [selectedSiteId, setSelectedSiteId] = useState(
+    initialValues?.siteId ??
+      (initialValues?.customerCompanyId && autoSelectGenericSiteOnCustomerChange
+        ? genericInspectionSiteOptionValue
+        : "")
+  );
   const [inspectionClassification, setInspectionClassification] = useState<InspectionClassification>(
     initialValues?.inspectionClassification ?? "standard"
   );
@@ -428,8 +433,8 @@ export function InspectionSchedulerForm({
             required
             value={resolvedSiteId}
           >
-            <option value="">{selectedCustomerId ? "Select site for customer" : "Select customer first"}</option>
-            {selectedCustomerId ? <option value={genericInspectionSiteOptionValue}>Use generic site ({genericInspectionSiteName})</option> : null}
+            <option value="">{selectedCustomerId ? genericInspectionSiteName : "Select customer first"}</option>
+            {selectedCustomerId ? <option value={genericInspectionSiteOptionValue}>{genericInspectionSiteName}</option> : null}
             {selectedCustomerId && allowCustomOneTimeSite ? <option value={customInspectionSiteOptionValue}>{customInspectionSiteName}</option> : null}
             {filteredSites.map((site) => <option key={site.id} value={site.id}>{site.name} - {site.city}</option>)}
           </select>

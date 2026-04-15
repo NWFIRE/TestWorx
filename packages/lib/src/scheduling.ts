@@ -320,6 +320,15 @@ export function isGenericInspectionSiteName(siteName: string | null | undefined)
   return (siteName ?? "").trim() === genericInspectionSiteName;
 }
 
+export function getCustomerFacingSiteLabel(siteName: string | null | undefined) {
+  const normalized = (siteName ?? "").trim();
+  if (!normalized || isGenericInspectionSiteName(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
 export function getInspectionDisplayLabels(input: {
   siteName: string | null | undefined;
   customerName: string | null | undefined;
