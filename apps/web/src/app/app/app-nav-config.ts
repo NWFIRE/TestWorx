@@ -57,6 +57,15 @@ const adminNavItems: AppNavItem[] = [
     tone: "violet"
   },
   {
+    href: "/app/admin/quotes",
+    label: "Quotes",
+    shortLabel: "Quotes",
+    abbreviation: "QT",
+    icon: "invoice",
+    description: "Create, send, approve, and sync quotes",
+    tone: "blue"
+  },
+  {
     href: "/app/deficiencies",
     label: "Deficiency Center",
     shortLabel: "Deficiencies",
@@ -64,24 +73,6 @@ const adminNavItems: AppNavItem[] = [
     icon: "alert",
     description: "Quotes, approvals, and open issues",
     tone: "amber"
-  },
-  {
-    href: "/app/admin/clients",
-    label: "Clients",
-    shortLabel: "Clients",
-    abbreviation: "CL",
-    icon: "team",
-    description: "Customer records, billing profiles, and QuickBooks links",
-    tone: "slate"
-  },
-  {
-    href: "/app/admin/email-reminders",
-    label: "Email Reminders",
-    shortLabel: "Email Reminders",
-    abbreviation: "ER",
-    icon: "mail",
-    description: "Prepare and send branded customer reminder emails",
-    tone: "blue"
   },
   {
     href: "/app/admin/upcoming-inspections",
@@ -93,22 +84,22 @@ const adminNavItems: AppNavItem[] = [
     tone: "blue"
   },
   {
-    href: "/app/admin/archive",
-    label: "Inspection Archive",
-    shortLabel: "Archive",
-    abbreviation: "AR",
-    icon: "clipboard",
-    description: "Completed inspection history, reports, and documents",
-    tone: "slate"
+    href: "/app/admin/parts-and-services",
+    label: "Parts and Services",
+    shortLabel: "Parts/Services",
+    abbreviation: "PS",
+    icon: "grid",
+    description: "QuickBooks products, services, and invoice items",
+    tone: "blue"
   },
   {
-    href: "/app/admin/quotes",
-    label: "Quotes",
-    shortLabel: "Quotes",
-    abbreviation: "QT",
-    icon: "invoice",
-    description: "Create, send, approve, and sync quotes",
-    tone: "blue"
+    href: "/app/admin/clients",
+    label: "Clients",
+    shortLabel: "Clients",
+    abbreviation: "CL",
+    icon: "team",
+    description: "Customer records, billing profiles, and QuickBooks links",
+    tone: "slate"
   },
   {
     href: "/app/admin/billing",
@@ -120,13 +111,22 @@ const adminNavItems: AppNavItem[] = [
     tone: "emerald"
   },
   {
-    href: "/app/admin/parts-and-services",
-    label: "Parts and Services",
-    shortLabel: "Catalog",
-    abbreviation: "PS",
-    icon: "grid",
-    description: "QuickBooks products, services, and invoice items",
+    href: "/app/admin/email-reminders",
+    label: "Email Reminders",
+    shortLabel: "Email Reminders",
+    abbreviation: "ER",
+    icon: "mail",
+    description: "Prepare and send branded customer reminder emails",
     tone: "blue"
+  },
+  {
+    href: "/app/admin/archive",
+    label: "Inspection Archive",
+    shortLabel: "Archive",
+    abbreviation: "AR",
+    icon: "clipboard",
+    description: "Completed inspection history, reports, and documents",
+    tone: "slate"
   },
   {
     href: "/app/admin/team",
