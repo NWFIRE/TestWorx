@@ -56,6 +56,12 @@ type RefreshDebugState = {
   activeTouch: boolean;
 };
 
+declare global {
+  interface Window {
+    __tradeworxPtrDebug?: RefreshDebugState;
+  }
+}
+
 const MobileRefreshContext = createContext<MobileRefreshContextValue | null>(null);
 
 function isIPadLikeDevice() {
@@ -332,6 +338,7 @@ export function MobilePullToRefresh({
   const refreshingRef = useRef(false);
   const timeoutRef = useRef<number | null>(null);
   const activeTouchIdRef = useRef<number | null>(null);
+  const activePointerIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     readyRef.current = ready;
@@ -353,6 +360,15 @@ export function MobilePullToRefresh({
       stage: refreshing ? "refreshing" : current.stage
     }));
   }, [drawerOpen, pullDistance, ready, refreshEnabled, refreshing, routeEnabled]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !SHOW_REFRESH_DEBUG_STRIP) {
+      return;
+    }
+
+    window.__tradeworxPtrDebug = debugState;
+    window.dispatchEvent(new CustomEvent("tradeworx:ptr-debug", { detail: debugState }));
+  }, [debugState]);
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
@@ -394,6 +410,7 @@ export function MobilePullToRefresh({
     startYRef.current = 0;
     startXRef.current = 0;
     activeTouchIdRef.current = null;
+    activePointerIdRef.current = null;
     setPullDistance(0);
     setReady(false);
     setDebugState((current) => ({
@@ -446,12 +463,13 @@ export function MobilePullToRefresh({
       return;
     }
 
-    const handleTouchStart = (event: TouchEvent) => {
-      const touch = event.touches[0];
-      if (!touch) {
-        return;
-      }
-
+    const startTracking = (input: {
+      target: EventTarget | null;
+      clientX: number;
+      clientY: number;
+      touchId?: number | null;
+      pointerId?: number | null;
+    }) => {
       const scrollTop = getPrimaryScrollTop(container);
       let blockedReason: string | null = null;
 
@@ -465,17 +483,15 @@ export function MobilePullToRefresh({
         blockedReason = "route-blocked";
       } else if (refreshingRef.current) {
         blockedReason = "already-refreshing";
-      } else if (event.touches.length !== 1) {
-        blockedReason = "multi-touch";
-      } else if (!isTargetWithinBoundary(event.target, gestureTarget)) {
+      } else if (!isTargetWithinBoundary(input.target, gestureTarget)) {
         blockedReason = "outside-shell";
       } else if (scrollTop > 0) {
         blockedReason = "not-at-top";
-      } else if (isInteractiveTarget(event.target)) {
+      } else if (isInteractiveTarget(input.target)) {
         blockedReason = "interactive-target";
-      } else if (hasHorizontalScrollAncestor(event.target, container)) {
+      } else if (hasHorizontalScrollAncestor(input.target, container)) {
         blockedReason = "horizontal-scroll";
-      } else if (hasNestedVerticalScroll(event.target, container)) {
+      } else if (hasNestedVerticalScroll(input.target, container)) {
         blockedReason = "nested-scroll";
       }
 
@@ -492,9 +508,10 @@ export function MobilePullToRefresh({
       }
 
       trackingRef.current = true;
-      activeTouchIdRef.current = touch.identifier;
-      startYRef.current = touch.clientY;
-      startXRef.current = touch.clientX;
+      activeTouchIdRef.current = input.touchId ?? null;
+      activePointerIdRef.current = input.pointerId ?? null;
+      startYRef.current = input.clientY;
+      startXRef.current = input.clientX;
       setPullDistance(0);
       setReady(false);
       setDebugState((current) => ({
@@ -508,19 +525,27 @@ export function MobilePullToRefresh({
       }));
     };
 
-    const handleTouchMove = (event: TouchEvent) => {
-      if (!trackingRef.current || refreshingRef.current) {
+    const handleTouchStart = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (!touch || event.touches.length !== 1) {
         return;
       }
 
-      const touch = Array.from(event.touches).find((entry) => entry.identifier === activeTouchIdRef.current);
-      if (!touch) {
-        setDebugState((current) => ({
-          ...current,
-          stage: "cancelled",
-          reason: "touch-lost"
-        }));
-        reset();
+      startTracking({
+        target: event.target,
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+        touchId: touch.identifier
+      });
+    };
+
+    const updatePull = (input: {
+      target: EventTarget | null;
+      clientX: number;
+      clientY: number;
+      preventDefault?: () => void;
+    }) => {
+      if (!trackingRef.current || refreshingRef.current) {
         return;
       }
 
@@ -536,8 +561,8 @@ export function MobilePullToRefresh({
         return;
       }
 
-      const deltaX = touch.clientX - startXRef.current;
-      const deltaY = touch.clientY - startYRef.current;
+      const deltaX = input.clientX - startXRef.current;
+      const deltaY = input.clientY - startYRef.current;
 
       if (Math.abs(deltaX) > Math.abs(deltaY) * 0.9) {
         setDebugState((current) => ({
@@ -576,7 +601,53 @@ export function MobilePullToRefresh({
         thresholdReached: resistedDistance >= READY_THRESHOLD,
         activeTouch: true
       }));
-      event.preventDefault();
+      input.preventDefault?.();
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      const touch = Array.from(event.touches).find((entry) => entry.identifier === activeTouchIdRef.current);
+      if (!touch) {
+        setDebugState((current) => ({
+          ...current,
+          stage: "cancelled",
+          reason: "touch-lost"
+        }));
+        reset();
+        return;
+      }
+
+      updatePull({
+        target: event.target,
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+        preventDefault: () => event.preventDefault()
+      });
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.pointerType !== "touch") {
+        return;
+      }
+
+      startTracking({
+        target: event.target,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        pointerId: event.pointerId
+      });
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (event.pointerType !== "touch" || activePointerIdRef.current !== event.pointerId) {
+        return;
+      }
+
+      updatePull({
+        target: event.target,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        preventDefault: () => event.preventDefault()
+      });
     };
 
     const handleTouchEnd = () => {
@@ -597,6 +668,14 @@ export function MobilePullToRefresh({
       reset();
     };
 
+    const handlePointerEnd = (event: PointerEvent) => {
+      if (event.pointerType !== "touch" || activePointerIdRef.current !== event.pointerId) {
+        return;
+      }
+
+      handleTouchEnd();
+    };
+
     const handleScroll = () => {
       if (getPrimaryScrollTop(container) > 0 && !refreshingRef.current) {
         setDebugState((current) => ({
@@ -609,18 +688,26 @@ export function MobilePullToRefresh({
       }
     };
 
-    gestureTarget.addEventListener("touchstart", handleTouchStart, { passive: true, capture: true });
-    gestureTarget.addEventListener("touchmove", handleTouchMove, { passive: false, capture: true });
+    document.addEventListener("touchstart", handleTouchStart, { passive: true, capture: true });
+    document.addEventListener("touchmove", handleTouchMove, { passive: false, capture: true });
+    document.addEventListener("pointerdown", handlePointerDown, { passive: true, capture: true });
+    document.addEventListener("pointermove", handlePointerMove, { passive: false, capture: true });
     container.addEventListener("scroll", handleScroll, { passive: true });
     document.addEventListener("touchend", handleTouchEnd, { passive: true, capture: true });
     document.addEventListener("touchcancel", handleTouchEnd, { passive: true, capture: true });
+    document.addEventListener("pointerup", handlePointerEnd, { passive: true, capture: true });
+    document.addEventListener("pointercancel", handlePointerEnd, { passive: true, capture: true });
 
     return () => {
-      gestureTarget.removeEventListener("touchstart", handleTouchStart, true);
-      gestureTarget.removeEventListener("touchmove", handleTouchMove, true);
+      document.removeEventListener("touchstart", handleTouchStart, true);
+      document.removeEventListener("touchmove", handleTouchMove, true);
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      document.removeEventListener("pointermove", handlePointerMove, true);
       container.removeEventListener("scroll", handleScroll);
       document.removeEventListener("touchend", handleTouchEnd, true);
       document.removeEventListener("touchcancel", handleTouchEnd, true);
+      document.removeEventListener("pointerup", handlePointerEnd, true);
+      document.removeEventListener("pointercancel", handlePointerEnd, true);
       if (timeoutRef.current) {
         window.clearTimeout(timeoutRef.current);
       }
