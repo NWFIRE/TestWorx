@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 import { BrandLoader } from "@/app/brand-loader";
@@ -426,128 +425,108 @@ export function ExternalDocumentSigner({
   const savedVariantLabel = isSignatureWorkflow ? "Open saved signed PDF" : "Open saved annotated PDF";
 
   return (
-    <div className="fixed inset-0 z-[70] overflow-hidden bg-[color:var(--surface-canvas)] text-slate-900">
-      <div className="flex h-full flex-col">
-        <header className="border-b border-[color:var(--border-default)] bg-white/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/88 lg:px-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              {backNavigation ? (
-                <PageBackControl fallbackHref={backNavigation.fallbackHref} label={backNavigation.label ?? "Back to inspection"} />
-              ) : null}
-              <div className="mt-1 flex flex-wrap items-center gap-3">
-                <h2 className="text-2xl font-semibold text-ink lg:text-3xl">
-                  {inspectionDocument.label || inspectionDocument.fileName}
-                </h2>
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[inspectionDocument.status] ?? statusClasses.UPLOADED}`}>
-                  {inspectionDocument.status.replaceAll("_", " ")}
-                </span>
-              </div>
-              <p className="mt-2 max-w-4xl text-sm text-slate-500">
-                {isSignatureWorkflow
-                  ? "Review the PDF in full screen, switch to Draw / Sign when you are ready to mark it up, and save the signed copy without changing the original upload."
-                  : "Review the PDF in full screen, switch to Draw when you are ready to mark it up, and save the annotated copy without changing the original upload."}
-              </p>
-            </div>
+    <div className="space-y-6">
+      <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+        {backNavigation ? (
+          <PageBackControl className="mb-2" fallbackHref={backNavigation.fallbackHref} label={backNavigation.label} />
+        ) : null}
+        <p className="text-sm uppercase tracking-[0.25em] text-slate-500">External document</p>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <h2 className="text-3xl font-semibold text-ink">{inspectionDocument.label || inspectionDocument.fileName}</h2>
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusClasses[inspectionDocument.status] ?? statusClasses.UPLOADED}`}>
+            {inspectionDocument.status.replaceAll("_", " ")}
+          </span>
+        </div>
+        <p className="mt-3 text-slate-500">
+          {isSignatureWorkflow
+            ? "Review the attached PDF, switch to Draw / Sign when you are ready to mark it up, and save the signed copy without changing the original upload."
+            : "Review the attached PDF, switch to Draw when you are ready to mark it up, and save the annotated copy without changing the original upload."}
+        </p>
+      </div>
 
-            {backNavigation ? (
-              <Link
-                className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 py-2.5 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
-                href={backNavigation.fallbackHref}
+      <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
+        <div className="space-y-4 rounded-[2rem] bg-white p-6 shadow-panel">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] p-1">
+              <button
+                className={`inline-flex min-h-10 items-center justify-center rounded-[1rem] px-3 text-sm font-semibold transition ${
+                  interactionMode === "navigate"
+                    ? "bg-white text-slate-950 shadow-sm"
+                    : "text-[color:var(--text-secondary)] hover:text-slate-950"
+                }`}
+                onClick={() => setInteractionMode("navigate")}
+                type="button"
               >
-                Exit full screen
-              </Link>
-            ) : null}
-          </div>
-        </header>
-
-        <div className="grid min-h-0 flex-1 gap-0 xl:grid-cols-[minmax(0,1.4fr)_24rem]">
-          <section className="min-h-0 border-b border-[color:var(--border-default)] bg-[color:var(--surface-canvas)] xl:border-b-0 xl:border-r">
-            <div className="sticky top-0 z-10 border-b border-[color:var(--border-default)] bg-white/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/88 lg:px-6">
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="inline-flex rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] p-1">
-                  <button
-                    className={`inline-flex min-h-10 items-center justify-center rounded-[1rem] px-3 text-sm font-semibold transition ${
-                      interactionMode === "navigate"
-                        ? "bg-white text-slate-950 shadow-sm"
-                        : "text-[color:var(--text-secondary)] hover:text-slate-950"
-                    }`}
-                    onClick={() => setInteractionMode("navigate")}
-                    type="button"
-                  >
-                    Scroll document
-                  </button>
-                  <button
-                    className={`inline-flex min-h-10 items-center justify-center rounded-[1rem] px-3 text-sm font-semibold transition ${
-                      interactionMode === "markup"
-                        ? "bg-white text-slate-950 shadow-sm"
-                        : "text-[color:var(--text-secondary)] hover:text-slate-950"
-                    }`}
-                    onClick={() => setInteractionMode("markup")}
-                    type="button"
-                  >
-                    {isSignatureWorkflow ? "Draw / Sign" : "Draw"}
-                  </button>
-                </div>
-
-                <p className="text-sm text-slate-500">
-                  {interactionMode === "navigate"
-                    ? "Scroll mode is on. Swipe to move through the PDF without adding strokes."
-                    : "Draw mode is on. Finger and Pencil input will add markup to the page."}
-                </p>
-              </div>
+                Scroll document
+              </button>
+              <button
+                className={`inline-flex min-h-10 items-center justify-center rounded-[1rem] px-3 text-sm font-semibold transition ${
+                  interactionMode === "markup"
+                    ? "bg-white text-slate-950 shadow-sm"
+                    : "text-[color:var(--text-secondary)] hover:text-slate-950"
+                }`}
+                onClick={() => setInteractionMode("markup")}
+                type="button"
+              >
+                {isSignatureWorkflow ? "Draw / Sign" : "Draw"}
+              </button>
             </div>
 
-            <div className="h-full overflow-y-auto px-4 py-4 lg:px-6 lg:py-5">
-              <div className="space-y-4">
-                {loadingPdf ? (
-                  <p className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm text-slate-500 shadow-sm">
-                    <BrandLoader label="Loading PDF pages" size="sm" tone="muted" />
-                    Loading PDF pages...
-                  </p>
-                ) : null}
-                {pdfError ? <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-600">{pdfError}</p> : null}
-
-                {pages.map((page) => (
-                  <PdfMarkupPage
-                    key={page.pageIndex}
-                    activeColor={activeColor}
-                    activeWidth={activeWidth}
-                    disabled={pending || Boolean(pdfError)}
-                    interactionMode={interactionMode}
-                    onStrokeComplete={(stroke) => {
-                      setAnnotationStrokes((current) => [...current, stroke]);
-                    }}
-                    page={page}
-                    strokes={annotationStrokes.filter((stroke) => stroke.pageIndex === page.pageIndex)}
-                  />
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <form action={formAction} className="min-h-0 overflow-y-auto border-t border-[color:var(--border-default)] bg-white px-4 py-4 xl:border-t-0 xl:px-5 xl:py-5">
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <a
+                className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
+                href={originalPdfUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Open original PDF
+              </a>
+              {savedVariantHref ? (
                 <a
                   className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
-                  href={originalPdfUrl}
+                  href={savedVariantHref}
                   rel="noreferrer"
                   target="_blank"
                 >
-                  Open original PDF
+                  {savedVariantLabel}
                 </a>
-                {savedVariantHref ? (
-                  <a
-                    className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
-                    href={savedVariantHref}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    {savedVariantLabel}
-                  </a>
-                ) : null}
-              </div>
+              ) : null}
+            </div>
+          </div>
 
+          <p className="text-sm text-slate-500">
+            {interactionMode === "navigate"
+              ? "Scroll mode is on. Swipe to move through the PDF without adding strokes."
+              : "Draw mode is on. Finger and Pencil input will add markup to the page."}
+          </p>
+
+          {loadingPdf ? (
+            <p className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
+              <BrandLoader label="Loading PDF pages" size="sm" tone="muted" />
+              Loading PDF pages...
+            </p>
+          ) : null}
+          {pdfError ? <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-600">{pdfError}</p> : null}
+
+          <div className="space-y-4">
+            {pages.map((page) => (
+              <PdfMarkupPage
+                key={page.pageIndex}
+                activeColor={activeColor}
+                activeWidth={activeWidth}
+                disabled={pending || Boolean(pdfError)}
+                interactionMode={interactionMode}
+                onStrokeComplete={(stroke) => {
+                  setAnnotationStrokes((current) => [...current, stroke]);
+                }}
+                page={page}
+                strokes={annotationStrokes.filter((stroke) => stroke.pageIndex === page.pageIndex)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <form action={formAction} className="space-y-4 rounded-[2rem] bg-white p-6 shadow-panel">
           <input name="inspectionId" type="hidden" value={inspectionId} />
           <input name="documentId" type="hidden" value={inspectionDocument.id} />
           <input name="signerName" type="hidden" value={signerName} />
@@ -641,18 +620,16 @@ export function ExternalDocumentSigner({
           {!inspectionDocument.requiresSignature ? <p className="text-sm text-slate-500">This document was uploaded as reference-only. Signature is not required, but saved markup will create an annotated PDF variant.</p> : null}
           {state.error ? <p className="text-sm text-rose-600">{state.error}</p> : null}
           {state.success ? <p className="text-sm text-emerald-600">{state.success}</p> : null}
-              <button
-                className="w-full rounded-2xl bg-slateblue px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
-                disabled={pending || (isSignatureWorkflow && !signerName.trim()) || totalStrokeCount === 0 || Boolean(pdfError) || loadingPdf}
-                type="submit"
-              >
-                {pending
-                  ? (isSignatureWorkflow ? "Saving signed PDF..." : "Saving annotated PDF...")
-                  : (isSignatureWorkflow ? "Save signed PDF" : "Save annotated PDF")}
-              </button>
-            </div>
-          </form>
-        </div>
+          <button
+            className="w-full rounded-2xl bg-slateblue px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
+            disabled={pending || (isSignatureWorkflow && !signerName.trim()) || totalStrokeCount === 0 || Boolean(pdfError) || loadingPdf}
+            type="submit"
+          >
+            {pending
+              ? (isSignatureWorkflow ? "Saving signed PDF..." : "Saving annotated PDF...")
+              : (isSignatureWorkflow ? "Save signed PDF" : "Save annotated PDF")}
+          </button>
+        </form>
       </div>
     </div>
   );
