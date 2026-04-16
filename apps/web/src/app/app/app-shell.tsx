@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 import { getAppNavItemsForRole, getCurrentAppNavItem, isAppNavItemActive, type AppNavItem } from "./app-nav-config";
+import { MobilePullToRefresh } from "./mobile-pull-to-refresh";
 
 const DRAWER_SELECTOR =
   'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
@@ -271,6 +272,7 @@ export function AppShell({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const drawerRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
@@ -460,10 +462,13 @@ export function AppShell({
         </header>
 
         <main
-          className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:overflow-y-auto lg:px-8"
+          className="min-w-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-6 sm:px-6 lg:px-8"
+          ref={contentRef}
           style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
         >
-          <div className="mx-auto w-full max-w-[1700px] min-w-0">{children}</div>
+          <MobilePullToRefresh containerRef={contentRef} drawerOpen={drawerOpen}>
+            <div className="mx-auto w-full max-w-[1700px] min-w-0">{children}</div>
+          </MobilePullToRefresh>
         </main>
       </div>
     </div>

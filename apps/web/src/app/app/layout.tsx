@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { getTenantBrandingSettings } from "@testworx/lib";
 import { AppShell } from "./app-shell";
-import { MobilePullToRefresh } from "./mobile-pull-to-refresh";
 
 function isStaleSessionError(error: unknown) {
   return error instanceof Error && /tenant not found|user not found/i.test(error.message);
@@ -37,7 +36,6 @@ export default async function AppLayout({ children }: Readonly<{ children: React
 
   return (
     <div className="min-h-screen bg-slate-100">
-      <MobilePullToRefresh />
       <AppShell
         allowances={session.user.allowances ?? null}
         role={session.user.role}
