@@ -103,15 +103,18 @@ function formatScheduleDetail(inspection: DashboardInspection) {
   return `${taskSummary} • ${technicianSummary}`;
 }
 
+function formatInspectionMetaLine(inspection: DashboardInspection, dateFormat = "MMM d, yyyy h:mm a") {
+  return [inspection.secondaryTitle, format(inspection.scheduledStart, dateFormat)]
+    .filter(Boolean)
+    .join(" - ");
+}
+
 function buildActivityItems(
   inspections: CompletedDashboardInspection[]
 ): Array<{ title: string; meta: string; tag: string; href: string }> {
   return inspections.slice(0, 3).map((inspection) => ({
     title: `${inspection.primaryTitle ?? inspection.site.name} finalized`,
-    meta: `${inspection.secondaryTitle ?? inspection.customerCompany.name} • ${format(
-      inspection.scheduledStart,
-      "MMM d, yyyy h:mm a"
-    )}`,
+    meta: formatInspectionMetaLine(inspection),
     tag: inspection.billingStatus ? inspection.billingStatus.replaceAll("_", " ") : "Completed",
     href: `/app/admin/inspections/${inspection.id}?from=${encodeURIComponent("/app/admin/dashboard")}`
   }));
@@ -238,8 +241,7 @@ function InspectionListCard({
                       {inspection.primaryTitle ?? inspection.site.name}
                     </div>
                     <div className="mt-1 text-sm leading-6 text-[color:var(--text-secondary)]">
-                      {inspection.secondaryTitle ?? inspection.customerCompany.name} •{" "}
-                      {format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}
+                      {formatInspectionMetaLine(inspection)}
                     </div>
                     <div className="mt-1 text-sm leading-6 text-[color:var(--text-muted)]">
                       {inspection.tasks.map((task) => taskDisplayLabel(task)).join(", ") ||
@@ -247,8 +249,8 @@ function InspectionListCard({
                     </div>
                     <div className="mt-1 text-sm leading-6 text-[color:var(--text-muted)]">
                       Next due: {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}
-                    </div>
                   </div>
+                    </div>
                   <Link
                     className="inline-flex rounded-2xl border border-[color:var(--border-default)] bg-white px-4 py-2.5 text-sm font-medium text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
                     href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(detailHrefBase)}`}

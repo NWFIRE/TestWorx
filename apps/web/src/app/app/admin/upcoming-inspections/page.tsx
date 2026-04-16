@@ -194,8 +194,7 @@ export default async function UpcomingInspectionsPage({
                               />
                             </div>
                             <p className="text-sm text-slate-500">
-                              {inspection.secondaryTitle ?? inspection.customerCompany.name} -{" "}
-                              {format(inspection.scheduledStart, "EEE, MMM d, yyyy h:mm a")}
+                              {[inspection.secondaryTitle, format(inspection.scheduledStart, "EEE, MMM d, yyyy h:mm a")].filter(Boolean).join(" - ")}
                             </p>
                             <div className="flex flex-wrap gap-2">
                               {inspection.tasks.map((task) => (

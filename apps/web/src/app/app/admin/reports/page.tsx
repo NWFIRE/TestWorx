@@ -116,8 +116,7 @@ export default async function AdminReportsQueuePage({
                       <StatusBadge label={inspection.billingStatus ?? "not invoiced"} tone="blue" />
                     </div>
                     <p className="text-sm leading-5 text-slate-500">
-                      {inspection.secondaryTitle ?? inspection.customerCompany.name} •{" "}
-                      {format(inspection.completedAt ?? inspection.scheduledStart, "MMM d, yyyy")}
+                      {[inspection.secondaryTitle, format(inspection.completedAt ?? inspection.scheduledStart, "MMM d, yyyy")].filter(Boolean).join(" - ")}
                     </p>
                     <p className="text-sm leading-5 text-slate-500">
                       Assigned: {inspection.assignedTechnicianNames.join(", ") || "Shared queue"}

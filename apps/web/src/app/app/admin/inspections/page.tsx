@@ -323,13 +323,16 @@ export default async function AdminInspectionsPage({
                   inspection.tasks.map((task) => task.recurrence?.nextDueAt)
                 );
                 const scheduledLabel = format(inspection.scheduledStart, "MMM d, yyyy h:mm a");
-                const locationLabel = [
-                  inspection.primaryTitle ?? inspection.site.name,
-                  inspection.site.addressLine1,
-                  inspection.site.city
-                ]
-                  .filter(Boolean)
-                  .join(" · ");
+                const customerLabel = inspection.customerLabel ?? inspection.customerCompany.name;
+                const resolvedLocationLabel = inspection.isGenericSite
+                  ? inspection.locationLabel ?? "No fixed service address"
+                  : [
+                      inspection.locationLabel,
+                      inspection.site.addressLine1,
+                      inspection.site.city
+                    ]
+                      .filter(Boolean)
+                      .join(" - ");
 
                 return (
                   <div
@@ -341,10 +344,10 @@ export default async function AdminInspectionsPage({
                         className="block truncate text-sm font-semibold text-slate-950 hover:text-slateblue"
                         href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`}
                       >
-                        {inspection.secondaryTitle ?? inspection.customerCompany.name}
+                        {customerLabel}
                       </Link>
                       <p className="mt-1 text-sm text-[color:var(--text-secondary)] lg:hidden">
-                        {locationLabel}
+                        {resolvedLocationLabel}
                       </p>
                       <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
                         {inspection.tasks.map((task) => taskDisplayLabel(task)).join(", ") || "Inspection workflow"}
@@ -352,7 +355,7 @@ export default async function AdminInspectionsPage({
                     </div>
 
                     <div className="min-w-0">
-                      <p className="truncate text-sm text-[color:var(--text-secondary)]">{locationLabel}</p>
+                      <p className="truncate text-sm text-[color:var(--text-secondary)]">{resolvedLocationLabel}</p>
                       <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
                         Next due: {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}
                       </p>

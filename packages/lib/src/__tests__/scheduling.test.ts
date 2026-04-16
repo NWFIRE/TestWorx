@@ -383,8 +383,10 @@ describe("month defaults and past-due status", () => {
       })
     ).toEqual({
       isGenericSite: true,
+      customerLabel: "NW Fire",
+      locationLabel: "No fixed service address",
       primaryTitle: "NW Fire",
-      secondaryTitle: "General / No Fixed Site"
+      secondaryTitle: null
     });
   });
 
@@ -396,6 +398,8 @@ describe("month defaults and past-due status", () => {
       })
     ).toEqual({
       isGenericSite: false,
+      customerLabel: "NW Fire",
+      locationLabel: "Main Campus",
       primaryTitle: "Main Campus",
       secondaryTitle: "NW Fire"
     });

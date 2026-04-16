@@ -212,7 +212,7 @@ export default async function TechnicianPage({
                             <PaymentCollectionBadge visible={isDueAtTimeOfServiceCustomer(inspection.customerCompany)} />
                           </div>
                         <p className="mt-2 text-sm text-slate-500">
-                          {format(inspection.scheduledStart, "EEE, MMM d h:mm a")} | {((inspection as typeof inspection & { secondaryTitle?: string }).secondaryTitle ?? inspection.customerCompany.name)}
+                          {[format(inspection.scheduledStart, "EEE, MMM d h:mm a"), ((inspection as typeof inspection & { secondaryTitle?: string }).secondaryTitle ?? null)].filter(Boolean).join(" | ")}
                         </p>
                         <p className="mt-1 text-sm text-slate-500">Assigned team: {((inspection as typeof inspection & { assignedTechnicianNames?: string[] }).assignedTechnicianNames ?? []).join(", ")}</p>
                         <p className="mt-1 text-sm text-slate-500">Due date: {nextDueLabel(nextDue, inspection.scheduledStart)}</p>
@@ -334,7 +334,7 @@ export default async function TechnicianPage({
                             <PaymentCollectionBadge visible={isDueAtTimeOfServiceCustomer(inspection.customerCompany)} />
                           </div>
                         <p className="mt-2 text-sm text-slate-500">
-                          {format(inspection.scheduledStart, "MMM d, h:mm a")} | {((inspection as typeof inspection & { secondaryTitle?: string }).secondaryTitle ?? inspection.customerCompany.name)}
+                          {[format(inspection.scheduledStart, "MMM d, h:mm a"), ((inspection as typeof inspection & { secondaryTitle?: string }).secondaryTitle ?? null)].filter(Boolean).join(" | ")}
                         </p>
                         <p className="mt-1 text-sm text-slate-500">Due date: {nextDueLabel(nextDue, inspection.scheduledStart)}</p>
                         {isDueAtTimeOfServiceCustomer(inspection.customerCompany) ? (

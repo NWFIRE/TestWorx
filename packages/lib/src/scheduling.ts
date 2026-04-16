@@ -336,11 +336,15 @@ export function getInspectionDisplayLabels(input: {
   const siteName = (input.siteName ?? "").trim();
   const customerName = (input.customerName ?? "").trim();
   const isGenericSite = isGenericInspectionSiteName(siteName);
+  const customerLabel = customerName || siteName || "Untitled inspection";
+  const locationLabel = getCustomerFacingSiteLabel(siteName) ?? genericInspectionSiteAddressLine1;
 
   return {
     isGenericSite,
-    primaryTitle: isGenericSite && customerName ? customerName : siteName || customerName || "Untitled inspection",
-    secondaryTitle: isGenericSite ? genericInspectionSiteName : customerName
+    customerLabel,
+    locationLabel,
+    primaryTitle: isGenericSite ? customerLabel : siteName || customerLabel,
+    secondaryTitle: isGenericSite ? null : customerName || null
   };
 }
 

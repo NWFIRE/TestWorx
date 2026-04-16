@@ -176,7 +176,7 @@ export default async function AdminAmendmentsPage({
                         ) : null}
                       </div>
                       <p className="text-sm text-slate-500">
-                        {inspection.secondaryTitle ?? inspection.customerCompany.name} | {format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}
+                        {[inspection.secondaryTitle, format(inspection.scheduledStart, "MMM d, yyyy h:mm a")].filter(Boolean).join(" - ")}
                       </p>
                       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         <div className="rounded-2xl border border-slate-200 bg-white p-4">

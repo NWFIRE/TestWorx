@@ -265,7 +265,9 @@ describe("admin amendment management data", () => {
     );
 
     expect(result.items[0]?.primaryTitle).toBe("Land Run Historical Center");
-    expect(result.items[0]?.secondaryTitle).toBe("General / No Fixed Site");
+    expect(result.items[0]?.customerLabel).toBe("Land Run Historical Center");
+    expect(result.items[0]?.locationLabel).toBe("No fixed service address");
+    expect(result.items[0]?.secondaryTitle).toBeNull();
   });
 
   it("blocks technician access to amendment management", async () => {
