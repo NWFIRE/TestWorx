@@ -90,6 +90,19 @@ function buildSettingsHref(params: SettingsSearchParams, nextValues: Record<stri
   return query ? `/app/admin/settings?${query}` : "/app/admin/settings";
 }
 
+function formatStatusLabel(value: string | null | undefined, fallback: string) {
+  const normalized = value?.trim();
+  if (!normalized) {
+    return fallback;
+  }
+
+  return normalized
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 function LazySectionCard({
   eyebrow,
   title,
@@ -306,7 +319,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
           label="Subscription"
           note={billingSettings.tenant.subscriptionPlan?.name ?? "Not assigned"}
           tone="blue"
-          value={billingSettings.tenant.stripeSubscriptionStatus ?? "Not connected"}
+          value={formatStatusLabel(billingSettings.tenant.stripeSubscriptionStatus, "Not connected")}
         />
         <KPIStatCard
           label="QuickBooks"
