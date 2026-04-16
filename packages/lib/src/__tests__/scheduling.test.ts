@@ -144,6 +144,30 @@ describe("schedule creation parsing", () => {
     expect(result.success).toBe(true);
   });
 
+  it("allows current-visit service lines to remain unassigned for the shared technician queue", () => {
+    const result = scheduleInspectionSchema.safeParse({
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      scheduledStart: new Date("2026-03-15T09:00:00.000Z"),
+      scheduledEnd: null,
+      assignedTechnicianIds: [],
+      status: "scheduled",
+      notes: "Leave this open for the first available technician.",
+      tasks: [
+        {
+          inspectionType: "fire_extinguisher",
+          frequency: "ANNUAL",
+          assignedTechnicianId: null,
+          dueMonth: "2026-03",
+          dueDate: new Date("2026-03-15T00:00:00.000Z"),
+          schedulingStatus: "scheduled_now"
+        }
+      ]
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it("rejects an inspection end time before the start time", () => {
     const formData = new FormData();
     formData.set("customerCompanyId", "customer_1");

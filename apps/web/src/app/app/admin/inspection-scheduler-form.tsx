@@ -642,7 +642,7 @@ export function InspectionSchedulerForm({
                       onChange={(event) => updateServiceLine(line.id, { assignedTechnicianId: event.target.value })}
                       value={line.assignedTechnicianId}
                     >
-                      <option value="">{isCurrentVisitLine ? "Select technician" : "Leave unassigned for now"}</option>
+                      <option value="">{isCurrentVisitLine ? "Leave unassigned for shared queue" : "Leave unassigned for now"}</option>
                       {technicians.map((technician) => (
                         <option key={technician.id} value={technician.id}>
                           {technician.name}

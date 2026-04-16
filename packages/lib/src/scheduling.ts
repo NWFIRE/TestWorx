@@ -167,7 +167,6 @@ export const scheduleInspectionSchema = z.object({
     context.addIssue({ code: z.ZodIssueCode.custom, message: "Scheduled end must be after the scheduled start.", path: ["scheduledEnd"] });
   }
 
-  const currentVisitStatuses: InspectionTaskSchedulingStatus[] = ["due_now", "scheduled_now"];
   input.tasks.forEach((task, index) => {
     const normalizedDueMonth =
       task.dueMonth ||
@@ -180,14 +179,6 @@ export const scheduleInspectionSchema = z.object({
         code: z.ZodIssueCode.custom,
         message: "Each service line needs a due month or due date.",
         path: ["tasks", index, "dueMonth"]
-      });
-    }
-
-    if (currentVisitStatuses.includes(task.schedulingStatus) && !task.assignedTechnicianId) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Assign a technician to any service scheduled for this visit.",
-        path: ["tasks", index, "assignedTechnicianId"]
       });
     }
   });
