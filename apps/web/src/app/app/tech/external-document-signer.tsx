@@ -282,17 +282,30 @@ export function ExternalDocumentSigner({
     async function loadPdfPages() {
       setLoadingPdf(true);
       setPdfError(null);
+      setPages([]);
 
       try {
         const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
-          import.meta.url
-        ).toString();
+        const workerModule = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
+        if (!("pdfjsWorker" in globalThis)) {
+          Object.assign(globalThis, { pdfjsWorker: workerModule });
+        }
+
+        const response = await fetch(originalPdfUrl, {
+          credentials: "same-origin"
+        });
+        if (!response.ok) {
+          throw new Error("Unable to load the original PDF for signing.");
+        }
+
+        const pdfBytes = new Uint8Array(await response.arrayBuffer());
 
         const loadingTask = pdfjs.getDocument({
-          url: originalPdfUrl,
-          withCredentials: true
+          data: pdfBytes,
+          isOffscreenCanvasSupported: false,
+          isImageDecoderSupported: false,
+          useWorkerFetch: false,
+          stopAtErrors: true
         });
 
         const pdfDocument = (await loadingTask.promise) as PdfDocumentProxy;
