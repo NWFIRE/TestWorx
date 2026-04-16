@@ -15,6 +15,7 @@ import {
 
 import { auth } from "@/auth";
 import {
+  formatInspectionTaskSummary,
   formatInspectionStatusLabel,
   getAdminDashboardData,
   getAdminDeficiencyDashboardData,
@@ -56,10 +57,6 @@ function inspectionStatusLabel(status: string) {
   );
 }
 
-function taskDisplayLabel(task: { inspectionType: string; displayLabel?: string }) {
-  return task.displayLabel ?? task.inspectionType.replaceAll("_", " ");
-}
-
 function getGreetingName(name?: string | null) {
   return name?.trim().split(/\s+/)[0] || "there";
 }
@@ -94,7 +91,7 @@ function getGreetingByHour(date: Date, timezone?: string | null) {
 
 function formatScheduleDetail(inspection: DashboardInspection) {
   const taskSummary = inspection.tasks.length
-    ? inspection.tasks.map((task) => taskDisplayLabel(task)).join(", ")
+    ? formatInspectionTaskSummary(inspection.tasks)
     : "Inspection workflow";
   const technicianSummary = inspection.assignedTechnicianNames.length
     ? `${inspection.assignedTechnicianNames.length} tech${inspection.assignedTechnicianNames.length === 1 ? "" : "s"} assigned`
@@ -244,7 +241,7 @@ function InspectionListCard({
                       {formatInspectionMetaLine(inspection)}
                     </div>
                     <div className="mt-1 text-sm leading-6 text-[color:var(--text-muted)]">
-                      {inspection.tasks.map((task) => taskDisplayLabel(task)).join(", ") ||
+                      {formatInspectionTaskSummary(inspection.tasks) ||
                         "Inspection workflow"}
                     </div>
                     <div className="mt-1 text-sm leading-6 text-[color:var(--text-muted)]">

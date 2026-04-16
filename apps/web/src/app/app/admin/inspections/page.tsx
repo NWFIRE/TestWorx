@@ -7,6 +7,7 @@ import { LiveUrlSearchInput } from "@/app/live-url-search-input";
 import { LiveUrlSelectFilter } from "@/app/live-url-select-filter";
 import {
   activeOperationalInspectionStatuses,
+  formatInspectionTaskSummary,
   formatInspectionClassificationLabel,
   formatInspectionStatusLabel,
   getAdminDashboardData,
@@ -84,10 +85,6 @@ function buildInspectionsHref(input: {
 
   const query = params.toString();
   return query ? `/app/admin/inspections?${query}` : "/app/admin/inspections";
-}
-
-function taskDisplayLabel(task: { inspectionType: string; displayLabel?: string }) {
-  return task.displayLabel ?? task.inspectionType.replaceAll("_", " ");
 }
 
 function resolveStatusSelectValue(statuses: string[]) {
@@ -350,7 +347,7 @@ export default async function AdminInspectionsPage({
                         {resolvedLocationLabel}
                       </p>
                       <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
-                        {inspection.tasks.map((task) => taskDisplayLabel(task)).join(", ") || "Inspection workflow"}
+                        {formatInspectionTaskSummary(inspection.tasks) || "Inspection workflow"}
                       </p>
                     </div>
 

@@ -3,11 +3,7 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { buildTenantBrandingCss, getCustomerFacingSiteLabel, getCustomerPortalData, getCustomerQuoteList, inspectionTypeRegistry, quoteStatusLabels } from "@testworx/lib";
-
-function getInspectionTypeLabel(inspectionType: keyof typeof inspectionTypeRegistry) {
-  return inspectionTypeRegistry[inspectionType]?.label ?? inspectionType.replaceAll("_", " ");
-}
+import { buildTenantBrandingCss, formatInspectionTaskSummary, getCustomerFacingSiteLabel, getCustomerPortalData, getCustomerQuoteList, inspectionTypeRegistry, quoteStatusLabels } from "@testworx/lib";
 
 export default async function CustomerPage() {
   const session = await auth();
@@ -26,7 +22,7 @@ export default async function CustomerPage() {
     scheduledStart: Date;
     latestFinalizedAt: Date;
     site: { name: string };
-    taskTypes: Array<{ id: string; inspectionType: keyof typeof inspectionTypeRegistry; displayLabel?: string }>;
+    taskTypes: Array<{ id: string; inspectionType: keyof typeof inspectionTypeRegistry; displayLabel?: string | null }>;
     packetDocuments: Array<{ id: string }>;
   }>;
 
@@ -60,7 +56,7 @@ export default async function CustomerPage() {
                     <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Finalized</span>
                   </div>
                   <p className="mt-1 text-sm text-slate-500">
-                    {inspection.taskTypes.map((task) => task.displayLabel ?? getInspectionTypeLabel(task.inspectionType)).join(", ")} | {format(inspection.latestFinalizedAt, "MMM d, yyyy")}
+                    {formatInspectionTaskSummary(inspection.taskTypes)} | {format(inspection.latestFinalizedAt, "MMM d, yyyy")}
                   </p>
                   <p className="mt-1 text-sm text-slate-500">
                     {inspection.packetDocuments.length} PDF document{inspection.packetDocuments.length === 1 ? "" : "s"} available

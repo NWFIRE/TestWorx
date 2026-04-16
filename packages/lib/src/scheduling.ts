@@ -361,6 +361,57 @@ export function buildInspectionTaskDisplayLabel(input: {
   return `${baseLabel} ${input.occurrenceIndex}`;
 }
 
+export function formatInspectionTaskSummary<
+  T extends {
+    inspectionType: keyof typeof inspectionTypeRegistry;
+    displayLabel?: string | null;
+  }
+>(tasks: T[]) {
+  const totals = new Map<keyof typeof inspectionTypeRegistry, number>();
+  const seen = new Map<keyof typeof inspectionTypeRegistry, number>();
+  const groupedCounts = new Map<string, number>();
+  const orderedLabels: string[] = [];
+
+  for (const task of tasks) {
+    totals.set(task.inspectionType, (totals.get(task.inspectionType) ?? 0) + 1);
+  }
+
+  for (const task of tasks) {
+    const occurrenceIndex = (seen.get(task.inspectionType) ?? 0) + 1;
+    seen.set(task.inspectionType, occurrenceIndex);
+
+    const totalOccurrences = totals.get(task.inspectionType) ?? 1;
+    const baseLabel = formatInspectionTaskTypeLabel(task.inspectionType);
+    const generatedLabel = buildInspectionTaskDisplayLabel({
+      inspectionType: task.inspectionType,
+      occurrenceIndex,
+      totalOccurrences
+    });
+    const resolvedLabel = task.displayLabel?.trim() || generatedLabel;
+    const isDefaultGeneratedLabel = !task.displayLabel?.trim() || resolvedLabel === generatedLabel;
+
+    if (isDefaultGeneratedLabel) {
+      if (!groupedCounts.has(baseLabel)) {
+        orderedLabels.push(baseLabel);
+      }
+      groupedCounts.set(baseLabel, (groupedCounts.get(baseLabel) ?? 0) + 1);
+      continue;
+    }
+
+    orderedLabels.push(resolvedLabel);
+  }
+
+  return orderedLabels
+    .map((label) => {
+      const count = groupedCounts.get(label) ?? 0;
+      if (count > 1) {
+        return `${label} (${count})`;
+      }
+      return count === 1 ? label : label;
+    })
+    .join(", ");
+}
+
 export function withInspectionTaskDisplayLabels<T extends {
   id: string;
   inspectionType: keyof typeof inspectionTypeRegistry;

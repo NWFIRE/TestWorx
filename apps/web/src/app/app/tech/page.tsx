@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import {
+  formatInspectionTaskSummary,
   formatInspectionClassificationLabel,
   formatInspectionStatusLabel,
   getInspectionClassificationTone,
@@ -222,7 +223,7 @@ export default async function TechnicianPage({
                         {isDueAtTimeOfServiceCustomer(inspection.customerCompany) ? (
                           <p className="mt-1 text-sm font-semibold text-amber-800">Collect payment before leaving the site.</p>
                         ) : null}
-                        <p className="mt-1 text-sm text-slate-500">Report types: {inspection.tasks.map((task: DashboardTask) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
+                        <p className="mt-1 text-sm text-slate-500">Report types: {formatInspectionTaskSummary(inspection.tasks)}</p>
                         <p className="mt-1 text-sm text-slate-500">{finalizedTaskCount} of {inspection.tasks.length} report task{inspection.tasks.length === 1 ? "" : "s"} finalized</p>
                         {inspection.closeoutRequest?.status === "pending" ? (
                           <div className="mt-3 rounded-[1.25rem] border border-blue-200 bg-blue-50/80 px-4 py-3">
