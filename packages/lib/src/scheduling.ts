@@ -3503,6 +3503,10 @@ export async function getAdminReportReviewQueueData(
     })
     .filter((inspection) => inspection.reviewTasks.length > 0);
 
+  const awaitingReviewInspections = mapped.filter(
+    (inspection) => !inspection.billingStatus || inspection.billingStatus === "draft"
+  );
+
   const monthOptions = Array.from({ length: 12 }, (_, index) => {
     const monthDate = subMonths(currentMonthStart, index);
     return {
@@ -3516,13 +3520,13 @@ export async function getAdminReportReviewQueueData(
       month: format(monthStart, "yyyy-MM")
     },
     counts: {
-      awaitingReview: mapped.filter((inspection) => inspection.billingStatus !== "invoiced").length,
+      awaitingReview: awaitingReviewInspections.length,
       completed: mapped.length
     },
     options: {
       months: monthOptions
     },
-    inspections: mapped
+    inspections: awaitingReviewInspections
   };
 }
 
