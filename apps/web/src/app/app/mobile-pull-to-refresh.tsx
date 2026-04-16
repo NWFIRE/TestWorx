@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
   useTransition,
+  type CSSProperties,
   type MutableRefObject,
   type ReactNode
 } from "react";
@@ -19,6 +20,7 @@ import { BrandLoader } from "@/app/brand-loader";
 const READY_THRESHOLD = 66;
 const MAX_PULL_DISTANCE = 124;
 const REFRESH_HOLD_MS = 700;
+const MIN_VISIBLE_PULL = 3;
 
 type RefreshHandler = () => Promise<void> | void;
 
@@ -57,6 +59,16 @@ function isTouchRefreshDevice() {
   }
 
   return window.matchMedia("(pointer: coarse), (hover: none)").matches || window.innerWidth <= 1366;
+}
+
+function getRefreshIndicatorOffset(container: HTMLElement | null) {
+  if (!container) {
+    return 6;
+  }
+
+  const containerStyle = window.getComputedStyle(container);
+  const paddingTop = Number.parseFloat(containerStyle.paddingTop || "0");
+  return Math.max(6, Math.min(20, paddingTop * 0.5));
 }
 
 function isSupportedMobileRoute(pathname: string) {
@@ -153,21 +165,27 @@ function hasNestedVerticalScroll(target: EventTarget | null, boundary: HTMLEleme
 function PullIndicator({
   pullDistance,
   ready,
-  refreshing
+  refreshing,
+  topOffset
 }: {
   pullDistance: number;
   ready: boolean;
   refreshing: boolean;
+  topOffset: number;
 }) {
-  const visible = refreshing || pullDistance > 6;
+  const visible = refreshing || pullDistance > MIN_VISIBLE_PULL;
   const opacity = refreshing ? 1 : Math.min(1, pullDistance / READY_THRESHOLD);
-  const translateY = refreshing ? 16 : Math.min(22, pullDistance / 3.4);
+  const translateY = refreshing ? topOffset + 8 : topOffset + Math.min(18, pullDistance / 4.2);
+  const style: CSSProperties = {
+    opacity,
+    transform: `translateY(${translateY}px)`
+  };
 
   return (
     <div
       aria-hidden={!visible}
-      className="pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center"
-      style={{ opacity, transform: `translateY(${translateY}px)` }}
+      className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center"
+      style={style}
     >
       <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border-default)] bg-white/94 px-3.5 py-2 shadow-[0_14px_28px_rgba(15,23,42,0.08)] backdrop-blur">
         {refreshing ? (
@@ -238,6 +256,8 @@ export function MobilePullToRefresh({
   const [pullDistance, setPullDistance] = useState(0);
   const [ready, setReady] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshEnabled, setRefreshEnabled] = useState(false);
+  const [indicatorTopOffset, setIndicatorTopOffset] = useState(6);
 
   const registrationRef = useRef<MobileRefreshRegistration>({
     refreshHandler: null,
@@ -269,7 +289,10 @@ export function MobilePullToRefresh({
 
     const pointerQuery = window.matchMedia("(pointer: coarse), (hover: none)");
     const updateEnabled = () => {
-      enabledRef.current = isTouchRefreshDevice();
+      const nextEnabled = isTouchRefreshDevice();
+      enabledRef.current = nextEnabled;
+      setRefreshEnabled(nextEnabled);
+      setIndicatorTopOffset(getRefreshIndicatorOffset(containerRef.current));
     };
 
     updateEnabled();
@@ -288,7 +311,7 @@ export function MobilePullToRefresh({
         pointerQuery.removeListener(updateEnabled);
       }
     };
-  }, []);
+  }, [containerRef]);
 
   const reset = useCallback(() => {
     trackingRef.current = false;
@@ -411,14 +434,22 @@ export function MobilePullToRefresh({
       reset();
     };
 
-    document.addEventListener("touchstart", handleTouchStart, { passive: true, capture: true });
-    document.addEventListener("touchmove", handleTouchMove, { passive: false, capture: true });
+    const handleScroll = () => {
+      if (getPrimaryScrollTop(container) > 0 && !refreshingRef.current) {
+        reset();
+      }
+    };
+
+    gestureTarget.addEventListener("touchstart", handleTouchStart, { passive: true, capture: true });
+    gestureTarget.addEventListener("touchmove", handleTouchMove, { passive: false, capture: true });
+    container.addEventListener("scroll", handleScroll, { passive: true });
     document.addEventListener("touchend", handleTouchEnd, { passive: true, capture: true });
     document.addEventListener("touchcancel", handleTouchEnd, { passive: true, capture: true });
 
     return () => {
-      document.removeEventListener("touchstart", handleTouchStart, true);
-      document.removeEventListener("touchmove", handleTouchMove, true);
+      gestureTarget.removeEventListener("touchstart", handleTouchStart, true);
+      gestureTarget.removeEventListener("touchmove", handleTouchMove, true);
+      container.removeEventListener("scroll", handleScroll);
       document.removeEventListener("touchend", handleTouchEnd, true);
       document.removeEventListener("touchcancel", handleTouchEnd, true);
       if (timeoutRef.current) {
@@ -446,18 +477,48 @@ export function MobilePullToRefresh({
   );
 
   const contentOffset = refreshing ? 52 : pullDistance > 0 ? Math.min(44, pullDistance * 0.45) : 0;
+  const showRefreshAffordance = refreshEnabled && routeEnabled && !drawerOpen;
 
   return (
     <MobileRefreshContext.Provider value={contextValue}>
-      <PullIndicator pullDistance={pullDistance} ready={ready} refreshing={refreshing} />
-      <div
-        className="min-h-0 flex-1 will-change-transform"
-        style={{
-          transform: contentOffset > 0 ? `translateY(${contentOffset}px)` : undefined,
-          transition: refreshing || pullDistance === 0 ? "transform 180ms cubic-bezier(0.22, 1, 0.36, 1)" : undefined
-        }}
-      >
-        {children}
+      <div className="relative min-h-0 flex-1 overflow-visible">
+        <PullIndicator pullDistance={pullDistance} ready={ready} refreshing={refreshing} topOffset={indicatorTopOffset} />
+        {showRefreshAffordance ? (
+          <button
+            aria-label={refreshing ? "Refreshing current view" : "Refresh current view"}
+            className="absolute right-3 top-3 z-10 inline-flex min-h-10 min-w-10 items-center justify-center rounded-full border border-[color:var(--border-default)] bg-white/94 text-[color:var(--text-secondary)] shadow-[0_12px_24px_rgba(15,23,42,0.08)] backdrop-blur transition hover:text-slate-950 disabled:cursor-wait disabled:opacity-70"
+            disabled={refreshing}
+            onClick={() => {
+              if (!refreshingRef.current) {
+                void runRefresh();
+              }
+            }}
+            type="button"
+          >
+            {refreshing ? (
+              <BrandLoader label="Refreshing" size="sm" tone="muted" />
+            ) : (
+              <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 16 16">
+                <path
+                  d="M13 8a5 5 0 1 1-1.46-3.54M13 3.5v3.25H9.75"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.65"
+                />
+              </svg>
+            )}
+          </button>
+        ) : null}
+        <div
+          className="min-h-0 flex-1 will-change-transform"
+          style={{
+            transform: contentOffset > 0 ? `translateY(${contentOffset}px)` : undefined,
+            transition: refreshing || pullDistance === 0 ? "transform 180ms cubic-bezier(0.22, 1, 0.36, 1)" : undefined
+          }}
+        >
+          {children}
+        </div>
       </div>
     </MobileRefreshContext.Provider>
   );
