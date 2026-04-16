@@ -243,7 +243,6 @@ export function MobilePullToRefresh({
   const [pullDistance, setPullDistance] = useState(0);
   const [ready, setReady] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [refreshEnabled, setRefreshEnabled] = useState(false);
   const [indicatorTopOffset, setIndicatorTopOffset] = useState(6);
 
   const registrationRef = useRef<MobileRefreshRegistration>({
@@ -277,7 +276,6 @@ export function MobilePullToRefresh({
     const updateEnabled = () => {
       const nextEnabled = isTouchRefreshDevice();
       enabledRef.current = nextEnabled;
-      setRefreshEnabled(nextEnabled);
       setIndicatorTopOffset(getRefreshIndicatorOffset(containerRef.current));
     };
 
@@ -549,39 +547,11 @@ export function MobilePullToRefresh({
   );
 
   const contentOffset = refreshing ? 52 : pullDistance > 0 ? Math.min(44, pullDistance * 0.45) : 0;
-  const showRefreshAffordance = refreshEnabled && routeEnabled && !drawerOpen;
 
   return (
     <MobileRefreshContext.Provider value={contextValue}>
       <div className="relative min-h-0 flex-1 overflow-visible">
         <PullIndicator pullDistance={pullDistance} ready={ready} refreshing={refreshing} topOffset={indicatorTopOffset} />
-        {showRefreshAffordance ? (
-          <button
-            aria-label={refreshing ? "Refreshing current view" : "Refresh current view"}
-            className="absolute right-3 top-3 z-10 inline-flex min-h-10 min-w-10 items-center justify-center rounded-full border border-[color:var(--border-default)] bg-white/94 text-[color:var(--text-secondary)] shadow-[0_12px_24px_rgba(15,23,42,0.08)] backdrop-blur transition hover:text-slate-950 disabled:cursor-wait disabled:opacity-70"
-            disabled={refreshing}
-            onClick={() => {
-              if (!refreshingRef.current) {
-                void runRefresh();
-              }
-            }}
-            type="button"
-          >
-            {refreshing ? (
-              <BrandLoader label="Refreshing" size="sm" tone="muted" />
-            ) : (
-              <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 16 16">
-                <path
-                  d="M13 8a5 5 0 1 1-1.46-3.54M13 3.5v3.25H9.75"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.65"
-                />
-              </svg>
-            )}
-          </button>
-        ) : null}
         <div
           className="min-h-0 flex-1 will-change-transform"
           style={{
