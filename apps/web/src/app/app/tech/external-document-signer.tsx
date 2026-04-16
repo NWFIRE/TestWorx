@@ -443,8 +443,8 @@ export function ExternalDocumentSigner({
         </p>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-        <div className="space-y-4 rounded-[2rem] bg-white p-6 shadow-panel">
+      <div className="grid items-start gap-6 landscape:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[1.3fr_0.7fr]">
+        <div className="order-2 space-y-4 rounded-[2rem] bg-white p-6 shadow-panel landscape:order-1">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="inline-flex rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] p-1">
               <button
@@ -525,7 +525,7 @@ export function ExternalDocumentSigner({
           </div>
         </div>
 
-        <form action={formAction} className="space-y-4 rounded-[2rem] bg-white p-6 shadow-panel">
+        <form action={formAction} className="order-1 space-y-4 rounded-[2rem] bg-white p-6 shadow-panel landscape:order-2">
           <input name="inspectionId" type="hidden" value={inspectionId} />
           <input name="documentId" type="hidden" value={inspectionDocument.id} />
           <input name="signatureDataUrl" type="hidden" value="" />
