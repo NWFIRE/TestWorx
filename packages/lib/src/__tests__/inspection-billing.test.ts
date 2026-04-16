@@ -213,6 +213,26 @@ describe("inspection billing extraction", () => {
     prismaMock.auditLog.create.mockResolvedValue(undefined);
     prismaMock.quickBooksCatalogItemAlias.upsert.mockResolvedValue(undefined);
     prismaMock.billingItemCatalogMatch.upsert.mockResolvedValue(undefined);
+    prismaMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      site: {
+        city: "Chicago",
+        state: "IL",
+        postalCode: "60601"
+      }
+    });
+    prismaMock.tenant.findUnique.mockResolvedValue({
+      defaultServiceFeeCode: "SERVICE_FEE",
+      defaultServiceFeeUnitPrice: 95
+    });
+    prismaMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    prismaMock.site.findFirst.mockResolvedValue({
+      city: "Chicago",
+      state: "IL"
+    });
+    prismaMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
   });
 
   it("extracts kitchen suppression material items from structured fields", () => {
@@ -461,6 +481,26 @@ describe("inspection billing persistence and admin review", () => {
     txMock.tenant.findUnique.mockReset();
     txMock.serviceFeeRule.findMany.mockReset();
     txMock.complianceReportingFeeRule.findFirst.mockReset();
+    prismaMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      site: {
+        city: "Chicago",
+        state: "IL",
+        postalCode: "60601"
+      }
+    });
+    prismaMock.tenant.findUnique.mockResolvedValue({
+      defaultServiceFeeCode: "SERVICE_FEE",
+      defaultServiceFeeUnitPrice: 95
+    });
+    prismaMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    prismaMock.site.findFirst.mockResolvedValue({
+      city: "Chicago",
+      state: "IL"
+    });
+    prismaMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
     prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
@@ -769,6 +809,78 @@ describe("inspection billing persistence and admin review", () => {
     const summaries = await getAdminBillingSummaries({ userId: "office_1", role: "office_admin", tenantId: "tenant_1" });
     expect(summaries[0]?.metrics.materialItemCount).toBe(3);
 
+    prismaMock.$queryRaw
+      .mockResolvedValueOnce([
+        {
+          id: "summary_1",
+          status: "draft"
+        }
+      ])
+      .mockResolvedValueOnce([
+        { inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "report_1",
+          inspectionId: "inspection_1",
+          tenantId: "tenant_1",
+          contentJson: buildKitchenDraft(),
+          inspectionType: "kitchen_suppression"
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "summary_1",
+          tenantId: "tenant_1",
+          inspectionId: "inspection_1",
+          customerCompanyId: "customer_1",
+          siteId: "site_1",
+          status: "draft",
+          items: extractBillableItemsFromDraft({
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "kitchen_suppression",
+            draft: buildKitchenDraft()
+          }),
+          subtotal: 0,
+          notes: "Review pricing",
+          createdAt: new Date("2026-04-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-04-01T00:00:00.000Z")
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "summary_1",
+          inspectionId: "inspection_1",
+          customerCompanyId: "customer_1",
+          customerName: "Pinecrest Property Management",
+          siteId: "site_1",
+          siteName: "Pinecrest Tower",
+          inspectionDate: new Date("2026-03-20T15:00:00.000Z"),
+          technicianName: "Alex Turner",
+          status: "draft",
+          quickbooksSyncStatus: null,
+          quickbooksInvoiceId: null,
+          quickbooksInvoiceNumber: null,
+          quickbooksConnectionMode: null,
+          quickbooksSyncedAt: null,
+          quickbooksSendStatus: null,
+          quickbooksSentAt: null,
+          quickbooksSyncError: null,
+          quickbooksSendError: null,
+          subtotal: 0,
+          notes: "Review pricing",
+          items: extractBillableItemsFromDraft({
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "kitchen_suppression",
+            draft: buildKitchenDraft()
+          })
+        }
+      ]);
+
     const detail = await getAdminBillingSummaryDetail({ userId: "office_1", role: "office_admin", tenantId: "tenant_1" }, "inspection_1");
     expect(detail?.groupedItems.material).toHaveLength(3);
     expect(detail?.notes).toBe("Review pricing");
@@ -831,7 +943,19 @@ describe("inspection billing persistence and admin review", () => {
   });
 
   it("does not expose catalog matches for service fee lines in admin review", async () => {
-    prismaMock.$queryRaw.mockResolvedValueOnce([
+    prismaMock.$queryRaw
+      .mockResolvedValueOnce([
+        {
+          id: "summary_1",
+          status: "draft"
+        }
+      ])
+      .mockResolvedValueOnce([
+        { inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
       {
         id: "summary_1",
         inspectionId: "inspection_1",
@@ -871,6 +995,16 @@ describe("inspection billing persistence and admin review", () => {
         ]
       }
     ]);
+    prismaMock.tenant.findUnique.mockResolvedValue({
+      defaultServiceFeeCode: "SERVICE_FEE",
+      defaultServiceFeeUnitPrice: 95
+    });
+    prismaMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    prismaMock.site.findFirst.mockResolvedValue({
+      city: "Chicago",
+      state: "IL"
+    });
+    prismaMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
 
     const detail = await getAdminBillingSummaryDetail(
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
@@ -880,6 +1014,140 @@ describe("inspection billing persistence and admin review", () => {
     expect(detail?.items[0]?.currentCatalogMatch).toBeNull();
     expect(detail?.items[0]?.suggestedCatalogMatches).toEqual([]);
     expect(prismaMock.quickBooksCatalogItem.findMany).not.toHaveBeenCalled();
+  });
+
+  it("resyncs non-invoiced billing detail so compliance reporting fees reflect current rules", async () => {
+    const kitchenDraft = buildKitchenDraft();
+
+    prismaMock.$queryRaw
+      .mockResolvedValueOnce([
+        {
+          id: "summary_1",
+          status: "draft"
+        }
+      ])
+      .mockResolvedValueOnce([
+        { inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "report_1",
+          inspectionId: "inspection_1",
+          tenantId: "tenant_1",
+          contentJson: kitchenDraft,
+          inspectionType: "kitchen_suppression"
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "summary_1",
+          tenantId: "tenant_1",
+          inspectionId: "inspection_1",
+          customerCompanyId: "customer_1",
+          siteId: "site_1",
+          status: "draft",
+          items: [],
+          subtotal: 0,
+          notes: null,
+          createdAt: new Date("2026-04-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-04-01T00:00:00.000Z")
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "summary_1",
+          inspectionId: "inspection_1",
+          customerCompanyId: "customer_1",
+          customerName: "Pinecrest Property Management",
+          siteId: "site_1",
+          siteName: "Pinecrest Tower",
+          inspectionDate: new Date("2026-03-20T15:00:00.000Z"),
+          technicianName: "Alex Turner",
+          status: "draft",
+          quickbooksSyncStatus: null,
+          quickbooksInvoiceId: null,
+          quickbooksInvoiceNumber: null,
+          quickbooksConnectionMode: null,
+          quickbooksSyncedAt: null,
+          quickbooksSendStatus: null,
+          quickbooksSentAt: null,
+          quickbooksSyncError: null,
+          quickbooksSendError: null,
+          subtotal: 117.5,
+          notes: null,
+          items: [
+            {
+              id: "inspection_1:service-fee",
+              tenantId: "tenant_1",
+              inspectionId: "inspection_1",
+              reportId: "inspection_1",
+              reportType: "inspection",
+              sourceSection: "service-fee",
+              sourceField: "serviceFee",
+              category: "fee",
+              code: "SERVICE_FEE",
+              description: "Service Fee",
+              quantity: 1,
+              unitPrice: 95,
+              amount: 95
+            },
+            {
+              id: "inspection_1:compliance-fee:kitchen_suppression",
+              tenantId: "tenant_1",
+              inspectionId: "inspection_1",
+              reportId: "inspection_1",
+              reportType: "compliance_reporting",
+              sourceSection: "compliance-reporting-fee",
+              sourceField: "kitchen_suppression",
+              category: "fee",
+              code: "COMPLIANCE_REPORTING_FEE_KITCHEN_SUPPRESSION",
+              description: "Compliance Reporting Fee",
+              quantity: 1,
+              unitPrice: 22.5,
+              amount: 22.5,
+              metadata: {
+                feeType: "compliance_reporting",
+                complianceDivision: "kitchen_suppression",
+                complianceRuleId: "compliance_rule_1",
+                complianceJurisdictionCity: "Chicago",
+                complianceJurisdictionCounty: "Cook",
+                complianceJurisdictionState: "IL",
+                complianceResolutionSource: "city"
+              }
+            }
+          ]
+        }
+      ]);
+
+    prismaMock.tenant.findUnique.mockResolvedValue({
+      defaultServiceFeeCode: "SERVICE_FEE",
+      defaultServiceFeeUnitPrice: 95
+    });
+    prismaMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    prismaMock.site.findFirst.mockResolvedValue({
+      city: "Chicago",
+      state: "IL"
+    });
+    prismaMock.complianceReportingFeeRule.findFirst.mockResolvedValue({
+      id: "compliance_rule_1",
+      city: "Chicago",
+      county: "Cook",
+      state: "IL",
+      feeAmount: 22.5
+    });
+
+    const detail = await getAdminBillingSummaryDetail(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    expect(prismaMock.$executeRaw).toHaveBeenCalled();
+    expect(detail?.items.find((item) => item.code === "COMPLIANCE_REPORTING_FEE_KITCHEN_SUPPRESSION")).toEqual(
+      expect.objectContaining({
+        description: "Compliance Reporting Fee",
+        unitPrice: 22.5
+      })
+    );
   });
 
   it("updates grouped billing rows while preserving underlying items", async () => {
@@ -944,7 +1212,33 @@ describe("inspection billing persistence and admin review", () => {
   });
 
   it("suggests normalized and alias-based catalog matches without forcing manual renames", async () => {
-    prismaMock.$queryRaw.mockResolvedValueOnce([
+    prismaMock.$queryRaw
+      .mockResolvedValueOnce([
+        {
+          id: "summary_1",
+          status: "draft"
+        }
+      ])
+      .mockResolvedValueOnce([
+        { inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "summary_1",
+          tenantId: "tenant_1",
+          inspectionId: "inspection_1",
+          customerCompanyId: "customer_1",
+          siteId: "site_1",
+          status: "draft",
+          items: [],
+          subtotal: 0,
+          notes: null,
+          createdAt: new Date("2026-04-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-04-01T00:00:00.000Z")
+        }
+      ])
+      .mockResolvedValueOnce([
       {
         id: "summary_1",
         inspectionId: "inspection_1",

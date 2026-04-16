@@ -1651,6 +1651,25 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
   ensureAdmin(parsedActor);
   const tenantId = parsedActor.tenantId as string;
 
+  const existingSummaryRows = (await prisma.$queryRaw`
+    SELECT "id", "status"
+    FROM "InspectionBillingSummary"
+    WHERE "tenantId" = ${tenantId} AND "inspectionId" = ${inspectionId}
+    LIMIT 1
+  `) as Array<{ id: string; status: string }>;
+
+  const existingSummary = existingSummaryRows[0] ?? null;
+  if (existingSummary && existingSummary.status !== "invoiced") {
+    try {
+      await syncInspectionBillingSummaryTx(prisma as unknown as TransactionClient, {
+        tenantId,
+        inspectionId
+      });
+    } catch {
+      // Keep billing review usable even if a legacy summary cannot be refreshed cleanly.
+    }
+  }
+
   const rows = (await prisma.$queryRaw`
     SELECT
       s."id",
