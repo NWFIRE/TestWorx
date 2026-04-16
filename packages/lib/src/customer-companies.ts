@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@testworx/db";
 import { z } from "zod";
 
@@ -6,6 +7,12 @@ import { actorContextSchema } from "@testworx/types";
 
 import { assertTenantContext } from "./permissions";
 import { getTenantQuickBooksConnectionStatus, syncTradeWorxCustomerCompanyToQuickBooks } from "./quickbooks";
+import {
+  customerBillingSettingsInputSchema,
+  invoiceDeliverySettingsSchema,
+  requiredBillingReferencesSchema,
+  validateCustomerBillingSettingsTx
+} from "./third-party-billing";
 
 export const customerPaymentTermsOptions = ["due_on_receipt", "net_15", "net_30", "net_60", "custom"] as const;
 
@@ -44,6 +51,12 @@ const customerCompanySelect = {
   paymentTermsCode: true,
   customPaymentTermsLabel: true,
   customPaymentTermsDays: true,
+  billingType: true,
+  billToAccountId: true,
+  contractProfileId: true,
+  invoiceDeliverySettings: true,
+  autoBillingEnabled: true,
+  requiredBillingReferences: true,
   quickbooksCustomerId: true,
   createdAt: true,
   updatedAt: true
@@ -79,6 +92,12 @@ type SelectedCustomerCompany = {
   paymentTermsCode: string;
   customPaymentTermsLabel: string | null;
   customPaymentTermsDays: number | null;
+  billingType: string;
+  billToAccountId: string | null;
+  contractProfileId: string | null;
+  invoiceDeliverySettings: Prisma.JsonValue | null;
+  autoBillingEnabled: boolean;
+  requiredBillingReferences: Prisma.JsonValue | null;
   quickbooksCustomerId: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -184,7 +203,13 @@ export const customerCompanyInputSchema = z
       message: "Select payment terms."
     }),
     customPaymentTermsLabel: nullableTrimmedString(120),
-    customPaymentTermsDays: optionalPositiveInt()
+    customPaymentTermsDays: optionalPositiveInt(),
+    billingType: z.enum(["standard", "third_party"]).default("standard"),
+    billToAccountId: nullableTrimmedString(160),
+    contractProfileId: nullableTrimmedString(160),
+    invoiceDeliverySettings: invoiceDeliverySettingsSchema.default({ method: "payer_email" }),
+    autoBillingEnabled: z.boolean().default(false),
+    requiredBillingReferences: requiredBillingReferencesSchema.default({})
   })
   .superRefine((input, context) => {
     if (input.paymentTermsCode === "custom" && !input.customPaymentTermsLabel && !input.customPaymentTermsDays) {
@@ -214,6 +239,24 @@ export const customerCompanyInputSchema = z
         }
       }
     }
+
+    const parsedBilling = customerBillingSettingsInputSchema.safeParse({
+      billingType: input.billingType,
+      billToAccountId: input.billToAccountId,
+      contractProfileId: input.contractProfileId,
+      invoiceDeliverySettings: input.invoiceDeliverySettings,
+      autoBillingEnabled: input.autoBillingEnabled,
+      requiredBillingReferences: input.requiredBillingReferences
+    });
+
+    if (!parsedBilling.success) {
+      const firstIssue = parsedBilling.error.issues[0];
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: firstIssue?.path ?? ["billingType"],
+        message: firstIssue?.message ?? "Invalid billing settings."
+      });
+    }
   });
 
 function normalizeCustomerCompanyInput(input: z.infer<typeof customerCompanyInputSchema>) {
@@ -221,6 +264,14 @@ function normalizeCustomerCompanyInput(input: z.infer<typeof customerCompanyInpu
   const paymentTermsCode = input.paymentTermsCode ?? "due_on_receipt";
   const customPaymentTermsLabel = paymentTermsCode === "custom" ? input.customPaymentTermsLabel ?? null : null;
   const customPaymentTermsDays = paymentTermsCode === "custom" ? input.customPaymentTermsDays ?? null : null;
+  const billingSettings = customerBillingSettingsInputSchema.parse({
+    billingType: input.billingType ?? "standard",
+    billToAccountId: input.billToAccountId ?? undefined,
+    contractProfileId: input.contractProfileId ?? undefined,
+    invoiceDeliverySettings: input.invoiceDeliverySettings ?? { method: "payer_email" },
+    autoBillingEnabled: input.autoBillingEnabled ?? false,
+    requiredBillingReferences: input.requiredBillingReferences ?? {}
+  });
 
   return {
     customerCompanyId: input.customerCompanyId?.trim() || undefined,
@@ -246,7 +297,13 @@ function normalizeCustomerCompanyInput(input: z.infer<typeof customerCompanyInpu
     isActive: input.isActive ?? true,
     paymentTermsCode,
     customPaymentTermsLabel,
-    customPaymentTermsDays
+    customPaymentTermsDays,
+    billingType: billingSettings.billingType,
+    billToAccountId: billingSettings.billingType === "third_party" ? billingSettings.billToAccountId ?? null : null,
+    contractProfileId: billingSettings.billingType === "third_party" ? billingSettings.contractProfileId ?? null : null,
+    invoiceDeliverySettings: billingSettings.invoiceDeliverySettings,
+    autoBillingEnabled: billingSettings.autoBillingEnabled,
+    requiredBillingReferences: billingSettings.requiredBillingReferences
   };
 }
 
@@ -491,10 +548,28 @@ export async function createCustomerCompany(
     throw new Error("A customer with that name already exists.");
   }
 
+  const validatedBilling = await validateCustomerBillingSettingsTx(prisma, {
+    tenantId: parsedActor.tenantId as string,
+    billingSettings: {
+      billingType: parsedInput.billingType,
+      billToAccountId: parsedInput.billToAccountId ?? undefined,
+      contractProfileId: parsedInput.contractProfileId ?? undefined,
+      invoiceDeliverySettings: parsedInput.invoiceDeliverySettings,
+      autoBillingEnabled: parsedInput.autoBillingEnabled,
+      requiredBillingReferences: parsedInput.requiredBillingReferences
+    }
+  });
+
   const customer = await prisma.customerCompany.create({
     data: {
       tenantId: parsedActor.tenantId as string,
-      ...parsedInput
+      ...parsedInput,
+      billingType: validatedBilling.billingSettings.billingType,
+      billToAccountId: validatedBilling.billingSettings.billToAccountId ?? null,
+      contractProfileId: validatedBilling.billingSettings.contractProfileId ?? null,
+      invoiceDeliverySettings: validatedBilling.billingSettings.invoiceDeliverySettings as unknown as Prisma.InputJsonValue,
+      autoBillingEnabled: validatedBilling.billingSettings.autoBillingEnabled,
+      requiredBillingReferences: validatedBilling.billingSettings.requiredBillingReferences as unknown as Prisma.InputJsonValue
     },
     select: customerCompanySelect
   });
@@ -513,7 +588,10 @@ export async function createCustomerCompany(
         isTaxExempt: customer.isTaxExempt,
         isActive: customer.isActive,
         paymentTermsCode: customer.paymentTermsCode,
-        billingAddressSameAsService: customer.billingAddressSameAsService
+        billingAddressSameAsService: customer.billingAddressSameAsService,
+        billingType: customer.billingType,
+        billToAccountId: customer.billToAccountId,
+        contractProfileId: customer.contractProfileId
       }
     }
   });
@@ -575,10 +653,28 @@ export async function updateCustomerCompany(
     throw new Error("Another customer already uses that name.");
   }
 
+  const validatedBilling = await validateCustomerBillingSettingsTx(prisma, {
+    tenantId: parsedActor.tenantId as string,
+    billingSettings: {
+      billingType: parsedInput.billingType,
+      billToAccountId: parsedInput.billToAccountId ?? undefined,
+      contractProfileId: parsedInput.contractProfileId ?? undefined,
+      invoiceDeliverySettings: parsedInput.invoiceDeliverySettings,
+      autoBillingEnabled: parsedInput.autoBillingEnabled,
+      requiredBillingReferences: parsedInput.requiredBillingReferences
+    }
+  });
+
   const customer = await prisma.customerCompany.update({
     where: { id: existing.id },
     data: {
-      ...parsedInput
+      ...parsedInput,
+      billingType: validatedBilling.billingSettings.billingType,
+      billToAccountId: validatedBilling.billingSettings.billToAccountId ?? null,
+      contractProfileId: validatedBilling.billingSettings.contractProfileId ?? null,
+      invoiceDeliverySettings: validatedBilling.billingSettings.invoiceDeliverySettings as unknown as Prisma.InputJsonValue,
+      autoBillingEnabled: validatedBilling.billingSettings.autoBillingEnabled,
+      requiredBillingReferences: validatedBilling.billingSettings.requiredBillingReferences as unknown as Prisma.InputJsonValue
     },
     select: customerCompanySelect
   });
@@ -597,7 +693,10 @@ export async function updateCustomerCompany(
         isTaxExempt: customer.isTaxExempt,
         isActive: customer.isActive,
         paymentTermsCode: customer.paymentTermsCode,
-        billingAddressSameAsService: customer.billingAddressSameAsService
+        billingAddressSameAsService: customer.billingAddressSameAsService,
+        billingType: customer.billingType,
+        billToAccountId: customer.billToAccountId,
+        contractProfileId: customer.contractProfileId
       }
     }
   });

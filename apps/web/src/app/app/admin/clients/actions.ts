@@ -52,16 +52,8 @@ function buildClientProfileHref(customerCompanyId: string, values: Record<string
     : `/app/admin/clients/${encodeURIComponent(customerCompanyId)}`;
 }
 
-export async function createCustomerCompanyAction(
-  _: { error: string | null; success: string | null; customerCompanyId?: string | null },
-  formData: FormData
-) {
-  const session = await auth();
-  if (!session?.user?.tenantId) {
-    return { error: "Unauthorized", success: null, customerCompanyId: null };
-  }
-
-  const parsed = customerCompanyInputSchema.safeParse({
+function buildCustomerCompanyPayload(formData: FormData) {
+  return {
     name: String(formData.get("name") ?? ""),
     contactName: String(formData.get("contactName") ?? ""),
     billingEmail: String(formData.get("billingEmail") ?? ""),
@@ -87,7 +79,38 @@ export async function createCustomerCompanyAction(
     customPaymentTermsDays: (() => {
       const raw = String(formData.get("customPaymentTermsDays") ?? "").trim();
       return raw ? Number(raw) : undefined;
-    })()
+    })(),
+    billingType: String(formData.get("billingType") ?? "standard"),
+    billToAccountId: String(formData.get("billToAccountId") ?? ""),
+    contractProfileId: String(formData.get("contractProfileId") ?? ""),
+    invoiceDeliverySettings: {
+      method: String(formData.get("invoiceDeliveryMethod") ?? "payer_email"),
+      recipientEmail: String(formData.get("invoiceDeliveryRecipientEmail") ?? ""),
+      label: String(formData.get("invoiceDeliveryLabel") ?? "")
+    },
+    autoBillingEnabled: formData.get("autoBillingEnabled") === "on",
+    requiredBillingReferences: {
+      requirePo: formData.get("requirePo") === "on",
+      requireCustomerReference: formData.get("requireCustomerReference") === "on",
+      labels: String(formData.get("requiredReferenceLabels") ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean)
+    }
+  };
+}
+
+export async function createCustomerCompanyAction(
+  _: { error: string | null; success: string | null; customerCompanyId?: string | null },
+  formData: FormData
+) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { error: "Unauthorized", success: null, customerCompanyId: null };
+  }
+
+  const parsed = customerCompanyInputSchema.safeParse({
+    ...buildCustomerCompanyPayload(formData)
   });
 
   if (!parsed.success) {
@@ -127,32 +150,7 @@ export async function updateCustomerCompanyAction(formData: FormData) {
 
   const parsed = customerCompanyInputSchema.safeParse({
     customerCompanyId: String(formData.get("customerCompanyId") ?? ""),
-    name: String(formData.get("name") ?? ""),
-    contactName: String(formData.get("contactName") ?? ""),
-    billingEmail: String(formData.get("billingEmail") ?? ""),
-    phone: String(formData.get("phone") ?? ""),
-    isTaxExempt: formData.get("isTaxExempt") === "on",
-    serviceAddressLine1: String(formData.get("serviceAddressLine1") ?? ""),
-    serviceAddressLine2: String(formData.get("serviceAddressLine2") ?? ""),
-    serviceCity: String(formData.get("serviceCity") ?? ""),
-    serviceState: String(formData.get("serviceState") ?? ""),
-    servicePostalCode: String(formData.get("servicePostalCode") ?? ""),
-    serviceCountry: String(formData.get("serviceCountry") ?? ""),
-    billingAddressSameAsService: formData.get("billingAddressSameAsService") === "on",
-    billingAddressLine1: String(formData.get("billingAddressLine1") ?? ""),
-    billingAddressLine2: String(formData.get("billingAddressLine2") ?? ""),
-    billingCity: String(formData.get("billingCity") ?? ""),
-    billingState: String(formData.get("billingState") ?? ""),
-    billingPostalCode: String(formData.get("billingPostalCode") ?? ""),
-    billingCountry: String(formData.get("billingCountry") ?? ""),
-    notes: String(formData.get("notes") ?? ""),
-    isActive: formData.get("isActive") === "on",
-    paymentTermsCode: String(formData.get("paymentTermsCode") ?? "due_on_receipt"),
-    customPaymentTermsLabel: String(formData.get("customPaymentTermsLabel") ?? ""),
-    customPaymentTermsDays: (() => {
-      const raw = String(formData.get("customPaymentTermsDays") ?? "").trim();
-      return raw ? Number(raw) : undefined;
-    })()
+    ...buildCustomerCompanyPayload(formData)
   });
 
   if (!parsed.success) {
@@ -202,32 +200,7 @@ export async function updateCustomerCompanyProfileAction(formData: FormData) {
 
   const parsed = customerCompanyInputSchema.safeParse({
     customerCompanyId,
-    name: String(formData.get("name") ?? ""),
-    contactName: String(formData.get("contactName") ?? ""),
-    billingEmail: String(formData.get("billingEmail") ?? ""),
-    phone: String(formData.get("phone") ?? ""),
-    isTaxExempt: formData.get("isTaxExempt") === "on",
-    serviceAddressLine1: String(formData.get("serviceAddressLine1") ?? ""),
-    serviceAddressLine2: String(formData.get("serviceAddressLine2") ?? ""),
-    serviceCity: String(formData.get("serviceCity") ?? ""),
-    serviceState: String(formData.get("serviceState") ?? ""),
-    servicePostalCode: String(formData.get("servicePostalCode") ?? ""),
-    serviceCountry: String(formData.get("serviceCountry") ?? ""),
-    billingAddressSameAsService: formData.get("billingAddressSameAsService") === "on",
-    billingAddressLine1: String(formData.get("billingAddressLine1") ?? ""),
-    billingAddressLine2: String(formData.get("billingAddressLine2") ?? ""),
-    billingCity: String(formData.get("billingCity") ?? ""),
-    billingState: String(formData.get("billingState") ?? ""),
-    billingPostalCode: String(formData.get("billingPostalCode") ?? ""),
-    billingCountry: String(formData.get("billingCountry") ?? ""),
-    notes: String(formData.get("notes") ?? ""),
-    isActive: formData.get("isActive") === "on",
-    paymentTermsCode: String(formData.get("paymentTermsCode") ?? "due_on_receipt"),
-    customPaymentTermsLabel: String(formData.get("customPaymentTermsLabel") ?? ""),
-    customPaymentTermsDays: (() => {
-      const raw = String(formData.get("customPaymentTermsDays") ?? "").trim();
-      return raw ? Number(raw) : undefined;
-    })()
+    ...buildCustomerCompanyPayload(formData)
   });
 
   if (!parsed.success) {

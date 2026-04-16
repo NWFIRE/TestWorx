@@ -17,6 +17,7 @@ import {
 import { resolveInspectionServiceFeeTx } from "./service-fees";
 import { saveQuickBooksItemMappingForCode } from "./quickbooks";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
+import { applyBillingContextToItems, resolveCustomerBillingContextTx, type ResolvedBillingContext } from "./third-party-billing";
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -97,6 +98,17 @@ type PersistedBillingSummary = {
   customerCompanyId: string;
   siteId: string;
   status: BillingSummaryStatus;
+  billingType: "standard" | "third_party";
+  billToAccountId: string | null;
+  billToName: string | null;
+  contractProfileId: string | null;
+  contractProfileName: string | null;
+  routingSnapshot: JsonValue | null;
+  pricingSnapshot: JsonValue | null;
+  groupingSnapshot: JsonValue | null;
+  attachmentSnapshot: JsonValue | null;
+  deliverySnapshot: JsonValue | null;
+  referenceSnapshot: JsonValue | null;
   items: BillableItem[];
   subtotal: number;
   notes: string | null;
@@ -111,6 +123,17 @@ type PersistedBillingSummaryRow = {
   customerCompanyId: string;
   siteId: string;
   status: string;
+  billingType: string;
+  billToAccountId: string | null;
+  billToName: string | null;
+  contractProfileId: string | null;
+  contractProfileName: string | null;
+  routingSnapshot: JsonValue | null;
+  pricingSnapshot: JsonValue | null;
+  groupingSnapshot: JsonValue | null;
+  attachmentSnapshot: JsonValue | null;
+  deliverySnapshot: JsonValue | null;
+  referenceSnapshot: JsonValue | null;
   items: JsonValue;
   subtotal: number;
   notes: string | null;
@@ -128,6 +151,17 @@ type BillingSummaryListRow = {
   inspectionDate: Date;
   technicianName: string | null;
   status: BillingSummaryStatus;
+  billingType: "standard" | "third_party";
+  billToAccountId: string | null;
+  billToName: string | null;
+  contractProfileId: string | null;
+  contractProfileName: string | null;
+  routingSnapshot: JsonValue | null;
+  pricingSnapshot: JsonValue | null;
+  groupingSnapshot: JsonValue | null;
+  attachmentSnapshot: JsonValue | null;
+  deliverySnapshot: JsonValue | null;
+  referenceSnapshot: JsonValue | null;
   quickbooksSyncStatus: string | null;
   quickbooksInvoiceId: string | null;
   quickbooksInvoiceNumber: string | null;
@@ -152,6 +186,17 @@ type AdminBillingSummaryDetailRow = {
   inspectionDate: Date;
   technicianName: string | null;
   status: string;
+  billingType: string;
+  billToAccountId: string | null;
+  billToName: string | null;
+  contractProfileId: string | null;
+  contractProfileName: string | null;
+  routingSnapshot: JsonValue | null;
+  pricingSnapshot: JsonValue | null;
+  groupingSnapshot: JsonValue | null;
+  attachmentSnapshot: JsonValue | null;
+  deliverySnapshot: JsonValue | null;
+  referenceSnapshot: JsonValue | null;
   quickbooksSyncStatus: string | null;
   quickbooksInvoiceId: string | null;
   quickbooksInvoiceNumber: string | null;
@@ -171,6 +216,17 @@ type AuthorizedBillingSummaryRow = {
   tenantId: string;
   inspectionId: string;
   status: string;
+  billingType: string;
+  billToAccountId: string | null;
+  billToName: string | null;
+  contractProfileId: string | null;
+  contractProfileName: string | null;
+  routingSnapshot: JsonValue | null;
+  pricingSnapshot: JsonValue | null;
+  groupingSnapshot: JsonValue | null;
+  attachmentSnapshot: JsonValue | null;
+  deliverySnapshot: JsonValue | null;
+  referenceSnapshot: JsonValue | null;
   subtotal: number;
   notes: string | null;
   items: JsonValue;
@@ -191,6 +247,7 @@ type InspectionRow = {
   inspectionId: string;
   customerCompanyId: string;
   siteId: string;
+  inspectionClassification: string | null;
 };
 
 const INSPECTION_LEVEL_REPORT_TYPE = "inspection";
@@ -1426,9 +1483,38 @@ function subtotalForItems(items: BillableItem[]) {
   return Number(items.reduce((sum, item) => sum + (item.amount ?? 0), 0).toFixed(2));
 }
 
+function normalizeBillingType(value: string | null | undefined): "standard" | "third_party" {
+  return value === "third_party" ? "third_party" : "standard";
+}
+
+function buildBillingContextSnapshots(context: ResolvedBillingContext) {
+  return {
+    billingType: context.billingType,
+    billToAccountId: context.routing.billToAccountId,
+    billToName: context.routing.billToName,
+    contractProfileId: context.contractProfile?.id ?? null,
+    contractProfileName: context.contractProfile?.name ?? null,
+    routingSnapshot: {
+      billToAccountId: context.routing.billToAccountId,
+      billToName: context.routing.billToName,
+      quickbooksCustomerId: context.routing.quickbooksCustomerId,
+      autoBillingEnabled: context.autoBillingEnabled
+    } satisfies JsonValue,
+    pricingSnapshot: {
+      mode: context.pricing.mode,
+      source: context.pricing.source,
+      overridesByCode: context.pricing.overridesByCode
+    } satisfies JsonValue,
+    groupingSnapshot: context.grouping as unknown as JsonValue,
+    attachmentSnapshot: context.attachments as unknown as JsonValue,
+    deliverySnapshot: context.delivery as unknown as JsonValue,
+    referenceSnapshot: context.references as unknown as JsonValue
+  };
+}
+
 async function getExistingBillingSummaryRow(tx: TransactionClient, inspectionId: string) {
   const rows = await tx.$queryRaw`
-    SELECT "id", "tenantId", "inspectionId", "customerCompanyId", "siteId", "status", "items", "subtotal", "notes", "createdAt", "updatedAt"
+    SELECT "id", "tenantId", "inspectionId", "customerCompanyId", "siteId", "status", "billingType", "billToAccountId", "billToName", "contractProfileId", "contractProfileName", "routingSnapshot", "pricingSnapshot", "groupingSnapshot", "attachmentSnapshot", "deliverySnapshot", "referenceSnapshot", "items", "subtotal", "notes", "createdAt", "updatedAt"
     FROM "InspectionBillingSummary"
     WHERE "inspectionId" = ${inspectionId}
     LIMIT 1
@@ -1442,6 +1528,7 @@ async function getExistingBillingSummaryRow(tx: TransactionClient, inspectionId:
   return {
     ...row,
     status: row.status as BillingSummaryStatus,
+    billingType: normalizeBillingType(row.billingType),
     items: normalizeExistingItems(row.items)
   } satisfies PersistedBillingSummary;
 }
@@ -1453,7 +1540,7 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
   const db: TransactionClient = tx;
 
   const inspectionRows = (await db.$queryRaw`
-    SELECT "id" AS "inspectionId", "customerCompanyId", "siteId"
+    SELECT "id" AS "inspectionId", "customerCompanyId", "siteId", "inspectionClassification"
     FROM "Inspection"
     WHERE "id" = ${input.inspectionId} AND "tenantId" = ${input.tenantId}
     LIMIT 1
@@ -1500,6 +1587,14 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
     return null;
   }
 
+  const billingContext = await resolveCustomerBillingContextTx(db, {
+    tenantId: input.tenantId,
+    customerCompanyId: inspection.customerCompanyId,
+    inspectionClassification: inspection.inspectionClassification,
+    hasDeficiencyWork: reports.some((report) => report.inspectionType === "work_order"),
+    hasServiceWork: extracted.some((item) => item.category === "labor" || item.category === "service")
+  });
+
   const mergedItems = mergeBillingItems(existing?.items ?? [], extracted);
   const linkedItems = await Promise.all(
     mergedItems.map(async (item) => {
@@ -1535,12 +1630,14 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
       } satisfies BillableItem;
     })
   );
-  const subtotal = subtotalForItems(linkedItems);
+  const pricedItems = applyBillingContextToItems(linkedItems, billingContext);
+  const subtotal = subtotalForItems(pricedItems);
+  const snapshots = buildBillingContextSnapshots(billingContext);
 
   const summaryId = existing?.id ?? crypto.randomUUID();
   await db.$executeRaw`
     INSERT INTO "InspectionBillingSummary" (
-      "id", "tenantId", "inspectionId", "customerCompanyId", "siteId", "status", "items", "subtotal", "notes", "createdAt", "updatedAt"
+      "id", "tenantId", "inspectionId", "customerCompanyId", "siteId", "status", "billingType", "billToAccountId", "billToName", "contractProfileId", "contractProfileName", "routingSnapshot", "pricingSnapshot", "groupingSnapshot", "attachmentSnapshot", "deliverySnapshot", "referenceSnapshot", "items", "subtotal", "notes", "createdAt", "updatedAt"
     ) VALUES (
       ${summaryId},
       ${input.tenantId},
@@ -1548,7 +1645,18 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
       ${inspection.customerCompanyId},
       ${inspection.siteId},
       ${existing?.status ?? "draft"},
-      ${JSON.stringify(linkedItems)}::jsonb,
+      ${snapshots.billingType}::"BillingType",
+      ${snapshots.billToAccountId},
+      ${snapshots.billToName},
+      ${snapshots.contractProfileId},
+      ${snapshots.contractProfileName},
+      ${JSON.stringify(snapshots.routingSnapshot)}::jsonb,
+      ${JSON.stringify(snapshots.pricingSnapshot)}::jsonb,
+      ${JSON.stringify(snapshots.groupingSnapshot)}::jsonb,
+      ${JSON.stringify(snapshots.attachmentSnapshot)}::jsonb,
+      ${JSON.stringify(snapshots.deliverySnapshot)}::jsonb,
+      ${JSON.stringify(snapshots.referenceSnapshot)}::jsonb,
+      ${JSON.stringify(pricedItems)}::jsonb,
       ${subtotal},
       ${existing?.notes ?? null},
       NOW(),
@@ -1559,6 +1667,17 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
       "tenantId" = EXCLUDED."tenantId",
       "customerCompanyId" = EXCLUDED."customerCompanyId",
       "siteId" = EXCLUDED."siteId",
+      "billingType" = EXCLUDED."billingType",
+      "billToAccountId" = EXCLUDED."billToAccountId",
+      "billToName" = EXCLUDED."billToName",
+      "contractProfileId" = EXCLUDED."contractProfileId",
+      "contractProfileName" = EXCLUDED."contractProfileName",
+      "routingSnapshot" = EXCLUDED."routingSnapshot",
+      "pricingSnapshot" = EXCLUDED."pricingSnapshot",
+      "groupingSnapshot" = EXCLUDED."groupingSnapshot",
+      "attachmentSnapshot" = EXCLUDED."attachmentSnapshot",
+      "deliverySnapshot" = EXCLUDED."deliverySnapshot",
+      "referenceSnapshot" = EXCLUDED."referenceSnapshot",
       "items" = EXCLUDED."items",
       "subtotal" = EXCLUDED."subtotal",
       "notes" = COALESCE("InspectionBillingSummary"."notes", EXCLUDED."notes"),
@@ -1572,7 +1691,18 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
     customerCompanyId: inspection.customerCompanyId,
     siteId: inspection.siteId,
     status: existing?.status ?? "draft",
-    items: linkedItems,
+    billingType: snapshots.billingType,
+    billToAccountId: snapshots.billToAccountId,
+    billToName: snapshots.billToName,
+    contractProfileId: snapshots.contractProfileId,
+    contractProfileName: snapshots.contractProfileName,
+    routingSnapshot: snapshots.routingSnapshot,
+    pricingSnapshot: snapshots.pricingSnapshot,
+    groupingSnapshot: snapshots.groupingSnapshot,
+    attachmentSnapshot: snapshots.attachmentSnapshot,
+    deliverySnapshot: snapshots.deliverySnapshot,
+    referenceSnapshot: snapshots.referenceSnapshot,
+    items: pricedItems,
     subtotal,
     notes: existing?.notes ?? null,
     createdAt: existing?.createdAt ?? new Date(),
@@ -1613,6 +1743,17 @@ export async function getAdminBillingSummaries(actor: ActorContext) {
       i."scheduledStart" AS "inspectionDate",
       tech."name" AS "technicianName",
       s."status",
+      s."billingType",
+      s."billToAccountId",
+      s."billToName",
+      s."contractProfileId",
+      s."contractProfileName",
+      s."routingSnapshot",
+      s."pricingSnapshot",
+      s."groupingSnapshot",
+      s."attachmentSnapshot",
+      s."deliverySnapshot",
+      s."referenceSnapshot",
       s."quickbooksSyncStatus",
       s."quickbooksInvoiceId",
       s."quickbooksInvoiceNumber",
@@ -1681,6 +1822,17 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
       i."scheduledStart" AS "inspectionDate",
       tech."name" AS "technicianName",
       s."status",
+      s."billingType",
+      s."billToAccountId",
+      s."billToName",
+      s."contractProfileId",
+      s."contractProfileName",
+      s."routingSnapshot",
+      s."pricingSnapshot",
+      s."groupingSnapshot",
+      s."attachmentSnapshot",
+      s."deliverySnapshot",
+      s."referenceSnapshot",
       s."quickbooksSyncStatus",
       s."quickbooksInvoiceId",
       s."quickbooksInvoiceNumber",
@@ -1721,6 +1873,7 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
   return {
     ...row,
     status: row.status as BillingSummaryStatus,
+    billingType: normalizeBillingType(row.billingType),
     quickbooksSyncStatus: row.quickbooksSyncStatus ?? "not_synced",
     quickbooksInvoiceId: row.quickbooksInvoiceId ?? null,
     quickbooksInvoiceNumber: row.quickbooksInvoiceNumber ?? null,
@@ -1743,7 +1896,7 @@ async function getAuthorizedBillingSummary(actor: ActorContext, summaryId: strin
   ensureAdmin(parsedActor);
 
   const rows = (await prisma.$queryRaw`
-    SELECT "id", "tenantId", "inspectionId", "status", "subtotal", "notes", "items", "quickbooksSyncStatus", "quickbooksInvoiceId", "quickbooksSendStatus"
+    SELECT "id", "tenantId", "inspectionId", "status", "billingType", "billToAccountId", "billToName", "contractProfileId", "contractProfileName", "routingSnapshot", "pricingSnapshot", "groupingSnapshot", "attachmentSnapshot", "deliverySnapshot", "referenceSnapshot", "subtotal", "notes", "items", "quickbooksSyncStatus", "quickbooksInvoiceId", "quickbooksSendStatus"
     FROM "InspectionBillingSummary"
     WHERE "id" = ${summaryId} AND "tenantId" = ${parsedActor.tenantId as string}
     LIMIT 1

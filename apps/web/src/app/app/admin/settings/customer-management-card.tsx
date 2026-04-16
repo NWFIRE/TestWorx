@@ -47,7 +47,32 @@ type CustomerProfileSeed = Partial<{
   paymentTermsCode: string;
   customPaymentTermsLabel: string | null;
   customPaymentTermsDays: number | null;
+  billingType: "standard" | "third_party";
+  billToAccountId: string | null;
+  contractProfileId: string | null;
+  invoiceDeliveryMethod: "payer_email" | "customer_email" | "manual";
+  invoiceDeliveryRecipientEmail: string | null;
+  invoiceDeliveryLabel: string | null;
+  autoBillingEnabled: boolean;
+  requirePo: boolean;
+  requireCustomerReference: boolean;
+  requiredReferenceLabels: string[];
 }>;
+
+type BillingPayerOption = {
+  id: string;
+  name: string;
+  isActive: boolean;
+};
+
+type BillingContractOption = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  payerAccountId: string | null;
+  effectiveStartDate: Date | string;
+  effectiveEndDate: Date | string | null;
+};
 
 type CustomerPagination = {
   page: number;
@@ -76,6 +101,8 @@ type CustomerManagementCardProps = {
     formData: FormData
   ) => Promise<{ error: string | null; success: string | null; customerCompanyId?: string | null }>;
   notice?: string | null;
+  payerAccounts: BillingPayerOption[];
+  contractProfiles: BillingContractOption[];
 };
 
 type CustomerFormValues = {
@@ -102,6 +129,16 @@ type CustomerFormValues = {
   paymentTermsCode: string;
   customPaymentTermsLabel: string;
   customPaymentTermsDays: string;
+  billingType: "standard" | "third_party";
+  billToAccountId: string;
+  contractProfileId: string;
+  invoiceDeliveryMethod: "payer_email" | "customer_email" | "manual";
+  invoiceDeliveryRecipientEmail: string;
+  invoiceDeliveryLabel: string;
+  autoBillingEnabled: boolean;
+  requirePo: boolean;
+  requireCustomerReference: boolean;
+  requiredReferenceLabels: string;
 };
 
 function toFormValues(customer?: CustomerProfileSeed): CustomerFormValues {
@@ -128,7 +165,17 @@ function toFormValues(customer?: CustomerProfileSeed): CustomerFormValues {
     isActive: customer?.isActive ?? true,
     paymentTermsCode: customer?.paymentTermsCode ?? "due_on_receipt",
     customPaymentTermsLabel: customer?.customPaymentTermsLabel ?? "",
-    customPaymentTermsDays: customer?.customPaymentTermsDays ? String(customer.customPaymentTermsDays) : ""
+    customPaymentTermsDays: customer?.customPaymentTermsDays ? String(customer.customPaymentTermsDays) : "",
+    billingType: customer?.billingType ?? "standard",
+    billToAccountId: customer?.billToAccountId ?? "",
+    contractProfileId: customer?.contractProfileId ?? "",
+    invoiceDeliveryMethod: customer?.invoiceDeliveryMethod ?? "payer_email",
+    invoiceDeliveryRecipientEmail: customer?.invoiceDeliveryRecipientEmail ?? "",
+    invoiceDeliveryLabel: customer?.invoiceDeliveryLabel ?? "",
+    autoBillingEnabled: customer?.autoBillingEnabled ?? false,
+    requirePo: customer?.requirePo ?? false,
+    requireCustomerReference: customer?.requireCustomerReference ?? false,
+    requiredReferenceLabels: customer?.requiredReferenceLabels?.join(", ") ?? ""
   };
 }
 
@@ -154,17 +201,27 @@ function CustomerFieldGroup({
 
 export function CustomerProfileFields({
   customer,
-  formIdPrefix
+  formIdPrefix,
+  payerAccounts,
+  contractProfiles
 }: {
   customer?: CustomerProfileSeed;
   formIdPrefix: string;
+  payerAccounts: BillingPayerOption[];
+  contractProfiles: BillingContractOption[];
 }) {
   const [billingAddressSameAsService, setBillingAddressSameAsService] = useState(
     customer?.billingAddressSameAsService ?? true
   );
   const [paymentTermsCode, setPaymentTermsCode] = useState(customer?.paymentTermsCode ?? "due_on_receipt");
   const initialValues = useMemo(() => toFormValues(customer), [customer]);
+  const [billingType, setBillingType] = useState<"standard" | "third_party">(initialValues.billingType);
+  const [billToAccountId, setBillToAccountId] = useState(initialValues.billToAccountId);
   const showCustomTerms = paymentTermsCode === "custom";
+  const availableContractProfiles = useMemo(
+    () => contractProfiles.filter((profile) => !billToAccountId || !profile.payerAccountId || profile.payerAccountId === billToAccountId),
+    [billToAccountId, contractProfiles]
+  );
 
   return (
     <div className="space-y-4">
@@ -332,6 +389,98 @@ export function CustomerProfileFields({
           </div>
         </div>
       </CustomerFieldGroup>
+
+      <CustomerFieldGroup
+        title="Third-party billing"
+        description="Route invoices through a bill-to payer and contract profile when this customer is serviced under another company’s contract."
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-billingType`}>Billing type</label>
+            <select
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3"
+              defaultValue={initialValues.billingType}
+              id={`${formIdPrefix}-billingType`}
+              name="billingType"
+              onChange={(event) => setBillingType(event.target.value as "standard" | "third_party")}
+            >
+              <option value="standard">Standard customer billing</option>
+              <option value="third_party">Third-party payer billing</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-autoBillingEnabled`}>Review readiness</label>
+            <label className="flex min-h-[52px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700">
+              <input className="h-4 w-4 rounded border-slate-300 text-slateblue focus:ring-slateblue" defaultChecked={initialValues.autoBillingEnabled} id={`${formIdPrefix}-autoBillingEnabled`} name="autoBillingEnabled" type="checkbox" />
+              Mark as eligible for future auto billing
+            </label>
+          </div>
+
+          {billingType === "third_party" ? (
+            <>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-billToAccountId`}>Bill-to payer</label>
+                <select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" defaultValue={initialValues.billToAccountId} id={`${formIdPrefix}-billToAccountId`} name="billToAccountId" onChange={(event) => setBillToAccountId(event.target.value)} required>
+                  <option value="">Select a payer account</option>
+                  {payerAccounts.map((payer) => (
+                    <option key={payer.id} value={payer.id}>{payer.name}{payer.isActive ? "" : " (inactive)"}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-contractProfileId`}>Contract profile</label>
+                <select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" defaultValue={initialValues.contractProfileId} id={`${formIdPrefix}-contractProfileId`} name="contractProfileId" required>
+                  <option value="">Select a contract profile</option>
+                  {availableContractProfiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>{profile.name}{profile.isActive ? "" : " (inactive)"}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          ) : (
+            <>
+              <input name="billToAccountId" type="hidden" value="" />
+              <input name="contractProfileId" type="hidden" value="" />
+            </>
+          )}
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-invoiceDeliveryMethod`}>Invoice delivery</label>
+            <select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" defaultValue={initialValues.invoiceDeliveryMethod} id={`${formIdPrefix}-invoiceDeliveryMethod`} name="invoiceDeliveryMethod">
+              <option value="payer_email">Use payer billing email</option>
+              <option value="customer_email">Use customer billing email</option>
+              <option value="manual">Manual send after review</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-invoiceDeliveryRecipientEmail`}>Override recipient email</label>
+            <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" defaultValue={initialValues.invoiceDeliveryRecipientEmail} id={`${formIdPrefix}-invoiceDeliveryRecipientEmail`} name="invoiceDeliveryRecipientEmail" placeholder="billing@payer.com" type="email" />
+          </div>
+          <div className="md:col-span-2">
+            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-invoiceDeliveryLabel`}>Delivery label</label>
+            <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" defaultValue={initialValues.invoiceDeliveryLabel} id={`${formIdPrefix}-invoiceDeliveryLabel`} name="invoiceDeliveryLabel" placeholder="AP inbox / regional billing desk" />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-requirePo`}>Required billing references</label>
+            <div className="space-y-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+              <label className="flex items-center gap-3 text-sm font-medium text-slate-700">
+                <input className="h-4 w-4 rounded border-slate-300 text-slateblue focus:ring-slateblue" defaultChecked={initialValues.requirePo} id={`${formIdPrefix}-requirePo`} name="requirePo" type="checkbox" />
+                Require PO number
+              </label>
+              <label className="flex items-center gap-3 text-sm font-medium text-slate-700">
+                <input className="h-4 w-4 rounded border-slate-300 text-slateblue focus:ring-slateblue" defaultChecked={initialValues.requireCustomerReference} id={`${formIdPrefix}-requireCustomerReference`} name="requireCustomerReference" type="checkbox" />
+                Require customer reference
+              </label>
+            </div>
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-requiredReferenceLabels`}>Reference labels</label>
+            <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" defaultValue={initialValues.requiredReferenceLabels} id={`${formIdPrefix}-requiredReferenceLabels`} name="requiredReferenceLabels" placeholder="Store number, Work order, AP code" />
+            <p className="mt-2 text-xs text-slate-500">Comma-separated customer-facing labels shown during billing review.</p>
+          </div>
+        </div>
+      </CustomerFieldGroup>
     </div>
   );
 }
@@ -341,7 +490,9 @@ export function CustomerManagementCard({
   pagination,
   filters,
   createCustomerAction,
-  notice
+  notice,
+  payerAccounts,
+  contractProfiles
 }: CustomerManagementCardProps) {
   const [createState, createFormAction, createPending] = useActionState(createCustomerAction, initialState);
   const pathname = usePathname();
@@ -498,7 +649,7 @@ export function CustomerManagementCard({
 
         {isCreateOpen ? (
           <form action={createFormAction} className="mt-5 space-y-4 border-t border-slate-200 pt-5">
-            <CustomerProfileFields formIdPrefix="create-customer" />
+            <CustomerProfileFields contractProfiles={contractProfiles} formIdPrefix="create-customer" payerAccounts={payerAccounts} />
             {createState.error ? <p className="text-sm text-rose-600">{createState.error}</p> : null}
             {createState.success ? <p className="text-sm text-emerald-600">{createState.success}</p> : null}
             {createState.success && createState.customerCompanyId ? (

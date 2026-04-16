@@ -29,6 +29,7 @@ export * from "./report-service";
 export * from "./scheduling";
 export * from "./service-fees";
 export * from "./storage";
+export * from "./third-party-billing";
 export * from "./team-management-shared";
 
 type TeamManagementModule = typeof import("./team-management");

@@ -129,6 +129,11 @@ enum QuickBooksConnectionMode {
   live
 }
 
+enum BillingType {
+  standard
+  third_party
+}
+
 enum ComplianceReportingDivision {
   fire_extinguishers
   fire_alarm
@@ -243,6 +248,8 @@ model Tenant {
   inspectionTechnicianAssignments InspectionTechnicianAssignment[]
   stripeWebhookEvents       StripeWebhookEvent[]
   serviceFeeRules           ServiceFeeRule[]
+  billingPayerAccounts      BillingPayerAccount[]
+  billingContractProfiles   BillingContractProfile[]
   complianceReportingFeeRules ComplianceReportingFeeRule[]
   quickbooksCatalogItems    QuickBooksCatalogItem[]
   quickBooksItemMaps        QuickBooksItemMap[]
@@ -322,10 +329,18 @@ model CustomerCompany {
   paymentTermsCode          String   @default("due_on_receipt")
   customPaymentTermsLabel   String?
   customPaymentTermsDays    Int?
+  billingType               BillingType @default(standard)
+  billToAccountId           String?
+  contractProfileId         String?
+  invoiceDeliverySettings   Json?
+  autoBillingEnabled        Boolean  @default(false)
+  requiredBillingReferences Json?
   quickbooksCustomerId      String?
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
   tenant                    Tenant   @relation(fields: [tenantId], references: [id])
+  billToAccount             BillingPayerAccount? @relation("CustomerCompanyBillToAccount", fields: [billToAccountId], references: [id])
+  contractProfile           BillingContractProfile? @relation(fields: [contractProfileId], references: [id])
   users                     User[]
   sites                     Site[]
   inspections               Inspection[]
@@ -334,6 +349,65 @@ model CustomerCompany {
   accountInvitations        AccountInvitation[]
   quotes                    Quote[]
   emailReminderSendLogs     EmailReminderSendLog[]
+
+  @@index([tenantId, billingType])
+  @@index([tenantId, billToAccountId])
+  @@index([tenantId, contractProfileId])
+}
+
+model BillingPayerAccount {
+  id                      String   @id @default(cuid())
+  tenantId                String
+  name                    String
+  contactName             String?
+  billingEmail            String?
+  phone                   String?
+  billingAddressLine1     String?
+  billingAddressLine2     String?
+  billingCity             String?
+  billingState            String?
+  billingPostalCode       String?
+  billingCountry          String?
+  invoiceDeliverySettings Json?
+  quickbooksCustomerId    String?
+  externalAccountCode     String?
+  externalReference       String?
+  isActive                Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  tenant                  Tenant   @relation(fields: [tenantId], references: [id])
+  customerCompanies       CustomerCompany[] @relation("CustomerCompanyBillToAccount")
+  contractProfiles        BillingContractProfile[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+}
+
+model BillingContractProfile {
+  id                String   @id @default(cuid())
+  tenantId          String
+  payerAccountId    String?
+  name              String
+  isActive          Boolean  @default(true)
+  effectiveStartDate DateTime
+  effectiveEndDate  DateTime?
+  inspectionRules   Json?
+  serviceRules      Json?
+  emergencyRules    Json?
+  deficiencyRules   Json?
+  groupingRules     Json?
+  attachmentRules   Json?
+  deliveryRules     Json?
+  referenceRules    Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+  payerAccount      BillingPayerAccount? @relation(fields: [payerAccountId], references: [id])
+  customerCompanies CustomerCompany[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive, effectiveStartDate])
+  @@index([tenantId, payerAccountId])
 }
 
 model Site {
@@ -777,6 +851,17 @@ model InspectionBillingSummary {
   customerCompanyId String
   siteId            String
   status            String       @default("draft")
+  billingType       BillingType  @default(standard)
+  billToAccountId   String?
+  billToName        String?
+  contractProfileId String?
+  contractProfileName String?
+  routingSnapshot   Json?
+  pricingSnapshot   Json?
+  groupingSnapshot  Json?
+  attachmentSnapshot Json?
+  deliverySnapshot  Json?
+  referenceSnapshot Json?
   quickbooksSyncStatus String?   @default("not_synced")
   quickbooksSendStatus String?   @default("not_sent")
   quickbooksInvoiceId String?
@@ -800,6 +885,9 @@ model InspectionBillingSummary {
   @@index([tenantId, status])
   @@index([tenantId, customerCompanyId])
   @@index([tenantId, siteId])
+  @@index([tenantId, billingType])
+  @@index([tenantId, billToAccountId])
+  @@index([tenantId, contractProfileId])
 }
 
 model ServiceFeeRule {

@@ -46,6 +46,46 @@ const categoryLabels = {
   fee: "Fees"
 } as const;
 
+function asRecord(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function formatBillingType(value: "standard" | "third_party") {
+  return value === "third_party" ? "Third-party payer" : "Standard customer billing";
+}
+
+function formatGroupingMode(value: unknown) {
+  if (value === "group_by_site") {
+    return "Group by site";
+  }
+  if (value === "group_by_inspection") {
+    return "Group by inspection";
+  }
+  return "Standard";
+}
+
+function formatPricingMode(value: unknown) {
+  if (value === "contract_rule_override") {
+    return "Contract rule override";
+  }
+  if (value === "manual_review") {
+    return "Manual review override";
+  }
+  return "Existing standard billing logic";
+}
+
+function formatDeliveryMethod(value: unknown) {
+  if (value === "customer_email") {
+    return "Customer billing email";
+  }
+  if (value === "manual") {
+    return "Manual send";
+  }
+  return "Payer billing email";
+}
+
 function buildBillingItemContext(item: {
   code?: string | null;
   metadata?: Record<string, unknown> | null;
@@ -163,6 +203,18 @@ export default async function BillingSummaryDetailPage({
     ? summary.quickbooksConnectionMode
     : null;
   const summaryModeMismatch = Boolean(summaryQuickBooksMode && summaryQuickBooksMode !== quickBooksConnection.connection.appMode);
+  const pricingSnapshot = asRecord(summary.pricingSnapshot);
+  const routingSnapshot = asRecord(summary.routingSnapshot);
+  const groupingSnapshot = asRecord(summary.groupingSnapshot);
+  const attachmentSnapshot = asRecord(summary.attachmentSnapshot);
+  const deliverySnapshot = asRecord(summary.deliverySnapshot);
+  const referenceSnapshot = asRecord(summary.referenceSnapshot);
+  const requiredAttachmentLabels = Array.isArray(attachmentSnapshot?.requiredDocumentLabels)
+    ? attachmentSnapshot.requiredDocumentLabels.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    : [];
+  const referenceLabels = Array.isArray(referenceSnapshot?.labels)
+    ? referenceSnapshot.labels.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    : [];
 
   return (
     <AppPageShell density="wide">
@@ -314,6 +366,61 @@ export default async function BillingSummaryDetailPage({
         </div>
 
         <div className="space-y-6">
+          <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing context</p>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Routing</p>
+                <p className="mt-3 text-sm text-slate-600">Billing type</p>
+                <p className="text-base font-semibold text-ink">{formatBillingType(summary.billingType)}</p>
+                <p className="mt-3 text-sm text-slate-600">Serviced customer</p>
+                <p className="text-base font-semibold text-ink">{summary.customerName}</p>
+                <p className="mt-3 text-sm text-slate-600">Bill-to payer</p>
+                <p className="text-base font-semibold text-ink">{summary.billToName ?? summary.customerName}</p>
+                <p className="mt-3 text-sm text-slate-600">Contract profile</p>
+                <p className="text-base font-semibold text-ink">{summary.contractProfileName ?? "No third-party contract"}</p>
+                <p className="mt-3 text-sm text-slate-600">Auto billing eligible</p>
+                <p className="text-base font-semibold text-ink">{routingSnapshot?.autoBillingEnabled ? "Yes, future-ready" : "No, manual review only"}</p>
+              </div>
+              <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Resolved outcome</p>
+                <p className="mt-3 text-sm text-slate-600">Pricing mode</p>
+                <p className="text-base font-semibold text-ink">{formatPricingMode(pricingSnapshot?.mode)}</p>
+                <p className="mt-3 text-sm text-slate-600">Pricing source</p>
+                <p className="text-base font-semibold text-ink">{typeof pricingSnapshot?.source === "string" ? pricingSnapshot.source.replaceAll("_", " ") : "Existing standard billing logic"}</p>
+                <p className="mt-3 text-sm text-slate-600">Grouping policy</p>
+                <p className="text-base font-semibold text-ink">{formatGroupingMode(groupingSnapshot?.mode)}</p>
+                <p className="mt-3 text-sm text-slate-600">Delivery behavior</p>
+                <p className="text-base font-semibold text-ink">
+                  {formatDeliveryMethod(deliverySnapshot?.method)}
+                  {deliverySnapshot?.holdForManualReview === true ? " / Hold for manual review" : ""}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Required references</p>
+                <p className="mt-3 text-sm text-slate-600">PO required</p>
+                <p className="text-base font-semibold text-ink">{referenceSnapshot?.requirePo ? "Yes" : "No"}</p>
+                <p className="mt-3 text-sm text-slate-600">Customer reference required</p>
+                <p className="text-base font-semibold text-ink">{referenceSnapshot?.requireCustomerReference ? "Yes" : "No"}</p>
+                <p className="mt-3 text-sm text-slate-600">Reference labels</p>
+                <p className="text-base font-semibold text-ink">{referenceLabels.length > 0 ? referenceLabels.join(", ") : "No extra labels"}</p>
+              </div>
+              <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Attachments and delivery</p>
+                <p className="mt-3 text-sm text-slate-600">Finalized report required</p>
+                <p className="text-base font-semibold text-ink">{attachmentSnapshot?.requireFinalizedReport ? "Yes" : "No"}</p>
+                <p className="mt-3 text-sm text-slate-600">Signed document required</p>
+                <p className="text-base font-semibold text-ink">{attachmentSnapshot?.requireSignedDocument ? "Yes" : "No"}</p>
+                <p className="mt-3 text-sm text-slate-600">Required attachment labels</p>
+                <p className="text-base font-semibold text-ink">{requiredAttachmentLabels.length > 0 ? requiredAttachmentLabels.join(", ") : "No attachment labels"}</p>
+                <p className="mt-3 text-sm text-slate-600">Resolved recipient</p>
+                <p className="text-base font-semibold text-ink">{typeof deliverySnapshot?.recipientEmail === "string" && deliverySnapshot.recipientEmail ? deliverySnapshot.recipientEmail : "Resolved at send time"}</p>
+              </div>
+            </div>
+          </div>
+
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Summary status</p>
             <h3 className="mt-1 text-2xl font-semibold text-ink">{summary.status}</h3>

@@ -10,6 +10,7 @@ import { quoteStatusLabels } from "./quotes";
 import { inspectionTypeRegistry } from "./report-config";
 import { inspectionStatusLabels } from "./scheduling";
 import { assertTenantContext } from "./permissions";
+import { invoiceDeliverySettingsSchema, requiredBillingReferencesSchema } from "./third-party-billing";
 
 function parseActor(actor: ActorContext) {
   const parsed = actorContextSchema.parse(actor);
@@ -376,6 +377,12 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
       paymentTermsCode: customer.paymentTermsCode,
       customPaymentTermsLabel: customer.customPaymentTermsLabel,
       customPaymentTermsDays: customer.customPaymentTermsDays,
+      billingType: customer.billingType,
+      billToAccountId: customer.billToAccountId,
+      contractProfileId: customer.contractProfileId,
+      invoiceDeliverySettings: invoiceDeliverySettingsSchema.parse(customer.invoiceDeliverySettings ?? { method: "payer_email" }),
+      autoBillingEnabled: customer.autoBillingEnabled,
+      requiredBillingReferences: requiredBillingReferencesSchema.parse(customer.requiredBillingReferences ?? {}),
       paymentTermsLabel: getCustomerPaymentTermsLabel({
         paymentTermsCode: customer.paymentTermsCode,
         customPaymentTermsLabel: customer.customPaymentTermsLabel,

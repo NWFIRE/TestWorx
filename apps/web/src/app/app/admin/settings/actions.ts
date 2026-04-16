@@ -8,7 +8,9 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import {
   createBillingCheckoutSession,
+  createBillingContractProfile,
   createBillingPortalSession,
+  createBillingPayerAccount,
   createComplianceReportingFeeRule,
   createCustomerCompany,
   createQuickBooksCatalogItem,
@@ -24,9 +26,13 @@ import {
   quickBooksCatalogItemInputSchema,
   saveQuickBooksItemMappingForCode,
   clearQuickBooksItemMappingForCode,
+  billingContractProfileInputSchema,
+  billingPayerAccountInputSchema,
   syncQuickBooksCustomers,
   quoteReminderSettingsInputSchema,
   updateCustomerCompany,
+  updateBillingContractProfile,
+  updateBillingPayerAccount,
   updateComplianceReportingFeeRule,
   getTenantBrandingSettings,
   updateQuoteReminderSettings,
@@ -92,6 +98,144 @@ function buildSettingsRedirectWithParams(values: Record<string, string | null | 
 
   const query = params.toString();
   return query ? `/app/admin/settings?${query}` : "/app/admin/settings";
+}
+
+function buildCustomerCompanyPayload(formData: FormData) {
+  return {
+    name: String(formData.get("name") ?? ""),
+    contactName: String(formData.get("contactName") ?? ""),
+    billingEmail: String(formData.get("billingEmail") ?? ""),
+    phone: String(formData.get("phone") ?? ""),
+    isTaxExempt: formData.get("isTaxExempt") === "on",
+    serviceAddressLine1: String(formData.get("serviceAddressLine1") ?? ""),
+    serviceAddressLine2: String(formData.get("serviceAddressLine2") ?? ""),
+    serviceCity: String(formData.get("serviceCity") ?? ""),
+    serviceState: String(formData.get("serviceState") ?? ""),
+    servicePostalCode: String(formData.get("servicePostalCode") ?? ""),
+    serviceCountry: String(formData.get("serviceCountry") ?? ""),
+    billingAddressSameAsService: formData.get("billingAddressSameAsService") === "on",
+    billingAddressLine1: String(formData.get("billingAddressLine1") ?? ""),
+    billingAddressLine2: String(formData.get("billingAddressLine2") ?? ""),
+    billingCity: String(formData.get("billingCity") ?? ""),
+    billingState: String(formData.get("billingState") ?? ""),
+    billingPostalCode: String(formData.get("billingPostalCode") ?? ""),
+    billingCountry: String(formData.get("billingCountry") ?? ""),
+    notes: String(formData.get("notes") ?? ""),
+    isActive: formData.get("isActive") === "on",
+    paymentTermsCode: String(formData.get("paymentTermsCode") ?? "due_on_receipt"),
+    customPaymentTermsLabel: String(formData.get("customPaymentTermsLabel") ?? ""),
+    customPaymentTermsDays: (() => {
+      const raw = String(formData.get("customPaymentTermsDays") ?? "").trim();
+      return raw ? Number(raw) : undefined;
+    })(),
+    billingType: String(formData.get("billingType") ?? "standard"),
+    billToAccountId: String(formData.get("billToAccountId") ?? ""),
+    contractProfileId: String(formData.get("contractProfileId") ?? ""),
+    invoiceDeliverySettings: {
+      method: String(formData.get("invoiceDeliveryMethod") ?? "payer_email"),
+      recipientEmail: String(formData.get("invoiceDeliveryRecipientEmail") ?? ""),
+      label: String(formData.get("invoiceDeliveryLabel") ?? "")
+    },
+    autoBillingEnabled: formData.get("autoBillingEnabled") === "on",
+    requiredBillingReferences: {
+      requirePo: formData.get("requirePo") === "on",
+      requireCustomerReference: formData.get("requireCustomerReference") === "on",
+      labels: String(formData.get("requiredReferenceLabels") ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean)
+    }
+  };
+}
+
+function buildBillingPayerPayload(formData: FormData) {
+  return {
+    payerAccountId: String(formData.get("payerAccountId") ?? ""),
+    name: String(formData.get("name") ?? ""),
+    contactName: String(formData.get("contactName") ?? ""),
+    billingEmail: String(formData.get("billingEmail") ?? ""),
+    phone: String(formData.get("phone") ?? ""),
+    billingAddressLine1: String(formData.get("billingAddressLine1") ?? ""),
+    billingAddressLine2: String(formData.get("billingAddressLine2") ?? ""),
+    billingCity: String(formData.get("billingCity") ?? ""),
+    billingState: String(formData.get("billingState") ?? ""),
+    billingPostalCode: String(formData.get("billingPostalCode") ?? ""),
+    billingCountry: String(formData.get("billingCountry") ?? ""),
+    invoiceDeliverySettings: {
+      method: String(formData.get("invoiceDeliveryMethod") ?? "payer_email"),
+      recipientEmail: String(formData.get("invoiceDeliveryRecipientEmail") ?? ""),
+      label: String(formData.get("invoiceDeliveryLabel") ?? "")
+    },
+    quickbooksCustomerId: String(formData.get("quickbooksCustomerId") ?? ""),
+    externalAccountCode: String(formData.get("externalAccountCode") ?? ""),
+    externalReference: String(formData.get("externalReference") ?? ""),
+    isActive: formData.get("isActive") === "on"
+  };
+}
+
+function buildBillingContractPayload(formData: FormData) {
+  const parseCodePriceMap = (value: string) =>
+    Object.fromEntries(
+      value
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const [code, rawPrice] = line.split(":");
+          return [code?.trim(), Number(rawPrice?.trim() ?? "0")] as const;
+        })
+        .filter(([code, price]) => Boolean(code) && Number.isFinite(price))
+    );
+
+  return {
+    contractProfileId: String(formData.get("contractProfileId") ?? ""),
+    payerAccountId: String(formData.get("payerAccountId") ?? ""),
+    name: String(formData.get("name") ?? ""),
+    isActive: formData.get("isActive") === "on",
+    effectiveStartDate: String(formData.get("effectiveStartDate") ?? ""),
+    effectiveEndDate: String(formData.get("effectiveEndDate") ?? ""),
+    inspectionRules: {
+      codeUnitPrices: parseCodePriceMap(String(formData.get("inspectionCodeUnitPrices") ?? "")),
+      note: String(formData.get("inspectionRulesNote") ?? "")
+    },
+    serviceRules: {
+      codeUnitPrices: parseCodePriceMap(String(formData.get("serviceCodeUnitPrices") ?? "")),
+      note: String(formData.get("serviceRulesNote") ?? "")
+    },
+    emergencyRules: {
+      codeUnitPrices: parseCodePriceMap(String(formData.get("emergencyCodeUnitPrices") ?? "")),
+      note: String(formData.get("emergencyRulesNote") ?? "")
+    },
+    deficiencyRules: {
+      codeUnitPrices: parseCodePriceMap(String(formData.get("deficiencyCodeUnitPrices") ?? "")),
+      note: String(formData.get("deficiencyRulesNote") ?? "")
+    },
+    groupingRules: {
+      mode: String(formData.get("groupingMode") ?? "standard"),
+      note: String(formData.get("groupingRulesNote") ?? "")
+    },
+    attachmentRules: {
+      requireFinalizedReport: formData.get("requireFinalizedReport") === "on",
+      requireSignedDocument: formData.get("requireSignedDocument") === "on",
+      requiredDocumentLabels: String(formData.get("requiredDocumentLabels") ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean)
+    },
+    deliveryRules: {
+      holdForManualReview: formData.get("holdForManualReview") === "on",
+      deliveryMethod: String(formData.get("deliveryMethod") ?? "payer_email"),
+      recipientEmail: String(formData.get("deliveryRecipientEmail") ?? "")
+    },
+    referenceRules: {
+      requirePo: formData.get("requirePo") === "on",
+      requireCustomerReference: formData.get("requireCustomerReference") === "on",
+      labels: String(formData.get("referenceLabels") ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean)
+    }
+  };
 }
 
 export async function updateTenantBrandingAction(_: { error: string | null; success: string | null }, formData: FormData) {
@@ -209,32 +353,7 @@ export async function createCustomerCompanyAction(_: { error: string | null; suc
   }
 
   const parsed = customerCompanyInputSchema.safeParse({
-    name: String(formData.get("name") ?? ""),
-    contactName: String(formData.get("contactName") ?? ""),
-    billingEmail: String(formData.get("billingEmail") ?? ""),
-    phone: String(formData.get("phone") ?? ""),
-    isTaxExempt: formData.get("isTaxExempt") === "on",
-    serviceAddressLine1: String(formData.get("serviceAddressLine1") ?? ""),
-    serviceAddressLine2: String(formData.get("serviceAddressLine2") ?? ""),
-    serviceCity: String(formData.get("serviceCity") ?? ""),
-    serviceState: String(formData.get("serviceState") ?? ""),
-    servicePostalCode: String(formData.get("servicePostalCode") ?? ""),
-    serviceCountry: String(formData.get("serviceCountry") ?? ""),
-    billingAddressSameAsService: formData.get("billingAddressSameAsService") === "on",
-    billingAddressLine1: String(formData.get("billingAddressLine1") ?? ""),
-    billingAddressLine2: String(formData.get("billingAddressLine2") ?? ""),
-    billingCity: String(formData.get("billingCity") ?? ""),
-    billingState: String(formData.get("billingState") ?? ""),
-    billingPostalCode: String(formData.get("billingPostalCode") ?? ""),
-    billingCountry: String(formData.get("billingCountry") ?? ""),
-    notes: String(formData.get("notes") ?? ""),
-    isActive: formData.get("isActive") === "on",
-    paymentTermsCode: String(formData.get("paymentTermsCode") ?? "due_on_receipt"),
-    customPaymentTermsLabel: String(formData.get("customPaymentTermsLabel") ?? ""),
-    customPaymentTermsDays: (() => {
-      const raw = String(formData.get("customPaymentTermsDays") ?? "").trim();
-      return raw ? Number(raw) : undefined;
-    })()
+    ...buildCustomerCompanyPayload(formData)
   });
 
   if (!parsed.success) {
@@ -269,32 +388,7 @@ export async function updateCustomerCompanyAction(formData: FormData) {
 
   const parsed = customerCompanyInputSchema.safeParse({
     customerCompanyId: String(formData.get("customerCompanyId") ?? ""),
-    name: String(formData.get("name") ?? ""),
-    contactName: String(formData.get("contactName") ?? ""),
-    billingEmail: String(formData.get("billingEmail") ?? ""),
-    phone: String(formData.get("phone") ?? ""),
-    isTaxExempt: formData.get("isTaxExempt") === "on",
-    serviceAddressLine1: String(formData.get("serviceAddressLine1") ?? ""),
-    serviceAddressLine2: String(formData.get("serviceAddressLine2") ?? ""),
-    serviceCity: String(formData.get("serviceCity") ?? ""),
-    serviceState: String(formData.get("serviceState") ?? ""),
-    servicePostalCode: String(formData.get("servicePostalCode") ?? ""),
-    serviceCountry: String(formData.get("serviceCountry") ?? ""),
-    billingAddressSameAsService: formData.get("billingAddressSameAsService") === "on",
-    billingAddressLine1: String(formData.get("billingAddressLine1") ?? ""),
-    billingAddressLine2: String(formData.get("billingAddressLine2") ?? ""),
-    billingCity: String(formData.get("billingCity") ?? ""),
-    billingState: String(formData.get("billingState") ?? ""),
-    billingPostalCode: String(formData.get("billingPostalCode") ?? ""),
-    billingCountry: String(formData.get("billingCountry") ?? ""),
-    notes: String(formData.get("notes") ?? ""),
-    isActive: formData.get("isActive") === "on",
-    paymentTermsCode: String(formData.get("paymentTermsCode") ?? "due_on_receipt"),
-    customPaymentTermsLabel: String(formData.get("customPaymentTermsLabel") ?? ""),
-    customPaymentTermsDays: (() => {
-      const raw = String(formData.get("customPaymentTermsDays") ?? "").trim();
-      return raw ? Number(raw) : undefined;
-    })()
+    ...buildCustomerCompanyPayload(formData)
   });
 
   if (!parsed.success) {
@@ -329,6 +423,130 @@ export async function updateCustomerCompanyAction(formData: FormData) {
       customersPage,
       customersQuery: customersQuery || null,
       customers: error instanceof Error ? error.message : "Unable to update customer."
+    }));
+  }
+}
+
+export async function createBillingPayerAccountAction(_: { error: string | null; success: string | null }, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { error: "Unauthorized", success: null };
+  }
+
+  const parsed = billingPayerAccountInputSchema.safeParse(buildBillingPayerPayload(formData));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid payer account input.", success: null };
+  }
+
+  try {
+    const payer = await createBillingPayerAccount(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      parsed.data
+    );
+    revalidatePath("/app/admin/settings");
+    revalidatePath("/app/admin/clients");
+    revalidatePath("/app/admin/billing");
+    return { error: null, success: `${payer.name} created.` };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Unable to create payer account.", success: null };
+  }
+}
+
+export async function updateBillingPayerAccountAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    redirect("/login");
+  }
+
+  const parsed = billingPayerAccountInputSchema.safeParse(buildBillingPayerPayload(formData));
+  if (!parsed.success) {
+    redirect(buildSettingsRedirectWithParams({
+      payerAccountsOpen: "1",
+      billingPayers: parsed.error.issues[0]?.message ?? "Invalid payer account input."
+    }));
+  }
+
+  try {
+    const payer = await updateBillingPayerAccount(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      parsed.data
+    );
+    revalidatePath("/app/admin/settings");
+    revalidatePath("/app/admin/clients");
+    revalidatePath("/app/admin/billing");
+    redirect(buildSettingsRedirectWithParams({
+      payerAccountsOpen: "1",
+      billingPayers: `${payer.name} updated.`
+    }));
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+    redirect(buildSettingsRedirectWithParams({
+      payerAccountsOpen: "1",
+      billingPayers: error instanceof Error ? error.message : "Unable to update payer account."
+    }));
+  }
+}
+
+export async function createBillingContractProfileAction(_: { error: string | null; success: string | null }, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { error: "Unauthorized", success: null };
+  }
+
+  const parsed = billingContractProfileInputSchema.safeParse(buildBillingContractPayload(formData));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid contract profile input.", success: null };
+  }
+
+  try {
+    const profile = await createBillingContractProfile(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      parsed.data
+    );
+    revalidatePath("/app/admin/settings");
+    revalidatePath("/app/admin/clients");
+    revalidatePath("/app/admin/billing");
+    return { error: null, success: `${profile.name} created.` };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Unable to create contract profile.", success: null };
+  }
+}
+
+export async function updateBillingContractProfileAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    redirect("/login");
+  }
+
+  const parsed = billingContractProfileInputSchema.safeParse(buildBillingContractPayload(formData));
+  if (!parsed.success) {
+    redirect(buildSettingsRedirectWithParams({
+      contractProfilesOpen: "1",
+      billingContracts: parsed.error.issues[0]?.message ?? "Invalid contract profile input."
+    }));
+  }
+
+  try {
+    const profile = await updateBillingContractProfile(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      parsed.data
+    );
+    revalidatePath("/app/admin/settings");
+    revalidatePath("/app/admin/clients");
+    revalidatePath("/app/admin/billing");
+    redirect(buildSettingsRedirectWithParams({
+      contractProfilesOpen: "1",
+      billingContracts: `${profile.name} updated.`
+    }));
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+    redirect(buildSettingsRedirectWithParams({
+      contractProfilesOpen: "1",
+      billingContracts: error instanceof Error ? error.message : "Unable to update contract profile."
     }));
   }
 }

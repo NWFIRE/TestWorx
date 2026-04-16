@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getClientProfileData } from "@testworx/lib";
+import { getClientProfileData, getTenantBillingContractProfiles, getTenantBillingPayerAccounts } from "@testworx/lib";
 
 import { AppPageShell, PageHeader, SectionCard } from "../../operations-ui";
 import { ClientProfileWorkspace } from "../client-profile-workspace";
@@ -26,14 +26,16 @@ export default async function ClientProfilePage({
 
   const { customerId } = await params;
   const query = searchParams ? await searchParams : {};
-  const data = await getClientProfileData(
-    {
-      userId: session.user.id,
-      role: session.user.role,
-      tenantId: session.user.tenantId
-    },
-    customerId
-  );
+  const actor = {
+    userId: session.user.id,
+    role: session.user.role,
+    tenantId: session.user.tenantId
+  };
+  const [data, payerAccounts, contractProfiles] = await Promise.all([
+    getClientProfileData(actor, customerId),
+    getTenantBillingPayerAccounts(actor),
+    getTenantBillingContractProfiles(actor)
+  ]);
 
   if (!data) {
     notFound();
@@ -64,7 +66,17 @@ export default async function ClientProfilePage({
     isActive: data.customer.isActive,
     paymentTermsCode: data.customer.paymentTermsCode,
     customPaymentTermsLabel: data.customer.customPaymentTermsLabel,
-    customPaymentTermsDays: data.customer.customPaymentTermsDays
+    customPaymentTermsDays: data.customer.customPaymentTermsDays,
+    billingType: data.customer.billingType,
+    billToAccountId: data.customer.billToAccountId,
+    contractProfileId: data.customer.contractProfileId,
+    invoiceDeliveryMethod: data.customer.invoiceDeliverySettings.method,
+    invoiceDeliveryRecipientEmail: data.customer.invoiceDeliverySettings.recipientEmail ?? null,
+    invoiceDeliveryLabel: data.customer.invoiceDeliverySettings.label ?? null,
+    autoBillingEnabled: data.customer.autoBillingEnabled,
+    requirePo: data.customer.requiredBillingReferences.requirePo,
+    requireCustomerReference: data.customer.requiredBillingReferences.requireCustomerReference,
+    requiredReferenceLabels: data.customer.requiredBillingReferences.labels
   };
 
   return (
@@ -92,7 +104,7 @@ export default async function ClientProfilePage({
           </div>
           <form action={updateCustomerCompanyProfileAction} className="space-y-4">
             <input name="customerCompanyId" type="hidden" value={data.customer.id} />
-            <CustomerProfileFields customer={customerSeed} formIdPrefix={`customer-profile-${data.customer.id}`} />
+            <CustomerProfileFields contractProfiles={contractProfiles} customer={customerSeed} formIdPrefix={`customer-profile-${data.customer.id}`} payerAccounts={payerAccounts} />
             {customerNotice ? <p className="text-sm text-slateblue">{customerNotice}</p> : null}
             <div className="flex flex-wrap gap-3">
               <button className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white" type="submit">

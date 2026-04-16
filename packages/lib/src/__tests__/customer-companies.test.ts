@@ -9,6 +9,12 @@ const { prismaMock, quickBooksMock } = vi.hoisted(() => ({
       create: vi.fn(),
       update: vi.fn()
     },
+    billingPayerAccount: {
+      findFirst: vi.fn()
+    },
+    billingContractProfile: {
+      findFirst: vi.fn()
+    },
     auditLog: {
       create: vi.fn()
     }
@@ -62,6 +68,12 @@ function buildCustomerCompany(overrides: Partial<Record<string, unknown>> = {}) 
     customPaymentTermsLabel: null,
     customPaymentTermsDays: null,
     quickbooksCustomerId: null,
+    billingType: "standard",
+    billToAccountId: null,
+    contractProfileId: null,
+    invoiceDeliverySettings: { method: "payer_email" },
+    autoBillingEnabled: false,
+    requiredBillingReferences: { requirePo: false, requireCustomerReference: false, labels: [] },
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides
@@ -72,6 +84,8 @@ describe("customer company settings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     prismaMock.customerCompany.count.mockResolvedValue(1);
+    prismaMock.billingPayerAccount.findFirst.mockResolvedValue(null);
+    prismaMock.billingContractProfile.findFirst.mockResolvedValue(null);
     quickBooksMock.getTenantQuickBooksConnectionStatus.mockResolvedValue({
       connection: { connected: false }
     });
@@ -209,6 +223,100 @@ describe("customer company settings", () => {
     });
     expect(result.quickBooksSynced).toBe(false);
     expect(result.quickBooksSyncError).toMatch(/QuickBooks unavailable/i);
+  });
+
+  it("requires an active payer account and contract profile for third-party billing", async () => {
+    await expect(
+      createCustomerCompany(
+        { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+        {
+          name: "Acme Tower",
+          billingAddressSameAsService: true,
+          isActive: true,
+          paymentTermsCode: "due_on_receipt",
+          billingType: "third_party"
+        }
+      )
+    ).rejects.toThrow(/Third-party billing requires both an active payer account and an active contract profile/i);
+  });
+
+  it("saves validated third-party billing settings on the customer record", async () => {
+    prismaMock.customerCompany.findFirst.mockResolvedValueOnce(null);
+    prismaMock.billingPayerAccount.findFirst.mockResolvedValue({
+      id: "payer_1",
+      tenantId: "tenant_1",
+      name: "Academy Fire",
+      contactName: null,
+      billingEmail: "ap@academy.test",
+      phone: null,
+      billingAddressLine1: null,
+      billingAddressLine2: null,
+      billingCity: null,
+      billingState: null,
+      billingPostalCode: null,
+      billingCountry: null,
+      invoiceDeliverySettings: { method: "payer_email" },
+      quickbooksCustomerId: "qb_payer_1",
+      externalAccountCode: null,
+      externalReference: null,
+      isActive: true
+    });
+    prismaMock.billingContractProfile.findFirst.mockResolvedValue({
+      id: "contract_1",
+      tenantId: "tenant_1",
+      payerAccountId: "payer_1",
+      name: "Academy Annual",
+      isActive: true,
+      effectiveStartDate: new Date("2026-01-01T00:00:00.000Z"),
+      effectiveEndDate: null,
+      inspectionRules: {},
+      serviceRules: {},
+      emergencyRules: {},
+      deficiencyRules: {},
+      groupingRules: { mode: "standard" },
+      attachmentRules: {},
+      deliveryRules: { holdForManualReview: true },
+      referenceRules: { requirePo: true, labels: ["Store number"] }
+    });
+    prismaMock.customerCompany.create.mockResolvedValue(
+      buildCustomerCompany({
+        billingType: "third_party",
+        billToAccountId: "payer_1",
+        contractProfileId: "contract_1",
+        invoiceDeliverySettings: { method: "payer_email", label: "Academy AP" },
+        autoBillingEnabled: true,
+        requiredBillingReferences: { requirePo: true, requireCustomerReference: false, labels: ["Store number"] }
+      })
+    );
+    prismaMock.auditLog.create.mockResolvedValue(undefined);
+
+    await createCustomerCompany(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        name: "Acme Tower",
+        billingAddressSameAsService: true,
+        isActive: true,
+        paymentTermsCode: "due_on_receipt",
+        billingType: "third_party",
+        billToAccountId: "payer_1",
+        contractProfileId: "contract_1",
+        invoiceDeliverySettings: { method: "payer_email", label: "Academy AP" },
+        autoBillingEnabled: true,
+        requiredBillingReferences: { requirePo: true, requireCustomerReference: false, labels: ["Store number"] }
+      }
+    );
+
+    expect(prismaMock.customerCompany.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        billingType: "third_party",
+        billToAccountId: "payer_1",
+        contractProfileId: "contract_1",
+        autoBillingEnabled: true,
+        invoiceDeliverySettings: { method: "payer_email", label: "Academy AP" },
+        requiredBillingReferences: { requirePo: true, requireCustomerReference: false, labels: ["Store number"] }
+      }),
+      select: expect.any(Object)
+    });
   });
 
   it("filters current customers by search query", async () => {

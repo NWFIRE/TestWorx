@@ -15,6 +15,10 @@ const prismaMock = {
     update: vi.fn(),
     updateMany: vi.fn()
   },
+  billingPayerAccount: {
+    findFirst: vi.fn(),
+    update: vi.fn()
+  },
   site: {
     findFirst: vi.fn()
   },
@@ -113,12 +117,19 @@ function buildBillingSummary(overrides?: Partial<{
   quickbooksSentAt: Date | null;
   quickbooksSendError: string | null;
   billingEmail: string | null;
+  billingType: "standard" | "third_party";
+  billToAccountId: string | null;
+  billToName: string | null;
+  deliverySnapshot: Record<string, unknown> | null;
 }>) {
   return {
     id: "summary_1",
     tenantId: "tenant_1",
     inspectionId: "inspection_1",
     customerCompanyId: "customer_1",
+    billingType: overrides?.billingType ?? "standard",
+    billToAccountId: overrides?.billToAccountId ?? null,
+    billToName: overrides?.billToName ?? null,
     status: overrides?.status ?? "reviewed",
     subtotal: 125,
     notes: "Inspection billing",
@@ -141,6 +152,7 @@ function buildBillingSummary(overrides?: Partial<{
     quickbooksSentAt: overrides?.quickbooksSentAt ?? null,
     quickbooksSendError: overrides?.quickbooksSendError ?? null,
     quickbooksInvoiceNumber: null,
+    deliverySnapshot: overrides?.deliverySnapshot ?? null,
     customerCompany: {
       id: "customer_1",
       name: "Pinecrest Property Management",
@@ -207,6 +219,8 @@ describe("quickbooks billing sync hardening", () => {
     prismaMock.serviceFeeRule.findMany.mockResolvedValue([]);
     prismaMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
     prismaMock.quoteLineItem.findMany.mockResolvedValue([]);
+    prismaMock.billingPayerAccount.findFirst.mockResolvedValue(null);
+    prismaMock.billingPayerAccount.update.mockResolvedValue(undefined);
     prismaMock.inspectionBillingSummary.findMany.mockResolvedValue([]);
     prismaMock.quickBooksItemMap.upsert.mockResolvedValue(undefined);
     prismaMock.quickBooksItemMap.deleteMany.mockResolvedValue({ count: 0 });
@@ -322,6 +336,59 @@ describe("quickbooks billing sync hardening", () => {
       data: expect.objectContaining({
         quickbooksSendStatus: "send_skipped"
       })
+    });
+  });
+
+  it("routes third-party billing summaries through the payer QuickBooks customer", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.billingPayerAccount.findFirst
+      .mockResolvedValueOnce({
+        id: "payer_1",
+        tenantId: "tenant_1",
+        name: "Academy Fire",
+        billingEmail: "ap@academy.test",
+        quickbooksCustomerId: "qb_payer_1"
+      })
+      .mockResolvedValueOnce({
+        id: "payer_1",
+        tenantId: "tenant_1",
+        name: "Academy Fire",
+        billingEmail: "ap@academy.test",
+        quickbooksCustomerId: "qb_payer_1"
+      });
+    prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: "qb_customer_1" });
+    prismaMock.site.findFirst.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
+    prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue(
+      buildBillingSummary({
+        billingType: "third_party",
+        billToAccountId: "payer_1",
+        billToName: "Academy Fire",
+        deliverySnapshot: { method: "payer_email", recipientEmail: "ap@academy.test" }
+      })
+    );
+    prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qb_payer_1", DisplayName: "Academy Fire", SyncToken: "0" } }))
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qb_payer_1", DisplayName: "Academy Fire" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
+      .mockResolvedValueOnce(jsonResponse({}));
+
+    const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
+
+    const result = await syncBillingSummaryToQuickBooks(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    expect(result.quickbooksSentTo).toBe("ap@academy.test");
+    expect(prismaMock.billingPayerAccount.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "payer_1",
+        tenantId: "tenant_1"
+      }
     });
   });
 

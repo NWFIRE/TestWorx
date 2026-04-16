@@ -72,6 +72,9 @@ type QuickBooksBillingSummary = {
   tenantId: string;
   inspectionId: string;
   customerCompanyId: string;
+  billingType?: "standard" | "third_party";
+  billToAccountId?: string | null;
+  billToName?: string | null;
   status: string;
   subtotal: number;
   notes: string | null;
@@ -1846,6 +1849,125 @@ async function resolveQuickBooksCustomer(connection: QuickBooksTenantConnection,
 
   await prisma.customerCompany.update({
     where: { id: summary.customerCompanyId },
+    data: { quickbooksCustomerId: createdCustomerId }
+  });
+
+  return createdCustomerId;
+}
+
+async function resolveQuickBooksPayerAccount(connection: QuickBooksTenantConnection, payer: {
+  payerAccountId: string;
+  payerName: string;
+  billingEmail: string | null;
+  phone: string | null;
+  billingAddressLine1?: string | null;
+  billingAddressLine2?: string | null;
+  billingCity?: string | null;
+  billingState?: string | null;
+  billingPostalCode?: string | null;
+  billingCountry?: string | null;
+  notes?: string | null;
+}) {
+  const payerRecord = await prisma.billingPayerAccount.findUnique({
+    where: { id: payer.payerAccountId },
+    select: { quickbooksCustomerId: true }
+  });
+
+  if (payerRecord?.quickbooksCustomerId) {
+    const existingCustomer = await fetchQuickBooksCustomerById(connection, payerRecord.quickbooksCustomerId).catch(() => null);
+    if (existingCustomer?.quickbooksCustomerId) {
+      const updated = await quickBooksApiRequest<{ Customer?: unknown }>(connection, {
+        path: "/customer",
+        method: "POST",
+        searchParams: new URLSearchParams({ operation: "update" }),
+        body: {
+          Id: existingCustomer.quickbooksCustomerId,
+          SyncToken: existingCustomer.syncToken,
+          sparse: true,
+          ...buildQuickBooksCustomerPayload({
+            customerName: payer.payerName,
+            billingEmail: payer.billingEmail,
+            phone: payer.phone,
+            siteName: payer.payerName,
+            billingAddressLine1: payer.billingAddressLine1,
+            billingAddressLine2: payer.billingAddressLine2,
+            billingCity: payer.billingCity,
+            billingState: payer.billingState,
+            billingPostalCode: payer.billingPostalCode,
+            billingCountry: payer.billingCountry,
+            notes: payer.notes
+          })
+        }
+      });
+
+      const updatedCustomer = (await normalizeQuickBooksCustomer(connection, updated.Customer)) ?? existingCustomer;
+      await prisma.billingPayerAccount.update({
+        where: { id: payer.payerAccountId },
+        data: { quickbooksCustomerId: updatedCustomer.quickbooksCustomerId }
+      });
+      return updatedCustomer.quickbooksCustomerId;
+    }
+  }
+
+  const existingCustomer = await fetchQuickBooksCustomerByDisplayName(connection, payer.payerName);
+  if (existingCustomer?.quickbooksCustomerId) {
+    const updated = await quickBooksApiRequest<{ Customer?: unknown }>(connection, {
+      path: "/customer",
+      method: "POST",
+      searchParams: new URLSearchParams({ operation: "update" }),
+      body: {
+        Id: existingCustomer.quickbooksCustomerId,
+        SyncToken: existingCustomer.syncToken,
+        sparse: true,
+        ...buildQuickBooksCustomerPayload({
+          customerName: payer.payerName,
+          billingEmail: payer.billingEmail,
+          phone: payer.phone,
+          siteName: payer.payerName,
+          billingAddressLine1: payer.billingAddressLine1,
+          billingAddressLine2: payer.billingAddressLine2,
+          billingCity: payer.billingCity,
+          billingState: payer.billingState,
+          billingPostalCode: payer.billingPostalCode,
+          billingCountry: payer.billingCountry,
+          notes: payer.notes
+        })
+      }
+    });
+
+    const updatedCustomer = (await normalizeQuickBooksCustomer(connection, updated.Customer)) ?? existingCustomer;
+    await prisma.billingPayerAccount.update({
+      where: { id: payer.payerAccountId },
+      data: { quickbooksCustomerId: updatedCustomer.quickbooksCustomerId }
+    });
+    return updatedCustomer.quickbooksCustomerId;
+  }
+
+  const created = await quickBooksApiRequest<{ Customer?: { Id: string } }>(connection, {
+    path: "/customer",
+    method: "POST",
+    body: buildQuickBooksCustomerPayload({
+      customerName: payer.payerName,
+      billingEmail: payer.billingEmail,
+      phone: payer.phone,
+      siteName: payer.payerName,
+      billingAddressLine1: payer.billingAddressLine1,
+      billingAddressLine2: payer.billingAddressLine2,
+      billingCity: payer.billingCity,
+      billingState: payer.billingState,
+      billingPostalCode: payer.billingPostalCode,
+      billingCountry: payer.billingCountry,
+      notes: payer.notes
+    })
+  });
+
+  const createdCustomerId = created.Customer?.Id;
+  if (!createdCustomerId) {
+    throw new Error("QuickBooks did not return a payer customer id.");
+  }
+
+  await prisma.billingPayerAccount.update({
+    where: { id: payer.payerAccountId },
     data: { quickbooksCustomerId: createdCustomerId }
   });
 
@@ -3753,20 +3875,48 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
   }
 
   try {
-    const customerId = await resolveQuickBooksCustomer(tenant, {
-      customerCompanyId: summary.customerCompanyId,
-      customerName: summary.customerCompany.name,
-      billingEmail: summary.customerCompany.billingEmail,
-      phone: summary.customerCompany.phone,
-      siteName: summary.site.name,
-      billingAddressLine1: summary.customerCompany.billingAddressLine1 ?? summary.customerCompany.serviceAddressLine1 ?? summary.site.addressLine1,
-      billingAddressLine2: summary.customerCompany.billingAddressLine2 ?? summary.customerCompany.serviceAddressLine2 ?? summary.site.addressLine2,
-      billingCity: summary.customerCompany.billingCity ?? summary.customerCompany.serviceCity ?? summary.site.city,
-      billingState: summary.customerCompany.billingState ?? summary.customerCompany.serviceState ?? summary.site.state,
-      billingPostalCode: summary.customerCompany.billingPostalCode ?? summary.customerCompany.servicePostalCode ?? summary.site.postalCode,
-      billingCountry: summary.customerCompany.billingCountry ?? summary.customerCompany.serviceCountry ?? null,
-      notes: summary.customerCompany.notes ?? null
-    });
+    const payerAccount = summary.billingType === "third_party" && summary.billToAccountId
+      ? await prisma.billingPayerAccount.findFirst({
+          where: {
+            id: summary.billToAccountId,
+            tenantId: parsedActor.tenantId as string
+          }
+        })
+      : null;
+
+    const customerId = payerAccount
+      ? await resolveQuickBooksPayerAccount(tenant, {
+          payerAccountId: payerAccount.id,
+          payerName: payerAccount.name,
+          billingEmail: payerAccount.billingEmail,
+          phone: payerAccount.phone,
+          billingAddressLine1: payerAccount.billingAddressLine1,
+          billingAddressLine2: payerAccount.billingAddressLine2,
+          billingCity: payerAccount.billingCity,
+          billingState: payerAccount.billingState,
+          billingPostalCode: payerAccount.billingPostalCode,
+          billingCountry: payerAccount.billingCountry,
+          notes: payerAccount.externalReference
+        })
+      : await resolveQuickBooksCustomer(tenant, {
+          customerCompanyId: summary.customerCompanyId,
+          customerName: summary.customerCompany.name,
+          billingEmail: summary.customerCompany.billingEmail,
+          phone: summary.customerCompany.phone,
+          siteName: summary.site.name,
+          billingAddressLine1: summary.customerCompany.billingAddressLine1 ?? summary.customerCompany.serviceAddressLine1 ?? summary.site.addressLine1,
+          billingAddressLine2: summary.customerCompany.billingAddressLine2 ?? summary.customerCompany.serviceAddressLine2 ?? summary.site.addressLine2,
+          billingCity: summary.customerCompany.billingCity ?? summary.customerCompany.serviceCity ?? summary.site.city,
+          billingState: summary.customerCompany.billingState ?? summary.customerCompany.serviceState ?? summary.site.state,
+          billingPostalCode: summary.customerCompany.billingPostalCode ?? summary.customerCompany.servicePostalCode ?? summary.site.postalCode,
+          billingCountry: summary.customerCompany.billingCountry ?? summary.customerCompany.serviceCountry ?? null,
+          notes: summary.customerCompany.notes ?? null
+        });
+
+    const deliverySnapshot = (summary.deliverySnapshot ?? {}) as Record<string, unknown>;
+    const sendToEmail = typeof deliverySnapshot.recipientEmail === "string" && deliverySnapshot.recipientEmail.trim().length > 0
+      ? deliverySnapshot.recipientEmail.trim()
+      : payerAccount?.billingEmail ?? summary.customerCompany.billingEmail;
 
     const itemRefCache = new Map<string, { qbItemId: string; qbItemName: string }>();
     const invoiceLines = [] as Array<Record<string, unknown>>;
@@ -3821,7 +3971,7 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
       body: {
         DocNumber: docNumber,
         CustomerRef: { value: customerId },
-        ...(summary.customerCompany.billingEmail ? { BillEmail: { Address: summary.customerCompany.billingEmail } } : {}),
+        ...(sendToEmail ? { BillEmail: { Address: sendToEmail } } : {}),
         PrivateNote: summary.notes ?? `Synced from TradeWorx inspection ${summary.inspectionId}`,
         Line: invoiceLines
       }
@@ -3902,9 +4052,7 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
         id: summary.id,
         inspectionId: summary.inspectionId,
         quickbooksInvoiceId: verifiedInvoice.id,
-        customerCompany: {
-          billingEmail: summary.customerCompany.billingEmail
-        }
+        billingEmail: sendToEmail ?? null
       },
       suppressThrowOnSendFailure: true
     });
@@ -4471,16 +4619,14 @@ async function sendQuickBooksInvoiceForSummary(input: {
     id: string;
     inspectionId: string;
     quickbooksInvoiceId: string;
-    customerCompany: {
-      billingEmail: string | null;
-    };
+    billingEmail: string | null;
   };
   suppressThrowOnSendFailure?: boolean;
 }) {
   const { parsedActor, tenant, summary, suppressThrowOnSendFailure } = input;
 
-  if (!summary.customerCompany.billingEmail) {
-    const message = "QuickBooks invoice send skipped because the customer does not have a billing email.";
+  if (!summary.billingEmail) {
+    const message = "QuickBooks invoice send skipped because the bill-to account does not have a delivery email.";
 
     await prisma.inspectionBillingSummary.update({
       where: { id: summary.id },
@@ -4517,7 +4663,7 @@ async function sendQuickBooksInvoiceForSummary(input: {
   }
 
   const sendParams = new URLSearchParams();
-  sendParams.set("sendTo", summary.customerCompany.billingEmail);
+  sendParams.set("sendTo", summary.billingEmail);
 
   try {
     await quickBooksApiRequest<Record<string, unknown>>(tenant, {
@@ -4545,7 +4691,7 @@ async function sendQuickBooksInvoiceForSummary(input: {
         metadata: {
           inspectionId: summary.inspectionId,
           invoiceId: summary.quickbooksInvoiceId,
-          sentTo: summary.customerCompany.billingEmail ?? null
+          sentTo: summary.billingEmail ?? null
         }
       }
     });
@@ -4555,7 +4701,7 @@ async function sendQuickBooksInvoiceForSummary(input: {
       inspectionId: summary.inspectionId,
       invoiceId: summary.quickbooksInvoiceId,
       sendStatus: "sent",
-      sentTo: summary.customerCompany.billingEmail,
+      sentTo: summary.billingEmail,
       error: null
     } satisfies QuickBooksInvoiceSendResult;
   } catch (error) {
@@ -4600,7 +4746,7 @@ async function sendQuickBooksInvoiceForSummary(input: {
       inspectionId: summary.inspectionId,
       invoiceId: summary.quickbooksInvoiceId,
       sendStatus: "send_failed",
-      sentTo: summary.customerCompany.billingEmail,
+      sentTo: summary.billingEmail,
       error: normalizedError.message
     } satisfies QuickBooksInvoiceSendResult;
   }
@@ -4621,7 +4767,15 @@ export async function sendQuickBooksInvoice(
 
   const summary = await prisma.inspectionBillingSummary.findUnique({
     where: { inspectionId },
-    include: {
+    select: {
+      id: true,
+      tenantId: true,
+      inspectionId: true,
+      quickbooksInvoiceId: true,
+      quickbooksSyncStatus: true,
+      quickbooksConnectionMode: true,
+      deliverySnapshot: true,
+      billToAccountId: true,
       customerCompany: {
         select: {
           billingEmail: true
@@ -4641,6 +4795,20 @@ export async function sendQuickBooksInvoice(
     throw new Error(`This billing summary was synced in QuickBooks ${summary.quickbooksConnectionMode ? formatQuickBooksConnectionModeLabel(summary.quickbooksConnectionMode as QuickBooksConnectionMode) : "Unknown"}. Re-sync it in ${connectionStatus.appModeLabel} mode before sending.`);
   }
 
+  const payerAccount = summary.billToAccountId
+    ? await prisma.billingPayerAccount.findFirst({
+        where: {
+          id: summary.billToAccountId,
+          tenantId: parsedActor.tenantId as string
+        },
+        select: { billingEmail: true }
+      })
+    : null;
+  const deliverySnapshot = (summary.deliverySnapshot ?? {}) as Record<string, unknown>;
+  const billingEmail = typeof deliverySnapshot.recipientEmail === "string" && deliverySnapshot.recipientEmail.trim().length > 0
+    ? deliverySnapshot.recipientEmail.trim()
+    : payerAccount?.billingEmail ?? summary.customerCompany.billingEmail;
+
   return sendQuickBooksInvoiceForSummary({
     parsedActor,
     tenant,
@@ -4648,9 +4816,7 @@ export async function sendQuickBooksInvoice(
       id: summary.id,
       inspectionId: summary.inspectionId,
       quickbooksInvoiceId: summary.quickbooksInvoiceId,
-      customerCompany: {
-        billingEmail: summary.customerCompany.billingEmail
-      }
+      billingEmail
     },
     suppressThrowOnSendFailure: options?.suppressThrowOnSendFailure
   });
