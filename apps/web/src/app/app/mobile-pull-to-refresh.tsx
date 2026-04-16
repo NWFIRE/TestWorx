@@ -250,9 +250,9 @@ function RefreshDebugStrip({
 }) {
   return (
     <div className="pointer-events-none fixed inset-x-3 bottom-3 z-50 flex justify-center lg:bottom-4">
-      <div className="w-full max-w-3xl rounded-2xl border border-amber-200 bg-slate-950/92 px-3 py-2.5 text-[11px] font-medium text-slate-100 shadow-[0_18px_36px_rgba(15,23,42,0.22)] backdrop-blur">
+      <div className="w-full max-w-3xl rounded-2xl border-2 border-amber-300 bg-white/96 px-3 py-2.5 text-[11px] font-semibold text-slate-900 shadow-[0_18px_36px_rgba(15,23,42,0.18)] backdrop-blur">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="font-semibold uppercase tracking-[0.18em] text-amber-200">PTR Debug</span>
+          <span className="font-bold uppercase tracking-[0.18em] text-amber-700">PTR Debug</span>
           <span>enabled: {state.enabled ? "yes" : "no"}</span>
           <span>route: {state.routeEnabled ? "yes" : "no"}</span>
           <span>blocked: {state.blocked ? "yes" : "no"}</span>

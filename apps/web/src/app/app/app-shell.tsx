@@ -599,9 +599,9 @@ export function AppShell({
       >
         {SHOW_PTR_DEBUG_SHELL_STRIP && pullToRefreshDebug ? (
           <div className="pointer-events-none fixed inset-x-2 top-2 z-[90] flex justify-center">
-            <div className="w-full max-w-5xl rounded-2xl border-2 border-fuchsia-400 bg-slate-950/96 px-3 py-2 text-[11px] font-semibold text-white shadow-[0_20px_40px_rgba(15,23,42,0.3)] backdrop-blur">
+            <div className="w-full max-w-5xl rounded-2xl border-2 border-fuchsia-400 bg-white/97 px-3 py-2 text-[11px] font-semibold text-slate-900 shadow-[0_20px_40px_rgba(15,23,42,0.18)] backdrop-blur">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="uppercase tracking-[0.18em] text-fuchsia-300">PTR Shell Debug</span>
+                <span className="uppercase tracking-[0.18em] text-fuchsia-700">PTR Shell Debug</span>
                 <span>enabled: {pullToRefreshDebug.enabled ? "yes" : "no"}</span>
                 <span>route: {pullToRefreshDebug.routeEnabled ? "yes" : "no"}</span>
                 <span>blocked: {pullToRefreshDebug.blocked ? "yes" : "no"}</span>
