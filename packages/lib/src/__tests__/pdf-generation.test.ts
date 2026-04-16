@@ -9,7 +9,7 @@ import {
   getCustomerFacingReportState,
   getPdfComplianceStandards
 } from "../pdf-report";
-import { resolveReportTypeConfig } from "../report-pdf-config";
+import { defaultReportPageOneConfig, resolveReportTypeConfig } from "../report-pdf-config";
 import { buildDataUrlStorageKey, decodeStoredFile } from "../storage";
 
 const tinyPngBytes = Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII=", "base64"));
@@ -21,6 +21,10 @@ describe("pdf generation workflow", () => {
     expect(getPdfComplianceStandards("kitchen_suppression")).toEqual(["NFPA 17A", "NFPA 96"]);
     expect(resolveReportTypeConfig("fire_alarm").title).toBe("Fire Alarm Inspection and Testing Report");
     expect(resolveReportTypeConfig("fire_alarm").sections[0]?.key).toBe("control-panel");
+    expect(resolveReportTypeConfig("fire_alarm").pageOne.compliance.label).toBe("Compliance Standards");
+    expect(resolveReportTypeConfig("fire_alarm").pageOne.outcomeSummary.metrics).toEqual(["documentStatus", "outcome", "deficiencyCount", "completionPercent"]);
+    expect(resolveReportTypeConfig("kitchen_suppression").pageOne.systemSummary.sectionKey).toBe("system-details");
+    expect(defaultReportPageOneConfig.primaryFacts.layout).toBe("two-column-grid");
     expect(getCustomerFacingReportState({ report: { finalizedAt: new Date("2026-03-12T11:00:00.000Z") } })).toBe("Finalized");
     expect(getCustomerFacingReportState({ report: { finalizedAt: null } })).toBe("In Review");
     expect(getCustomerFacingOutcomeLabel({ report: { finalizedAt: new Date("2026-03-12T11:00:00.000Z") } }, 0)).toBe("Passed");
@@ -44,6 +48,21 @@ describe("pdf generation workflow", () => {
         postalCode: "60601"
       })
     ).toBe("100 State St, Chicago, IL 60601");
+  });
+
+  it("keeps page-one compliance and system-summary config wired for the main inspection report types", () => {
+    const fireAlarm = resolveReportTypeConfig("fire_alarm");
+    const kitchenSuppression = resolveReportTypeConfig("kitchen_suppression");
+    const extinguisher = resolveReportTypeConfig("fire_extinguisher");
+
+    expect(fireAlarm.pageOne.compliance.codes).toEqual(["NFPA 72", "NFPA 70"]);
+    expect(fireAlarm.pageOne.systemSummary.sectionKey).toBe("system-summary");
+
+    expect(kitchenSuppression.pageOne.compliance.codes).toEqual(["NFPA 17A", "NFPA 96"]);
+    expect(kitchenSuppression.pageOne.systemSummary.sectionKey).toBe("system-details");
+
+    expect(extinguisher.pageOne.compliance.codes).toEqual(["NFPA 10"]);
+    expect(extinguisher.pageOne.systemSummary.sectionKey).toBe("service");
   });
 
   it("generates a branded inspection report PDF payload", async () => {
@@ -212,6 +231,89 @@ describe("pdf generation workflow", () => {
 
     const pdf = await PDFDocument.load(bytes);
     expect(pdf.getPageCount()).toBeGreaterThan(1);
+  });
+
+  it("generates a kitchen suppression PDF through the shared config-driven page-one renderer", async () => {
+    const bytes = await generateInspectionReportPdf({
+      tenant: { name: "Evergreen Fire Protection", branding: { primaryColor: "#1E3A5F", accentColor: "#C2410C" } },
+      customerCompany: { name: "Commercial Fire LLC", contactName: "Jeremy O'Brien", billingEmail: "office@commercialfire.com", phone: "405-555-0135" },
+      site: { name: "Sprouts Farmers Market #802", addressLine1: "24 E 2nd St", addressLine2: null, city: "Edmond", state: "OK", postalCode: "73034" },
+      inspection: { id: "inspection_ks_1", scheduledStart: new Date("2026-04-01T09:00:00.000Z"), scheduledEnd: null, status: "completed", notes: "Semi-annual kitchen suppression visit" },
+      task: { inspectionType: "kitchen_suppression" },
+      report: { id: "report_ks_1", finalizedAt: new Date("2026-04-01T11:00:00.000Z"), technicianName: "Eli Rodriguez" },
+      draft: {
+        templateVersion: 1,
+        inspectionType: "kitchen_suppression",
+        overallNotes: "System discharged and reset correctly.",
+        sectionOrder: ["system-details", "appliance-coverage", "system-checklist", "tank-and-service"],
+        activeSectionId: "system-details",
+        sections: {
+          "system-details": {
+            status: "pass",
+            notes: "",
+            fields: {
+              systemType: "Ansul R-102",
+              cylinderCount: 2,
+              manualPullStations: 1,
+              fuelShutoffVerified: true,
+              applianceCount: 5,
+              followUpRequired: false
+            }
+          },
+          "appliance-coverage": {
+            status: "pass",
+            notes: "",
+            fields: {
+              appliances: [
+                { location: "Line 1", applianceType: "Fryer", manufacturer: "Pitco", notes: "Protected and tagged" }
+              ]
+            }
+          },
+          "system-checklist": {
+            status: "pass",
+            notes: "",
+            fields: {
+              allAppliancesProtected: true,
+              ductPlenumProtected: true,
+              nozzlePositioningCorrect: true,
+              systemInstalledPerMfgUl: true,
+              fuelShutdownVerified: true,
+              fireAlarmInterconnectWorking: true,
+              kClassExtinguisherPresent: true,
+              hoodCleanedPerNFPA96: true
+            }
+          },
+          "tank-and-service": {
+            status: "pass",
+            notes: "",
+            fields: {
+              serviceItems: [
+                { location: "Tank Room", type: "Fusible Link Kit", notes: "Replaced during inspection" }
+              ]
+            }
+          }
+        },
+        deficiencies: [],
+        attachments: [],
+        signatures: {
+          technician: { signerName: "Eli Rodriguez", imageDataUrl: tinyPngDataUrl, signedAt: "2026-04-01T10:50:00.000Z" },
+          customer: { signerName: "Jeremy O'Brien", imageDataUrl: tinyPngDataUrl, signedAt: "2026-04-01T10:55:00.000Z" }
+        },
+        context: {
+          siteName: "Sprouts Farmers Market #802",
+          customerName: "Commercial Fire LLC",
+          scheduledDate: "2026-04-01T09:00:00.000Z",
+          assetCount: 5,
+          priorReportSummary: "Prior semi-annual inspection completed."
+        }
+      },
+      deficiencies: [],
+      photos: [],
+      technicianSignature: { signerName: "Eli Rodriguez", imageDataUrl: tinyPngDataUrl, signedAt: "2026-04-01T10:50:00.000Z" },
+      customerSignature: { signerName: "Jeremy O'Brien", imageDataUrl: tinyPngDataUrl, signedAt: "2026-04-01T10:55:00.000Z" }
+    });
+
+    expect(Buffer.from(bytes).slice(0, 4).toString()).toBe("%PDF");
   });
 
   it("generates a branded work order report PDF using the shared premium renderer", async () => {

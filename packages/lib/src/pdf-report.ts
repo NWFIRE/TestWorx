@@ -14,6 +14,7 @@ import {
 } from "./report-config";
 import {
   customerFacingFieldRules,
+  type ReportPageOneConfig,
   mapCustomerFacingReportStatus,
   resolveReportTypeConfig,
   type ChecklistItemConfig,
@@ -69,6 +70,12 @@ type MetricCard = {
   value: string;
   supportingText?: string;
   tone: "pass" | "fail" | "warn" | "neutral";
+};
+
+type OrderedReportSection = {
+  sectionConfig: ReportSectionConfig;
+  templateSection: ReturnType<typeof resolveReportTemplate>["sections"][number];
+  draftSection: ReportDraft["sections"][string];
 };
 
 const PAGE_WIDTH = 612;
@@ -775,19 +782,18 @@ function statusVariant(status: string): "pass" | "fail" | "warn" | "neutral" {
 
 function renderComplianceStandards(
   state: PageState,
-  inspectionType: InspectionType,
+  compliance: ReportPageOneConfig["compliance"],
   theme: PdfTheme,
   boldFont: PDFFont,
   regularFont: PDFFont
 ) {
-  const config = resolveReportTypeConfig(inspectionType);
-  const standards = config.compliance.codes;
+  const standards = compliance.enabled ? compliance.codes : [];
   if (standards.length === 0) {
     return;
   }
 
   const standardsLine = standards.join(" • ");
-  const description = config.compliance.description || COMPLIANCE_SUBTITLE;
+  const description = compliance.description || COMPLIANCE_SUBTITLE;
   const contentHeight =
     18 +
     measureParagraphHeight(boldFont, standardsLine, CONTENT_WIDTH - 24, 12, 3, 2) +
@@ -795,7 +801,7 @@ function renderComplianceStandards(
   const blockHeight = Math.max(64, contentHeight);
 
   drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, blockHeight, theme.softSurface, theme.line, 1);
-  state.page.drawText("COMPLIANCE STANDARDS", {
+  state.page.drawText((compliance.label || "Compliance Standards").toUpperCase(), {
     x: PAGE_MARGIN + 12,
     y: state.y - 16,
     size: 7.5,
@@ -804,6 +810,51 @@ function renderComplianceStandards(
   });
   drawParagraph(state.page, boldFont, standardsLine, PAGE_MARGIN + 12, state.y - 34, CONTENT_WIDTH - 24, 12, theme.ink, 3, 2);
   drawParagraph(state.page, regularFont, description, PAGE_MARGIN + 12, state.y - 52, CONTENT_WIDTH - 24, 8.5, theme.muted, 3, 2);
+  state.y -= blockHeight + SECTION_SPACING;
+}
+
+function renderIdentityBand(
+  state: PageState,
+  input: PdfInput,
+  pageOneConfig: ReportPageOneConfig,
+  theme: PdfTheme,
+  boldFont: PDFFont,
+  regularFont: PDFFont
+) {
+  const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name);
+  const facts: KeyValueRow[] = [];
+
+  if (pageOneConfig.identity.showCustomer && isMeaningful(input.customerCompany.name)) {
+    facts.push({ label: "Customer", value: input.customerCompany.name });
+  }
+  if (pageOneConfig.identity.showSite && isMeaningful(customerFacingSiteName)) {
+    facts.push({ label: "Site", value: customerFacingSiteName ?? "" });
+  }
+  if (pageOneConfig.identity.showTechnician && isMeaningful(input.report.technicianName ?? "")) {
+    facts.push({ label: "Technician", value: input.report.technicianName ?? "" });
+  }
+  if (pageOneConfig.identity.showServiceDate) {
+    facts.push({ label: "Service Date", value: formatDate(input.inspection.scheduledStart) });
+  }
+
+  const title = getReportTitle(input);
+  const blockHeight = Math.max(88, 40 + Math.max(facts.length, 1) * 18);
+  drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, blockHeight, theme.surface, theme.line, 1);
+  drawParagraph(state.page, boldFont, title, PAGE_MARGIN + 14, state.y - 18, CONTENT_WIDTH - 28, 18, theme.ink, 3, 2);
+
+  let rowY = state.y - 46;
+  for (const fact of facts) {
+    state.page.drawText(`${fact.label}:`, {
+      x: PAGE_MARGIN + 14,
+      y: rowY,
+      size: 8.5,
+      font: boldFont,
+      color: theme.muted
+    });
+    drawParagraph(state.page, regularFont, fact.value, PAGE_MARGIN + 90, rowY, CONTENT_WIDTH - 104, 8.5, theme.ink, 3, 1);
+    rowY -= 18;
+  }
+
   state.y -= blockHeight + SECTION_SPACING;
 }
 
@@ -1227,12 +1278,6 @@ function getOrderedReportSections(
   template: ReturnType<typeof resolveReportTemplate>,
   draft: ReportDraft
 ) {
-  type OrderedReportSection = {
-    sectionConfig: ReportSectionConfig;
-    templateSection: ReturnType<typeof resolveReportTemplate>["sections"][number];
-    draftSection: ReportDraft["sections"][string];
-  };
-
   const configured = configSections
     .filter((section) => !["findings", "notes", "photos", "signatures"].includes(section.renderer))
     .map((sectionConfig) => {
@@ -1266,6 +1311,51 @@ function getOrderedReportSections(
         : null;
     })
     .filter(Boolean) as OrderedReportSection[];
+}
+
+function renderPageOne(
+  state: PageState,
+  pdfDoc: PDFDocument,
+  input: PdfInput,
+  branding: ReturnType<typeof resolveTenantBranding>,
+  pageOneConfig: ReportPageOneConfig,
+  orderedSections: OrderedReportSection[],
+  preview: ReturnType<typeof buildReportPreview>,
+  theme: PdfTheme,
+  boldFont: PDFFont,
+  regularFont: PDFFont,
+  logoEmbedded: PDFImage | null
+) {
+  renderIdentityBand(state, input, pageOneConfig, theme, boldFont, regularFont);
+  renderComplianceStandards(state, pageOneConfig.compliance, theme, boldFont, regularFont);
+  renderKpiStrip(state, preview, input, pageOneConfig.outcomeSummary.metrics, theme, boldFont, regularFont);
+
+  drawSectionTitle(state, "Customer and Service Context", "Customer, site, technician, and completion context for this report.", theme, boldFont, regularFont);
+  renderInspectionOverview(state, input, pageOneConfig.primaryFacts.fields, pageOneConfig.primaryFacts.layout, theme, boldFont, regularFont);
+
+  state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 160);
+  drawSectionTitle(state, "Inspection Overview", "Operational context and service details captured for this visit.", theme, boldFont, regularFont);
+  renderSummaryContext(state, input, pageOneConfig.overviewFacts.fields, pageOneConfig.overviewFacts.layout, theme, boldFont, regularFont);
+
+  const systemSection = orderedSections.find(({ sectionConfig }) => sectionConfig.key === pageOneConfig.systemSummary.sectionKey || sectionConfig.sourceSectionId === pageOneConfig.systemSummary.sectionKey);
+  if (!systemSection) {
+    return state;
+  }
+
+  const compactItems = getScalarSectionItems(systemSection.templateSection, systemSection.draftSection);
+  state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 140);
+  renderCompactSystemSummary(
+    state,
+    compactItems,
+    systemSection.sectionConfig.title,
+    systemSection.sectionConfig.description ?? systemSection.templateSection.description,
+    pageOneConfig.systemSummary.mode,
+    theme,
+    boldFont,
+    regularFont
+  );
+
+  return state;
 }
 
 function extractFollowUpRequirements(sectionTemplate: ReturnType<typeof resolveReportTemplate>["sections"][number], section: ReportDraft["sections"][string]) {
@@ -1304,22 +1394,24 @@ function renderInspectionOverview(
   state: PageState,
   input: PdfInput,
   factKeys: SummaryFactKey[],
+  layout: "two-column-grid" | "stacked",
   theme: PdfTheme,
   boldFont: PDFFont,
   regularFont: PDFFont
 ) {
-  renderKeyValueGrid(state, buildSummaryFacts(input, factKeys), theme, boldFont, regularFont, 2);
+  renderKeyValueGrid(state, buildSummaryFacts(input, factKeys), theme, boldFont, regularFont, layout === "stacked" ? 1 : 2);
 }
 
 function renderSummaryContext(
   state: PageState,
   input: PdfInput,
   factKeys: SummaryFactKey[],
+  layout: "two-column-grid" | "stacked",
   theme: PdfTheme,
   boldFont: PDFFont,
   regularFont: PDFFont
 ) {
-  renderKeyValueGrid(state, buildSummaryFacts(input, factKeys), theme, boldFont, regularFont, 2);
+  renderKeyValueGrid(state, buildSummaryFacts(input, factKeys), theme, boldFont, regularFont, layout === "stacked" ? 1 : 2);
 }
 
 function buildSummaryFacts(input: PdfInput, factKeys: SummaryFactKey[]): KeyValueRow[] {
@@ -1357,6 +1449,25 @@ function buildSummaryFacts(input: PdfInput, factKeys: SummaryFactKey[]): KeyValu
         return { label: humanizeText(factKey), value: "" };
     }
   });
+}
+
+function renderCompactSystemSummary(
+  state: PageState,
+  items: KeyValueRow[],
+  title: string,
+  description: string | undefined,
+  mode: ReportPageOneConfig["systemSummary"]["mode"],
+  theme: PdfTheme,
+  boldFont: PDFFont,
+  regularFont: PDFFont
+) {
+  const compactItems = items.filter((item) => isMeaningful(item.value)).slice(0, mode === "compact-metrics" ? 4 : 6);
+  if (compactItems.length === 0) {
+    return;
+  }
+
+  drawSectionTitle(state, title, description, theme, boldFont, regularFont);
+  renderKeyValueGrid(state, compactItems, theme, boldFont, regularFont, mode === "compact-metrics" ? 4 : 2);
 }
 
 function getDraftSectionFieldValue(input: PdfInput, sectionId: string, fieldId: string) {
@@ -1768,20 +1879,22 @@ export async function generateInspectionReportPdf(input: PdfInput) {
   const template = resolveReportTemplate({ inspectionType: input.task.inspectionType });
   const reportTypeConfig = resolveReportTypeConfig(input.task.inspectionType);
   const preview = buildReportPreview(input.draft);
+  const orderedSections = getOrderedReportSections(reportTypeConfig.sections, template, input.draft);
 
   let state = addPage(pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 1);
-
-  renderComplianceStandards(state, input.task.inspectionType, theme, boldFont, regularFont);
-  renderKpiStrip(state, preview, input, reportTypeConfig.summary.topMetrics, theme, boldFont, regularFont);
-
-  drawSectionTitle(state, "Executive Summary", "Customer, site, technician, and compliance context for this inspection.", theme, boldFont, regularFont);
-  renderInspectionOverview(state, input, reportTypeConfig.summary.primaryFacts, theme, boldFont, regularFont);
-
-  state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 180);
-  drawSectionTitle(state, "Inspection Overview", "Visit timing, account context, and prior-report context for this inspection.", theme, boldFont, regularFont);
-  renderSummaryContext(state, input, reportTypeConfig.summary.overviewFacts, theme, boldFont, regularFont);
-
-  const orderedSections = getOrderedReportSections(reportTypeConfig.sections, template, input.draft);
+  state = renderPageOne(
+    state,
+    pdfDoc,
+    input,
+    branding,
+    reportTypeConfig.pageOne,
+    orderedSections,
+    preview,
+    theme,
+    boldFont,
+    regularFont,
+    logoEmbedded
+  );
 
   for (const { sectionConfig, templateSection, draftSection } of orderedSections) {
     const scalarItems = getScalarSectionItems(templateSection, draftSection);

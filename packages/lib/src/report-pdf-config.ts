@@ -95,6 +95,36 @@ export type SignatureSectionConfig = {
   roles: string[];
 };
 
+export type ReportPageOneConfig = {
+  identity: {
+    showCustomer: boolean;
+    showSite: boolean;
+    showTechnician: boolean;
+    showServiceDate: boolean;
+  };
+  compliance: {
+    enabled: boolean;
+    label: string;
+    description?: string;
+    codes: string[];
+  };
+  outcomeSummary: {
+    metrics: SummaryMetricKey[];
+  };
+  primaryFacts: {
+    fields: SummaryFactKey[];
+    layout: "two-column-grid" | "stacked";
+  };
+  overviewFacts: {
+    fields: SummaryFactKey[];
+    layout: "two-column-grid" | "stacked";
+  };
+  systemSummary: {
+    sectionKey: string;
+    mode: "compact-key-value" | "compact-metrics";
+  };
+};
+
 export type ReportTypeConfig = {
   type: InspectionType;
   title: string;
@@ -119,6 +149,7 @@ export type ReportTypeConfig = {
     primaryFacts: SummaryFactKey[];
     overviewFacts: SummaryFactKey[];
   };
+  pageOne: ReportPageOneConfig;
   sections: ReportSectionConfig[];
   photos?: PhotoSectionConfig;
   signatures?: SignatureSectionConfig;
@@ -128,6 +159,36 @@ export const reportComplianceMap: Partial<Record<InspectionType, string[]>> = {
   fire_alarm: ["NFPA 72", "NFPA 70"],
   kitchen_suppression: ["NFPA 17A", "NFPA 96"],
   fire_extinguisher: ["NFPA 10"]
+};
+
+export const defaultReportPageOneConfig: ReportPageOneConfig = {
+  identity: {
+    showCustomer: true,
+    showSite: true,
+    showTechnician: true,
+    showServiceDate: true
+  },
+  compliance: {
+    enabled: true,
+    label: "Compliance Standards",
+    description: "This inspection was performed in accordance with the following standards.",
+    codes: []
+  },
+  outcomeSummary: {
+    metrics: ["documentStatus", "outcome", "deficiencyCount", "serviceDate"]
+  },
+  primaryFacts: {
+    fields: ["customer", "site", "inspectionDate", "completionDate", "technician"],
+    layout: "two-column-grid"
+  },
+  overviewFacts: {
+    fields: ["scheduledWindow", "billingContact", "siteAddress"],
+    layout: "two-column-grid"
+  },
+  systemSummary: {
+    sectionKey: "system_summary",
+    mode: "compact-key-value"
+  }
 };
 
 export const customerFacingFieldRules = {
@@ -179,6 +240,26 @@ export const fireAlarmReportConfig: ReportTypeConfig = {
     primaryFacts: ["customer", "site", "inspectionDate", "completionDate", "technician"],
     overviewFacts: ["scheduledWindow", "billingContact", "siteAddress", "inspectionStatus"]
   },
+  pageOne: {
+    ...defaultReportPageOneConfig,
+    compliance: {
+      enabled: true,
+      label: "Compliance Standards",
+      description: "This inspection was performed in accordance with the following standards.",
+      codes: ["NFPA 72", "NFPA 70"]
+    },
+    outcomeSummary: {
+      metrics: ["documentStatus", "outcome", "deficiencyCount", "completionPercent"]
+    },
+    overviewFacts: {
+      fields: ["scheduledWindow", "billingContact", "siteAddress", "inspectionStatus"],
+      layout: "two-column-grid"
+    },
+    systemSummary: {
+      sectionKey: "system-summary",
+      mode: "compact-key-value"
+    }
+  },
   sections: [
     { key: "control-panel", title: "Control Panel", description: "Inspect panel identification, power supplies, indications, communication, annunciation, and physical condition.", renderer: "keyValue", sourceSectionId: "control-panel" },
     { key: "initiating-devices", title: "Initiating Devices", description: "Record detectors, pull stations, and supervisory initiating devices tested during this visit.", renderer: "table", sourceSectionId: "initiating-devices" },
@@ -213,6 +294,23 @@ export const kitchenSuppressionReportConfig: ReportTypeConfig = {
     topMetrics: ["documentStatus", "outcome", "deficiencyCount", "serviceDate"],
     primaryFacts: ["customer", "site", "inspectionDate", "completionDate", "technician"],
     overviewFacts: ["scheduledWindow", "billingContact", "siteAddress", "inspectionStatus"]
+  },
+  pageOne: {
+    ...defaultReportPageOneConfig,
+    compliance: {
+      enabled: true,
+      label: "Compliance Standards",
+      description: "This inspection was performed in accordance with the following standards.",
+      codes: ["NFPA 17A", "NFPA 96"]
+    },
+    overviewFacts: {
+      fields: ["scheduledWindow", "billingContact", "siteAddress", "inspectionStatus"],
+      layout: "two-column-grid"
+    },
+    systemSummary: {
+      sectionKey: "system-details",
+      mode: "compact-key-value"
+    }
   },
   sections: [
     { key: "system-details", title: "System Details", description: "Capture the core kitchen suppression system details for this hood system.", renderer: "keyValue", sourceSectionId: "system-details" },
@@ -269,6 +367,23 @@ export const fireExtinguisherReportConfig: ReportTypeConfig = {
     primaryFacts: ["customer", "site", "inspectionDate", "completionDate", "technician"],
     overviewFacts: ["scheduledWindow", "billingContact", "siteAddress", "inspectionStatus"]
   },
+  pageOne: {
+    ...defaultReportPageOneConfig,
+    compliance: {
+      enabled: true,
+      label: "Compliance Standards",
+      description: "This inspection was performed in accordance with the following standards.",
+      codes: ["NFPA 10"]
+    },
+    overviewFacts: {
+      fields: ["scheduledWindow", "billingContact", "siteAddress", "inspectionStatus"],
+      layout: "two-column-grid"
+    },
+    systemSummary: {
+      sectionKey: "service",
+      mode: "compact-key-value"
+    }
+  },
   sections: [
     { key: "inventory", title: "Extinguisher Inventory", description: "Record extinguisher location, type, condition, and service results.", renderer: "table", sourceSectionId: "inventory" },
     { key: "service", title: "Service Findings", description: "Capture work performed and follow-up recommendations for this visit.", renderer: "keyValue", sourceSectionId: "service" },
@@ -312,6 +427,23 @@ function buildDefaultReportTypeConfig(type: InspectionType): ReportTypeConfig {
       topMetrics: ["documentStatus", "outcome", "deficiencyCount", "serviceDate"],
       primaryFacts: ["customer", "site", "inspectionDate", "completionDate", "technician"],
       overviewFacts: ["scheduledWindow", "billingContact", "siteAddress", "inspectionStatus"]
+    },
+    pageOne: {
+      ...defaultReportPageOneConfig,
+      compliance: {
+        enabled: true,
+        label: "Compliance Standards",
+        description: "This inspection was performed in accordance with the following standards.",
+        codes: reportComplianceMap[type] ?? pdf.nfpaReferences ?? []
+      },
+      overviewFacts: {
+        fields: ["scheduledWindow", "billingContact", "siteAddress", "inspectionStatus"],
+        layout: "two-column-grid"
+      },
+      systemSummary: {
+        sectionKey: template.sections[0]?.id ?? "system_summary",
+        mode: "compact-key-value"
+      }
     },
     sections: template.sections.map((section) => ({
       key: section.id,
