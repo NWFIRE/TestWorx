@@ -52,6 +52,54 @@ const strokeWidthOptions = [
   { label: "Bold", value: 5 }
 ] as const;
 
+function ensurePdfJsRuntimeCompatibility() {
+  const PromiseCompat = Promise as typeof Promise & {
+    withResolvers?: <T>() => {
+      promise: Promise<T>;
+      resolve: (value: T | PromiseLike<T>) => void;
+      reject: (reason?: unknown) => void;
+    };
+  };
+
+  if (typeof PromiseCompat.withResolvers !== "function") {
+    PromiseCompat.withResolvers = function withResolvers<T>() {
+      let resolve!: (value: T | PromiseLike<T>) => void;
+      let reject!: (reason?: unknown) => void;
+      const promise = new Promise<T>((innerResolve, innerReject) => {
+        resolve = innerResolve;
+        reject = innerReject;
+      });
+
+      return { promise, resolve, reject };
+    };
+  }
+
+  const arrayPrototype = Array.prototype as Array<unknown> & {
+    findLast?: <T>(
+      this: T[],
+      predicate: (value: T, index: number, array: T[]) => boolean,
+      thisArg?: unknown
+    ) => T | undefined;
+  };
+
+  if (typeof arrayPrototype.findLast !== "function") {
+    arrayPrototype.findLast = function findLast<T>(
+      this: T[],
+      predicate: (value: T, index: number, array: T[]) => boolean,
+      thisArg?: unknown
+    ) {
+      for (let index = this.length - 1; index >= 0; index -= 1) {
+        const value = this[index];
+        if (value !== undefined && predicate.call(thisArg, value, index, this)) {
+          return value;
+        }
+      }
+
+      return undefined;
+    };
+  }
+}
+
 function distanceBetween(a: AnnotationPoint, b: AnnotationPoint) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
@@ -285,6 +333,7 @@ export function ExternalDocumentSigner({
       setPages([]);
 
       try {
+        ensurePdfJsRuntimeCompatibility();
         const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
         const workerModule = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
         if (!("pdfjsWorker" in globalThis)) {
