@@ -13,20 +13,6 @@ const DRAWER_SELECTOR =
 
 const MOBILE_KEYBOARD_THRESHOLD = 120;
 const EXPANDED_SIDEBAR_BREAKPOINT = 1280;
-const SHOW_PTR_DEBUG_SHELL_STRIP = true;
-
-type PullToRefreshDebugState = {
-  enabled: boolean;
-  routeEnabled: boolean;
-  blocked: boolean;
-  drawerOpen: boolean;
-  stage: string;
-  reason: string | null;
-  scrollTop: number;
-  pullDistance: number;
-  thresholdReached: boolean;
-  activeTouch: boolean;
-};
 
 function isKeyboardFocusableElement(target: EventTarget | null): target is HTMLElement {
   return target instanceof HTMLElement && Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
@@ -303,9 +289,6 @@ export function AppShell({
     () => typeof window === "undefined" || window.innerWidth < EXPANDED_SIDEBAR_BREAKPOINT
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [pullToRefreshDebug, setPullToRefreshDebug] = useState<PullToRefreshDebugState | null>(
-    () => (typeof window !== "undefined" ? ((window as Window & { __tradeworxPtrDebug?: PullToRefreshDebugState }).__tradeworxPtrDebug ?? null) : null)
-  );
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const drawerRef = useRef<HTMLDivElement | null>(null);
   const shellContentRef = useRef<HTMLDivElement | null>(null);
@@ -363,24 +346,6 @@ export function AppShell({
         behavior: "smooth"
       });
     });
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !SHOW_PTR_DEBUG_SHELL_STRIP) {
-      return;
-    }
-
-    const handleDebugUpdate = (event: Event) => {
-      const detail = (event as CustomEvent<PullToRefreshDebugState>).detail;
-      if (detail) {
-        setPullToRefreshDebug(detail);
-      }
-    };
-
-    window.addEventListener("tradeworx:ptr-debug", handleDebugUpdate as EventListener);
-    return () => {
-      window.removeEventListener("tradeworx:ptr-debug", handleDebugUpdate as EventListener);
-    };
   }, []);
 
   useEffect(() => {
@@ -597,25 +562,6 @@ export function AppShell({
         ref={shellContentRef}
         style={{ minHeight: "var(--app-height, 100dvh)" }}
       >
-        {SHOW_PTR_DEBUG_SHELL_STRIP && pullToRefreshDebug ? (
-          <div className="pointer-events-none fixed inset-x-2 top-2 z-[90] flex justify-center">
-            <div className="w-full max-w-5xl rounded-2xl border-2 border-fuchsia-400 bg-white/97 px-3 py-2 text-[11px] font-semibold text-slate-900 shadow-[0_20px_40px_rgba(15,23,42,0.18)] backdrop-blur">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="uppercase tracking-[0.18em] text-fuchsia-700">PTR Shell Debug</span>
-                <span>enabled: {pullToRefreshDebug.enabled ? "yes" : "no"}</span>
-                <span>route: {pullToRefreshDebug.routeEnabled ? "yes" : "no"}</span>
-                <span>blocked: {pullToRefreshDebug.blocked ? "yes" : "no"}</span>
-                <span>drawer: {pullToRefreshDebug.drawerOpen ? "open" : "closed"}</span>
-                <span>touch: {pullToRefreshDebug.activeTouch ? "active" : "idle"}</span>
-                <span>stage: {pullToRefreshDebug.stage}</span>
-                <span>scrollTop: {Math.round(pullToRefreshDebug.scrollTop)}</span>
-                <span>pull: {Math.round(pullToRefreshDebug.pullDistance)}</span>
-                <span>ready: {pullToRefreshDebug.thresholdReached ? "yes" : "no"}</span>
-                {pullToRefreshDebug.reason ? <span>reason: {pullToRefreshDebug.reason}</span> : null}
-              </div>
-            </div>
-          </div>
-        ) : null}
         <header className="sticky top-0 z-30 border-b border-[color:var(--border-default)] bg-white/96 backdrop-blur">
           <div
             className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8"

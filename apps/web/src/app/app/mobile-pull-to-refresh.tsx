@@ -21,7 +21,6 @@ const READY_THRESHOLD = 66;
 const MAX_PULL_DISTANCE = 124;
 const REFRESH_HOLD_MS = 700;
 const MIN_VISIBLE_PULL = 3;
-const SHOW_REFRESH_DEBUG_STRIP = true;
 
 type RefreshHandler = () => Promise<void> | void;
 
@@ -34,33 +33,6 @@ type MobileRefreshContextValue = {
   registerRefreshHandler: (handler: RefreshHandler | null) => () => void;
   setRefreshBlocked: (blocked: boolean) => void;
 };
-
-type RefreshDebugState = {
-  enabled: boolean;
-  routeEnabled: boolean;
-  blocked: boolean;
-  drawerOpen: boolean;
-  stage:
-    | "idle"
-    | "touch-start"
-    | "blocked"
-    | "pulling"
-    | "ready"
-    | "refreshing"
-    | "complete"
-    | "cancelled";
-  reason: string | null;
-  scrollTop: number;
-  pullDistance: number;
-  thresholdReached: boolean;
-  activeTouch: boolean;
-};
-
-declare global {
-  interface Window {
-    __tradeworxPtrDebug?: RefreshDebugState;
-  }
-}
 
 const MobileRefreshContext = createContext<MobileRefreshContextValue | null>(null);
 
@@ -100,25 +72,11 @@ function getRefreshIndicatorOffset(container: HTMLElement | null) {
 }
 
 function isSupportedMobileRoute(pathname: string) {
-  return (
-    pathname === "/app/admin/dashboard" ||
-    pathname === "/app/admin/inspections" ||
-    pathname.startsWith("/app/admin/inspections/") ||
-    pathname === "/app/admin/reports" ||
-    pathname === "/app/deficiencies" ||
-    pathname === "/app/admin/billing" ||
-    pathname.startsWith("/app/admin/billing/") ||
-    pathname.startsWith("/app/admin/clients/")
-  );
+  return pathname === "/app/tech";
 }
 
 function isBlockedMobileRoute(pathname: string) {
-  return (
-    pathname.startsWith("/app/tech/reports/") ||
-    pathname.includes("/documents/") ||
-    pathname.startsWith("/app/admin/reports/") ||
-    pathname.includes("/quotes/new")
-  );
+  return !isSupportedMobileRoute(pathname);
 }
 
 function isInteractiveTarget(target: EventTarget | null) {
@@ -243,32 +201,6 @@ function PullIndicator({
   );
 }
 
-function RefreshDebugStrip({
-  state
-}: {
-  state: RefreshDebugState;
-}) {
-  return (
-    <div className="pointer-events-none fixed inset-x-3 bottom-3 z-50 flex justify-center lg:bottom-4">
-      <div className="w-full max-w-3xl rounded-2xl border-2 border-amber-300 bg-white/96 px-3 py-2.5 text-[11px] font-semibold text-slate-900 shadow-[0_18px_36px_rgba(15,23,42,0.18)] backdrop-blur">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="font-bold uppercase tracking-[0.18em] text-amber-700">PTR Debug</span>
-          <span>enabled: {state.enabled ? "yes" : "no"}</span>
-          <span>route: {state.routeEnabled ? "yes" : "no"}</span>
-          <span>blocked: {state.blocked ? "yes" : "no"}</span>
-          <span>drawer: {state.drawerOpen ? "open" : "closed"}</span>
-          <span>touch: {state.activeTouch ? "active" : "idle"}</span>
-          <span>stage: {state.stage}</span>
-          <span>scrollTop: {Math.round(state.scrollTop)}</span>
-          <span>pull: {Math.round(state.pullDistance)}</span>
-          <span>ready: {state.thresholdReached ? "yes" : "no"}</span>
-          {state.reason ? <span>reason: {state.reason}</span> : null}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function useMobilePullToRefreshRegistration(handler: RefreshHandler | null, options?: { blocked?: boolean }) {
   const context = useContext(MobileRefreshContext);
 
@@ -313,18 +245,6 @@ export function MobilePullToRefresh({
   const [refreshing, setRefreshing] = useState(false);
   const [refreshEnabled, setRefreshEnabled] = useState(false);
   const [indicatorTopOffset, setIndicatorTopOffset] = useState(6);
-  const [debugState, setDebugState] = useState<RefreshDebugState>({
-    enabled: false,
-    routeEnabled,
-    blocked: false,
-    drawerOpen,
-    stage: "idle",
-    reason: null,
-    scrollTop: 0,
-    pullDistance: 0,
-    thresholdReached: false,
-    activeTouch: false
-  });
 
   const registrationRef = useRef<MobileRefreshRegistration>({
     refreshHandler: null,
@@ -349,28 +269,6 @@ export function MobilePullToRefresh({
   }, [refreshing]);
 
   useEffect(() => {
-    setDebugState((current) => ({
-      ...current,
-      enabled: refreshEnabled,
-      routeEnabled,
-      blocked: registrationRef.current.blocked,
-      drawerOpen,
-      thresholdReached: ready,
-      pullDistance,
-      stage: refreshing ? "refreshing" : current.stage
-    }));
-  }, [drawerOpen, pullDistance, ready, refreshEnabled, refreshing, routeEnabled]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !SHOW_REFRESH_DEBUG_STRIP) {
-      return;
-    }
-
-    window.__tradeworxPtrDebug = debugState;
-    window.dispatchEvent(new CustomEvent("tradeworx:ptr-debug", { detail: debugState }));
-  }, [debugState]);
-
-  useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
       return;
     }
@@ -381,10 +279,6 @@ export function MobilePullToRefresh({
       enabledRef.current = nextEnabled;
       setRefreshEnabled(nextEnabled);
       setIndicatorTopOffset(getRefreshIndicatorOffset(containerRef.current));
-      setDebugState((current) => ({
-        ...current,
-        enabled: nextEnabled
-      }));
     };
 
     updateEnabled();
@@ -413,12 +307,6 @@ export function MobilePullToRefresh({
     activePointerIdRef.current = null;
     setPullDistance(0);
     setReady(false);
-    setDebugState((current) => ({
-      ...current,
-      activeTouch: false,
-      pullDistance: 0,
-      thresholdReached: false
-    }));
   }, []);
 
   const runRefresh = useCallback(async () => {
@@ -426,11 +314,6 @@ export function MobilePullToRefresh({
 
     setRefreshing(true);
     reset();
-    setDebugState((current) => ({
-      ...current,
-      stage: "refreshing",
-      reason: null
-    }));
 
     try {
       if (registeredRefresh) {
@@ -447,11 +330,6 @@ export function MobilePullToRefresh({
 
       timeoutRef.current = window.setTimeout(() => {
         setRefreshing(false);
-        setDebugState((current) => ({
-          ...current,
-          stage: "complete",
-          activeTouch: false
-        }));
       }, REFRESH_HOLD_MS);
     }
   }, [reset, router, startTransition]);
@@ -497,13 +375,6 @@ export function MobilePullToRefresh({
 
       if (blockedReason) {
         trackingRef.current = false;
-        setDebugState((current) => ({
-          ...current,
-          stage: "blocked",
-          reason: blockedReason,
-          scrollTop,
-          activeTouch: false
-        }));
         return;
       }
 
@@ -514,15 +385,6 @@ export function MobilePullToRefresh({
       startXRef.current = input.clientX;
       setPullDistance(0);
       setReady(false);
-      setDebugState((current) => ({
-        ...current,
-        stage: "touch-start",
-        reason: null,
-        scrollTop,
-        activeTouch: true,
-        pullDistance: 0,
-        thresholdReached: false
-      }));
     };
 
     const handleTouchStart = (event: TouchEvent) => {
@@ -551,12 +413,6 @@ export function MobilePullToRefresh({
 
       const scrollTop = getPrimaryScrollTop(container);
       if (scrollTop > 0) {
-        setDebugState((current) => ({
-          ...current,
-          stage: "cancelled",
-          reason: "scroll-left-top",
-          scrollTop
-        }));
         reset();
         return;
       }
@@ -565,12 +421,6 @@ export function MobilePullToRefresh({
       const deltaY = input.clientY - startYRef.current;
 
       if (Math.abs(deltaX) > Math.abs(deltaY) * 0.9) {
-        setDebugState((current) => ({
-          ...current,
-          stage: "cancelled",
-          reason: "horizontal-gesture",
-          scrollTop
-        }));
         reset();
         return;
       }
@@ -578,40 +428,18 @@ export function MobilePullToRefresh({
       if (deltaY <= 0) {
         setPullDistance(0);
         setReady(false);
-        setDebugState((current) => ({
-          ...current,
-          stage: "pulling",
-          reason: "reverse-or-upward",
-          scrollTop,
-          pullDistance: 0,
-          thresholdReached: false
-        }));
         return;
       }
 
       const resistedDistance = Math.min(MAX_PULL_DISTANCE, deltaY * 0.5 + Math.sqrt(deltaY) * 1.55);
       setPullDistance(resistedDistance);
       setReady(resistedDistance >= READY_THRESHOLD);
-      setDebugState((current) => ({
-        ...current,
-        stage: resistedDistance >= READY_THRESHOLD ? "ready" : "pulling",
-        reason: null,
-        scrollTop,
-        pullDistance: resistedDistance,
-        thresholdReached: resistedDistance >= READY_THRESHOLD,
-        activeTouch: true
-      }));
       input.preventDefault?.();
     };
 
     const handleTouchMove = (event: TouchEvent) => {
       const touch = Array.from(event.touches).find((entry) => entry.identifier === activeTouchIdRef.current);
       if (!touch) {
-        setDebugState((current) => ({
-          ...current,
-          stage: "cancelled",
-          reason: "touch-lost"
-        }));
         reset();
         return;
       }
@@ -659,12 +487,6 @@ export function MobilePullToRefresh({
         void runRefresh();
         return;
       }
-
-      setDebugState((current) => ({
-        ...current,
-        stage: "cancelled",
-        reason: "released-before-threshold"
-      }));
       reset();
     };
 
@@ -678,12 +500,6 @@ export function MobilePullToRefresh({
 
     const handleScroll = () => {
       if (getPrimaryScrollTop(container) > 0 && !refreshingRef.current) {
-        setDebugState((current) => ({
-          ...current,
-          stage: current.activeTouch ? "cancelled" : current.stage,
-          reason: current.activeTouch ? "container-scrolled" : current.reason,
-          scrollTop: getPrimaryScrollTop(container)
-        }));
         reset();
       }
     };
@@ -738,7 +554,6 @@ export function MobilePullToRefresh({
   return (
     <MobileRefreshContext.Provider value={contextValue}>
       <div className="relative min-h-0 flex-1 overflow-visible">
-        {SHOW_REFRESH_DEBUG_STRIP ? <RefreshDebugStrip state={debugState} /> : null}
         <PullIndicator pullDistance={pullDistance} ready={ready} refreshing={refreshing} topOffset={indicatorTopOffset} />
         {showRefreshAffordance ? (
           <button
