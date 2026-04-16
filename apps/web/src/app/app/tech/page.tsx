@@ -134,10 +134,13 @@ export default async function TechnicianPage({
 
   return (
     <section className="space-y-5 pb-8">
-      <div className="rounded-[2rem] bg-ink p-6 text-white shadow-panel">
-        <p className="text-sm uppercase tracking-[0.25em] text-white/60">Technician workspace</p>
+      <div
+        className="rounded-[2rem] p-6 text-white shadow-[0_22px_48px_rgb(var(--tenant-primary-rgb)_/_0.22)]"
+        style={{ background: "linear-gradient(135deg, var(--tenant-primary) 0%, var(--tenant-accent) 100%)" }}
+      >
+        <p className="text-sm uppercase tracking-[0.25em] text-white/70">Technician workspace</p>
         <h2 className="mt-2 text-3xl font-semibold">Field schedule</h2>
-        <p className="mt-3 max-w-2xl text-white/75">Claim open work, move visits through the day, and finish reports without losing sight of due dates.</p>
+        <p className="mt-3 max-w-2xl text-white/80">Claim open work, move visits through the day, and finish reports without losing sight of due dates.</p>
       </div>
 
       {reportNotice === "finalized" ? (

@@ -86,7 +86,7 @@ export function CompleteInspectionCard({ inspectionId }: { inspectionId: string 
           </p>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             <button
-              className="pressable pressable-filled min-h-12 flex-1 rounded-[1.25rem] bg-ink px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+              className="pressable pressable-filled btn-brand-primary min-h-12 flex-1 rounded-[1.25rem] border border-transparent px-4 py-3 text-sm font-semibold disabled:opacity-60"
               disabled={pending}
               onClick={() => startTransition(async () => {
                 const result = await completeInspectionWithCloseoutRequestAction(inspectionId, {

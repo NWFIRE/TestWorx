@@ -13,7 +13,7 @@ export function ClaimButton({ inspectionId }: { inspectionId: string }) {
   return (
     <div className="space-y-2">
       <button
-        className="pressable pressable-filled min-h-14 w-full rounded-[1.25rem] bg-slateblue px-5 py-4 text-base font-semibold text-white shadow-sm disabled:opacity-60"
+        className="pressable pressable-filled btn-brand-primary min-h-14 w-full rounded-[1.25rem] border border-transparent px-5 py-4 text-base font-semibold shadow-sm disabled:opacity-60"
         disabled={pending}
         onClick={() => startTransition(async () => {
           const result = await claimInspectionAction(inspectionId);

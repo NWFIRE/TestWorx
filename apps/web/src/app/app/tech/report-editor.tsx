@@ -1185,7 +1185,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
               Save
             </button>
             {canFinalizeNow && !nextSectionId ? (
-              <button className="rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={!canFinalizeNow} onClick={() => { void finalizeReport(); }} type="button">
+              <button className="btn-brand-primary rounded-2xl border border-transparent px-4 py-3 text-sm font-semibold disabled:opacity-50" disabled={!canFinalizeNow} onClick={() => { void finalizeReport(); }} type="button">
                 Finalize
               </button>
             ) : (
