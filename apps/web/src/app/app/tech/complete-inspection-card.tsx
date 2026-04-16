@@ -73,7 +73,8 @@ export function CompleteInspectionCard({ inspectionId }: { inspectionId: string 
                 Request note
               </label>
               <textarea
-                className="mt-2 min-h-28 w-full rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3 text-sm text-ink shadow-sm outline-none transition focus:border-slateblue focus:ring-2 focus:ring-slateblue/10"
+                className="mt-2 min-h-28 w-full resize-none overflow-hidden rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3 text-sm text-ink shadow-sm outline-none transition focus:border-slateblue focus:ring-2 focus:ring-slateblue/10"
+                data-auto-grow="on"
                 id={`closeout-note-${inspectionId}`}
                 onChange={(event) => setNote(event.target.value)}
                 placeholder="Explain what needs to happen next so office staff can review and schedule correctly."

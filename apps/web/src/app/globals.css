@@ -39,6 +39,7 @@
 html {
   min-height: 100%;
   overflow-x: hidden;
+  height: 100%;
 }
 
 body {
@@ -69,7 +70,7 @@ body {
   textarea {
     color: var(--text-primary);
     scroll-margin-top: calc(var(--mobile-header-offset, 88px) + 0.75rem);
-    scroll-margin-bottom: calc(var(--keyboard-offset, 0px) + 5rem);
+    scroll-margin-bottom: calc(var(--keyboard-offset, 0px) + 7rem + env(safe-area-inset-bottom));
   }
 
   input::placeholder,
@@ -83,6 +84,12 @@ body[data-keyboard-open="true"] .mobile-keyboard-hide {
   opacity: 0;
   pointer-events: none;
   transform: translateY(1rem);
+  visibility: hidden;
+}
+
+html[data-keyboard-open="true"],
+body[data-keyboard-open="true"] {
+  min-height: var(--app-height, 100dvh);
 }
 
 @keyframes tradeworx-loader-spin {

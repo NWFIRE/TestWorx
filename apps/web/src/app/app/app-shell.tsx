@@ -28,6 +28,19 @@ function syncTextareaHeight(textarea: HTMLTextAreaElement) {
   textarea.style.overflowY = "hidden";
 }
 
+function getVisibleViewportMetrics() {
+  const viewport = typeof window !== "undefined" ? window.visualViewport : null;
+  const viewportHeight = viewport ? viewport.height : window.innerHeight;
+  const viewportOffsetTop = viewport ? viewport.offsetTop : 0;
+  const viewportBottom = viewportHeight + viewportOffsetTop;
+
+  return {
+    viewportHeight,
+    viewportOffsetTop,
+    viewportBottom
+  };
+}
+
 function getFocusableElements(container: HTMLElement | null) {
   if (!container) {
     return [];
@@ -307,6 +320,7 @@ export function AppShell({
     document.documentElement.style.setProperty("--app-height", `${Math.round(appHeight)}px`);
     document.documentElement.style.setProperty("--keyboard-offset", `${Math.round(keyboardOffset)}px`);
     document.body.dataset.keyboardOpen = keyboardOffset > 0 ? "true" : "false";
+    document.documentElement.dataset.keyboardOpen = keyboardOffset > 0 ? "true" : "false";
   }, []);
 
   const keepFocusedElementVisible = useCallback((target: HTMLElement) => {
@@ -325,26 +339,41 @@ export function AppShell({
       const keyboardOffset = Number.parseFloat(
         getComputedStyle(document.documentElement).getPropertyValue("--keyboard-offset") || "0"
       );
+      const { viewportBottom } = getVisibleViewportMetrics();
       const containerRect = container.getBoundingClientRect();
       const targetRect = target.getBoundingClientRect();
       const visibleTop = containerRect.top + headerHeight + 12;
-      const visibleBottom = window.innerHeight - keyboardOffset - 20;
+      const visibleBottom = Math.min(containerRect.bottom, viewportBottom - keyboardOffset) - 20;
 
       if (targetRect.top >= visibleTop && targetRect.bottom <= visibleBottom) {
         return;
       }
 
-      const currentScrollTop = container.scrollTop;
-      const targetTopWithinContainer = targetRect.top - containerRect.top + currentScrollTop;
-      const desiredTop = Math.max(
-        0,
-        targetTopWithinContainer - Math.max(24, headerHeight + 18)
-      );
-
-      container.scrollTo({
-        top: desiredTop,
-        behavior: "smooth"
+      target.scrollIntoView({
+        block: "center",
+        behavior: "smooth",
+        inline: "nearest"
       });
+
+      window.setTimeout(() => {
+        const refreshedContainerRect = container.getBoundingClientRect();
+        const refreshedTargetRect = target.getBoundingClientRect();
+        const refreshedBottom = Math.min(refreshedContainerRect.bottom, getVisibleViewportMetrics().viewportBottom - keyboardOffset) - 20;
+        const refreshedTop = refreshedContainerRect.top + headerHeight + 12;
+
+        if (refreshedTargetRect.top >= refreshedTop && refreshedTargetRect.bottom <= refreshedBottom) {
+          return;
+        }
+
+        const currentScrollTop = container.scrollTop;
+        const targetTopWithinContainer = refreshedTargetRect.top - refreshedContainerRect.top + currentScrollTop;
+        const desiredTop = Math.max(0, targetTopWithinContainer - Math.max(32, headerHeight + 24));
+
+        container.scrollTo({
+          top: desiredTop,
+          behavior: "smooth"
+        });
+      }, 90);
     });
   }, []);
 
@@ -383,9 +412,42 @@ export function AppShell({
       }
       document.documentElement.style.removeProperty("--app-height");
       document.documentElement.style.removeProperty("--keyboard-offset");
+      delete document.documentElement.dataset.keyboardOpen;
       delete document.body.dataset.keyboardOpen;
     };
   }, [updateViewportMetrics]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleViewportShift = () => {
+      const activeElement = document.activeElement;
+      if (!isKeyboardFocusableElement(activeElement)) {
+        return;
+      }
+
+      keepFocusedElementVisible(activeElement);
+    };
+
+    const viewport = window.visualViewport;
+    window.addEventListener("resize", handleViewportShift);
+    window.addEventListener("orientationchange", handleViewportShift);
+    if (viewport) {
+      viewport.addEventListener("resize", handleViewportShift);
+      viewport.addEventListener("scroll", handleViewportShift);
+    }
+
+    return () => {
+      window.removeEventListener("resize", handleViewportShift);
+      window.removeEventListener("orientationchange", handleViewportShift);
+      if (viewport) {
+        viewport.removeEventListener("resize", handleViewportShift);
+        viewport.removeEventListener("scroll", handleViewportShift);
+      }
+    };
+  }, [keepFocusedElementVisible]);
 
   useEffect(() => {
     const container = contentRef.current;
@@ -601,7 +663,11 @@ export function AppShell({
         <main
           className="min-w-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-6 sm:px-6 lg:px-8"
           ref={contentRef}
-          style={{ paddingBottom: "calc(max(1.5rem, env(safe-area-inset-bottom)) + var(--keyboard-offset, 0px))" }}
+          style={{
+            paddingBottom: "calc(max(1.5rem, env(safe-area-inset-bottom)) + var(--keyboard-offset, 0px))",
+            scrollPaddingTop: "calc(var(--mobile-header-offset, 88px) + 1rem)",
+            scrollPaddingBottom: "calc(var(--keyboard-offset, 0px) + 7rem + env(safe-area-inset-bottom))"
+          }}
         >
           <MobilePullToRefresh containerRef={contentRef} drawerOpen={drawerOpen} gestureRef={shellContentRef}>
             <div className="mx-auto w-full max-w-[1700px] min-w-0">{children}</div>

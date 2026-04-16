@@ -974,7 +974,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
                                   {deficiencyNotesField ? (
                                     <div className="space-y-2 md:col-span-2">
                                       <label className="block text-sm font-medium text-slate-600">{deficiencyNotesField.label}</label>
-                                      <textarea className="min-h-24 w-full rounded-[1.5rem] border border-slate-200 px-4 py-4 text-base uppercase" disabled={isFieldDisabled(data.canEdit, data.reportStatus, deficiencyNotesField)} onChange={(event) => updateRepeaterRowField(activeSection.id, field, rowIndex, deficiencyNotesField.id, normalizeEditorText(event.target.value))} placeholder={deficiencyNotesField.placeholder} value={String(row[deficiencyNotesField.id] ?? "")} />
+                                      <textarea className="min-h-24 w-full resize-none overflow-hidden rounded-[1.5rem] border border-slate-200 px-4 py-4 text-base uppercase" data-auto-grow="on" disabled={isFieldDisabled(data.canEdit, data.reportStatus, deficiencyNotesField)} onChange={(event) => updateRepeaterRowField(activeSection.id, field, rowIndex, deficiencyNotesField.id, normalizeEditorText(event.target.value))} placeholder={deficiencyNotesField.placeholder} value={String(row[deficiencyNotesField.id] ?? "")} />
                                     </div>
                                   ) : null}
                                   {deficiencyPhotoField ? (
@@ -1035,14 +1035,14 @@ export function ReportEditor({ data }: { data: EditorData }) {
               ))}
               <div>
                 <label className="block text-sm font-medium text-slate-600">Section notes</label>
-                <textarea className="mt-2 min-h-32 w-full rounded-[1.5rem] border border-slate-200 px-4 py-4 text-base uppercase" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateSectionMeta(activeSection.id, "notes", event.target.value)} value={draft.sections[activeSection.id]?.notes ?? ""} />
+                <textarea className="mt-2 min-h-32 w-full resize-none overflow-hidden rounded-[1.5rem] border border-slate-200 px-4 py-4 text-base uppercase" data-auto-grow="on" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateSectionMeta(activeSection.id, "notes", event.target.value)} value={draft.sections[activeSection.id]?.notes ?? ""} />
               </div>
             </div>
           </div>
 
           <div className="overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel sm:rounded-[2rem] sm:p-5">
             <h3 className="text-xl font-semibold text-ink">Technician notes</h3>
-            <textarea className="mt-4 min-h-32 w-full rounded-[1.5rem] border border-slate-200 px-4 py-4 text-base uppercase" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateDraft({ ...draft, overallNotes: normalizeEditorText(event.target.value) })} value={draft.overallNotes} />
+            <textarea className="mt-4 min-h-32 w-full resize-none overflow-hidden rounded-[1.5rem] border border-slate-200 px-4 py-4 text-base uppercase" data-auto-grow="on" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateDraft({ ...draft, overallNotes: normalizeEditorText(event.target.value) })} value={draft.overallNotes} />
           </div>
 
           <div className="overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel sm:rounded-[2rem] sm:p-5">
@@ -1056,7 +1056,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
               {draft.deficiencies.length === 0 ? <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No deficiencies captured.</p> : draft.deficiencies.map((deficiency, index) => (
                 <div key={deficiency.id} className="space-y-3 rounded-[1.5rem] border border-slate-200 p-4">
                   <input className="min-h-12 w-full rounded-2xl border border-slate-200 px-4 py-3 uppercase" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateDeficiency(index, "title", event.target.value)} placeholder="Deficiency title" value={deficiency.title} />
-                  <textarea className="min-h-24 w-full rounded-2xl border border-slate-200 px-4 py-3 uppercase" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateDeficiency(index, "description", event.target.value)} placeholder="Describe the deficiency" value={deficiency.description} />
+                  <textarea className="min-h-24 w-full resize-none overflow-hidden rounded-2xl border border-slate-200 px-4 py-3 uppercase" data-auto-grow="on" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateDeficiency(index, "description", event.target.value)} placeholder="Describe the deficiency" value={deficiency.description} />
                   <div className="grid gap-3 md:grid-cols-2">
                     <select className="min-h-12 rounded-2xl border border-slate-200 px-4 py-3 uppercase" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateDeficiency(index, "severity", event.target.value)} value={deficiency.severity}>
                       <option value="low">{normalizeOptionLabel("Low")}</option>
