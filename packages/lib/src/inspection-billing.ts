@@ -1990,8 +1990,8 @@ export async function linkBillingSummaryItemCatalog(
     candidate.id === input.itemId
       ? {
           ...candidate,
-          unitPrice: candidate.unitPrice ?? catalogItem.unitPrice ?? null,
-          amount: calculateAmount(candidate.quantity, candidate.unitPrice ?? catalogItem.unitPrice ?? null),
+          unitPrice: catalogItem.unitPrice ?? null,
+          amount: calculateAmount(candidate.quantity, catalogItem.unitPrice ?? null),
           linkedCatalogItemId: catalogItem.id,
           linkedCatalogItemName: catalogItem.name,
           linkedQuickBooksItemId: catalogItem.quickbooksItemId,
@@ -2174,8 +2174,8 @@ export async function linkBillingSummaryItemGroupCatalog(
     groupedItemSet.has(candidate.id)
       ? {
           ...candidate,
-          unitPrice: candidate.unitPrice ?? catalogItem.unitPrice ?? null,
-          amount: calculateAmount(candidate.quantity, candidate.unitPrice ?? catalogItem.unitPrice ?? null),
+          unitPrice: catalogItem.unitPrice ?? null,
+          amount: calculateAmount(candidate.quantity, catalogItem.unitPrice ?? null),
           linkedCatalogItemId: catalogItem.id,
           linkedCatalogItemName: catalogItem.name,
           linkedQuickBooksItemId: catalogItem.quickbooksItemId,

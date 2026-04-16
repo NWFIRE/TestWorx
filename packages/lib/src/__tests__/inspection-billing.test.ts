@@ -45,6 +45,7 @@ import {
   groupBillableItems,
   groupBillingReviewItems,
   linkBillingSummaryItemCatalog,
+  linkBillingSummaryItemGroupCatalog,
   mergeBillingItems,
   searchBillingSummaryItemCatalogMatches,
   syncInspectionBillingSummaryTx,
@@ -1246,7 +1247,7 @@ describe("inspection billing persistence and admin review", () => {
     expect(prismaMock.quickBooksCatalogItemAlias.upsert).toHaveBeenCalled();
   });
 
-  it("fills missing unit price from the linked catalog item without overwriting existing manual pricing", async () => {
+  it("applies the linked catalog price to billing lines", async () => {
     const summaryRow = [
       {
         id: "summary_1",
@@ -1334,9 +1335,83 @@ describe("inspection billing persistence and admin review", () => {
     );
     expect(secondItems.find((item) => item.id === "line_priced")).toEqual(
       expect.objectContaining({
-        unitPrice: 125,
-        amount: 125,
+        unitPrice: 65,
+        amount: 65,
         linkedCatalogItemId: "catalog_2"
+      })
+    );
+  });
+
+  it("applies the linked catalog price across grouped billing rows", async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      {
+        id: "summary_1",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        status: "draft",
+        subtotal: 40,
+        notes: "Review pricing",
+        quickbooksSyncStatus: "not_synced",
+        quickbooksInvoiceId: null,
+        items: [
+          {
+            id: "line_1",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "fire_extinguisher",
+            category: "material",
+            description: "Cabinet decal",
+            quantity: 1,
+            unitPrice: 10
+          },
+          {
+            id: "line_2",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "fire_extinguisher",
+            category: "material",
+            description: "Cabinet decal",
+            quantity: 3,
+            unitPrice: 10
+          }
+        ]
+      }
+    ]);
+    prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValueOnce({
+      id: "catalog_group",
+      quickbooksItemId: "qb_group",
+      name: "Cabinet decal",
+      sku: "DECAL",
+      unitPrice: 18
+    });
+
+    await linkBillingSummaryItemGroupCatalog(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        summaryId: "summary_1",
+        itemIds: ["line_1", "line_2"],
+        catalogItemId: "catalog_group",
+        saveMapping: false
+      }
+    );
+
+    const updateCall = prismaMock.inspectionBillingSummary.update.mock.calls.at(-1)?.[0];
+    const updatedItems = Array.isArray(updateCall?.data?.items) ? updateCall.data.items : [];
+
+    expect(updatedItems.find((item) => item.id === "line_1")).toEqual(
+      expect.objectContaining({
+        unitPrice: 18,
+        amount: 18,
+        linkedCatalogItemId: "catalog_group"
+      })
+    );
+    expect(updatedItems.find((item) => item.id === "line_2")).toEqual(
+      expect.objectContaining({
+        unitPrice: 18,
+        amount: 54,
+        linkedCatalogItemId: "catalog_group"
       })
     );
   });
