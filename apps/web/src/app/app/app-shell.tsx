@@ -288,6 +288,7 @@ export function AppShell({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const drawerRef = useRef<HTMLDivElement | null>(null);
+  const shellContentRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLElement | null>(null);
 
   const updateViewportMetrics = useCallback(() => {
@@ -553,7 +554,11 @@ export function AppShell({
         </>
       ) : null}
 
-      <div className="flex min-w-0 flex-1 flex-col lg:h-[100dvh] lg:min-h-0" style={{ minHeight: "var(--app-height, 100dvh)" }}>
+      <div
+        className="flex min-w-0 flex-1 flex-col lg:h-[100dvh] lg:min-h-0"
+        ref={shellContentRef}
+        style={{ minHeight: "var(--app-height, 100dvh)" }}
+      >
         <header className="sticky top-0 z-30 border-b border-[color:var(--border-default)] bg-white/96 backdrop-blur">
           <div
             className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8"
@@ -595,7 +600,7 @@ export function AppShell({
           ref={contentRef}
           style={{ paddingBottom: "calc(max(1.5rem, env(safe-area-inset-bottom)) + var(--keyboard-offset, 0px))" }}
         >
-          <MobilePullToRefresh containerRef={contentRef} drawerOpen={drawerOpen}>
+          <MobilePullToRefresh containerRef={contentRef} drawerOpen={drawerOpen} gestureRef={shellContentRef}>
             <div className="mx-auto w-full max-w-[1700px] min-w-0">{children}</div>
           </MobilePullToRefresh>
         </main>

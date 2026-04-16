@@ -16,8 +16,8 @@ import { usePathname, useRouter } from "next/navigation";
 
 import { BrandLoader } from "@/app/brand-loader";
 
-const READY_THRESHOLD = 74;
-const MAX_PULL_DISTANCE = 116;
+const READY_THRESHOLD = 66;
+const MAX_PULL_DISTANCE = 124;
 const REFRESH_HOLD_MS = 700;
 
 type RefreshHandler = () => Promise<void> | void;
@@ -214,10 +214,12 @@ export function useMobilePullToRefreshRegistration(handler: RefreshHandler | nul
 export function MobilePullToRefresh({
   children,
   containerRef,
+  gestureRef,
   drawerOpen
 }: {
   children: ReactNode;
   containerRef: MutableRefObject<HTMLElement | null>;
+  gestureRef?: MutableRefObject<HTMLElement | null>;
   drawerOpen: boolean;
 }) {
   const pathname = usePathname();
@@ -314,7 +316,8 @@ export function MobilePullToRefresh({
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) {
+    const gestureTarget = gestureRef?.current ?? container;
+    if (!container || !gestureTarget) {
       return;
     }
 
@@ -378,7 +381,7 @@ export function MobilePullToRefresh({
         return;
       }
 
-      const resistedDistance = Math.min(MAX_PULL_DISTANCE, deltaY * 0.42 + Math.sqrt(deltaY) * 1.8);
+      const resistedDistance = Math.min(MAX_PULL_DISTANCE, deltaY * 0.5 + Math.sqrt(deltaY) * 1.55);
       setPullDistance(resistedDistance);
       setReady(resistedDistance >= READY_THRESHOLD);
       event.preventDefault();
@@ -397,21 +400,21 @@ export function MobilePullToRefresh({
       reset();
     };
 
-    container.addEventListener("touchstart", handleTouchStart, { passive: true });
-    container.addEventListener("touchmove", handleTouchMove, { passive: false });
-    container.addEventListener("touchend", handleTouchEnd, { passive: true });
-    container.addEventListener("touchcancel", handleTouchEnd, { passive: true });
+    gestureTarget.addEventListener("touchstart", handleTouchStart, { passive: true });
+    gestureTarget.addEventListener("touchmove", handleTouchMove, { passive: false });
+    gestureTarget.addEventListener("touchend", handleTouchEnd, { passive: true });
+    gestureTarget.addEventListener("touchcancel", handleTouchEnd, { passive: true });
 
     return () => {
-      container.removeEventListener("touchstart", handleTouchStart);
-      container.removeEventListener("touchmove", handleTouchMove);
-      container.removeEventListener("touchend", handleTouchEnd);
-      container.removeEventListener("touchcancel", handleTouchEnd);
+      gestureTarget.removeEventListener("touchstart", handleTouchStart);
+      gestureTarget.removeEventListener("touchmove", handleTouchMove);
+      gestureTarget.removeEventListener("touchend", handleTouchEnd);
+      gestureTarget.removeEventListener("touchcancel", handleTouchEnd);
       if (timeoutRef.current) {
         window.clearTimeout(timeoutRef.current);
       }
     };
-  }, [containerRef, drawerOpen, reset, routeEnabled, runRefresh]);
+  }, [containerRef, drawerOpen, gestureRef, reset, routeEnabled, runRefresh]);
 
   const contextValue = useMemo<MobileRefreshContextValue>(
     () => ({
