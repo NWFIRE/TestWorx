@@ -34,6 +34,31 @@ type MobileRefreshContextValue = {
 
 const MobileRefreshContext = createContext<MobileRefreshContextValue | null>(null);
 
+function isIPadLikeDevice() {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  return /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+}
+
+function isTouchRefreshDevice() {
+  if (typeof window === "undefined" || typeof navigator === "undefined") {
+    return false;
+  }
+
+  const touchCapable = navigator.maxTouchPoints > 0 || "ontouchstart" in window;
+  if (!touchCapable) {
+    return false;
+  }
+
+  if (isIPadLikeDevice()) {
+    return true;
+  }
+
+  return window.matchMedia("(pointer: coarse), (hover: none)").matches || window.innerWidth <= 1366;
+}
+
 function isSupportedMobileRoute(pathname: string) {
   return (
     pathname === "/app/admin/dashboard" ||
@@ -230,23 +255,25 @@ export function MobilePullToRefresh({
       return;
     }
 
-    const mediaQuery = window.matchMedia("(pointer: coarse) and (max-width: 1024px)");
+    const pointerQuery = window.matchMedia("(pointer: coarse), (hover: none)");
     const updateEnabled = () => {
-      enabledRef.current = mediaQuery.matches;
+      enabledRef.current = isTouchRefreshDevice();
     };
 
     updateEnabled();
-    if (typeof mediaQuery.addEventListener === "function") {
-      mediaQuery.addEventListener("change", updateEnabled);
-    } else if (typeof mediaQuery.addListener === "function") {
-      mediaQuery.addListener(updateEnabled);
+    window.addEventListener("resize", updateEnabled);
+    if (typeof pointerQuery.addEventListener === "function") {
+      pointerQuery.addEventListener("change", updateEnabled);
+    } else if (typeof pointerQuery.addListener === "function") {
+      pointerQuery.addListener(updateEnabled);
     }
 
     return () => {
-      if (typeof mediaQuery.removeEventListener === "function") {
-        mediaQuery.removeEventListener("change", updateEnabled);
-      } else if (typeof mediaQuery.removeListener === "function") {
-        mediaQuery.removeListener(updateEnabled);
+      window.removeEventListener("resize", updateEnabled);
+      if (typeof pointerQuery.removeEventListener === "function") {
+        pointerQuery.removeEventListener("change", updateEnabled);
+      } else if (typeof pointerQuery.removeListener === "function") {
+        pointerQuery.removeListener(updateEnabled);
       }
     };
   }, []);
