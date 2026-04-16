@@ -8,11 +8,19 @@ import {
   type ReportDraft
 } from "./report-engine";
 import {
-  getReportPdfMetadata,
   resolveReportTemplate,
   type ReportFieldDefinition,
   type ReportPrimitiveValue
 } from "./report-config";
+import {
+  customerFacingFieldRules,
+  mapCustomerFacingReportStatus,
+  resolveReportTypeConfig,
+  type ChecklistItemConfig,
+  type ReportSectionConfig,
+  type SummaryFactKey,
+  type SummaryMetricKey
+} from "./report-pdf-config";
 import { getCustomerFacingSiteLabel } from "./scheduling";
 import { decodeStoredFile } from "./storage";
 
@@ -369,12 +377,14 @@ async function embedImage(pdfDoc: PDFDocument, dataUrl: string) {
 }
 
 function getReportTitle(input: PdfInput) {
-  const metadata = getReportPdfMetadata(input.task.inspectionType);
-  return metadata.subtitle || `${humanizeText(input.task.inspectionType)} Inspection Report`;
+  return resolveReportTypeConfig(input.task.inspectionType).title;
 }
 
 export function getCustomerFacingReportState(input: Pick<PdfInput, "report">) {
-  return input.report.finalizedAt ? "Finalized" : "In Review";
+  return mapCustomerFacingReportStatus({
+    isFinalized: Boolean(input.report.finalizedAt),
+    isSigned: Boolean(input.report.finalizedAt)
+  }).documentStatus;
 }
 
 export function getCustomerFacingOutcomeLabel(input: Pick<PdfInput, "report">, deficiencyTotal: number) {
@@ -390,7 +400,7 @@ export function buildPdfPhotoCaption(index: number) {
 }
 
 export function getPdfComplianceStandards(inspectionType: InspectionType) {
-  return getReportPdfMetadata(inspectionType).nfpaReferences ?? [];
+  return resolveReportTypeConfig(inspectionType).compliance.codes;
 }
 
 function getDisplayCompletionStatus(input: PdfInput) {
@@ -406,11 +416,11 @@ function getDisplayResultStatus(input: PdfInput, deficiencyTotal: number) {
 }
 
 function getDisplayInspectionStatus(input: PdfInput) {
-  if (input.report.finalizedAt) {
-    return "Finalized";
-  }
-
-  return humanizeText(input.inspection.status || "In Review");
+  return mapCustomerFacingReportStatus({
+    isFinalized: Boolean(input.report.finalizedAt),
+    isSigned: Boolean(input.report.finalizedAt),
+    workflowStatus: input.inspection.status
+  }).inspectionStatus;
 }
 
 function getDisplaySectionStatus(status: string, input: PdfInput) {
@@ -770,16 +780,18 @@ function renderComplianceStandards(
   boldFont: PDFFont,
   regularFont: PDFFont
 ) {
-  const standards = getPdfComplianceStandards(inspectionType);
+  const config = resolveReportTypeConfig(inspectionType);
+  const standards = config.compliance.codes;
   if (standards.length === 0) {
     return;
   }
 
   const standardsLine = standards.join(" • ");
+  const description = config.compliance.description || COMPLIANCE_SUBTITLE;
   const contentHeight =
     18 +
     measureParagraphHeight(boldFont, standardsLine, CONTENT_WIDTH - 24, 12, 3, 2) +
-    measureParagraphHeight(regularFont, COMPLIANCE_SUBTITLE, CONTENT_WIDTH - 24, 8.5, 3, 2);
+    measureParagraphHeight(regularFont, description, CONTENT_WIDTH - 24, 8.5, 3, 2);
   const blockHeight = Math.max(64, contentHeight);
 
   drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, blockHeight, theme.softSurface, theme.line, 1);
@@ -791,7 +803,7 @@ function renderComplianceStandards(
     color: theme.softText
   });
   drawParagraph(state.page, boldFont, standardsLine, PAGE_MARGIN + 12, state.y - 34, CONTENT_WIDTH - 24, 12, theme.ink, 3, 2);
-  drawParagraph(state.page, regularFont, COMPLIANCE_SUBTITLE, PAGE_MARGIN + 12, state.y - 52, CONTENT_WIDTH - 24, 8.5, theme.muted, 3, 2);
+  drawParagraph(state.page, regularFont, description, PAGE_MARGIN + 12, state.y - 52, CONTENT_WIDTH - 24, 8.5, theme.muted, 3, 2);
   state.y -= blockHeight + SECTION_SPACING;
 }
 
@@ -799,39 +811,77 @@ function renderKpiStrip(
   state: PageState,
   preview: ReturnType<typeof buildReportPreview>,
   input: PdfInput,
+  metricKeys: SummaryMetricKey[],
   theme: PdfTheme,
   boldFont: PDFFont,
   regularFont: PDFFont
 ) {
   const deficiencyTotal = preview.deficiencyCount + preview.manualDeficiencyCount;
-  const cards: MetricCard[] = [
-    {
-      label: "Result",
-      value: getDisplayResultStatus(input, deficiencyTotal),
-      supportingText: deficiencyTotal > 0 ? "Deficiencies require follow-up" : "No deficiencies recorded",
-      tone: deficiencyTotal > 0 ? "fail" : "pass"
-    },
-    {
-      label: "Completion",
-      value: getDisplayCompletionStatus(input),
-      supportingText: input.report.finalizedAt ? withFallback(formatDateTime(input.report.finalizedAt), "Finalized") : "Awaiting finalization",
-      tone: input.report.finalizedAt ? "pass" : "warn"
-    },
-    {
-      label: "Deficiencies",
-      value: deficiencyTotal === 0 ? "None" : String(deficiencyTotal),
-      supportingText: deficiencyTotal === 1 ? "1 issue recorded" : `${deficiencyTotal} issues recorded`,
-      tone: deficiencyTotal > 0 ? "fail" as const : "neutral" as const
-    },
-    {
-      label: "Service date",
-      value: withFallback(formatDate(input.inspection.scheduledStart), DEFAULT_EMPTY_COPY),
-      supportingText: input.report.technicianName ? `Technician ${input.report.technicianName}` : "Technician not assigned",
-      tone: "neutral"
-    }
-  ];
+  const cards = metricKeys.map((metricKey) => buildSummaryMetricCard(metricKey, input, deficiencyTotal));
 
-  renderMetricCards(state, cards, theme, boldFont, regularFont, 4);
+  renderMetricCards(state, cards, theme, boldFont, regularFont, Math.max(1, cards.length));
+}
+
+function inspectionHasFollowUp(input: PdfInput) {
+  for (const section of Object.values(input.draft.sections)) {
+    for (const [fieldId, value] of Object.entries(section.fields)) {
+      if (/follow.?up|recommendedRepair|recommended/i.test(fieldId) && (value === true || (typeof value === "string" && cleanCustomerFacingText(value)))) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function buildSummaryMetricCard(metricKey: SummaryMetricKey, input: PdfInput, deficiencyTotal: number): MetricCard {
+  switch (metricKey) {
+    case "documentStatus":
+      return {
+        label: "Document Status",
+        value: getCustomerFacingReportState(input),
+        supportingText: input.report.finalizedAt ? withFallback(formatDateTime(input.report.finalizedAt), "Finalized") : "Awaiting finalization",
+        tone: input.report.finalizedAt ? "pass" : "warn"
+      };
+    case "outcome":
+      return {
+        label: "Outcome",
+        value: getDisplayResultStatus(input, deficiencyTotal),
+        supportingText: deficiencyTotal > 0 ? "Deficiencies require follow-up" : "No deficiencies recorded",
+        tone: deficiencyTotal > 0 ? "fail" : "pass"
+      };
+    case "deficiencyCount":
+      return {
+        label: "Deficiencies",
+        value: deficiencyTotal === 0 ? "None" : String(deficiencyTotal),
+        supportingText: deficiencyTotal === 1 ? "1 issue recorded" : `${deficiencyTotal} issues recorded`,
+        tone: deficiencyTotal > 0 ? "fail" : "neutral"
+      };
+    case "completionPercent":
+      return {
+        label: "Completion",
+        value: input.report.finalizedAt ? "100%" : "In Review",
+        supportingText: input.report.finalizedAt ? "Report finalized" : "Awaiting finalization",
+        tone: input.report.finalizedAt ? "pass" : "warn"
+      };
+    case "followUpRequired": {
+      const followUpRequired = inspectionHasFollowUp(input);
+      return {
+        label: "Follow-Up",
+        value: followUpRequired ? "Required" : "Not Required",
+        supportingText: followUpRequired ? "Additional service may be needed" : "No follow-up recorded",
+        tone: followUpRequired ? "warn" : "neutral"
+      };
+    }
+    case "serviceDate":
+    default:
+      return {
+        label: "Service Date",
+        value: withFallback(formatDate(input.inspection.scheduledStart), DEFAULT_EMPTY_COPY),
+        supportingText: input.report.technicianName ? `Technician ${input.report.technicianName}` : "Technician not assigned",
+        tone: "neutral"
+      };
+  }
 }
 
 function renderMetricCards(
@@ -1112,6 +1162,35 @@ function renderRepeaterTable(
   return renderTableBlock(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, title, columns, rows, "No items recorded.");
 }
 
+function renderChecklistSection(
+  state: PageState,
+  pdfDoc: PDFDocument,
+  input: PdfInput,
+  branding: ReturnType<typeof resolveTenantBranding>,
+  theme: PdfTheme,
+  boldFont: PDFFont,
+  regularFont: PDFFont,
+  logoEmbedded: PDFImage | null,
+  title: string,
+  items: ChecklistItemConfig[],
+  fields: Record<string, unknown>,
+  emptyMessage: string
+) {
+  const rows = items
+    .map((item) => ({
+      item: item.label,
+      result: normalizeDisplayValue(fields[item.key] as ReportPrimitiveValue | undefined)
+    }))
+    .filter((row) => isMeaningful(row.result));
+
+  const columns: TableColumn[] = [
+    { key: "item", label: "Checklist Item", width: 0.72 },
+    { key: "result", label: "Result", width: 0.28 }
+  ];
+
+  return renderTableBlock(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, title, columns, rows, emptyMessage);
+}
+
 function getScalarSectionItems(
   sectionTemplate: ReturnType<typeof resolveReportTemplate>["sections"][number],
   section: ReportDraft["sections"][string]
@@ -1141,6 +1220,52 @@ function getSectionTableGroups(
       };
     })
     .filter((group) => group.rows.length > 0);
+}
+
+function getOrderedReportSections(
+  configSections: ReportSectionConfig[],
+  template: ReturnType<typeof resolveReportTemplate>,
+  draft: ReportDraft
+) {
+  type OrderedReportSection = {
+    sectionConfig: ReportSectionConfig;
+    templateSection: ReturnType<typeof resolveReportTemplate>["sections"][number];
+    draftSection: ReportDraft["sections"][string];
+  };
+
+  const configured = configSections
+    .filter((section) => !["findings", "notes", "photos", "signatures"].includes(section.renderer))
+    .map((sectionConfig) => {
+      const sourceSectionId = sectionConfig.sourceSectionId ?? sectionConfig.key;
+      const templateSection = template.sections.find((section) => section.id === sourceSectionId);
+      const draftSection = draft.sections[sourceSectionId];
+      return templateSection && draftSection ? { sectionConfig, templateSection, draftSection } : null;
+    })
+    .filter(Boolean) as OrderedReportSection[];
+
+  if (configured.length > 0) {
+    return configured;
+  }
+
+  return draft.sectionOrder
+    .map((sectionId) => {
+      const templateSection = template.sections.find((section) => section.id === sectionId);
+      const draftSection = draft.sections[sectionId];
+      return templateSection && draftSection
+        ? {
+            sectionConfig: {
+              key: sectionId,
+              title: templateSection.label,
+              description: templateSection.description,
+              renderer: templateSection.fields.some((field) => field.type === "repeater") ? "table" as const : "keyValue" as const,
+              sourceSectionId: sectionId
+            },
+            templateSection,
+            draftSection
+          }
+        : null;
+    })
+    .filter(Boolean) as OrderedReportSection[];
 }
 
 function extractFollowUpRequirements(sectionTemplate: ReturnType<typeof resolveReportTemplate>["sections"][number], section: ReportDraft["sections"][string]) {
@@ -1178,41 +1303,60 @@ function renderSectionNotes(state: PageState, notes: string, theme: PdfTheme, bo
 function renderInspectionOverview(
   state: PageState,
   input: PdfInput,
-  pdfMetadata: ReturnType<typeof getReportPdfMetadata>,
+  factKeys: SummaryFactKey[],
   theme: PdfTheme,
   boldFont: PDFFont,
   regularFont: PDFFont
 ) {
-  const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name);
-  renderKeyValueGrid(state, [
-    { label: "Customer", value: input.customerCompany.name },
-    { label: "Site", value: customerFacingSiteName ?? "" },
-    { label: "Inspection date", value: formatDate(input.inspection.scheduledStart) },
-    { label: "Completion", value: input.report.finalizedAt ? formatDateTime(input.report.finalizedAt) : "" },
-    { label: "Technician", value: input.report.technicianName ?? "" },
-    { label: "Applicable codes", value: (pdfMetadata.nfpaReferences ?? []).join(" • ") || "" }
-  ], theme, boldFont, regularFont, 2);
+  renderKeyValueGrid(state, buildSummaryFacts(input, factKeys), theme, boldFont, regularFont, 2);
 }
 
 function renderSummaryContext(
   state: PageState,
   input: PdfInput,
+  factKeys: SummaryFactKey[],
   theme: PdfTheme,
   boldFont: PDFFont,
   regularFont: PDFFont
 ) {
+  renderKeyValueGrid(state, buildSummaryFacts(input, factKeys), theme, boldFont, regularFont, 2);
+}
+
+function buildSummaryFacts(input: PdfInput, factKeys: SummaryFactKey[]): KeyValueRow[] {
   const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name);
-  const customerFacingSiteAddress = customerFacingSiteName
+  const siteAddress = customerFacingSiteName
     ? [input.site.addressLine1, input.site.addressLine2, [input.site.city, input.site.state, input.site.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ")
     : null;
-  renderKeyValueGrid(state, [
-    { label: "Inspection status", value: getDisplayInspectionStatus(input) },
-    { label: "Scheduled window", value: input.inspection.scheduledEnd ? `${formatDateTime(input.inspection.scheduledStart)} - ${formatDateTime(input.inspection.scheduledEnd)}` : formatDateTime(input.inspection.scheduledStart) },
-    { label: "Customer contact", value: input.customerCompany.contactName ?? "" },
-    { label: "Billing contact", value: input.customerCompany.billingEmail ?? input.customerCompany.phone ?? "" },
-    { label: "Site address", value: customerFacingSiteAddress ?? NO_SITE_ADDRESS_COPY },
-    { label: "Prior inspection context", value: input.draft.context.priorReportSummary || "" }
-  ], theme, boldFont, regularFont, 2);
+
+  return factKeys.map((factKey) => {
+    switch (factKey) {
+      case "customer":
+        return { label: "Customer", value: input.customerCompany.name };
+      case "site":
+        return { label: "Site", value: customerFacingSiteName ?? "" };
+      case "inspectionDate":
+        return { label: "Inspection Date", value: formatDate(input.inspection.scheduledStart) };
+      case "completionDate":
+        return { label: "Completion Date", value: input.report.finalizedAt ? formatDateTime(input.report.finalizedAt) : "" };
+      case "technician":
+        return { label: "Technician", value: input.report.technicianName ?? "" };
+      case "billingContact":
+        return { label: "Billing Contact", value: input.customerCompany.billingEmail ?? input.customerCompany.phone ?? "" };
+      case "siteAddress":
+        return { label: "Site Address", value: siteAddress ?? customerFacingFieldRules.addressFallback };
+      case "scheduledWindow":
+        return {
+          label: "Scheduled Window",
+          value: input.inspection.scheduledEnd
+            ? `${formatDateTime(input.inspection.scheduledStart)} - ${formatDateTime(input.inspection.scheduledEnd)}`
+            : formatDateTime(input.inspection.scheduledStart)
+        };
+      case "inspectionStatus":
+        return { label: "Inspection Status", value: getDisplayInspectionStatus(input) };
+      default:
+        return { label: humanizeText(factKey), value: "" };
+    }
+  });
 }
 
 function getDraftSectionFieldValue(input: PdfInput, sectionId: string, fieldId: string) {
@@ -1622,45 +1766,57 @@ export async function generateInspectionReportPdf(input: PdfInput) {
   }
 
   const template = resolveReportTemplate({ inspectionType: input.task.inspectionType });
-  const pdfMetadata = getReportPdfMetadata(input.task.inspectionType);
+  const reportTypeConfig = resolveReportTypeConfig(input.task.inspectionType);
   const preview = buildReportPreview(input.draft);
 
   let state = addPage(pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 1);
 
   renderComplianceStandards(state, input.task.inspectionType, theme, boldFont, regularFont);
-  renderKpiStrip(state, preview, input, theme, boldFont, regularFont);
+  renderKpiStrip(state, preview, input, reportTypeConfig.summary.topMetrics, theme, boldFont, regularFont);
 
   drawSectionTitle(state, "Executive Summary", "Customer, site, technician, and compliance context for this inspection.", theme, boldFont, regularFont);
-  renderInspectionOverview(state, input, pdfMetadata, theme, boldFont, regularFont);
+  renderInspectionOverview(state, input, reportTypeConfig.summary.primaryFacts, theme, boldFont, regularFont);
 
   state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 180);
   drawSectionTitle(state, "Inspection Overview", "Visit timing, account context, and prior-report context for this inspection.", theme, boldFont, regularFont);
-  renderSummaryContext(state, input, theme, boldFont, regularFont);
+  renderSummaryContext(state, input, reportTypeConfig.summary.overviewFacts, theme, boldFont, regularFont);
 
-  for (const sectionId of input.draft.sectionOrder) {
-    const sectionTemplate = template.sections.find((section) => section.id === sectionId);
-    const section = input.draft.sections[sectionId];
-    if (!section || !sectionTemplate) {
-      continue;
-    }
+  const orderedSections = getOrderedReportSections(reportTypeConfig.sections, template, input.draft);
 
-    const scalarItems = getScalarSectionItems(sectionTemplate, section);
-    const tableGroups = getSectionTableGroups(sectionTemplate, section);
-    const followUp = extractFollowUpRequirements(sectionTemplate, section);
+  for (const { sectionConfig, templateSection, draftSection } of orderedSections) {
+    const scalarItems = getScalarSectionItems(templateSection, draftSection);
+    const tableGroups = getSectionTableGroups(templateSection, draftSection);
+    const followUp = extractFollowUpRequirements(templateSection, draftSection);
 
     state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 88);
-    drawSectionTitle(state, sectionTemplate.label, sectionTemplate.description, theme, boldFont, regularFont);
+    drawSectionTitle(state, sectionConfig.title, sectionConfig.description ?? templateSection.description, theme, boldFont, regularFont);
     drawBadge(
       state.page,
       PAGE_MARGIN + CONTENT_WIDTH - 104,
       state.y + 12,
-      getDisplaySectionStatus(section.status, input),
+      getDisplaySectionStatus(draftSection.status, input),
       theme,
       boldFont,
-      statusVariant(section.status)
+      statusVariant(draftSection.status)
     );
 
-    if (scalarItems.length > 0) {
+    if (sectionConfig.renderer === "checklist" && sectionConfig.checklist) {
+      state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 140);
+      state = renderChecklistSection(
+        state,
+        pdfDoc,
+        input,
+        branding,
+        theme,
+        boldFont,
+        regularFont,
+        logoEmbedded,
+        sectionConfig.title,
+        sectionConfig.checklist.items,
+        draftSection.fields,
+        sectionConfig.emptyState?.message ?? "No checklist results recorded"
+      );
+    } else if (scalarItems.length > 0) {
       state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 150);
       renderKeyValueGrid(state, scalarItems, theme, boldFont, regularFont, 2);
     }
@@ -1674,30 +1830,51 @@ export async function generateInspectionReportPdf(input: PdfInput) {
       renderFindingsBlock(state, "Follow-up requirements", followUp, "warn", theme, boldFont, regularFont);
     }
 
-    if (cleanCustomerFacingText(section.notes)) {
+    if (cleanCustomerFacingText(draftSection.notes)) {
       state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 96);
-      renderSectionNotes(state, section.notes, theme, boldFont, regularFont);
+      renderSectionNotes(state, draftSection.notes, theme, boldFont, regularFont);
     }
   }
 
+  const findingsConfig = reportTypeConfig.sections.find((section) => section.renderer === "findings");
   state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 150);
-  drawSectionTitle(state, "Findings and Deficiencies", "Service findings, recorded deficiencies, and follow-up items captured during the visit.", theme, boldFont, regularFont);
+  drawSectionTitle(
+    state,
+    findingsConfig?.title ?? "Findings and Deficiencies",
+    findingsConfig?.description ?? "Service findings, recorded deficiencies, and follow-up items captured during the visit.",
+    theme,
+    boldFont,
+    regularFont
+  );
   renderFindingsBlock(state, "Service findings", buildServiceFindingLines(preview), "neutral", theme, boldFont, regularFont);
   const manualDeficiencies = buildManualDeficiencyLines(input);
-  renderFindingsBlock(state, "Deficiencies", manualDeficiencies, manualDeficiencies.length > 0 ? "fail" : "neutral", theme, boldFont, regularFont);
+  renderFindingsBlock(
+    state,
+    "Deficiencies",
+    manualDeficiencies.length > 0 ? manualDeficiencies : [findingsConfig?.emptyState?.message ?? customerFacingFieldRules.findingsFallback],
+    manualDeficiencies.length > 0 ? "fail" : "neutral",
+    theme,
+    boldFont,
+    regularFont
+  );
 
   const overallNotes = input.draft.overallNotes || input.inspection.notes || "";
+  const notesConfig = reportTypeConfig.sections.find((section) => section.renderer === "notes");
   state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 96);
-  drawSectionTitle(state, "Notes", "Technician summary and visit-level observations.", theme, boldFont, regularFont);
-  renderSectionNotes(state, overallNotes, theme, boldFont, regularFont);
+  drawSectionTitle(state, notesConfig?.title ?? "Notes", notesConfig?.description ?? "Technician summary and visit-level observations.", theme, boldFont, regularFont);
+  renderSectionNotes(state, overallNotes || notesConfig?.emptyState?.message || customerFacingFieldRules.notesFallback, theme, boldFont, regularFont);
 
-  state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 140);
-  drawSectionTitle(state, "Photos", "Photo evidence attached to this inspection report.", theme, boldFont, regularFont);
-  state = await renderPhotos(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded);
+  if (reportTypeConfig.photos?.enabled !== false) {
+    state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 140);
+    drawSectionTitle(state, reportTypeConfig.photos?.title ?? "Photos", "Photo evidence attached to this inspection report.", theme, boldFont, regularFont);
+    state = await renderPhotos(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded);
+  }
 
-  state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 170);
-  drawSectionTitle(state, "Signatures", "Technician and customer sign-off captured at finalization.", theme, boldFont, regularFont);
-  await renderSignatures(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded);
+  if (reportTypeConfig.signatures?.enabled !== false) {
+    state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 170);
+    drawSectionTitle(state, reportTypeConfig.signatures?.title ?? "Signatures", "Technician and customer sign-off captured at finalization.", theme, boldFont, regularFont);
+    await renderSignatures(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded);
+  }
 
   return pdfDoc.save();
 }

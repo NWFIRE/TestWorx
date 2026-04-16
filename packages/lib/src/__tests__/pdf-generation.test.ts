@@ -9,6 +9,7 @@ import {
   getCustomerFacingReportState,
   getPdfComplianceStandards
 } from "../pdf-report";
+import { resolveReportTypeConfig } from "../report-pdf-config";
 import { buildDataUrlStorageKey, decodeStoredFile } from "../storage";
 
 const tinyPngBytes = Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII=", "base64"));
@@ -18,6 +19,8 @@ describe("pdf generation workflow", () => {
   it("formats shared PDF customer-facing helpers cleanly", () => {
     expect(buildPdfPhotoCaption(0)).toBe("Photo 1");
     expect(getPdfComplianceStandards("kitchen_suppression")).toEqual(["NFPA 17A", "NFPA 96"]);
+    expect(resolveReportTypeConfig("fire_alarm").title).toBe("Fire Alarm Inspection and Testing Report");
+    expect(resolveReportTypeConfig("fire_alarm").sections[0]?.key).toBe("control-panel");
     expect(getCustomerFacingReportState({ report: { finalizedAt: new Date("2026-03-12T11:00:00.000Z") } })).toBe("Finalized");
     expect(getCustomerFacingReportState({ report: { finalizedAt: null } })).toBe("In Review");
     expect(getCustomerFacingOutcomeLabel({ report: { finalizedAt: new Date("2026-03-12T11:00:00.000Z") } }, 0)).toBe("Passed");
