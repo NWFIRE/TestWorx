@@ -67,16 +67,20 @@ const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
 const PAGE_MARGIN = 36;
 const CONTENT_WIDTH = PAGE_WIDTH - PAGE_MARGIN * 2;
-const HEADER_HEIGHT = 108;
+const HEADER_HEIGHT = 116;
 const FOOTER_HEIGHT = 28;
 const BODY_TOP = PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT - 20;
 const MIN_CONTENT_Y = PAGE_MARGIN + FOOTER_HEIGHT + 12;
 const SECTION_SPACING = 18;
+const CARD_GAP = 12;
+const TABLE_CELL_PADDING_X = 10;
+const TABLE_CELL_PADDING_Y = 12;
 const DEFAULT_EMPTY_COPY = "Not provided";
 const NO_SITE_ADDRESS_COPY = "No fixed service address on file";
 const NO_NOTES_COPY = "No notes provided";
 const NO_PHOTOS_COPY = "No inspection photos included";
 const NO_SIGNATURE_COPY = "Not captured";
+const COMPLIANCE_SUBTITLE = "This inspection was performed in accordance with the following standards.";
 
 function hexToRgb(hex: string, fallback: { r: number; g: number; b: number }) {
   const normalized = hex.replace("#", "").trim();
@@ -125,6 +129,10 @@ function cleanCustomerFacingText(value: unknown) {
   return normalized;
 }
 
+function cleanCellValue(value: string | null | undefined) {
+  return cleanCustomerFacingText(value);
+}
+
 function withFallback(value: string, fallback: string) {
   return cleanCustomerFacingText(value) || fallback;
 }
@@ -160,19 +168,25 @@ export function formatPdfAddress(input: {
 
 function formatDateTime(value: Date | string | null | undefined) {
   if (!value) {
-    return "—";
+    return "";
   }
 
   const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
 function formatDate(value: Date | string | null | undefined) {
   if (!value) {
-    return "—";
+    return "";
   }
 
   const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(date);
 }
 
@@ -203,7 +217,7 @@ function normalizeDisplayValue(value: ReportPrimitiveValue | undefined) {
   }
 
   if (value === null || value === undefined || value === "") {
-    return "—";
+    return "";
   }
 
   if (typeof value === "string" && (value.startsWith("blob:") || value.startsWith("data:image/"))) {
@@ -229,25 +243,27 @@ function resolveWorkOrderDisplayValue(primary: unknown, custom?: unknown) {
 
   const primaryValue = normalizeDisplayValue(primary as ReportPrimitiveValue | undefined);
   if (isOtherOptionValue(primary) && !isMeaningful(customValue)) {
-    return "—";
+    return "";
   }
 
   return primaryValue;
 }
 
 function isMeaningful(value: string | null | undefined) {
-  return Boolean(value && value.trim() && value.trim() !== "—");
+  return Boolean(value && cleanCustomerFacingText(value));
 }
 
 function splitTextIntoLines(font: PDFFont, text: string, maxWidth: number, size: number, maxLines?: number) {
-  const normalized = text.trim() || "—";
+  const normalized = cleanCustomerFacingText(text);
+  if (!normalized) {
+    return [];
+  }
   const paragraphs = normalized.split(/\n+/);
   const lines: string[] = [];
 
   for (const paragraph of paragraphs) {
     const words = paragraph.split(/\s+/).filter(Boolean);
     if (words.length === 0) {
-      lines.push("—");
       continue;
     }
 
@@ -279,7 +295,7 @@ function splitTextIntoLines(font: PDFFont, text: string, maxWidth: number, size:
     return lines.slice(0, maxLines);
   }
 
-  return lines.length > 0 ? lines : ["—"];
+  return lines;
 }
 
 function clampLines(lines: string[], font: PDFFont, maxWidth: number, size: number, maxLines: number) {
@@ -298,7 +314,7 @@ function clampLines(lines: string[], font: PDFFont, maxWidth: number, size: numb
 
 function measureParagraphHeight(font: PDFFont, text: string, maxWidth: number, size: number, lineGap = 3, maxLines?: number) {
   const lines = clampLines(splitTextIntoLines(font, text, maxWidth, size, maxLines), font, maxWidth, size, maxLines ?? Number.MAX_SAFE_INTEGER);
-  return lines.length * (size + lineGap);
+  return Math.max(lines.length, 1) * (size + lineGap);
 }
 
 function drawParagraph(
@@ -314,6 +330,9 @@ function drawParagraph(
   maxLines?: number
 ) {
   const lines = clampLines(splitTextIntoLines(font, text, maxWidth, size, maxLines), font, maxWidth, size, maxLines ?? Number.MAX_SAFE_INTEGER);
+  if (lines.length === 0) {
+    return y;
+  }
   lines.forEach((line, index) => {
     page.drawText(line, { x, y: y - index * (size + lineGap), size, font, color });
   });
@@ -354,20 +373,57 @@ function getReportTitle(input: PdfInput) {
   return metadata.subtitle || `${humanizeText(input.task.inspectionType)} Inspection Report`;
 }
 
-function getCustomerFacingReportState(input: PdfInput) {
-  return input.report.finalizedAt ? "Finalized" : "Draft";
+export function getCustomerFacingReportState(input: Pick<PdfInput, "report">) {
+  return input.report.finalizedAt ? "Finalized" : "In Review";
 }
 
-function getCustomerFacingOutcomeLabel(input: PdfInput, deficiencyTotal: number) {
+export function getCustomerFacingOutcomeLabel(input: Pick<PdfInput, "report">, deficiencyTotal: number) {
   if (!input.report.finalizedAt) {
-    return deficiencyTotal > 0 ? "Deficiencies Found" : "In Review";
+    return deficiencyTotal > 0 ? "Deficiencies Found" : "Completed";
   }
 
   return deficiencyTotal > 0 ? "Deficiencies Found" : "Passed";
 }
 
 export function buildPdfPhotoCaption(index: number) {
-  return `Inspection photo ${index + 1}`;
+  return `Photo ${index + 1}`;
+}
+
+export function getPdfComplianceStandards(inspectionType: InspectionType) {
+  return getReportPdfMetadata(inspectionType).nfpaReferences ?? [];
+}
+
+function getDisplayCompletionStatus(input: PdfInput) {
+  return input.report.finalizedAt ? "Completed" : "In Review";
+}
+
+function getDisplayResultStatus(input: PdfInput, deficiencyTotal: number) {
+  if (!input.report.finalizedAt) {
+    return deficiencyTotal > 0 ? "Failed" : "Completed";
+  }
+
+  return deficiencyTotal > 0 ? "Failed" : "Passed";
+}
+
+function getDisplayInspectionStatus(input: PdfInput) {
+  if (input.report.finalizedAt) {
+    return "Finalized";
+  }
+
+  return humanizeText(input.inspection.status || "In Review");
+}
+
+function getDisplaySectionStatus(status: string, input: PdfInput) {
+  const normalized = cleanCustomerFacingText(status).toLowerCase();
+  if (input.report.finalizedAt && ["in progress", "in_progress", "to be completed", "draft", "pending"].includes(normalized)) {
+    return "Finalized";
+  }
+
+  if (normalized === "pass_with_deficiencies") {
+    return "Deficiencies Found";
+  }
+
+  return humanizeText(status);
 }
 
 function renderPremiumPageChrome(
@@ -382,32 +438,28 @@ function renderPremiumPageChrome(
 ) {
   const headerTop = PAGE_HEIGHT - PAGE_MARGIN;
   const leftX = PAGE_MARGIN;
-  const rightZoneWidth = 210;
-  const leftZoneWidth = CONTENT_WIDTH - rightZoneWidth - 18;
-  const rightZoneX = PAGE_MARGIN + leftZoneWidth + 18;
-  const logoBox = 44;
+  const rightZoneWidth = 224;
+  const gutter = 20;
+  const leftZoneWidth = CONTENT_WIDTH - rightZoneWidth - gutter;
+  const rightZoneX = PAGE_MARGIN + leftZoneWidth + gutter;
+  const logoBox = 42;
   const companyName = branding.legalBusinessName || input.tenant.name;
-  const contactLine = joinPresentValues([branding.phone, branding.email, branding.website], " | ");
+  const contactDetails = joinPresentValues([branding.phone, branding.email], "   ");
   const addressLine = formatPdfAddress({
     addressLine1: branding.addressLine1,
+    addressLine2: branding.addressLine2,
     city: branding.city,
     state: branding.state,
     postalCode: branding.postalCode
   });
   const reportTitle = getReportTitle(input);
-  const headerMeta = [
-    `Report ID ${input.report.id}`,
-    formatDate(input.inspection.scheduledStart) ? `Service date ${formatDate(input.inspection.scheduledStart)}` : "",
-    `Page ${pageNumber}`
-  ].filter(Boolean).join(" | ");
-  const contextMeta = joinPresentValues(
-    [
-      input.customerCompany.name,
-      getCustomerFacingSiteLabel(input.site.name) ?? "",
-      input.report.technicianName ?? ""
-    ],
-    " | "
-  );
+  const metadataRows: KeyValueRow[] = [
+    { label: "Report ID", value: input.report.id },
+    { label: "Service Date", value: formatDate(input.inspection.scheduledStart) },
+    { label: "Page", value: String(pageNumber) }
+  ];
+  const row1Top = headerTop - 8;
+  const row2Top = headerTop - 52;
 
   if (logoEmbedded) {
     const scaled = logoEmbedded.scale(1);
@@ -416,40 +468,51 @@ function renderPremiumPageChrome(
     const height = scaled.height * ratio;
     page.drawImage(logoEmbedded, {
       x: leftX,
-      y: headerTop - 8 - height,
+      y: row1Top - height + 2,
       width,
       height
     });
   } else {
-    drawRect(page, leftX, headerTop - 4, logoBox, logoBox, theme.softSurface, theme.line, 1);
+    drawRect(page, leftX, row1Top + 4, logoBox, logoBox, theme.softSurface, theme.line, 1);
     page.drawText(companyName.split(/\s+/).map((part) => part[0] ?? "").slice(0, 2).join("").toUpperCase(), {
       x: leftX + 13,
-      y: headerTop - 34,
+      y: row1Top - 24,
       size: 18,
       font: boldFont,
       color: theme.primary
     });
   }
 
-  drawParagraph(page, boldFont, companyName, leftX + 58, headerTop - 12, leftZoneWidth - 58, 14, theme.ink, 3, 2);
-  if (contactLine) {
-    drawParagraph(page, regularFont, contactLine, leftX + 58, headerTop - 32, leftZoneWidth - 58, 8.5, theme.softText, 3, 2);
+  drawParagraph(page, boldFont, companyName, leftX + 56, row1Top - 2, leftZoneWidth - 56, 13, theme.ink, 3, 2);
+  drawParagraph(page, boldFont, reportTitle, rightZoneX, row1Top - 2, rightZoneWidth, 16, theme.ink, 3, 2);
+
+  let contactY = row2Top;
+  if (contactDetails) {
+    drawParagraph(page, regularFont, contactDetails, leftX, contactY, leftZoneWidth, 8.5, theme.softText, 3, 2);
+    contactY -= 12;
   }
   if (addressLine) {
-    drawParagraph(page, regularFont, addressLine, leftX + 58, headerTop - 45, leftZoneWidth - 58, 8, theme.softText, 3, 2);
+    drawParagraph(page, regularFont, addressLine, leftX, contactY, leftZoneWidth, 8, theme.softText, 3, 2);
   }
 
-  drawParagraph(page, boldFont, reportTitle, rightZoneX, headerTop - 12, rightZoneWidth, 16, theme.ink, 3, 2);
-  drawParagraph(page, regularFont, headerMeta, rightZoneX, headerTop - 36, rightZoneWidth, 8.5, theme.softText, 3, 2);
-  if (contextMeta) {
-    drawParagraph(page, regularFont, contextMeta, rightZoneX, headerTop - 49, rightZoneWidth, 8, theme.softText, 3, 2);
-  }
-
-  page.drawLine({
-    start: { x: rightZoneX - 10, y: headerTop - 4 },
-    end: { x: rightZoneX - 10, y: PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT + 10 },
-    thickness: 1,
-    color: theme.line
+  let metaY = row2Top;
+  metadataRows.forEach((row) => {
+    page.drawText(row.label.toUpperCase(), {
+      x: rightZoneX,
+      y: metaY,
+      size: 7,
+      font: boldFont,
+      color: theme.softText
+    });
+    const valueWidth = regularFont.widthOfTextAtSize(row.value, 8.5);
+    page.drawText(row.value, {
+      x: rightZoneX + rightZoneWidth - valueWidth,
+      y: metaY,
+      size: 8.5,
+      font: regularFont,
+      color: theme.ink
+    });
+    metaY -= 12;
   });
 
   page.drawLine({
@@ -700,6 +763,38 @@ function statusVariant(status: string): "pass" | "fail" | "warn" | "neutral" {
   return "neutral";
 }
 
+function renderComplianceStandards(
+  state: PageState,
+  inspectionType: InspectionType,
+  theme: PdfTheme,
+  boldFont: PDFFont,
+  regularFont: PDFFont
+) {
+  const standards = getPdfComplianceStandards(inspectionType);
+  if (standards.length === 0) {
+    return;
+  }
+
+  const standardsLine = standards.join(" • ");
+  const contentHeight =
+    18 +
+    measureParagraphHeight(boldFont, standardsLine, CONTENT_WIDTH - 24, 12, 3, 2) +
+    measureParagraphHeight(regularFont, COMPLIANCE_SUBTITLE, CONTENT_WIDTH - 24, 8.5, 3, 2);
+  const blockHeight = Math.max(64, contentHeight);
+
+  drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, blockHeight, theme.softSurface, theme.line, 1);
+  state.page.drawText("COMPLIANCE STANDARDS", {
+    x: PAGE_MARGIN + 12,
+    y: state.y - 16,
+    size: 7.5,
+    font: boldFont,
+    color: theme.softText
+  });
+  drawParagraph(state.page, boldFont, standardsLine, PAGE_MARGIN + 12, state.y - 34, CONTENT_WIDTH - 24, 12, theme.ink, 3, 2);
+  drawParagraph(state.page, regularFont, COMPLIANCE_SUBTITLE, PAGE_MARGIN + 12, state.y - 52, CONTENT_WIDTH - 24, 8.5, theme.muted, 3, 2);
+  state.y -= blockHeight + SECTION_SPACING;
+}
+
 function renderKpiStrip(
   state: PageState,
   preview: ReturnType<typeof buildReportPreview>,
@@ -711,16 +806,16 @@ function renderKpiStrip(
   const deficiencyTotal = preview.deficiencyCount + preview.manualDeficiencyCount;
   const cards: MetricCard[] = [
     {
-      label: "Document",
-      value: getCustomerFacingReportState(input),
-      supportingText: input.report.finalizedAt ? formatDateTime(input.report.finalizedAt) || "Completed" : "Awaiting finalization",
-      tone: input.report.finalizedAt ? "pass" : "warn"
+      label: "Result",
+      value: getDisplayResultStatus(input, deficiencyTotal),
+      supportingText: deficiencyTotal > 0 ? "Deficiencies require follow-up" : "No deficiencies recorded",
+      tone: deficiencyTotal > 0 ? "fail" : "pass"
     },
     {
-      label: "Outcome",
-      value: getCustomerFacingOutcomeLabel(input, deficiencyTotal),
-      supportingText: deficiencyTotal > 0 ? "Customer follow-up may be required" : "No deficiencies recorded",
-      tone: deficiencyTotal > 0 ? "fail" as const : "pass" as const
+      label: "Completion",
+      value: getDisplayCompletionStatus(input),
+      supportingText: input.report.finalizedAt ? withFallback(formatDateTime(input.report.finalizedAt), "Finalized") : "Awaiting finalization",
+      tone: input.report.finalizedAt ? "pass" : "warn"
     },
     {
       label: "Deficiencies",
@@ -795,8 +890,8 @@ function renderKeyValueGrid(
   columns = 2
 ) {
   const filtered = items.filter((item) => isMeaningful(item.value));
-  const rows = filtered.length > 0 ? filtered : [{ label: "Details", value: "—" }];
-  const gap = 12;
+  const rows = filtered.length > 0 ? filtered : [{ label: "Details", value: DEFAULT_EMPTY_COPY }];
+  const gap = CARD_GAP;
   const columnWidth = (CONTENT_WIDTH - gap * (columns - 1)) / columns;
   const heights = rows.map((row) => 34 + measureParagraphHeight(regularFont, row.value, columnWidth - 20, 10, 3, 3));
   const totalRows = Math.ceil(rows.length / columns);
@@ -841,7 +936,7 @@ function firstValue(row: Record<string, unknown>, keys: string[]) {
     }
   }
 
-  return "—";
+  return "";
 }
 
 function buildIndicatorSummary(
@@ -853,7 +948,7 @@ function buildIndicatorSummary(
       /(gauge|mount|seal|hose|pin|pressure|test|status|condition|battery|load|hydro|serviceDate|newUnit|signal|alarm|breaker|power|followUp|recommendedRepair)/i.test(field.id)
     )
     .map((field) => `${field.label}: ${normalizeDisplayValue(row[field.id] as ReportPrimitiveValue | undefined)}`)
-    .filter((value) => !value.endsWith(": —"))
+    .filter((value) => !value.endsWith(": "))
     .slice(0, 4);
 
   if (priority.length > 0) {
@@ -862,10 +957,10 @@ function buildIndicatorSummary(
 
   const fallback = rowFields
     .map((field) => `${field.label}: ${normalizeDisplayValue(row[field.id] as ReportPrimitiveValue | undefined)}`)
-    .filter((value) => !value.endsWith(": —"))
+    .filter((value) => !value.endsWith(": "))
     .slice(0, 3);
 
-  return fallback.length > 0 ? fallback.join(" • ") : "—";
+  return fallback.length > 0 ? fallback.join(" • ") : "";
 }
 
 function buildRepeaterTableRows(
@@ -908,7 +1003,7 @@ function rowHeightForTable(columns: TableColumn[], row: TableRow, regularFont: P
   let maxHeight = 34;
   for (const column of columns) {
     const width = CONTENT_WIDTH * column.width;
-    const height = 16 + measureParagraphHeight(regularFont, row[column.key] ?? "—", width - 16, 8.5, 2, 3);
+    const height = 16 + measureParagraphHeight(regularFont, row[column.key] ?? "", width - TABLE_CELL_PADDING_X * 2, 8.5, 2, 3);
     maxHeight = Math.max(maxHeight, height);
   }
   return maxHeight;
@@ -927,7 +1022,7 @@ function drawTableRow(
   let x = PAGE_MARGIN;
   for (const column of columns) {
     const width = CONTENT_WIDTH * column.width;
-    drawParagraph(state.page, regularFont, row[column.key] ?? "—", x + 8, state.y - 12, width - 16, 8.5, theme.ink, 2, 3);
+    drawParagraph(state.page, regularFont, cleanCellValue(row[column.key] ?? ""), x + TABLE_CELL_PADDING_X, state.y - TABLE_CELL_PADDING_Y, width - TABLE_CELL_PADDING_X * 2, 8.5, theme.ink, 2, 3);
     x += width;
   }
   state.y -= rowHeight;
@@ -1066,7 +1161,8 @@ function extractFollowUpRequirements(sectionTemplate: ReturnType<typeof resolveR
 }
 
 function renderSectionNotes(state: PageState, notes: string, theme: PdfTheme, boldFont: PDFFont, regularFont: PDFFont) {
-  const height = 28 + measureParagraphHeight(regularFont, notes, CONTENT_WIDTH - 24, 9, 3, 4);
+  const resolvedNotes = withFallback(notes, NO_NOTES_COPY);
+  const height = 28 + measureParagraphHeight(regularFont, resolvedNotes, CONTENT_WIDTH - 24, 9, 3, 4);
   drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, height, theme.softSurface, theme.line, 1);
   state.page.drawText("Section notes".toUpperCase(), {
     x: PAGE_MARGIN + 10,
@@ -1075,7 +1171,7 @@ function renderSectionNotes(state: PageState, notes: string, theme: PdfTheme, bo
     font: boldFont,
     color: theme.softText
   });
-  drawParagraph(state.page, regularFont, notes, PAGE_MARGIN + 10, state.y - 28, CONTENT_WIDTH - 20, 9, theme.ink, 3, 4);
+  drawParagraph(state.page, regularFont, resolvedNotes, PAGE_MARGIN + 10, state.y - 28, CONTENT_WIDTH - 20, 9, theme.ink, 3, 4);
   state.y -= height + 14;
 }
 
@@ -1090,11 +1186,11 @@ function renderInspectionOverview(
   const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name);
   renderKeyValueGrid(state, [
     { label: "Customer", value: input.customerCompany.name },
-    { label: "Site", value: customerFacingSiteName ?? "â€”" },
+    { label: "Site", value: customerFacingSiteName ?? "" },
     { label: "Inspection date", value: formatDate(input.inspection.scheduledStart) },
-    { label: "Completion", value: input.report.finalizedAt ? formatDateTime(input.report.finalizedAt) : "—" },
-    { label: "Technician", value: input.report.technicianName ?? "—" },
-    { label: "Applicable codes", value: (pdfMetadata.nfpaReferences ?? []).join(" • ") || "—" }
+    { label: "Completion", value: input.report.finalizedAt ? formatDateTime(input.report.finalizedAt) : "" },
+    { label: "Technician", value: input.report.technicianName ?? "" },
+    { label: "Applicable codes", value: (pdfMetadata.nfpaReferences ?? []).join(" • ") || "" }
   ], theme, boldFont, regularFont, 2);
 }
 
@@ -1110,12 +1206,12 @@ function renderSummaryContext(
     ? [input.site.addressLine1, input.site.addressLine2, [input.site.city, input.site.state, input.site.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ")
     : null;
   renderKeyValueGrid(state, [
-    { label: "Inspection status", value: humanizeText(input.inspection.status) },
-    { label: "Scheduled window", value: input.inspection.scheduledEnd ? `${formatDateTime(input.inspection.scheduledStart)} — ${formatDateTime(input.inspection.scheduledEnd)}` : formatDateTime(input.inspection.scheduledStart) },
-    { label: "Customer contact", value: input.customerCompany.contactName ?? "—" },
-    { label: "Billing contact", value: input.customerCompany.billingEmail ?? input.customerCompany.phone ?? "—" },
-    { label: "Site address", value: [input.site.addressLine1, input.site.addressLine2, [input.site.city, input.site.state, input.site.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ") || "—" },
-    { label: "Prior inspection context", value: input.draft.context.priorReportSummary || "—" }
+    { label: "Inspection status", value: getDisplayInspectionStatus(input) },
+    { label: "Scheduled window", value: input.inspection.scheduledEnd ? `${formatDateTime(input.inspection.scheduledStart)} - ${formatDateTime(input.inspection.scheduledEnd)}` : formatDateTime(input.inspection.scheduledStart) },
+    { label: "Customer contact", value: input.customerCompany.contactName ?? "" },
+    { label: "Billing contact", value: input.customerCompany.billingEmail ?? input.customerCompany.phone ?? "" },
+    { label: "Site address", value: customerFacingSiteAddress ?? NO_SITE_ADDRESS_COPY },
+    { label: "Prior inspection context", value: input.draft.context.priorReportSummary || "" }
   ], theme, boldFont, regularFont, 2);
 }
 
@@ -1126,7 +1222,7 @@ function getDraftSectionFieldValue(input: PdfInput, sectionId: string, fieldId: 
 function formatWorkOrderHours(value: unknown, custom?: unknown) {
   const resolved = resolveWorkOrderDisplayValue(value, custom);
   if (!isMeaningful(resolved)) {
-    return "—";
+    return "";
   }
 
   if (/^\d+(\.\d+)?$/.test(resolved)) {
@@ -1191,7 +1287,7 @@ function renderWorkOrderNarrative(
   boldFont: PDFFont,
   regularFont: PDFFont
 ) {
-  const narrative = isMeaningful(body) ? body : "—";
+  const narrative = withFallback(body, NO_NOTES_COPY);
   const height = 30 + measureParagraphHeight(regularFont, narrative, CONTENT_WIDTH - 20, 9.5, 3, 10);
   drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, height, theme.surface, theme.line, 1);
   state.page.drawText(title.toUpperCase(), {
@@ -1257,10 +1353,10 @@ async function renderWorkOrderReport(
     { label: "Customer", value: input.customerCompany.name },
     { label: "Site", value: input.site.name },
     { label: "Site address", value: [input.site.addressLine1, input.site.addressLine2, [input.site.city, input.site.state, input.site.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ") },
-    { label: "Customer contact", value: input.customerCompany.contactName ?? input.customerCompany.billingEmail ?? input.customerCompany.phone ?? "—" },
-    { label: "Technician", value: input.report.technicianName ?? "—" },
+    { label: "Customer contact", value: input.customerCompany.contactName ?? input.customerCompany.billingEmail ?? input.customerCompany.phone ?? "" },
+    { label: "Technician", value: input.report.technicianName ?? "" },
     { label: "Work date", value: formatDate(input.inspection.scheduledStart) },
-    { label: "Completion date", value: input.report.finalizedAt ? formatDateTime(input.report.finalizedAt) : "—" },
+    { label: "Completion date", value: input.report.finalizedAt ? formatDateTime(input.report.finalizedAt) : "" },
     { label: "Jobsite hours", value: jobsiteHours },
     { label: "Follow-up required", value: followUpRequired },
     { label: "Work order ID", value: isMeaningful(workOrderNumber) ? workOrderNumber : input.report.id }
@@ -1269,7 +1365,7 @@ async function renderWorkOrderReport(
   state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 120);
   drawSectionTitle(state, "Work performed", "This work order outlines the service work completed and any supporting notes captured during the visit.", theme, boldFont, regularFont);
   renderWorkOrderNarrative(state, "Description of Work", descriptionOfWork, theme, boldFont, regularFont);
-  if (isMeaningful(additionalNotes) && additionalNotes !== "—") {
+  if (isMeaningful(additionalNotes)) {
     state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 96);
     renderWorkOrderNarrative(state, "Additional Notes", additionalNotes, theme, boldFont, regularFont);
   }
@@ -1328,7 +1424,7 @@ function renderFindingsBlock(
   });
   let y = state.y - 30;
   if (items.length === 0) {
-    state.page.drawText(title === "Deficiencies" ? "No deficiencies recorded" : "—", {
+    state.page.drawText(title === "Deficiencies" ? "No deficiencies recorded" : NO_NOTES_COPY, {
       x: PAGE_MARGIN + 10,
       y,
       size: 9,
@@ -1380,7 +1476,7 @@ async function renderPhotos(
     return state;
   }
 
-  const cardGap = 12;
+  const cardGap = CARD_GAP;
   const cardWidth = (CONTENT_WIDTH - cardGap) / 2;
   let column = 0;
   let rowTop = state.y;
@@ -1439,7 +1535,7 @@ async function renderSignatures(
   logoEmbedded: PDFImage | null
 ) {
   state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 168);
-  const gap = 12;
+  const gap = CARD_GAP;
   const cardWidth = (CONTENT_WIDTH - gap) / 2;
   const cards = [
     { title: "Technician signature", value: input.technicianSignature },
@@ -1458,24 +1554,31 @@ async function renderSignatures(
     });
 
     if (card.value) {
+      state.page.drawText(card.title.startsWith("Technician") ? "Inspector sign-off" : "Customer sign-off", {
+        x: x + 12,
+        y: state.y - 28,
+        size: 8,
+        font: regularFont,
+        color: theme.muted
+      });
       state.page.drawText(withFallback(card.value.signerName, DEFAULT_EMPTY_COPY), {
         x: x + 12,
-        y: state.y - 34,
+        y: state.y - 44,
         size: 9.5,
         font: regularFont,
         color: theme.ink
       });
       state.page.drawText(withFallback(formatDateTime(card.value.signedAt), DEFAULT_EMPTY_COPY), {
         x: x + 12,
-        y: state.y - 48,
+        y: state.y - 58,
         size: 8,
         font: regularFont,
         color: theme.softText
       });
     } else {
-      state.page.drawText("—", {
+      state.page.drawText(NO_SIGNATURE_COPY, {
         x: x + 12,
-        y: state.y - 36,
+        y: state.y - 44,
         size: 10,
         font: regularFont,
         color: theme.softText
@@ -1524,13 +1627,14 @@ export async function generateInspectionReportPdf(input: PdfInput) {
 
   let state = addPage(pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 1);
 
+  renderComplianceStandards(state, input.task.inspectionType, theme, boldFont, regularFont);
   renderKpiStrip(state, preview, input, theme, boldFont, regularFont);
 
-  drawSectionTitle(state, "Summary", "Client, site, technician, and code context for this inspection.", theme, boldFont, regularFont);
+  drawSectionTitle(state, "Executive Summary", "Customer, site, technician, and compliance context for this inspection.", theme, boldFont, regularFont);
   renderInspectionOverview(state, input, pdfMetadata, theme, boldFont, regularFont);
 
   state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 180);
-  drawSectionTitle(state, "Inspection Overview", "Visit timing, account context, and prior-report carry-forward details.", theme, boldFont, regularFont);
+  drawSectionTitle(state, "Inspection Overview", "Visit timing, account context, and prior-report context for this inspection.", theme, boldFont, regularFont);
   renderSummaryContext(state, input, theme, boldFont, regularFont);
 
   for (const sectionId of input.draft.sectionOrder) {
@@ -1546,7 +1650,15 @@ export async function generateInspectionReportPdf(input: PdfInput) {
 
     state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 88);
     drawSectionTitle(state, sectionTemplate.label, sectionTemplate.description, theme, boldFont, regularFont);
-    drawBadge(state.page, PAGE_MARGIN + CONTENT_WIDTH - 92, state.y + 12, humanizeText(section.status), theme, boldFont, statusVariant(section.status));
+    drawBadge(
+      state.page,
+      PAGE_MARGIN + CONTENT_WIDTH - 104,
+      state.y + 12,
+      getDisplaySectionStatus(section.status, input),
+      theme,
+      boldFont,
+      statusVariant(section.status)
+    );
 
     if (scalarItems.length > 0) {
       state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 150);
@@ -1562,7 +1674,7 @@ export async function generateInspectionReportPdf(input: PdfInput) {
       renderFindingsBlock(state, "Follow-up requirements", followUp, "warn", theme, boldFont, regularFont);
     }
 
-    if (section.notes.trim()) {
+    if (cleanCustomerFacingText(section.notes)) {
       state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 96);
       renderSectionNotes(state, section.notes, theme, boldFont, regularFont);
     }
@@ -1577,7 +1689,7 @@ export async function generateInspectionReportPdf(input: PdfInput) {
   const overallNotes = input.draft.overallNotes || input.inspection.notes || "";
   state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 96);
   drawSectionTitle(state, "Notes", "Technician summary and visit-level observations.", theme, boldFont, regularFont);
-  renderSectionNotes(state, overallNotes || "—", theme, boldFont, regularFont);
+  renderSectionNotes(state, overallNotes, theme, boldFont, regularFont);
 
   state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 140);
   drawSectionTitle(state, "Photos", "Photo evidence attached to this inspection report.", theme, boldFont, regularFont);

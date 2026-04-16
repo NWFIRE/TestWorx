@@ -1,7 +1,14 @@
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 
-import { buildPdfPhotoCaption, formatPdfAddress, generateInspectionReportPdf } from "../pdf-report";
+import {
+  buildPdfPhotoCaption,
+  formatPdfAddress,
+  generateInspectionReportPdf,
+  getCustomerFacingOutcomeLabel,
+  getCustomerFacingReportState,
+  getPdfComplianceStandards
+} from "../pdf-report";
 import { buildDataUrlStorageKey, decodeStoredFile } from "../storage";
 
 const tinyPngBytes = Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII=", "base64"));
@@ -9,7 +16,13 @@ const tinyPngDataUrl = buildDataUrlStorageKey({ mimeType: "image/png", bytes: ti
 
 describe("pdf generation workflow", () => {
   it("formats shared PDF customer-facing helpers cleanly", () => {
-    expect(buildPdfPhotoCaption(0)).toBe("Inspection photo 1");
+    expect(buildPdfPhotoCaption(0)).toBe("Photo 1");
+    expect(getPdfComplianceStandards("kitchen_suppression")).toEqual(["NFPA 17A", "NFPA 96"]);
+    expect(getCustomerFacingReportState({ report: { finalizedAt: new Date("2026-03-12T11:00:00.000Z") } })).toBe("Finalized");
+    expect(getCustomerFacingReportState({ report: { finalizedAt: null } })).toBe("In Review");
+    expect(getCustomerFacingOutcomeLabel({ report: { finalizedAt: new Date("2026-03-12T11:00:00.000Z") } }, 0)).toBe("Passed");
+    expect(getCustomerFacingOutcomeLabel({ report: { finalizedAt: null } }, 0)).toBe("Completed");
+    expect(getCustomerFacingOutcomeLabel({ report: { finalizedAt: null } }, 2)).toBe("Deficiencies Found");
     expect(
       formatPdfAddress({
         addressLine1: null,
