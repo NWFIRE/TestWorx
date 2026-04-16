@@ -104,6 +104,16 @@ function isInteractiveTarget(target: EventTarget | null) {
   return false;
 }
 
+function isTargetWithinBoundary(target: EventTarget | null, boundary: HTMLElement | null) {
+  return target instanceof Node && Boolean(boundary?.contains(target));
+}
+
+function getPrimaryScrollTop(container: HTMLElement | null) {
+  const documentScrollTop = document.scrollingElement?.scrollTop ?? 0;
+  const windowScrollTop = window.scrollY ?? 0;
+  return Math.max(container?.scrollTop ?? 0, documentScrollTop, windowScrollTop);
+}
+
 function hasHorizontalScrollAncestor(target: EventTarget | null, boundary: HTMLElement | null) {
   let node = target instanceof HTMLElement ? target : null;
 
@@ -334,7 +344,8 @@ export function MobilePullToRefresh({
         registrationRef.current.blocked ||
         refreshingRef.current ||
         event.touches.length !== 1 ||
-        container.scrollTop > 0 ||
+        !isTargetWithinBoundary(event.target, gestureTarget) ||
+        getPrimaryScrollTop(container) > 0 ||
         isInteractiveTarget(event.target) ||
         hasHorizontalScrollAncestor(event.target, container) ||
         hasNestedVerticalScroll(event.target, container)
@@ -362,7 +373,7 @@ export function MobilePullToRefresh({
         return;
       }
 
-      if (container.scrollTop > 0) {
+      if (getPrimaryScrollTop(container) > 0) {
         reset();
         return;
       }
@@ -400,16 +411,16 @@ export function MobilePullToRefresh({
       reset();
     };
 
-    gestureTarget.addEventListener("touchstart", handleTouchStart, { passive: true });
-    gestureTarget.addEventListener("touchmove", handleTouchMove, { passive: false });
-    gestureTarget.addEventListener("touchend", handleTouchEnd, { passive: true });
-    gestureTarget.addEventListener("touchcancel", handleTouchEnd, { passive: true });
+    document.addEventListener("touchstart", handleTouchStart, { passive: true, capture: true });
+    document.addEventListener("touchmove", handleTouchMove, { passive: false, capture: true });
+    document.addEventListener("touchend", handleTouchEnd, { passive: true, capture: true });
+    document.addEventListener("touchcancel", handleTouchEnd, { passive: true, capture: true });
 
     return () => {
-      gestureTarget.removeEventListener("touchstart", handleTouchStart);
-      gestureTarget.removeEventListener("touchmove", handleTouchMove);
-      gestureTarget.removeEventListener("touchend", handleTouchEnd);
-      gestureTarget.removeEventListener("touchcancel", handleTouchEnd);
+      document.removeEventListener("touchstart", handleTouchStart, true);
+      document.removeEventListener("touchmove", handleTouchMove, true);
+      document.removeEventListener("touchend", handleTouchEnd, true);
+      document.removeEventListener("touchcancel", handleTouchEnd, true);
       if (timeoutRef.current) {
         window.clearTimeout(timeoutRef.current);
       }
