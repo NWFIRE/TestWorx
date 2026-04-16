@@ -168,5 +168,11 @@ describe("customer portal access controls", () => {
       "/api/attachments/attachment_report",
       "/api/attachments/attachment_uploaded"
     ]);
+    expect(documents.map((document) => document.viewPath)).toEqual([
+      "/api/inspection-documents/document_annotated?disposition=inline",
+      "/api/inspection-documents/document_signed?disposition=inline",
+      "/api/attachments/attachment_report?disposition=inline",
+      "/api/attachments/attachment_uploaded?disposition=inline"
+    ]);
   });
 });

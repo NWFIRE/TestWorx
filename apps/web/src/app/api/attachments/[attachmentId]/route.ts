@@ -23,12 +23,15 @@ function getStatusCode(error: unknown) {
   return 400;
 }
 
-export async function GET(_: Request, { params }: { params: Promise<{ attachmentId: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ attachmentId: string }> }) {
   try {
     const session = await auth();
     if (!session?.user?.tenantId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { searchParams } = new URL(request.url);
+    const disposition = searchParams.get("disposition") === "inline" ? "inline" : "attachment";
 
     const { attachmentId } = await params;
     const file = await getAuthorizedAttachmentDownload(
@@ -45,7 +48,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ attachment
     return new NextResponse(responseBytes, {
       headers: {
         "Content-Type": file.mimeType,
-        "Content-Disposition": `attachment; filename="${file.fileName}"`,
+        "Content-Disposition": `${disposition}; filename="${file.fileName}"`,
         "Cache-Control": "private, no-store",
         "X-Content-Type-Options": "nosniff"
       }

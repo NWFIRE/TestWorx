@@ -63,6 +63,7 @@ export type InspectionPacketDocument = {
   customerVisible: boolean;
   happenedAt: Date;
   downloadPath: string;
+  viewPath: string;
 };
 
 export function buildInspectionPacketDocuments(input: {
@@ -99,7 +100,8 @@ export function buildInspectionPacketDocuments(input: {
       fileName: attachment.fileName,
       customerVisible: Boolean(attachment.customerVisible),
       happenedAt: attachment.createdAt,
-      downloadPath: `/api/attachments/${attachment.id}`
+      downloadPath: `/api/attachments/${attachment.id}`,
+      viewPath: `/api/attachments/${attachment.id}?disposition=inline`
     });
   }
 
@@ -128,7 +130,8 @@ export function buildInspectionPacketDocuments(input: {
         : isAnnotatedReferenceDocument
           ? document.annotatedAt ?? document.uploadedAt ?? new Date(0)
           : document.uploadedAt ?? new Date(0),
-      downloadPath: `/api/inspection-documents/${document.id}`
+      downloadPath: `/api/inspection-documents/${document.id}`,
+      viewPath: `/api/inspection-documents/${document.id}?disposition=inline`
     });
   }
 

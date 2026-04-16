@@ -10,6 +10,7 @@ type PacketDocument = {
   customerVisible: boolean;
   happenedAt: Date;
   downloadPath: string;
+  viewPath: string;
 };
 
 function groupDocuments(documents: PacketDocument[]) {
@@ -59,10 +60,9 @@ export function InspectionPacketCard({
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{groupLabel}</p>
               <div className="space-y-3">
                 {groupDocuments.map((document) => (
-                  <a
+                  <div
                     key={`${document.source}-${document.id}`}
                     className="flex flex-col gap-3 rounded-[1.5rem] border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50/70 md:flex-row md:items-center md:justify-between"
-                    href={document.downloadPath}
                   >
                     <div className="min-w-0">
                       <p className="font-semibold text-ink">{document.title}</p>
@@ -74,10 +74,23 @@ export function InspectionPacketCard({
                         <p className="mt-1 text-sm text-slate-500">{document.fileName}</p>
                       ) : null}
                     </div>
-                    <span className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue">
-                      Download PDF
-                    </span>
-                  </a>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
+                        href={document.viewPath}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        View PDF
+                      </a>
+                      <a
+                        className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
+                        href={document.downloadPath}
+                      >
+                        Download PDF
+                      </a>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
