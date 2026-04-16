@@ -145,7 +145,7 @@ function buildAnnotatedFileName(fileName: string) {
 async function buildSignedInspectionDocumentPdf(input: {
   originalBytes: Uint8Array;
   signatureBytes: Uint8Array;
-  signerName: string;
+  signerName?: string;
   signedAt: Date;
   label: string;
 }) {
@@ -169,7 +169,7 @@ async function buildSignedInspectionDocumentPdf(input: {
     font: regular,
     color: rgb(0.2, 0.27, 0.37)
   });
-  page.drawText(`Signed by technician: ${input.signerName}`, {
+  page.drawText(`Signed by technician: ${input.signerName?.trim() || "Technician"}`, {
     x: 48,
     y: 676,
     size: 12,
@@ -483,7 +483,7 @@ export async function getTechnicianInspectionDocumentDetail(actor: ActorContext,
 
 export async function signInspectionDocument(actor: ActorContext, input: {
   documentId: string;
-  signerName: string;
+  signerName?: string;
   signatureDataUrl?: string;
   annotationData?: string;
 }) {
@@ -528,16 +528,12 @@ export async function signInspectionDocument(actor: ActorContext, input: {
   const hasAnnotations = Boolean(annotations && annotations.strokes.length > 0);
   const requiresSignature = document.requiresSignature;
 
-  if (requiresSignature && !input.signerName.trim()) {
-    throw new Error("Signer name is required.");
-  }
-
   let outputBytes: Uint8Array;
   if (hasAnnotations) {
     const annotationPayload = annotations!;
     outputBytes = await buildAnnotatedInspectionDocumentPdf({
       originalBytes: originalPdf.bytes,
-      signerName: requiresSignature ? input.signerName.trim() : undefined,
+      signerName: requiresSignature ? input.signerName?.trim() : undefined,
       savedAt,
       label: document.label ?? document.fileName,
       annotations: annotationPayload
@@ -547,7 +543,7 @@ export async function signInspectionDocument(actor: ActorContext, input: {
     outputBytes = await buildSignedInspectionDocumentPdf({
       originalBytes: originalPdf.bytes,
       signatureBytes: signatureImage.bytes,
-      signerName: input.signerName.trim(),
+      signerName: input.signerName?.trim(),
       signedAt: savedAt,
       label: document.label ?? document.fileName
     });
@@ -586,7 +582,7 @@ export async function signInspectionDocument(actor: ActorContext, input: {
     inspectionId: document.inspectionId,
     metadata: {
       savedAt: savedAt.toISOString(),
-      signerName: input.signerName.trim() || null,
+      signerName: input.signerName?.trim() || null,
       annotated: hasAnnotations
     }
   });

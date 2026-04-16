@@ -309,7 +309,6 @@ export function ExternalDocumentSigner({
   };
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
-  const [signerName, setSignerName] = useState("");
   const [pages, setPages] = useState<RenderedPage[]>([]);
   const [annotationStrokes, setAnnotationStrokes] = useState<AnnotationStroke[]>([]);
   const [activeColor, setActiveColor] = useState<string>(strokeColorOptions[0].value);
@@ -529,7 +528,6 @@ export function ExternalDocumentSigner({
         <form action={formAction} className="space-y-4 rounded-[2rem] bg-white p-6 shadow-panel">
           <input name="inspectionId" type="hidden" value={inspectionId} />
           <input name="documentId" type="hidden" value={inspectionDocument.id} />
-          <input name="signerName" type="hidden" value={signerName} />
           <input name="signatureDataUrl" type="hidden" value="" />
           <input name="annotationData" type="hidden" value={JSON.stringify(annotationPayload)} />
 
@@ -542,22 +540,6 @@ export function ExternalDocumentSigner({
                 : "Add checkmarks, notes, callouts, or markup directly on the document. The saved annotated PDF will be the preferred version for office review and customer access when enabled."}
             </p>
           </div>
-
-          {isSignatureWorkflow ? (
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="signerName">
-              Technician name
-            </label>
-            <input
-              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-base outline-none transition focus:border-slateblue"
-              disabled={pending || !inspectionDocument.requiresSignature}
-              id="signerName"
-              onChange={(event) => setSignerName(event.target.value)}
-              placeholder="Technician name"
-              value={signerName}
-            />
-          </div>
-          ) : null}
 
           <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm font-semibold text-slate-700">Ink tools</p>
@@ -622,7 +604,7 @@ export function ExternalDocumentSigner({
           {state.success ? <p className="text-sm text-emerald-600">{state.success}</p> : null}
           <button
             className="w-full rounded-2xl bg-slateblue px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
-            disabled={pending || (isSignatureWorkflow && !signerName.trim()) || totalStrokeCount === 0 || Boolean(pdfError) || loadingPdf}
+            disabled={pending || totalStrokeCount === 0 || Boolean(pdfError) || loadingPdf}
             type="submit"
           >
             {pending
