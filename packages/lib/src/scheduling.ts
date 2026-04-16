@@ -3453,10 +3453,28 @@ export async function getAdminReportReviewQueueData(
     where: {
       tenantId,
       status: InspectionStatus.completed,
-      completedAt: {
-        gte: monthStart,
-        lte: monthEnd
-      }
+      OR: [
+        {
+          completedAt: {
+            gte: monthStart,
+            lte: monthEnd
+          }
+        },
+        {
+          completedAt: null,
+          tasks: {
+            some: {
+              report: {
+                status: reportStatuses.finalized,
+                finalizedAt: {
+                  gte: monthStart,
+                  lte: monthEnd
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     include: {
       site: true,
@@ -3485,9 +3503,14 @@ export async function getAdminReportReviewQueueData(
       const reviewTasks = tasks.filter(
         (task) => task.report && task.report.status === reportStatuses.finalized
       );
+      const latestReviewFinalizedAt = reviewTasks
+        .map((task) => task.report?.finalizedAt ?? null)
+        .filter((value): value is Date => value instanceof Date)
+        .sort((left, right) => right.getTime() - left.getTime())[0] ?? null;
 
       return {
         ...inspection,
+        completedAt: inspection.completedAt ?? latestReviewFinalizedAt ?? inspection.scheduledStart,
         tasks,
         reviewTasks,
         billingStatus: inspection.billingSummary?.status ?? null,

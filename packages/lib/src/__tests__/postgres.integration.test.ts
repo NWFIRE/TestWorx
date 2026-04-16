@@ -310,6 +310,8 @@ describeIfDatabase("postgres-backed integration flows", () => {
     expect(finalizedReport.attachments.some((attachment) => attachment.kind === "pdf" && attachment.source === "generated")).toBe(true);
     expect(finalizedReport.task.status).toBe("completed");
     expect(finalizedReport.inspection.status).toBe("completed");
+    expect(finalizedReport.inspection.completedAt).not.toBeNull();
+    expect(finalizedReport.inspection.archivedAt).not.toBeNull();
 
     await cleanupTenant(fixture.tenant.id);
     createdTenantIds.delete(fixture.tenant.id);

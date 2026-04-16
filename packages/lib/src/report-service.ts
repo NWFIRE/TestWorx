@@ -6,6 +6,7 @@ import { actorContextSchema, reportStatuses } from "@testworx/types";
 
 import { resolveTenantBranding } from "./branding";
 import { assertTenantEntitlementForTenant } from "./billing";
+import { syncInspectionArchiveStateTx } from "./inspection-archive";
 import { syncInspectionBillingSummaryTx } from "./inspection-billing";
 import type { JsonInputValue, JsonObject, JsonValue } from "./json-types";
 import { assertTenantContext } from "./permissions";
@@ -1077,6 +1078,13 @@ export async function reopenCompletedReportForCorrection(actor: ActorContext, in
       data: { status: InspectionStatus.in_progress }
     });
 
+    await syncInspectionArchiveStateTx(tx, {
+      tenantId,
+      inspectionId: report.inspectionId,
+      completedAtOverride: null,
+      archivedAtOverride: null
+    });
+
     await syncInspectionBillingSummaryTx(tx, {
       tenantId,
       inspectionId: report.inspectionId
@@ -1349,6 +1357,13 @@ export async function finalizeInspectionReport(actor: ActorContext, input: {
           isPriority: false,
           priorityClearedAt: new Date()
         }
+      });
+
+      await syncInspectionArchiveStateTx(tx, {
+        tenantId: parsedActor.tenantId as string,
+        inspectionId: report.inspectionId,
+        completedAtOverride: finalizedAt,
+        archivedAtOverride: finalizedAt
       });
     }
 
