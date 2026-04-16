@@ -16,7 +16,6 @@ import {
   AppPageShell,
   EmptyState,
   FilterBar,
-  FilterChipLink,
   KPIStatCard,
   PageHeader,
   PriorityBadge,
@@ -24,6 +23,7 @@ import {
   StatusBadge,
   WorkspaceSplit
 } from "../operations-ui";
+import { PlanningMonthJumpBar } from "./planning-month-jump-bar";
 
 function taskDisplayLabel(task: { inspectionType: string; displayLabel?: string }) {
   return task.displayLabel ?? task.inspectionType.replaceAll("_", " ");
@@ -59,7 +59,6 @@ export default async function UpcomingInspectionsPage({
       tenantId: session.user.tenantId
     },
     {
-      startMonth: selectedMonth,
       monthsAhead: 6
     }
   );
@@ -121,21 +120,13 @@ export default async function UpcomingInspectionsPage({
         title="Planning window"
         description="Jump the planning form and board to a specific starting month without losing the surrounding month-by-month view."
       >
-        {data.months.map((month) => (
-          <FilterChipLink
-            key={month.monthKey}
-            active={data.startMonth === month.monthKey}
-            href={`/app/admin/upcoming-inspections?month=${month.monthKey}`}
-            label={month.monthLabel}
-            tone="blue"
-          />
-        ))}
+        <PlanningMonthJumpBar initialMonthKey={selectedMonth ?? data.startMonth} months={data.months} />
       </FilterBar>
 
       <WorkspaceSplit variant="content-heavy">
         <div className="space-y-6">
           {data.months.map((month) => (
-            <SectionCard key={month.monthKey}>
+            <SectionCard className="scroll-mt-24" key={month.monthKey} id={`planning-month-${month.monthKey}`}>
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
