@@ -12,6 +12,7 @@ const DRAWER_SELECTOR =
   'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 
 const MOBILE_KEYBOARD_THRESHOLD = 120;
+const EXPANDED_SIDEBAR_BREAKPOINT = 1280;
 
 function isKeyboardFocusableElement(target: EventTarget | null): target is HTMLElement {
   return target instanceof HTMLElement && Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
@@ -284,7 +285,9 @@ export function AppShell({
   const pathname = usePathname();
   const navItems = useMemo(() => getAppNavItemsForRole(role, allowances), [allowances, role]);
   const currentItem = useMemo(() => getCurrentAppNavItem(role, pathname, allowances), [allowances, pathname, role]);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => typeof window === "undefined" || window.innerWidth < EXPANDED_SIDEBAR_BREAKPOINT
+  );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const drawerRef = useRef<HTMLDivElement | null>(null);
