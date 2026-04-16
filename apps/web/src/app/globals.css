@@ -4,6 +4,9 @@
 
 :root {
   color-scheme: light;
+  --app-height: 100dvh;
+  --keyboard-offset: 0px;
+  --mobile-header-offset: 88px;
   --app-bg: #F3F6FB;
   --surface-base: #FFFFFF;
   --surface-subtle: #F8FAFC;
@@ -41,8 +44,13 @@ html {
 body {
   @apply bg-paper text-ink antialiased;
   font-family: ui-sans-serif, system-ui, sans-serif;
-  min-height: 100dvh;
+  min-height: var(--app-height, 100dvh);
   overflow-x: hidden;
+}
+
+html,
+body {
+  overscroll-behavior-y: contain;
 }
 
 ::selection {
@@ -60,6 +68,8 @@ body {
   select,
   textarea {
     color: var(--text-primary);
+    scroll-margin-top: calc(var(--mobile-header-offset, 88px) + 0.75rem);
+    scroll-margin-bottom: calc(var(--keyboard-offset, 0px) + 5rem);
   }
 
   input::placeholder,
@@ -67,6 +77,12 @@ body {
     color: var(--text-tertiary);
     opacity: 1;
   }
+}
+
+body[data-keyboard-open="true"] .mobile-keyboard-hide {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(1rem);
 }
 
 @keyframes brand-loader-presence {

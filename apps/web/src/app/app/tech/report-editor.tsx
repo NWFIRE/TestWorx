@@ -1162,7 +1162,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
         <>
           {(visibleErrorMessage || backupWarning) ? (
             <div
-              className="fixed inset-x-0 z-20 px-4 lg:hidden"
+              className="mobile-keyboard-hide fixed inset-x-0 z-20 px-4 transition-all duration-150 ease-out lg:hidden"
               style={{ bottom: "calc(5.5rem + env(safe-area-inset-bottom))" }}
             >
               <div className="mx-auto max-w-7xl space-y-2">
@@ -1172,7 +1172,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
             </div>
           ) : null}
         <div
-          className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur lg:hidden"
+          className="mobile-keyboard-hide fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur transition-all duration-150 ease-out lg:hidden"
           style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
         >
           <div className="mx-auto max-w-7xl">

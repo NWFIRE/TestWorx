@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 import { getAppNavItemsForRole, getCurrentAppNavItem, isAppNavItemActive, type AppNavItem } from "./app-nav-config";
@@ -10,6 +10,22 @@ import { MobilePullToRefresh } from "./mobile-pull-to-refresh";
 
 const DRAWER_SELECTOR =
   'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+
+const MOBILE_KEYBOARD_THRESHOLD = 120;
+
+function isKeyboardFocusableElement(target: EventTarget | null): target is HTMLElement {
+  return target instanceof HTMLElement && Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+}
+
+function syncTextareaHeight(textarea: HTMLTextAreaElement) {
+  if (textarea.dataset.autoGrow === "off") {
+    return;
+  }
+
+  textarea.style.height = "auto";
+  textarea.style.height = `${Math.max(textarea.scrollHeight, textarea.clientHeight)}px`;
+  textarea.style.overflowY = "hidden";
+}
 
 function getFocusableElements(container: HTMLElement | null) {
   if (!container) {
@@ -274,6 +290,60 @@ export function AppShell({
   const drawerRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLElement | null>(null);
 
+  const updateViewportMetrics = useCallback(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      return;
+    }
+
+    const viewport = window.visualViewport;
+    const appHeight = viewport ? viewport.height + viewport.offsetTop : window.innerHeight;
+    const rawKeyboardOffset = viewport ? window.innerHeight - viewport.height - viewport.offsetTop : 0;
+    const keyboardOffset = rawKeyboardOffset > MOBILE_KEYBOARD_THRESHOLD ? rawKeyboardOffset : 0;
+
+    document.documentElement.style.setProperty("--app-height", `${Math.round(appHeight)}px`);
+    document.documentElement.style.setProperty("--keyboard-offset", `${Math.round(keyboardOffset)}px`);
+    document.body.dataset.keyboardOpen = keyboardOffset > 0 ? "true" : "false";
+  }, []);
+
+  const keepFocusedElementVisible = useCallback((target: HTMLElement) => {
+    const container = contentRef.current;
+    if (!container || !isKeyboardFocusableElement(target)) {
+      return;
+    }
+
+    if (target instanceof HTMLTextAreaElement) {
+      syncTextareaHeight(target);
+    }
+
+    window.requestAnimationFrame(() => {
+      const header = container.previousElementSibling instanceof HTMLElement ? container.previousElementSibling : null;
+      const headerHeight = header?.getBoundingClientRect().height ?? 0;
+      const keyboardOffset = Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue("--keyboard-offset") || "0"
+      );
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const visibleTop = containerRect.top + headerHeight + 12;
+      const visibleBottom = window.innerHeight - keyboardOffset - 20;
+
+      if (targetRect.top >= visibleTop && targetRect.bottom <= visibleBottom) {
+        return;
+      }
+
+      const currentScrollTop = container.scrollTop;
+      const targetTopWithinContainer = targetRect.top - containerRect.top + currentScrollTop;
+      const desiredTop = Math.max(
+        0,
+        targetTopWithinContainer - Math.max(24, headerHeight + 18)
+      );
+
+      container.scrollTo({
+        top: desiredTop,
+        behavior: "smooth"
+      });
+    });
+  }, []);
+
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
     const originalTouchAction = document.body.style.touchAction;
@@ -288,6 +358,64 @@ export function AppShell({
       document.body.style.touchAction = originalTouchAction;
     };
   }, [drawerOpen]);
+
+  useEffect(() => {
+    updateViewportMetrics();
+
+    const viewport = window.visualViewport;
+    window.addEventListener("resize", updateViewportMetrics);
+    window.addEventListener("orientationchange", updateViewportMetrics);
+    if (viewport) {
+      viewport.addEventListener("resize", updateViewportMetrics);
+      viewport.addEventListener("scroll", updateViewportMetrics);
+    }
+
+    return () => {
+      window.removeEventListener("resize", updateViewportMetrics);
+      window.removeEventListener("orientationchange", updateViewportMetrics);
+      if (viewport) {
+        viewport.removeEventListener("resize", updateViewportMetrics);
+        viewport.removeEventListener("scroll", updateViewportMetrics);
+      }
+      document.documentElement.style.removeProperty("--app-height");
+      document.documentElement.style.removeProperty("--keyboard-offset");
+      delete document.body.dataset.keyboardOpen;
+    };
+  }, [updateViewportMetrics]);
+
+  useEffect(() => {
+    const container = contentRef.current;
+    if (!container) {
+      return;
+    }
+
+    const handleFocusIn = (event: FocusEvent) => {
+      if (!isKeyboardFocusableElement(event.target)) {
+        return;
+      }
+
+      keepFocusedElementVisible(event.target);
+      window.setTimeout(() => keepFocusedElementVisible(event.target as HTMLElement), 140);
+      window.setTimeout(() => keepFocusedElementVisible(event.target as HTMLElement), 320);
+    };
+
+    const handleInput = (event: Event) => {
+      if (!(event.target instanceof HTMLTextAreaElement)) {
+        return;
+      }
+
+      syncTextareaHeight(event.target);
+      keepFocusedElementVisible(event.target);
+    };
+
+    container.addEventListener("focusin", handleFocusIn);
+    container.addEventListener("input", handleInput);
+
+    return () => {
+      container.removeEventListener("focusin", handleFocusIn);
+      container.removeEventListener("input", handleInput);
+    };
+  }, [keepFocusedElementVisible]);
 
   useEffect(() => {
     if (!drawerOpen) {
@@ -341,7 +469,7 @@ export function AppShell({
   const closeDrawer = () => setDrawerOpen(false);
 
   return (
-    <div className="min-h-[100dvh] bg-paper lg:flex lg:h-[100dvh] lg:overflow-hidden">
+    <div className="bg-paper lg:flex lg:overflow-hidden" style={{ minHeight: "var(--app-height, 100dvh)" }}>
       {navItems.length > 0 ? (
         <aside
           aria-label="Primary navigation"
@@ -392,12 +520,13 @@ export function AppShell({
           <aside
             aria-label="Primary navigation"
             aria-modal={drawerOpen}
-            className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[min(320px,86vw)] flex-col overflow-hidden border-r border-[color:var(--border-default)] bg-[color:var(--sidebar-bg)] shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none lg:hidden ${
+            className={`fixed inset-y-0 left-0 z-50 flex w-[min(320px,86vw)] flex-col overflow-hidden border-r border-[color:var(--border-default)] bg-[color:var(--sidebar-bg)] shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none lg:hidden ${
               drawerOpen ? "translate-x-0 visible" : "-translate-x-full invisible"
             }`}
             ref={drawerRef}
             role="dialog"
             style={{
+              height: "var(--app-height, 100dvh)",
               paddingTop: "max(0rem, env(safe-area-inset-top))",
               paddingBottom: "max(0rem, env(safe-area-inset-bottom))"
             }}
@@ -424,7 +553,7 @@ export function AppShell({
         </>
       ) : null}
 
-      <div className="flex min-h-[100dvh] min-w-0 flex-1 flex-col lg:h-[100dvh] lg:min-h-0">
+      <div className="flex min-w-0 flex-1 flex-col lg:h-[100dvh] lg:min-h-0" style={{ minHeight: "var(--app-height, 100dvh)" }}>
         <header className="sticky top-0 z-30 border-b border-[color:var(--border-default)] bg-white/96 backdrop-blur">
           <div
             className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8"
@@ -464,7 +593,7 @@ export function AppShell({
         <main
           className="min-w-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-6 sm:px-6 lg:px-8"
           ref={contentRef}
-          style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+          style={{ paddingBottom: "calc(max(1.5rem, env(safe-area-inset-bottom)) + var(--keyboard-offset, 0px))" }}
         >
           <MobilePullToRefresh containerRef={contentRef} drawerOpen={drawerOpen}>
             <div className="mx-auto w-full max-w-[1700px] min-w-0">{children}</div>
