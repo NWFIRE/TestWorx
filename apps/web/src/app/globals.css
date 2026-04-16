@@ -85,20 +85,13 @@ body[data-keyboard-open="true"] .mobile-keyboard-hide {
   transform: translateY(1rem);
 }
 
-@keyframes brand-loader-presence {
-  0% {
-    transform: scale(0.985);
-    opacity: 0.78;
+@keyframes tradeworx-loader-spin {
+  from {
+    transform: rotate(0deg);
   }
 
-  50% {
-    transform: scale(1);
-    opacity: 1;
-  }
-
-  100% {
-    transform: scale(0.985);
-    opacity: 0.78;
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -230,18 +223,17 @@ body[data-keyboard-open="true"] .mobile-keyboard-hide {
     outline: none;
   }
 
-  .brand-loader {
+  .tradeworx-loader {
     line-height: 0;
   }
 
-  .brand-loader-mark-wrap {
-    animation: brand-loader-presence 1200ms ease-in-out infinite;
+  .tradeworx-loader-orbit {
+    animation: tradeworx-loader-spin 900ms linear infinite;
     transform-origin: center;
   }
 
-  .brand-loader-mark {
-    transform-origin: center;
-    filter: saturate(1.02);
+  .tradeworx-loader-dot {
+    box-shadow: 0 0 0 0.5px rgb(255 255 255 / 0.08);
   }
 
   .toast-card {
@@ -300,7 +292,7 @@ body[data-keyboard-open="true"] .mobile-keyboard-hide {
     animation: none;
   }
 
-  .brand-loader-mark-wrap,
+  .tradeworx-loader-orbit,
   .toast-card {
     animation: none;
   }
