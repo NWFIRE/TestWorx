@@ -4,6 +4,7 @@ import type { ReportCalculationKey } from "./report-calculations";
 import { resolveOptionProvider } from "./report-options";
 import type { ReportOptionProviderKey } from "./report-options";
 import { backflowReportTemplate } from "./backflow-report";
+import { acceptanceTestReportTemplate } from "./acceptance-test-report";
 import { jointCommissionFireSprinklerReportTemplate } from "./joint-commission-fire-sprinkler-report";
 import { wetSprinklerReportTemplate } from "./wet-sprinkler-report";
 import { workOrderReportTemplate } from "./work-order-report";
@@ -91,6 +92,7 @@ export type ReportFieldPrefillDefinition =
   | { source: "priorAnyField"; sectionId: string; fieldIds: string[]; value: ReportPrimitiveValue }
   | { source: "priorFieldsJoined"; sectionId: string; fieldIds: string[]; separator?: string }
   | { source: "siteDefault"; key: string }
+  | { source: "tenantBranding"; key: string }
   | { source: "reportDefault"; value: ReportPrimitiveValue };
 
 export type ReportFieldMappingDefinition = {
@@ -1032,6 +1034,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
       }
     ]
   },
+  wet_chemical_acceptance_test: acceptanceTestReportTemplate,
   work_order: workOrderReportTemplate,
   wet_fire_sprinkler: wetSprinklerReportTemplate,
   joint_commission_fire_sprinkler: jointCommissionFireSprinklerReportTemplate,

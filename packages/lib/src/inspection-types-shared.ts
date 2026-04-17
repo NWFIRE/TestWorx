@@ -9,6 +9,11 @@ export const inspectionTypeRegistry = {
     description: "Inspection and testing for the fire alarm system.",
     defaultRecurrenceFrequency: "ANNUAL"
   },
+  wet_chemical_acceptance_test: {
+    label: "Wet Chemical Acceptance Test",
+    description: "Acceptance testing for wet chemical suppression systems.",
+    defaultRecurrenceFrequency: "ONCE"
+  },
   wet_fire_sprinkler: {
     label: "Wet Fire Sprinkler",
     description: "Annual wet sprinkler inspection and testing.",

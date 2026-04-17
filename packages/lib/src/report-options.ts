@@ -2,6 +2,7 @@ import type { ReportAssetRecord, ReportOption, ReportPrimitiveValue } from "./re
 import { backflowRequirementProfiles, jointCommissionSprinklerRequirementProfiles, wetSprinklerRequirementProfiles } from "./report-requirements";
 
 export type ReportOptionProviderKey =
+  | "acceptanceTestResultOptions"
   | "passFail"
   | "pass_fail"
   | "passFailNA"
@@ -139,6 +140,13 @@ const yesNoNAOptions: ReportOption[] = [
   { label: "Yes", value: "yes" },
   { label: "No", value: "no" },
   { label: "N/A", value: "na" }
+];
+
+const acceptanceTestResultOptions: ReportOption[] = [
+  { label: "Pass", value: "pass" },
+  { label: "Fail", value: "fail" },
+  { label: "Yes", value: "yes" },
+  { label: "No", value: "no" }
 ];
 
 const normalLowHighNAOptions: ReportOption[] = [
@@ -979,6 +987,7 @@ const sprinklerManufacturers: ReportOption[] = [
 ];
 
 export const reportOptionProviders = {
+  acceptanceTestResultOptions,
   passFail: passFailOptions,
   pass_fail: passFailStrictOptions,
   passFailNA: passFailNAOptions,

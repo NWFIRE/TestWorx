@@ -67,6 +67,11 @@ export async function generateInspectionReportPdfV2(input: PdfInput) {
     return renderFireAlarmPdf(input);
   }
 
+  if (input.task.inspectionType === "wet_chemical_acceptance_test") {
+    const { renderAcceptanceTestPdf } = await import("./acceptance-test");
+    return renderAcceptanceTestPdf(input);
+  }
+
   return generateLegacyInspectionReportPdfV2(input);
 }
 

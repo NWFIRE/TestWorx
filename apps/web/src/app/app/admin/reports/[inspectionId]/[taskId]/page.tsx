@@ -5,6 +5,8 @@ import { auth } from "@/auth";
 import { getInspectionReportDraft } from "@testworx/lib/server/index";
 
 import { ReportEditor } from "../../../../tech/report-editor";
+import { buildAcceptanceTestViewModel } from "../../../../../reports/acceptance-test/buildAcceptanceTestViewModel";
+import { AcceptanceReportEditView } from "../../../../../reports/acceptance-test/pages/AcceptanceReportEditView";
 
 function buildCorrectionNotice(report: Awaited<ReturnType<typeof getInspectionReportDraft>>) {
   if (!report || report.correctionState === "none") {
@@ -40,8 +42,7 @@ export default async function AdminReportCorrectionPage({ params }: { params: Pr
   const correctionNotice = adminOverrideForFinalized
     ? "Admin override mode. Saving changes will return this report to draft until you finalize it again."
     : buildCorrectionNotice(report);
-
-  return (
+  const editor = (
     <ReportEditor
       data={{
         reportId: report.id,
@@ -62,4 +63,35 @@ export default async function AdminReportCorrectionPage({ params }: { params: Pr
       }}
     />
   );
+
+  if (report.task.inspectionType === "wet_chemical_acceptance_test") {
+    const model = buildAcceptanceTestViewModel({
+      tenant: {
+        name: report.inspection.tenant.name,
+        branding: report.inspection.tenant.branding
+      },
+      customerCompany: report.inspection.customerCompany,
+      site: report.inspection.site,
+      inspection: report.inspection,
+      task: {
+        inspectionType: report.task.inspectionType
+      },
+      report: {
+        id: report.id,
+        finalizedAt: report.finalizedAt,
+        technicianName: null,
+        status: adminOverrideForFinalized ? "draft" : report.status,
+        assignedTo: report.task.assignedTechnician?.name ?? report.inspection.assignedTechnician?.name ?? null
+      },
+      draft: report.draft,
+      deficiencies: [],
+      photos: [],
+      technicianSignature: report.draft.signatures.technician ?? null,
+      customerSignature: report.draft.signatures.customer ?? null
+    });
+
+    return <AcceptanceReportEditView model={model} editor={editor} />;
+  }
+
+  return editor;
 }

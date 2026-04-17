@@ -320,11 +320,16 @@ async function getAuthorizedReport(actor: ActorContext, inspectionId: string, ta
           site: true,
           customerCompany: true,
           tenant: true,
+          assignedTechnician: true,
           technicianAssignments: { select: { technicianId: true } },
           tasks: { select: { id: true, inspectionType: true, customDisplayLabel: true } }
         }
       },
-      task: true,
+      task: {
+        include: {
+          assignedTechnician: true
+        }
+      },
       technician: true,
       attachments: true,
       signatures: true,
@@ -770,7 +775,11 @@ async function getAuthorizedEditableReport(actor: ActorContext, inspectionReport
     where: { id: inspectionReportId, tenantId: parsedActor.tenantId as string },
     include: {
       inspection: { include: { technicianAssignments: { select: { technicianId: true } } } },
-      task: true,
+      task: {
+        include: {
+          assignedTechnician: true
+        }
+      },
       attachments: true,
       signatures: true,
       deficiencies: true
@@ -935,6 +944,17 @@ export async function getInspectionReportDraft(actor: ActorContext, inspectionId
     inspectionType: report.task.inspectionType,
     assets
   });
+  const tenantBranding = resolveTenantBranding({
+    tenantName: report.inspection.tenant.name,
+    branding: report.inspection.tenant.branding,
+    billingEmail: report.inspection.tenant.billingEmail
+  });
+  const rawTenantBranding = report.inspection.tenant.branding && typeof report.inspection.tenant.branding === "object"
+    ? report.inspection.tenant.branding as Record<string, unknown>
+    : {};
+  const cityStateZip = [tenantBranding.city, tenantBranding.state, tenantBranding.postalCode]
+    .filter((value) => typeof value === "string" && value.trim().length > 0)
+    .join(", ");
 
   const draft = buildInitialReportDraft({
     inspectionType: report.task.inspectionType,
@@ -949,6 +969,15 @@ export async function getInspectionReportDraft(actor: ActorContext, inspectionId
       siteName: report.inspection.site.name,
       customerName: report.inspection.customerCompany.name,
       siteAddress: report.inspection.site.addressLine1
+    } satisfies Record<string, ReportPrimitiveValue>,
+    tenantBrandingDefaults: {
+      legalBusinessName: tenantBranding.legalBusinessName,
+      phone: tenantBranding.phone,
+      email: tenantBranding.email,
+      website: tenantBranding.website,
+      addressLine1: tenantBranding.addressLine1,
+      cityStateZip,
+      licenseNumber: typeof rawTenantBranding.licenseNumber === "string" ? rawTenantBranding.licenseNumber : null
     } satisfies Record<string, ReportPrimitiveValue>,
     priorReportSummary: priorReport ? `Previous finalized report completed ${priorReport.finalizedAt?.toISOString() ?? priorReport.updatedAt.toISOString()}.` : ""
   });
@@ -1749,7 +1778,8 @@ export async function getCustomerReportDetail(actor: ActorContext, reportId: str
       inspection: {
         include: {
           site: true,
-          customerCompany: true
+          customerCompany: true,
+          tenant: true
         }
       },
       task: true,

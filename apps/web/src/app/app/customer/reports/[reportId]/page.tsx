@@ -6,6 +6,8 @@ import { auth } from "@/auth";
 import { buildReportPreview, describeRepeaterValueLines, getCustomerFacingSiteLabel, getCustomerReportDetail, isCustomerVisibleField, type ReportFieldDefinition } from "@testworx/lib/server/index";
 
 import { InspectionPacketCard } from "../../../inspection-packet-card";
+import { buildAcceptanceTestViewModel } from "../../../../reports/acceptance-test/buildAcceptanceTestViewModel";
+import { AcceptanceReportView } from "../../../../reports/acceptance-test/pages/AcceptanceReportView";
 
 type CustomerReportView = {
   updatedAt: Date;
@@ -86,6 +88,67 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
     }>;
   }).packetDocuments ?? [];
   const preview = buildReportPreview(detail.draft);
+
+  if (detail.report.task.inspectionType === "wet_chemical_acceptance_test") {
+    const signaturesByKind = Object.fromEntries(detail.report.signatures.map((signature) => [signature.kind, signature])) as Record<
+      string,
+      { signerName: string; imageDataUrl: string; signedAt: Date }
+    >;
+    const model = buildAcceptanceTestViewModel({
+      tenant: {
+        name: detail.report.inspection.tenant.name,
+        branding: detail.report.inspection.tenant.branding
+      },
+      customerCompany: detail.report.inspection.customerCompany,
+      site: {
+        ...detail.report.inspection.site,
+        name: customerFacingSiteName ?? detail.report.inspection.site.name
+      },
+      inspection: detail.report.inspection,
+      task: {
+        inspectionType: detail.report.task.inspectionType
+      },
+      report: {
+        id: detail.report.id,
+        finalizedAt: detail.report.finalizedAt,
+        technicianName: detail.report.technician?.name ?? null,
+        status: "finalized",
+        assignedTo: detail.report.task.assignedTechnician?.name ?? null
+      },
+      draft: detail.draft,
+      deficiencies: detail.report.deficiencies,
+      photos: [],
+      technicianSignature: signaturesByKind.technician ?? null,
+      customerSignature: signaturesByKind.customer ?? null
+    });
+
+    return (
+      <section className="space-y-6">
+        <AcceptanceReportView model={model} />
+        <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+          <InspectionPacketCard
+            description="This report is part of a completed inspection packet. Download every customer-authorized PDF tied to the visit from one place."
+            documents={packetDocuments}
+            emptyDescription="No customer-authorized PDFs are available for this completed inspection."
+            emptyTitle="No packet documents available"
+            title="Inspection packet documents"
+          />
+          <div className="space-y-6">
+            <Link
+              className="inline-flex rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue"
+              href={`/app/customer/inspections/${detail.report.inspectionId}`}
+            >
+              Open full inspection packet
+            </Link>
+            <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+              <h3 className="text-2xl font-semibold text-ink">Technician notes</h3>
+              <p className="mt-4 text-sm leading-6 text-slate-600">{detail.draft.overallNotes || "No technician notes were recorded."}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-6">

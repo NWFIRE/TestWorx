@@ -16,6 +16,7 @@ export type TechnicianOption = { id: string; name: string };
 export const inspectionTypes = {
   fire_extinguisher: "fire_extinguisher",
   fire_alarm: "fire_alarm",
+  wet_chemical_acceptance_test: "wet_chemical_acceptance_test",
   wet_fire_sprinkler: "wet_fire_sprinkler",
   joint_commission_fire_sprinkler: "joint_commission_fire_sprinkler",
   work_order: "work_order",

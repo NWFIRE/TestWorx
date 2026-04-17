@@ -1,12 +1,7 @@
 import "server-only";
 
-import { readFileSync } from "node:fs";
-import path from "node:path";
-
 import type { ReactElement } from "react";
-
-const pdfCssPath = path.resolve(__dirname, "../styles/pdf.css");
-const pdfCss = readFileSync(pdfCssPath, "utf8");
+import { pdfCss } from "../styles/pdf-css";
 
 export async function renderPdfHtml(element: ReactElement): Promise<string> {
   const { renderToStaticMarkup } = await import("react-dom/server");

@@ -279,6 +279,7 @@ type ReportRepeaterRow = Record<string, ReportPrimitiveValue>;
 type SmartBuildContext = {
   inspectionType: InspectionType;
   siteDefaults: Record<string, ReportPrimitiveValue>;
+  tenantBrandingDefaults: Record<string, ReportPrimitiveValue>;
   assets: ReportAssetRecord[];
   priorDraft: z.infer<typeof carryForwardDraftSchema> | null;
 };
@@ -494,6 +495,13 @@ function resolvePrefillValue(
 
     if (provider.source === "siteDefault") {
       const candidate = input.context.siteDefaults[provider.key];
+      if (!isEmptyValue(candidate)) {
+        return candidate;
+      }
+    }
+
+    if (provider.source === "tenantBranding") {
+      const candidate = input.context.tenantBrandingDefaults[provider.key];
       if (!isEmptyValue(candidate)) {
         return candidate;
       }
@@ -986,6 +994,7 @@ export function buildInitialReportDraft(input: {
   priorReportSummary?: string;
   assets?: ReportAssetRecord[];
   siteDefaults?: Record<string, ReportPrimitiveValue>;
+  tenantBrandingDefaults?: Record<string, ReportPrimitiveValue>;
 }) {
   const template = resolveReportTemplate({
     inspectionType: input.inspectionType,
@@ -1001,6 +1010,9 @@ export function buildInitialReportDraft(input: {
       customerName: input.customerName,
       scheduledDate: input.scheduledDate,
       ...(input.siteDefaults ?? {})
+    },
+    tenantBrandingDefaults: {
+      ...(input.tenantBrandingDefaults ?? {})
     },
     assets: input.assets ?? [],
     priorDraft: priorCompletedDraft

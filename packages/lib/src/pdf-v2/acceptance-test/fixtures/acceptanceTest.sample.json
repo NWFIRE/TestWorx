@@ -1,0 +1,156 @@
+{
+  "tenant": {
+    "name": "Northwest Fire & Safety",
+    "branding": {
+      "legalBusinessName": "Northwest Fire & Safety",
+      "phone": "(580) 540-3119",
+      "email": "service@nwfireandsafety.com",
+      "website": "www.nwfireandsafety.com",
+      "addressLine1": "2610 N Van Buren St",
+      "city": "Enid",
+      "state": "Oklahoma",
+      "postalCode": "73703",
+      "licenseNumber": "OK #466",
+      "logoDataUrl": ""
+    }
+  },
+  "customerCompany": {
+    "name": "Enid Bistro",
+    "contactName": "Unknown Unknown",
+    "billingEmail": "owner@enidbistro.com",
+    "phone": "580-555-0148"
+  },
+  "site": {
+    "name": "Enid Bistro Main Kitchen",
+    "addressLine1": "425 W Randolph Ave",
+    "addressLine2": "—",
+    "city": "Enid",
+    "state": "OK",
+    "postalCode": "73701"
+  },
+  "inspection": {
+    "id": "inspection_acceptance_sample",
+    "scheduledStart": "2026-04-16T15:00:00.000Z",
+    "scheduledEnd": "2026-04-16T16:00:00.000Z",
+    "status": "In Progress",
+    "notes": "Na"
+  },
+  "task": {
+    "inspectionType": "wet_chemical_acceptance_test"
+  },
+  "report": {
+    "id": "report_acceptance_sample",
+    "finalizedAt": "2026-04-16T21:24:00.000Z",
+    "technicianName": "Jordan Lee",
+    "status": "submitted",
+    "assignedTo": "Jordan Lee"
+  },
+  "draft": {
+    "templateVersion": 1,
+    "inspectionType": "wet_chemical_acceptance_test",
+    "overallNotes": "Unknown",
+    "sectionOrder": [
+      "property-information",
+      "installer-information",
+      "system-information",
+      "test-results",
+      "witness-information",
+      "comments"
+    ],
+    "activeSectionId": "property-information",
+    "sections": {
+      "property-information": {
+        "status": "completed",
+        "notes": "",
+        "fields": {
+          "buildingName": "Enid Bistro",
+          "address": "425 W Randolph Ave, Enid, OK 73701",
+          "buildingOwner": "Unknown Unknown",
+          "ownerContact": "   "
+        }
+      },
+      "installer-information": {
+        "status": "completed",
+        "notes": "",
+        "fields": {
+          "installerCompanyName": "",
+          "installerAddressLine1": "",
+          "installerCityStateZip": "",
+          "installerContactPerson": "Na",
+          "installerPhone": "",
+          "installerEmail": "",
+          "installerWebsite": "",
+          "installerLicenseNumber": ""
+        }
+      },
+      "system-information": {
+        "status": "completed",
+        "notes": "",
+        "fields": {
+          "hazardDescription": "Kitchen hood over line cook range and fry station",
+          "manufacturer": "Pyro-Chem",
+          "model": "PCL-3000",
+          "dateLeftInService": "2026-04-16"
+        }
+      },
+      "test-results": {
+        "status": "completed",
+        "notes": "",
+        "fields": {
+          "installationApprovedPlans": "Yes",
+          "pipingTest": "Pass",
+          "properLabeling": "Yes",
+          "properAlarmOperation": "Pass",
+          "manualReleaseAccessibility": "Yes",
+          "releasingControlPanel": "Pass",
+          "automaticDetectionAndManualRelease": "Yes",
+          "systemProperlyChargedAndSet": "Pass",
+          "manualLeftWithOwner": "Yes",
+          "totalTests": 9,
+          "passedTests": 9,
+          "failedTests": 0
+        }
+      },
+      "witness-information": {
+        "status": "completed",
+        "notes": "",
+        "fields": {
+          "witnessedBy": "Chris Dawson"
+        }
+      },
+      "comments": {
+        "status": "completed",
+        "notes": "",
+        "fields": {
+          "comments": "—"
+        }
+      }
+    },
+    "deficiencies": [],
+    "attachments": [],
+    "signatures": {
+      "technician": {
+        "signerName": "Jordan Lee",
+        "imageDataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5wH6sAAAAASUVORK5CYII=",
+        "signedAt": "2026-04-16T21:22:00.000Z"
+      },
+      "customer": {
+        "signerName": "Morgan Hale",
+        "imageDataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5wH6sAAAAASUVORK5CYII=",
+        "signedAt": "2026-04-16T21:24:00.000Z"
+      }
+    }
+  },
+  "deficiencies": [],
+  "photos": [],
+  "technicianSignature": {
+    "signerName": "Jordan Lee",
+    "imageDataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5wH6sAAAAASUVORK5CYII=",
+    "signedAt": "2026-04-16T21:22:00.000Z"
+  },
+  "customerSignature": {
+    "signerName": "Morgan Hale",
+    "imageDataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5wH6sAAAAASUVORK5CYII=",
+    "signedAt": "2026-04-16T21:24:00.000Z"
+  }
+}
