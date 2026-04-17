@@ -10,6 +10,7 @@ import { renderNotesSection } from "./sections/notes";
 import { renderPhotosSection } from "./sections/photos";
 import { renderSignaturesSection } from "./sections/signatures";
 import { renderTableSection } from "./sections/table";
+import { renderFireAlarmPdf } from "./fire-alarm";
 import type { PdfInput } from "./types";
 
 export * from "./types";
@@ -19,8 +20,9 @@ export * from "./compliance";
 export * from "./indicators";
 export * from "./render-model";
 export * from "./registry";
+export * from "./fire-alarm";
 
-export async function generateInspectionReportPdfV2(input: PdfInput) {
+async function generateLegacyInspectionReportPdfV2(input: PdfInput) {
   const model = buildReportRenderModelFromDraft(input);
   const runtime = await buildRuntime(model);
   let cursor = addPage(runtime, 1);
@@ -57,6 +59,14 @@ export async function generateInspectionReportPdfV2(input: PdfInput) {
   }
 
   return runtime.pdfDoc.save({ useObjectStreams: false });
+}
+
+export async function generateInspectionReportPdfV2(input: PdfInput) {
+  if (input.task.inspectionType === "fire_alarm") {
+    return renderFireAlarmPdf(input);
+  }
+
+  return generateLegacyInspectionReportPdfV2(input);
 }
 
 export function resolvePdfVersionForInspectionType(inspectionType: PdfInput["task"]["inspectionType"]) {

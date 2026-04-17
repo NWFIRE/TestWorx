@@ -1,0 +1,167 @@
+{
+  "tenant": {
+    "name": "Northwest Fire & Safety",
+    "branding": {
+      "legalBusinessName": "Northwest Fire & Safety",
+      "phone": "405-555-0199",
+      "email": "service@nwfire.com",
+      "website": "https://nwfire.com",
+      "addressLine1": "2517 N. Van Buren St.",
+      "city": "Enid",
+      "state": "OK",
+      "postalCode": "73703",
+      "logoDataUrl": ""
+    }
+  },
+  "customerCompany": {
+    "name": "Commercial Fire LLC",
+    "contactName": "Unknown Unknown",
+    "billingEmail": "ap@commercialfire.com",
+    "phone": "405-555-0135"
+  },
+  "site": {
+    "name": "Willow View Church - Enid",
+    "addressLine1": "—",
+    "addressLine2": "Na",
+    "city": "Enid",
+    "state": "OK",
+    "postalCode": "73703"
+  },
+  "inspection": {
+    "id": "inspection_fire_alarm_sample",
+    "scheduledStart": "2026-04-15T16:30:00.000Z",
+    "scheduledEnd": "2026-04-15T17:30:00.000Z",
+    "status": "In Progress",
+    "notes": "Unknown"
+  },
+  "task": {
+    "inspectionType": "fire_alarm"
+  },
+  "report": {
+    "id": "report_fire_alarm_sample",
+    "finalizedAt": "2026-04-15T22:24:00.000Z",
+    "technicianName": "Paul Sanders"
+  },
+  "draft": {
+    "templateVersion": 1,
+    "inspectionType": "fire_alarm",
+    "overallNotes": "—",
+    "sectionOrder": ["control-panel", "initiating-devices", "notification", "system-summary"],
+    "activeSectionId": "control-panel",
+    "sections": {
+      "control-panel": {
+        "status": "pass",
+        "notes": "",
+        "fields": {
+          "controlPanels": [
+            {
+              "assetTag": "FAP-100",
+              "panelName": "Main Fire Alarm Panel",
+              "manufacturer": "Notifier",
+              "model": "NFS2-3030",
+              "serialNumber": "SN-100",
+              "location": "Electrical Room",
+              "communicationPathType": "dual_path"
+            }
+          ],
+          "controlPanelsInspected": 1,
+          "lineVoltageStatus": "normal",
+          "acPowerIndicator": "yes",
+          "powerSupplyCondition": "good",
+          "batteryDateCode": "2025-08",
+          "batterySize": "12v_18ah",
+          "batteryQuantity": "2",
+          "batteryChargeLevel": "normal",
+          "batteryLoadTest": "pass",
+          "centralStationSignalTest": "pass",
+          "controlPanelCondition": "pass"
+        }
+      },
+      "initiating-devices": {
+        "status": "pass",
+        "notes": "",
+        "fields": {
+          "initiatingDevicesInspected": 23,
+          "initiatingDevices": [
+            { "location": "Lobby", "deviceType": "smoke_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "South Hall", "deviceType": "pull_station", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 101", "deviceType": "smoke_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 102", "deviceType": "smoke_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 103", "deviceType": "smoke_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 104", "deviceType": "smoke_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 105", "deviceType": "heat_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 106", "deviceType": "heat_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 107", "deviceType": "heat_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 108", "deviceType": "heat_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 109", "deviceType": "heat_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 110", "deviceType": "smoke_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 111", "deviceType": "smoke_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 112", "deviceType": "smoke_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 113", "deviceType": "smoke_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 114", "deviceType": "pull_station", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 115", "deviceType": "pull_station", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 116", "deviceType": "smoke_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 117", "deviceType": "smoke_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 118", "deviceType": "smoke_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 119", "deviceType": "smoke_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Room 120", "deviceType": "smoke_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "" },
+            { "location": "Sanctuary", "deviceType": "smoke_detector", "functionalTestResult": "pass", "physicalCondition": "good", "comments": "Unknown" }
+          ]
+        }
+      },
+      "notification": {
+        "status": "pass",
+        "notes": "",
+        "fields": {
+          "notificationAppliancesInspected": 2,
+          "notificationAppliances": [
+            { "applianceType": "strobe", "quantity": "4", "audibleOperation": "pass", "visualOperation": "pass", "comments": "—" },
+            { "applianceType": "horn_strobe", "quantity": "8", "audibleOperation": "pass", "visualOperation": "pass", "comments": "" }
+          ]
+        }
+      },
+      "system-summary": {
+        "status": "pass",
+        "notes": "",
+        "fields": {
+          "controlPanelsInspected": 1,
+          "initiatingDevicesInspected": 23,
+          "notificationAppliancesInspected": 2,
+          "deficiencyCount": 0,
+          "deficienciesFound": false,
+          "fireAlarmSystemStatus": "pass",
+          "inspectorNotes": "N/A",
+          "recommendedRepairs": "",
+          "followUpRequired": false
+        }
+      }
+    },
+    "deficiencies": [],
+    "attachments": [],
+    "signatures": {},
+    "context": {
+      "siteName": "Willow View Church - Enid",
+      "customerName": "Commercial Fire LLC",
+      "scheduledDate": "2026-04-15T16:30:00.000Z",
+      "assetCount": 26,
+      "priorReportSummary": "Unknown Unknown"
+    }
+  },
+  "deficiencies": [],
+  "photos": [
+    {
+      "fileName": "raw-filename-photo.jpg",
+      "storageKey": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII="
+    }
+  ],
+  "technicianSignature": {
+    "signerName": "Paul Sanders",
+    "imageDataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII=",
+    "signedAt": "2026-04-15T22:24:00.000Z"
+  },
+  "customerSignature": {
+    "signerName": "John Carter",
+    "imageDataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII=",
+    "signedAt": "2026-04-15T22:26:00.000Z"
+  }
+}
