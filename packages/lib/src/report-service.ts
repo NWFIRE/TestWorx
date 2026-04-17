@@ -10,7 +10,6 @@ import { syncInspectionArchiveStateTx } from "./inspection-archive";
 import { syncInspectionBillingSummaryTx } from "./inspection-billing";
 import type { JsonInputValue, JsonObject, JsonValue } from "./json-types";
 import { assertTenantContext } from "./permissions";
-import { generateInspectionReportPdf } from "./pdf-report";
 import { resolveReportTemplate } from "./report-config";
 import {
   getCustomerFacingSiteLabel,
@@ -1187,6 +1186,7 @@ async function replaceGeneratedReportPdfTx(
     report: any;
   }
 ) {
+  const { generateInspectionReportPdf } = await import("./pdf-report");
   const draft = reportDraftSchema.parse(input.report.contentJson ?? {});
   const priorGeneratedAttachments = input.report.attachments.filter(
     (attachment: GeneratedPdfAttachmentRecord) => attachment.kind === AttachmentKind.pdf && attachment.source === "generated"
