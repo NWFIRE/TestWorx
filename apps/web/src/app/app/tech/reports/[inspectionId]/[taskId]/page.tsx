@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getInspectionDisplayLabels, getInspectionReportDraft, isDueAtTimeOfServiceCustomer } from "@testworx/lib";
+import { getInspectionDisplayLabels, getInspectionReportDraft, isDueAtTimeOfServiceCustomer } from "@testworx/lib/server/index";
 
 import { ReportEditor } from "../../../report-editor";
 

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getEmailReminderWorkspaceData } from "@testworx/lib";
+import { getEmailReminderWorkspaceData } from "@testworx/lib/server/index";
 
 import { AppPageShell, PageHeader } from "../operations-ui";
 import { sendEmailRemindersAction } from "./actions";
@@ -72,3 +72,4 @@ export default async function EmailRemindersPage({
     </AppPageShell>
   );
 }
+

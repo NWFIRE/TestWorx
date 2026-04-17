@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getCustomerQuoteDetail, getQuoteStatusTone, quoteStatusLabels } from "@testworx/lib";
+import { getCustomerQuoteDetail, getQuoteStatusTone, quoteStatusLabels } from "@testworx/lib/server/index";
 
 import { AppPageShell, PageHeader, SectionCard, StatusBadge, WorkspaceSplit } from "../../../admin/operations-ui";
 import { QuoteProjectTermsCard } from "../../../../quote-project-terms-card";

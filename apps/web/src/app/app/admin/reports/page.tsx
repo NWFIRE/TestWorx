@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { LiveUrlSelectFilter } from "@/app/live-url-select-filter";
-import { getAdminReportReviewQueueData } from "@testworx/lib";
+import { getAdminReportReviewQueueData } from "@testworx/lib/server/index";
 
 import {
   AppPageShell,
@@ -166,3 +166,4 @@ export default async function AdminReportsQueuePage({
     </AppPageShell>
   );
 }
+

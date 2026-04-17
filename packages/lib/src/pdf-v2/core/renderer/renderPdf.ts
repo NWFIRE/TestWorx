@@ -1,3 +1,5 @@
+import "server-only";
+
 async function resolveExecutablePath(chromium: {
   executablePath: () => Promise<string>;
 }) {

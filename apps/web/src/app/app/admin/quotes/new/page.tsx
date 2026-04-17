@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { addDays } from "date-fns";
 
 import { auth } from "@/auth";
-import { DEFAULT_QUOTE_EXPIRATION_DAYS, getQuoteFormOptions, hasQuoteManagementAccess } from "@testworx/lib";
+import { DEFAULT_QUOTE_EXPIRATION_DAYS, getQuoteFormOptions, hasQuoteManagementAccess } from "@testworx/lib/server/index";
 
 import { AppPageShell, PageHeader } from "../../operations-ui";
 import { createQuoteAction } from "../actions";
@@ -85,3 +85,4 @@ export default async function NewQuotePage({
     </AppPageShell>
   );
 }
+

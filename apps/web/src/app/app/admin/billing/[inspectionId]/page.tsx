@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { PageBackControl } from "@/app/page-back-control";
-import { getAdminBillingSummaryDetail, getTenantQuickBooksConnectionStatus } from "@testworx/lib";
+import { getAdminBillingSummaryDetail, getTenantQuickBooksConnectionStatus } from "@testworx/lib/server/index";
 
 import { BillingSummaryStatusActions } from "../billing-summary-status-actions";
 import { BillingItemMatchPanel } from "../../billing-item-match-panel";

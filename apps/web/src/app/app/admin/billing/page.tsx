@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getAdminBillingSummaries } from "@testworx/lib";
+import { getAdminBillingSummaries } from "@testworx/lib/server/index";
 
 import {
   AppPageShell,
@@ -256,3 +256,4 @@ export default async function AdminBillingPage({
     </AppPageShell>
   );
 }
+

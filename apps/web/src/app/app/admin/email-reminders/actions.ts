@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { auth } from "@/auth";
-import { sendManualEmailReminders } from "@testworx/lib";
+import { sendManualEmailReminders } from "@testworx/lib/server/index";
 
 export async function sendEmailRemindersAction(input: {
   dueMonth: string;
@@ -42,3 +42,4 @@ export async function sendEmailRemindersAction(input: {
     };
   }
 }
+

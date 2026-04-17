@@ -10,7 +10,7 @@ import {
   getInspectionClassificationTone,
   getInspectionStatusTone,
   pickEarliestNextDueAt
-} from "@testworx/lib";
+} from "@testworx/lib/server/index";
 
 import {
   AppPageShell,
@@ -259,3 +259,4 @@ export default async function UpcomingInspectionsPage({
     </AppPageShell>
   );
 }
+

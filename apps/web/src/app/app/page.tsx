@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getDefaultDashboardPath } from "@testworx/lib";
+import { getDefaultDashboardPath } from "@testworx/lib/server/index";
 
 export default async function DashboardRouterPage() {
   const session = await auth();
@@ -11,4 +11,5 @@ export default async function DashboardRouterPage() {
 
   redirect(getDefaultDashboardPath(session.user.role));
 }
+
 

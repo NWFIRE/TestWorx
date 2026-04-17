@@ -3,7 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import { z } from "zod";
 
 import { prisma } from "@testworx/db";
-import { assertEnvForFeature, comparePassword } from "@testworx/lib";
+import { assertEnvForFeature, comparePassword } from "@testworx/lib/server/index";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -122,4 +122,5 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }
   }
 });
+
 

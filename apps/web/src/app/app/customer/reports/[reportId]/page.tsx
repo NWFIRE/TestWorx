@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { buildReportPreview, describeRepeaterValueLines, getCustomerFacingSiteLabel, getCustomerReportDetail, isCustomerVisibleField, type ReportFieldDefinition } from "@testworx/lib";
+import { buildReportPreview, describeRepeaterValueLines, getCustomerFacingSiteLabel, getCustomerReportDetail, isCustomerVisibleField, type ReportFieldDefinition } from "@testworx/lib/server/index";
 
 import { InspectionPacketCard } from "../../../inspection-packet-card";
 

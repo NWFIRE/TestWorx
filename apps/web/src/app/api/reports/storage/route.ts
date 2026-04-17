@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { getAuthorizedReportMediaDownload } from "@testworx/lib";
+import { getAuthorizedReportMediaDownload } from "@testworx/lib/server/index";
 
 function getStatusCode(error: unknown) {
   if (!(error instanceof Error)) {
@@ -63,3 +63,4 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to retrieve report media." }, { status: getStatusCode(error) });
   }
 }
+

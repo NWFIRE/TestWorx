@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { completeQuickBooksConnection } from "@testworx/lib";
+import { completeQuickBooksConnection } from "@testworx/lib/server/index";
 
 export const dynamic = "force-dynamic";
 
@@ -36,3 +36,4 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/app/admin/settings?quickbooks=error", request.url));
   }
 }
+

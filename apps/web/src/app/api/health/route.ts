@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@testworx/db";
-import { assertEnvForFeature, evaluateSystemReadiness, getOptionalQuickBooksEnv, getOptionalStripeEnv, getServerEnv } from "@testworx/lib";
+import { assertEnvForFeature, evaluateSystemReadiness, getOptionalQuickBooksEnv, getOptionalStripeEnv, getServerEnv } from "@testworx/lib/server/index";
 
 export const dynamic = "force-dynamic";
 
@@ -45,3 +45,4 @@ export async function GET() {
     );
   }
 }
+

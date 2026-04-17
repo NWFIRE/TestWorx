@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getPaginatedTenantCustomerCompanyDirectory, getTenantBillingContractProfiles, getTenantBillingPayerAccounts } from "@testworx/lib";
+import { getPaginatedTenantCustomerCompanyDirectory, getTenantBillingContractProfiles, getTenantBillingPayerAccounts } from "@testworx/lib/server/index";
 
 import { AppPageShell, KPIStatCard, PageHeader } from "../operations-ui";
 import { CustomerManagementCard } from "../settings/customer-management-card";
@@ -104,3 +104,4 @@ export default async function ClientsPage({
     </AppPageShell>
   );
 }
+

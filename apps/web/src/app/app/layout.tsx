@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth, signOut } from "@/auth";
-import { getTenantBrandingSettings } from "@testworx/lib";
+import { getTenantBrandingSettings } from "@testworx/lib/server/index";
 import { AppShell } from "./app-shell";
 
 function isStaleSessionError(error: unknown) {
@@ -47,4 +47,5 @@ export default async function AppLayout({ children }: Readonly<{ children: React
     </div>
   );
 }
+
 

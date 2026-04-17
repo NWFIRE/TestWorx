@@ -3,7 +3,7 @@ import { addDays } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getQuickBooksDirectInvoiceFormOptions, quoteProposalTypes } from "@testworx/lib";
+import { getQuickBooksDirectInvoiceFormOptions, quoteProposalTypes } from "@testworx/lib/server/index";
 
 import { AppPageShell, PageHeader } from "../../operations-ui";
 import { createDirectQuickBooksInvoiceAction } from "../../actions";
@@ -89,3 +89,4 @@ export default async function CreateBillingInvoicePage({
     </AppPageShell>
   );
 }
+

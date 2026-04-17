@@ -12,7 +12,7 @@ import {
   quoteStatusLabels,
   quoteSyncStatusLabels,
   resolveTenantBranding
-} from "@testworx/lib";
+} from "@testworx/lib/server/index";
 
 import { AppPageShell, PageHeader, SectionCard, StatusBadge, WorkspaceSplit } from "../../operations-ui";
 import {

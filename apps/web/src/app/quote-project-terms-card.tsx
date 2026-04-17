@@ -1,4 +1,4 @@
-import { getQuoteTermsContent } from "@testworx/lib";
+import { getQuoteTermsContent } from "@testworx/lib/server/index";
 
 export function QuoteProjectTermsCard({
   className = "",
@@ -67,3 +67,4 @@ export function QuoteProjectTermsCard({
     </section>
   );
 }
+

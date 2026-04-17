@@ -16,6 +16,7 @@
     "baseUrl": ".",
     "paths": {
       "@testworx/db": ["packages/db/src/index.ts"],
+      "@testworx/lib/server": ["packages/lib/src/server.ts"],
       "@testworx/lib/*": ["packages/lib/src/*"],
       "@testworx/lib": ["packages/lib/src/index.ts"],
       "@testworx/types": ["packages/types/src/index.ts"],

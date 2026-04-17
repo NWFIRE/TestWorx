@@ -1,3 +1,5 @@
+import "server-only";
+
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import type { InspectionType } from "@testworx/types";
 

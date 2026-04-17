@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getAdminInspectionArchiveDetail, getInspectionStatusTone, inspectionStatusLabels } from "@testworx/lib";
+import { getAdminInspectionArchiveDetail, getInspectionStatusTone, inspectionStatusLabels } from "@testworx/lib/server/index";
 
 import { InspectionPacketCard } from "../../../inspection-packet-card";
 import { AppPageShell, PageHeader, SectionCard, StatusBadge, WorkspaceSplit } from "../../operations-ui";

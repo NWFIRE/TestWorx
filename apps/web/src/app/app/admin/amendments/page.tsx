@@ -7,7 +7,7 @@ import {
   formatInspectionCloseoutRequestStatusLabel,
   formatInspectionCloseoutRequestTypeLabel,
   getAdminAmendmentManagementData
-} from "@testworx/lib";
+} from "@testworx/lib/server/index";
 
 import {
   AppPageShell,
@@ -294,3 +294,4 @@ export default async function AdminAmendmentsPage({
     </AppPageShell>
   );
 }
+

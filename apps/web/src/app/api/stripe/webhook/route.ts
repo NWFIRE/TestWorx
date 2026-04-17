@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { handleStripeWebhook } from "@testworx/lib";
+import { handleStripeWebhook } from "@testworx/lib/server/index";
 
 export const dynamic = "force-dynamic";
 
@@ -34,3 +34,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to process Stripe webhook." }, { status: getStatusCode(error) });
   }
 }
+

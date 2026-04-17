@@ -13,7 +13,7 @@ import {
   hostedQuoteStateLabels,
   quoteStatusLabels,
   resolveTenantBranding
-} from "@testworx/lib";
+} from "@testworx/lib/server/index";
 
 import { approveQuoteFromHostedPage, declineQuoteFromHostedPage } from "./actions";
 import { ProposalActionBanner, ProposalHero, QuoteStatusBadge, TotalSummaryCard } from "../../quote-proposal-sections";

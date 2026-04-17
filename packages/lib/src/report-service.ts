@@ -1,3 +1,5 @@
+import "server-only";
+
 import { AttachmentKind, InspectionDocumentStatus, InspectionStatus, Prisma, ReportCorrectionState, SignatureKind } from "@prisma/client";
 import { prisma } from "@testworx/db";
 

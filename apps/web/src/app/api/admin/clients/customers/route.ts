@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { getPaginatedTenantCustomerCompanyDirectory } from "@testworx/lib";
+import { getPaginatedTenantCustomerCompanyDirectory } from "@testworx/lib/server/index";
 
 export const dynamic = "force-dynamic";
 
@@ -41,3 +41,4 @@ export async function GET(request: Request) {
     );
   }
 }
+

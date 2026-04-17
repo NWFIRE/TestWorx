@@ -1,3 +1,5 @@
+import "server-only";
+
 import { buildReportRenderModelFromDraft } from "./adapters/from-report-draft";
 import { renderPageOneV2 } from "./page-one";
 import { addPage, buildRuntime } from "./page-shell";

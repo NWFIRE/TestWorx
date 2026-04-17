@@ -12,7 +12,7 @@ import {
   removeInspectionTask,
   signInspectionDocument,
   updateInspectionStatus
-} from "@testworx/lib";
+} from "@testworx/lib/server/index";
 
 type ActionResult = { ok: boolean; error: string | null };
 type FormActionResult = { error: string | null; success: string | null };
@@ -145,3 +145,4 @@ export async function signInspectionDocumentAction(_: FormActionResult, formData
     return { error: error instanceof Error ? error.message : "Unable to save inspection document changes.", success: null };
   }
 }
+

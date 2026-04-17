@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { runQuoteReminderSweep } from "@testworx/lib";
+import { runQuoteReminderSweep } from "@testworx/lib/server/index";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -41,3 +41,4 @@ export async function GET(request: Request) {
     );
   }
 }
+

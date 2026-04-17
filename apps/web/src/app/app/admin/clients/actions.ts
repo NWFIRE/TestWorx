@@ -10,7 +10,7 @@ import {
   customerCompanyInputSchema,
   deleteCustomerCompany,
   updateCustomerCompany
-} from "@testworx/lib";
+} from "@testworx/lib/server/index";
 
 function buildCustomerResultMessage(result: { quickBooksSynced: boolean; quickBooksSyncError: string | null }, baseMessage: string) {
   if (result.quickBooksSynced) {
@@ -274,3 +274,4 @@ export async function deleteCustomerCompanyAction(
     };
   }
 }
+

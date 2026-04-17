@@ -40,7 +40,7 @@ import {
   updateServiceFeeRule,
   updateTenantBranding,
   updateTenantDefaultServiceFee
-} from "@testworx/lib";
+} from "@testworx/lib/server/index";
 
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 const BRAND_PRIMARY_COOKIE = "tradeworx_brand_primary";
@@ -1062,3 +1062,4 @@ export async function deleteComplianceReportingFeeRuleAction(formData: FormData)
   revalidatePath("/app/admin/settings");
   revalidatePath("/app/admin/billing");
 }
+

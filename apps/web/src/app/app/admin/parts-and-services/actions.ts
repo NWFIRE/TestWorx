@@ -8,7 +8,7 @@ import {
   importQuickBooksCatalogItems,
   quickBooksCatalogItemInputSchema,
   updateQuickBooksCatalogItem
-} from "@testworx/lib";
+} from "@testworx/lib/server/index";
 
 type CatalogActionState = {
   error: string | null;
@@ -122,3 +122,4 @@ export async function updateQuickBooksCatalogItemInlineAction(formData: FormData
     };
   }
 }
+

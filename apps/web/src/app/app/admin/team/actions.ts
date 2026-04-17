@@ -15,7 +15,7 @@ import {
   setUserActiveState,
   updateInviteAllowances,
   updateUserAllowances
-} from "@testworx/lib";
+} from "@testworx/lib/server/index";
 import { initialTeamActionState, type TeamActionState } from "./action-state";
 
 function readAllowanceValues(formData: FormData) {
@@ -209,3 +209,4 @@ export async function completePasswordResetAction(_: TeamActionState, formData: 
     return { ...initialTeamActionState, error: error instanceof Error ? error.message : "Unable to reset password." };
   }
 }
+

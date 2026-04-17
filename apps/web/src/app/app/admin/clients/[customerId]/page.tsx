@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getClientProfileData, getTenantBillingContractProfiles, getTenantBillingPayerAccounts } from "@testworx/lib";
+import { getClientProfileData, getTenantBillingContractProfiles, getTenantBillingPayerAccounts } from "@testworx/lib/server/index";
 
 import { AppPageShell, PageHeader, SectionCard } from "../../operations-ui";
 import { ClientProfileWorkspace } from "../client-profile-workspace";

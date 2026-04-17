@@ -3,6 +3,27 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
+      "@testworx/db": [
+        "../../packages/db/src/index.ts"
+      ],
+      "@testworx/lib": [
+        "../../packages/lib/src/index.ts"
+      ],
+      "@testworx/lib/*": [
+        "../../packages/lib/src/*"
+      ],
+      "@testworx/lib/server": [
+        "../../packages/lib/src/server.ts"
+      ],
+      "@testworx/lib/server/index": [
+        "../../packages/lib/src/server/index.ts"
+      ],
+      "@testworx/types": [
+        "../../packages/types/src/index.ts"
+      ],
+      "@testworx/ui": [
+        "../../packages/ui/src/index.ts"
+      ],
       "@/*": [
         "./src/*"
       ]

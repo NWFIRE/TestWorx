@@ -12,7 +12,7 @@ import {
   getTechnicianDashboardData,
   isDueAtTimeOfServiceCustomer,
   pickEarliestNextDueAt
-} from "@testworx/lib";
+} from "@testworx/lib/server/index";
 
 import { AddReportTypeControl } from "./add-report-type-control";
 import { ClaimButton } from "./claim-button";
@@ -359,3 +359,4 @@ export default async function TechnicianPage({
     </section>
   );
 }
+

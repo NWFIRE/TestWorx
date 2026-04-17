@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import {
   getAdminInspectionArchiveData
-} from "@testworx/lib";
+} from "@testworx/lib/server/index";
 
 import { LiveUrlDateFilter } from "@/app/live-url-date-filter";
 import { LiveUrlSearchInput } from "@/app/live-url-search-input";
@@ -350,3 +350,4 @@ export default async function InspectionArchivePage({
     </AppPageShell>
   );
 }
+

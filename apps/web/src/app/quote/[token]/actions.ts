@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 
-import { approveQuoteByAccessToken, declineQuoteByAccessToken } from "@testworx/lib";
+import { approveQuoteByAccessToken, declineQuoteByAccessToken } from "@testworx/lib/server/index";
 
 function quoteHref(token: string, params?: Record<string, string | null | undefined>) {
   const search = new URLSearchParams();

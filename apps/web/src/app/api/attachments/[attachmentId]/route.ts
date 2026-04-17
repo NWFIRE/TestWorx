@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { getAuthorizedAttachmentDownload } from "@testworx/lib";
+import { getAuthorizedAttachmentDownload } from "@testworx/lib/server/index";
 
 function getStatusCode(error: unknown) {
   if (!(error instanceof Error)) {

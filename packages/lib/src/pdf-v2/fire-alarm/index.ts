@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createElement } from "react";
 import { buildDataUrlStorageKey, decodeStoredFile } from "../../storage";
 import type { PdfInput } from "../types";

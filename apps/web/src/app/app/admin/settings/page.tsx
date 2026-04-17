@@ -13,7 +13,7 @@ import {
   getTenantBillingSettings,
   getTenantBrandingSettings,
   getTenantQuickBooksConnectionSettings
-} from "@testworx/lib";
+} from "@testworx/lib/server/index";
 
 import { AppPageShell, KPIStatCard, PageHeader, SectionCard, WorkspaceSplit } from "../operations-ui";
 import { BrandLoader } from "@/app/brand-loader";
@@ -534,3 +534,4 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
     </AppPageShell>
   );
 }
+

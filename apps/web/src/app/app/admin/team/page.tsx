@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getTeamWorkspaceData } from "@testworx/lib";
+import { getTeamWorkspaceData } from "@testworx/lib/server/index";
 
 import { TeamManagementWorkspace } from "./team-management-workspace";
 
@@ -82,3 +82,4 @@ export default async function AdminTeamPage({
     </main>
   );
 }
+

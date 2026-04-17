@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { auth } from "@/auth";
-import { buildTenantBrandingCss, getTenantBrandingSettings } from "@testworx/lib";
+import { buildTenantBrandingCss, getTenantBrandingSettings } from "@testworx/lib/server/index";
 import { cookies } from "next/headers";
 import "./globals.css";
 import { GlobalBackButton } from "./global-back-button";
@@ -80,4 +80,5 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     </html>
   );
 }
+
 

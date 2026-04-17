@@ -25,7 +25,7 @@ import {
   updateQuoteReminderSettings,
   updateQuoteStatus,
   convertQuoteToInspection
-} from "@testworx/lib";
+} from "@testworx/lib/server/index";
 
 function parseLineItems(formData: FormData) {
   const raw = String(formData.get("lineItemsJson") ?? "[]");
@@ -482,3 +482,4 @@ export async function updateQuoteReminderSettingsAction(
     };
   }
 }
+

@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { getPasswordResetDetails } from "@testworx/lib";
+import { getPasswordResetDetails } from "@testworx/lib/server/index";
 
 import { ResetPasswordForm } from "./reset-password-form";
 
@@ -69,3 +69,4 @@ export default async function ResetPasswordPage({
     </main>
   );
 }
+

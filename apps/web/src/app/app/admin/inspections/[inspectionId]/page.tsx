@@ -21,7 +21,7 @@ import {
   getInspectionForEdit,
   getInspectionStatusTone,
   isDueAtTimeOfServiceCustomer
-} from "@testworx/lib";
+} from "@testworx/lib/server/index";
 
 import { amendInspectionAction, deleteInspectionAction, regenerateCompletedReportPdfAction, reopenCompletedReportAction, updateInspectionAction, updateInspectionStatusAdminAction, uploadInspectionExternalDocumentAction, uploadInspectionPdfAction } from "../../actions";
 import { AdminReportDeleteButton } from "../../admin-report-delete-button";

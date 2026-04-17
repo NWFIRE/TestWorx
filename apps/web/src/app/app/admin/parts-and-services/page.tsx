@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 import {
   getPaginatedTenantQuickBooksCatalogSettings,
   getTenantQuickBooksConnectionSettings
-} from "@testworx/lib";
+} from "@testworx/lib/server/index";
 
 import { AppPageShell, KPIStatCard, PageHeader } from "../operations-ui";
 import { QuickBooksCatalogManagementCard } from "../settings/quickbooks-catalog-management-card";
@@ -128,3 +128,4 @@ export default async function PartsAndServicesPage({
     </AppPageShell>
   );
 }
+

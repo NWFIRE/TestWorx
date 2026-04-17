@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Buffer } from "node:buffer";
 
-import { getPublicQuotePdfByAccessToken } from "@testworx/lib";
+import { getPublicQuotePdfByAccessToken } from "@testworx/lib/server/index";
 
 export async function GET(
   _request: Request,

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { finalizeInspectionReport, isPrivateBlobStoreConfigurationError } from "@testworx/lib";
+import { finalizeInspectionReport, isPrivateBlobStoreConfigurationError } from "@testworx/lib/server/index";
 
 function getStatusCode(error: unknown) {
   if (!(error instanceof Error)) {
@@ -53,3 +53,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to finalize report." }, { status: getStatusCode(error) });
   }
 }
+

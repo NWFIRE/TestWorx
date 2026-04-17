@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { buildTenantBrandingCss, formatInspectionTaskSummary, getCustomerFacingSiteLabel, getCustomerPortalData, getCustomerQuoteList, inspectionTypeRegistry, quoteStatusLabels } from "@testworx/lib";
+import { buildTenantBrandingCss, formatInspectionTaskSummary, getCustomerFacingSiteLabel, getCustomerPortalData, getCustomerQuoteList, inspectionTypeRegistry, quoteStatusLabels } from "@testworx/lib/server/index";
 
 export default async function CustomerPage() {
   const session = await auth();
@@ -104,3 +104,4 @@ export default async function CustomerPage() {
     </section>
   );
 }
+

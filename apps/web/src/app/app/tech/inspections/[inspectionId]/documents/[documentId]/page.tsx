@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getTechnicianInspectionDocumentDetail } from "@testworx/lib";
+import { getTechnicianInspectionDocumentDetail } from "@testworx/lib/server/index";
 
 import { signInspectionDocumentAction } from "../../../../actions";
 import { ExternalDocumentSigner } from "../../../../external-document-signer";

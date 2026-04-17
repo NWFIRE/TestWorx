@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { getAuthorizedQuotePdf } from "@testworx/lib";
+import { getAuthorizedQuotePdf } from "@testworx/lib/server/index";
 
 export async function GET(_: Request, { params }: { params: Promise<{ quoteId: string }> }) {
   const session = await auth();

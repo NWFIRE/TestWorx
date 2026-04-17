@@ -40,7 +40,7 @@ import {
   regenerateFinalizedReportPdf,
   removeInspectionTask,
   uploadInspectionPdfAttachment
-} from "@testworx/lib";
+} from "@testworx/lib/server/index";
 
 export { getCustomerSiteImportTemplateCsv };
 
@@ -967,3 +967,4 @@ export async function sendQuickBooksInvoiceAction(formData: FormData) {
     };
   }
 }
+

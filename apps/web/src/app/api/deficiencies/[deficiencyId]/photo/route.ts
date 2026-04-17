@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { getAuthorizedDeficiencyPhotoDownload } from "@testworx/lib";
+import { getAuthorizedDeficiencyPhotoDownload } from "@testworx/lib/server/index";
 
 export async function GET(_: Request, { params }: { params: Promise<{ deficiencyId: string }> }) {
   const session = await auth();

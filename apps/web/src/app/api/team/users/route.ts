@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { searchTeamWorkspaceUsers } from "@testworx/lib";
+import { searchTeamWorkspaceUsers } from "@testworx/lib/server/index";
 
 type SearchParams = URLSearchParams;
 
@@ -44,3 +44,4 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: message }, { status });
   }
 }
+

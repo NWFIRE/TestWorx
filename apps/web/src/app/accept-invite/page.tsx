@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { getInvitationAcceptanceDetails } from "@testworx/lib";
+import { getInvitationAcceptanceDetails } from "@testworx/lib/server/index";
 
 import { AcceptInviteForm } from "./accept-invite-form";
 
@@ -69,3 +69,4 @@ export default async function AcceptInvitePage({
     </main>
   );
 }
+

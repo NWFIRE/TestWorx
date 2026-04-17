@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 
 import { ActionButton } from "@/app/action-button";
 import { SearchInput } from "@/app/search-input";
-import type { getClientProfileData } from "@testworx/lib";
+import type { getClientProfileData } from "@testworx/lib/server/index";
 
 import {
   EmptyState,

@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getAdminDeficiencyDashboardData } from "@testworx/lib";
+import { getAdminDeficiencyDashboardData } from "@testworx/lib/server/index";
 
 import { updateDeficiencyStatusAction } from "../admin/actions";
 import {
@@ -323,3 +323,4 @@ export default async function DeficienciesPage({
     </AppPageShell>
   );
 }
+

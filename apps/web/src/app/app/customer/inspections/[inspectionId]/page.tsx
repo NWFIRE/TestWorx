@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getCustomerFacingSiteLabel, getCustomerInspectionPacketDetail } from "@testworx/lib";
+import { getCustomerFacingSiteLabel, getCustomerInspectionPacketDetail } from "@testworx/lib/server/index";
 import { PageBackControl } from "@/app/page-back-control";
 
 import { InspectionPacketCard } from "../../../inspection-packet-card";
