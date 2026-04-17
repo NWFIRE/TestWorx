@@ -9,6 +9,7 @@ const storageCategoryValues = [
   "signature",
   "generated-pdf",
   "uploaded-pdf",
+  "manual",
   "inspection-document-original",
   "inspection-document-signed"
 ] as const;

@@ -3,7 +3,7 @@ export type AppNavItem = {
   label: string;
   shortLabel: string;
   abbreviation: string;
-  icon?: "calendar" | "branch" | "alert" | "invoice" | "settings" | "grid" | "clipboard" | "portal" | "team" | "mail";
+  icon?: "calendar" | "branch" | "alert" | "invoice" | "settings" | "grid" | "clipboard" | "portal" | "team" | "mail" | "book";
   description?: string;
   tone?: "blue" | "amber" | "emerald" | "violet" | "slate";
   matchMode?: "exact" | "prefix";
@@ -93,6 +93,17 @@ const adminNavItems: AppNavItem[] = [
     tone: "blue"
   },
   {
+    href: "/app/manuals",
+    label: "Manuals",
+    shortLabel: "Manuals",
+    abbreviation: "MN",
+    icon: "book",
+    description: "Field-ready manuals, favorites, and recent documentation",
+    tone: "blue",
+    matchMode: "exact",
+    matchPrefixes: ["/app/manuals", "/app/admin/manuals"]
+  },
+  {
     href: "/app/admin/clients",
     label: "Clients",
     shortLabel: "Clients",
@@ -174,6 +185,17 @@ const navByRole: Record<string, AppNavItem[]> = {
       tone: "blue",
       matchMode: "exact",
       matchPrefixes: ["/app/tech/inspections", "/app/tech/reports"]
+    },
+    {
+      href: "/app/manuals",
+      label: "Manuals",
+      shortLabel: "Manuals",
+      abbreviation: "MN",
+      icon: "book",
+      description: "Favorites, recent manuals, and field documentation",
+      tone: "blue",
+      matchMode: "exact",
+      matchPrefixes: ["/app/manuals"]
     }
   ],
   customer_user: [

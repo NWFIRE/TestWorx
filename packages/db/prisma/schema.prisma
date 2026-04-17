@@ -84,6 +84,30 @@ enum AttachmentSource {
   generated
 }
 
+enum ManualSystemCategory {
+  wet_chemical
+  industrial_dry_chemical
+}
+
+enum ManualDocumentType {
+  installation
+  inspection
+  service
+  owners_manual
+  parts
+  tech_data
+  troubleshooting
+  catalog
+  other
+}
+
+enum ManualSearchableTextStatus {
+  pending
+  ready
+  failed
+  not_requested
+}
+
 enum SignatureKind {
   technician
   customer
@@ -238,6 +262,7 @@ model Tenant {
   inspectionReports         InspectionReport[]
   recurrences               InspectionRecurrence[]
   attachments               Attachment[]
+  manuals                   Manual[]
   signatures                Signature[]
   deficiencies              Deficiency[]
   billingSummaries          InspectionBillingSummary[]
@@ -302,6 +327,9 @@ model User {
   updatedQuotes       Quote[]                  @relation("QuoteUpdatedBy")
   pausedQuoteReminders Quote[]                @relation("QuoteRemindersPausedBy")
   sentEmailReminderLogs EmailReminderSendLog[] @relation("EmailReminderSentBy")
+  createdManuals       Manual[]                @relation("ManualCreatedBy")
+  updatedManuals       Manual[]                @relation("ManualUpdatedBy")
+  manualStates         UserManualState[]
 }
 
 model CustomerCompany {
@@ -797,6 +825,88 @@ model Attachment {
   tenant             Tenant            @relation(fields: [tenantId], references: [id])
   inspection         Inspection?       @relation(fields: [inspectionId], references: [id])
   inspectionReport   InspectionReport? @relation(fields: [inspectionReportId], references: [id])
+  manualFile         Manual?           @relation("ManualFileAttachment")
+}
+
+model Manual {
+  id                   String                   @id @default(cuid())
+  tenantId             String
+  title                String
+  manufacturer         String
+  systemCategory       ManualSystemCategory
+  productFamily        String?
+  model                String?
+  documentType         ManualDocumentType
+  revisionLabel        String?
+  revisionDate         DateTime?
+  description          String?
+  notes                String?
+  tags                 String[]
+  fileId               String                   @unique
+  fileName             String
+  mimeType             String
+  fileSizeBytes        Int?
+  pageCount            Int?
+  source               String?
+  isActive             Boolean                  @default(true)
+  isOfflineEligible    Boolean                  @default(false)
+  searchableTextStatus ManualSearchableTextStatus @default(not_requested)
+  searchableText       String?
+  supersedesManualId   String?                  @unique
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  createdByUserId      String?
+  updatedByUserId      String?
+  tenant               Tenant                   @relation(fields: [tenantId], references: [id])
+  file                 Attachment               @relation("ManualFileAttachment", fields: [fileId], references: [id])
+  createdByUser        User?                    @relation("ManualCreatedBy", fields: [createdByUserId], references: [id])
+  updatedByUser        User?                    @relation("ManualUpdatedBy", fields: [updatedByUserId], references: [id])
+  supersedesManual     Manual?                  @relation("ManualSupersession", fields: [supersedesManualId], references: [id])
+  supersededManuals    Manual[]                 @relation("ManualSupersession")
+  applicability        ManualApplicability[]
+  userStates           UserManualState[]
+
+  @@index([tenantId])
+  @@index([tenantId, systemCategory])
+  @@index([tenantId, manufacturer])
+  @@index([tenantId, model])
+  @@index([tenantId, documentType])
+  @@index([tenantId, isActive])
+  @@index([tenantId, revisionDate])
+}
+
+model ManualApplicability {
+  id            String   @id @default(cuid())
+  manualId      String
+  manufacturer  String
+  productFamily String?
+  model         String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  manual        Manual   @relation(fields: [manualId], references: [id], onDelete: Cascade)
+
+  @@index([manualId])
+  @@index([manufacturer])
+  @@index([productFamily])
+  @@index([model])
+}
+
+model UserManualState {
+  id             String   @id @default(cuid())
+  userId         String
+  manualId       String
+  isFavorite     Boolean  @default(false)
+  lastViewedAt   DateTime?
+  savedOfflineAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  manual         Manual   @relation(fields: [manualId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, manualId])
+  @@index([userId])
+  @@index([manualId])
 }
 
 model Signature {

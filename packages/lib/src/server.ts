@@ -6,6 +6,7 @@ export * from "./report-engine";
 export * from "./report-options";
 export * from "./report-photo";
 export * from "./team-management-shared";
+export * from "./manuals-shared";
 
 export type {
   ReportFieldDefinition,
@@ -27,6 +28,7 @@ export * from "./env";
 export * from "./inspection-billing";
 export * from "./inspection-archive";
 export * from "./inspection-documents";
+export * from "./manuals";
 export * from "./permissions";
 export * from "./pilot-readiness";
 export * from "./quickbooks";

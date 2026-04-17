@@ -181,6 +181,9 @@ async function main() {
   await prisma.inspectionAmendment.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.deficiency.deleteMany();
+  await prisma.userManualState.deleteMany();
+  await prisma.manualApplicability.deleteMany();
+  await prisma.manual.deleteMany();
   await prisma.inspectionBillingSummary.deleteMany();
   await prisma.complianceReportingFeeRule.deleteMany();
   await prisma.inspectionDocument.deleteMany();
@@ -688,6 +691,191 @@ async function main() {
       billingAddressSameAsService: true,
       paymentTermsCode: "net_30"
     }
+  });
+
+  const [
+    ansulServiceAttachment,
+    ansulInspectionAttachment,
+    pyrochemTroubleshootingAttachment,
+    rangeGuardTechAttachment
+  ] = await Promise.all([
+    prisma.attachment.create({
+      data: {
+        tenantId: tenant.id,
+        kind: "pdf",
+        source: "uploaded",
+        fileName: "ansul-r102-service-manual.pdf",
+        mimeType: "application/pdf",
+        storageKey: buildPdfStorageKey()
+      }
+    }),
+    prisma.attachment.create({
+      data: {
+        tenantId: tenant.id,
+        kind: "pdf",
+        source: "uploaded",
+        fileName: "ansul-r102-inspection-checklist.pdf",
+        mimeType: "application/pdf",
+        storageKey: buildPdfStorageKey()
+      }
+    }),
+    prisma.attachment.create({
+      data: {
+        tenantId: tenant.id,
+        kind: "pdf",
+        source: "uploaded",
+        fileName: "pyrochem-monarch-troubleshooting-guide.pdf",
+        mimeType: "application/pdf",
+        storageKey: buildPdfStorageKey()
+      }
+    }),
+    prisma.attachment.create({
+      data: {
+        tenantId: tenant.id,
+        kind: "pdf",
+        source: "uploaded",
+        fileName: "range-guard-tech-data.pdf",
+        mimeType: "application/pdf",
+        storageKey: buildPdfStorageKey()
+      }
+    })
+  ]);
+
+  const [ansulServiceManual, ansulInspectionManual, pyrochemManual, rangeGuardManual] = await Promise.all([
+    prisma.manual.create({
+      data: {
+        tenantId: tenant.id,
+        title: "ANSUL R-102 Service Manual",
+        manufacturer: "ANSUL",
+        systemCategory: "wet_chemical",
+        productFamily: "R-102",
+        model: "Restaurant Fire Suppression System",
+        documentType: "service",
+        revisionLabel: "Rev 2025.3",
+        revisionDate: new Date("2025-03-15T00:00:00.000Z"),
+        description: "Core service reference for wet chemical kitchen systems, including cartridge handling, maintenance intervals, and shutdown verification.",
+        tags: ["service", "maintenance", "recharge", "kitchen", "wet chemical"],
+        fileId: ansulServiceAttachment.id,
+        fileName: ansulServiceAttachment.fileName,
+        mimeType: ansulServiceAttachment.mimeType,
+        pageCount: 84,
+        source: "ANSUL distributor portal",
+        isActive: true,
+        isOfflineEligible: true,
+        searchableTextStatus: "ready",
+        searchableText: "service maintenance recharge shutdown cartridge nozzle chart kitchen wet chemical",
+        createdByUserId: officeAdmin.id,
+        updatedByUserId: officeAdmin.id
+      }
+    }),
+    prisma.manual.create({
+      data: {
+        tenantId: tenant.id,
+        title: "ANSUL R-102 Inspection Checklist and Reference",
+        manufacturer: "ANSUL",
+        systemCategory: "wet_chemical",
+        productFamily: "R-102",
+        model: "Inspection Reference",
+        documentType: "inspection",
+        revisionLabel: "2026 Annual",
+        revisionDate: new Date("2026-01-09T00:00:00.000Z"),
+        description: "Inspection-focused reference for field walkthroughs, nozzle verification, tank pressure checks, and final set condition review.",
+        tags: ["inspection", "maintenance", "nozzle chart", "wet chemical"],
+        fileId: ansulInspectionAttachment.id,
+        fileName: ansulInspectionAttachment.fileName,
+        mimeType: ansulInspectionAttachment.mimeType,
+        pageCount: 36,
+        source: "Internal field pack",
+        isActive: true,
+        isOfflineEligible: true,
+        searchableTextStatus: "ready",
+        searchableText: "inspection wet chemical nozzle chart maintenance checklist owner final set condition",
+        createdByUserId: officeAdmin.id,
+        updatedByUserId: officeAdmin.id
+      }
+    }),
+    prisma.manual.create({
+      data: {
+        tenantId: tenant.id,
+        title: "Pyro-Chem Monarch Industrial Dry Chemical Troubleshooting Guide",
+        manufacturer: "Pyro-Chem",
+        systemCategory: "industrial_dry_chemical",
+        productFamily: "Monarch",
+        model: "IDCS Platform",
+        documentType: "troubleshooting",
+        revisionLabel: "Rev B",
+        revisionDate: new Date("2024-11-01T00:00:00.000Z"),
+        description: "Field troubleshooting reference for industrial dry chemical systems, alarms, release failures, and detection troubleshooting.",
+        tags: ["troubleshooting", "industrial dry chemical", "service", "parts"],
+        fileId: pyrochemTroubleshootingAttachment.id,
+        fileName: pyrochemTroubleshootingAttachment.fileName,
+        mimeType: pyrochemTroubleshootingAttachment.mimeType,
+        pageCount: 58,
+        source: "Manufacturer tech archive",
+        isActive: true,
+        isOfflineEligible: true,
+        searchableTextStatus: "ready",
+        searchableText: "industrial dry chemical troubleshooting release alarm parts maintenance monarch pyro chem",
+        createdByUserId: officeAdmin.id,
+        updatedByUserId: officeAdmin.id
+      }
+    }),
+    prisma.manual.create({
+      data: {
+        tenantId: tenant.id,
+        title: "Range Guard Wet Chemical Technical Data Book",
+        manufacturer: "Range Guard",
+        systemCategory: "wet_chemical",
+        productFamily: "RG Series",
+        model: "RG-300",
+        documentType: "tech_data",
+        revisionLabel: "2025",
+        revisionDate: new Date("2025-05-21T00:00:00.000Z"),
+        description: "Tech data reference with agent quantities, nozzle coverage data, and component identification.",
+        tags: ["tech data", "nozzle chart", "parts", "wet chemical"],
+        fileId: rangeGuardTechAttachment.id,
+        fileName: rangeGuardTechAttachment.fileName,
+        mimeType: rangeGuardTechAttachment.mimeType,
+        pageCount: 44,
+        source: "Range Guard technical library",
+        isActive: true,
+        isOfflineEligible: false,
+        searchableTextStatus: "ready",
+        searchableText: "tech data wet chemical nozzle chart coverage parts range guard",
+        createdByUserId: officeAdmin.id,
+        updatedByUserId: officeAdmin.id
+      }
+    })
+  ]);
+
+  await prisma.userManualState.createMany({
+    data: [
+      {
+        userId: tech1.id,
+        manualId: ansulServiceManual.id,
+        isFavorite: true,
+        lastViewedAt: new Date("2026-04-16T16:15:00.000Z"),
+        savedOfflineAt: new Date("2026-04-16T16:20:00.000Z")
+      },
+      {
+        userId: tech1.id,
+        manualId: pyrochemManual.id,
+        isFavorite: true,
+        lastViewedAt: new Date("2026-04-15T14:10:00.000Z")
+      },
+      {
+        userId: tech1.id,
+        manualId: ansulInspectionManual.id,
+        isFavorite: false,
+        lastViewedAt: new Date("2026-04-14T09:30:00.000Z")
+      },
+      {
+        userId: tech2.id,
+        manualId: rangeGuardManual.id,
+        isFavorite: true,
+        lastViewedAt: new Date("2026-04-12T11:05:00.000Z")
+      }
+    ]
   });
 
   const [northshoreAdmin, northshoreTech, northshoreCustomerUser] = await Promise.all([
