@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
 import { getAppNavItemsForRole, getCurrentAppNavItem, isAppNavItemActive, type AppNavItem } from "./app-nav-config";
 import { MobilePullToRefresh } from "./mobile-pull-to-refresh";
@@ -295,9 +295,11 @@ export function AppShell({
   };
   signOutAction: () => Promise<void>;
 }) {
+  const router = useRouter();
   const pathname = usePathname();
   const navItems = useMemo(() => getAppNavItemsForRole(role, allowances), [allowances, role]);
   const currentItem = useMemo(() => getCurrentAppNavItem(role, pathname, allowances), [allowances, pathname, role]);
+  const [isRefreshing, startRefreshTransition] = useTransition();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window === "undefined" || window.innerWidth < EXPANDED_SIDEBAR_BREAKPOINT
   );
@@ -322,6 +324,12 @@ export function AppShell({
     document.body.dataset.keyboardOpen = keyboardOffset > 0 ? "true" : "false";
     document.documentElement.dataset.keyboardOpen = keyboardOffset > 0 ? "true" : "false";
   }, []);
+
+  const handleRefresh = useCallback(() => {
+    startRefreshTransition(() => {
+      router.refresh();
+    });
+  }, [router]);
 
   const keepFocusedElementVisible = useCallback((target: HTMLElement) => {
     const container = contentRef.current;
@@ -651,6 +659,25 @@ export function AppShell({
                 <p className="truncate">{user.email}</p>
                 <p className="truncate capitalize">{role.replaceAll("_", " ")}</p>
               </div>
+              <button
+                aria-label="Refresh page"
+                className="pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-[color:var(--border-default)] bg-white px-3 text-sm font-medium text-[color:var(--text-secondary)] outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
+                disabled={isRefreshing}
+                onClick={handleRefresh}
+                title={isRefreshing ? "Refreshing..." : "Refresh page"}
+                type="button"
+              >
+                <svg aria-hidden="true" className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} viewBox="0 0 24 24">
+                  <path
+                    d="M20 11a8 8 0 1 0 2.1 5.4M20 11v-6m0 6h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.8"
+                  />
+                </svg>
+              </button>
               <form action={signOutAction}>
                 <button className="pressable min-h-11 rounded-xl border border-[color:var(--border-default)] bg-white px-4 py-2 text-sm font-medium text-[color:var(--text-secondary)] outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2" type="submit">
                   Sign out
