@@ -14,7 +14,6 @@ export * from "./inspection-archive";
 export * from "./inspection-documents";
 export * from "./permissions";
 export * from "./pilot-readiness";
-export * from "./pdf-v2";
 export * from "./quickbooks";
 export * from "./quote-pdf";
 export * from "./quote-email";
