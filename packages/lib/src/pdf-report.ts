@@ -24,7 +24,7 @@ import {
 } from "./report-pdf-config";
 import { getCustomerFacingSiteLabel } from "./scheduling";
 import { decodeStoredFile } from "./storage";
-import { generateInspectionReportPdfV2, supportsPdfV2, type PdfInput } from "./pdf-v2";
+import type { PdfInput } from "./pdf-v2";
 
 type PageState = {
   page: PDFPage;
@@ -1852,6 +1852,7 @@ async function renderSignatures(
 }
 
 export async function generateInspectionReportPdf(input: PdfInput) {
+  const { generateInspectionReportPdfV2, supportsPdfV2 } = await import("./pdf-v2");
   if (supportsPdfV2(input.task.inspectionType)) {
     return generateInspectionReportPdfV2(input);
   }
