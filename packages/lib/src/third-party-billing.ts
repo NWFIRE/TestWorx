@@ -210,7 +210,12 @@ export type ResolvedBillingContext = {
   };
   grouping: GroupingRules;
   attachments: AttachmentRules;
-  delivery: DeliveryRules & { method: DeliveryMethod; recipientEmail: string | null };
+  delivery: {
+    holdForManualReview: boolean;
+    deliveryMethod?: DeliveryMethod;
+    method: DeliveryMethod;
+    recipientEmail: string | null;
+  };
   references: ReferenceRules;
   autoBillingEnabled: boolean;
 };
