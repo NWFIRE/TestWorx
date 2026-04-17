@@ -113,7 +113,7 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
         finalizedAt: detail.report.finalizedAt,
         technicianName: detail.report.technician?.name ?? null,
         status: "finalized",
-        assignedTo: detail.report.task.assignedTechnician?.name ?? null
+        assignedTo: null
       },
       draft: detail.draft,
       deficiencies: detail.report.deficiencies,

@@ -54,6 +54,7 @@ export default async function TechnicianReportPage({ params }: { params: Promise
     siteName: report.inspection.site.name,
     customerName: report.inspection.customerCompany.name
   });
+  const finalizedAtDate = report.finalizedAt ? new Date(report.finalizedAt) : null;
   const editor = (
     <ReportEditor
       data={{
@@ -93,7 +94,7 @@ export default async function TechnicianReportPage({ params }: { params: Promise
       },
       report: {
         id: report.id,
-        finalizedAt: report.finalizedAt,
+        finalizedAt: finalizedAtDate,
         technicianName: null,
         status: report.status,
         assignedTo: report.task.assignedTechnician?.name ?? report.inspection.assignedTechnician?.name ?? null
