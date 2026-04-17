@@ -1170,6 +1170,16 @@ function buildGeneratedPdfName(report: { inspection: { customerCompany: { name: 
   return `${slugifyFileName(report.inspection.customerCompany.name)}-${slugifyFileName(report.inspection.site.name)}-${slugifyFileName(report.task.inspectionType)}-report.pdf`;
 }
 
+type GeneratedPdfAttachmentRecord = {
+  kind: AttachmentKind;
+  source: string;
+  storageKey: string;
+};
+
+type GeneratedPdfSignatureRecord = {
+  kind: SignatureKind;
+};
+
 async function replaceGeneratedReportPdfTx(
   tx: Prisma.TransactionClient,
   input: {
@@ -1178,10 +1188,18 @@ async function replaceGeneratedReportPdfTx(
   }
 ) {
   const draft = reportDraftSchema.parse(input.report.contentJson ?? {});
-  const priorGeneratedAttachments = input.report.attachments.filter((attachment) => attachment.kind === AttachmentKind.pdf && attachment.source === "generated");
-  const technicianSignature = input.report.signatures.find((signature) => signature.kind === SignatureKind.technician) ?? null;
-  const customerSignature = input.report.signatures.find((signature) => signature.kind === SignatureKind.customer) ?? null;
-  const photoAttachments = input.report.attachments.filter((attachment) => attachment.kind === AttachmentKind.photo);
+  const priorGeneratedAttachments = input.report.attachments.filter(
+    (attachment: GeneratedPdfAttachmentRecord) => attachment.kind === AttachmentKind.pdf && attachment.source === "generated"
+  );
+  const technicianSignature = input.report.signatures.find(
+    (signature: GeneratedPdfSignatureRecord) => signature.kind === SignatureKind.technician
+  ) ?? null;
+  const customerSignature = input.report.signatures.find(
+    (signature: GeneratedPdfSignatureRecord) => signature.kind === SignatureKind.customer
+  ) ?? null;
+  const photoAttachments = input.report.attachments.filter(
+    (attachment: GeneratedPdfAttachmentRecord) => attachment.kind === AttachmentKind.photo
+  );
   const customerFacingSiteName = getCustomerFacingSiteLabel(input.report.inspection.site.name);
   const pdfBytes = await generateInspectionReportPdf({
     tenant: { name: input.report.tenant.name, branding: input.report.tenant.branding },
@@ -1242,7 +1260,7 @@ async function replaceGeneratedReportPdfTx(
 
   return {
     generatedAttachment,
-    priorGeneratedKeys: priorGeneratedAttachments.map((attachment) => attachment.storageKey)
+    priorGeneratedKeys: priorGeneratedAttachments.map((attachment: GeneratedPdfAttachmentRecord) => attachment.storageKey)
   };
 }
 
