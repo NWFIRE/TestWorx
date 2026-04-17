@@ -10,7 +10,18 @@ import {
   manualSearchableTextStatuses,
   manualSystemCategories
 } from "@testworx/lib";
-import { initialManualActionState } from "../actions";
+
+type ManualActionState = {
+  error: string | null;
+  success: string | null;
+  redirectTo: string | null;
+};
+
+const initialManualActionState: ManualActionState = {
+  error: null,
+  success: null,
+  redirectTo: null
+};
 
 type ManualFormValues = {
   manualId?: string;
@@ -39,7 +50,7 @@ export function ManualForm({
   heading,
   submitLabel
 }: {
-  action: (state: typeof initialManualActionState, formData: FormData) => Promise<typeof initialManualActionState>;
+  action: (state: ManualActionState, formData: FormData) => Promise<ManualActionState>;
   values?: ManualFormValues;
   heading: string;
   submitLabel: string;

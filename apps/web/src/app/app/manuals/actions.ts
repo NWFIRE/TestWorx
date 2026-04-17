@@ -21,12 +21,6 @@ type ManualActionState = {
   redirectTo: string | null;
 };
 
-export const initialManualActionState: ManualActionState = {
-  error: null,
-  success: null,
-  redirectTo: null
-};
-
 function readBooleanField(formData: FormData, key: string) {
   return formData.get(key) === "on";
 }
