@@ -300,16 +300,50 @@ function normalizeContractRecord(record: {
   deliveryRules: unknown;
   referenceRules: unknown;
 }): BillingContractProfileRecord {
+  const parsedGroupingRules = groupingRulesSchema.safeParse(record.groupingRules);
+  const groupingRules: GroupingRules = parsedGroupingRules.success
+    ? {
+        mode: parsedGroupingRules.data.mode ?? "standard",
+        note: parsedGroupingRules.data.note
+      }
+    : defaultGroupingRules;
+  const parsedAttachmentRules = attachmentRulesSchema.safeParse(record.attachmentRules);
+  const attachmentRules: AttachmentRules = parsedAttachmentRules.success
+    ? {
+        requireFinalizedReport: parsedAttachmentRules.data.requireFinalizedReport ?? false,
+        requireSignedDocument: parsedAttachmentRules.data.requireSignedDocument ?? false,
+        requiredDocumentLabels: Array.isArray(parsedAttachmentRules.data.requiredDocumentLabels)
+          ? parsedAttachmentRules.data.requiredDocumentLabels
+          : []
+      }
+    : defaultAttachmentRules;
+  const parsedDeliveryRules = deliveryRulesSchema.safeParse(record.deliveryRules);
+  const deliveryRules: DeliveryRules = parsedDeliveryRules.success
+    ? {
+        holdForManualReview: parsedDeliveryRules.data.holdForManualReview ?? true,
+        deliveryMethod: parsedDeliveryRules.data.deliveryMethod,
+        recipientEmail: parsedDeliveryRules.data.recipientEmail
+      }
+    : defaultDeliveryRules;
+  const parsedReferenceRules = referenceRulesSchema.safeParse(record.referenceRules);
+  const referenceRules: ReferenceRules = parsedReferenceRules.success
+    ? {
+        requirePo: parsedReferenceRules.data.requirePo ?? false,
+        requireCustomerReference: parsedReferenceRules.data.requireCustomerReference ?? false,
+        labels: Array.isArray(parsedReferenceRules.data.labels) ? parsedReferenceRules.data.labels : []
+      }
+    : defaultReferenceRules;
+
   return {
     ...record,
     inspectionRules: parseJsonValue(record.inspectionRules, pricingRuleBucketSchema, {}),
     serviceRules: parseJsonValue(record.serviceRules, pricingRuleBucketSchema, {}),
     emergencyRules: parseJsonValue(record.emergencyRules, pricingRuleBucketSchema, {}),
     deficiencyRules: parseJsonValue(record.deficiencyRules, pricingRuleBucketSchema, {}),
-    groupingRules: parseJsonValue(record.groupingRules, groupingRulesSchema, defaultGroupingRules),
-    attachmentRules: parseJsonValue(record.attachmentRules, attachmentRulesSchema, defaultAttachmentRules),
-    deliveryRules: parseJsonValue(record.deliveryRules, deliveryRulesSchema, defaultDeliveryRules),
-    referenceRules: parseJsonValue(record.referenceRules, referenceRulesSchema, defaultReferenceRules)
+    groupingRules,
+    attachmentRules,
+    deliveryRules,
+    referenceRules
   };
 }
 
