@@ -22,7 +22,7 @@ export function SignaturesSection({ model }: { model: AcceptanceTestRenderModel 
           imageUrl: model.signatures.installingContractor.imageUrl
         }
       : null
-  ].filter((item): item is { role: string; name: string; signedAt?: string; imageUrl?: string } => Boolean(item && item.imageUrl));
+  ].flatMap((item) => (item?.imageUrl ? [{ ...item, imageUrl: item.imageUrl }] : []));
 
   return (
     <section className="pdf-section">
@@ -37,7 +37,7 @@ export function SignaturesSection({ model }: { model: AcceptanceTestRenderModel 
               role={signature.role}
               name={signature.name}
               signedAt={signature.signedAt}
-              imageUrl={signature.imageUrl!}
+              imageUrl={signature.imageUrl}
             />
           ))}
         </div>
