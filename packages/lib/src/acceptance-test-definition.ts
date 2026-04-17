@@ -1,3 +1,9 @@
+export type AcceptanceTestDefinition = {
+  key: string;
+  label: string;
+  code?: string;
+};
+
 export const acceptanceTestInstallerDefaults = {
   companyName: "Northwest Fire & Safety",
   cityState: "Enid, Oklahoma",
@@ -6,7 +12,7 @@ export const acceptanceTestInstallerDefaults = {
   licenseNumber: "OK #466"
 } as const;
 
-export const acceptanceTestDefinitions = [
+export const acceptanceTestDefinitions: readonly AcceptanceTestDefinition[] = [
   {
     key: "installationApprovedPlans",
     label: "Installation in accordance with approved plans, where required, and manufacturer's design, installation, and maintenance manual"
@@ -51,7 +57,6 @@ export const acceptanceTestDefinitions = [
     label: "Manual Left With Owner",
     code: "6.4.10.4"
   }
-] as const;
+];
 
-export type AcceptanceTestDefinition = (typeof acceptanceTestDefinitions)[number];
 export type AcceptanceTestKey = AcceptanceTestDefinition["key"];
