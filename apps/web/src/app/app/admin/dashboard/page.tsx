@@ -625,6 +625,35 @@ export default async function AdminDashboardPage({
                 </div>
               </SectionCard>
 
+              <section className="rounded-[28px] border border-slate-200/80 bg-[#0f172a] p-5 text-white shadow-[0_16px_44px_rgba(15,23,42,0.14)] lg:p-6">
+                <div className="text-[10px] font-semibold tracking-[0.24em] text-white/60">
+                  QUICK ACTIONS
+                </div>
+                <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">
+                  Move the work forward.
+                </h3>
+                <p className="mt-2 text-sm leading-7 text-white/72">
+                  Open the tasks that most directly affect delivery and collected revenue.
+                </p>
+
+                <div className="mt-5 space-y-3">
+                  {[
+                    { label: "Finalize pending reports", href: "/app/admin/reports?status=awaiting-review" },
+                    { label: "Review auto-generated billing", href: "/app/admin/billing?status=ready" },
+                    { label: "Follow up on open deficiencies", href: "/app/deficiencies?status=open" }
+                  ].map((item) => (
+                    <Link
+                      key={item.label}
+                      href={item.href}
+                      className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3.5 text-left text-sm font-medium text-white transition hover:bg-white/10"
+                    >
+                      <span>{item.label}</span>
+                      <span className="text-white/50">→</span>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+
               <SectionCard>
                 <div className="flex items-center justify-between gap-4">
                   <div>
@@ -661,35 +690,6 @@ export default async function AdminDashboardPage({
                   ))}
                 </div>
               </SectionCard>
-
-              <section className="rounded-[28px] border border-slate-200/80 bg-[#0f172a] p-5 text-white shadow-[0_16px_44px_rgba(15,23,42,0.14)] lg:p-6">
-                <div className="text-[10px] font-semibold tracking-[0.24em] text-white/60">
-                  QUICK ACTIONS
-                </div>
-                <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">
-                  Move the work forward.
-                </h3>
-                <p className="mt-2 text-sm leading-7 text-white/72">
-                  Open the tasks that most directly affect delivery and collected revenue.
-                </p>
-
-                <div className="mt-5 space-y-3">
-                  {[
-                    { label: "Finalize pending reports", href: "/app/admin/reports?status=awaiting-review" },
-                    { label: "Review auto-generated billing", href: "/app/admin/billing?status=ready" },
-                    { label: "Follow up on open deficiencies", href: "/app/deficiencies?status=open" }
-                  ].map((item) => (
-                    <Link
-                      key={item.label}
-                      href={item.href}
-                      className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3.5 text-left text-sm font-medium text-white transition hover:bg-white/10"
-                    >
-                      <span>{item.label}</span>
-                      <span className="text-white/50">→</span>
-                    </Link>
-                  ))}
-                </div>
-              </section>
 
             </div>
           </WorkspaceSplit>
