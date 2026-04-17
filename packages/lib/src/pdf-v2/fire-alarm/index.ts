@@ -1,8 +1,6 @@
 import { createElement } from "react";
 import { buildDataUrlStorageKey, decodeStoredFile } from "../../storage";
 import type { PdfInput } from "../types";
-import { renderPdfFromHtml } from "../core/renderer/renderPdf";
-import { renderPdfHtml } from "../core/renderer/renderHtml";
 
 import { buildFireAlarmRenderModel } from "./adapter/buildFireAlarmRenderModel";
 import { FireAlarmReportDocument } from "./templates/FireAlarmReportDocument";
@@ -57,6 +55,10 @@ async function hydratePdfInput(rawReport: PdfInput): Promise<PdfInput> {
 }
 
 export async function renderFireAlarmPdf(rawReport: unknown): Promise<Buffer> {
+  const [{ renderPdfFromHtml }, { renderPdfHtml }] = await Promise.all([
+    import("../core/renderer/renderPdf"),
+    import("../core/renderer/renderHtml")
+  ]);
   const hydrated = await hydratePdfInput(rawReport as PdfInput);
   const model = buildFireAlarmRenderModel(hydrated);
   const html = await renderPdfHtml(createElement(FireAlarmReportDocument, { model }));

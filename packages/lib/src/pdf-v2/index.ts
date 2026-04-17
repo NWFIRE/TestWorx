@@ -10,7 +10,6 @@ import { renderNotesSection } from "./sections/notes";
 import { renderPhotosSection } from "./sections/photos";
 import { renderSignaturesSection } from "./sections/signatures";
 import { renderTableSection } from "./sections/table";
-import { renderFireAlarmPdf } from "./fire-alarm";
 import type { PdfInput } from "./types";
 
 export * from "./types";
@@ -20,7 +19,6 @@ export * from "./compliance";
 export * from "./indicators";
 export * from "./render-model";
 export * from "./registry";
-export * from "./fire-alarm";
 
 async function generateLegacyInspectionReportPdfV2(input: PdfInput) {
   const model = buildReportRenderModelFromDraft(input);
@@ -63,6 +61,7 @@ async function generateLegacyInspectionReportPdfV2(input: PdfInput) {
 
 export async function generateInspectionReportPdfV2(input: PdfInput) {
   if (input.task.inspectionType === "fire_alarm") {
+    const { renderFireAlarmPdf } = await import("./fire-alarm");
     return renderFireAlarmPdf(input);
   }
 
