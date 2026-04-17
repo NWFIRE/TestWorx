@@ -9,10 +9,10 @@ import {
   favoriteManual,
   manualSearchableTextStatuses,
   parseManualTags,
+  registerUploadedManualFile,
   setManualOfflineState,
   unfavoriteManual,
   updateManual,
-  uploadManualFile
 } from "@testworx/lib/server/index";
 
 type ManualActionState = {
@@ -45,16 +45,16 @@ async function requireActor() {
   };
 }
 
-async function maybeUploadManualFile(actor: Awaited<ReturnType<typeof requireActor>>, formData: FormData) {
-  const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) {
+async function maybeResolveManualFileId(actor: Awaited<ReturnType<typeof requireActor>>, formData: FormData) {
+  const uploadedBlobPathname = String(formData.get("uploadedBlobPathname") ?? "").trim();
+  if (!uploadedBlobPathname) {
     return null;
   }
 
-  const uploaded = await uploadManualFile(actor, {
-    fileName: file.name,
-    mimeType: file.type || "application/pdf",
-    bytes: new Uint8Array(await file.arrayBuffer())
+  const uploaded = await registerUploadedManualFile(actor, {
+    pathname: uploadedBlobPathname,
+    fileName: String(formData.get("uploadedFileName") ?? "").trim() || "manual.pdf",
+    mimeType: String(formData.get("uploadedMimeType") ?? "").trim() || "application/pdf"
   });
 
   return uploaded.id;
@@ -103,7 +103,7 @@ export async function toggleManualOfflineAction(formData: FormData) {
 export async function createManualAction(_: ManualActionState, formData: FormData): Promise<ManualActionState> {
   try {
     const actor = await requireActor();
-    const uploadedFileId = await maybeUploadManualFile(actor, formData);
+    const uploadedFileId = await maybeResolveManualFileId(actor, formData);
     const manual = await createManual(actor, {
       title: String(formData.get("title") ?? ""),
       manufacturer: String(formData.get("manufacturer") ?? ""),
@@ -148,7 +148,7 @@ export async function updateManualAction(_: ManualActionState, formData: FormDat
 
   try {
     const actor = await requireActor();
-    const uploadedFileId = await maybeUploadManualFile(actor, formData);
+    const uploadedFileId = await maybeResolveManualFileId(actor, formData);
     await updateManual(actor, manualId, {
       title: String(formData.get("title") ?? ""),
       manufacturer: String(formData.get("manufacturer") ?? ""),

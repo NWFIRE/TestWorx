@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -48,15 +48,21 @@ export function ManualForm({
   action,
   values,
   heading,
-  submitLabel
+  submitLabel,
+  tenantStoragePrefix
 }: {
   action: (state: ManualActionState, formData: FormData) => Promise<ManualActionState>;
   values?: ManualFormValues;
   heading: string;
   submitLabel: string;
+  tenantStoragePrefix: string;
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(action, initialManualActionState);
+  const [isUploading, startUploadTransition] = useTransition();
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const isEdit = Boolean(values?.manualId);
+  const combinedPending = pending || isUploading;
 
   useEffect(() => {
     if (state.redirectTo) {
@@ -65,8 +71,51 @@ export function ManualForm({
     }
   }, [router, state.redirectTo]);
 
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setUploadError(null);
+
+    const formData = new FormData(event.currentTarget);
+    const selectedFile = formData.get("file");
+    const file = selectedFile instanceof File && selectedFile.size > 0 ? selectedFile : null;
+
+    if (!file && !isEdit) {
+      setUploadError("Upload a PDF before saving this manual.");
+      return;
+    }
+
+    if (file) {
+      startUploadTransition(() => {
+        void (async () => {
+          try {
+            const { upload } = await import("@vercel/blob/client");
+            const uploaded = await upload(
+              `${tenantStoragePrefix}/manual/${Date.now()}-${file.name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "manual.pdf"}`,
+              file,
+              {
+                access: "private",
+                handleUploadUrl: "/api/manuals/upload"
+              }
+            );
+
+            formData.delete("file");
+            formData.set("uploadedBlobPathname", uploaded.pathname);
+            formData.set("uploadedFileName", file.name);
+            formData.set("uploadedMimeType", file.type || uploaded.contentType || "application/pdf");
+            formAction(formData);
+          } catch (error) {
+            setUploadError(error instanceof Error ? error.message : "Unable to upload the manual PDF.");
+          }
+        })();
+      });
+      return;
+    }
+
+    formAction(formData);
+  }
+
   return (
-    <form action={formAction} className="space-y-5 rounded-[28px] border border-[color:rgb(203_215_230_/_0.92)] bg-white p-5 shadow-[0_16px_38px_rgba(15,23,42,0.06)] lg:p-6">
+    <form className="space-y-5 rounded-[28px] border border-[color:rgb(203_215_230_/_0.92)] bg-white p-5 shadow-[0_16px_38px_rgba(15,23,42,0.06)] lg:p-6" onSubmit={handleSubmit}>
       {values?.manualId ? <input name="manualId" type="hidden" value={values.manualId} /> : null}
       <div>
         <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">{heading}</h2>
@@ -74,6 +123,7 @@ export function ManualForm({
       </div>
 
       {state.error ? <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{state.error}</p> : null}
+      {uploadError ? <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{uploadError}</p> : null}
       {state.success ? <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{state.success}</p> : null}
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -144,7 +194,7 @@ export function ManualForm({
         </label>
         <label className="block md:col-span-2">
           <span className="mb-2 block text-sm font-medium text-slate-600">PDF file</span>
-          <input accept="application/pdf" className="w-full rounded-2xl border border-slate-200 px-4 py-3" name="file" type="file" />
+          <input accept="application/pdf" className="w-full rounded-2xl border border-slate-200 px-4 py-3" name="file" required={!isEdit} type="file" />
         </label>
       </div>
 
@@ -176,8 +226,8 @@ export function ManualForm({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-slate-500">PDF upload is optional on edit. Leave it blank to keep the current file.</p>
-        <button className="rounded-2xl bg-[var(--tenant-primary)] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={pending} type="submit">
-          {pending ? "Saving..." : submitLabel}
+        <button className="rounded-2xl bg-[var(--tenant-primary)] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={combinedPending} type="submit">
+          {combinedPending ? (isUploading ? "Uploading..." : "Saving...") : submitLabel}
         </button>
       </div>
     </form>

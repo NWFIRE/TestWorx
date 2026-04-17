@@ -16,7 +16,7 @@ import {
   updateManualInputSchema
 } from "./manuals-shared";
 import { assertTenantContext } from "./permissions";
-import { buildFileDownloadResponse, buildStoredFilePayload } from "./storage";
+import { buildBlobStorageKey, buildFileDownloadResponse, buildStoredFilePayload } from "./storage";
 
 function parseActor(actor: ActorContext) {
   const parsed = actorContextSchema.parse(actor);
@@ -375,6 +375,35 @@ export async function uploadManualFile(
       fileName: stored.fileName,
       mimeType: stored.mimeType,
       storageKey: stored.storageKey,
+      customerVisible: false
+    }
+  });
+}
+
+export async function registerUploadedManualFile(
+  actor: ActorContext,
+  input: {
+    pathname: string;
+    fileName: string;
+    mimeType: string;
+  }
+) {
+  const parsedActor = parseActor(actor);
+  ensureAdminAccess(parsedActor);
+
+  const expectedPrefix = `${String(parsedActor.tenantId).toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "file"}/manual/`;
+  if (!input.pathname.startsWith(expectedPrefix)) {
+    throw new Error("Uploaded manual file path is invalid for this tenant.");
+  }
+
+  return prisma.attachment.create({
+    data: {
+      tenantId: parsedActor.tenantId as string,
+      kind: input.mimeType === "application/pdf" ? AttachmentKind.pdf : AttachmentKind.file,
+      source: AttachmentSource.uploaded,
+      fileName: input.fileName,
+      mimeType: input.mimeType,
+      storageKey: buildBlobStorageKey(input.pathname),
       customerVisible: false
     }
   });

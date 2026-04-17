@@ -5,6 +5,10 @@ import { AppPageShell, PageHeader } from "../../operations-ui";
 import { createManualAction } from "../../../manuals/actions";
 import { ManualForm } from "../../../manuals/components/ManualForm";
 
+function sanitizePathSegment(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "file";
+}
+
 export default async function ManualCreatePage() {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -23,7 +27,12 @@ export default async function ManualCreatePage() {
         eyebrow="Manuals admin"
         title="Add manual"
       />
-      <ManualForm action={createManualAction} heading="New manual" submitLabel="Create manual" />
+      <ManualForm
+        action={createManualAction}
+        heading="New manual"
+        submitLabel="Create manual"
+        tenantStoragePrefix={sanitizePathSegment(session.user.tenantId)}
+      />
     </AppPageShell>
   );
 }

@@ -6,6 +6,10 @@ import { AppPageShell, PageHeader } from "../../operations-ui";
 import { archiveManualAction, updateManualAction } from "../../../manuals/actions";
 import { ManualForm } from "../../../manuals/components/ManualForm";
 
+function sanitizePathSegment(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "file";
+}
+
 export default async function ManualEditPage({
   params
 }: {
@@ -48,6 +52,7 @@ export default async function ManualEditPage({
         action={updateManualAction}
         heading="Edit manual"
         submitLabel="Save changes"
+        tenantStoragePrefix={sanitizePathSegment(session.user.tenantId)}
         values={{
           manualId: manual.id,
           title: manual.title,

@@ -69,6 +69,10 @@ function toBlobStorageKey(pathname: string) {
   return `${BLOB_STORAGE_PREFIX}${pathname}`;
 }
 
+export function buildBlobStorageKey(pathname: string) {
+  return toBlobStorageKey(pathname);
+}
+
 function fromBlobStorageKey(storageKey: string) {
   if (!storageKey.startsWith(BLOB_STORAGE_PREFIX)) {
     throw new Error("Unsupported blob storage key.");
