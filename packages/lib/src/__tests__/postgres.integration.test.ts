@@ -3,7 +3,7 @@ import { PrismaClient, RecurrenceFrequency } from "@prisma/client";
 import { reportStatuses } from "@testworx/types";
 import { hash } from "bcryptjs";
 
-import { buildInitialReportDraft, createInspectionAmendment, finalizeInspectionReport, claimInspection, reopenCompletedReportForCorrection } from "..";
+import { buildInitialReportDraft, createInspectionAmendment, finalizeInspectionReport, claimInspection, regenerateFinalizedReportPdf, reopenCompletedReportForCorrection } from "..";
 import { inspectionTypeRegistry } from "../report-config";
 
 const prisma = new PrismaClient();
@@ -450,6 +450,63 @@ describeIfDatabase("postgres-backed integration flows", () => {
     });
     expect(auditActions.map((entry) => entry.action)).toContain("report.reissued_to_technician");
     expect(auditActions.map((entry) => entry.action)).toContain("report.recompleted");
+
+    await cleanupTenant(fixture.tenant.id);
+    createdTenantIds.delete(fixture.tenant.id);
+  }, 30000);
+
+  it("regenerates finalized report PDFs through the current renderer without reopening the report", async () => {
+    const fixture = await createTenantFixture();
+    const { report } = await createInspectionFixture({
+      tenantId: fixture.tenant.id,
+      customerCompanyId: fixture.customer.id,
+      siteId: fixture.site.id,
+      createdByUserId: fixture.officeAdmin.id,
+      assignedTechnicianId: fixture.technicianA.id,
+      inspectionType: "fire_alarm"
+    });
+
+    const draft = buildFinalizableDraft({
+      inspectionType: "fire_alarm",
+      siteName: fixture.site.name,
+      customerName: fixture.customer.name,
+      scheduledDate: new Date().toISOString()
+    });
+
+    await finalizeInspectionReport(
+      { userId: fixture.technicianA.id, role: "technician", tenantId: fixture.tenant.id },
+      { inspectionReportId: report.id, contentJson: draft }
+    );
+
+    const before = await prisma.inspectionReport.findUniqueOrThrow({
+      where: { id: report.id },
+      include: { attachments: true }
+    });
+    const originalPdf = before.attachments.find((attachment) => attachment.kind === "pdf" && attachment.source === "generated");
+
+    expect(originalPdf).toBeTruthy();
+
+    await regenerateFinalizedReportPdf(
+      { userId: fixture.officeAdmin.id, role: "office_admin", tenantId: fixture.tenant.id },
+      { inspectionReportId: report.id }
+    );
+
+    const regenerated = await prisma.inspectionReport.findUniqueOrThrow({
+      where: { id: report.id },
+      include: { attachments: true }
+    });
+    const regeneratedPdfs = regenerated.attachments.filter((attachment) => attachment.kind === "pdf" && attachment.source === "generated");
+
+    expect(regenerated.status).toBe("finalized");
+    expect(regenerated.finalizedAt).not.toBeNull();
+    expect(regeneratedPdfs).toHaveLength(1);
+    expect(regeneratedPdfs[0]?.storageKey).not.toBe(originalPdf?.storageKey);
+
+    const auditActions = await prisma.auditLog.findMany({
+      where: { tenantId: fixture.tenant.id, entityId: report.id },
+      select: { action: true }
+    });
+    expect(auditActions.map((entry) => entry.action)).toContain("report.pdf_regenerated");
 
     await cleanupTenant(fixture.tenant.id);
     createdTenantIds.delete(fixture.tenant.id);

@@ -37,6 +37,7 @@ import {
   updateInspection,
   updateInspectionStatus,
   reopenCompletedReportForCorrection,
+  regenerateFinalizedReportPdf,
   removeInspectionTask,
   uploadInspectionPdfAttachment
 } from "@testworx/lib";
@@ -530,6 +531,39 @@ export async function reopenCompletedReportAction(_: { error: string | null; suc
     };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unable to reopen completed report.", success: null };
+  }
+}
+
+export async function regenerateCompletedReportPdfAction(_: { error: string | null; success: string | null }, formData: FormData) {
+  const session = await auth();
+  const inspectionId = String(formData.get("inspectionId") ?? "");
+  const inspectionReportId = String(formData.get("inspectionReportId") ?? "");
+  const taskId = String(formData.get("taskId") ?? "");
+
+  if (!session?.user?.tenantId || !inspectionId || !inspectionReportId || !taskId) {
+    return { error: "Unauthorized", success: null };
+  }
+
+  try {
+    await regenerateFinalizedReportPdf(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      { inspectionReportId }
+    );
+
+    revalidatePath("/app/admin");
+    revalidatePath(`/app/admin/inspections/${inspectionId}`);
+    revalidatePath(`/app/admin/reports/${inspectionId}/${taskId}`);
+    revalidatePath("/app/admin/archive");
+    revalidatePath("/app/customer");
+    revalidatePath(`/app/customer/inspections/${inspectionId}`);
+    revalidatePath(`/app/customer/reports/${inspectionReportId}`);
+
+    return {
+      error: null,
+      success: "Report PDF regenerated with the current v2 renderer."
+    };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Unable to regenerate the report PDF.", success: null };
   }
 }
 

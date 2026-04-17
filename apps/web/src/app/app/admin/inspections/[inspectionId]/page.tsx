@@ -23,7 +23,7 @@ import {
   isDueAtTimeOfServiceCustomer
 } from "@testworx/lib";
 
-import { amendInspectionAction, deleteInspectionAction, reopenCompletedReportAction, updateInspectionAction, updateInspectionStatusAdminAction, uploadInspectionExternalDocumentAction, uploadInspectionPdfAction } from "../../actions";
+import { amendInspectionAction, deleteInspectionAction, regenerateCompletedReportPdfAction, reopenCompletedReportAction, updateInspectionAction, updateInspectionStatusAdminAction, uploadInspectionExternalDocumentAction, uploadInspectionPdfAction } from "../../actions";
 import { AdminReportDeleteButton } from "../../admin-report-delete-button";
 import { DeleteInspectionCard } from "../../delete-inspection-card";
 import { InspectionExternalDocumentsCard } from "../../inspection-external-documents-card";
@@ -429,6 +429,7 @@ export default async function EditInspectionPage({
             <InspectionReportCorrectionsCard
               action={reopenCompletedReportAction}
               inspectionId={inspection.id}
+              regenerateAction={regenerateCompletedReportPdfAction}
               reports={inspectionView.tasks.map((task: InspectionTask) => ({
                 taskId: task.id,
                 inspectionType: task.inspectionType,

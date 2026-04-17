@@ -24,20 +24,7 @@ import {
 } from "./report-pdf-config";
 import { getCustomerFacingSiteLabel } from "./scheduling";
 import { decodeStoredFile } from "./storage";
-
-type PdfInput = {
-  tenant: { name: string; branding: unknown };
-  customerCompany: { name: string; contactName: string | null; billingEmail: string | null; phone: string | null };
-  site: { name: string; addressLine1: string; addressLine2: string | null; city: string; state: string; postalCode: string };
-  inspection: { id: string; scheduledStart: Date; scheduledEnd: Date | null; status: string; notes: string | null };
-  task: { inspectionType: InspectionType };
-  report: { id: string; finalizedAt: Date | null; technicianName: string | null };
-  draft: ReportDraft;
-  deficiencies: Array<{ title: string; description: string; severity: string; status: string; deviceType?: string | null; location?: string | null; notes?: string | null }>;
-  photos: Array<{ fileName: string; storageKey: string }>;
-  technicianSignature: { signerName: string; imageDataUrl: string; signedAt: Date | string } | null;
-  customerSignature: { signerName: string; imageDataUrl: string; signedAt: Date | string } | null;
-};
+import { generateInspectionReportPdfV2, supportsPdfV2, type PdfInput } from "./pdf-v2";
 
 type PageState = {
   page: PDFPage;
@@ -1865,6 +1852,10 @@ async function renderSignatures(
 }
 
 export async function generateInspectionReportPdf(input: PdfInput) {
+  if (supportsPdfV2(input.task.inspectionType)) {
+    return generateInspectionReportPdfV2(input);
+  }
+
   const pdfDoc = await PDFDocument.create();
   const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);

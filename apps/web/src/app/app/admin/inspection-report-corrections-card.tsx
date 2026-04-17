@@ -28,7 +28,8 @@ const reportStatusClasses: Record<string, string> = {
 export function InspectionReportCorrectionsCard({
   inspectionId,
   reports,
-  action
+  action,
+  regenerateAction
 }: {
   inspectionId: string;
   reports: Array<{
@@ -54,21 +55,25 @@ export function InspectionReportCorrectionsCard({
         createdAt: string;
         actedBy: { id: string; name: string };
       }>;
-    } | null;
+  } | null;
   }>;
   action: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
+  regenerateAction: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  const [regenerateState, regenerateFormAction, regeneratePending] = useActionState(regenerateAction, initialState);
 
   return (
     <div className="space-y-5 rounded-[2rem] bg-white p-6 shadow-panel">
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Completed report corrections</p>
         <h3 className="mt-2 text-2xl font-semibold text-ink">Report correction controls</h3>
-        <p className="mt-2 text-sm text-slate-500">Reopen completed reports for office corrections or send them back to the assigned technician with an audited reason.</p>
+        <p className="mt-2 text-sm text-slate-500">Reopen completed reports for correction, or regenerate their stored PDF when you need older visits reissued through the current v2 document engine.</p>
       </div>
       {state.error ? <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{state.error}</p> : null}
       {state.success ? <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{state.success}</p> : null}
+      {regenerateState.error ? <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{regenerateState.error}</p> : null}
+      {regenerateState.success ? <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{regenerateState.success}</p> : null}
       <div className="space-y-4">
         {reports.length === 0 ? (
           <p className="rounded-[1.5rem] border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No report tasks found for this inspection.</p>
@@ -150,6 +155,27 @@ export function InspectionReportCorrectionsCard({
                         value="reissue_to_technician"
                       >
                         {pending ? "Working..." : "Re-issue to technician"}
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+
+                {report?.status === "finalized" ? (
+                  <form action={regenerateFormAction} className="rounded-[1.25rem] border border-slate-200 bg-white p-4">
+                    <input name="inspectionId" type="hidden" value={inspectionId} />
+                    <input name="inspectionReportId" type="hidden" value={report.id} />
+                    <input name="taskId" type="hidden" value={task.taskId} />
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-ink">Regenerate customer PDF</p>
+                        <p className="mt-1 text-sm text-slate-500">Replace the stored generated PDF with a fresh v2 version without reopening the report.</p>
+                      </div>
+                      <button
+                        className="inline-flex rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-ink disabled:opacity-60"
+                        disabled={regeneratePending}
+                        type="submit"
+                      >
+                        {regeneratePending ? "Regenerating..." : "Regenerate PDF"}
                       </button>
                     </div>
                   </form>

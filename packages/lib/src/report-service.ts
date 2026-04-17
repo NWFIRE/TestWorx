@@ -1170,6 +1170,82 @@ function buildGeneratedPdfName(report: { inspection: { customerCompany: { name: 
   return `${slugifyFileName(report.inspection.customerCompany.name)}-${slugifyFileName(report.inspection.site.name)}-${slugifyFileName(report.task.inspectionType)}-report.pdf`;
 }
 
+async function replaceGeneratedReportPdfTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    tenantId: string;
+    report: any;
+  }
+) {
+  const draft = reportDraftSchema.parse(input.report.contentJson ?? {});
+  const priorGeneratedAttachments = input.report.attachments.filter((attachment) => attachment.kind === AttachmentKind.pdf && attachment.source === "generated");
+  const technicianSignature = input.report.signatures.find((signature) => signature.kind === SignatureKind.technician) ?? null;
+  const customerSignature = input.report.signatures.find((signature) => signature.kind === SignatureKind.customer) ?? null;
+  const photoAttachments = input.report.attachments.filter((attachment) => attachment.kind === AttachmentKind.photo);
+  const customerFacingSiteName = getCustomerFacingSiteLabel(input.report.inspection.site.name);
+  const pdfBytes = await generateInspectionReportPdf({
+    tenant: { name: input.report.tenant.name, branding: input.report.tenant.branding },
+    customerCompany: input.report.inspection.customerCompany as any,
+    site: {
+      ...input.report.inspection.site,
+      name: customerFacingSiteName ?? "",
+      addressLine1: customerFacingSiteName ? input.report.inspection.site.addressLine1 : "",
+      addressLine2: customerFacingSiteName ? input.report.inspection.site.addressLine2 : null,
+      city: customerFacingSiteName ? input.report.inspection.site.city : "",
+      state: customerFacingSiteName ? input.report.inspection.site.state : "",
+      postalCode: customerFacingSiteName ? input.report.inspection.site.postalCode : ""
+    },
+    inspection: input.report.inspection as any,
+    task: input.report.task as any,
+    report: {
+      id: input.report.id,
+      finalizedAt: input.report.finalizedAt,
+      technicianName: input.report.technician?.name ?? null
+    },
+    draft,
+    deficiencies: input.report.deficiencies as any,
+    photos: photoAttachments,
+    technicianSignature,
+    customerSignature
+  });
+
+  const pdfPayload = await buildStoredFilePayload({
+    tenantId: input.tenantId,
+    category: "generated-pdf",
+    fileName: buildGeneratedPdfName(input.report as any),
+    mimeType: "application/pdf",
+    bytes: pdfBytes
+  });
+
+  await tx.attachment.deleteMany({
+    where: {
+      tenantId: input.tenantId,
+      inspectionReportId: input.report.id,
+      kind: AttachmentKind.pdf,
+      source: "generated"
+    } as any
+  });
+
+  const generatedAttachment = await tx.attachment.create({
+    data: {
+      tenantId: input.tenantId,
+      inspectionId: input.report.inspectionId,
+      inspectionReportId: input.report.id,
+      kind: AttachmentKind.pdf,
+      source: "generated",
+      fileName: pdfPayload.fileName,
+      mimeType: pdfPayload.mimeType,
+      storageKey: pdfPayload.storageKey,
+      customerVisible: true
+    } as any
+  });
+
+  return {
+    generatedAttachment,
+    priorGeneratedKeys: priorGeneratedAttachments.map((attachment) => attachment.storageKey)
+  };
+}
+
 export async function finalizeInspectionReport(actor: ActorContext, input: {
   inspectionReportId: string;
   contentJson: unknown;
@@ -1266,64 +1342,12 @@ export async function finalizeInspectionReport(actor: ActorContext, input: {
       }
     });
 
-    const priorGeneratedAttachments = finalized.attachments.filter((attachment) => attachment.kind === AttachmentKind.pdf && attachment.source === "generated");
-    priorGeneratedKeys = priorGeneratedAttachments.map((attachment) => attachment.storageKey);
-    const technicianSignature = finalized.signatures.find((signature) => signature.kind === SignatureKind.technician) ?? null;
-    const customerSignature = finalized.signatures.find((signature) => signature.kind === SignatureKind.customer) ?? null;
-    const photoAttachments = finalized.attachments.filter((attachment) => attachment.kind === AttachmentKind.photo);
-    const customerFacingSiteName = getCustomerFacingSiteLabel(finalized.inspection.site.name);
-    const pdfBytes = await generateInspectionReportPdf({
-      tenant: { name: finalized.tenant.name, branding: finalized.tenant.branding },
-      customerCompany: finalized.inspection.customerCompany,
-      site: {
-        ...finalized.inspection.site,
-        name: customerFacingSiteName ?? "",
-        addressLine1: customerFacingSiteName ? finalized.inspection.site.addressLine1 : "",
-        addressLine2: customerFacingSiteName ? finalized.inspection.site.addressLine2 : null,
-        city: customerFacingSiteName ? finalized.inspection.site.city : "",
-        state: customerFacingSiteName ? finalized.inspection.site.state : "",
-        postalCode: customerFacingSiteName ? finalized.inspection.site.postalCode : ""
-      },
-      inspection: finalized.inspection,
-      task: finalized.task,
-      report: { id: finalized.id, finalizedAt, technicianName: finalized.technician?.name ?? null },
-      draft: validatedDraft,
-      deficiencies: finalized.deficiencies,
-      photos: photoAttachments,
-      technicianSignature,
-      customerSignature
-    });
-
-    const pdfPayload = await buildStoredFilePayload({
+    const pdfResult = await replaceGeneratedReportPdfTx(tx, {
       tenantId: parsedActor.tenantId as string,
-      category: "generated-pdf",
-      fileName: buildGeneratedPdfName(finalized),
-      mimeType: "application/pdf",
-      bytes: pdfBytes
+      report: finalized as any
     });
-
-    await tx.attachment.deleteMany({
-      where: {
-        tenantId: parsedActor.tenantId as string,
-        inspectionReportId: report.id,
-        kind: AttachmentKind.pdf,
-        source: "generated"
-      } as any
-    });
-
-    const generatedAttachment = await tx.attachment.create({
-      data: {
-        tenantId: parsedActor.tenantId as string,
-        inspectionId: report.inspectionId,
-        inspectionReportId: report.id,
-        kind: AttachmentKind.pdf,
-        source: "generated",
-        fileName: pdfPayload.fileName,
-        mimeType: pdfPayload.mimeType,
-        storageKey: pdfPayload.storageKey,
-        customerVisible: true
-      } as any
-    });
+    priorGeneratedKeys = pdfResult.priorGeneratedKeys;
+    const generatedAttachment = pdfResult.generatedAttachment;
 
     await tx.inspectionTask.update({
       where: { id: report.inspectionTaskId },
@@ -1441,6 +1465,78 @@ export async function finalizeInspectionReport(actor: ActorContext, input: {
   ]);
 
   return finalized;
+}
+
+export async function regenerateFinalizedReportPdf(actor: ActorContext, input: {
+  inspectionReportId: string;
+}) {
+  const parsedActor = parseActor(actor);
+  if (!["tenant_admin", "office_admin", "platform_admin"].includes(parsedActor.role)) {
+    throw new Error("Only administrators can regenerate completed report PDFs.");
+  }
+
+  let priorGeneratedKeys: string[] = [];
+
+  const regenerated = await prisma.$transaction(async (tx) => {
+    const report = await tx.inspectionReport.findFirst({
+      where: {
+        id: input.inspectionReportId,
+        tenantId: parsedActor.tenantId as string
+      },
+      include: {
+        tenant: true,
+        inspection: {
+          include: {
+            site: true,
+            customerCompany: true
+          }
+        },
+        task: true,
+        technician: true,
+        attachments: true,
+        signatures: true,
+        deficiencies: true
+      }
+    });
+
+    if (!report) {
+      throw new Error("Report not found.");
+    }
+
+    if (report.status !== reportStatuses.finalized || !report.finalizedAt) {
+      throw new Error("Only finalized reports can be regenerated.");
+    }
+
+    const pdfResult = await replaceGeneratedReportPdfTx(tx, {
+      tenantId: parsedActor.tenantId as string,
+      report: report as any
+    });
+    priorGeneratedKeys = pdfResult.priorGeneratedKeys;
+
+    await createAuditLog(tx, {
+      tenantId: parsedActor.tenantId as string,
+      actorUserId: parsedActor.userId,
+      action: "report.pdf_regenerated",
+      entityId: report.id,
+      metadata: {
+        inspectionId: report.inspectionId,
+        inspectionTaskId: report.inspectionTaskId,
+        generatedAttachmentId: pdfResult.generatedAttachment.id,
+        pdfVersion: "v2"
+      }
+    });
+
+    return {
+      reportId: report.id,
+      inspectionId: report.inspectionId,
+      inspectionTaskId: report.inspectionTaskId,
+      generatedAttachmentId: pdfResult.generatedAttachment.id
+    };
+  }, { timeout: 20_000 });
+
+  await Promise.all(priorGeneratedKeys.map((storageKey) => deleteStoredFile(storageKey)));
+
+  return regenerated;
 }
 
 const MAX_UPLOADED_PDF_BYTES = 12 * 1024 * 1024;
