@@ -1,13 +1,15 @@
 import "server-only";
 
+import type { PdfInput } from "@testworx/lib/pdf-v2/types";
 import { cleanText } from "@testworx/lib/pdf-v2/core/formatting/text";
 import { buildAcceptanceTestRenderModel } from "@testworx/lib/pdf-v2/acceptance-test/adapter/buildAcceptanceTestRenderModel";
 
 import type { AcceptanceTestViewModel } from "./types/acceptanceTest";
 
-type AcceptanceViewSource = Parameters<typeof buildAcceptanceTestRenderModel>[0] & {
-  draft?: {
-    sections?: Record<string, { fields?: Record<string, unknown> }>;
+type AcceptanceViewSource = PdfInput & {
+  report: PdfInput["report"] & {
+    status?: string | null;
+    assignedTo?: string | null;
   };
 };
 
