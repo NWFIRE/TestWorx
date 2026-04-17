@@ -1,7 +1,6 @@
-import chromium from "@sparticuz/chromium";
-import puppeteer from "puppeteer-core";
-
-async function resolveExecutablePath() {
+async function resolveExecutablePath(chromium: {
+  executablePath: () => Promise<string>;
+}) {
   const envPath = process.env.PUPPETEER_EXECUTABLE_PATH ?? process.env.CHROME_EXECUTABLE_PATH;
   if (envPath) {
     return envPath;
@@ -11,6 +10,10 @@ async function resolveExecutablePath() {
 }
 
 export async function renderPdfFromHtml(html: string): Promise<Buffer> {
+  const [{ default: chromium }, { default: puppeteer }] = await Promise.all([
+    import("@sparticuz/chromium"),
+    import("puppeteer-core")
+  ]);
   const browser = await puppeteer.launch({
     args: chromium.args,
     defaultViewport: {
@@ -18,7 +21,7 @@ export async function renderPdfFromHtml(html: string): Promise<Buffer> {
       height: 1650,
       deviceScaleFactor: 1
     },
-    executablePath: await resolveExecutablePath(),
+    executablePath: await resolveExecutablePath(chromium),
     headless: true
   });
 
