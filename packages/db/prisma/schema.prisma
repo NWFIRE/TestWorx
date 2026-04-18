@@ -199,6 +199,24 @@ enum WorkOrderProviderSourceType {
   third_party_provider
 }
 
+enum BillingResolutionSourceEntityType {
+  work_order
+  report
+  invoice
+}
+
+enum BillingResolutionMode {
+  direct_customer
+  contract_provider
+}
+
+enum BillingResolutionPricingSource {
+  provider_contract_rate
+  customer_pricing
+  default_pricing
+  manual_override
+}
+
 enum ComplianceReportingDivision {
   fire_extinguishers
   fire_alarm
@@ -320,6 +338,7 @@ model Tenant {
   providerContractProfiles  ProviderContractProfile[]
   serviceSiteProviderAssignments ServiceSiteProviderAssignment[]
   complianceReportingFeeRules ComplianceReportingFeeRule[]
+  billingResolutionSnapshots BillingResolutionSnapshot[]
   quickbooksCatalogItems    QuickBooksCatalogItem[]
   quickBooksItemMaps        QuickBooksItemMap[]
   quickBooksItemCache       QuickBooksItemCache[]
@@ -417,6 +436,7 @@ model CustomerCompany {
   sites                     Site[]
   inspections               Inspection[]
   billingSummaries          InspectionBillingSummary[]
+  billingResolutionSnapshots BillingResolutionSnapshot[]
   serviceFeeRules           ServiceFeeRule[]
   accountInvitations        AccountInvitation[]
   quotes                    Quote[]
@@ -504,6 +524,7 @@ model ContractProviderAccount {
   contractProfiles       ProviderContractProfile[]
   siteAssignments        ServiceSiteProviderAssignment[]
   workOrderContexts      WorkOrderProviderContext[]
+  billingResolutionSnapshots BillingResolutionSnapshot[]
 
   @@index([organizationId])
   @@index([organizationId, status])
@@ -530,6 +551,7 @@ model ProviderContractProfile {
   rates                          ProviderContractRate[]
   siteAssignments                ServiceSiteProviderAssignment[]
   workOrderContexts              WorkOrderProviderContext[]
+  billingResolutionSnapshots     BillingResolutionSnapshot[]
 
   @@index([organizationId])
   @@index([providerAccountId])
@@ -605,6 +627,7 @@ model ServiceSiteProviderAssignment {
   providerAccount           ContractProviderAccount             @relation(fields: [providerAccountId], references: [id])
   providerContractProfile   ProviderContractProfile?            @relation(fields: [providerContractProfileId], references: [id])
   workOrderProviderContexts WorkOrderProviderContext[]
+  billingResolutionSnapshots BillingResolutionSnapshot[]
 
   @@index([organizationId])
   @@index([serviceSiteId])
@@ -631,6 +654,35 @@ model WorkOrderProviderContext {
   siteProviderAssignment    ServiceSiteProviderAssignment?   @relation(fields: [siteProviderAssignmentId], references: [id])
 
   @@index([providerAccountId])
+  @@index([providerContractProfileId])
+  @@index([siteProviderAssignmentId])
+}
+
+model BillingResolutionSnapshot {
+  id                        String                            @id @default(cuid())
+  organizationId            String
+  sourceEntityType          BillingResolutionSourceEntityType
+  sourceEntityId            String
+  resolvedMode              BillingResolutionMode
+  payerCustomerId           String?
+  payerProviderAccountId    String?
+  providerContractProfileId String?
+  siteProviderAssignmentId  String?
+  pricingSource             BillingResolutionPricingSource
+  pricingSourceReferenceId  String?
+  resolutionReason          String?
+  snapshotData              String
+  createdAt                 DateTime                          @default(now())
+  organization              Tenant                            @relation(fields: [organizationId], references: [id])
+  payerCustomer             CustomerCompany?                  @relation(fields: [payerCustomerId], references: [id])
+  payerProviderAccount      ContractProviderAccount?          @relation(fields: [payerProviderAccountId], references: [id])
+  providerContractProfile   ProviderContractProfile?          @relation(fields: [providerContractProfileId], references: [id])
+  siteProviderAssignment    ServiceSiteProviderAssignment?    @relation(fields: [siteProviderAssignmentId], references: [id])
+
+  @@index([organizationId])
+  @@index([organizationId, sourceEntityType, sourceEntityId])
+  @@index([payerCustomerId])
+  @@index([payerProviderAccountId])
   @@index([providerContractProfileId])
   @@index([siteProviderAssignmentId])
 }
