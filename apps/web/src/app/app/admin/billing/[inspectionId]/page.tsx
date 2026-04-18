@@ -215,6 +215,7 @@ export default async function BillingSummaryDetailPage({
   const attachmentSnapshot = asRecord(summary.attachmentSnapshot);
   const deliverySnapshot = asRecord(summary.deliverySnapshot);
   const referenceSnapshot = asRecord(summary.referenceSnapshot);
+  const billingResolutionMetadata = summary.billingResolutionMetadata;
   const requiredAttachmentLabels = Array.isArray(attachmentSnapshot?.requiredDocumentLabels)
     ? attachmentSnapshot.requiredDocumentLabels.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
     : [];
@@ -374,6 +375,21 @@ export default async function BillingSummaryDetailPage({
         <div className="space-y-6">
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing context</p>
+            {billingResolutionMetadata?.blockingIssueCode === "provider_contract_expired" ? (
+              <div className="mt-4 rounded-[1.5rem] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-900">
+                This invoice is blocked because the snapped provider contract is expired. Update the contract or switch the work order to direct billing before invoicing.
+              </div>
+            ) : null}
+            {billingResolutionMetadata?.warnings?.length ? (
+              <div className="mt-4 rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
+                <p className="font-semibold text-amber-950">Billing warnings</p>
+                <div className="mt-2 space-y-2">
+                  {billingResolutionMetadata.warnings.map((warning) => (
+                    <p key={warning}>{warning}</p>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Routing</p>
@@ -427,6 +443,8 @@ export default async function BillingSummaryDetailPage({
                 <p className="text-base font-semibold text-ink">{summary.billingResolution?.providerContractProfile?.name ?? summary.contractProfileName ?? "No contract profile"}</p>
                 <p className="mt-3 text-sm text-slate-600">Resolution reason</p>
                 <p className="text-base font-semibold text-ink">{summary.billingResolution?.resolutionReason ?? "No resolution reason recorded yet."}</p>
+                <p className="mt-3 text-sm text-slate-600">Work-order override</p>
+                <p className="text-base font-semibold text-ink">{billingResolutionMetadata?.workOrderLevelOverride ? "Yes" : "No"}</p>
               </div>
             </div>
             <div className="mt-4 grid gap-4 md:grid-cols-2">

@@ -34,6 +34,7 @@ import {
   updateBillingSummaryStatus,
   updateDeficiencyStatus,
   editableInspectionStatuses,
+  updateInspectionBillingSourceType,
   updateInspection,
   updateInspectionStatus,
   reopenCompletedReportForCorrection,
@@ -43,6 +44,29 @@ import {
 } from "@testworx/lib/server/index";
 
 export { getCustomerSiteImportTemplateCsv };
+
+function asRecord(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function extractBillingResolutionBlockMessage(detail: Awaited<ReturnType<typeof getAdminBillingSummaryDetail>>) {
+  if (!detail) {
+    return null;
+  }
+
+  const deliverySnapshot = asRecord(detail.deliverySnapshot);
+  const blockingIssueCode = typeof deliverySnapshot?.blockingIssueCode === "string"
+    ? deliverySnapshot.blockingIssueCode
+    : null;
+
+  if (blockingIssueCode === "provider_contract_expired") {
+    return "This work order is tied to an expired provider contract. Update the contract or override billing before invoicing.";
+  }
+
+  return null;
+}
 
 function resolveInspectionDeleteRedirectTarget(input: string | null | undefined) {
   const fallback = "/app/admin/dashboard?inspection=deleted";
@@ -594,6 +618,17 @@ export async function updateBillingSummaryStatusAction(formData: FormData) {
     return { ok: false, error: "Unauthorized", message: null, detail: null };
   }
 
+  if (status === "invoiced") {
+    const detail = await getAdminBillingSummaryDetail(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      inspectionId
+    );
+    const blockMessage = extractBillingResolutionBlockMessage(detail);
+    if (blockMessage) {
+      return { ok: false, error: blockMessage, message: null, detail };
+    }
+  }
+
   await updateBillingSummaryStatus(
     { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
     summaryId,
@@ -883,6 +918,20 @@ export async function syncBillingSummaryToQuickBooksAction(formData: FormData) {
   }
 
   try {
+    const existingDetail = await getAdminBillingSummaryDetail(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      inspectionId
+    );
+    const blockMessage = extractBillingResolutionBlockMessage(existingDetail);
+    if (blockMessage) {
+      return {
+        ok: false,
+        error: blockMessage,
+        message: null,
+        detail: existingDetail
+      };
+    }
+
     const result = await syncBillingSummaryToQuickBooks(
       { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
       inspectionId
@@ -934,6 +983,20 @@ export async function sendQuickBooksInvoiceAction(formData: FormData) {
   }
 
   try {
+    const existingDetail = await getAdminBillingSummaryDetail(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      inspectionId
+    );
+    const blockMessage = extractBillingResolutionBlockMessage(existingDetail);
+    if (blockMessage) {
+      return {
+        ok: false,
+        error: blockMessage,
+        message: null,
+        detail: existingDetail
+      };
+    }
+
     const result = await sendQuickBooksInvoice(
       { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
       inspectionId
@@ -965,6 +1028,30 @@ export async function sendQuickBooksInvoiceAction(formData: FormData) {
       message: null,
       detail: null
     };
+  }
+}
+
+export async function updateInspectionBillingSourceTypeAction(formData: FormData) {
+  const session = await auth();
+  const inspectionId = String(formData.get("inspectionId") ?? "");
+  const sourceType = String(formData.get("sourceType") ?? "");
+
+  if (!session?.user?.tenantId || !inspectionId || (sourceType !== "direct" && sourceType !== "third_party_provider")) {
+    return;
+  }
+
+  try {
+    await updateInspectionBillingSourceType(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      { inspectionId, sourceType }
+    );
+
+    revalidatePath("/app/admin");
+    revalidatePath("/app/admin/billing");
+    revalidatePath(`/app/admin/billing/${inspectionId}`);
+    revalidatePath(`/app/admin/inspections/${inspectionId}`);
+  } catch (error) {
+    throw error instanceof Error ? error : new Error("Unable to update the billing override.");
   }
 }
 

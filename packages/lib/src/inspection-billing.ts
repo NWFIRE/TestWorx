@@ -328,8 +328,86 @@ type BillingResolutionResult = {
   items: BillableItem[];
 };
 
+type BillingResolutionWarningCode =
+  | "provider_contract_missing"
+  | "provider_contract_expired"
+  | "provider_rate_missing"
+  | "provider_context_override_direct"
+  | "provider_context_missing";
+
+type BillingResolutionSnapshotMetadata = {
+  warningCodes: BillingResolutionWarningCode[];
+  warnings: string[];
+  blockingIssueCode: BillingResolutionWarningCode | null;
+  manualReviewRequired: boolean;
+  contractResolutionStatus: "active" | "missing" | "expired" | "not_applicable";
+  monthlyGroupingDeferred: boolean;
+  workOrderLevelOverride: boolean;
+};
+
+type ProviderContractProfileResolution = {
+  profile: {
+    id: string;
+    name: string;
+    status: "draft" | "active" | "inactive" | "expired";
+    invoiceGroupingMode: "per_work_order" | "per_site" | "monthly_rollup";
+    requireProviderWorkOrderNumber: boolean;
+    requireSiteReferenceNumber: boolean;
+    effectiveStartDate: Date | null;
+    effectiveEndDate: Date | null;
+  } | null;
+  contractResolutionStatus: "active" | "missing" | "expired";
+  warningCode: BillingResolutionWarningCode | null;
+  warning: string | null;
+  blockingIssueCode: BillingResolutionWarningCode | null;
+};
+
 const INSPECTION_LEVEL_REPORT_TYPE = "inspection";
 const COMPLIANCE_FEE_REPORT_TYPE = "compliance_reporting";
+
+const defaultBillingResolutionSnapshotMetadata: BillingResolutionSnapshotMetadata = {
+  warningCodes: [],
+  warnings: [],
+  blockingIssueCode: null,
+  manualReviewRequired: false,
+  contractResolutionStatus: "not_applicable",
+  monthlyGroupingDeferred: false,
+  workOrderLevelOverride: false
+};
+
+export function parseBillingResolutionSnapshotMetadata(snapshotData: string | null | undefined): BillingResolutionSnapshotMetadata {
+  if (!snapshotData || !snapshotData.trim()) {
+    return defaultBillingResolutionSnapshotMetadata;
+  }
+
+  try {
+    const parsed = JSON.parse(snapshotData) as Partial<BillingResolutionSnapshotMetadata> | null;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return defaultBillingResolutionSnapshotMetadata;
+    }
+
+    return {
+      warningCodes: Array.isArray(parsed.warningCodes)
+        ? parsed.warningCodes.filter((value): value is BillingResolutionWarningCode => typeof value === "string")
+        : [],
+      warnings: Array.isArray(parsed.warnings)
+        ? parsed.warnings.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+        : [],
+      blockingIssueCode: typeof parsed.blockingIssueCode === "string" ? parsed.blockingIssueCode as BillingResolutionWarningCode : null,
+      manualReviewRequired: parsed.manualReviewRequired === true,
+      contractResolutionStatus: parsed.contractResolutionStatus === "active"
+        || parsed.contractResolutionStatus === "missing"
+        || parsed.contractResolutionStatus === "expired"
+        || parsed.contractResolutionStatus === "not_applicable"
+        ? parsed.contractResolutionStatus
+        : "not_applicable",
+      monthlyGroupingDeferred: parsed.monthlyGroupingDeferred === true,
+      workOrderLevelOverride: parsed.workOrderLevelOverride === true
+    };
+  } catch {
+    return defaultBillingResolutionSnapshotMetadata;
+  }
+}
 
 function parseActor(actor: ActorContext) {
   const parsed = actorContextSchema.parse(actor);
@@ -1871,7 +1949,7 @@ async function resolveProviderContractProfileTx(
     providerContext: NonNullable<InspectionBillingResolutionContext["providerContext"]>;
     billingDate: Date;
   }
-) {
+): Promise<ProviderContractProfileResolution> {
   const directProfile = input.providerContext.providerContractProfile;
   if (
     directProfile
@@ -1879,7 +1957,13 @@ async function resolveProviderContractProfileTx(
     && (!directProfile.effectiveStartDate || directProfile.effectiveStartDate.getTime() <= input.billingDate.getTime())
     && (!directProfile.effectiveEndDate || directProfile.effectiveEndDate.getTime() >= input.billingDate.getTime())
   ) {
-    return directProfile;
+    return {
+      profile: directProfile,
+      contractResolutionStatus: "active",
+      warningCode: null,
+      warning: null,
+      blockingIssueCode: null
+    };
   }
 
   const profileId = input.providerContext.providerContractProfileId
@@ -1888,19 +1972,9 @@ async function resolveProviderContractProfileTx(
 
   if (profileId) {
     const profile = await tx.providerContractProfile.findFirst({
-    where: {
-      id: profileId,
-      organizationId: input.tenantId,
-      status: "active",
-      effectiveStartDate: { lte: input.billingDate },
-      AND: [
-        {
-          OR: [
-              { effectiveEndDate: null },
-              { effectiveEndDate: { gte: input.billingDate } }
-            ]
-          }
-        ]
+      where: {
+        id: profileId,
+        organizationId: input.tenantId
       },
       select: {
         id: true,
@@ -1915,7 +1989,29 @@ async function resolveProviderContractProfileTx(
     });
 
     if (profile) {
-      return profile;
+      const startsOnTime = !profile.effectiveStartDate || profile.effectiveStartDate.getTime() <= input.billingDate.getTime();
+      const endsOnTime = !profile.effectiveEndDate || profile.effectiveEndDate.getTime() >= input.billingDate.getTime();
+      const isExpired = profile.status === "expired" || Boolean(profile.effectiveEndDate && profile.effectiveEndDate.getTime() < input.billingDate.getTime());
+
+      if (profile.status === "active" && startsOnTime && endsOnTime) {
+        return {
+          profile,
+          contractResolutionStatus: "active",
+          warningCode: null,
+          warning: null,
+          blockingIssueCode: null
+        };
+      }
+
+      if (isExpired) {
+        return {
+          profile,
+          contractResolutionStatus: "expired",
+          warningCode: "provider_contract_expired",
+          warning: `Provider contract ${profile.name} is expired for this billing date.`,
+          blockingIssueCode: "provider_contract_expired"
+        };
+      }
     }
   }
 
@@ -1955,10 +2051,22 @@ async function resolveProviderContractProfileTx(
   });
 
   if (!fallbackProfile) {
-    throw new Error("Third-party provider work orders require an active provider contract profile.");
+    return {
+      profile: null,
+      contractResolutionStatus: "missing",
+      warningCode: "provider_contract_missing",
+      warning: "Provider billing has no active contract profile. Pricing fell back to the next available pricing source.",
+      blockingIssueCode: null
+    };
   }
 
-  return fallbackProfile;
+  return {
+    profile: fallbackProfile,
+    contractResolutionStatus: "active",
+    warningCode: null,
+    warning: null,
+    blockingIssueCode: null
+  };
 }
 
 async function resolveProviderContractRateTx(
@@ -2038,30 +2146,51 @@ async function resolveBillingOutcomeTx(
       : hasServiceWork
         ? "service"
         : "inspection";
+  const shouldUseProviderBilling = inspection.sourceType === "third_party_provider" && Boolean(inspection.providerContext);
 
-  if (inspection.providerContext) {
+  if (shouldUseProviderBilling && inspection.providerContext) {
     const providerAccount = inspection.providerContext.providerAccount;
     const providerAccountId = inspection.providerContext.providerAccountId ?? providerAccount?.id ?? null;
     if (!providerAccountId || !providerAccount || providerAccount.status !== "active") {
       throw new Error("Third-party provider work orders require an active provider account.");
     }
 
-    const contractProfile = await resolveProviderContractProfileTx(tx, {
+    const contractResolution = await resolveProviderContractProfileTx(tx, {
       tenantId: input.tenantId,
       providerContext: inspection.providerContext,
       billingDate
     });
-    const providerRate = await resolveProviderContractRateTx(tx, {
-      providerContractProfileId: contractProfile.id,
-      billingDate,
-      serviceType,
-      reportTypes: input.reportTypes,
-      items: input.items
-    });
+    const contractProfile = contractResolution.profile;
+    const providerRate = contractProfile && contractResolution.contractResolutionStatus === "active"
+      ? await resolveProviderContractRateTx(tx, {
+          providerContractProfileId: contractProfile.id,
+          billingDate,
+          serviceType,
+          reportTypes: input.reportTypes,
+          items: input.items
+        })
+      : null;
     const fallbackPricing = resolvePricingFallback({ items: input.items });
     const pricedItems = providerRate ? applyProviderContractRateToItems(input.items, providerRate) : input.items;
     const pricingSource = providerRate ? "provider_contract_rate" : fallbackPricing.pricingSource;
     const pricingSourceReferenceId = providerRate ? providerRate.id : fallbackPricing.pricingSourceReferenceId;
+    const warnings = [
+      ...(contractResolution.warning ? [contractResolution.warning] : []),
+      ...(!providerRate
+        ? [
+            contractProfile
+              ? `No matching provider contract rate was found, so pricing fell back to ${fallbackPricing.pricingSource.replaceAll("_", " ")}.`
+              : "No active provider contract profile was found, so pricing fell back to the next available pricing source."
+          ]
+        : [])
+    ];
+    const warningCodes = [
+      ...(contractResolution.warningCode ? [contractResolution.warningCode] : []),
+      ...(!providerRate ? ["provider_rate_missing" as const] : [])
+    ];
+    const monthlyGroupingDeferred = contractProfile?.invoiceGroupingMode === "monthly_rollup";
+    const manualReviewRequired = true;
+    const blockingIssueCode = contractResolution.blockingIssueCode;
     const resolutionReason = providerRate
       ? `Resolved to contract provider billing for ${providerAccount.name} using contract rate ${providerRate.id}.`
       : `Resolved to contract provider billing for ${providerAccount.name}; ${fallbackPricing.resolutionReason}`;
@@ -2079,36 +2208,52 @@ async function resolveBillingOutcomeTx(
       sourceReferenceId: pricingSourceReferenceId,
       serviceType,
       pricingMethod: providerRate?.pricingMethod ?? null,
-      providerRateId: providerRate?.id ?? null
+      providerRateId: providerRate?.id ?? null,
+      contractResolutionStatus: contractResolution.contractResolutionStatus,
+      warningCodes,
+      warnings
     } satisfies JsonValue;
-    const groupingSnapshot = mapProviderGroupingMode(contractProfile.invoiceGroupingMode);
+    const groupingSnapshot = mapProviderGroupingMode(contractProfile?.invoiceGroupingMode ?? "per_work_order");
     const attachmentSnapshot = {
       requireFinalizedReport: true,
       requireSignedDocument: false,
       requiredDocumentLabels: []
     } satisfies JsonValue;
     const deliverySnapshot = {
-      holdForManualReview: true,
+      holdForManualReview: manualReviewRequired,
       method: "manual",
-      recipientEmail: null
+      recipientEmail: null,
+      blockingIssueCode,
+      warnings,
+      warningCodes,
+      contractResolutionStatus: contractResolution.contractResolutionStatus,
+      monthlyGroupingDeferred,
+      manualReviewRequired
     } satisfies JsonValue;
     const referenceLabels = [
-      ...(contractProfile.requireProviderWorkOrderNumber ? ["Provider work order number"] : []),
-      ...(contractProfile.requireSiteReferenceNumber ? ["Site reference number"] : [])
+      ...(contractProfile?.requireProviderWorkOrderNumber ? ["Provider work order number"] : []),
+      ...(contractProfile?.requireSiteReferenceNumber ? ["Site reference number"] : [])
     ];
     const referenceSnapshot = {
-      requirePo: contractProfile.requireProviderWorkOrderNumber,
-      requireCustomerReference: contractProfile.requireSiteReferenceNumber,
+      requirePo: contractProfile?.requireProviderWorkOrderNumber ?? false,
+      requireCustomerReference: contractProfile?.requireSiteReferenceNumber ?? false,
       labels: referenceLabels
     } satisfies JsonValue;
     const snapshotData = JSON.stringify({
       resolvedMode: "contract_provider",
       payerProviderAccountId: providerAccountId,
-      providerContractProfileId: contractProfile.id,
+      providerContractProfileId: contractProfile?.id ?? null,
       siteProviderAssignmentId: inspection.providerContext.siteProviderAssignmentId ?? null,
       pricingSource,
       pricingSourceReferenceId,
       resolutionReason,
+      warningCodes,
+      warnings,
+      blockingIssueCode,
+      manualReviewRequired,
+      contractResolutionStatus: contractResolution.contractResolutionStatus,
+      monthlyGroupingDeferred,
+      workOrderLevelOverride: false,
       routingSnapshot,
       pricingSnapshot
     });
@@ -2120,8 +2265,8 @@ async function resolveBillingOutcomeTx(
       payerProviderAccountId: providerAccountId,
       billToAccountId: providerAccountId,
       billToName: providerAccount.name,
-      contractProfileId: contractProfile.id,
-      contractProfileName: contractProfile.name,
+      contractProfileId: contractProfile?.id ?? null,
+      contractProfileName: contractProfile?.name ?? null,
       routingSnapshot,
       pricingSnapshot,
       groupingSnapshot,
@@ -2132,7 +2277,7 @@ async function resolveBillingOutcomeTx(
         resolvedMode: "contract_provider",
         pricingSource,
         pricingSourceReferenceId,
-        providerContractProfileId: contractProfile.id,
+        providerContractProfileId: contractProfile?.id ?? null,
         siteProviderAssignmentId: inspection.providerContext.siteProviderAssignmentId ?? null,
         payerCustomerId: null,
         payerProviderAccountId: providerAccountId,
@@ -2144,17 +2289,36 @@ async function resolveBillingOutcomeTx(
   }
 
   const fallbackPricing = resolvePricingFallback({ items: input.items });
+  const directWarnings = [
+    ...(inspection.providerContext && inspection.sourceType === "direct"
+      ? ["Provider context exists on this work order, but billing was intentionally overridden to direct customer billing."]
+      : []),
+    ...(!inspection.providerContext && inspection.sourceType === "third_party_provider"
+      ? ["No provider snapshot was attached to this work order, so billing defaulted to the direct customer."]
+      : [])
+  ];
+  const directWarningCodes = [
+    ...(inspection.providerContext && inspection.sourceType === "direct"
+      ? ["provider_context_override_direct" as const]
+      : []),
+    ...(!inspection.providerContext && inspection.sourceType === "third_party_provider"
+      ? ["provider_context_missing" as const]
+      : [])
+  ];
   const routingSnapshot = {
     billToAccountId: null,
     billToName: inspection.customerCompanyName,
     quickbooksCustomerId: inspection.customerQuickbooksCustomerId,
     autoBillingEnabled: false,
-    sourceType: inspection.sourceType
+    sourceType: inspection.sourceType,
+    workOrderLevelOverride: inspection.providerContext ? inspection.sourceType === "direct" : false
   } satisfies JsonValue;
   const pricingSnapshot = {
     source: fallbackPricing.pricingSource,
     sourceReferenceId: fallbackPricing.pricingSourceReferenceId,
-    serviceType
+    serviceType,
+    warningCodes: directWarningCodes,
+    warnings: directWarnings
   } satisfies JsonValue;
   const groupingSnapshot = { mode: "standard" } satisfies JsonValue;
   const attachmentSnapshot = {
@@ -2165,7 +2329,13 @@ async function resolveBillingOutcomeTx(
   const deliverySnapshot = {
     holdForManualReview: false,
     method: inspection.customerBillingEmail ? "customer_email" : "manual",
-    recipientEmail: inspection.customerBillingEmail
+    recipientEmail: inspection.customerBillingEmail,
+    blockingIssueCode: null,
+    warnings: directWarnings,
+    warningCodes: directWarningCodes,
+    contractResolutionStatus: "not_applicable",
+    monthlyGroupingDeferred: false,
+    manualReviewRequired: false
   } satisfies JsonValue;
   const referenceSnapshot = {
     requirePo: false,
@@ -2179,6 +2349,13 @@ async function resolveBillingOutcomeTx(
     pricingSource: fallbackPricing.pricingSource,
     pricingSourceReferenceId: fallbackPricing.pricingSourceReferenceId,
     resolutionReason,
+    warningCodes: directWarningCodes,
+    warnings: directWarnings,
+    blockingIssueCode: null,
+    manualReviewRequired: false,
+    contractResolutionStatus: "not_applicable",
+    monthlyGroupingDeferred: false,
+    workOrderLevelOverride: inspection.providerContext ? inspection.sourceType === "direct" : false,
     routingSnapshot,
     pricingSnapshot
   });
@@ -2703,6 +2880,9 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
     reportTypes: [...new Set(itemsWithCatalogState.map((item) => item.reportType).filter((reportType) => reportType !== INSPECTION_LEVEL_REPORT_TYPE))],
     metrics: buildSummaryMetrics(itemsWithCatalogState),
     billingResolution: billingResolutionSnapshot?.billingResolutionSnapshot ?? null,
+    billingResolutionMetadata: parseBillingResolutionSnapshotMetadata(
+      billingResolutionSnapshot?.billingResolutionSnapshot?.snapshotData
+    ),
     providerContext: providerContextRecord ?? null
   };
 }

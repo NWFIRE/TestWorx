@@ -3851,6 +3851,14 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
     throw new Error("Billing summary not found.");
   }
 
+  const deliverySnapshot = (summary.deliverySnapshot ?? {}) as Record<string, unknown>;
+  const blockingIssueCode = typeof deliverySnapshot.blockingIssueCode === "string"
+    ? deliverySnapshot.blockingIssueCode
+    : null;
+  if (blockingIssueCode === "provider_contract_expired") {
+    throw new Error("This billing summary is tied to an expired provider contract. Update the contract or override billing before syncing.");
+  }
+
   if (summary.quickbooksInvoiceId && isVerifiedQuickBooksSyncStatus(summary.quickbooksSyncStatus)) {
     throw new Error("This billing summary has already been synced to QuickBooks.");
   }
@@ -3876,27 +3884,46 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
 
   try {
     const payerAccount = summary.billingType === "third_party" && summary.billToAccountId
-      ? await prisma.billingPayerAccount.findFirst({
-          where: {
-            id: summary.billToAccountId,
-            tenantId: parsedActor.tenantId as string
-          }
-        })
+      ? summary.payerType === "provider"
+        ? await prisma.contractProviderAccount.findFirst({
+            where: {
+              id: summary.billToAccountId,
+              organizationId: parsedActor.tenantId as string
+            },
+            select: {
+              id: true,
+              name: true,
+              billingEmail: true,
+              billingPhone: true,
+              remittanceAddressLine1: true,
+              remittanceAddressLine2: true,
+              remittanceCity: true,
+              remittanceState: true,
+              remittancePostalCode: true,
+              notes: true
+            }
+          })
+        : await prisma.billingPayerAccount.findFirst({
+            where: {
+              id: summary.billToAccountId,
+              tenantId: parsedActor.tenantId as string
+            }
+          })
       : null;
 
     const customerId = payerAccount
       ? await resolveQuickBooksPayerAccount(tenant, {
           payerAccountId: payerAccount.id,
           payerName: payerAccount.name,
-          billingEmail: payerAccount.billingEmail,
-          phone: payerAccount.phone,
-          billingAddressLine1: payerAccount.billingAddressLine1,
-          billingAddressLine2: payerAccount.billingAddressLine2,
-          billingCity: payerAccount.billingCity,
-          billingState: payerAccount.billingState,
-          billingPostalCode: payerAccount.billingPostalCode,
-          billingCountry: payerAccount.billingCountry,
-          notes: payerAccount.externalReference
+          billingEmail: payerAccount.billingEmail ?? null,
+          phone: "billingPhone" in payerAccount ? payerAccount.billingPhone ?? null : payerAccount.phone,
+          billingAddressLine1: "remittanceAddressLine1" in payerAccount ? payerAccount.remittanceAddressLine1 ?? null : payerAccount.billingAddressLine1,
+          billingAddressLine2: "remittanceAddressLine2" in payerAccount ? payerAccount.remittanceAddressLine2 ?? null : payerAccount.billingAddressLine2,
+          billingCity: "remittanceCity" in payerAccount ? payerAccount.remittanceCity ?? null : payerAccount.billingCity,
+          billingState: "remittanceState" in payerAccount ? payerAccount.remittanceState ?? null : payerAccount.billingState,
+          billingPostalCode: "remittancePostalCode" in payerAccount ? payerAccount.remittancePostalCode ?? null : payerAccount.billingPostalCode,
+          billingCountry: "billingCountry" in payerAccount ? payerAccount.billingCountry : null,
+          notes: "externalReference" in payerAccount ? payerAccount.externalReference : payerAccount.notes
         })
       : await resolveQuickBooksCustomer(tenant, {
           customerCompanyId: summary.customerCompanyId,
@@ -3913,7 +3940,6 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
           notes: summary.customerCompany.notes ?? null
         });
 
-    const deliverySnapshot = (summary.deliverySnapshot ?? {}) as Record<string, unknown>;
     const sendToEmail = typeof deliverySnapshot.recipientEmail === "string" && deliverySnapshot.recipientEmail.trim().length > 0
       ? deliverySnapshot.recipientEmail.trim()
       : payerAccount?.billingEmail ?? summary.customerCompany.billingEmail;
@@ -4771,6 +4797,7 @@ export async function sendQuickBooksInvoice(
       id: true,
       tenantId: true,
       inspectionId: true,
+      payerType: true,
       quickbooksInvoiceId: true,
       quickbooksSyncStatus: true,
       quickbooksConnectionMode: true,
@@ -4788,6 +4815,14 @@ export async function sendQuickBooksInvoice(
     throw new Error("Billing summary not found.");
   }
 
+  const deliverySnapshot = (summary.deliverySnapshot ?? {}) as Record<string, unknown>;
+  const blockingIssueCode = typeof deliverySnapshot.blockingIssueCode === "string"
+    ? deliverySnapshot.blockingIssueCode
+    : null;
+  if (blockingIssueCode === "provider_contract_expired") {
+    throw new Error("This billing summary is tied to an expired provider contract. Update the contract or override billing before sending.");
+  }
+
   if (!summary.quickbooksInvoiceId || !isVerifiedQuickBooksSyncStatus(summary.quickbooksSyncStatus)) {
     throw new Error("Sync and verify this billing summary in QuickBooks before sending it.");
   }
@@ -4796,15 +4831,22 @@ export async function sendQuickBooksInvoice(
   }
 
   const payerAccount = summary.billToAccountId
-    ? await prisma.billingPayerAccount.findFirst({
-        where: {
-          id: summary.billToAccountId,
-          tenantId: parsedActor.tenantId as string
-        },
-        select: { billingEmail: true }
-      })
+    ? summary.payerType === "provider"
+      ? await prisma.contractProviderAccount.findFirst({
+          where: {
+            id: summary.billToAccountId,
+            organizationId: parsedActor.tenantId as string
+          },
+          select: { billingEmail: true }
+        })
+      : await prisma.billingPayerAccount.findFirst({
+          where: {
+            id: summary.billToAccountId,
+            tenantId: parsedActor.tenantId as string
+          },
+          select: { billingEmail: true }
+        })
     : null;
-  const deliverySnapshot = (summary.deliverySnapshot ?? {}) as Record<string, unknown>;
   const billingEmail = typeof deliverySnapshot.recipientEmail === "string" && deliverySnapshot.recipientEmail.trim().length > 0
     ? deliverySnapshot.recipientEmail.trim()
     : payerAccount?.billingEmail ?? summary.customerCompany.billingEmail;

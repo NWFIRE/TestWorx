@@ -815,6 +815,248 @@ describe("inspection billing persistence and admin review", () => {
     );
   });
 
+  it("falls back to direct customer billing when a work order is overridden to direct", async () => {
+    const kitchenDraft = buildKitchenDraft();
+
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      inspectionClassification: "standard",
+      sourceType: "direct",
+      providerContextRecord: {
+        id: "provider_context_1",
+        providerAccountId: "provider_1",
+        providerContractProfileId: "provider_contract_1",
+        siteProviderAssignmentId: "site_assignment_1",
+        providerWorkOrderNumber: "CF-1001",
+        providerReferenceNumber: "REF-22",
+        sourceType: "third_party_provider",
+        providerAccount: {
+          id: "provider_1",
+          name: "Commercial Fire",
+          status: "active"
+        },
+        providerContractProfile: {
+          id: "provider_contract_1",
+          name: "Commercial Fire Annual",
+          status: "active",
+          invoiceGroupingMode: "per_work_order",
+          requireProviderWorkOrderNumber: true,
+          requireSiteReferenceNumber: true,
+          effectiveStartDate: new Date("2026-01-01T00:00:00.000Z"),
+          effectiveEndDate: null
+        },
+        siteProviderAssignment: {
+          id: "site_assignment_1",
+          providerContractProfileId: "provider_contract_1",
+          externalAccountName: "Pinecrest Tower",
+          externalAccountNumber: "ACCT-77",
+          externalLocationCode: "LOC-19"
+        }
+      },
+      providerContextSnapshot: null
+    });
+    txMock.tenant.findUnique.mockResolvedValue({
+      defaultServiceFeeCode: "SERVICE_FEE",
+      defaultServiceFeeUnitPrice: 95
+    });
+    txMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    txMock.site.findFirst.mockResolvedValue({
+      city: "Chicago",
+      state: "IL"
+    });
+    txMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
+    txMock.$queryRaw
+      .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }])
+      .mockResolvedValueOnce([
+        {
+          id: "report_1",
+          inspectionId: "inspection_1",
+          tenantId: "tenant_1",
+          contentJson: kitchenDraft,
+          inspectionType: "kitchen_suppression"
+        }
+      ])
+      .mockResolvedValueOnce([]);
+
+    const summary = await syncInspectionBillingSummaryTx(txMock as never, {
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1"
+    });
+
+    expect(summary?.billingType).toBe("standard");
+    expect(summary?.payerType).toBe("customer");
+    expect(summary?.routingSnapshot).toEqual(
+      expect.objectContaining({
+        sourceType: "direct",
+        workOrderLevelOverride: true
+      })
+    );
+    expect(summary?.deliverySnapshot).toEqual(
+      expect.objectContaining({
+        warningCodes: ["provider_context_override_direct"]
+      })
+    );
+  });
+
+  it("falls back to non-contract pricing with a warning when a provider has no active contract", async () => {
+    const kitchenDraft = buildKitchenDraft();
+
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      inspectionClassification: "standard",
+      sourceType: "third_party_provider",
+      providerContextRecord: {
+        id: "provider_context_1",
+        providerAccountId: "provider_1",
+        providerContractProfileId: null,
+        siteProviderAssignmentId: "site_assignment_1",
+        providerWorkOrderNumber: "CF-1001",
+        providerReferenceNumber: "REF-22",
+        sourceType: "third_party_provider",
+        providerAccount: {
+          id: "provider_1",
+          name: "Commercial Fire",
+          status: "active"
+        },
+        providerContractProfile: null,
+        siteProviderAssignment: {
+          id: "site_assignment_1",
+          providerContractProfileId: null,
+          externalAccountName: "Pinecrest Tower",
+          externalAccountNumber: "ACCT-77",
+          externalLocationCode: "LOC-19"
+        }
+      },
+      providerContextSnapshot: null
+    });
+    txMock.providerContractProfile.findFirst.mockResolvedValue(null);
+    txMock.tenant.findUnique.mockResolvedValue({
+      defaultServiceFeeCode: "SERVICE_FEE",
+      defaultServiceFeeUnitPrice: 95
+    });
+    txMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    txMock.site.findFirst.mockResolvedValue({
+      city: "Chicago",
+      state: "IL"
+    });
+    txMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
+    txMock.$queryRaw
+      .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }])
+      .mockResolvedValueOnce([
+        {
+          id: "report_1",
+          inspectionId: "inspection_1",
+          tenantId: "tenant_1",
+          contentJson: kitchenDraft,
+          inspectionType: "kitchen_suppression"
+        }
+      ])
+      .mockResolvedValueOnce([]);
+
+    const summary = await syncInspectionBillingSummaryTx(txMock as never, {
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1"
+    });
+
+    expect(summary?.billingType).toBe("third_party");
+    expect(summary?.pricingSnapshot).toEqual(
+      expect.objectContaining({
+        source: "default_pricing",
+        contractResolutionStatus: "missing"
+      })
+    );
+    expect(summary?.deliverySnapshot).toEqual(
+      expect.objectContaining({
+        blockingIssueCode: null,
+        warningCodes: expect.arrayContaining(["provider_contract_missing", "provider_rate_missing"])
+      })
+    );
+  });
+
+  it("marks provider billing blocked when the snapped contract is expired", async () => {
+    const kitchenDraft = buildKitchenDraft();
+
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      inspectionClassification: "standard",
+      sourceType: "third_party_provider",
+      providerContextRecord: {
+        id: "provider_context_1",
+        providerAccountId: "provider_1",
+        providerContractProfileId: "provider_contract_1",
+        siteProviderAssignmentId: "site_assignment_1",
+        providerWorkOrderNumber: "CF-1001",
+        providerReferenceNumber: "REF-22",
+        sourceType: "third_party_provider",
+        providerAccount: {
+          id: "provider_1",
+          name: "Commercial Fire",
+          status: "active"
+        },
+        providerContractProfile: {
+          id: "provider_contract_1",
+          name: "Commercial Fire Annual",
+          status: "expired",
+          invoiceGroupingMode: "per_work_order",
+          requireProviderWorkOrderNumber: true,
+          requireSiteReferenceNumber: true,
+          effectiveStartDate: new Date("2025-01-01T00:00:00.000Z"),
+          effectiveEndDate: new Date("2025-12-31T00:00:00.000Z")
+        },
+        siteProviderAssignment: {
+          id: "site_assignment_1",
+          providerContractProfileId: "provider_contract_1",
+          externalAccountName: "Pinecrest Tower",
+          externalAccountNumber: "ACCT-77",
+          externalLocationCode: "LOC-19"
+        }
+      },
+      providerContextSnapshot: null
+    });
+    txMock.providerContractProfile.findFirst.mockResolvedValue(null);
+    txMock.tenant.findUnique.mockResolvedValue({
+      defaultServiceFeeCode: "SERVICE_FEE",
+      defaultServiceFeeUnitPrice: 95
+    });
+    txMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    txMock.site.findFirst.mockResolvedValue({
+      city: "Chicago",
+      state: "IL"
+    });
+    txMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
+    txMock.$queryRaw
+      .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }])
+      .mockResolvedValueOnce([
+        {
+          id: "report_1",
+          inspectionId: "inspection_1",
+          tenantId: "tenant_1",
+          contentJson: kitchenDraft,
+          inspectionType: "kitchen_suppression"
+        }
+      ])
+      .mockResolvedValueOnce([]);
+
+    const summary = await syncInspectionBillingSummaryTx(txMock as never, {
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1"
+    });
+
+    expect(summary?.billingType).toBe("third_party");
+    expect(summary?.deliverySnapshot).toEqual(
+      expect.objectContaining({
+        blockingIssueCode: "provider_contract_expired",
+        contractResolutionStatus: "expired"
+      })
+    );
+  });
+
   it("does not duplicate compliance reporting fees when multiple sprinkler report types are finalized together", async () => {
     txMock.inspection.findFirst.mockResolvedValue({
       id: "inspection_1",

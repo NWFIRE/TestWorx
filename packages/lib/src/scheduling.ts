@@ -1369,8 +1369,7 @@ async function snapshotProviderAssignmentForInspectionTx(
     await tx.inspection.update({
       where: { id: input.inspectionId },
       data: {
-        providerContextId: existingContext.id,
-        sourceType: "third_party_provider"
+        providerContextId: existingContext.id
       }
     });
     return existingContext.id;
@@ -1429,6 +1428,59 @@ async function snapshotProviderAssignmentForInspectionTx(
   });
 
   return providerContext.id;
+}
+
+export async function updateInspectionBillingSourceType(
+  actor: ActorContext,
+  input: {
+    inspectionId: string;
+    sourceType: "direct" | "third_party_provider";
+  }
+) {
+  const parsedActor = parseActor(actor);
+  if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
+    throw new Error("Only tenant and office administrators can update billing source overrides.");
+  }
+
+  const inspection = await prisma.inspection.findFirst({
+    where: {
+      id: input.inspectionId,
+      tenantId: parsedActor.tenantId as string
+    },
+    select: {
+      id: true,
+      sourceType: true,
+      providerContextId: true,
+      providerContextSnapshot: { select: { id: true } },
+      providerContextRecord: { select: { id: true } }
+    }
+  });
+
+  if (!inspection) {
+    throw new Error("Inspection not found.");
+  }
+
+  const providerContextId = inspection.providerContextId
+    ?? inspection.providerContextRecord?.id
+    ?? inspection.providerContextSnapshot?.id
+    ?? null;
+
+  if (input.sourceType === "third_party_provider" && !providerContextId) {
+    throw new Error("This work order does not have a provider snapshot to use for third-party billing.");
+  }
+
+  return prisma.inspection.update({
+    where: { id: inspection.id },
+    data: {
+      sourceType: input.sourceType,
+      providerContextId
+    },
+    select: {
+      id: true,
+      sourceType: true,
+      providerContextId: true
+    }
+  });
 }
 
 async function createRecurringFollowUpInspectionsTx(tx: Prisma.TransactionClient, input: {

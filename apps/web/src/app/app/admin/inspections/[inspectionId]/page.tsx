@@ -26,7 +26,7 @@ import {
   isDueAtTimeOfServiceCustomer
 } from "@testworx/lib/server/index";
 
-import { amendInspectionAction, deleteInspectionAction, regenerateCompletedReportPdfAction, reopenCompletedReportAction, updateInspectionAction, updateInspectionStatusAdminAction, uploadInspectionExternalDocumentAction, uploadInspectionPdfAction } from "../../actions";
+import { amendInspectionAction, deleteInspectionAction, regenerateCompletedReportPdfAction, reopenCompletedReportAction, updateInspectionAction, updateInspectionBillingSourceTypeAction, updateInspectionStatusAdminAction, uploadInspectionExternalDocumentAction, uploadInspectionPdfAction } from "../../actions";
 import { AdminReportDeleteButton } from "../../admin-report-delete-button";
 import { DeleteInspectionCard } from "../../delete-inspection-card";
 import { InspectionExternalDocumentsCard } from "../../inspection-external-documents-card";
@@ -296,6 +296,12 @@ export default async function EditInspectionPage({
         payerProviderAccount?: { id: string; name: string } | null;
         providerContractProfile?: { id: string; name: string } | null;
       } | null;
+      billingResolutionMetadata?: {
+        warnings: string[];
+        blockingIssueCode: string | null;
+        monthlyGroupingDeferred: boolean;
+        workOrderLevelOverride: boolean;
+      } | null;
     } | null;
   };
   const attachmentView = attachments as unknown as Array<{ id: string; fileName: string; source: "uploaded" | "generated"; customerVisible: boolean; createdAt: Date }>;
@@ -341,6 +347,7 @@ export default async function EditInspectionPage({
       })
     : null;
   const providerContext = inspectionView.providerContextRecord ?? inspectionView.providerContextSnapshot ?? null;
+  const billingResolutionMetadata = inspectionView.billingSummary?.billingResolutionMetadata ?? null;
   const backLabel = resolveInspectionBackLabel(originPath);
   return (
     <section className="space-y-6">
@@ -462,6 +469,37 @@ export default async function EditInspectionPage({
               />
             ) : null}
           </div>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <form action={updateInspectionBillingSourceTypeAction}>
+              <input name="inspectionId" type="hidden" value={inspection.id} />
+              <input name="sourceType" type="hidden" value="direct" />
+              <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" type="submit">
+                Bill direct customer
+              </button>
+            </form>
+            <form action={updateInspectionBillingSourceTypeAction}>
+              <input name="inspectionId" type="hidden" value={inspection.id} />
+              <input name="sourceType" type="hidden" value="third_party_provider" />
+              <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-50" disabled={!providerContext} type="submit">
+                Use snapped provider billing
+              </button>
+            </form>
+          </div>
+          {billingResolutionMetadata?.warnings?.length ? (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-900">Billing warnings</p>
+              <div className="mt-2 space-y-2 text-sm text-amber-900">
+                {billingResolutionMetadata.warnings.map((warning) => (
+                  <p key={warning}>{warning}</p>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {billingResolutionMetadata?.blockingIssueCode === "provider_contract_expired" ? (
+            <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50/80 p-4 text-sm text-rose-900">
+              This work order is still snapped to an expired provider contract. Update the contract or switch the work order back to direct billing before invoicing.
+            </div>
+          ) : null}
           <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-2xl border border-slate-200 bg-white p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Source type</p>
