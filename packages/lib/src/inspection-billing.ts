@@ -17,7 +17,6 @@ import {
 import { resolveInspectionServiceFeeTx } from "./service-fees";
 import { saveQuickBooksItemMappingForCode } from "./quickbooks";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
-import { applyBillingContextToItems, resolveCustomerBillingContextTx, type ResolvedBillingContext } from "./third-party-billing";
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -99,6 +98,10 @@ type PersistedBillingSummary = {
   siteId: string;
   status: BillingSummaryStatus;
   billingType: "standard" | "third_party";
+  payerType: "customer" | "provider";
+  payerCustomerId: string | null;
+  payerProviderAccountId: string | null;
+  billingResolutionSnapshotId: string | null;
   billToAccountId: string | null;
   billToName: string | null;
   contractProfileId: string | null;
@@ -124,6 +127,10 @@ type PersistedBillingSummaryRow = {
   siteId: string;
   status: string;
   billingType: string;
+  payerType: string;
+  payerCustomerId: string | null;
+  payerProviderAccountId: string | null;
+  billingResolutionSnapshotId: string | null;
   billToAccountId: string | null;
   billToName: string | null;
   contractProfileId: string | null;
@@ -248,6 +255,77 @@ type InspectionRow = {
   customerCompanyId: string;
   siteId: string;
   inspectionClassification: string | null;
+};
+
+type InspectionBillingResolutionContext = {
+  inspectionId: string;
+  customerCompanyId: string;
+  customerCompanyName: string;
+  customerQuickbooksCustomerId: string | null;
+  customerBillingEmail: string | null;
+  sourceType: "direct" | "third_party_provider";
+  providerContext:
+    | {
+        id: string;
+        providerAccountId: string | null;
+        providerContractProfileId: string | null;
+        siteProviderAssignmentId: string | null;
+        providerWorkOrderNumber: string | null;
+        providerReferenceNumber: string | null;
+        sourceType: "direct" | "third_party_provider";
+        providerAccount: {
+          id: string;
+          name: string;
+          status: "active" | "inactive";
+        } | null;
+        providerContractProfile: {
+          id: string;
+          name: string;
+          status: "draft" | "active" | "inactive" | "expired";
+          invoiceGroupingMode: "per_work_order" | "per_site" | "monthly_rollup";
+          requireProviderWorkOrderNumber: boolean;
+          requireSiteReferenceNumber: boolean;
+          effectiveStartDate: Date | null;
+          effectiveEndDate: Date | null;
+        } | null;
+        siteProviderAssignment: {
+          id: string;
+          providerContractProfileId: string | null;
+          externalAccountName: string | null;
+          externalAccountNumber: string | null;
+          externalLocationCode: string | null;
+        } | null;
+      }
+    | null;
+};
+
+type BillingResolutionResult = {
+  billingType: "standard" | "third_party";
+  payerType: "customer" | "provider";
+  payerCustomerId: string | null;
+  payerProviderAccountId: string | null;
+  billToAccountId: string | null;
+  billToName: string;
+  contractProfileId: string | null;
+  contractProfileName: string | null;
+  routingSnapshot: JsonValue;
+  pricingSnapshot: JsonValue;
+  groupingSnapshot: JsonValue;
+  attachmentSnapshot: JsonValue;
+  deliverySnapshot: JsonValue;
+  referenceSnapshot: JsonValue;
+  resolutionSnapshot: {
+    resolvedMode: "direct_customer" | "contract_provider";
+    pricingSource: "provider_contract_rate" | "customer_pricing" | "default_pricing" | "manual_override";
+    pricingSourceReferenceId: string | null;
+    providerContractProfileId: string | null;
+    siteProviderAssignmentId: string | null;
+    payerCustomerId: string | null;
+    payerProviderAccountId: string | null;
+    resolutionReason: string;
+    snapshotData: string;
+  };
+  items: BillableItem[];
 };
 
 const INSPECTION_LEVEL_REPORT_TYPE = "inspection";
@@ -1487,34 +1565,657 @@ function normalizeBillingType(value: string | null | undefined): "standard" | "t
   return value === "third_party" ? "third_party" : "standard";
 }
 
-function buildBillingContextSnapshots(context: ResolvedBillingContext) {
+function normalizeInvoicePayerType(value: string | null | undefined): "customer" | "provider" {
+  return value === "provider" ? "provider" : "customer";
+}
+
+function mapProviderGroupingMode(mode: "per_work_order" | "per_site" | "monthly_rollup" | undefined) {
+  switch (mode) {
+    case "per_site":
+      return { mode: "group_by_site", note: "Grouped by assigned provider site." } satisfies JsonValue;
+    case "monthly_rollup":
+      return { mode: "standard", note: "Monthly provider rollup billing." } satisfies JsonValue;
+    case "per_work_order":
+    default:
+      return { mode: "group_by_inspection", note: "Billed per provider work order." } satisfies JsonValue;
+  }
+}
+
+function resolvePricingFallback(input: {
+  items: BillableItem[];
+}): {
+  pricingSource: "customer_pricing" | "default_pricing";
+  pricingSourceReferenceId: string | null;
+  resolutionReason: string;
+} {
+  const serviceFeeItem = input.items.find((item) => item.sourceSection === "service-fee");
+  const serviceFeeMetadata = (serviceFeeItem?.metadata ?? {}) as Record<string, unknown>;
+  const serviceFeeResolutionSource = typeof serviceFeeMetadata.resolutionSource === "string"
+    ? serviceFeeMetadata.resolutionSource
+    : null;
+  const serviceFeeRuleId = typeof serviceFeeMetadata.serviceFeeRuleId === "string"
+    ? serviceFeeMetadata.serviceFeeRuleId
+    : null;
+
+  if (serviceFeeResolutionSource && serviceFeeResolutionSource !== "default") {
+    return {
+      pricingSource: "customer_pricing",
+      pricingSourceReferenceId: serviceFeeRuleId,
+      resolutionReason: `Resolved pricing from customer pricing rules via ${serviceFeeResolutionSource}.`
+    };
+  }
+
   return {
-    billingType: context.billingType,
-    billToAccountId: context.routing.billToAccountId,
-    billToName: context.routing.billToName,
-    contractProfileId: context.contractProfile?.id ?? null,
-    contractProfileName: context.contractProfile?.name ?? null,
-    routingSnapshot: {
-      billToAccountId: context.routing.billToAccountId,
-      billToName: context.routing.billToName,
-      quickbooksCustomerId: context.routing.quickbooksCustomerId,
-      autoBillingEnabled: context.autoBillingEnabled
-    } satisfies JsonValue,
-    pricingSnapshot: {
-      mode: context.pricing.mode,
-      source: context.pricing.source,
-      overridesByCode: context.pricing.overridesByCode
-    } satisfies JsonValue,
-    groupingSnapshot: context.grouping as unknown as JsonValue,
-    attachmentSnapshot: context.attachments as unknown as JsonValue,
-    deliverySnapshot: context.delivery as unknown as JsonValue,
-    referenceSnapshot: context.references as unknown as JsonValue
+    pricingSource: "default_pricing",
+    pricingSourceReferenceId: null,
+    resolutionReason: "Resolved pricing from default pricing because no provider contract or customer-specific pricing rule applied."
+  };
+}
+
+function scoreProviderContractRateMatch(input: {
+  rate: {
+    inspectionType: InspectionType | null;
+    reportType: string | null;
+    assetCategory: string | null;
+    priority: number;
+    effectiveStartDate: Date | null;
+  };
+  reportTypes: InspectionType[];
+  assetCategories: string[];
+}) {
+  let specificity = input.rate.priority * 1000;
+
+  if (input.rate.inspectionType && input.reportTypes.includes(input.rate.inspectionType)) {
+    specificity += 200;
+  }
+
+  if (input.rate.reportType && input.reportTypes.includes(input.rate.reportType as InspectionType)) {
+    specificity += 150;
+  }
+
+  if (input.rate.assetCategory && input.assetCategories.includes(input.rate.assetCategory)) {
+    specificity += 100;
+  }
+
+  if (input.rate.effectiveStartDate) {
+    specificity += Math.floor(input.rate.effectiveStartDate.getTime() / 1000_000_000);
+  }
+
+  return specificity;
+}
+
+function applyProviderContractRateToItems(
+  items: BillableItem[],
+  rate: {
+    pricingMethod: "flat_rate" | "per_unit" | "hourly";
+    unitRate: number | null;
+    flatRate: number | null;
+    minimumCharge: number | null;
+  }
+) {
+  if (!items.length) {
+    return items;
+  }
+
+  let targetIds = new Set<string>();
+  if (rate.pricingMethod === "hourly") {
+    targetIds = new Set(items.filter((item) => item.category === "labor").map((item) => item.id));
+  } else if (rate.pricingMethod === "per_unit") {
+    targetIds = new Set(items.filter((item) => item.category !== "fee").map((item) => item.id));
+  } else {
+    const flatTarget = items.find((item) => item.sourceSection === "service-fee") ?? items[0];
+    if (flatTarget) {
+      targetIds = new Set([flatTarget.id]);
+    }
+  }
+
+  if (!targetIds.size) {
+    const fallbackTarget = items.find((item) => item.sourceSection === "service-fee") ?? items[0];
+    if (fallbackTarget) {
+      targetIds = new Set([fallbackTarget.id]);
+    }
+  }
+
+  const updatedItems = items.map((item) => {
+    if (!targetIds.has(item.id)) {
+      return item;
+    }
+
+    if (rate.pricingMethod === "flat_rate") {
+      const unitPrice = rate.flatRate ?? item.unitPrice ?? null;
+      return {
+        ...item,
+        quantity: 1,
+        unitPrice,
+        amount: calculateAmount(1, unitPrice)
+      };
+    }
+
+    const unitPrice = rate.unitRate ?? item.unitPrice ?? null;
+    return {
+      ...item,
+      unitPrice,
+      amount: calculateAmount(item.quantity, unitPrice)
+    };
+  });
+
+  if (!rate.minimumCharge || subtotalForItems(updatedItems) >= rate.minimumCharge) {
+    return updatedItems;
+  }
+
+  const minimumChargeDelta = Number((rate.minimumCharge - subtotalForItems(updatedItems)).toFixed(2));
+  const topUpTarget = updatedItems.find((item) => targetIds.has(item.id)) ?? updatedItems[0];
+  if (!topUpTarget) {
+    return updatedItems;
+  }
+
+  return updatedItems.map((item) => {
+    if (item.id !== topUpTarget.id) {
+      return item;
+    }
+
+    const nextAmount = Number(((item.amount ?? 0) + minimumChargeDelta).toFixed(2));
+    const nextUnitPrice = item.quantity > 0 ? Number((nextAmount / item.quantity).toFixed(2)) : nextAmount;
+
+    return {
+      ...item,
+      unitPrice: nextUnitPrice,
+      amount: nextAmount
+    };
+  });
+}
+
+async function getInspectionBillingResolutionContextTx(
+  tx: TransactionClient,
+  input: {
+    tenantId: string;
+    inspectionId: string;
+  }
+) {
+  const inspection = await tx.inspection.findFirst({
+    where: {
+      id: input.inspectionId,
+      tenantId: input.tenantId
+    },
+    select: {
+      id: true,
+      customerCompanyId: true,
+      sourceType: true,
+      customerCompany: {
+        select: {
+          id: true,
+          name: true,
+          quickbooksCustomerId: true,
+          billingEmail: true
+        }
+      },
+      providerContextRecord: {
+        select: {
+          id: true,
+          providerAccountId: true,
+          providerContractProfileId: true,
+          siteProviderAssignmentId: true,
+          providerWorkOrderNumber: true,
+          providerReferenceNumber: true,
+          sourceType: true,
+          providerAccount: {
+            select: {
+              id: true,
+              name: true,
+              status: true
+            }
+          },
+          providerContractProfile: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              invoiceGroupingMode: true,
+              requireProviderWorkOrderNumber: true,
+              requireSiteReferenceNumber: true,
+              effectiveStartDate: true,
+              effectiveEndDate: true
+            }
+          },
+          siteProviderAssignment: {
+            select: {
+              id: true,
+              providerContractProfileId: true,
+              externalAccountName: true,
+              externalAccountNumber: true,
+              externalLocationCode: true
+            }
+          }
+        }
+      },
+      providerContextSnapshot: {
+        select: {
+          id: true,
+          providerAccountId: true,
+          providerContractProfileId: true,
+          siteProviderAssignmentId: true,
+          providerWorkOrderNumber: true,
+          providerReferenceNumber: true,
+          sourceType: true,
+          providerAccount: {
+            select: {
+              id: true,
+              name: true,
+              status: true
+            }
+          },
+          providerContractProfile: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              invoiceGroupingMode: true,
+              requireProviderWorkOrderNumber: true,
+              requireSiteReferenceNumber: true,
+              effectiveStartDate: true,
+              effectiveEndDate: true
+            }
+          },
+          siteProviderAssignment: {
+            select: {
+              id: true,
+              providerContractProfileId: true,
+              externalAccountName: true,
+              externalAccountNumber: true,
+              externalLocationCode: true
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (!inspection) {
+    throw new Error("Inspection not found for billing resolution.");
+  }
+
+  const customerCompany = inspection.customerCompany ?? await tx.customerCompany.findFirst({
+    where: {
+      id: inspection.customerCompanyId,
+      tenantId: input.tenantId
+    },
+    select: {
+      id: true,
+      name: true,
+      quickbooksCustomerId: true,
+      billingEmail: true
+    }
+  });
+
+  if (!customerCompany) {
+    throw new Error("Customer not found for billing resolution.");
+  }
+
+  const providerContext = inspection.providerContextRecord ?? inspection.providerContextSnapshot ?? null;
+
+  return {
+    inspectionId: inspection.id,
+    customerCompanyId: customerCompany.id,
+    customerCompanyName: customerCompany.name,
+    customerQuickbooksCustomerId: customerCompany.quickbooksCustomerId ?? null,
+    customerBillingEmail: customerCompany.billingEmail ?? null,
+    sourceType: inspection.sourceType ?? "direct",
+    providerContext
+  } satisfies InspectionBillingResolutionContext;
+}
+
+async function resolveProviderContractProfileTx(
+  tx: TransactionClient,
+  input: {
+    tenantId: string;
+    providerContext: NonNullable<InspectionBillingResolutionContext["providerContext"]>;
+    billingDate: Date;
+  }
+) {
+  const directProfile = input.providerContext.providerContractProfile;
+  if (
+    directProfile
+    && directProfile.status === "active"
+    && (!directProfile.effectiveStartDate || directProfile.effectiveStartDate.getTime() <= input.billingDate.getTime())
+    && (!directProfile.effectiveEndDate || directProfile.effectiveEndDate.getTime() >= input.billingDate.getTime())
+  ) {
+    return directProfile;
+  }
+
+  const profileId = input.providerContext.providerContractProfileId
+    ?? input.providerContext.siteProviderAssignment?.providerContractProfileId
+    ?? null;
+
+  if (profileId) {
+    const profile = await tx.providerContractProfile.findFirst({
+    where: {
+      id: profileId,
+      organizationId: input.tenantId,
+      status: "active",
+      effectiveStartDate: { lte: input.billingDate },
+      AND: [
+        {
+          OR: [
+              { effectiveEndDate: null },
+              { effectiveEndDate: { gte: input.billingDate } }
+            ]
+          }
+        ]
+      },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        invoiceGroupingMode: true,
+        requireProviderWorkOrderNumber: true,
+        requireSiteReferenceNumber: true,
+        effectiveStartDate: true,
+        effectiveEndDate: true
+      }
+    });
+
+    if (profile) {
+      return profile;
+    }
+  }
+
+  if (!input.providerContext.providerAccountId) {
+    throw new Error("Third-party provider work orders require a provider account.");
+  }
+
+  const fallbackProfile = await tx.providerContractProfile.findFirst({
+    where: {
+      organizationId: input.tenantId,
+      providerAccountId: input.providerContext.providerAccountId,
+      status: "active",
+      effectiveStartDate: { lte: input.billingDate },
+      AND: [
+        {
+          OR: [
+            { effectiveEndDate: null },
+            { effectiveEndDate: { gte: input.billingDate } }
+          ]
+        }
+      ]
+    },
+    orderBy: [
+      { effectiveStartDate: "desc" },
+      { createdAt: "desc" }
+    ],
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      invoiceGroupingMode: true,
+      requireProviderWorkOrderNumber: true,
+      requireSiteReferenceNumber: true,
+      effectiveStartDate: true,
+      effectiveEndDate: true
+    }
+  });
+
+  if (!fallbackProfile) {
+    throw new Error("Third-party provider work orders require an active provider contract profile.");
+  }
+
+  return fallbackProfile;
+}
+
+async function resolveProviderContractRateTx(
+  tx: TransactionClient,
+  input: {
+    providerContractProfileId: string;
+    billingDate: Date;
+    serviceType: string;
+    reportTypes: InspectionType[];
+    items: BillableItem[];
+  }
+) {
+  const assetCategories = [
+    ...new Set(
+      input.items
+        .map((item) => {
+          const metadata = (item.metadata ?? {}) as Record<string, unknown>;
+          return typeof metadata.assetCategory === "string" ? metadata.assetCategory : null;
+        })
+        .filter((value): value is string => Boolean(value))
+    )
+  ];
+
+  const rates = await tx.providerContractRate.findMany({
+    where: {
+      providerContractProfileId: input.providerContractProfileId,
+      serviceType: input.serviceType
+    },
+    select: {
+      id: true,
+      inspectionType: true,
+      reportType: true,
+      assetCategory: true,
+      pricingMethod: true,
+      unitRate: true,
+      flatRate: true,
+      minimumCharge: true,
+      effectiveStartDate: true,
+      effectiveEndDate: true,
+      priority: true
+    }
+  });
+
+  return rates
+    .filter((rate) => !rate.effectiveStartDate || rate.effectiveStartDate.getTime() <= input.billingDate.getTime())
+    .filter((rate) => !rate.effectiveEndDate || rate.effectiveEndDate.getTime() >= input.billingDate.getTime())
+    .filter((rate) => !rate.inspectionType || input.reportTypes.includes(rate.inspectionType))
+    .filter((rate) => !rate.reportType || input.reportTypes.includes(rate.reportType as InspectionType))
+    .filter((rate) => !rate.assetCategory || assetCategories.includes(rate.assetCategory))
+    .sort((left, right) =>
+      scoreProviderContractRateMatch({ rate: right, reportTypes: input.reportTypes, assetCategories })
+      - scoreProviderContractRateMatch({ rate: left, reportTypes: input.reportTypes, assetCategories })
+    )[0] ?? null;
+}
+
+async function resolveBillingOutcomeTx(
+  tx: TransactionClient,
+  input: {
+    tenantId: string;
+    inspectionId: string;
+    inspectionClassification: string | null;
+    reportTypes: InspectionType[];
+    items: BillableItem[];
+  }
+): Promise<BillingResolutionResult> {
+  const inspection = await getInspectionBillingResolutionContextTx(tx, {
+    tenantId: input.tenantId,
+    inspectionId: input.inspectionId
+  });
+  const billingDate = new Date();
+  const hasDeficiencyWork = input.reportTypes.includes("work_order");
+  const hasServiceWork = input.items.some((item) => item.category === "labor" || item.category === "service");
+  const serviceType = input.inspectionClassification === "emergency"
+    ? "emergency"
+    : hasDeficiencyWork
+      ? "deficiency"
+      : hasServiceWork
+        ? "service"
+        : "inspection";
+
+  if (inspection.providerContext) {
+    const providerAccount = inspection.providerContext.providerAccount;
+    const providerAccountId = inspection.providerContext.providerAccountId ?? providerAccount?.id ?? null;
+    if (!providerAccountId || !providerAccount || providerAccount.status !== "active") {
+      throw new Error("Third-party provider work orders require an active provider account.");
+    }
+
+    const contractProfile = await resolveProviderContractProfileTx(tx, {
+      tenantId: input.tenantId,
+      providerContext: inspection.providerContext,
+      billingDate
+    });
+    const providerRate = await resolveProviderContractRateTx(tx, {
+      providerContractProfileId: contractProfile.id,
+      billingDate,
+      serviceType,
+      reportTypes: input.reportTypes,
+      items: input.items
+    });
+    const fallbackPricing = resolvePricingFallback({ items: input.items });
+    const pricedItems = providerRate ? applyProviderContractRateToItems(input.items, providerRate) : input.items;
+    const pricingSource = providerRate ? "provider_contract_rate" : fallbackPricing.pricingSource;
+    const pricingSourceReferenceId = providerRate ? providerRate.id : fallbackPricing.pricingSourceReferenceId;
+    const resolutionReason = providerRate
+      ? `Resolved to contract provider billing for ${providerAccount.name} using contract rate ${providerRate.id}.`
+      : `Resolved to contract provider billing for ${providerAccount.name}; ${fallbackPricing.resolutionReason}`;
+    const routingSnapshot = {
+      billToAccountId: providerAccountId,
+      billToName: providerAccount.name,
+      quickbooksCustomerId: null,
+      autoBillingEnabled: true,
+      sourceType: inspection.providerContext.sourceType,
+      providerWorkOrderNumber: inspection.providerContext.providerWorkOrderNumber,
+      providerReferenceNumber: inspection.providerContext.providerReferenceNumber
+    } satisfies JsonValue;
+    const pricingSnapshot = {
+      source: pricingSource,
+      sourceReferenceId: pricingSourceReferenceId,
+      serviceType,
+      pricingMethod: providerRate?.pricingMethod ?? null,
+      providerRateId: providerRate?.id ?? null
+    } satisfies JsonValue;
+    const groupingSnapshot = mapProviderGroupingMode(contractProfile.invoiceGroupingMode);
+    const attachmentSnapshot = {
+      requireFinalizedReport: true,
+      requireSignedDocument: false,
+      requiredDocumentLabels: []
+    } satisfies JsonValue;
+    const deliverySnapshot = {
+      holdForManualReview: true,
+      method: "manual",
+      recipientEmail: null
+    } satisfies JsonValue;
+    const referenceLabels = [
+      ...(contractProfile.requireProviderWorkOrderNumber ? ["Provider work order number"] : []),
+      ...(contractProfile.requireSiteReferenceNumber ? ["Site reference number"] : [])
+    ];
+    const referenceSnapshot = {
+      requirePo: contractProfile.requireProviderWorkOrderNumber,
+      requireCustomerReference: contractProfile.requireSiteReferenceNumber,
+      labels: referenceLabels
+    } satisfies JsonValue;
+    const snapshotData = JSON.stringify({
+      resolvedMode: "contract_provider",
+      payerProviderAccountId: providerAccountId,
+      providerContractProfileId: contractProfile.id,
+      siteProviderAssignmentId: inspection.providerContext.siteProviderAssignmentId ?? null,
+      pricingSource,
+      pricingSourceReferenceId,
+      resolutionReason,
+      routingSnapshot,
+      pricingSnapshot
+    });
+
+    return {
+      billingType: "third_party",
+      payerType: "provider",
+      payerCustomerId: null,
+      payerProviderAccountId: providerAccountId,
+      billToAccountId: providerAccountId,
+      billToName: providerAccount.name,
+      contractProfileId: contractProfile.id,
+      contractProfileName: contractProfile.name,
+      routingSnapshot,
+      pricingSnapshot,
+      groupingSnapshot,
+      attachmentSnapshot,
+      deliverySnapshot,
+      referenceSnapshot,
+      resolutionSnapshot: {
+        resolvedMode: "contract_provider",
+        pricingSource,
+        pricingSourceReferenceId,
+        providerContractProfileId: contractProfile.id,
+        siteProviderAssignmentId: inspection.providerContext.siteProviderAssignmentId ?? null,
+        payerCustomerId: null,
+        payerProviderAccountId: providerAccountId,
+        resolutionReason,
+        snapshotData
+      },
+      items: pricedItems
+    };
+  }
+
+  const fallbackPricing = resolvePricingFallback({ items: input.items });
+  const routingSnapshot = {
+    billToAccountId: null,
+    billToName: inspection.customerCompanyName,
+    quickbooksCustomerId: inspection.customerQuickbooksCustomerId,
+    autoBillingEnabled: false,
+    sourceType: inspection.sourceType
+  } satisfies JsonValue;
+  const pricingSnapshot = {
+    source: fallbackPricing.pricingSource,
+    sourceReferenceId: fallbackPricing.pricingSourceReferenceId,
+    serviceType
+  } satisfies JsonValue;
+  const groupingSnapshot = { mode: "standard" } satisfies JsonValue;
+  const attachmentSnapshot = {
+    requireFinalizedReport: false,
+    requireSignedDocument: false,
+    requiredDocumentLabels: []
+  } satisfies JsonValue;
+  const deliverySnapshot = {
+    holdForManualReview: false,
+    method: inspection.customerBillingEmail ? "customer_email" : "manual",
+    recipientEmail: inspection.customerBillingEmail
+  } satisfies JsonValue;
+  const referenceSnapshot = {
+    requirePo: false,
+    requireCustomerReference: false,
+    labels: []
+  } satisfies JsonValue;
+  const resolutionReason = `Resolved to direct customer billing; ${fallbackPricing.resolutionReason}`;
+  const snapshotData = JSON.stringify({
+    resolvedMode: "direct_customer",
+    payerCustomerId: inspection.customerCompanyId,
+    pricingSource: fallbackPricing.pricingSource,
+    pricingSourceReferenceId: fallbackPricing.pricingSourceReferenceId,
+    resolutionReason,
+    routingSnapshot,
+    pricingSnapshot
+  });
+
+  return {
+    billingType: "standard",
+    payerType: "customer",
+    payerCustomerId: inspection.customerCompanyId,
+    payerProviderAccountId: null,
+    billToAccountId: null,
+    billToName: inspection.customerCompanyName,
+    contractProfileId: null,
+    contractProfileName: null,
+    routingSnapshot,
+    pricingSnapshot,
+    groupingSnapshot,
+    attachmentSnapshot,
+    deliverySnapshot,
+    referenceSnapshot,
+    resolutionSnapshot: {
+      resolvedMode: "direct_customer",
+      pricingSource: fallbackPricing.pricingSource,
+      pricingSourceReferenceId: fallbackPricing.pricingSourceReferenceId,
+      providerContractProfileId: null,
+      siteProviderAssignmentId: null,
+      payerCustomerId: inspection.customerCompanyId,
+      payerProviderAccountId: null,
+      resolutionReason,
+      snapshotData
+    },
+    items: input.items
   };
 }
 
 async function getExistingBillingSummaryRow(tx: TransactionClient, inspectionId: string) {
   const rows = await tx.$queryRaw`
-    SELECT "id", "tenantId", "inspectionId", "customerCompanyId", "siteId", "status", "billingType", "billToAccountId", "billToName", "contractProfileId", "contractProfileName", "routingSnapshot", "pricingSnapshot", "groupingSnapshot", "attachmentSnapshot", "deliverySnapshot", "referenceSnapshot", "items", "subtotal", "notes", "createdAt", "updatedAt"
+    SELECT "id", "tenantId", "inspectionId", "customerCompanyId", "siteId", "status", "billingType", "payerType", "payerCustomerId", "payerProviderAccountId", "billingResolutionSnapshotId", "billToAccountId", "billToName", "contractProfileId", "contractProfileName", "routingSnapshot", "pricingSnapshot", "groupingSnapshot", "attachmentSnapshot", "deliverySnapshot", "referenceSnapshot", "items", "subtotal", "notes", "createdAt", "updatedAt"
     FROM "InspectionBillingSummary"
     WHERE "inspectionId" = ${inspectionId}
     LIMIT 1
@@ -1529,6 +2230,7 @@ async function getExistingBillingSummaryRow(tx: TransactionClient, inspectionId:
     ...row,
     status: row.status as BillingSummaryStatus,
     billingType: normalizeBillingType(row.billingType),
+    payerType: normalizeInvoicePayerType(row.payerType),
     items: normalizeExistingItems(row.items)
   } satisfies PersistedBillingSummary;
 }
@@ -1587,14 +2289,6 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
     return null;
   }
 
-  const billingContext = await resolveCustomerBillingContextTx(db, {
-    tenantId: input.tenantId,
-    customerCompanyId: inspection.customerCompanyId,
-    inspectionClassification: inspection.inspectionClassification,
-    hasDeficiencyWork: reports.some((report) => report.inspectionType === "work_order"),
-    hasServiceWork: extracted.some((item) => item.category === "labor" || item.category === "service")
-  });
-
   const mergedItems = mergeBillingItems(existing?.items ?? [], extracted);
   const linkedItems = await Promise.all(
     mergedItems.map(async (item) => {
@@ -1630,14 +2324,83 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
       } satisfies BillableItem;
     })
   );
-  const pricedItems = applyBillingContextToItems(linkedItems, billingContext);
+  const existingResolutionSnapshot = existing?.billingResolutionSnapshotId
+    ? await db.billingResolutionSnapshot.findFirst({
+        where: {
+          id: existing.billingResolutionSnapshotId,
+          organizationId: input.tenantId
+        },
+        select: { id: true }
+      })
+    : null;
+  const existingResolvedSummary = existing && existingResolutionSnapshot
+    ? existing
+    : null;
+  const billingResolution = existingResolvedSummary
+    ? {
+        billingType: existingResolvedSummary.billingType,
+        payerType: existingResolvedSummary.payerType,
+        payerCustomerId: existingResolvedSummary.payerCustomerId,
+        payerProviderAccountId: existingResolvedSummary.payerProviderAccountId,
+        billToAccountId: existingResolvedSummary.billToAccountId,
+        billToName: existingResolvedSummary.billToName ?? "Billing Payer",
+        contractProfileId: existingResolvedSummary.contractProfileId,
+        contractProfileName: existingResolvedSummary.contractProfileName,
+        routingSnapshot: existingResolvedSummary.routingSnapshot ?? null,
+        pricingSnapshot: existingResolvedSummary.pricingSnapshot ?? null,
+        groupingSnapshot: existingResolvedSummary.groupingSnapshot ?? null,
+        attachmentSnapshot: existingResolvedSummary.attachmentSnapshot ?? null,
+        deliverySnapshot: existingResolvedSummary.deliverySnapshot ?? null,
+        referenceSnapshot: existingResolvedSummary.referenceSnapshot ?? null,
+        resolutionSnapshot: {
+          resolvedMode: (existingResolvedSummary.payerType === "provider"
+            ? "contract_provider"
+            : "direct_customer") as "contract_provider" | "direct_customer",
+          pricingSource: "manual_override" as const,
+          pricingSourceReferenceId: null,
+          providerContractProfileId: existingResolvedSummary.contractProfileId,
+          siteProviderAssignmentId: null,
+          payerCustomerId: existingResolvedSummary.payerCustomerId,
+          payerProviderAccountId: existingResolvedSummary.payerProviderAccountId,
+          resolutionReason: "Reused existing billing resolution snapshot.",
+          snapshotData: "{}"
+        },
+        items: linkedItems
+      }
+    : await resolveBillingOutcomeTx(db, {
+        tenantId: input.tenantId,
+        inspectionId: input.inspectionId,
+        inspectionClassification: inspection.inspectionClassification,
+        reportTypes: reports.map((report) => report.inspectionType),
+        items: linkedItems
+      });
+  const pricedItems = billingResolution.items;
   const subtotal = subtotalForItems(pricedItems);
-  const snapshots = buildBillingContextSnapshots(billingContext);
+  const billingResolutionSnapshotId = existingResolutionSnapshot?.id
+    ?? (
+      await db.billingResolutionSnapshot.create({
+        data: {
+          organizationId: input.tenantId,
+          sourceEntityType: "work_order",
+          sourceEntityId: input.inspectionId,
+          resolvedMode: billingResolution.resolutionSnapshot.resolvedMode,
+          payerCustomerId: billingResolution.resolutionSnapshot.payerCustomerId,
+          payerProviderAccountId: billingResolution.resolutionSnapshot.payerProviderAccountId,
+          providerContractProfileId: billingResolution.resolutionSnapshot.providerContractProfileId,
+          siteProviderAssignmentId: billingResolution.resolutionSnapshot.siteProviderAssignmentId,
+          pricingSource: billingResolution.resolutionSnapshot.pricingSource,
+          pricingSourceReferenceId: billingResolution.resolutionSnapshot.pricingSourceReferenceId,
+          resolutionReason: billingResolution.resolutionSnapshot.resolutionReason,
+          snapshotData: billingResolution.resolutionSnapshot.snapshotData
+        },
+        select: { id: true }
+      })
+    ).id;
 
   const summaryId = existing?.id ?? crypto.randomUUID();
   await db.$executeRaw`
     INSERT INTO "InspectionBillingSummary" (
-      "id", "tenantId", "inspectionId", "customerCompanyId", "siteId", "status", "billingType", "billToAccountId", "billToName", "contractProfileId", "contractProfileName", "routingSnapshot", "pricingSnapshot", "groupingSnapshot", "attachmentSnapshot", "deliverySnapshot", "referenceSnapshot", "items", "subtotal", "notes", "createdAt", "updatedAt"
+      "id", "tenantId", "inspectionId", "customerCompanyId", "siteId", "status", "billingType", "payerType", "payerCustomerId", "payerProviderAccountId", "billingResolutionSnapshotId", "billToAccountId", "billToName", "contractProfileId", "contractProfileName", "routingSnapshot", "pricingSnapshot", "groupingSnapshot", "attachmentSnapshot", "deliverySnapshot", "referenceSnapshot", "items", "subtotal", "notes", "createdAt", "updatedAt"
     ) VALUES (
       ${summaryId},
       ${input.tenantId},
@@ -1645,17 +2408,21 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
       ${inspection.customerCompanyId},
       ${inspection.siteId},
       ${existing?.status ?? "draft"},
-      ${snapshots.billingType}::"BillingType",
-      ${snapshots.billToAccountId},
-      ${snapshots.billToName},
-      ${snapshots.contractProfileId},
-      ${snapshots.contractProfileName},
-      ${JSON.stringify(snapshots.routingSnapshot)}::jsonb,
-      ${JSON.stringify(snapshots.pricingSnapshot)}::jsonb,
-      ${JSON.stringify(snapshots.groupingSnapshot)}::jsonb,
-      ${JSON.stringify(snapshots.attachmentSnapshot)}::jsonb,
-      ${JSON.stringify(snapshots.deliverySnapshot)}::jsonb,
-      ${JSON.stringify(snapshots.referenceSnapshot)}::jsonb,
+      ${billingResolution.billingType}::"BillingType",
+      ${billingResolution.payerType}::"InvoicePayerType",
+      ${billingResolution.payerCustomerId},
+      ${billingResolution.payerProviderAccountId},
+      ${billingResolutionSnapshotId},
+      ${billingResolution.billToAccountId},
+      ${billingResolution.billToName},
+      ${billingResolution.contractProfileId},
+      ${billingResolution.contractProfileName},
+      ${JSON.stringify(billingResolution.routingSnapshot)}::jsonb,
+      ${JSON.stringify(billingResolution.pricingSnapshot)}::jsonb,
+      ${JSON.stringify(billingResolution.groupingSnapshot)}::jsonb,
+      ${JSON.stringify(billingResolution.attachmentSnapshot)}::jsonb,
+      ${JSON.stringify(billingResolution.deliverySnapshot)}::jsonb,
+      ${JSON.stringify(billingResolution.referenceSnapshot)}::jsonb,
       ${JSON.stringify(pricedItems)}::jsonb,
       ${subtotal},
       ${existing?.notes ?? null},
@@ -1668,6 +2435,10 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
       "customerCompanyId" = EXCLUDED."customerCompanyId",
       "siteId" = EXCLUDED."siteId",
       "billingType" = EXCLUDED."billingType",
+      "payerType" = EXCLUDED."payerType",
+      "payerCustomerId" = EXCLUDED."payerCustomerId",
+      "payerProviderAccountId" = EXCLUDED."payerProviderAccountId",
+      "billingResolutionSnapshotId" = COALESCE("InspectionBillingSummary"."billingResolutionSnapshotId", EXCLUDED."billingResolutionSnapshotId"),
       "billToAccountId" = EXCLUDED."billToAccountId",
       "billToName" = EXCLUDED."billToName",
       "contractProfileId" = EXCLUDED."contractProfileId",
@@ -1691,17 +2462,21 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
     customerCompanyId: inspection.customerCompanyId,
     siteId: inspection.siteId,
     status: existing?.status ?? "draft",
-    billingType: snapshots.billingType,
-    billToAccountId: snapshots.billToAccountId,
-    billToName: snapshots.billToName,
-    contractProfileId: snapshots.contractProfileId,
-    contractProfileName: snapshots.contractProfileName,
-    routingSnapshot: snapshots.routingSnapshot,
-    pricingSnapshot: snapshots.pricingSnapshot,
-    groupingSnapshot: snapshots.groupingSnapshot,
-    attachmentSnapshot: snapshots.attachmentSnapshot,
-    deliverySnapshot: snapshots.deliverySnapshot,
-    referenceSnapshot: snapshots.referenceSnapshot,
+    billingType: billingResolution.billingType,
+    payerType: billingResolution.payerType,
+    payerCustomerId: billingResolution.payerCustomerId,
+    payerProviderAccountId: billingResolution.payerProviderAccountId,
+    billingResolutionSnapshotId,
+    billToAccountId: billingResolution.billToAccountId,
+    billToName: billingResolution.billToName,
+    contractProfileId: billingResolution.contractProfileId,
+    contractProfileName: billingResolution.contractProfileName,
+    routingSnapshot: billingResolution.routingSnapshot,
+    pricingSnapshot: billingResolution.pricingSnapshot,
+    groupingSnapshot: billingResolution.groupingSnapshot,
+    attachmentSnapshot: billingResolution.attachmentSnapshot,
+    deliverySnapshot: billingResolution.deliverySnapshot,
+    referenceSnapshot: billingResolution.referenceSnapshot,
     items: pricedItems,
     subtotal,
     notes: existing?.notes ?? null,

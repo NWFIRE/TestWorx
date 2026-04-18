@@ -10,6 +10,9 @@ const { prismaMock, txMock } = vi.hoisted(() => ({
     customerCompany: { findFirst: vi.fn() },
     billingPayerAccount: { findFirst: vi.fn() },
     billingContractProfile: { findFirst: vi.fn() },
+    providerContractProfile: { findFirst: vi.fn() },
+    providerContractRate: { findMany: vi.fn() },
+    billingResolutionSnapshot: { findFirst: vi.fn(), create: vi.fn() },
     site: { findFirst: vi.fn() },
     tenant: { findUnique: vi.fn() },
     serviceFeeRule: { findMany: vi.fn() },
@@ -27,6 +30,9 @@ const { prismaMock, txMock } = vi.hoisted(() => ({
     customerCompany: { findFirst: vi.fn() },
     billingPayerAccount: { findFirst: vi.fn() },
     billingContractProfile: { findFirst: vi.fn() },
+    providerContractProfile: { findFirst: vi.fn() },
+    providerContractRate: { findMany: vi.fn() },
+    billingResolutionSnapshot: { findFirst: vi.fn(), create: vi.fn() },
     site: { findFirst: vi.fn() },
     tenant: { findUnique: vi.fn() },
     serviceFeeRule: { findMany: vi.fn() },
@@ -209,6 +215,10 @@ describe("inspection billing extraction", () => {
     txMock.customerCompany.findFirst.mockReset();
     txMock.billingPayerAccount.findFirst.mockReset();
     txMock.billingContractProfile.findFirst.mockReset();
+    txMock.providerContractProfile.findFirst.mockReset();
+    txMock.providerContractRate.findMany.mockReset();
+    txMock.billingResolutionSnapshot.findFirst.mockReset();
+    txMock.billingResolutionSnapshot.create.mockReset();
     txMock.site.findFirst.mockReset();
     txMock.tenant.findUnique.mockReset();
     txMock.serviceFeeRule.findMany.mockReset();
@@ -222,6 +232,17 @@ describe("inspection billing extraction", () => {
     prismaMock.auditLog.create.mockResolvedValue(undefined);
     prismaMock.quickBooksCatalogItemAlias.upsert.mockResolvedValue(undefined);
     prismaMock.billingItemCatalogMatch.upsert.mockResolvedValue(undefined);
+    prismaMock.billingResolutionSnapshot.findFirst.mockResolvedValue(null);
+    prismaMock.billingResolutionSnapshot.create.mockResolvedValue({ id: "billing_resolution_1" });
+    txMock.providerContractRate.findMany.mockResolvedValue([]);
+    txMock.billingResolutionSnapshot.findFirst.mockResolvedValue(null);
+    txMock.billingResolutionSnapshot.create.mockResolvedValue({ id: "billing_resolution_1" });
+    txMock.customerCompany.findFirst.mockResolvedValue({
+      id: "customer_1",
+      name: "Pinecrest Property Management",
+      quickbooksCustomerId: "qb_customer_1",
+      billingEmail: "billing@pinecrest.test"
+    });
     prismaMock.inspection.findFirst.mockResolvedValue({
       id: "inspection_1",
       customerCompanyId: "customer_1",
@@ -659,67 +680,68 @@ describe("inspection billing persistence and admin review", () => {
     expect(txMock.$executeRaw).toHaveBeenCalledTimes(1);
   });
 
-  it("snapshots third-party billing routing and resolved outcome during summary sync", async () => {
+  it("snapshots contract-provider billing resolution during summary sync", async () => {
     const kitchenDraft = buildKitchenDraft();
 
     txMock.inspection.findFirst.mockResolvedValue({
       id: "inspection_1",
       customerCompanyId: "customer_1",
       siteId: "site_1",
+      sourceType: "third_party_provider",
       inspectionClassification: null,
-      site: {
-        city: "Chicago",
-        state: "IL",
-        postalCode: "60601"
+      customerCompany: {
+        id: "customer_1",
+        name: "Pinecrest Property Management",
+        quickbooksCustomerId: "qb_customer_1",
+        billingEmail: "billing@pinecrest.test"
+      },
+      providerContextRecord: {
+        id: "provider_context_1",
+        providerAccountId: "provider_1",
+        providerContractProfileId: "provider_contract_1",
+        siteProviderAssignmentId: "site_assignment_1",
+        providerWorkOrderNumber: "CF-1001",
+        providerReferenceNumber: "REF-22",
+        sourceType: "third_party_provider",
+        providerAccount: {
+          id: "provider_1",
+          name: "Commercial Fire",
+          status: "active"
+        },
+        providerContractProfile: {
+          id: "provider_contract_1",
+          name: "Commercial Fire Annual",
+          status: "active",
+          invoiceGroupingMode: "per_work_order",
+          requireProviderWorkOrderNumber: true,
+          requireSiteReferenceNumber: true,
+          effectiveStartDate: new Date("2026-01-01T00:00:00.000Z"),
+          effectiveEndDate: null
+        },
+        siteProviderAssignment: {
+          id: "site_assignment_1",
+          providerContractProfileId: "provider_contract_1",
+          externalAccountName: "Pinecrest Tower",
+          externalAccountNumber: "ACCT-77",
+          externalLocationCode: "LOC-19"
+        }
       }
     });
-    txMock.customerCompany.findFirst.mockResolvedValue({
-      id: "customer_1",
-      name: "Pinecrest Property Management",
-      quickbooksCustomerId: "qb_customer_1",
-      billingType: "third_party",
-      billToAccountId: "payer_1",
-      contractProfileId: "contract_1",
-      invoiceDeliverySettings: { method: "payer_email" },
-      autoBillingEnabled: true,
-      requiredBillingReferences: { requirePo: true, labels: ["Store number"] }
-    });
-    txMock.billingPayerAccount.findFirst.mockResolvedValue({
-      id: "payer_1",
-      tenantId: "tenant_1",
-      name: "Academy Fire",
-      contactName: null,
-      billingEmail: "ap@academy.test",
-      phone: null,
-      billingAddressLine1: null,
-      billingAddressLine2: null,
-      billingCity: null,
-      billingState: null,
-      billingPostalCode: null,
-      billingCountry: null,
-      invoiceDeliverySettings: { method: "payer_email" },
-      quickbooksCustomerId: "qb_payer_1",
-      externalAccountCode: null,
-      externalReference: null,
-      isActive: true
-    });
-    txMock.billingContractProfile.findFirst.mockResolvedValue({
-      id: "contract_1",
-      tenantId: "tenant_1",
-      payerAccountId: "payer_1",
-      name: "Academy Annual",
-      isActive: true,
-      effectiveStartDate: new Date("2026-01-01T00:00:00.000Z"),
-      effectiveEndDate: null,
-      inspectionRules: { codeUnitPrices: { "SERVICE_FEE": 140 } },
-      serviceRules: {},
-      emergencyRules: {},
-      deficiencyRules: {},
-      groupingRules: { mode: "group_by_site" },
-      attachmentRules: { requireFinalizedReport: true, requireSignedDocument: true, requiredDocumentLabels: ["Signed report"] },
-      deliveryRules: { holdForManualReview: true, deliveryMethod: "payer_email", recipientEmail: "ap@academy.test" },
-      referenceRules: { requirePo: true, requireCustomerReference: false, labels: ["Store number"] }
-    });
+    txMock.providerContractRate.findMany.mockResolvedValue([
+      {
+        id: "provider_rate_1",
+        inspectionType: "kitchen_suppression",
+        reportType: "kitchen_suppression",
+        assetCategory: null,
+        pricingMethod: "flat_rate",
+        unitRate: null,
+        flatRate: 140,
+        minimumCharge: null,
+        effectiveStartDate: new Date("2026-01-01T00:00:00.000Z"),
+        effectiveEndDate: null,
+        priority: 10
+      }
+    ]);
     txMock.tenant.findUnique.mockResolvedValue({
       defaultServiceFeeCode: "SERVICE_FEE",
       defaultServiceFeeUnitPrice: 95
@@ -749,31 +771,46 @@ describe("inspection billing persistence and admin review", () => {
     });
 
     expect(summary?.billingType).toBe("third_party");
-    expect(summary?.billToName).toBe("Academy Fire");
-    expect(summary?.contractProfileName).toBe("Academy Annual");
+    expect(summary?.payerType).toBe("provider");
+    expect(summary?.payerProviderAccountId).toBe("provider_1");
+    expect(summary?.billToName).toBe("Commercial Fire");
+    expect(summary?.contractProfileName).toBe("Commercial Fire Annual");
     expect(summary?.pricingSnapshot).toEqual(
       expect.objectContaining({
-        mode: "contract_rule_override",
-        source: "inspectionRules"
+        source: "provider_contract_rate",
+        sourceReferenceId: "provider_rate_1"
       })
     );
     expect(summary?.deliverySnapshot).toEqual(
       expect.objectContaining({
-        method: "payer_email",
-        recipientEmail: "ap@academy.test"
+        method: "manual"
       })
     );
     expect(summary?.referenceSnapshot).toEqual(
       expect.objectContaining({
         requirePo: true,
-        labels: ["Store number"]
+        requireCustomerReference: true,
+        labels: ["Provider work order number", "Site reference number"]
       })
     );
     expect(summary?.routingSnapshot).toEqual(
       expect.objectContaining({
-        billToName: "Academy Fire",
-        quickbooksCustomerId: "qb_payer_1",
+        billToName: "Commercial Fire",
+        providerWorkOrderNumber: "CF-1001",
+        providerReferenceNumber: "REF-22",
         autoBillingEnabled: true
+      })
+    );
+    expect(summary?.billingResolutionSnapshotId).toBe("billing_resolution_1");
+    expect(txMock.billingResolutionSnapshot.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          resolvedMode: "contract_provider",
+          payerProviderAccountId: "provider_1",
+          pricingSource: "provider_contract_rate",
+          pricingSourceReferenceId: "provider_rate_1"
+        }),
+        select: { id: true }
       })
     );
   });
