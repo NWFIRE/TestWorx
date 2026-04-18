@@ -217,6 +217,11 @@ enum BillingResolutionPricingSource {
   manual_override
 }
 
+enum InvoicePayerType {
+  customer
+  provider
+}
+
 enum ComplianceReportingDivision {
   fire_extinguishers
   fire_alarm
@@ -437,6 +442,7 @@ model CustomerCompany {
   inspections               Inspection[]
   billingSummaries          InspectionBillingSummary[]
   billingResolutionSnapshots BillingResolutionSnapshot[]
+  payerBillingSummaries     InspectionBillingSummary[] @relation("InspectionBillingSummaryPayerCustomer")
   serviceFeeRules           ServiceFeeRule[]
   accountInvitations        AccountInvitation[]
   quotes                    Quote[]
@@ -525,6 +531,7 @@ model ContractProviderAccount {
   siteAssignments        ServiceSiteProviderAssignment[]
   workOrderContexts      WorkOrderProviderContext[]
   billingResolutionSnapshots BillingResolutionSnapshot[]
+  payerBillingSummaries  InspectionBillingSummary[] @relation("InspectionBillingSummaryPayerProvider")
 
   @@index([organizationId])
   @@index([organizationId, status])
@@ -648,7 +655,8 @@ model WorkOrderProviderContext {
   sourceType                WorkOrderProviderSourceType
   createdAt                 DateTime                         @default(now())
   updatedAt                 DateTime                         @updatedAt
-  workOrder                 Inspection                       @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  workOrder                 Inspection?                      @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  linkedWorkOrder           Inspection?                      @relation("InspectionProviderContextRecord")
   providerAccount           ContractProviderAccount?         @relation(fields: [providerAccountId], references: [id])
   providerContractProfile   ProviderContractProfile?         @relation(fields: [providerContractProfileId], references: [id])
   siteProviderAssignment    ServiceSiteProviderAssignment?   @relation(fields: [siteProviderAssignmentId], references: [id])
@@ -678,6 +686,7 @@ model BillingResolutionSnapshot {
   payerProviderAccount      ContractProviderAccount?          @relation(fields: [payerProviderAccountId], references: [id])
   providerContractProfile   ProviderContractProfile?          @relation(fields: [providerContractProfileId], references: [id])
   siteProviderAssignment    ServiceSiteProviderAssignment?    @relation(fields: [siteProviderAssignmentId], references: [id])
+  billingSummaries          InspectionBillingSummary[]
 
   @@index([organizationId])
   @@index([organizationId, sourceEntityType, sourceEntityId])
@@ -707,9 +716,11 @@ model Inspection {
     tenantId              String
     customerCompanyId     String
     siteId                String
+    providerContextId     String?                 @unique
     assignedTechnicianId  String?
     createdByUserId       String
     inspectionClassification InspectionClassification @default(standard)
+    sourceType            WorkOrderProviderSourceType @default(direct)
     isPriority            Boolean                 @default(false)
     priorityAssignedAt    DateTime?
     priorityClearedAt     DateTime?
@@ -737,6 +748,8 @@ model Inspection {
   tenant                Tenant                  @relation(fields: [tenantId], references: [id])
   customerCompany       CustomerCompany         @relation(fields: [customerCompanyId], references: [id])
   site                  Site                    @relation(fields: [siteId], references: [id])
+  providerContextRecord WorkOrderProviderContext? @relation("InspectionProviderContextRecord", fields: [providerContextId], references: [id])
+  providerContextSnapshot WorkOrderProviderContext?
   assignedTechnician    User?                   @relation("InspectionAssignedTechnician", fields: [assignedTechnicianId], references: [id])
   attachments           Attachment[]
   createdBy             User                    @relation("InspectionCreatedBy", fields: [createdByUserId], references: [id])
@@ -750,7 +763,6 @@ model Inspection {
       closeoutRequest       InspectionCloseoutRequest?
       createdFromCloseoutRequests InspectionCloseoutRequest[] @relation("InspectionCloseoutRequestCreatedInspection")
       technicianAssignments InspectionTechnicianAssignment[]
-      providerContext       WorkOrderProviderContext?
       convertedFromQuotes   Quote[]                 @relation("QuoteConvertedInspection")
 
     @@index([tenantId, inspectionClassification])
@@ -1189,6 +1201,10 @@ model InspectionBillingSummary {
   siteId            String
   status            String       @default("draft")
   billingType       BillingType  @default(standard)
+  payerType         InvoicePayerType @default(customer)
+  payerCustomerId   String?
+  payerProviderAccountId String?
+  billingResolutionSnapshotId String?
   billToAccountId   String?
   billToName        String?
   contractProfileId String?
@@ -1218,13 +1234,20 @@ model InspectionBillingSummary {
   inspection        Inspection   @relation(fields: [inspectionId], references: [id])
   customerCompany   CustomerCompany @relation(fields: [customerCompanyId], references: [id])
   site              Site         @relation(fields: [siteId], references: [id])
-
+  payerCustomer     CustomerCompany? @relation("InspectionBillingSummaryPayerCustomer", fields: [payerCustomerId], references: [id])
+  payerProviderAccount ContractProviderAccount? @relation("InspectionBillingSummaryPayerProvider", fields: [payerProviderAccountId], references: [id])
+  billingResolutionSnapshot BillingResolutionSnapshot? @relation(fields: [billingResolutionSnapshotId], references: [id])
+  
   @@index([tenantId, status])
   @@index([tenantId, customerCompanyId])
   @@index([tenantId, siteId])
   @@index([tenantId, billingType])
+  @@index([tenantId, payerType])
+  @@index([tenantId, payerCustomerId])
+  @@index([tenantId, payerProviderAccountId])
   @@index([tenantId, billToAccountId])
   @@index([tenantId, contractProfileId])
+  @@index([tenantId, billingResolutionSnapshotId])
 }
 
 model ServiceFeeRule {
