@@ -3068,6 +3068,36 @@ export async function getInspectionForEdit(actor: ActorContext, inspectionId: st
           customerVisible: true
         }
       },
+      providerContextRecord: {
+        include: {
+          providerAccount: true,
+          providerContractProfile: true,
+          siteProviderAssignment: true
+        }
+      },
+      providerContextSnapshot: {
+        include: {
+          providerAccount: true,
+          providerContractProfile: true,
+          siteProviderAssignment: true
+        }
+      },
+      billingSummary: {
+        include: {
+          billingResolutionSnapshot: {
+            include: {
+              payerCustomer: { select: { id: true, name: true } },
+              payerProviderAccount: { select: { id: true, name: true } },
+              providerContractProfile: { select: { id: true, name: true } },
+              siteProviderAssignment: {
+                include: {
+                  serviceSite: { select: { id: true, name: true } }
+                }
+              }
+            }
+          }
+        }
+      },
       replacementAmendments: {
         include: {
           inspection: {

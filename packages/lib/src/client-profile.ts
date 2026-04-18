@@ -5,6 +5,7 @@ import type { ActorContext, InspectionType } from "@testworx/types";
 import { actorContextSchema } from "@testworx/types";
 
 import { getCustomerPaymentTermsLabel } from "./customer-companies";
+import { mapSiteProviderAssignmentForDisplay } from "./contract-provider-billing";
 import { getQuickBooksCustomerInvoiceHistory } from "./quickbooks";
 import { quoteStatusLabels } from "./quotes";
 import { inspectionTypeRegistry } from "./report-config";
@@ -90,6 +91,23 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
       sites: {
         orderBy: { name: "asc" },
         include: {
+          providerAssignments: {
+            orderBy: [{ effectiveStartDate: "desc" }, { createdAt: "desc" }],
+            include: {
+              providerAccount: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              },
+              providerContractProfile: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
+          },
           _count: {
             select: {
               inspections: true,
@@ -445,7 +463,8 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
       address: formatAddress(site),
       city: site.city,
       assetCount: site._count.assets,
-      inspectionCount: site._count.inspections
+      inspectionCount: site._count.inspections,
+      ...mapSiteProviderAssignmentForDisplay(site)
     })),
     inspectionHistory,
     workHistory,

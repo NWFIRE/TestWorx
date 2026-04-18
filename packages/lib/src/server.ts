@@ -19,6 +19,7 @@ export * from "./account-email";
 export * from "./billing";
 export * from "./branding";
 export * from "./client-profile";
+export * from "./contract-provider-billing";
 export * from "./compliance-reporting-fees";
 export * from "./customer-companies";
 export * from "./customer-import";

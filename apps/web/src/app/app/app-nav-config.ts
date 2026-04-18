@@ -122,6 +122,17 @@ const adminNavItems: AppNavItem[] = [
     tone: "emerald"
   },
   {
+    href: "/app/admin/contract-providers",
+    label: "Contract Providers",
+    shortLabel: "Providers",
+    abbreviation: "CP",
+    icon: "team",
+    description: "Provider billing accounts, contracts, and site assignment visibility",
+    tone: "emerald",
+    matchMode: "exact",
+    matchPrefixes: ["/app/admin/contract-providers"]
+  },
+  {
     href: "/app/admin/email-reminders",
     label: "Email Reminders",
     shortLabel: "Email Reminders",

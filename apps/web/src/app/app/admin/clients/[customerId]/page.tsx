@@ -1,13 +1,19 @@
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getClientProfileData, getTenantBillingContractProfiles, getTenantBillingPayerAccounts } from "@testworx/lib/server/index";
+import {
+  getClientProfileData,
+  getContractProviderAssignmentOptions,
+  getTenantBillingContractProfiles,
+  getTenantBillingPayerAccounts
+} from "@testworx/lib/server/index";
 
 import { AppPageShell, PageHeader, SectionCard } from "../../operations-ui";
 import { ClientProfileWorkspace } from "../client-profile-workspace";
 import { deleteCustomerCompanyAction, updateCustomerCompanyProfileAction } from "../actions";
 import { CustomerProfileFields } from "../../settings/customer-management-card";
 import { DeleteCustomerCard } from "../delete-customer-card";
+import { setServiceSiteProviderAssignmentAction } from "../../contract-providers/actions";
 
 export default async function ClientProfilePage({
   params,
@@ -31,10 +37,11 @@ export default async function ClientProfilePage({
     role: session.user.role,
     tenantId: session.user.tenantId
   };
-  const [data, payerAccounts, contractProfiles] = await Promise.all([
+  const [data, payerAccounts, contractProfiles, providerOptions] = await Promise.all([
     getClientProfileData(actor, customerId),
     getTenantBillingPayerAccounts(actor),
-    getTenantBillingContractProfiles(actor)
+    getTenantBillingContractProfiles(actor),
+    getContractProviderAssignmentOptions(actor)
   ]);
 
   if (!data) {
@@ -124,6 +131,104 @@ export default async function ClientProfilePage({
           <p className="text-sm text-slateblue">{customerNotice}</p>
         </SectionCard>
       ) : null}
+
+      <SectionCard>
+        <div className="mb-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Contract Provider Assignment
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+            Site-level provider billing defaults
+          </h2>
+          <p className="mt-2 text-sm text-slate-500">
+            This is the visible default billing source for new work orders created from each service site. Changing it creates a new assignment snapshot instead of rewriting history.
+          </p>
+        </div>
+        <div className="space-y-4">
+          {data.sites.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">
+              No service sites are available for provider assignment yet.
+            </p>
+          ) : data.sites.map((site) => (
+            <form action={setServiceSiteProviderAssignmentAction} className="rounded-[1.5rem] border border-slate-200 p-4" key={site.id}>
+              <input name="customerCompanyId" type="hidden" value={data.customer.id} />
+              <input name="serviceSiteId" type="hidden" value={site.id} />
+              <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="text-lg font-semibold text-slate-950">{site.name}</p>
+                  <p className="mt-1 text-sm text-slate-500">{site.address || "No address saved"}</p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Current billing default: {site.currentAssignment?.providerAccountName ?? "Direct customer"}
+                    {site.currentAssignment?.providerContractProfileName ? ` · ${site.currentAssignment.providerContractProfileName}` : ""}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+                  <span className="rounded-full border border-slate-200 px-3 py-1">{site.currentAssignment?.statusLabel ?? "No provider assignment"}</span>
+                  <span className="rounded-full border border-slate-200 px-3 py-1">{site.assignmentHistoryCount} assignment record{site.assignmentHistoryCount === 1 ? "" : "s"}</span>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <label className="text-sm text-slate-600">
+                  Provider account
+                  <select className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={site.currentAssignment?.providerAccountId ?? ""} name="providerAccountId">
+                    <option value="">Direct customer billing</option>
+                    {providerOptions.providers.map((provider) => (
+                      <option key={provider.id} value={provider.id}>
+                        {provider.name} {provider.status === "inactive" ? "(Inactive)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm text-slate-600">
+                  Contract profile
+                  <select className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={site.currentAssignment?.providerContractProfileId ?? ""} name="providerContractProfileId">
+                    <option value="">No contract selected</option>
+                    {providerOptions.providers.flatMap((provider) =>
+                      provider.contracts.map((contract) => (
+                        <option key={contract.id} value={contract.id}>
+                          {provider.name} · {contract.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </label>
+                <label className="text-sm text-slate-600">
+                  External account name
+                  <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={site.currentAssignment?.externalAccountName ?? ""} name="externalAccountName" />
+                </label>
+                <label className="text-sm text-slate-600">
+                  External account number
+                  <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={site.currentAssignment?.externalAccountNumber ?? ""} name="externalAccountNumber" />
+                </label>
+                <label className="text-sm text-slate-600">
+                  External location code
+                  <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={site.currentAssignment?.externalLocationCode ?? ""} name="externalLocationCode" />
+                </label>
+                <label className="text-sm text-slate-600">
+                  Effective start date
+                  <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={site.currentAssignment?.effectiveStartDate ?? ""} name="effectiveStartDate" type="date" />
+                </label>
+                <label className="text-sm text-slate-600">
+                  Effective end date
+                  <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={site.currentAssignment?.effectiveEndDate ?? ""} name="effectiveEndDate" type="date" />
+                </label>
+                <label className="text-sm text-slate-600 xl:col-span-3">
+                  Billing notes
+                  <textarea className="mt-2 min-h-24 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={site.currentAssignment?.billingNotes ?? ""} name="billingNotes" />
+                </label>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <p className="text-sm text-slate-500">New work orders snapshot this site assignment at creation time so future site changes do not rewrite historical billing.</p>
+                <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue" type="submit">
+                  Save assignment
+                </button>
+              </div>
+            </form>
+          ))}
+        </div>
+      </SectionCard>
 
       <ClientProfileWorkspace data={data} />
 

@@ -2634,6 +2634,45 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
     return null;
   }
 
+  const [billingResolutionSnapshot, providerContextRecord] = await Promise.all([
+    prisma.inspectionBillingSummary.findFirst({
+      where: {
+        tenantId,
+        inspectionId
+      },
+      select: {
+        billingResolutionSnapshot: {
+          include: {
+            payerCustomer: { select: { id: true, name: true } },
+            payerProviderAccount: { select: { id: true, name: true } },
+            providerContractProfile: { select: { id: true, name: true } },
+            siteProviderAssignment: {
+              include: {
+                providerAccount: { select: { id: true, name: true } },
+                providerContractProfile: { select: { id: true, name: true } },
+                serviceSite: { select: { id: true, name: true } }
+              }
+            }
+          }
+        }
+      }
+    }),
+    prisma.workOrderProviderContext.findFirst({
+      where: {
+        workOrderId: inspectionId
+      },
+      include: {
+        providerAccount: { select: { id: true, name: true } },
+        providerContractProfile: { select: { id: true, name: true } },
+        siteProviderAssignment: {
+          include: {
+            serviceSite: { select: { id: true, name: true } }
+          }
+        }
+      }
+    })
+  ]);
+
   const items = normalizeExistingItems(row.items);
   const itemsWithCatalogState = await Promise.all(
     items.map(async (item) => {
@@ -2662,7 +2701,9 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
     groupedItems: groupBillableItems(itemsWithCatalogState),
     reviewGroupedItems: groupBillingReviewItems(itemsWithCatalogState),
     reportTypes: [...new Set(itemsWithCatalogState.map((item) => item.reportType).filter((reportType) => reportType !== INSPECTION_LEVEL_REPORT_TYPE))],
-    metrics: buildSummaryMetrics(itemsWithCatalogState)
+    metrics: buildSummaryMetrics(itemsWithCatalogState),
+    billingResolution: billingResolutionSnapshot?.billingResolutionSnapshot ?? null,
+    providerContext: providerContextRecord ?? null
   };
 }
 
