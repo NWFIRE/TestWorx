@@ -189,6 +189,11 @@ enum ProviderContractRatePricingMethod {
   hourly
 }
 
+enum ServiceSiteProviderAssignmentStatus {
+  active
+  inactive
+}
+
 enum ComplianceReportingDivision {
   fire_extinguishers
   fire_alarm
@@ -308,6 +313,7 @@ model Tenant {
   billingContractProfiles   BillingContractProfile[]
   contractProviderAccounts  ContractProviderAccount[]
   providerContractProfiles  ProviderContractProfile[]
+  serviceSiteProviderAssignments ServiceSiteProviderAssignment[]
   complianceReportingFeeRules ComplianceReportingFeeRule[]
   quickbooksCatalogItems    QuickBooksCatalogItem[]
   quickBooksItemMaps        QuickBooksItemMap[]
@@ -491,6 +497,7 @@ model ContractProviderAccount {
   updatedAt              DateTime                      @updatedAt
   organization           Tenant                        @relation(fields: [organizationId], references: [id])
   contractProfiles       ProviderContractProfile[]
+  siteAssignments        ServiceSiteProviderAssignment[]
 
   @@index([organizationId])
   @@index([organizationId, status])
@@ -515,6 +522,7 @@ model ProviderContractProfile {
   organization                   Tenant                        @relation(fields: [organizationId], references: [id])
   providerAccount                ContractProviderAccount       @relation(fields: [providerAccountId], references: [id])
   rates                          ProviderContractRate[]
+  siteAssignments                ServiceSiteProviderAssignment[]
 
   @@index([organizationId])
   @@index([providerAccountId])
@@ -567,6 +575,35 @@ model Site {
   billingSummaries  InspectionBillingSummary[]
   serviceFeeRules   ServiceFeeRule[]
   quotes            Quote[]
+  providerAssignments ServiceSiteProviderAssignment[]
+}
+
+model ServiceSiteProviderAssignment {
+  id                        String                              @id @default(cuid())
+  organizationId            String
+  serviceSiteId             String
+  providerAccountId         String
+  providerContractProfileId String?
+  status                    ServiceSiteProviderAssignmentStatus @default(active)
+  externalAccountName       String?
+  externalAccountNumber     String?
+  externalLocationCode      String?
+  effectiveStartDate        DateTime?
+  effectiveEndDate          DateTime?
+  billingNotes              String?
+  createdAt                 DateTime                            @default(now())
+  updatedAt                 DateTime                            @updatedAt
+  organization              Tenant                              @relation(fields: [organizationId], references: [id])
+  serviceSite               Site                                @relation(fields: [serviceSiteId], references: [id], onDelete: Cascade)
+  providerAccount           ContractProviderAccount             @relation(fields: [providerAccountId], references: [id])
+  providerContractProfile   ProviderContractProfile?            @relation(fields: [providerContractProfileId], references: [id])
+
+  @@index([organizationId])
+  @@index([serviceSiteId])
+  @@index([providerAccountId])
+  @@index([providerContractProfileId])
+  @@index([organizationId, serviceSiteId])
+  @@index([organizationId, status])
 }
 
 model Asset {
