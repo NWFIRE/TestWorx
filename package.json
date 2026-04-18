@@ -15,6 +15,7 @@
                     "db:status":  "npm run prisma:status --workspace @testworx/db",
                     "db:migrate":  "npm run prisma:migrate --workspace @testworx/db",
                     "db:seed":  "npm run prisma:seed --workspace @testworx/db",
+                    "db:backfill:provider-billing": "npm run provider-billing:backfill --workspace @testworx/db",
                     "db:verify":  "npm run verify --workspace @testworx/db",
                     "db:bootstrap:pilot":  "npm run bootstrap:pilot --workspace @testworx/db",
                     "db:bootstrap":  "npm run db:generate && npm run db:migrate && npm run db:seed && npm run db:verify",

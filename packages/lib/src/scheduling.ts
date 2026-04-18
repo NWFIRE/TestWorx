@@ -1351,6 +1351,86 @@ async function createInspectionTaskWithReport(input: {
   return createdTask;
 }
 
+async function snapshotProviderAssignmentForInspectionTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    tenantId: string;
+    inspectionId: string;
+    siteId: string;
+    scheduledStart: Date;
+  }
+) {
+  const existingContext = await tx.workOrderProviderContext.findFirst({
+    where: { workOrderId: input.inspectionId },
+    select: { id: true }
+  });
+
+  if (existingContext) {
+    await tx.inspection.update({
+      where: { id: input.inspectionId },
+      data: {
+        providerContextId: existingContext.id,
+        sourceType: "third_party_provider"
+      }
+    });
+    return existingContext.id;
+  }
+
+  const assignment = await tx.serviceSiteProviderAssignment.findFirst({
+    where: {
+      organizationId: input.tenantId,
+      serviceSiteId: input.siteId,
+      status: "active",
+      OR: [
+        { effectiveStartDate: null },
+        { effectiveStartDate: { lte: input.scheduledStart } }
+      ],
+      AND: [
+        {
+          OR: [
+            { effectiveEndDate: null },
+            { effectiveEndDate: { gte: input.scheduledStart } }
+          ]
+        }
+      ]
+    },
+    orderBy: [
+      { effectiveStartDate: "desc" },
+      { updatedAt: "desc" }
+    ],
+    select: {
+      id: true,
+      providerAccountId: true,
+      providerContractProfileId: true
+    }
+  });
+
+  if (!assignment) {
+    return null;
+  }
+
+  const providerContext = await tx.workOrderProviderContext.create({
+    data: {
+      workOrderId: input.inspectionId,
+      providerAccountId: assignment.providerAccountId,
+      providerContractProfileId: assignment.providerContractProfileId,
+      siteProviderAssignmentId: assignment.id,
+      sourceType: "third_party_provider"
+    },
+    select: { id: true }
+  });
+
+  await tx.inspection.update({
+    where: { id: input.inspectionId },
+    data: {
+      providerContextId: providerContext.id,
+      sourceType: "third_party_provider"
+    }
+  });
+
+  return providerContext.id;
+}
+
 async function createRecurringFollowUpInspectionsTx(tx: Prisma.TransactionClient, input: {
   tenantId: string;
   actorUserId: string;
@@ -1489,6 +1569,13 @@ async function createRecurringFollowUpInspectionsTx(tx: Prisma.TransactionClient
         notes: input.inspection.notes,
         claimable: assignedTechnicianIds.length === 0
       }
+    });
+
+    await snapshotProviderAssignmentForInspectionTx(tx, {
+      tenantId: input.tenantId,
+      inspectionId: createdInspection.id,
+      siteId: input.inspection.siteId,
+      scheduledStart: group.scheduledStart
     });
 
     await syncInspectionTechnicianAssignments(tx, createdInspection.id, input.tenantId, assignedTechnicianIds);
@@ -1669,6 +1756,13 @@ export async function createInspection(actor: ActorContext, input: z.infer<typeo
         notes: input.notes,
         claimable: assignedTechnicianIds.length === 0
       }
+    });
+
+    await snapshotProviderAssignmentForInspectionTx(tx, {
+      tenantId,
+      inspectionId: inspection.id,
+      siteId: site.id,
+      scheduledStart: input.scheduledStart
     });
 
     await syncInspectionTechnicianAssignments(tx, inspection.id, tenantId, assignedTechnicianIds);
@@ -2650,6 +2744,13 @@ export async function createInspectionAmendment(actor: ActorContext, inspectionI
       }
     });
 
+    await snapshotProviderAssignmentForInspectionTx(tx, {
+      tenantId,
+      inspectionId: replacementInspection.id,
+      siteId: site.id,
+      scheduledStart: input.scheduledStart
+    });
+
     await syncInspectionTechnicianAssignments(tx, replacementInspection.id, tenantId, assignedTechnicianIds);
     await writeInspectionTasks(
       tx,
@@ -2773,6 +2874,13 @@ export async function approveInspectionCloseoutRequest(actor: ActorContext, insp
         notes: closeoutRequest.note,
         claimable: true
       }
+    });
+
+    await snapshotProviderAssignmentForInspectionTx(tx, {
+      tenantId,
+      inspectionId: createdInspection.id,
+      siteId: inspection.siteId,
+      scheduledStart: inspection.scheduledStart
     });
 
     await writeInspectionTasks(
