@@ -194,6 +194,11 @@ enum ServiceSiteProviderAssignmentStatus {
   inactive
 }
 
+enum WorkOrderProviderSourceType {
+  direct
+  third_party_provider
+}
+
 enum ComplianceReportingDivision {
   fire_extinguishers
   fire_alarm
@@ -498,6 +503,7 @@ model ContractProviderAccount {
   organization           Tenant                        @relation(fields: [organizationId], references: [id])
   contractProfiles       ProviderContractProfile[]
   siteAssignments        ServiceSiteProviderAssignment[]
+  workOrderContexts      WorkOrderProviderContext[]
 
   @@index([organizationId])
   @@index([organizationId, status])
@@ -523,6 +529,7 @@ model ProviderContractProfile {
   providerAccount                ContractProviderAccount       @relation(fields: [providerAccountId], references: [id])
   rates                          ProviderContractRate[]
   siteAssignments                ServiceSiteProviderAssignment[]
+  workOrderContexts              WorkOrderProviderContext[]
 
   @@index([organizationId])
   @@index([providerAccountId])
@@ -597,6 +604,7 @@ model ServiceSiteProviderAssignment {
   serviceSite               Site                                @relation(fields: [serviceSiteId], references: [id], onDelete: Cascade)
   providerAccount           ContractProviderAccount             @relation(fields: [providerAccountId], references: [id])
   providerContractProfile   ProviderContractProfile?            @relation(fields: [providerContractProfileId], references: [id])
+  workOrderProviderContexts WorkOrderProviderContext[]
 
   @@index([organizationId])
   @@index([serviceSiteId])
@@ -604,6 +612,27 @@ model ServiceSiteProviderAssignment {
   @@index([providerContractProfileId])
   @@index([organizationId, serviceSiteId])
   @@index([organizationId, status])
+}
+
+model WorkOrderProviderContext {
+  id                        String                           @id @default(cuid())
+  workOrderId               String                           @unique
+  providerAccountId         String?
+  providerContractProfileId String?
+  siteProviderAssignmentId  String?
+  providerWorkOrderNumber   String?
+  providerReferenceNumber   String?
+  sourceType                WorkOrderProviderSourceType
+  createdAt                 DateTime                         @default(now())
+  updatedAt                 DateTime                         @updatedAt
+  workOrder                 Inspection                       @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  providerAccount           ContractProviderAccount?         @relation(fields: [providerAccountId], references: [id])
+  providerContractProfile   ProviderContractProfile?         @relation(fields: [providerContractProfileId], references: [id])
+  siteProviderAssignment    ServiceSiteProviderAssignment?   @relation(fields: [siteProviderAssignmentId], references: [id])
+
+  @@index([providerAccountId])
+  @@index([providerContractProfileId])
+  @@index([siteProviderAssignmentId])
 }
 
 model Asset {
@@ -669,6 +698,7 @@ model Inspection {
       closeoutRequest       InspectionCloseoutRequest?
       createdFromCloseoutRequests InspectionCloseoutRequest[] @relation("InspectionCloseoutRequestCreatedInspection")
       technicianAssignments InspectionTechnicianAssignment[]
+      providerContext       WorkOrderProviderContext?
       convertedFromQuotes   Quote[]                 @relation("QuoteConvertedInspection")
 
     @@index([tenantId, inspectionClassification])
