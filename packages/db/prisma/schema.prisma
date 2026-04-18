@@ -159,6 +159,36 @@ enum BillingType {
   third_party
 }
 
+enum ContractProviderAccountStatus {
+  active
+  inactive
+}
+
+enum ProviderContractProfileStatus {
+  draft
+  active
+  inactive
+  expired
+}
+
+enum ProviderContractPricingStrategy {
+  provider_rate_card
+  fixed_price
+  custom_rules
+}
+
+enum ProviderInvoiceGroupingMode {
+  per_work_order
+  per_site
+  monthly_rollup
+}
+
+enum ProviderContractRatePricingMethod {
+  flat_rate
+  per_unit
+  hourly
+}
+
 enum ComplianceReportingDivision {
   fire_extinguishers
   fire_alarm
@@ -276,6 +306,8 @@ model Tenant {
   serviceFeeRules           ServiceFeeRule[]
   billingPayerAccounts      BillingPayerAccount[]
   billingContractProfiles   BillingContractProfile[]
+  contractProviderAccounts  ContractProviderAccount[]
+  providerContractProfiles  ProviderContractProfile[]
   complianceReportingFeeRules ComplianceReportingFeeRule[]
   quickbooksCatalogItems    QuickBooksCatalogItem[]
   quickBooksItemMaps        QuickBooksItemMap[]
@@ -437,6 +469,81 @@ model BillingContractProfile {
   @@unique([tenantId, name])
   @@index([tenantId, isActive, effectiveStartDate])
   @@index([tenantId, payerAccountId])
+}
+
+model ContractProviderAccount {
+  id                     String                        @id @default(cuid())
+  organizationId         String
+  name                   String
+  legalName              String?
+  status                 ContractProviderAccountStatus @default(active)
+  billingContactName     String
+  billingEmail           String
+  billingPhone           String
+  remittanceAddressLine1 String
+  remittanceAddressLine2 String?
+  remittanceCity         String
+  remittanceState        String
+  remittancePostalCode   String
+  paymentTerms           String
+  notes                  String?
+  createdAt              DateTime                      @default(now())
+  updatedAt              DateTime                      @updatedAt
+  organization           Tenant                        @relation(fields: [organizationId], references: [id])
+  contractProfiles       ProviderContractProfile[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@unique([organizationId, name])
+}
+
+model ProviderContractProfile {
+  id                             String                        @id @default(cuid())
+  organizationId                 String
+  providerAccountId              String
+  name                           String
+  status                         ProviderContractProfileStatus @default(draft)
+  effectiveStartDate             DateTime
+  effectiveEndDate               DateTime?
+  pricingStrategy                ProviderContractPricingStrategy
+  invoiceGroupingMode            ProviderInvoiceGroupingMode
+  requireProviderWorkOrderNumber Boolean                       @default(false)
+  requireSiteReferenceNumber     Boolean                       @default(false)
+  notes                          String?
+  createdAt                      DateTime                      @default(now())
+  updatedAt                      DateTime                      @updatedAt
+  organization                   Tenant                        @relation(fields: [organizationId], references: [id])
+  providerAccount                ContractProviderAccount       @relation(fields: [providerAccountId], references: [id])
+  rates                          ProviderContractRate[]
+
+  @@index([organizationId])
+  @@index([providerAccountId])
+  @@index([organizationId, status])
+  @@index([organizationId, providerAccountId])
+  @@unique([organizationId, name])
+}
+
+model ProviderContractRate {
+  id                        String                            @id @default(cuid())
+  providerContractProfileId String
+  serviceType               String
+  inspectionType            InspectionType?
+  assetCategory             String?
+  reportType                String?
+  pricingMethod             ProviderContractRatePricingMethod
+  unitRate                  Float?
+  flatRate                  Float?
+  minimumCharge             Float?
+  effectiveStartDate        DateTime?
+  effectiveEndDate          DateTime?
+  priority                  Int                               @default(0)
+  createdAt                 DateTime                          @default(now())
+  updatedAt                 DateTime                          @updatedAt
+  providerContractProfile   ProviderContractProfile           @relation(fields: [providerContractProfileId], references: [id], onDelete: Cascade)
+
+  @@index([providerContractProfileId])
+  @@index([providerContractProfileId, priority])
+  @@index([providerContractProfileId, serviceType])
 }
 
 model Site {
