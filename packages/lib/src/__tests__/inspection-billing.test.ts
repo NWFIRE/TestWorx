@@ -2146,6 +2146,77 @@ describe("inspection billing persistence and admin review", () => {
     );
   });
 
+  it("preserves matched catalog pricing when saving a grouped row with a blank unit price", async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      {
+        id: "summary_1",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        status: "draft",
+        subtotal: 0,
+        notes: null,
+        quickbooksSyncStatus: "not_synced",
+        quickbooksInvoiceId: null,
+        items: [
+          {
+            id: "line_1",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "fire_extinguisher",
+            category: "material",
+            description: "New (2.5 lb ABC)",
+            quantity: 2,
+            unitPrice: null,
+            linkedCatalogItemId: "catalog_1",
+            linkedCatalogItemName: "New 2.5 ABC Fire Extinguisher",
+            linkedQuickBooksItemId: "qb_1",
+            linkedMatchMethod: "manual",
+            linkedMatchConfidence: 1
+          },
+          {
+            id: "line_2",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "fire_extinguisher",
+            category: "material",
+            description: "New (2.5 lb ABC)",
+            quantity: 5,
+            unitPrice: null,
+            linkedCatalogItemId: "catalog_1",
+            linkedCatalogItemName: "New 2.5 ABC Fire Extinguisher",
+            linkedQuickBooksItemId: "qb_1",
+            linkedMatchMethod: "manual",
+            linkedMatchConfidence: 1
+          }
+        ]
+      }
+    ]);
+    prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValueOnce({
+      id: "catalog_1",
+      quickbooksItemId: "qb_1",
+      name: "New 2.5 ABC Fire Extinguisher",
+      sku: "FE-2.5-ABC",
+      itemType: "Inventory",
+      unitPrice: 32.5
+    });
+
+    await updateBillingSummaryItemGroup(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "summary_1",
+      ["line_1", "line_2"],
+      7,
+      null
+    );
+
+    const updateCall = prismaMock.$executeRaw.mock.calls.at(-1)?.[0];
+    const executeRawText = String(updateCall);
+    expect(executeRawText).toContain("\"unitPrice\":32.5");
+    expect(executeRawText).toContain("\"amount\":65");
+    expect(executeRawText).toContain("\"amount\":162.5");
+  });
+
   it("clears a manual billing item link without breaking pricing", async () => {
     prismaMock.$queryRaw.mockResolvedValueOnce([
       {

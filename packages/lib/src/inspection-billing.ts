@@ -1531,6 +1531,15 @@ async function buildBillingItemCatalogState(tenantId: string, item: BillableItem
   };
 }
 
+async function resolveBillingItemMatchedUnitPrice(tenantId: string, item: BillableItem) {
+  if (typeof item.unitPrice === "number") {
+    return item.unitPrice;
+  }
+
+  const catalogState = await buildBillingItemCatalogState(tenantId, item);
+  return catalogState.currentMatch?.unitPrice ?? null;
+}
+
 async function buildInspectionServiceFeeItemTx(tx: TransactionClient, input: {
   tenantId: string;
   inspectionId: string;
@@ -2854,8 +2863,11 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
   const itemsWithCatalogState = await Promise.all(
     items.map(async (item) => {
       const catalogState = await buildBillingItemCatalogState(tenantId, item);
+      const resolvedUnitPrice = item.unitPrice ?? catalogState.currentMatch?.unitPrice ?? null;
       return {
         ...item,
+        unitPrice: resolvedUnitPrice,
+        amount: calculateAmount(item.quantity, resolvedUnitPrice),
         currentCatalogMatch: catalogState.currentMatch,
         suggestedCatalogMatches: catalogState.suggestedMatches
       };
@@ -2998,18 +3010,29 @@ export async function updateBillingSummaryNotes(actor: ActorContext, summaryId: 
 }
 
 export async function updateBillingSummaryItem(actor: ActorContext, summaryId: string, itemId: string, quantity: number, unitPrice: number | null) {
-  const { summary } = await getAuthorizedBillingSummary(actor, summaryId);
+  const { parsedActor, summary } = await getAuthorizedBillingSummary(actor, summaryId);
   if (summary.status === "invoiced") {
     throw new Error("Invoiced billing summaries must be moved back to review before editing line items.");
   }
-  const items = summary.items.map((item) => item.id === itemId
-    ? {
+  const items = await Promise.all(
+    summary.items.map(async (item) => {
+      if (item.id !== itemId) {
+        return item;
+      }
+
+      const resolvedUnitPrice =
+        unitPrice !== null && unitPrice !== undefined
+          ? unitPrice
+          : await resolveBillingItemMatchedUnitPrice(parsedActor.tenantId as string, item);
+
+      return {
         ...item,
         quantity,
-        unitPrice,
-        amount: calculateAmount(quantity, unitPrice)
-      }
-    : item);
+        unitPrice: resolvedUnitPrice,
+        amount: calculateAmount(quantity, resolvedUnitPrice)
+      };
+    })
+  );
   const subtotal = subtotalForItems(items);
 
   await prisma.$executeRaw`
@@ -3035,7 +3058,7 @@ export async function updateBillingSummaryItemGroup(
   quantity: number,
   unitPrice: number | null
 ) {
-  const { summary } = await getAuthorizedBillingSummary(actor, summaryId);
+  const { parsedActor, summary } = await getAuthorizedBillingSummary(actor, summaryId);
   if (summary.status === "invoiced") {
     throw new Error("Invoiced billing summaries must be moved back to review before editing line items.");
   }
@@ -3056,19 +3079,26 @@ export async function updateBillingSummaryItemGroup(
   }
 
   const quantityAssignments = distributeGroupedQuantity(groupedItems, quantity);
-  const updatedItems = summary.items.map((item) => {
-    if (!quantityAssignments.has(item.id)) {
-      return item;
-    }
+  const updatedItems = await Promise.all(
+    summary.items.map(async (item) => {
+      if (!quantityAssignments.has(item.id)) {
+        return item;
+      }
 
-    const nextQuantity = quantityAssignments.get(item.id) ?? 0;
-    return {
-      ...item,
-      quantity: nextQuantity,
-      unitPrice,
-      amount: calculateAmount(nextQuantity, unitPrice)
-    };
-  });
+      const nextQuantity = quantityAssignments.get(item.id) ?? 0;
+      const resolvedUnitPrice =
+        unitPrice !== null && unitPrice !== undefined
+          ? unitPrice
+          : await resolveBillingItemMatchedUnitPrice(parsedActor.tenantId as string, item);
+
+      return {
+        ...item,
+        quantity: nextQuantity,
+        unitPrice: resolvedUnitPrice,
+        amount: calculateAmount(nextQuantity, resolvedUnitPrice)
+      };
+    })
+  );
   const subtotal = subtotalForItems(updatedItems);
 
   await prisma.$executeRaw`
