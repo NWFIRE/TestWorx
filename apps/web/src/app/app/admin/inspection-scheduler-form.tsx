@@ -35,12 +35,14 @@ type InspectionSchedulerFormState = {
   error: string | null;
   success: string | null;
   redirectTo?: string | null;
+  createdInspectionId?: string | null;
 };
 
 const initialState: InspectionSchedulerFormState = {
   error: null,
   success: null,
-  redirectTo: null
+  redirectTo: null,
+  createdInspectionId: null
 };
 const inspectionTypeOptions = Object.keys(inspectionTypeRegistry) as InspectionType[];
 const serviceSchedulingOptions: InspectionTaskSchedulingStatus[] = [
@@ -202,7 +204,7 @@ export function InspectionSchedulerForm({
   allowDocumentUpload?: boolean;
   autoSelectGenericSiteOnCustomerChange?: boolean;
   allowCustomOneTimeSite?: boolean;
-  onSuccess?: () => void;
+  onSuccess?: (result: InspectionSchedulerFormState) => void;
   toastResults?: boolean;
   showInlineSuccess?: boolean;
   protectedSaveMode?: boolean;
@@ -212,6 +214,7 @@ export function InspectionSchedulerForm({
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const externalDocumentsInputRef = useRef<HTMLInputElement>(null);
   const lastErrorRef = useRef<string | null>(null);
   const lastSuccessRef = useRef<string | null>(null);
   const isCreateWorkflow = !initialValues?.inspectionId && !reasonLabel;
@@ -240,6 +243,11 @@ export function InspectionSchedulerForm({
   const [serviceLines, setServiceLines] = useState<ServiceLineDraft[]>(() => buildInitialServiceLines(initialValues));
   const [newestServiceLineId, setNewestServiceLineId] = useState<string | null>(null);
   const [showProtectedSaveConfirm, setShowProtectedSaveConfirm] = useState(false);
+  const [externalDocumentFiles, setExternalDocumentFiles] = useState<File[]>([]);
+  const [externalDocumentLabel, setExternalDocumentLabel] = useState("");
+  const [externalDocumentsRequireSignature, setExternalDocumentsRequireSignature] = useState(true);
+  const [externalDocumentsCustomerVisible, setExternalDocumentsCustomerVisible] = useState(false);
+  const [isUploadingExternalDocuments, setIsUploadingExternalDocuments] = useState(false);
   const serviceLineRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const filteredSites = useMemo(
     () => sites.filter((site) => !selectedCustomerId || site.customerCompanyId === selectedCustomerId),
@@ -295,11 +303,24 @@ export function InspectionSchedulerForm({
     setNotes("");
     setStartManuallyEdited(false);
     setServiceLines([createServiceLineDraft(defaultMonth, defaultStart)]);
+    setExternalDocumentFiles([]);
+    setExternalDocumentLabel("");
+    setExternalDocumentsRequireSignature(true);
+    setExternalDocumentsCustomerVisible(false);
+    if (externalDocumentsInputRef.current) {
+      externalDocumentsInputRef.current.value = "";
+    }
   };
 
   const [state, formAction, pending] = useActionState(async (previousState: typeof initialState, formData: FormData) => {
     const result = await action(previousState, formData);
-    if (isCreateWorkflow && !result.error && result.success) {
+    const shouldDeferReset =
+      isCreateWorkflow &&
+      allowDocumentUpload &&
+      externalDocumentFiles.length > 0 &&
+      Boolean(result.createdInspectionId);
+
+    if (isCreateWorkflow && !result.error && result.success && !shouldDeferReset) {
       resetCreateWorkflow();
     }
     return result;
@@ -336,9 +357,70 @@ export function InspectionSchedulerForm({
     }
 
     lastSuccessRef.current = state.success;
-    showToast({ title: state.success, tone: "success" });
-    onSuccess?.();
-  }, [onSuccess, showToast, state.success, toastResults]);
+
+    const finalizeSuccess = () => {
+      if (isCreateWorkflow) {
+        resetCreateWorkflow();
+      }
+      showToast({ title: state.success!, tone: "success" });
+      onSuccess?.(state);
+    };
+
+    if (!allowDocumentUpload || !isCreateWorkflow || externalDocumentFiles.length === 0 || !state.createdInspectionId) {
+      finalizeSuccess();
+      return;
+    }
+
+    setIsUploadingExternalDocuments(true);
+
+    void (async () => {
+      const uploadFormData = new FormData();
+      for (const file of externalDocumentFiles) {
+        uploadFormData.append("document", file);
+      }
+      uploadFormData.set("requiresSignature", externalDocumentsRequireSignature ? "on" : "");
+      uploadFormData.set("customerVisible", externalDocumentsCustomerVisible ? "on" : "");
+      uploadFormData.set("label", externalDocumentFiles.length === 1 ? externalDocumentLabel.trim() : "");
+
+      try {
+        const response = await fetch(`/api/inspections/${state.createdInspectionId}/documents/upload`, {
+          method: "POST",
+          body: uploadFormData
+        });
+        const payload = (await response.json()) as { error?: string; success?: string };
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Inspection was created, but the external PDFs could not be uploaded.");
+        }
+
+        finalizeSuccess();
+      } catch (uploadError) {
+        const message = uploadError instanceof Error
+          ? uploadError.message
+          : "Inspection was created, but the external PDFs could not be uploaded.";
+        showToast({
+          title: "Inspection created, but external PDFs still need to be uploaded from the inspection page.",
+          description: message,
+          tone: "error"
+        });
+        resetCreateWorkflow();
+        router.push(`/app/admin/inspections/${state.createdInspectionId}`);
+      } finally {
+        setIsUploadingExternalDocuments(false);
+      }
+    })();
+  }, [
+    allowDocumentUpload,
+    externalDocumentFiles,
+    externalDocumentLabel,
+    externalDocumentsCustomerVisible,
+    externalDocumentsRequireSignature,
+    isCreateWorkflow,
+    onSuccess,
+    router,
+    showToast,
+    state,
+    toastResults
+  ]);
 
   useEffect(() => {
     if (!state.redirectTo) {
@@ -773,19 +855,46 @@ export function InspectionSchedulerForm({
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="externalDocuments">Upload PDF documents</label>
-            <input accept="application/pdf" className="block w-full rounded-2xl border border-slate-200 px-4 py-3.5 text-sm" id="externalDocuments" multiple name="externalDocuments" type="file" />
+            <input
+              accept="application/pdf"
+              className="block w-full rounded-2xl border border-slate-200 px-4 py-3.5 text-sm"
+              id="externalDocuments"
+              multiple
+              onChange={(event) => setExternalDocumentFiles(Array.from(event.target.files ?? []))}
+              ref={externalDocumentsInputRef}
+              type="file"
+            />
             <p className="mt-2 text-sm leading-5 text-slate-500">You can attach one or more PDFs here. File names are used as the initial document identifiers.</p>
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="externalDocumentLabel">Optional label</label>
-            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3.5" id="externalDocumentLabel" name="externalDocumentLabel" placeholder="Used when uploading a single external PDF" />
+            <input
+              className="w-full rounded-2xl border border-slate-200 px-4 py-3.5"
+              id="externalDocumentLabel"
+              name="externalDocumentLabel"
+              onChange={(event) => setExternalDocumentLabel(event.target.value)}
+              placeholder="Used when uploading a single external PDF"
+              value={externalDocumentLabel}
+            />
           </div>
           <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            <input className="h-5 w-5 rounded border-slate-300" defaultChecked name="externalDocumentsRequireSignature" type="checkbox" />
+            <input
+              checked={externalDocumentsRequireSignature}
+              className="h-5 w-5 rounded border-slate-300"
+              name="externalDocumentsRequireSignature"
+              onChange={(event) => setExternalDocumentsRequireSignature(event.target.checked)}
+              type="checkbox"
+            />
             Mark uploaded PDFs as requiring technician signature
           </label>
           <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            <input className="h-5 w-5 rounded border-slate-300" name="externalDocumentsCustomerVisible" type="checkbox" />
+            <input
+              checked={externalDocumentsCustomerVisible}
+              className="h-5 w-5 rounded border-slate-300"
+              name="externalDocumentsCustomerVisible"
+              onChange={(event) => setExternalDocumentsCustomerVisible(event.target.checked)}
+              type="checkbox"
+            />
             Make signed versions visible in the customer portal
           </label>
         </div>
@@ -802,14 +911,14 @@ export function InspectionSchedulerForm({
           <div className="flex flex-wrap gap-3">
             <button
               className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-ember px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
-              disabled={pending}
+              disabled={pending || isUploadingExternalDocuments}
               type="submit"
             >
-              {pending ? "Saving new visit..." : protectedSaveConfirmLabel}
+              {pending || isUploadingExternalDocuments ? "Saving new visit..." : protectedSaveConfirmLabel}
             </button>
             <button
               className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-              disabled={pending}
+              disabled={pending || isUploadingExternalDocuments}
               onClick={() => setShowProtectedSaveConfirm(false)}
               type="button"
             >
@@ -820,7 +929,7 @@ export function InspectionSchedulerForm({
       ) : (
         <button
           className="w-full rounded-2xl bg-ember px-5 py-3 text-base font-semibold text-white disabled:opacity-60"
-          disabled={pending}
+          disabled={pending || isUploadingExternalDocuments}
           onClick={(event) => {
             if (!protectedSaveMode) {
               return;
@@ -831,7 +940,7 @@ export function InspectionSchedulerForm({
           }}
           type="submit"
         >
-          {pending ? "Saving schedule..." : submitLabel}
+          {pending ? "Saving schedule..." : isUploadingExternalDocuments ? "Uploading PDFs..." : submitLabel}
         </button>
       )}
     </form>

@@ -142,14 +142,8 @@ async function resolveInspectionSiteSelection<T extends {
   };
 }
 
-function readExternalDocumentFiles(formData: FormData) {
-  return formData
-    .getAll("externalDocuments")
-    .filter((value): value is File => value instanceof File && value.size > 0);
-}
-
 export async function createInspectionAction(
-  _: { error: string | null; success: string | null; redirectTo?: string | null },
+  _: { error: string | null; success: string | null; redirectTo?: string | null; createdInspectionId?: string | null },
   formData: FormData
 ) {
   const session = await auth();
@@ -166,25 +160,6 @@ export async function createInspectionAction(
     const actor = { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId };
     const resolvedInput = await resolveInspectionSiteSelection(actor, parsed.data, formData);
     const inspection = await createInspection(actor, resolvedInput);
-    const externalDocumentFiles = readExternalDocumentFiles(formData);
-    const requiresSignature = formData.get("externalDocumentsRequireSignature") === "on";
-    const customerVisible = formData.get("externalDocumentsCustomerVisible") === "on";
-    const externalDocumentLabel = String(formData.get("externalDocumentLabel") ?? "").trim();
-
-    for (const file of externalDocumentFiles) {
-      await uploadInspectionDocument(
-        { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-        {
-          inspectionId: inspection.id,
-          fileName: file.name,
-          mimeType: file.type || "application/pdf",
-          bytes: new Uint8Array(await file.arrayBuffer()),
-          label: externalDocumentFiles.length === 1 ? externalDocumentLabel || null : null,
-          requiresSignature,
-          customerVisible
-        }
-      );
-    }
     revalidatePath("/app/admin");
     revalidatePath("/app/admin/dashboard");
     revalidatePath("/app/admin/inspections");
@@ -193,9 +168,19 @@ export async function createInspectionAction(
     revalidatePath(`/app/admin/inspections/${inspection.id}`);
     revalidatePath("/app/tech");
     revalidatePath("/app/customer");
-    return { error: null, success: `Inspection created successfully for ${inspection.scheduledStart.toLocaleString()}.`, redirectTo: null };
+    return {
+      error: null,
+      success: `Inspection created successfully for ${inspection.scheduledStart.toLocaleString()}.`,
+      redirectTo: null,
+      createdInspectionId: inspection.id
+    };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Unable to create inspection.", success: null, redirectTo: null };
+    return {
+      error: error instanceof Error ? error.message : "Unable to create inspection.",
+      success: null,
+      redirectTo: null,
+      createdInspectionId: null
+    };
   }
 }
 
@@ -260,7 +245,7 @@ export async function importCustomerSiteCsvAction(_: { error: string | null; suc
 }
 
 export async function updateInspectionAction(
-  _: { error: string | null; success: string | null; redirectTo?: string | null },
+  _: { error: string | null; success: string | null; redirectTo?: string | null; createdInspectionId?: string | null },
   formData: FormData
 ) {
   const session = await auth();
@@ -282,9 +267,14 @@ export async function updateInspectionAction(
     revalidatePath("/app/admin/amendments");
     revalidatePath(`/app/admin/inspections/${inspectionId}`);
     revalidatePath("/app/tech");
-    return { error: null, success: "Visit updated successfully.", redirectTo: null };
+    return { error: null, success: "Visit updated successfully.", redirectTo: null, createdInspectionId: null };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Unable to update inspection.", success: null, redirectTo: null };
+    return {
+      error: error instanceof Error ? error.message : "Unable to update inspection.",
+      success: null,
+      redirectTo: null,
+      createdInspectionId: null
+    };
   }
 }
 
@@ -448,7 +438,7 @@ export async function uploadInspectionPdfAction(_: { error: string | null; succe
 
 
 export async function amendInspectionAction(
-  _: { error: string | null; success: string | null; redirectTo?: string | null },
+  _: { error: string | null; success: string | null; redirectTo?: string | null; createdInspectionId?: string | null },
   formData: FormData
 ) {
   const session = await auth();
@@ -481,10 +471,16 @@ export async function amendInspectionAction(
     return {
       error: null,
       success: "New visit created.",
-      redirectTo: `/app/admin/inspections/${newVisit.id}?from=${encodeURIComponent("/app/admin/inspections")}`
+      redirectTo: `/app/admin/inspections/${newVisit.id}?from=${encodeURIComponent("/app/admin/inspections")}`,
+      createdInspectionId: newVisit.id
     };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Unable to create a new visit.", success: null, redirectTo: null };
+    return {
+      error: error instanceof Error ? error.message : "Unable to create a new visit.",
+      success: null,
+      redirectTo: null,
+      createdInspectionId: null
+    };
   }
 }
 
