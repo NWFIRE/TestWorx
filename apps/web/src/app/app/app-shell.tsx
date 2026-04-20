@@ -674,14 +674,13 @@ export function AppShell({
                 title={isRefreshing ? "Refreshing..." : "Refresh page"}
                 type="button"
               >
-                <svg aria-hidden="true" className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} viewBox="0 0 24 24">
+                <svg aria-hidden="true" className={`h-4 w-4 ${isRefreshing ? "animate-pulse" : ""}`} fill="none" viewBox="0 0 16 16">
                   <path
-                    d="M20 11a8 8 0 1 0 2.1 5.4M20 11v-6m0 6h-6"
-                    fill="none"
+                    d="M8 3.25v8M4.75 8.75 8 12l3.25-3.25"
                     stroke="currentColor"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth="1.8"
+                    strokeWidth="1.7"
                   />
                 </svg>
               </button>
