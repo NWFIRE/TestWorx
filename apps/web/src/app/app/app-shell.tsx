@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
+import { BrandLoader } from "@/app/brand-loader";
 import { getAppNavItemsForRole, getCurrentAppNavItem, isAppNavItemActive, type AppNavItem } from "./app-nav-config";
 import { MobilePullToRefresh } from "./mobile-pull-to-refresh";
 
@@ -668,21 +669,13 @@ export function AppShell({
               </div>
               <button
                 aria-label="Refresh page"
-                className="pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-[color:var(--border-default)] bg-white px-3 text-sm font-medium text-[color:var(--text-secondary)] outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
+                className="pressable hidden min-h-11 min-w-11 items-center justify-center rounded-xl border border-[color:var(--border-default)] bg-white px-3 text-sm font-medium text-[color:var(--text-secondary)] outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2 lg:inline-flex"
                 disabled={isRefreshing}
                 onClick={handleRefresh}
                 title={isRefreshing ? "Refreshing..." : "Refresh page"}
                 type="button"
               >
-                <svg aria-hidden="true" className={`h-4 w-4 ${isRefreshing ? "animate-pulse" : ""}`} fill="none" viewBox="0 0 16 16">
-                  <path
-                    d="M8 3.25v8M4.75 8.75 8 12l3.25-3.25"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="1.7"
-                  />
-                </svg>
+                <BrandLoader className={isRefreshing ? "opacity-100" : "opacity-85"} label={isRefreshing ? "Refreshing" : "Refresh page"} size="sm" tone="muted" />
               </button>
               <form action={signOutAction}>
                 <button className="pressable min-h-11 rounded-xl border border-[color:var(--border-default)] bg-white px-4 py-2 text-sm font-medium text-[color:var(--text-secondary)] outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2" type="submit">
