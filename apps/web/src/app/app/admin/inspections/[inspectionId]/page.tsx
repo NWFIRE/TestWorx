@@ -193,6 +193,7 @@ export default async function EditInspectionPage({
         id: string;
         status: string;
         finalizedAt: Date | null;
+        updatedAt: Date;
         correctionState: string;
         correctionReason: string | null;
         correctionRequestedAt: Date | null;
@@ -321,11 +322,11 @@ export default async function EditInspectionPage({
   }>;
   const packetDocuments = buildInspectionPacketDocuments({
     reports: inspectionView.tasks
-      .filter((task) => task.report?.id && task.report?.status === "finalized")
+      .filter((task) => task.report?.id)
       .map((task) => ({
         id: task.report!.id,
         title: inspectionTaskLabel(task),
-        happenedAt: task.report!.finalizedAt,
+        happenedAt: task.report!.finalizedAt ?? task.report!.updatedAt ?? inspection.updatedAt,
         customerVisible: true,
         viewPath: `/app/admin/reports/${inspection.id}/${task.id}`
       })),
@@ -705,13 +706,13 @@ export default async function EditInspectionPage({
             description={
               inspection.status === "completed" || inspection.status === "invoiced" || inspection.status === "follow_up_required"
                 ? "Access hosted reports and every document tied to this completed visit from one inspection packet view."
-                : "This packet becomes the primary hosted-report and document handoff area once the visit is completed and documents are available."
+                : "Access hosted reports now, and use this packet as the primary document handoff area once the visit is completed."
             }
             documents={packetDocuments}
             emptyDescription={
               inspection.status === "completed" || inspection.status === "invoiced" || inspection.status === "follow_up_required"
                 ? "No hosted reports or packet documents are attached to this completed inspection yet."
-                : "This inspection is not completed yet, so the packet is not ready."
+                : "No hosted reports or packet documents are available for this inspection yet."
             }
             emptyTitle={
               inspection.status === "completed" || inspection.status === "invoiced" || inspection.status === "follow_up_required"
