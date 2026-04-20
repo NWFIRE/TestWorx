@@ -62,12 +62,6 @@ export default async function UpcomingInspectionsPage({
       monthsAhead: 11
     }
   );
-  const requestedCustomerId = typeof params.customerCompanyId === "string" ? params.customerCompanyId : "";
-  const requestedSiteId = typeof params.siteId === "string" ? params.siteId : "";
-  const resolvedCustomerId = data.customers.some((customer) => customer.id === requestedCustomerId) ? requestedCustomerId : "";
-  const resolvedSiteId = data.sites.some((site) => site.id === requestedSiteId && site.customerCompanyId === resolvedCustomerId)
-    ? requestedSiteId
-    : "";
 
   return (
     <AppPageShell density="wide">
@@ -230,31 +224,6 @@ export default async function UpcomingInspectionsPage({
           ))}
         </div>
 
-        <SectionCard>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-            Create from inspections
-          </p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-            Keep creation in one place
-          </h2>
-          <p className="mt-2 text-sm text-slate-500">
-            Inspection creation now lives in the Inspections workspace so office teams have one consistent command surface for new work.
-          </p>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Link
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white"
-              href={`/app/admin/inspections?create=1&month=${data.startMonth}${resolvedCustomerId ? `&customerCompanyId=${encodeURIComponent(resolvedCustomerId)}` : ""}${resolvedSiteId ? `&siteId=${encodeURIComponent(resolvedSiteId)}` : ""}`}
-            >
-              Open inspection creation
-            </Link>
-            <Link
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-              href="/app/admin/inspections"
-            >
-              Open inspections
-            </Link>
-          </div>
-        </SectionCard>
       </WorkspaceSplit>
     </AppPageShell>
   );
