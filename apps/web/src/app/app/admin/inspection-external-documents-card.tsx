@@ -1,8 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
-
-const initialState = { error: null as string | null, success: null as string | null };
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 function statusLabel(status: string) {
   return status.replaceAll("_", " ");
@@ -18,8 +17,7 @@ const statusClasses: Record<string, string> = {
 
 export function InspectionExternalDocumentsCard({
   inspectionId,
-  documents,
-  action
+  documents
 }: {
   inspectionId: string;
   documents: Array<{
@@ -35,9 +33,46 @@ export function InspectionExternalDocumentsCard({
     annotatedStorageKey: string | null;
     signedStorageKey: string | null;
   }>;
-  action: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
 }) {
-  const [state, formAction, pending] = useActionState(action, initialState);
+  const router = useRouter();
+  const [isUploading, startUploadTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setSuccess(null);
+
+    const formData = new FormData(event.currentTarget);
+    const file = formData.get("document");
+    if (!(file instanceof File) || file.size === 0) {
+      setError("Select a PDF to upload.");
+      return;
+    }
+
+    startUploadTransition(() => {
+      void (async () => {
+        try {
+          const response = await fetch(`/api/inspections/${inspectionId}/documents/upload`, {
+            method: "POST",
+            body: formData
+          });
+          const payload = (await response.json()) as { error?: string; success?: string };
+
+          if (!response.ok) {
+            throw new Error(payload.error ?? "Unable to upload PDF.");
+          }
+
+          setSuccess(payload.success ?? `${file.name} uploaded.`);
+          router.refresh();
+          event.currentTarget.reset();
+        } catch (submitError) {
+          setError(submitError instanceof Error ? submitError.message : "Unable to upload PDF.");
+        }
+      })();
+    });
+  }
 
   return (
     <div className="space-y-5 rounded-[2rem] bg-white p-6 shadow-panel">
@@ -46,7 +81,7 @@ export function InspectionExternalDocumentsCard({
         <h3 className="mt-2 text-2xl font-semibold text-ink">Customer PDFs</h3>
         <p className="mt-2 text-sm text-slate-500">Upload customer-provided PDFs, track signature status, and preserve the original and signed versions separately.</p>
       </div>
-      <form action={formAction} className="space-y-4 rounded-[1.5rem] border border-slate-200 p-4">
+      <form className="space-y-4 rounded-[1.5rem] border border-slate-200 p-4" onSubmit={handleSubmit}>
         <input name="inspectionId" type="hidden" value={inspectionId} />
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="label">Document label</label>
@@ -64,10 +99,10 @@ export function InspectionExternalDocumentsCard({
           <input className="h-5 w-5 rounded border-slate-300" name="customerVisible" type="checkbox" />
           Make the signed document visible in the customer portal when available
         </label>
-        {state.error ? <p className="text-sm text-rose-600">{state.error}</p> : null}
-        {state.success ? <p className="text-sm text-emerald-600">{state.success}</p> : null}
-        <button className="w-full rounded-2xl bg-slateblue px-5 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={pending} type="submit">
-          {pending ? "Uploading document..." : "Attach external PDF"}
+        {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+        {success ? <p className="text-sm text-emerald-600">{success}</p> : null}
+        <button className="w-full rounded-2xl bg-slateblue px-5 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={isUploading} type="submit">
+          {isUploading ? "Uploading document..." : "Attach external PDF"}
         </button>
       </form>
       <div className="space-y-3">
