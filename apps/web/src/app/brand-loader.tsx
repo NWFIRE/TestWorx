@@ -32,12 +32,14 @@ export function TradeWorxLoader({
   className,
   size = "md",
   label = "Loading",
-  tone = "default"
+  tone = "default",
+  animated = true
 }: {
   className?: string;
   size?: "sm" | "md" | "lg" | number;
   label?: string;
   tone?: "default" | "muted" | "inverse";
+  animated?: boolean;
 }) {
   const resolvedSize = typeof size === "number" ? size : sizeMap[size];
   const dotSize = Math.max(2.4, resolvedSize * 0.16);
@@ -56,7 +58,7 @@ export function TradeWorxLoader({
       role="status"
       style={{ width: resolvedSize, height: resolvedSize }}
     >
-      <span className="tradeworx-loader-orbit relative inline-flex h-full w-full">
+      <span className={cn("tradeworx-loader-orbit relative inline-flex h-full w-full", !animated && "animate-none")} style={animated ? undefined : { animation: "none" }}>
         {dots.map((dot, index) => (
           <span
             aria-hidden="true"
