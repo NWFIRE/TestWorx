@@ -504,12 +504,13 @@ export function QuoteEditorForm({
                     </div>
                   </div>
 
-                  <div className="mt-4 grid gap-4 lg:grid-cols-[1.6fr_0.6fr_0.8fr_auto_auto]">
+                  <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.8fr)_0.55fr_0.65fr_auto_auto]">
                     <label className="block">
                       <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Description</span>
                       <textarea
-                        className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900"
+                        className="min-h-40 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-7 text-slate-900"
                         onChange={(event) => updateLine(index, { description: event.target.value })}
+                        rows={5}
                         value={line.description}
                       />
                     </label>
