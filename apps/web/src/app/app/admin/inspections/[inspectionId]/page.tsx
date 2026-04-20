@@ -26,7 +26,7 @@ import {
   isDueAtTimeOfServiceCustomer
 } from "@testworx/lib/server/index";
 
-import { amendInspectionAction, deleteInspectionAction, regenerateCompletedReportPdfAction, reopenCompletedReportAction, updateInspectionAction, updateInspectionBillingSourceTypeAction, updateInspectionStatusAdminAction, uploadInspectionExternalDocumentAction, uploadInspectionPdfAction } from "../../actions";
+import { amendInspectionAction, deleteInspectionAction, regenerateCompletedReportPdfAction, reopenCompletedReportAction, updateInspectionAction, updateInspectionBillingSourceTypeAction, updateInspectionStatusAdminAction, uploadInspectionExternalDocumentAction } from "../../actions";
 import { AdminReportDeleteButton } from "../../admin-report-delete-button";
 import { DeleteInspectionCard } from "../../delete-inspection-card";
 import { InspectionExternalDocumentsCard } from "../../inspection-external-documents-card";
@@ -846,7 +846,7 @@ export default async function EditInspectionPage({
             </div>
           </div>
           ) : null}
-          {!isReviewMode ? <InspectionPdfUploadCard action={uploadInspectionPdfAction} attachments={attachmentView} inspectionId={inspection.id} /> : null}
+          {!isReviewMode ? <InspectionPdfUploadCard attachments={attachmentView} inspectionId={inspection.id} /> : null}
           {!isReviewMode ? <DeleteInspectionCard action={deleteInspectionAction} inspectionId={inspection.id} redirectTo={originPath} /> : null}
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Audit trail</p>

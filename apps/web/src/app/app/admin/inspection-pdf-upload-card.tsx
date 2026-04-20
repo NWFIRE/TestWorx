@@ -1,19 +1,54 @@
 "use client";
 
-import { useActionState } from "react";
-
-const initialState = { error: null as string | null, success: null as string | null };
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 export function InspectionPdfUploadCard({
   inspectionId,
-  attachments,
-  action
+  attachments
 }: {
   inspectionId: string;
   attachments: Array<{ id: string; fileName: string; source: "uploaded" | "generated"; customerVisible: boolean; createdAt: Date }>;
-  action: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
 }) {
-  const [state, formAction, pending] = useActionState(action, initialState);
+  const router = useRouter();
+  const [isUploading, startUploadTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setSuccess(null);
+
+    const formData = new FormData(event.currentTarget);
+    const files = formData.getAll("attachment").filter((entry): entry is File => entry instanceof File && entry.size > 0);
+    if (files.length === 0) {
+      setError("Select at least one PDF to upload.");
+      return;
+    }
+
+    startUploadTransition(() => {
+      void (async () => {
+        try {
+          const response = await fetch(`/api/inspections/${inspectionId}/attachments/upload`, {
+            method: "POST",
+            body: formData
+          });
+          const payload = (await response.json()) as { error?: string; success?: string };
+
+          if (!response.ok) {
+            throw new Error(payload.error ?? "Unable to upload PDF.");
+          }
+
+          setSuccess(payload.success ?? (files.length === 1 ? `${files[0]!.name} uploaded.` : `${files.length} PDFs uploaded.`));
+          router.refresh();
+          event.currentTarget.reset();
+        } catch (submitError) {
+          setError(submitError instanceof Error ? submitError.message : "Unable to upload PDF.");
+        }
+      })();
+    });
+  }
 
   return (
     <div className="space-y-5 rounded-[2rem] bg-white p-6 shadow-panel">
@@ -22,7 +57,7 @@ export function InspectionPdfUploadCard({
         <h3 className="mt-2 text-2xl font-semibold text-ink">Inspection attachments</h3>
         <p className="mt-2 text-sm text-slate-500">Upload customer-ready PDFs and keep generated report packets alongside inspection records.</p>
       </div>
-      <form action={formAction} className="space-y-4 rounded-[1.5rem] border border-slate-200 p-4">
+      <form className="space-y-4 rounded-[1.5rem] border border-slate-200 p-4" onSubmit={handleSubmit}>
         <input name="inspectionId" type="hidden" value={inspectionId} />
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="attachment">Upload PDF files</label>
@@ -33,10 +68,10 @@ export function InspectionPdfUploadCard({
           <input className="h-5 w-5 rounded border-slate-300" defaultChecked name="customerVisible" type="checkbox" />
           Make this PDF visible in the customer portal
         </label>
-        {state.error ? <p className="text-sm text-rose-600">{state.error}</p> : null}
-        {state.success ? <p className="text-sm text-emerald-600">{state.success}</p> : null}
-        <button className="w-full rounded-2xl bg-slateblue px-5 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={pending} type="submit">
-          {pending ? "Uploading PDFs..." : "Upload PDFs"}
+        {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+        {success ? <p className="text-sm text-emerald-600">{success}</p> : null}
+        <button className="w-full rounded-2xl bg-slateblue px-5 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={isUploading} type="submit">
+          {isUploading ? "Uploading PDFs..." : "Upload PDFs"}
         </button>
       </form>
       <div className="space-y-3">
