@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useActionState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 const initialState = { error: null as string | null, success: null as string | null };
 
@@ -22,16 +23,48 @@ type BrandingValues = {
 };
 
 export function TenantBrandingForm({
-  values,
-  action
+  values
 }: {
   values: BrandingValues;
-  action: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
 }) {
-  const [state, formAction, pending] = useActionState(action, initialState);
+  const router = useRouter();
+  const [state, setState] = useState(initialState);
+  const [pending, startTransition] = useTransition();
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setState(initialState);
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const response = await fetch("/api/admin/settings/branding", {
+            method: "POST",
+            body: formData
+          });
+          const payload = (await response.json()) as { error?: string; success?: string };
+
+          if (!response.ok) {
+            throw new Error(payload.error ?? "Unable to update branding.");
+          }
+
+          setState({ error: null, success: payload.success ?? "Branding updated." });
+          router.refresh();
+        } catch (submitError) {
+          setState({
+            error: submitError instanceof Error ? submitError.message : "Unable to update branding.",
+            success: null
+          });
+        }
+      })();
+    });
+  }
 
   return (
-    <form action={formAction} className="space-y-5 rounded-[2rem] bg-white p-6 shadow-panel">
+    <form className="space-y-5 rounded-[2rem] bg-white p-6 shadow-panel" onSubmit={handleSubmit}>
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Tenant branding</p>
         <h3 className="mt-2 text-2xl font-semibold text-ink">Brand and business details</h3>

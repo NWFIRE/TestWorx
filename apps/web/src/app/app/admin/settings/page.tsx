@@ -38,8 +38,7 @@ import {
   startBillingCheckoutAction,
   updateComplianceReportingFeeRuleAction,
   updateDefaultServiceFeeAction,
-  updateServiceFeeRuleAction,
-  updateTenantBrandingAction
+  updateServiceFeeRuleAction
 } from "./actions";
 import { BillingPlansSection } from "./billing-plans-section";
 import { BillingContractProfileSettingsCard } from "./billing-contract-profile-settings-card";
@@ -367,7 +366,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
         variant="balanced"
       >
         <div className="space-y-6">
-          <TenantBrandingForm action={updateTenantBrandingAction} values={{ ...brandingSettings.branding, billingEmail: brandingSettings.billingEmail }} />
+          <TenantBrandingForm values={{ ...brandingSettings.branding, billingEmail: brandingSettings.billingEmail }} />
           <QuickBooksSettingsCard
             companyName={quickBooksSettings.tenant.quickbooksCompanyName}
             configured={quickBooksSettings.config.enabled}

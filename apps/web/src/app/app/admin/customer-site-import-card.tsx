@@ -1,17 +1,51 @@
 "use client";
 
-import { useActionState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 const initialState = { error: null as string | null, success: null as string | null };
 
 export function CustomerSiteImportCard({
-  action,
   templateHref
 }: {
-  action: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
   templateHref: string;
 }) {
-  const [state, formAction, pending] = useActionState(action, initialState);
+  const router = useRouter();
+  const [state, setState] = useState(initialState);
+  const [pending, startTransition] = useTransition();
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setState(initialState);
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const response = await fetch("/api/admin/customer-import", {
+            method: "POST",
+            body: formData
+          });
+          const payload = (await response.json()) as { error?: string; success?: string };
+
+          if (!response.ok) {
+            throw new Error(payload.error ?? "Unable to import CSV.");
+          }
+
+          setState({ error: null, success: payload.success ?? "Import completed." });
+          form.reset();
+          router.refresh();
+        } catch (submitError) {
+          setState({
+            error: submitError instanceof Error ? submitError.message : "Unable to import CSV.",
+            success: null
+          });
+        }
+      })();
+    });
+  }
 
   return (
     <div className="space-y-5 rounded-[2rem] bg-white p-6 shadow-panel">
@@ -27,7 +61,7 @@ export function CustomerSiteImportCard({
           Download CSV template
         </a>
       </div>
-      <form action={formAction} className="space-y-4 rounded-[1.5rem] border border-slate-200 p-4">
+      <form className="space-y-4 rounded-[1.5rem] border border-slate-200 p-4" onSubmit={handleSubmit}>
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="csvFile">Customer/site/asset CSV</label>
           <input accept=".csv,text/csv" className="block w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" id="csvFile" name="csvFile" type="file" />
