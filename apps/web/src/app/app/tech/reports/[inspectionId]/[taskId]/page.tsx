@@ -71,6 +71,7 @@ export default async function TechnicianReportPage({ params }: { params: Promise
         siteName: inspectionDisplay.primaryTitle,
         customerName: inspectionDisplay.secondaryTitle || report.inspection.customerCompany.name,
         scheduledDateLabel: format(report.inspection.scheduledStart, "MMM d, yyyy h:mm a"),
+        dispatchNotes: report.inspection.notes,
         paymentCollectionNotice: isDueAtTimeOfServiceCustomer(report.inspection.customerCompany)
           ? "Payment due at time of service. Collect payment before leaving the site."
           : null,

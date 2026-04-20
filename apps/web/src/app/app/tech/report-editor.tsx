@@ -23,6 +23,7 @@ type EditorData = {
   siteName: string;
   customerName: string;
   scheduledDateLabel: string;
+  dispatchNotes?: string | null;
   paymentCollectionNotice?: string | null;
   template: ReportTemplateDefinition;
   draft: ReportDraft;
@@ -150,6 +151,20 @@ function toTechnicianFacingSaveMessage(message: string | null | undefined, actio
   return action === "save"
     ? "Unable to save your report right now. Check your connection and try again."
     : "Unable to finalize this report right now. Review the report and try again.";
+}
+
+function DispatchNotesBanner({ notes }: { notes: string | null | undefined }) {
+  const trimmedNotes = notes?.trim();
+  if (!trimmedNotes) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 rounded-[1.25rem] border border-amber-200 bg-amber-50/80 px-4 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-900">Dispatch notes</p>
+      <p className="mt-1 text-sm leading-6 text-amber-950 whitespace-pre-wrap">{trimmedNotes}</p>
+    </div>
+  );
 }
 
 export function ReportEditor({ data }: { data: EditorData }) {
@@ -692,9 +707,10 @@ export function ReportEditor({ data }: { data: EditorData }) {
             <h2 className="mt-2 text-3xl font-semibold text-ink">
               {(taskDisplayLabel.trim() || data.defaultInspectionTypeLabel)}
             </h2>
-            <p className="mt-2 text-sm text-slate-500">{data.siteName} | {data.customerName} | {data.scheduledDateLabel}</p>
-            {data.canEdit && data.reportStatus !== "finalized" ? (
-              <div className="mt-4 max-w-xl">
+          <p className="mt-2 text-sm text-slate-500">{data.siteName} | {data.customerName} | {data.scheduledDateLabel}</p>
+          <DispatchNotesBanner notes={data.dispatchNotes} />
+          {data.canEdit && data.reportStatus !== "finalized" ? (
+            <div className="mt-4 max-w-xl">
                 <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500" htmlFor={`report-name-${data.reportId}`}>
                   Custom report name
                 </label>

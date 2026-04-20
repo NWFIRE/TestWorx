@@ -290,7 +290,8 @@ export function ExternalDocumentSigner({
   inspectionId,
   document: inspectionDocument,
   action,
-  backNavigation
+  backNavigation,
+  dispatchNotes
 }: {
   inspectionId: string;
   document: {
@@ -307,6 +308,7 @@ export function ExternalDocumentSigner({
     label?: string;
     fallbackHref: string;
   };
+  dispatchNotes?: string | null;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const [pages, setPages] = useState<RenderedPage[]>([]);
@@ -441,6 +443,12 @@ export function ExternalDocumentSigner({
             ? "Review the attached PDF, switch to Draw / Sign when you are ready to mark it up, and save the signed copy without changing the original upload."
             : "Review the attached PDF, switch to Draw when you are ready to mark it up, and save the annotated copy without changing the original upload."}
         </p>
+        {dispatchNotes?.trim() ? (
+          <div className="mt-4 rounded-[1.25rem] border border-amber-200 bg-amber-50/80 px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-900">Dispatch notes</p>
+            <p className="mt-1 text-sm leading-6 text-amber-950 whitespace-pre-wrap">{dispatchNotes.trim()}</p>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid items-start gap-6 landscape:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[1.3fr_0.7fr]">

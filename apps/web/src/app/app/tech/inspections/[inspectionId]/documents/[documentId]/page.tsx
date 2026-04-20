@@ -46,6 +46,7 @@ export default async function TechnicianInspectionDocumentPage({
         annotatedStorageKey: detail.document.annotatedStorageKey,
         signedStorageKey: detail.document.signedStorageKey
       }}
+      dispatchNotes={detail.inspection.notes}
       inspectionId={inspectionId}
     />
   );
