@@ -411,27 +411,36 @@ export async function uploadInspectionPdfAction(_: { error: string | null; succe
   const session = await auth();
   const inspectionId = String(formData.get("inspectionId") ?? "");
   const customerVisible = formData.get("customerVisible") === "on";
-  const file = formData.get("attachment");
+  const files = formData
+    .getAll("attachment")
+    .filter((entry): entry is File => entry instanceof File && entry.size > 0);
 
-  if (!session?.user?.tenantId || !inspectionId || !(file instanceof File) || file.size === 0) {
-    return { error: "Select a PDF to upload.", success: null };
+  if (!session?.user?.tenantId || !inspectionId || files.length === 0) {
+    return { error: "Select at least one PDF to upload.", success: null };
   }
 
   try {
-    await uploadInspectionPdfAttachment(
-      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-      {
-        inspectionId,
-        fileName: file.name,
-        mimeType: file.type || "application/pdf",
-        bytes: new Uint8Array(await file.arrayBuffer()),
-        customerVisible
-      }
-    );
+    for (const file of files) {
+      await uploadInspectionPdfAttachment(
+        { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+        {
+          inspectionId,
+          fileName: file.name,
+          mimeType: file.type || "application/pdf",
+          bytes: new Uint8Array(await file.arrayBuffer()),
+          customerVisible
+        }
+      );
+    }
 
     revalidatePath(`/app/admin/inspections/${inspectionId}`);
     revalidatePath("/app/customer");
-    return { error: null, success: `${file.name} uploaded.` };
+    return {
+      error: null,
+      success: files.length === 1
+        ? `${files[0]!.name} uploaded.`
+        : `${files.length} PDFs uploaded.`
+    };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unable to upload PDF.", success: null };
   }

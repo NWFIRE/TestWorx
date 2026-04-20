@@ -25,8 +25,9 @@ export function InspectionPdfUploadCard({
       <form action={formAction} className="space-y-4 rounded-[1.5rem] border border-slate-200 p-4">
         <input name="inspectionId" type="hidden" value={inspectionId} />
         <div>
-          <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="attachment">Upload PDF</label>
-          <input accept="application/pdf" className="block w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" id="attachment" name="attachment" type="file" />
+          <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="attachment">Upload PDF files</label>
+          <input accept="application/pdf" className="block w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" id="attachment" multiple name="attachment" type="file" />
+          <p className="mt-2 text-xs text-slate-500">You can select and upload multiple PDFs at once.</p>
         </div>
         <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
           <input className="h-5 w-5 rounded border-slate-300" defaultChecked name="customerVisible" type="checkbox" />
@@ -35,7 +36,7 @@ export function InspectionPdfUploadCard({
         {state.error ? <p className="text-sm text-rose-600">{state.error}</p> : null}
         {state.success ? <p className="text-sm text-emerald-600">{state.success}</p> : null}
         <button className="w-full rounded-2xl bg-slateblue px-5 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={pending} type="submit">
-          {pending ? "Uploading PDF..." : "Upload PDF"}
+          {pending ? "Uploading PDFs..." : "Upload PDFs"}
         </button>
       </form>
       <div className="space-y-3">
