@@ -59,7 +59,7 @@ export default async function UpcomingInspectionsPage({
       tenantId: session.user.tenantId
     },
     {
-      monthsAhead: 6
+      monthsAhead: 11
     }
   );
   const requestedCustomerId = typeof params.customerCompanyId === "string" ? params.customerCompanyId : "";
