@@ -321,47 +321,45 @@ export default async function HostedQuotePage({
                   </div>
                 </div>
 
-                <div className="mt-6 grid gap-6 xl:grid-cols-[1.16fr_0.84fr]">
-                  <div className="space-y-4">
-                    {groupedLineItems.map((group) => (
-                      <div className="rounded-[24px] border border-slate-200 bg-slate-50/45 p-5" key={group.title}>
-                        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-700">{group.title}</p>
-                        <div className="mt-4 space-y-3">
-                          {group.items.map((line) => (
-                            <div className="rounded-[20px] border border-slate-200 bg-white p-4" key={line.id ?? `${group.title}-${line.title}`}>
-                              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                <div className="min-w-0">
-                                  <p className="text-base font-semibold text-slate-950">{line.title}</p>
-                                  {line.description ? <p className="mt-2 text-sm leading-7 text-slate-600">{line.description}</p> : null}
+                <div className="mt-6 space-y-5">
+                  {groupedLineItems.map((group) => (
+                    <div className="rounded-[24px] border border-slate-200 bg-slate-50/45 p-5" key={group.title}>
+                      <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-700">{group.title}</p>
+                      <div className="mt-4 space-y-3">
+                        {group.items.map((line) => (
+                          <div className="rounded-[20px] border border-slate-200 bg-white p-4" key={line.id ?? `${group.title}-${line.title}`}>
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-base font-semibold text-slate-950">{line.title}</p>
+                                {line.description ? <p className="mt-2 text-sm leading-7 text-slate-600">{line.description}</p> : null}
+                              </div>
+                              <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm sm:grid-cols-3 lg:min-w-[360px]">
+                                <div className="space-y-1">
+                                  <p className="text-slate-500">Qty</p>
+                                  <p className="font-medium text-slate-900">{line.quantity ?? 1}</p>
                                 </div>
-                                <div className="min-w-[176px] rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm">
-                                  <div className="flex items-center justify-between text-slate-500">
-                                    <span>Qty</span>
-                                    <span className="font-medium text-slate-900">{line.quantity ?? 1}</span>
-                                  </div>
-                                  <div className="mt-2 flex items-center justify-between text-slate-500">
-                                    <span>Unit Price</span>
-                                    <span className="font-medium text-slate-900">{formatMoney(line.unitPrice ?? 0)}</span>
-                                  </div>
-                                  <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3">
-                                    <span className="text-slate-700">Line Total</span>
-                                    <span className="font-semibold text-slate-950">{formatMoney(line.total ?? 0)}</span>
-                                  </div>
+                                <div className="space-y-1">
+                                  <p className="text-slate-500">Unit Price</p>
+                                  <p className="font-medium text-slate-900">{formatMoney(line.unitPrice ?? 0)}</p>
+                                </div>
+                                <div className="space-y-1 border-t border-slate-200 pt-3 sm:border-l sm:border-t-0 sm:pl-3 sm:pt-0">
+                                  <p className="text-slate-700">Line Total</p>
+                                  <p className="font-semibold text-slate-950">{formatMoney(line.total ?? 0)}</p>
                                 </div>
                               </div>
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
 
-                  <div className="space-y-5">
-                    <TotalSummaryCard primaryColor={primaryColor} subtotal={quote.subtotal} tax={quote.taxAmount} total={quote.total} />
+                  <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
                     <div className="rounded-[24px] border border-slate-200 bg-slate-50/60 p-5">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Deposit Requirement</p>
                       <p className="mt-3 text-sm leading-7 text-slate-700">A 30% deposit is required before planning, engineering, or design submittals begin.</p>
                     </div>
+                    <TotalSummaryCard primaryColor={primaryColor} subtotal={quote.subtotal} tax={quote.taxAmount} total={quote.total} />
                   </div>
                 </div>
               </section>
