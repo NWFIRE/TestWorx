@@ -59,15 +59,15 @@ export default async function CustomerInspectionPacketPage({
           <p className="mt-2 text-lg font-semibold text-ink">{detail.reportSummaries.length}</p>
         </div>
         <div className="rounded-3xl bg-white p-5 shadow-panel">
-          <p className="text-sm text-slate-500">PDF documents</p>
+          <p className="text-sm text-slate-500">Packet documents</p>
           <p className="mt-2 text-lg font-semibold text-ink">{detail.packetDocuments.length}</p>
         </div>
       </div>
 
       <InspectionPacketCard
-        description="Download every customer-authorized PDF tied to this completed inspection from one place."
+        description="Open hosted reports and download every customer-authorized inspection document from one place."
         documents={detail.packetDocuments}
-        emptyDescription="No customer-authorized PDFs are available for this completed inspection yet."
+        emptyDescription="No hosted reports or customer-authorized packet documents are available for this completed inspection yet."
         emptyTitle="No packet documents available"
       />
 

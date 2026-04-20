@@ -477,6 +477,15 @@ export async function getAdminInspectionArchiveDetail(actor: ActorContext, inspe
   }
 
   const packetDocuments = buildInspectionPacketDocuments({
+    reports: inspection.tasks
+      .filter((task) => task.report?.id && task.report.finalizedAt)
+      .map((task) => ({
+        id: task.report!.id,
+        title: task.customDisplayLabel?.trim() || inspectionTypeRegistry[task.inspectionType].label,
+        happenedAt: task.report!.finalizedAt,
+        customerVisible: true,
+        viewPath: `/app/admin/reports/${inspection.id}/${task.id}`
+      })),
     attachments: inspection.attachments.map((attachment) => ({
       ...attachment,
       source: attachment.source

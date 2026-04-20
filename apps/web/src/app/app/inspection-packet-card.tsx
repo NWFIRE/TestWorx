@@ -2,15 +2,17 @@ import { format } from "date-fns";
 
 type PacketDocument = {
   id: string;
-  source: "attachment" | "inspection_document";
-  category: "report_pdf" | "signed_document" | "inspection_pdf";
+  source: "attachment" | "inspection_document" | "report";
+  category: "hosted_report" | "report_pdf" | "signed_document" | "inspection_pdf";
   categoryLabel: string;
   title: string;
   fileName: string;
   customerVisible: boolean;
   happenedAt: Date;
-  downloadPath: string;
+  downloadPath: string | null;
   viewPath: string;
+  viewLabel?: string;
+  downloadLabel?: string;
 };
 
 function groupDocuments(documents: PacketDocument[]) {
@@ -81,14 +83,16 @@ export function InspectionPacketCard({
                         rel="noreferrer"
                         target="_blank"
                       >
-                        View PDF
+                        {document.viewLabel ?? "View PDF"}
                       </a>
-                      <a
-                        className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
-                        href={document.downloadPath}
-                      >
-                        Download PDF
-                      </a>
+                      {document.downloadPath ? (
+                        <a
+                          className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
+                          href={document.downloadPath}
+                        >
+                          {document.downloadLabel ?? "Download PDF"}
+                        </a>
+                      ) : null}
                     </div>
                   </div>
                 ))}

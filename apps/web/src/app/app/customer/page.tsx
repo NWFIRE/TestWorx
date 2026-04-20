@@ -42,7 +42,7 @@ export default async function CustomerPage() {
       <div className="space-y-4 rounded-[2rem] bg-white p-6 shadow-panel">
         <div>
           <h3 className="text-2xl font-semibold text-ink">Completed inspection packets</h3>
-          <p className="mt-2 text-sm text-slate-500">Open each completed visit to access every available PDF packet, signed document, and customer-authorized inspection file.</p>
+          <p className="mt-2 text-sm text-slate-500">Open each completed visit to access hosted reports, signed documents, and customer-authorized inspection files.</p>
         </div>
         {inspectionPackets.length === 0 ? (
           <p className="rounded-[1.5rem] border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No completed inspection packets are available yet.</p>
@@ -59,7 +59,7 @@ export default async function CustomerPage() {
                     {formatInspectionTaskSummary(inspection.taskTypes)} | {format(inspection.latestFinalizedAt, "MMM d, yyyy")}
                   </p>
                   <p className="mt-1 text-sm text-slate-500">
-                    {inspection.packetDocuments.length} PDF document{inspection.packetDocuments.length === 1 ? "" : "s"} available
+                    {inspection.packetDocuments.length} packet document{inspection.packetDocuments.length === 1 ? "" : "s"} available
                   </p>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">

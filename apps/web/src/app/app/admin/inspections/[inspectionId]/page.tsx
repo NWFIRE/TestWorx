@@ -181,6 +181,7 @@ export default async function EditInspectionPage({
     tasks: Array<{
       id: string;
       inspectionType: InspectionType;
+      customDisplayLabel?: string | null;
       addedByUserId: string | null;
       assignedTechnicianId?: string | null;
       dueMonth?: string | null;
@@ -319,6 +320,15 @@ export default async function EditInspectionPage({
     signedStorageKey: string | null;
   }>;
   const packetDocuments = buildInspectionPacketDocuments({
+    reports: inspectionView.tasks
+      .filter((task) => task.report?.id && task.report?.status === "finalized")
+      .map((task) => ({
+        id: task.report!.id,
+        title: inspectionTaskLabel(task),
+        happenedAt: task.report!.finalizedAt,
+        customerVisible: true,
+        viewPath: `/app/admin/reports/${inspection.id}/${task.id}`
+      })),
     attachments: attachmentView,
     inspectionDocuments: externalDocumentView.map((document) => ({
       ...document,
@@ -694,13 +704,13 @@ export default async function EditInspectionPage({
           <InspectionPacketCard
             description={
               inspection.status === "completed" || inspection.status === "invoiced" || inspection.status === "follow_up_required"
-                ? "Access every PDF tied to this completed visit from one inspection packet view."
-                : "This packet becomes the primary PDF handoff area once the visit is completed and documents are available."
+                ? "Access hosted reports and every document tied to this completed visit from one inspection packet view."
+                : "This packet becomes the primary hosted-report and document handoff area once the visit is completed and documents are available."
             }
             documents={packetDocuments}
             emptyDescription={
               inspection.status === "completed" || inspection.status === "invoiced" || inspection.status === "follow_up_required"
-                ? "No PDFs are attached to this completed inspection yet."
+                ? "No hosted reports or packet documents are attached to this completed inspection yet."
                 : "This inspection is not completed yet, so the packet is not ready."
             }
             emptyTitle={

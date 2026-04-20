@@ -77,14 +77,15 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
   const packetDocuments = (detail as typeof detail & {
     packetDocuments?: Array<{
       id: string;
-      source: "attachment" | "inspection_document";
-      category: "report_pdf" | "signed_document" | "inspection_pdf";
+      source: "attachment" | "inspection_document" | "report";
+      category: "hosted_report" | "report_pdf" | "signed_document" | "inspection_pdf";
       categoryLabel: string;
       title: string;
       fileName: string;
       customerVisible: boolean;
       happenedAt: Date;
-      downloadPath: string;
+      downloadPath: string | null;
+      viewPath: string;
     }>;
   }).packetDocuments ?? [];
   const preview = buildReportPreview(detail.draft);
@@ -127,9 +128,9 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
         <AcceptanceReportView model={model} />
         <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
           <InspectionPacketCard
-            description="This report is part of a completed inspection packet. Download every customer-authorized PDF tied to the visit from one place."
+            description="This report is part of a completed inspection packet. Open hosted reports and download every customer-authorized document tied to the visit from one place."
             documents={packetDocuments}
-            emptyDescription="No customer-authorized PDFs are available for this completed inspection."
+            emptyDescription="No hosted reports or customer-authorized packet documents are available for this completed inspection."
             emptyTitle="No packet documents available"
             title="Inspection packet documents"
           />
@@ -246,9 +247,9 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
         </div>
         <div className="space-y-6">
           <InspectionPacketCard
-            description="This report is part of a completed inspection packet. Download every customer-authorized PDF tied to the visit from one place."
+            description="This report is part of a completed inspection packet. Open hosted reports and download every customer-authorized document tied to the visit from one place."
             documents={packetDocuments}
-            emptyDescription="No customer-authorized PDFs are available for this completed inspection."
+            emptyDescription="No hosted reports or customer-authorized packet documents are available for this completed inspection."
             emptyTitle="No packet documents available"
             title="Inspection packet documents"
           />

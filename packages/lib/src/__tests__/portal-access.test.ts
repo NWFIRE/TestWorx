@@ -108,6 +108,15 @@ describe("customer portal access controls", () => {
 
   it("builds a completed inspection packet with report PDFs, signed documents, and other PDFs", () => {
     const documents = buildInspectionPacketDocuments({
+      reports: [
+        {
+          id: "report_hosted",
+          title: "Kitchen Suppression Report",
+          happenedAt: new Date("2026-04-02T18:00:00.000Z"),
+          customerVisible: true,
+          viewPath: "/app/customer/reports/report_hosted"
+        }
+      ],
       attachments: [
         {
           id: "attachment_report",
@@ -151,24 +160,28 @@ describe("customer portal access controls", () => {
     });
 
     expect(documents.map((document) => document.category)).toEqual([
+      "hosted_report",
       "inspection_pdf",
       "signed_document",
       "report_pdf",
       "inspection_pdf"
     ]);
     expect(documents.map((document) => document.categoryLabel)).toEqual([
+      "Hosted reports",
       "Other inspection PDFs",
       "Signed inspection documents",
       "Report PDFs",
       "Other inspection PDFs"
     ]);
     expect(documents.map((document) => document.downloadPath)).toEqual([
+      null,
       "/api/inspection-documents/document_annotated",
       "/api/inspection-documents/document_signed",
       "/api/attachments/attachment_report",
       "/api/attachments/attachment_uploaded"
     ]);
     expect(documents.map((document) => document.viewPath)).toEqual([
+      "/app/customer/reports/report_hosted",
       "/api/inspection-documents/document_annotated?disposition=inline",
       "/api/inspection-documents/document_signed?disposition=inline",
       "/api/attachments/attachment_report?disposition=inline",

@@ -130,9 +130,9 @@ export default async function InspectionArchiveDetailPage({
           </SectionCard>
 
           <InspectionPacketCard
-            description="Download report PDFs, signed documents, and archived inspection attachments from one archive packet."
+            description="Open hosted reports and download signed documents, report PDFs, and archived inspection attachments from one archive packet."
             documents={detail.packetDocuments}
-            emptyDescription="No archived report PDFs or packet documents are attached to this inspection yet."
+            emptyDescription="No hosted reports or archived packet documents are attached to this inspection yet."
             emptyTitle="No archive packet documents available"
             showCustomerVisibility
             title="Archive packet"

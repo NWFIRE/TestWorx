@@ -53,19 +53,21 @@ function slugifyFileName(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "inspection-report";
 }
 
-export type InspectionPacketDocumentCategory = "report_pdf" | "signed_document" | "inspection_pdf";
+export type InspectionPacketDocumentCategory = "hosted_report" | "report_pdf" | "signed_document" | "inspection_pdf";
 
 export type InspectionPacketDocument = {
   id: string;
-  source: "attachment" | "inspection_document";
+  source: "attachment" | "inspection_document" | "report";
   category: InspectionPacketDocumentCategory;
   categoryLabel: string;
   title: string;
   fileName: string;
   customerVisible: boolean;
   happenedAt: Date;
-  downloadPath: string;
+  downloadPath: string | null;
   viewPath: string;
+  viewLabel?: string;
+  downloadLabel?: string;
 };
 
 export function buildInspectionPacketDocuments(input: {
@@ -89,8 +91,31 @@ export function buildInspectionPacketDocuments(input: {
     signedStorageKey?: string | null;
     customerVisible?: boolean | null;
   }>;
+  reports?: Array<{
+    id: string;
+    title: string;
+    happenedAt?: Date | null;
+    customerVisible?: boolean | null;
+    viewPath: string;
+  }>;
 }) {
   const packetDocuments: InspectionPacketDocument[] = [];
+
+  for (const report of input.reports ?? []) {
+    packetDocuments.push({
+      id: report.id,
+      source: "report",
+      category: "hosted_report",
+      categoryLabel: "Hosted reports",
+      title: report.title,
+      fileName: report.title,
+      customerVisible: Boolean(report.customerVisible ?? true),
+      happenedAt: report.happenedAt ?? new Date(0),
+      downloadPath: null,
+      viewPath: report.viewPath,
+      viewLabel: "Open report"
+    });
+  }
 
   for (const attachment of input.attachments ?? []) {
     packetDocuments.push({
@@ -103,7 +128,9 @@ export function buildInspectionPacketDocuments(input: {
       customerVisible: Boolean(attachment.customerVisible),
       happenedAt: attachment.createdAt,
       downloadPath: `/api/attachments/${attachment.id}`,
-      viewPath: `/api/attachments/${attachment.id}?disposition=inline`
+      viewPath: `/api/attachments/${attachment.id}?disposition=inline`,
+      viewLabel: "View PDF",
+      downloadLabel: "Download PDF"
     });
   }
 
@@ -133,7 +160,9 @@ export function buildInspectionPacketDocuments(input: {
           ? document.annotatedAt ?? document.uploadedAt ?? new Date(0)
           : document.uploadedAt ?? new Date(0),
       downloadPath: `/api/inspection-documents/${document.id}`,
-      viewPath: `/api/inspection-documents/${document.id}?disposition=inline`
+      viewPath: `/api/inspection-documents/${document.id}?disposition=inline`,
+      viewLabel: "View PDF",
+      downloadLabel: "Download PDF"
     });
   }
 
@@ -1821,6 +1850,15 @@ export async function getCustomerReportDetail(actor: ActorContext, reportId: str
 
   const draft = reportDraftSchema.parse(report.contentJson ?? {});
   const packetDocuments = buildInspectionPacketDocuments({
+    reports: [
+      {
+        id: report.id,
+        title: resolveReportTemplate({ inspectionType: report.task.inspectionType }).label,
+        happenedAt: report.finalizedAt,
+        customerVisible: true,
+        viewPath: `/app/customer/reports/${report.id}`
+      }
+    ],
     attachments: [...report.attachments, ...inspectionAttachments],
     inspectionDocuments: inspectionDocuments.map((document) => ({
       ...document,
@@ -1899,6 +1937,13 @@ export async function getCustomerInspectionPacketDetail(actor: ActorContext, ins
     .filter((task) => task.report?.status === reportStatuses.finalized)
     .flatMap((task) => task.report?.attachments ?? []);
   const packetDocuments = buildInspectionPacketDocuments({
+    reports: reportSummaries.map((report) => ({
+      id: report.id,
+      title: report.displayLabel,
+      happenedAt: report.finalizedAt,
+      customerVisible: true,
+      viewPath: report.href
+    })),
     attachments: [...inspection.attachments, ...reportAttachments],
     inspectionDocuments: inspection.documents.map((document) => ({
       ...document,
