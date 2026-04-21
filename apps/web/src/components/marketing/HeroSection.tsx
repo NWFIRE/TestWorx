@@ -98,7 +98,7 @@ export function HeroSection() {
                     </div>
                     <div className="mt-4 space-y-3">
                       {[
-                        ["Enid Medical Plaza", "Wet chemical acceptance", "10:30 AM"],
+                        ["Harbor Point Center", "Wet chemical acceptance", "10:30 AM"],
                         ["Northwest Kitchen", "Extinguisher annuals", "1:00 PM"],
                         ["Cold Storage 4", "Industrial suppression follow-up", "3:15 PM"]
                       ].map(([site, task, time]) => (
@@ -180,17 +180,33 @@ export function HeroSection() {
                     <div className="hidden md:block">
                       <div className="absolute bottom-5 right-5 w-[240px] rounded-[22px] border border-slate-200 bg-white shadow-[0_18px_42px_rgba(15,23,42,0.14)]">
                         <div className="border-b border-slate-200 px-4 py-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Report preview</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Hosted report</p>
                         </div>
                         <div className="space-y-3 p-4">
-                          <div className="h-2 rounded-full bg-slate-900" />
-                          <div className="h-2 w-3/4 rounded-full bg-slate-200" />
-                          <div className="grid grid-cols-3 gap-2">
-                            <div className="h-14 rounded-2xl bg-slate-100" />
-                            <div className="h-14 rounded-2xl bg-slate-100" />
-                            <div className="h-14 rounded-2xl bg-slate-100" />
+                          <div>
+                            <p className="text-sm font-semibold tracking-[-0.02em] text-slate-950">Wet Chemical System Acceptance Test</p>
+                            <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">NFPA 17A hosted report</p>
                           </div>
-                          <div className="h-20 rounded-2xl bg-slate-50 ring-1 ring-slate-200" />
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Outcome</p>
+                              <p className="mt-2 text-sm font-semibold text-emerald-700">Pass</p>
+                            </div>
+                            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Signed</p>
+                              <p className="mt-2 text-sm font-semibold text-slate-950">2 of 2</p>
+                            </div>
+                          </div>
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Summary</p>
+                            <p className="mt-2 text-sm leading-6 text-slate-700">
+                              Customer-facing hosted report, premium PDF, and inspection packet are ready.
+                            </p>
+                          </div>
+                          <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm">
+                            <span className="text-slate-600">Portal visibility</span>
+                            <span className="font-semibold text-slate-950">Live</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -207,7 +223,7 @@ export function HeroSection() {
                     <div className="mt-4 rounded-[22px] border border-slate-200 bg-white p-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-semibold text-slate-950">Commercial Fire</p>
+                          <p className="text-sm font-semibold text-slate-950">3rd Party Provider</p>
                           <p className="mt-1 text-sm text-slate-500">Provider-billed work order CF-1001</p>
                         </div>
                         <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700">
@@ -216,7 +232,7 @@ export function HeroSection() {
                       </div>
                       <div className="mt-4 space-y-3">
                         {[
-                          ["Bill to", "Commercial Fire"],
+                          ["Bill to", "3rd Party Provider"],
                           ["Pricing source", "Provider contract rate"],
                           ["Status", "Ready for invoice review"]
                         ].map(([label, value]) => (
@@ -249,7 +265,7 @@ export function HeroSection() {
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Resolution detail</p>
                       <div className="mt-3 space-y-3">
                         {[
-                          ["Contract used", "Commercial Fire Annual"],
+                          ["Contract used", "3rd Party Provider Annual"],
                           ["Grouping mode", "Per work order"],
                           ["Last sync", "12 minutes ago"]
                         ].map(([label, value]) => (
