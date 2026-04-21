@@ -122,6 +122,10 @@ function resolveInspectionMode(value: string | undefined) {
   return value === "review" ? "review" : "workspace";
 }
 
+function sanitizePathSegment(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "file";
+}
+
 function resolveInspectionBackLabel(originPath: string) {
   if (originPath.startsWith("/app/admin/billing")) {
     return "Back to billing";
@@ -803,6 +807,7 @@ export default async function EditInspectionPage({
               signedAt: document.signedAt?.toISOString() ?? null
             }))}
             inspectionId={inspection.id}
+            tenantStoragePrefix={sanitizePathSegment(session.user.tenantId)}
           />
           ) : null}
           {!isReviewMode ? (
@@ -856,7 +861,7 @@ export default async function EditInspectionPage({
             </div>
           </div>
           ) : null}
-          {!isReviewMode ? <InspectionPdfUploadCard attachments={attachmentView} inspectionId={inspection.id} /> : null}
+          {!isReviewMode ? <InspectionPdfUploadCard attachments={attachmentView} inspectionId={inspection.id} tenantStoragePrefix={sanitizePathSegment(session.user.tenantId)} /> : null}
           {!isReviewMode ? <DeleteInspectionCard action={deleteInspectionAction} inspectionId={inspection.id} redirectTo={originPath} /> : null}
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Audit trail</p>

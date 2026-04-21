@@ -18,9 +18,11 @@ const statusClasses: Record<string, string> = {
 
 export function InspectionExternalDocumentsCard({
   inspectionId,
-  documents
+  documents,
+  tenantStoragePrefix
 }: {
   inspectionId: string;
+  tenantStoragePrefix: string;
   documents: Array<{
     id: string;
     fileName: string;
@@ -57,7 +59,7 @@ export function InspectionExternalDocumentsCard({
         try {
           const safeName = file.name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "inspection-document.pdf";
           const uploaded = await upload(
-            `${inspectionId}-${Date.now()}-${safeName}`,
+            `${tenantStoragePrefix}/inspection-document-original/${inspectionId}-${Date.now()}-${safeName}`,
             file,
             {
               access: "private",

@@ -6,9 +6,11 @@ import { upload } from "@vercel/blob/client";
 
 export function InspectionPdfUploadCard({
   inspectionId,
-  attachments
+  attachments,
+  tenantStoragePrefix
 }: {
   inspectionId: string;
+  tenantStoragePrefix: string;
   attachments: Array<{ id: string; fileName: string; source: "uploaded" | "generated"; customerVisible: boolean; createdAt: Date }>;
 }) {
   const router = useRouter();
@@ -34,7 +36,7 @@ export function InspectionPdfUploadCard({
           const uploadResults = await Promise.all(files.map(async (file) => {
             const safeName = file.name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "inspection.pdf";
             const uploaded = await upload(
-              `${inspectionId}-${Date.now()}-${safeName}`,
+              `${tenantStoragePrefix}/uploaded-pdf/${inspectionId}-${Date.now()}-${safeName}`,
               file,
               {
                 access: "private",
