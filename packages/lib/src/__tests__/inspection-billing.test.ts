@@ -1322,6 +1322,93 @@ describe("inspection billing persistence and admin review", () => {
     expect(detail?.notes).toBe("Review pricing");
   });
 
+  it("recomputes billing subtotals from priced items when stored amounts are missing", async () => {
+    const stalePricedItems = [
+      {
+        id: "line_1",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        reportId: "report_1",
+        reportType: "fire_extinguisher",
+        category: "inventory",
+        description: "New (2.5 lb ABC)",
+        quantity: 7,
+        unitPrice: 18,
+        amount: null
+      }
+    ];
+
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      {
+        id: "summary_1",
+        inspectionId: "inspection_1",
+        customerCompanyId: "customer_1",
+        customerName: "Pinecrest Property Management",
+        siteId: "site_1",
+        siteName: "Pinecrest Tower",
+        inspectionDate: new Date("2026-03-20T15:00:00.000Z"),
+        technicianName: "Alex Turner",
+        status: "draft",
+        subtotal: 0,
+        notes: null,
+        items: stalePricedItems
+      }
+    ]);
+
+    const summaries = await getAdminBillingSummaries({
+      userId: "office_1",
+      role: "office_admin",
+      tenantId: "tenant_1"
+    });
+
+    expect(summaries[0]?.subtotal).toBe(126);
+    expect(summaries[0]?.metrics.missingPriceCount).toBe(0);
+
+    prismaMock.$queryRaw
+      .mockResolvedValueOnce([
+        {
+          id: "summary_1",
+          status: "invoiced"
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "summary_1",
+          inspectionId: "inspection_1",
+          customerCompanyId: "customer_1",
+          customerName: "Pinecrest Property Management",
+          siteId: "site_1",
+          siteName: "Pinecrest Tower",
+          inspectionDate: new Date("2026-03-20T15:00:00.000Z"),
+          technicianName: "Alex Turner",
+          status: "invoiced",
+          quickbooksSyncStatus: null,
+          quickbooksInvoiceId: null,
+          quickbooksInvoiceNumber: null,
+          quickbooksConnectionMode: null,
+          quickbooksSyncedAt: null,
+          quickbooksSendStatus: null,
+          quickbooksSentAt: null,
+          quickbooksSyncError: null,
+          quickbooksSendError: null,
+          subtotal: 0,
+          notes: null,
+          items: stalePricedItems
+        }
+      ]);
+    prismaMock.inspectionBillingSummary.findFirst.mockResolvedValueOnce({
+      billingResolutionSnapshot: null
+    });
+
+    const detail = await getAdminBillingSummaryDetail(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    expect(detail?.subtotal).toBe(126);
+    expect(detail?.metrics.missingPriceCount).toBe(0);
+  });
+
   it("locks invoiced billing summaries from note and line edits", async () => {
     prismaMock.$queryRaw
       .mockResolvedValueOnce([

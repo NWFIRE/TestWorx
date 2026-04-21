@@ -120,7 +120,9 @@ function SummaryQueueSection({
                     <p className="text-sm text-slate-600">
                       Subtotal:{" "}
                       <span className="font-semibold text-slate-950">
-                        {summary.subtotal > 0 ? `$${summary.subtotal.toFixed(2)}` : "Pending pricing"}
+                        {summary.metrics.missingPriceCount > 0
+                          ? "Pending pricing"
+                          : `$${summary.subtotal.toFixed(2)}`}
                       </span>
                     </p>
                   </div>

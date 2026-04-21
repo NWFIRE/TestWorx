@@ -246,7 +246,7 @@ export default async function BillingSummaryDetailPage({
         <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Labor hours</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.laborHoursTotal}</p></div>
         <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Material items</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.materialItemCount}</p></div>
         <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Missing prices</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.missingPriceCount}</p></div>
-        <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Subtotal</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.subtotal > 0 ? `$${summary.subtotal.toFixed(2)}` : "Pending pricing"}</p></div>
+        <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Subtotal</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.missingPriceCount > 0 ? "Pending pricing" : `$${summary.subtotal.toFixed(2)}`}</p></div>
       </div>
 
       {isInvoiced ? (
