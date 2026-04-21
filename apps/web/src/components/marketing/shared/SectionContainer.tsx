@@ -11,5 +11,5 @@ export function SectionContainer({
   children: ReactNode;
   className?: string;
 }) {
-  return <div className={cn("mx-auto w-full max-w-[1240px] px-5 md:px-6 xl:px-8", className)}>{children}</div>;
+  return <div className={cn("w-full px-5 md:px-8 xl:px-10 2xl:px-12", className)}>{children}</div>;
 }
