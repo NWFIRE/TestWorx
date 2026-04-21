@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { upload } from "@vercel/blob/client";
 
 export function InspectionPdfUploadCard({
   inspectionId,
@@ -30,11 +31,48 @@ export function InspectionPdfUploadCard({
     startUploadTransition(() => {
       void (async () => {
         try {
+          const uploadResults = await Promise.all(files.map(async (file) => {
+            const safeName = file.name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "inspection.pdf";
+            const uploaded = await upload(
+              `${inspectionId}-${Date.now()}-${safeName}`,
+              file,
+              {
+                access: "private",
+                handleUploadUrl: `/api/inspections/${inspectionId}/attachments/blob`
+              }
+            );
+
+            return {
+              pathname: uploaded.pathname,
+              fileName: file.name,
+              mimeType: file.type || uploaded.contentType || "application/pdf"
+            };
+          }));
+
+          const metadataFormData = new FormData();
+          if (formData.get("customerVisible") === "on") {
+            metadataFormData.set("customerVisible", "on");
+          }
+          for (const uploaded of uploadResults) {
+            metadataFormData.append("uploadedBlobPathname", uploaded.pathname);
+            metadataFormData.append("uploadedFileName", uploaded.fileName);
+            metadataFormData.append("uploadedMimeType", uploaded.mimeType);
+          }
+
           const response = await fetch(`/api/inspections/${inspectionId}/attachments/upload`, {
             method: "POST",
-            body: formData
+            body: metadataFormData
           });
-          const payload = (await response.json()) as { error?: string; success?: string };
+          const responseText = await response.text();
+          const payload = responseText
+            ? (() => {
+                try {
+                  return JSON.parse(responseText) as { error?: string; success?: string };
+                } catch {
+                  return { error: responseText };
+                }
+              })()
+            : {};
 
           if (!response.ok) {
             throw new Error(payload.error ?? "Unable to upload PDF.");

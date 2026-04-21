@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { upload } from "@vercel/blob/client";
 
 function statusLabel(status: string) {
   return status.replaceAll("_", " ");
@@ -54,11 +55,45 @@ export function InspectionExternalDocumentsCard({
     startUploadTransition(() => {
       void (async () => {
         try {
+          const safeName = file.name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "inspection-document.pdf";
+          const uploaded = await upload(
+            `${inspectionId}-${Date.now()}-${safeName}`,
+            file,
+            {
+              access: "private",
+              handleUploadUrl: `/api/inspections/${inspectionId}/documents/blob`
+            }
+          );
+
+          const metadataFormData = new FormData();
+          const label = String(formData.get("label") ?? "").trim();
+          if (label) {
+            metadataFormData.set("label", label);
+          }
+          if (formData.get("requiresSignature") === "on") {
+            metadataFormData.set("requiresSignature", "on");
+          }
+          if (formData.get("customerVisible") === "on") {
+            metadataFormData.set("customerVisible", "on");
+          }
+          metadataFormData.set("uploadedBlobPathname", uploaded.pathname);
+          metadataFormData.set("uploadedFileName", file.name);
+          metadataFormData.set("uploadedMimeType", file.type || uploaded.contentType || "application/pdf");
+
           const response = await fetch(`/api/inspections/${inspectionId}/documents/upload`, {
             method: "POST",
-            body: formData
+            body: metadataFormData
           });
-          const payload = (await response.json()) as { error?: string; success?: string };
+          const responseText = await response.text();
+          const payload = responseText
+            ? (() => {
+                try {
+                  return JSON.parse(responseText) as { error?: string; success?: string };
+                } catch {
+                  return { error: responseText };
+                }
+              })()
+            : {};
 
           if (!response.ok) {
             throw new Error(payload.error ?? "Unable to upload PDF.");

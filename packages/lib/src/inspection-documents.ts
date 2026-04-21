@@ -13,6 +13,7 @@ import { getInspectionAssignedTechnicianIds, isActiveOperationalInspectionStatus
 import {
   assertStorageKeyBelongsToTenant,
   assertStorageKeyCategory,
+  buildBlobStorageKey,
   buildFileDownloadResponse,
   buildStoredFilePayload,
   decodeStoredFile,
@@ -423,6 +424,67 @@ export async function uploadInspectionDocument(actor: ActorContext, input: {
     metadata: {
       requiresSignature: document.requiresSignature,
       customerVisible: document.customerVisible
+    }
+  });
+
+  return document;
+}
+
+export async function registerInspectionDocumentUpload(actor: ActorContext, input: {
+  inspectionId: string;
+  fileName: string;
+  mimeType: string;
+  blobPathname: string;
+  label?: string | null;
+  requiresSignature?: boolean;
+  customerVisible?: boolean;
+}) {
+  const { parsedActor, inspection } = await assertInspectionDocumentAccess(actor, input.inspectionId);
+  if (!["tenant_admin", "office_admin", "platform_admin"].includes(parsedActor.role)) {
+    throw new Error("Only administrators can upload external inspection documents.");
+  }
+
+  await assertTenantEntitlementForTenant(parsedActor.tenantId as string, "uploadedInspectionPdfs", "Uploaded inspection PDFs require a Professional or Enterprise subscription.");
+
+  if (input.mimeType !== "application/pdf") {
+    throw new Error("Only PDF files are supported.");
+  }
+
+  if (!input.fileName.toLowerCase().endsWith(".pdf")) {
+    throw new Error("Uploaded inspection documents must use a .pdf file name.");
+  }
+
+  const storageKey = buildBlobStorageKey(input.blobPathname);
+  assertStorageKeyBelongsToTenant(storageKey, parsedActor.tenantId as string);
+  assertStorageKeyCategory(storageKey, ["inspection-document-original"]);
+
+  const document = await prisma.inspectionDocument.create({
+    data: {
+      tenantId: parsedActor.tenantId as string,
+      inspectionId: inspection.id,
+      fileName: input.fileName,
+      mimeType: input.mimeType,
+      fileSize: null,
+      documentType: InspectionDocumentType.EXTERNAL_CUSTOMER_FORM,
+      label: input.label?.trim() || null,
+      requiresSignature: Boolean(input.requiresSignature),
+      status: input.requiresSignature ? InspectionDocumentStatus.READY_FOR_SIGNATURE : InspectionDocumentStatus.UPLOADED,
+      customerVisible: Boolean(input.customerVisible),
+      originalStorageKey: storageKey,
+      uploadedByUserId: parsedActor.userId
+    }
+  });
+
+  await createInspectionDocumentAuditLog({
+    tenantId: parsedActor.tenantId as string,
+    actorUserId: parsedActor.userId,
+    action: "inspection_document.uploaded",
+    documentId: document.id,
+    inspectionId: inspection.id,
+    metadata: {
+      requiresSignature: document.requiresSignature,
+      customerVisible: document.customerVisible,
+      transport: "direct_blob_upload"
     }
   });
 

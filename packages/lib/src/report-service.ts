@@ -37,6 +37,7 @@ import {
 import {
   assertStorageKeyBelongsToTenant,
   assertStorageKeyCategory,
+  buildBlobStorageKey,
   buildFileDownloadResponse,
   buildStoredFilePayload,
   decodeStoredFile,
@@ -1683,6 +1684,70 @@ export async function uploadInspectionPdfAttachment(actor: ActorContext, input: 
       metadata: {
         inspectionId: input.inspectionId,
         customerVisible: input.customerVisible ?? true
+      }
+    });
+
+    return attachment;
+  });
+}
+
+export async function registerInspectionPdfAttachmentUpload(actor: ActorContext, input: {
+  inspectionId: string;
+  fileName: string;
+  mimeType: string;
+  blobPathname: string;
+  customerVisible?: boolean;
+}) {
+  const parsedActor = parseActor(actor);
+  if (!["tenant_admin", "office_admin", "platform_admin"].includes(parsedActor.role)) {
+    throw new Error("Only administrators can upload inspection PDFs.");
+  }
+
+  await assertTenantEntitlementForTenant(parsedActor.tenantId as string, "uploadedInspectionPdfs", "Uploaded inspection PDFs require a Professional or Enterprise subscription.");
+
+  if (input.mimeType !== "application/pdf") {
+    throw new Error("Only PDF files are supported.");
+  }
+
+  if (!input.fileName.toLowerCase().endsWith(".pdf")) {
+    throw new Error("Uploaded inspection packets must use a .pdf file name.");
+  }
+
+  const storageKey = buildBlobStorageKey(input.blobPathname);
+  assertStorageKeyBelongsToTenant(storageKey, parsedActor.tenantId as string);
+  assertStorageKeyCategory(storageKey, ["uploaded-pdf"]);
+
+  const inspection = await prisma.inspection.findFirst({
+    where: { id: input.inspectionId, tenantId: parsedActor.tenantId as string }
+  });
+
+  if (!inspection) {
+    throw new Error("Inspection not found.");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const attachment = await tx.attachment.create({
+      data: {
+        tenantId: parsedActor.tenantId as string,
+        inspectionId: input.inspectionId,
+        kind: AttachmentKind.pdf,
+        source: "uploaded",
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        storageKey,
+        customerVisible: input.customerVisible ?? true
+      } as any
+    });
+
+    await createAuditLog(tx, {
+      tenantId: parsedActor.tenantId as string,
+      actorUserId: parsedActor.userId,
+      action: "attachment.uploaded",
+      entityId: attachment.id,
+      metadata: {
+        inspectionId: input.inspectionId,
+        customerVisible: input.customerVisible ?? true,
+        transport: "direct_blob_upload"
       }
     });
 
