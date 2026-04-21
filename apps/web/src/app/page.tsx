@@ -1,9 +1,6 @@
-import { redirect } from "next/navigation";
+import { MarketingPage } from "@/components/marketing/MarketingPage";
 
-import { auth } from "@/auth";
-
-export default async function HomePage() {
-  const session = await auth();
-  redirect(session?.user ? "/app" : "/login");
+export default function HomePage() {
+  return <MarketingPage />;
 }
 
