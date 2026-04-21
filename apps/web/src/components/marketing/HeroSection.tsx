@@ -36,13 +36,13 @@ export function HeroSection() {
   return (
     <section className="pb-12 pt-14 md:pb-16 md:pt-[72px] xl:pb-[72px] xl:pt-[88px]">
       <SectionContainer>
-        <div className="grid grid-cols-12 items-center gap-8 xl:gap-10">
-          <div className="col-span-12 lg:col-span-5">
+        <div className="grid grid-cols-12 items-center gap-10 xl:gap-12">
+          <div className="col-span-12 lg:col-span-4 2xl:pr-6">
             <Eyebrow className="text-slate-600">Built for modern fire protection teams</Eyebrow>
             <h1 className="mt-5 max-w-[11ch] text-[40px] font-extrabold leading-[0.98] tracking-[-0.05em] text-slate-950 md:text-[52px] xl:text-[64px]">
               The operating system for fire inspection companies.
             </h1>
-            <p className="mt-6 max-w-[560px] text-[18px] leading-8 text-slate-600 md:text-[19px] xl:text-[20px]">
+            <p className="mt-6 max-w-[560px] text-[18px] leading-8 text-slate-600 md:text-[19px] xl:max-w-[620px] xl:text-[20px]">
               Manage field work, reporting, manuals, customer records, and billing in one unified platform designed for fire and life safety operations.
             </p>
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
@@ -66,24 +66,29 @@ export function HeroSection() {
             </div>
           </div>
 
-          <div className="col-span-12 lg:col-span-7">
+          <div className="col-span-12 lg:col-span-8">
             <div className="relative">
-              <ScreenshotCard className="mx-auto min-h-[520px] max-w-[720px]">
-                <div className="border-b border-slate-200 px-1 pb-5">
-                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <ScreenshotCard className="min-h-[560px] w-full max-w-none">
+                <div className="border-b border-slate-200 px-2 pb-6">
+                  <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Operations overview</p>
                       <p className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">Live inspection, reporting, and billing workflow</p>
+                      <p className="mt-2 max-w-[42rem] text-sm leading-6 text-slate-500">
+                        See assignments, report completion, and billing resolution in one operational surface built for daily fire protection workflows.
+                      </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 md:w-[320px]">
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:w-[520px]">
                       <SurfaceMetric label="Assigned today" tone="slate" value="24 visits" />
                       <SurfaceMetric label="Finalized" tone="blue" value="9 reports" />
+                      <SurfaceMetric label="Ready to invoice" tone="emerald" value="14 jobs" />
+                      <SurfaceMetric label="Provider work" tone="slate" value="5 active" />
                     </div>
                   </div>
                 </div>
 
-                <div className="grid gap-4 pt-5 lg:grid-cols-[1.05fr_1.15fr_0.9fr]">
-                  <section className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                <div className="grid gap-5 pt-6 lg:grid-cols-[1.08fr_1.2fr_1fr]">
+                  <section className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-semibold text-slate-950">Today / Upcoming Work</p>
@@ -110,9 +115,24 @@ export function HeroSection() {
                         </div>
                       ))}
                     </div>
+                    <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Queue status</p>
+                      <div className="mt-3 space-y-3">
+                        {[
+                          ["Unassigned and claimable", "4 visits"],
+                          ["Priority service windows", "3 stops"],
+                          ["Technician utilization", "87% scheduled"]
+                        ].map(([label, value]) => (
+                          <div key={label} className="flex items-center justify-between text-sm">
+                            <span className="text-slate-600">{label}</span>
+                            <span className="font-semibold text-slate-950">{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </section>
 
-                  <section className="relative rounded-[24px] border border-slate-200 bg-white p-4">
+                  <section className="relative rounded-[24px] border border-slate-200 bg-white p-5">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-semibold text-slate-950">Inspection / Report Progress</p>
@@ -120,7 +140,7 @@ export function HeroSection() {
                       </div>
                       <ClipboardCheck className="h-5 w-5 text-blue-600" />
                     </div>
-                    <div className="mt-4 rounded-[22px] border border-slate-200 bg-slate-950 p-4 text-white">
+                    <div className="mt-4 rounded-[22px] border border-slate-200 bg-slate-950 p-5 text-white">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-semibold">Wet Chemical System Acceptance Test</p>
@@ -143,11 +163,12 @@ export function HeroSection() {
                       </div>
                     </div>
 
-                    <div className="mt-4 space-y-3">
+                    <div className="mt-4 grid gap-3 xl:grid-cols-2">
                       {[
                         ["Draft in field", "6 active report sessions"],
                         ["Waiting on signatures", "2 customer approvals"],
-                        ["Posted today", "9 hosted reports available"]
+                        ["Posted today", "9 hosted reports available"],
+                        ["Deficiencies captured", "17 open items"]
                       ].map(([label, value]) => (
                         <div key={label} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                           <p className="text-sm text-slate-600">{label}</p>
@@ -157,7 +178,7 @@ export function HeroSection() {
                     </div>
 
                     <div className="hidden md:block">
-                      <div className="absolute bottom-5 right-5 w-[220px] rounded-[22px] border border-slate-200 bg-white shadow-[0_18px_42px_rgba(15,23,42,0.14)]">
+                      <div className="absolute bottom-5 right-5 w-[240px] rounded-[22px] border border-slate-200 bg-white shadow-[0_18px_42px_rgba(15,23,42,0.14)]">
                         <div className="border-b border-slate-200 px-4 py-3">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Report preview</p>
                         </div>
@@ -175,7 +196,7 @@ export function HeroSection() {
                     </div>
                   </section>
 
-                  <section className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                  <section className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-semibold text-slate-950">Billing / Provider Work</p>
@@ -216,6 +237,21 @@ export function HeroSection() {
                           ["Ready to invoice", "14"],
                           ["Contract-provider jobs", "5"],
                           ["Awaiting pricing review", "2"]
+                        ].map(([label, value]) => (
+                          <div key={label} className="flex items-center justify-between text-sm">
+                            <span className="text-slate-600">{label}</span>
+                            <span className="font-semibold text-slate-950">{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="mt-4 rounded-[22px] border border-slate-200 bg-white p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Resolution detail</p>
+                      <div className="mt-3 space-y-3">
+                        {[
+                          ["Contract used", "Commercial Fire Annual"],
+                          ["Grouping mode", "Per work order"],
+                          ["Last sync", "12 minutes ago"]
                         ].map(([label, value]) => (
                           <div key={label} className="flex items-center justify-between text-sm">
                             <span className="text-slate-600">{label}</span>
