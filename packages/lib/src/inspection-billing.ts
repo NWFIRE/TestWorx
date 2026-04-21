@@ -1645,11 +1645,7 @@ async function buildComplianceReportingFeeItemsTx(tx: TransactionClient, input: 
 }
 
 function subtotalForItems(items: BillableItem[]) {
-  return Number(
-    items
-      .reduce((sum, item) => sum + (item.amount ?? calculateAmount(item.quantity, item.unitPrice ?? null) ?? 0), 0)
-      .toFixed(2)
-  );
+  return Number(items.reduce((sum, item) => sum + (item.amount ?? 0), 0).toFixed(2));
 }
 
 function normalizeBillingType(value: string | null | undefined): "standard" | "third_party" {
@@ -2743,11 +2739,9 @@ export async function getAdminBillingSummaries(actor: ActorContext) {
   return rows.map((row) => {
     const items = normalizeExistingItems((row as unknown as { items: unknown }).items);
     const reportTypes = [...new Set(items.map((item) => item.reportType).filter((reportType) => reportType !== INSPECTION_LEVEL_REPORT_TYPE))];
-    const subtotal = subtotalForItems(items);
     return {
       ...row,
       items,
-      subtotal,
       reportTypes,
       metrics: buildSummaryMetrics(items)
     };
@@ -2879,7 +2873,6 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
       };
     })
   );
-  const subtotal = subtotalForItems(itemsWithCatalogState);
   return {
     ...row,
     status: row.status as BillingSummaryStatus,
@@ -2893,7 +2886,6 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
     quickbooksSentAt: row.quickbooksSentAt ?? (row.quickbooksSyncStatus === "sent" ? row.quickbooksSyncedAt ?? null : null),
     quickbooksSyncError: row.quickbooksSyncError ?? null,
     quickbooksSendError: row.quickbooksSendError ?? null,
-    subtotal,
     items: itemsWithCatalogState,
     groupedItems: groupBillableItems(itemsWithCatalogState),
     reviewGroupedItems: groupBillingReviewItems(itemsWithCatalogState),
