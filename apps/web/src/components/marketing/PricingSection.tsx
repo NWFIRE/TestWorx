@@ -24,8 +24,8 @@ export function PricingSection() {
             href="/login"
             name="Starter"
             price="$149"
-            secondaryText="For smaller teams getting organized"
-            subtitle="For smaller teams getting organized"
+            secondaryText="For smaller teams replacing spreadsheets and disconnected tools"
+            subtitle="For smaller teams replacing spreadsheets and disconnected tools"
           />
           <PricingCard
             cadence="/ month"
@@ -41,8 +41,8 @@ export function PricingSection() {
             href="/login"
             name="Pro"
             price="$349"
-            secondaryText="Built for teams running daily operations"
-            subtitle="For teams running daily operations"
+            secondaryText="Most teams running inspections every day start here."
+            subtitle="For daily operations across field work, reporting, and billing"
           />
           <PricingCard
             cadence="custom"
@@ -57,8 +57,8 @@ export function PricingSection() {
             href="#final-cta"
             name="Enterprise"
             price="Custom"
-            secondaryText="For larger or more complex operations"
-            subtitle="For larger or more complex operations"
+            secondaryText="For multi-team operations, advanced billing workflows, and rollout support"
+            subtitle="For multi-team operations, advanced billing workflows, and rollout support"
           />
         </div>
       </SectionContainer>

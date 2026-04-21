@@ -42,10 +42,14 @@ export function MarketingFooter() {
           </div>
           {columns.map((column) => (
             <div key={column.title}>
-              <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">{column.title}</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-700">{column.title}</h3>
               <div className="mt-4 space-y-3">
                 {column.links.map((link) => (
-                  <Link key={link.label} className="block text-sm text-slate-600 transition hover:text-slate-950" href={link.href}>
+                  <Link
+                    key={link.label}
+                    className="block text-sm text-slate-600 transition hover:text-slate-950"
+                    href={link.href}
+                  >
                     {link.label}
                   </Link>
                 ))}
@@ -54,11 +58,21 @@ export function MarketingFooter() {
           ))}
         </div>
 
-        <div id="footer-contact" className="mt-12 flex flex-col gap-3 border-t border-slate-200 pt-6 text-sm text-slate-500 md:flex-row md:items-center md:justify-between">
+        <div
+          id="footer-contact"
+          className="mt-12 flex flex-col gap-3 border-t border-slate-200 pt-6 text-sm text-slate-500 md:flex-row md:items-center md:justify-between"
+        >
           <p>© 2026 TradeWorx. Built for modern fire inspection and service operations.</p>
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-5">
-            <Link className="transition hover:text-slate-950" href="/login">Start Free Trial</Link>
-            <a className="transition hover:text-slate-950" href="mailto:hello@tradeworx.net">hello@tradeworx.net</a>
+            <Link className="font-semibold text-slate-700 transition hover:text-slate-950" href="/login">
+              Sign in
+            </Link>
+            <Link className="transition hover:text-slate-950" href="/login">
+              Start Free Trial
+            </Link>
+            <a className="transition hover:text-slate-950" href="mailto:hello@tradeworx.net">
+              hello@tradeworx.net
+            </a>
           </div>
         </div>
       </SectionContainer>

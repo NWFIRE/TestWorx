@@ -20,7 +20,7 @@ const rows = [
               <Smartphone className="h-5 w-5 text-blue-300" />
             </div>
             <div className="mt-4 space-y-3">
-              {["Kitchen suppression", "Alarm panel follow-up", "Extinguisher annual"].map((item) => (
+              {["Willow View Church — Wet chemical acceptance", "Cedar Hall — Alarm panel follow-up", "Northwest Kitchen — Extinguisher annual"].map((item) => (
                 <div key={item} className="rounded-2xl bg-white/10 px-3 py-3 text-sm text-white/85">{item}</div>
               ))}
             </div>
@@ -104,8 +104,8 @@ const rows = [
         <div className="grid gap-4 lg:grid-cols-[1fr_0.95fr]">
           <div className="space-y-3">
             {[
-              ["Bill to", "Commercial Fire"],
-              ["Contract used", "Kitchen systems annual service"],
+              ["Bill to", "3rd Part Provider"],
+              ["Contract used", "3rd Part Provider Annual"],
               ["Pricing source", "Provider contract rate"]
             ].map(([label, value]) => (
               <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3">

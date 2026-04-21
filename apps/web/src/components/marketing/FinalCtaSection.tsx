@@ -13,7 +13,7 @@ export function FinalCtaSection() {
             <h2 className="text-3xl font-bold tracking-[-0.04em] text-slate-950 md:text-4xl xl:text-[48px] xl:leading-[1.02]">
               Run your fire inspection business from one unified system.
             </h2>
-            <p className="mt-5 text-base leading-7 text-slate-600 md:text-lg md:leading-8">
+            <p className="mt-5 text-base leading-7 text-slate-700 md:text-lg md:leading-8">
               Modern workflows for field service, reporting, manuals, billing, and customer operations.
             </p>
             <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
