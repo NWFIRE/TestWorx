@@ -104,8 +104,8 @@ const rows = [
         <div className="grid gap-4 lg:grid-cols-[1fr_0.95fr]">
           <div className="space-y-3">
             {[
-              ["Bill to", "3rd Part Provider"],
-              ["Contract used", "3rd Part Provider Annual"],
+              ["Bill to", "3rd Party Provider"],
+              ["Contract used", "3rd Party Provider Annual"],
               ["Pricing source", "Provider contract rate"]
             ].map(([label, value]) => (
               <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3">
