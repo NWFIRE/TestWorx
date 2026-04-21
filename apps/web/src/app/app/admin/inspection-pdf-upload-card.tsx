@@ -23,7 +23,8 @@ export function InspectionPdfUploadCard({
     setError(null);
     setSuccess(null);
 
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const files = formData.getAll("attachment").filter((entry): entry is File => entry instanceof File && entry.size > 0);
     if (files.length === 0) {
       setError("Select at least one PDF to upload.");
@@ -82,7 +83,7 @@ export function InspectionPdfUploadCard({
 
           setSuccess(payload.success ?? (files.length === 1 ? `${files[0]!.name} uploaded.` : `${files.length} PDFs uploaded.`));
           router.refresh();
-          event.currentTarget.reset();
+          form.reset();
         } catch (submitError) {
           setError(submitError instanceof Error ? submitError.message : "Unable to upload PDF.");
         }

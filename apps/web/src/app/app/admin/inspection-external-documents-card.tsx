@@ -47,7 +47,8 @@ export function InspectionExternalDocumentsCard({
     setError(null);
     setSuccess(null);
 
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const file = formData.get("document");
     if (!(file instanceof File) || file.size === 0) {
       setError("Select a PDF to upload.");
@@ -103,7 +104,7 @@ export function InspectionExternalDocumentsCard({
 
           setSuccess(payload.success ?? `${file.name} uploaded.`);
           router.refresh();
-          event.currentTarget.reset();
+          form.reset();
         } catch (submitError) {
           setError(submitError instanceof Error ? submitError.message : "Unable to upload PDF.");
         }
