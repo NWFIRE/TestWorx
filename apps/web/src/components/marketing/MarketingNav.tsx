@@ -6,8 +6,8 @@ import { SectionContainer } from "./shared/SectionContainer";
 
 export function MarketingNav() {
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/90 backdrop-blur">
-      <SectionContainer className="flex h-[72px] items-center justify-between md:h-20">
+    <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur">
+      <SectionContainer className="flex h-[84px] items-center justify-between">
         <LogoLockup />
         <NavLinkGroup
           links={[
@@ -19,7 +19,7 @@ export function MarketingNav() {
           ]}
         />
         <div className="flex items-center gap-3">
-          <SecondaryButton className="min-h-[44px] px-4 py-2 sm:min-h-[52px]" href="/login">
+          <SecondaryButton className="min-h-11 px-4 py-2.5" href="/login">
             Sign in
           </SecondaryButton>
           <PrimaryButton className="hidden sm:inline-flex" href="/login">

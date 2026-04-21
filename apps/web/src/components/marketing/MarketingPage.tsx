@@ -11,7 +11,7 @@ import { WorkflowSection } from "./WorkflowSection";
 
 export function MarketingPage() {
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_18%,#f8fafc_100%)] text-slate-900">
+    <main className="min-h-screen bg-[linear-gradient(180deg,#f6f8fb_0%,#ffffff_14%,#ffffff_100%)] text-slate-900">
       <MarketingNav />
       <HeroSection />
       <TrustStrip />

@@ -15,7 +15,7 @@ type Props = {
 
 export function PrimaryButton({ children, href, className, type = "button", ...props }: Props) {
   const classes = cn(
-    "inline-flex min-h-[52px] items-center justify-center rounded-2xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(37,99,235,0.24)] transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300",
+    "inline-flex min-h-11 items-center justify-center rounded-[14px] bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_32px_rgba(29,78,216,0.22)] transition hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2",
     className
   );
 

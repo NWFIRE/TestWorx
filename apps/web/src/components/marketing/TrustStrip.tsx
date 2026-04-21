@@ -2,18 +2,29 @@ import { SectionContainer } from "./shared/SectionContainer";
 
 export function TrustStrip() {
   const items = [
-    "Built for fire and life safety operations",
-    "Customer-ready reporting",
-    "Field-first mobile workflows",
-    "Contract and billing support"
+    {
+      title: "Field Operations",
+      body: "Inspections, deficiencies, photos, signatures, offline workflows."
+    },
+    {
+      title: "Reporting",
+      body: "Customer-ready reports with clear compliance and premium output."
+    },
+    {
+      title: "Billing",
+      body: "Direct billing, provider billing, contract pricing, one unified system."
+    }
   ];
 
   return (
-    <section className="py-8 md:py-10">
+    <section className="mt-6 border-t border-slate-200/80 py-6">
       <SectionContainer>
-        <div className="grid gap-6 rounded-[24px] border border-slate-200 bg-slate-50 px-6 py-5 md:grid-cols-2 md:px-8 md:py-6 xl:grid-cols-4">
+        <div className="grid gap-8 md:grid-cols-3">
           {items.map((item) => (
-            <p key={item} className="text-sm font-medium text-slate-700 md:text-base">{item}</p>
+            <div key={item.title} className="space-y-2">
+              <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-slate-950">{item.title}</h2>
+              <p className="max-w-[34ch] text-[15px] leading-7 text-slate-600">{item.body}</p>
+            </div>
           ))}
         </div>
       </SectionContainer>

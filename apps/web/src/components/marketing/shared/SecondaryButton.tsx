@@ -15,7 +15,7 @@ type Props = {
 
 export function SecondaryButton({ children, href, className, type = "button", ...props }: Props) {
   const classes = cn(
-    "inline-flex min-h-[52px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-800 shadow-[0_10px_24px_rgba(15,23,42,0.05)] transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200",
+    "inline-flex min-h-11 items-center justify-center rounded-[14px] border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 shadow-[0_8px_20px_rgba(15,23,42,0.04)] transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 focus-visible:ring-offset-2",
     className
   );
 
