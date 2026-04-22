@@ -53,6 +53,13 @@ const saveStateTone: Record<string, string> = {
   Conflict: "text-rose-700"
 };
 
+const sectionStatusOptions = [
+  { value: "pending", label: "Pending", activeClassName: "border-slate-300 bg-slate-100 text-slate-700" },
+  { value: "pass", label: "Pass", activeClassName: "border-emerald-200 bg-emerald-50 text-emerald-800" },
+  { value: "attention", label: "Attention", activeClassName: "border-amber-200 bg-amber-50 text-amber-800" },
+  { value: "fail", label: "Fail", activeClassName: "border-rose-200 bg-rose-50 text-rose-800" }
+] as const;
+
 function buildReportSaveState(record: LocalReportDraftRecord | null, reportStatus: EditorData["reportStatus"]) {
   if (!record) {
     return reportStatus === "finalized" ? "Finalized" : "Saved";
@@ -1000,12 +1007,26 @@ export function ReportEditor({ data }: { data: EditorData }) {
               </div>
               <div className="w-full md:w-auto md:min-w-[13rem]">
                 <label className="mb-2 block text-sm font-medium text-slate-600">Section Status</label>
-                <select className="min-h-12 w-full rounded-2xl border border-slate-200 px-4 py-3 text-base uppercase" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateSectionMeta(activeSection.id, "status", event.target.value)} value={draft.sections[activeSection.id]?.status ?? "pending"}>
-                  <option value="pending">{normalizeOptionLabel("Pending")}</option>
-                  <option value="pass">{normalizeOptionLabel("Pass")}</option>
-                  <option value="attention">{normalizeOptionLabel("Attention")}</option>
-                  <option value="fail">{normalizeOptionLabel("Fail")}</option>
-                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  {sectionStatusOptions.map((option) => {
+                    const isActive = (draft.sections[activeSection.id]?.status ?? "pending") === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        className={`min-h-12 rounded-2xl border px-4 py-3 text-sm font-semibold uppercase tracking-[0.12em] transition ${
+                          isActive
+                            ? option.activeClassName
+                            : "border-slate-200 bg-white text-slate-600"
+                        } disabled:opacity-50`}
+                        disabled={!data.canEdit || data.reportStatus === "finalized"}
+                        onClick={() => updateSectionMeta(activeSection.id, "status", option.value)}
+                        type="button"
+                      >
+                        {normalizeOptionLabel(option.label)}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
             <div className="mt-5 grid gap-4">
