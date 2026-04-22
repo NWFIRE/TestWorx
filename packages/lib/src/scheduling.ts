@@ -1,4 +1,4 @@
-import { addMonths, endOfMonth, endOfWeek, format, isAfter, isSameDay, startOfDay, startOfMonth, subMonths } from "date-fns";
+import { addMonths, endOfMonth, endOfWeek, format, isAfter, isSameDay, startOfDay, startOfMonth, subDays, subMonths } from "date-fns";
 import {
   InspectionClassification,
   InspectionCloseoutRequestStatus,
@@ -4085,7 +4085,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(now);
 
-  const [assignedInspections, unassignedInspections] = await Promise.all([
+  const [assignedInspections, unassignedInspections, recentCompletedInspections] = await Promise.all([
     prisma.inspection.findMany({
       where: {
         tenantId,
@@ -4126,6 +4126,25 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
       where: { tenantId, assignedTechnicianId: null, technicianAssignments: { none: {} }, claimable: true, status: { in: [...claimableInspectionStatuses] } },
       include: { site: true, customerCompany: true, assignedTechnician: true, technicianAssignments: { include: { technician: true } }, tasks: { include: { recurrence: true, report: true, assignedTechnician: true } } },
       orderBy: [{ scheduledStart: "asc" }]
+    }),
+    prisma.inspection.findMany({
+      where: {
+        tenantId,
+        status: { in: [InspectionStatus.completed, InspectionStatus.invoiced] },
+        scheduledStart: { gte: subDays(now, 14) },
+        OR: [
+          { assignedTechnicianId: parsedActor.userId },
+          { technicianAssignments: { some: { technicianId: parsedActor.userId } } }
+        ]
+      },
+      include: {
+        site: true,
+        customerCompany: true,
+        assignedTechnician: true,
+        technicianAssignments: { include: { technician: true } },
+        tasks: { include: { recurrence: true, report: true, assignedTechnician: true } }
+      },
+      orderBy: [{ scheduledStart: "desc" }]
     })
   ]);
 
@@ -4136,24 +4155,26 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
     }))
     .filter((inspection) => inspection.tasks.length > 0);
   const monthAssigned = assignedQueue.filter((inspection) => inspection.scheduledStart >= monthStart && inspection.scheduledStart <= monthEnd);
+  const assignedWithDisplay = assignedQueue.map((inspection) => ({
+    ...inspection,
+    ...getInspectionDisplayLabels({
+      siteName: inspection.site.name,
+      customerName: inspection.customerCompany.name
+    }),
+    closeoutRequest: inspection.closeoutRequest,
+    displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
+    assignedTechnicianNames: formatAssignedTechnicianNames({
+      assignedTechnician: inspection.assignedTechnician,
+      technicianAssignments: readTechnicianNameAssignments(inspection)
+    })
+  }));
+  const monthAssignedWithDisplay = assignedWithDisplay.filter((inspection) => inspection.scheduledStart >= monthStart && inspection.scheduledStart <= monthEnd);
 
   return {
-    today: assignedQueue.filter((inspection) => isSameDay(inspection.scheduledStart, now)),
-    thisWeek: assignedQueue.filter((inspection) => inspection.scheduledStart >= dayStart && inspection.scheduledStart <= weekEnd),
-    thisMonth: monthAssigned,
-    assigned: assignedQueue.map((inspection) => ({
-      ...inspection,
-      ...getInspectionDisplayLabels({
-        siteName: inspection.site.name,
-        customerName: inspection.customerCompany.name
-      }),
-      closeoutRequest: inspection.closeoutRequest,
-      displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
-      assignedTechnicianNames: formatAssignedTechnicianNames({
-        assignedTechnician: inspection.assignedTechnician,
-        technicianAssignments: readTechnicianNameAssignments(inspection)
-      })
-    })),
+    today: assignedWithDisplay.filter((inspection) => isSameDay(inspection.scheduledStart, now)),
+    thisWeek: assignedWithDisplay.filter((inspection) => inspection.scheduledStart >= dayStart && inspection.scheduledStart <= weekEnd),
+    thisMonth: monthAssignedWithDisplay,
+    assigned: assignedWithDisplay,
     unassigned: unassignedInspections
       .map((inspection) => ({
         ...inspection,
@@ -4171,6 +4192,19 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
         })
       }))
       .filter((inspection) => inspection.tasks.length > 0),
+    recentCompleted: recentCompletedInspections.map((inspection) => ({
+      ...inspection,
+      tasks: withInspectionTaskDisplayLabels(inspection.tasks),
+      ...getInspectionDisplayLabels({
+        siteName: inspection.site.name,
+        customerName: inspection.customerCompany.name
+      }),
+      displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
+      assignedTechnicianNames: formatAssignedTechnicianNames({
+        assignedTechnician: inspection.assignedTechnician,
+        technicianAssignments: readTechnicianNameAssignments(inspection)
+      })
+    })),
     monthCalendar: buildMonthCalendar(monthAssigned)
   };
 }

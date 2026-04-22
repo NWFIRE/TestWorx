@@ -1,0 +1,162 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+
+type MobileTab = {
+  href: string;
+  label: string;
+  matchPrefixes?: string[];
+};
+
+const technicianTabs: MobileTab[] = [
+  { href: "/app/tech", label: "Home" },
+  { href: "/app/tech/work", label: "Work", matchPrefixes: ["/app/tech/work"] },
+  { href: "/app/tech/inspections", label: "Inspections", matchPrefixes: ["/app/tech/inspections", "/app/tech/reports"] },
+  { href: "/app/manuals", label: "Manuals", matchPrefixes: ["/app/manuals"] },
+  { href: "/app/tech/profile", label: "Profile", matchPrefixes: ["/app/tech/profile"] }
+];
+
+function isActive(pathname: string, tab: MobileTab) {
+  if (pathname === tab.href) {
+    return true;
+  }
+
+  return (tab.matchPrefixes ?? []).some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+function MobileTabIcon({ label, active }: { label: string; active: boolean }) {
+  const shared = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    strokeWidth: 1.9
+  };
+  const className = active ? "h-5 w-5 text-[var(--tenant-primary)]" : "h-5 w-5 text-slate-500";
+
+  switch (label) {
+    case "Home":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <path {...shared} d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" />
+        </svg>
+      );
+    case "Work":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <rect {...shared} x="4" y="5" width="16" height="15" rx="3" />
+          <path {...shared} d="M8 3v4M16 3v4M4 10h16M8 14h3M8 18h6" />
+        </svg>
+      );
+    case "Inspections":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <rect {...shared} x="6" y="4" width="12" height="17" rx="2.5" />
+          <path {...shared} d="M9 4.5h6a1.5 1.5 0 0 0-1.5-1.5h-3A1.5 1.5 0 0 0 9 4.5ZM9 10h6M9 14h6M9 18h4" />
+        </svg>
+      );
+    case "Manuals":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <path {...shared} d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v16H7.5A2.5 2.5 0 0 0 5 21.5v-16Z" />
+          <path {...shared} d="M7.5 3A2.5 2.5 0 0 0 5 5.5V19m4-11h6m-6 4h6" />
+        </svg>
+      );
+    case "Profile":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <circle {...shared} cx="12" cy="8.5" r="3.5" />
+          <path {...shared} d="M5 20a7 7 0 0 1 14 0" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
+export function TechnicianSyncPill() {
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    const syncOnlineState = () => setIsOnline(window.navigator.onLine);
+    syncOnlineState();
+    window.addEventListener("online", syncOnlineState);
+    window.addEventListener("offline", syncOnlineState);
+    return () => {
+      window.removeEventListener("online", syncOnlineState);
+      window.removeEventListener("offline", syncOnlineState);
+    };
+  }, []);
+
+  return (
+    <span
+      className={isOnline
+        ? "inline-flex min-h-9 items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
+        : "inline-flex min-h-9 items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800"}
+    >
+      {isOnline ? "Synced online" : "Offline mode"}
+    </span>
+  );
+}
+
+export function TechnicianMobileHeader({
+  pathname,
+  userName
+}: {
+  pathname: string;
+  userName: string | null;
+}) {
+  const activeTab = useMemo(
+    () => technicianTabs.find((tab) => isActive(pathname, tab)) ?? technicianTabs[0],
+    [pathname]
+  );
+
+  const subtitleByTab: Record<string, string> = {
+    Home: "What needs attention right now",
+    Work: "Assigned jobs and claimable field work",
+    Inspections: "Drafts, active inspections, and closeout",
+    Manuals: "Field manuals and offline-ready references",
+    Profile: "Sync, readiness, and technician tools"
+  };
+
+  return (
+    <div className="flex w-full items-start justify-between gap-3 lg:hidden">
+      <div className="min-w-0">
+        <p className="truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+          {userName ? `${userName.split(" ")[0]}'s workspace` : "Technician workspace"}
+        </p>
+        <h1 className="mt-1 truncate text-xl font-semibold text-slate-950">{activeTab.label}</h1>
+        <p className="mt-1 text-sm text-slate-500">{subtitleByTab[activeTab.label]}</p>
+      </div>
+      <TechnicianSyncPill />
+    </div>
+  );
+}
+
+export function TechnicianMobileTabBar({ pathname }: { pathname: string }) {
+  return (
+    <nav
+      aria-label="Technician mobile navigation"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/96 px-2 pb-[calc(max(0.75rem,env(safe-area-inset-bottom)))] pt-2 backdrop-blur lg:hidden"
+    >
+      <div className="grid grid-cols-5 gap-1">
+        {technicianTabs.map((tab) => {
+          const active = isActive(pathname, tab);
+          return (
+            <Link
+              key={tab.href}
+              className={active
+                ? "flex min-h-[64px] flex-col items-center justify-center rounded-2xl bg-[var(--tenant-primary-soft)] px-2 py-2 text-[11px] font-semibold text-[var(--tenant-primary)]"
+                : "flex min-h-[64px] flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium text-slate-500"}
+              href={tab.href}
+            >
+              <MobileTabIcon active={active} label={tab.label} />
+              <span className="mt-1.5 text-center leading-4">{tab.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}

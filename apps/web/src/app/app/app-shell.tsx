@@ -8,6 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { BrandLoader } from "@/app/brand-loader";
 import { getAppNavItemsForRole, getCurrentAppNavItem, isAppNavItemActive, type AppNavItem } from "./app-nav-config";
 import { MobilePullToRefresh } from "./mobile-pull-to-refresh";
+import { TechnicianMobileHeader, TechnicianMobileTabBar } from "./tech/technician-mobile-shell";
 
 const DRAWER_SELECTOR =
   'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
@@ -305,6 +306,7 @@ export function AppShell({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const isTechnician = role === "technician";
   const navItems = useMemo(() => getAppNavItemsForRole(role, allowances), [allowances, role]);
   const currentItem = useMemo(() => getCurrentAppNavItem(role, pathname, allowances), [allowances, pathname, role]);
   const [isRefreshing, startRefreshTransition] = useTransition();
@@ -590,7 +592,7 @@ export function AppShell({
         </aside>
       ) : null}
 
-      {navItems.length > 0 ? (
+      {navItems.length > 0 && !isTechnician ? (
         <>
           <div
             aria-hidden={!drawerOpen}
@@ -645,8 +647,12 @@ export function AppShell({
             className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8"
             style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
           >
-            <div className="flex min-w-0 items-center gap-3">
-              {navItems.length > 0 ? (
+            {isTechnician ? (
+              <TechnicianMobileHeader pathname={pathname} userName={user.name} />
+            ) : (
+              <>
+                <div className="flex min-w-0 items-center gap-3">
+                  {navItems.length > 0 ? (
                 <button
                   aria-label="Open navigation"
                   className="pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-[color:var(--border-default)] bg-white px-3 text-sm font-semibold text-[color:var(--text-secondary)] outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2 lg:hidden"
@@ -657,48 +663,55 @@ export function AppShell({
                   Menu
                 </button>
               ) : null}
-              <div className="min-w-0">
-                <p className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--text-tertiary)]">Workspace</p>
-                <h1 className="truncate text-lg font-semibold text-ink">{currentItem?.label ?? user.name ?? "Workspace"}</h1>
-              </div>
-            </div>
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="hidden min-w-0 text-right text-sm text-[color:var(--text-muted)] sm:block">
-                <p className="truncate">{user.email}</p>
-                <p className="truncate capitalize">{role.replaceAll("_", " ")}</p>
-              </div>
-              <button
-                aria-label="Refresh page"
-                className="pressable hidden min-h-11 min-w-11 items-center justify-center rounded-xl border border-[color:var(--border-default)] bg-white px-3 text-sm font-medium text-[color:var(--text-secondary)] outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2 lg:inline-flex"
-                disabled={isRefreshing}
-                onClick={handleRefresh}
-                title={isRefreshing ? "Refreshing..." : "Refresh page"}
-                type="button"
-              >
-                <BrandLoader animated={isRefreshing} className={isRefreshing ? "opacity-100" : "opacity-85"} label={isRefreshing ? "Refreshing" : "Refresh page"} size="sm" tone="muted" />
-              </button>
-              <form action={signOutAction}>
-                <button className="pressable min-h-11 rounded-xl border border-[color:var(--border-default)] bg-white px-4 py-2 text-sm font-medium text-[color:var(--text-secondary)] outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2" type="submit">
-                  Sign out
-                </button>
-              </form>
-            </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--text-tertiary)]">Workspace</p>
+                    <h1 className="truncate text-lg font-semibold text-ink">{currentItem?.label ?? user.name ?? "Workspace"}</h1>
+                  </div>
+                </div>
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="hidden min-w-0 text-right text-sm text-[color:var(--text-muted)] sm:block">
+                    <p className="truncate">{user.email}</p>
+                    <p className="truncate capitalize">{role.replaceAll("_", " ")}</p>
+                  </div>
+                  <button
+                    aria-label="Refresh page"
+                    className="pressable hidden min-h-11 min-w-11 items-center justify-center rounded-xl border border-[color:var(--border-default)] bg-white px-3 text-sm font-medium text-[color:var(--text-secondary)] outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2 lg:inline-flex"
+                    disabled={isRefreshing}
+                    onClick={handleRefresh}
+                    title={isRefreshing ? "Refreshing..." : "Refresh page"}
+                    type="button"
+                  >
+                    <BrandLoader animated={isRefreshing} className={isRefreshing ? "opacity-100" : "opacity-85"} label={isRefreshing ? "Refreshing" : "Refresh page"} size="sm" tone="muted" />
+                  </button>
+                  <form action={signOutAction}>
+                    <button className="pressable min-h-11 rounded-xl border border-[color:var(--border-default)] bg-white px-4 py-2 text-sm font-medium text-[color:var(--text-secondary)] outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2" type="submit">
+                      Sign out
+                    </button>
+                  </form>
+                </div>
+              </>
+            )}
           </div>
         </header>
 
         <main
-          className="min-w-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-6 sm:px-6 lg:px-8"
+          className={`min-w-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-6 sm:px-6 lg:px-8 ${isTechnician ? "pb-28 lg:pb-6" : ""}`}
           ref={contentRef}
           style={{
-            paddingBottom: "calc(max(1.5rem, env(safe-area-inset-bottom)) + var(--keyboard-offset, 0px))",
+            paddingBottom: isTechnician
+              ? "calc(max(6.5rem, env(safe-area-inset-bottom) + 5.25rem) + var(--keyboard-offset, 0px))"
+              : "calc(max(1.5rem, env(safe-area-inset-bottom)) + var(--keyboard-offset, 0px))",
             scrollPaddingTop: "calc(var(--mobile-header-offset, 88px) + 1rem)",
-            scrollPaddingBottom: "calc(var(--keyboard-offset, 0px) + 7rem + env(safe-area-inset-bottom))"
+            scrollPaddingBottom: isTechnician
+              ? "calc(var(--keyboard-offset, 0px) + 8rem + env(safe-area-inset-bottom))"
+              : "calc(var(--keyboard-offset, 0px) + 7rem + env(safe-area-inset-bottom))"
           }}
         >
           <MobilePullToRefresh containerRef={contentRef} drawerOpen={drawerOpen} gestureRef={shellContentRef}>
             <div className="mx-auto w-full max-w-[1700px] min-w-0">{children}</div>
           </MobilePullToRefresh>
         </main>
+        {isTechnician ? <TechnicianMobileTabBar pathname={pathname} /> : null}
       </div>
     </div>
   );

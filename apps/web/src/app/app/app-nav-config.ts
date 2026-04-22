@@ -188,12 +188,33 @@ const navByRole: Record<string, AppNavItem[]> = {
   technician: [
     {
       href: "/app/tech",
-      label: "Field Schedule",
-      shortLabel: "Schedule",
-      abbreviation: "FS",
-      icon: "clipboard",
-      description: "Assigned work, reports, and documents",
+      label: "Home",
+      shortLabel: "Home",
+      abbreviation: "HM",
+      icon: "grid",
+      description: "Today, upcoming work, and technician quick actions",
       tone: "blue",
+      matchMode: "exact"
+    },
+    {
+      href: "/app/tech/work",
+      label: "Work",
+      shortLabel: "Work",
+      abbreviation: "WK",
+      icon: "clipboard",
+      description: "Assigned jobs, claimable work, and field execution",
+      tone: "blue",
+      matchMode: "exact",
+      matchPrefixes: ["/app/tech/work"]
+    },
+    {
+      href: "/app/tech/inspections",
+      label: "Inspections",
+      shortLabel: "Inspections",
+      abbreviation: "IN",
+      icon: "calendar",
+      description: "Active inspections, drafts, and completion flow",
+      tone: "violet",
       matchMode: "exact",
       matchPrefixes: ["/app/tech/inspections", "/app/tech/reports"]
     },
@@ -207,6 +228,17 @@ const navByRole: Record<string, AppNavItem[]> = {
       tone: "blue",
       matchMode: "exact",
       matchPrefixes: ["/app/manuals"]
+    },
+    {
+      href: "/app/tech/profile",
+      label: "Profile",
+      shortLabel: "Profile",
+      abbreviation: "PF",
+      icon: "team",
+      description: "Sync status, offline readiness, and technician account tools",
+      tone: "slate",
+      matchMode: "exact",
+      matchPrefixes: ["/app/tech/profile"]
     }
   ],
   customer_user: [
@@ -226,13 +258,6 @@ const navByRole: Record<string, AppNavItem[]> = {
 
 export function getAppNavItemsForRole(role: string, allowances?: InternalAllowances) {
   const baseItems = navByRole[role] ?? [];
-
-  if (role === "technician" && hasQuoteAccessForRole(role, allowances)) {
-    return [
-      ...baseItems,
-      adminNavItems.find((item) => item.href === "/app/admin/quotes")
-    ].filter(Boolean) as AppNavItem[];
-  }
 
   if (!hasQuoteAccessForRole(role, allowances)) {
     return baseItems.filter((item) => item.href !== "/app/admin/quotes");
