@@ -210,6 +210,67 @@ function DispatchNotesBanner({ notes }: { notes: string | null | undefined }) {
   );
 }
 
+function ReportSelectControl({
+  options,
+  value,
+  onChange,
+  disabled,
+  className,
+  placeholder = "Select"
+}: {
+  options: Array<{ label: string; value: string }>;
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  className?: string;
+  placeholder?: string;
+}) {
+  const selectedOption = options.find((option) => option.value === value) ?? null;
+
+  return (
+    <div className="space-y-3">
+      <div className="md:hidden">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+          {normalizeOptionLabel(selectedOption?.label ?? placeholder)}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {options.map((option) => {
+            const isActive = option.value === value;
+            return (
+              <button
+                key={option.value}
+                className={`min-h-12 rounded-2xl border px-4 py-3 text-sm font-semibold uppercase tracking-[0.12em] transition ${
+                  isActive
+                    ? "border-slateblue bg-slateblue text-white"
+                    : "border-slate-200 bg-white text-slate-600"
+                } disabled:opacity-50`}
+                disabled={disabled}
+                onClick={() => onChange(option.value)}
+                type="button"
+              >
+                {normalizeOptionLabel(option.label)}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <select
+        className={`hidden min-h-14 uppercase md:block ${className ?? ""}`}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+        value={value}
+      >
+        <option value="">{normalizeOptionLabel(placeholder)}</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {normalizeOptionLabel(option.label)}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 export function ReportEditor({ data }: { data: EditorData }) {
   const [draft, setDraft] = useState<ReportDraft>(data.draft);
   const [taskDisplayLabel, setTaskDisplayLabel] = useState(data.customInspectionTypeLabel ?? "");
@@ -443,9 +504,15 @@ export function ReportEditor({ data }: { data: EditorData }) {
     return () => window.clearInterval(interval);
   }, [data.canEdit, data.reportStatus, dirty]);
 
-  function updateDraft(nextDraft: ReportDraft) {
+  function updateDraft(nextDraft: ReportDraft | ((current: ReportDraft) => ReportDraft)) {
     autosaveBlockedRef.current = false;
-    setDraft(nextDraft);
+    setDraft((current) => {
+      const resolvedDraft = typeof nextDraft === "function"
+        ? nextDraft(current)
+        : nextDraft;
+      latestDraftRef.current = resolvedDraft;
+      return resolvedDraft;
+    });
     setDirty(true);
     setSaveState("Unsaved changes");
     setFinalizeErrorMessage(null);
@@ -461,99 +528,118 @@ export function ReportEditor({ data }: { data: EditorData }) {
     }
   }
 
-  function sectionState(sectionId: string) {
-    return draft.sections[sectionId] ?? { status: "pending" as const, notes: "", fields: {} };
+  function sectionState(sectionId: string, sourceDraft: ReportDraft = latestDraftRef.current) {
+    return sourceDraft.sections[sectionId] ?? { status: "pending" as const, notes: "", fields: {} };
   }
 
   function updateSectionField(sectionId: string, fieldId: string, value: string | boolean | number) {
-    const currentSection = sectionState(sectionId);
-    const nextFields = applySectionFieldSmartUpdate(
-      data.template,
-      sectionId,
-      {
-        ...(currentSection.fields as Record<string, ReportPrimitiveValue>),
-        [fieldId]: value
-      },
-      fieldId
-    );
-    updateDraft({
-      ...draft,
-      sections: {
-        ...draft.sections,
-        [sectionId]: {
-          ...currentSection,
-          fields: nextFields
+    updateDraft((currentDraft) => {
+      const currentSection = sectionState(sectionId, currentDraft);
+      const nextFields = applySectionFieldSmartUpdate(
+        data.template,
+        sectionId,
+        {
+          ...(currentSection.fields as Record<string, ReportPrimitiveValue>),
+          [fieldId]: value
+        },
+        fieldId
+      );
+
+      return {
+        ...currentDraft,
+        sections: {
+          ...currentDraft.sections,
+          [sectionId]: {
+            ...currentSection,
+            fields: nextFields
+          }
         }
-      }
+      };
     });
   }
 
   function addRepeaterRow(sectionId: string, field: Extract<ReportFieldDefinition, { type: "repeater" }>) {
-    const currentRows = Array.isArray(draft.sections[sectionId]?.fields?.[field.id]) ? draft.sections[sectionId]?.fields?.[field.id] as Array<Record<string, ReportPrimitiveValue>> : [];
-    const nextRow = buildRepeaterRowDefaults(data.template, sectionId, field.id, currentRows.length);
-    updateDraft({
-      ...draft,
-      sections: {
-        ...draft.sections,
-        [sectionId]: {
-          ...sectionState(sectionId),
-          fields: {
-            ...sectionState(sectionId).fields,
-            [field.id]: [...currentRows, nextRow]
+    updateDraft((currentDraft) => {
+      const currentSection = sectionState(sectionId, currentDraft);
+      const currentRows = Array.isArray(currentSection.fields?.[field.id]) ? currentSection.fields?.[field.id] as Array<Record<string, ReportPrimitiveValue>> : [];
+      const nextRow = buildRepeaterRowDefaults(data.template, sectionId, field.id, currentRows.length);
+
+      return {
+        ...currentDraft,
+        sections: {
+          ...currentDraft.sections,
+          [sectionId]: {
+            ...currentSection,
+            fields: {
+              ...currentSection.fields,
+              [field.id]: [...currentRows, nextRow]
+            }
           }
         }
-      }
+      };
     });
   }
 
   function duplicateRepeaterRow(sectionId: string, fieldId: string, rowIndex: number) {
-    const currentRows = Array.isArray(draft.sections[sectionId]?.fields?.[fieldId]) ? draft.sections[sectionId]?.fields?.[fieldId] as Array<Record<string, ReportPrimitiveValue>> : [];
-    updateDraft({
-      ...draft,
-      sections: {
-        ...draft.sections,
-        [sectionId]: {
-          ...sectionState(sectionId),
-          fields: {
-            ...sectionState(sectionId).fields,
-            [fieldId]: duplicateRepeaterRows(currentRows, rowIndex)
+    updateDraft((currentDraft) => {
+      const currentSection = sectionState(sectionId, currentDraft);
+      const currentRows = Array.isArray(currentSection.fields?.[fieldId]) ? currentSection.fields?.[fieldId] as Array<Record<string, ReportPrimitiveValue>> : [];
+
+      return {
+        ...currentDraft,
+        sections: {
+          ...currentDraft.sections,
+          [sectionId]: {
+            ...currentSection,
+            fields: {
+              ...currentSection.fields,
+              [fieldId]: duplicateRepeaterRows(currentRows, rowIndex)
+            }
           }
         }
-      }
+      };
     });
   }
 
   function applyBulkAction(sectionId: string, field: Extract<ReportFieldDefinition, { type: "repeater" }>, actionId: string) {
-    const currentRows = Array.isArray(draft.sections[sectionId]?.fields?.[field.id]) ? draft.sections[sectionId]?.fields?.[field.id] as Array<Record<string, ReportPrimitiveValue>> : [];
-    updateDraft({
-      ...draft,
-      sections: {
-        ...draft.sections,
-        [sectionId]: {
-          ...sectionState(sectionId),
-          fields: {
-            ...sectionState(sectionId).fields,
-            [field.id]: applyRepeaterBulkAction(data.template, sectionId, field.id, currentRows, actionId)
+    updateDraft((currentDraft) => {
+      const currentSection = sectionState(sectionId, currentDraft);
+      const currentRows = Array.isArray(currentSection.fields?.[field.id]) ? currentSection.fields?.[field.id] as Array<Record<string, ReportPrimitiveValue>> : [];
+
+      return {
+        ...currentDraft,
+        sections: {
+          ...currentDraft.sections,
+          [sectionId]: {
+            ...currentSection,
+            fields: {
+              ...currentSection.fields,
+              [field.id]: applyRepeaterBulkAction(data.template, sectionId, field.id, currentRows, actionId)
+            }
           }
         }
-      }
+      };
     });
   }
 
   function removeRepeaterRow(sectionId: string, fieldId: string, rowIndex: number) {
-    const currentRows = Array.isArray(draft.sections[sectionId]?.fields?.[fieldId]) ? draft.sections[sectionId]?.fields?.[fieldId] as Array<Record<string, ReportPrimitiveValue>> : [];
-    updateDraft({
-      ...draft,
-      sections: {
-        ...draft.sections,
-        [sectionId]: {
-          ...sectionState(sectionId),
-          fields: {
-            ...sectionState(sectionId).fields,
-            [fieldId]: currentRows.filter((_, index) => index !== rowIndex)
+    updateDraft((currentDraft) => {
+      const currentSection = sectionState(sectionId, currentDraft);
+      const currentRows = Array.isArray(currentSection.fields?.[fieldId]) ? currentSection.fields?.[fieldId] as Array<Record<string, ReportPrimitiveValue>> : [];
+
+      return {
+        ...currentDraft,
+        sections: {
+          ...currentDraft.sections,
+          [sectionId]: {
+            ...currentSection,
+            fields: {
+              ...currentSection.fields,
+              [fieldId]: currentRows.filter((_, index) => index !== rowIndex)
+            }
           }
         }
-      }
+      };
     });
   }
 
@@ -564,27 +650,30 @@ export function ReportEditor({ data }: { data: EditorData }) {
     rowFieldId: string,
     value: ReportPrimitiveValue
   ) {
-    const currentRows = Array.isArray(draft.sections[sectionId]?.fields?.[field.id]) ? draft.sections[sectionId]?.fields?.[field.id] as Array<Record<string, ReportPrimitiveValue>> : [];
-    const nextRows = currentRows.map((row, index) => {
-      if (index !== rowIndex) {
-        return row;
-      }
+    updateDraft((currentDraft) => {
+      const currentSection = sectionState(sectionId, currentDraft);
+      const currentRows = Array.isArray(currentSection.fields?.[field.id]) ? currentSection.fields?.[field.id] as Array<Record<string, ReportPrimitiveValue>> : [];
+      const nextRows = currentRows.map((row, index) => {
+        if (index !== rowIndex) {
+          return row;
+        }
 
-      return applyRepeaterRowSmartUpdate(data.template, sectionId, field.id, { ...row, [rowFieldId]: value }, rowFieldId);
-    });
+        return applyRepeaterRowSmartUpdate(data.template, sectionId, field.id, { ...row, [rowFieldId]: value }, rowFieldId);
+      });
 
-    updateDraft({
-      ...draft,
-      sections: {
-        ...draft.sections,
-        [sectionId]: {
-          ...sectionState(sectionId),
-          fields: {
-            ...sectionState(sectionId).fields,
-            [field.id]: nextRows
+      return {
+        ...currentDraft,
+        sections: {
+          ...currentDraft.sections,
+          [sectionId]: {
+            ...currentSection,
+            fields: {
+              ...currentSection.fields,
+              [field.id]: nextRows
+            }
           }
         }
-      }
+      };
     });
   }
 
@@ -645,24 +734,26 @@ export function ReportEditor({ data }: { data: EditorData }) {
   }
 
   function updateSectionMeta(sectionId: string, key: "status" | "notes", value: string) {
-    const currentSection = sectionState(sectionId);
-    updateDraft({
-      ...draft,
-      sections: {
-        ...draft.sections,
-        [sectionId]: {
-          ...currentSection,
-          [key]: key === "notes" ? normalizeEditorText(value) : value
+    updateDraft((currentDraft) => {
+      const currentSection = sectionState(sectionId, currentDraft);
+      return {
+        ...currentDraft,
+        sections: {
+          ...currentDraft.sections,
+          [sectionId]: {
+            ...currentSection,
+            [key]: key === "notes" ? normalizeEditorText(value) : value
+          }
         }
-      }
+      };
     });
   }
 
   function addDeficiency() {
-    updateDraft({
-      ...draft,
+    updateDraft((currentDraft) => ({
+      ...currentDraft,
       deficiencies: [
-        ...draft.deficiencies,
+        ...currentDraft.deficiencies,
         {
           id: crypto.randomUUID(),
           title: "",
@@ -680,21 +771,21 @@ export function ReportEditor({ data }: { data: EditorData }) {
           photoStorageKey: undefined
         }
       ]
-    });
+    }));
   }
 
   function updateDeficiency(index: number, key: "title" | "description" | "severity" | "status", value: string) {
-    updateDraft({
-      ...draft,
-      deficiencies: draft.deficiencies.map((deficiency, itemIndex) => itemIndex === index ? { ...deficiency, [key]: key === "title" || key === "description" ? normalizeEditorText(value) : value } : deficiency)
-    });
+    updateDraft((currentDraft) => ({
+      ...currentDraft,
+      deficiencies: currentDraft.deficiencies.map((deficiency, itemIndex) => itemIndex === index ? { ...deficiency, [key]: key === "title" || key === "description" ? normalizeEditorText(value) : value } : deficiency)
+    }));
   }
 
   function removeDeficiency(index: number) {
-    updateDraft({
-      ...draft,
-      deficiencies: draft.deficiencies.filter((_, itemIndex) => itemIndex !== index)
-    });
+    updateDraft((currentDraft) => ({
+      ...currentDraft,
+      deficiencies: currentDraft.deficiencies.filter((_, itemIndex) => itemIndex !== index)
+    }));
   }
 
   async function handleFilesSelected(files: FileList | null) {
@@ -730,37 +821,40 @@ export function ReportEditor({ data }: { data: EditorData }) {
       );
 
       setErrorMessage(null);
-      updateDraft({ ...draft, attachments: [...draft.attachments, ...attachments] });
+      updateDraft((currentDraft) => ({ ...currentDraft, attachments: [...currentDraft.attachments, ...attachments] }));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unable to prepare these photos for report saving.");
     }
   }
 
   function removeAttachment(id: string) {
-    updateDraft({ ...draft, attachments: draft.attachments.filter((attachment) => attachment.id !== id) });
+    updateDraft((currentDraft) => ({
+      ...currentDraft,
+      attachments: currentDraft.attachments.filter((attachment) => attachment.id !== id)
+    }));
   }
 
   function updateSignature(kind: "technician" | "customer", signerName: string, imageDataUrl: string | null) {
-    updateDraft({
-      ...draft,
+    updateDraft((currentDraft) => ({
+      ...currentDraft,
       signatures: {
-        ...draft.signatures,
+        ...currentDraft.signatures,
         [kind]: imageDataUrl ? { signerName: normalizeEditorText(signerName), imageDataUrl, signedAt: new Date().toISOString() } : undefined
       }
-    });
+    }));
   }
 
   function updateSignerName(kind: "technician" | "customer", signerName: string) {
     const normalizedName = normalizeEditorText(signerName);
-    updateDraft({
-      ...draft,
+    updateDraft((currentDraft) => ({
+      ...currentDraft,
       signatures: {
-        ...draft.signatures,
-        [kind]: draft.signatures[kind]
-          ? { ...draft.signatures[kind], signerName: normalizedName }
+        ...currentDraft.signatures,
+        [kind]: currentDraft.signatures[kind]
+          ? { ...currentDraft.signatures[kind], signerName: normalizedName }
           : { signerName: normalizedName, imageDataUrl: "", signedAt: new Date().toISOString() }
       }
-    });
+    }));
   }
 
   async function finalizeReport() {
@@ -1085,10 +1179,13 @@ export function ReportEditor({ data }: { data: EditorData }) {
                                       {row[rowField.id] ? normalizeOptionLabel("Yes") : normalizeOptionLabel("No")}
                                     </button>
                                   ) : rowField.type === "select" ? (
-                                    <select className={`min-h-14 uppercase ${fieldShellClassName(rowField.readOnly)}`} disabled={isFieldDisabled(data.canEdit, data.reportStatus, rowField)} onChange={(event) => updateRepeaterRowField(activeSection.id, field, rowIndex, rowField.id, event.target.value)} value={String(row[rowField.id] ?? "")}>
-                                      <option value="">{normalizeOptionLabel("Select")}</option>
-                                      {rowField.options?.map((option) => <option key={option.value} value={option.value}>{normalizeOptionLabel(option.label)}</option>)}
-                                    </select>
+                                    <ReportSelectControl
+                                      className={fieldShellClassName(rowField.readOnly)}
+                                      disabled={isFieldDisabled(data.canEdit, data.reportStatus, rowField)}
+                                      onChange={(nextValue) => updateRepeaterRowField(activeSection.id, field, rowIndex, rowField.id, nextValue)}
+                                      options={rowField.options ?? []}
+                                      value={String(row[rowField.id] ?? "")}
+                                    />
                                   ) : rowField.type === "photo" ? (
                                     <div className="space-y-3 rounded-[1.5rem] border border-slate-200 p-3">
                                       {row[rowField.id] ? <Image alt={rowField.label} className="h-40 w-full rounded-2xl object-cover" height={160} src={resolveStoredMediaSrc(data.reportId, String(row[rowField.id] ?? "")) ?? String(row[rowField.id] ?? "")} unoptimized width={320} /> : <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No photo attached.</p>}
@@ -1118,10 +1215,13 @@ export function ReportEditor({ data }: { data: EditorData }) {
                                   {deficiencySeverityField ? (
                                     <div className="space-y-2">
                                       <label className="block text-sm font-medium text-slate-600">{deficiencySeverityField.label}</label>
-                                      <select className={`min-h-14 uppercase ${fieldShellClassName(deficiencySeverityField.readOnly)}`} disabled={isFieldDisabled(data.canEdit, data.reportStatus, deficiencySeverityField)} onChange={(event) => updateRepeaterRowField(activeSection.id, field, rowIndex, deficiencySeverityField.id, event.target.value)} value={String(row[deficiencySeverityField.id] ?? "")}>
-                                        <option value="">{normalizeOptionLabel("Select")}</option>
-                                        {deficiencySeverityField.options?.map((option) => <option key={option.value} value={option.value}>{normalizeOptionLabel(option.label)}</option>)}
-                                      </select>
+                                      <ReportSelectControl
+                                        className={fieldShellClassName(deficiencySeverityField.readOnly)}
+                                        disabled={isFieldDisabled(data.canEdit, data.reportStatus, deficiencySeverityField)}
+                                        onChange={(nextValue) => updateRepeaterRowField(activeSection.id, field, rowIndex, deficiencySeverityField.id, nextValue)}
+                                        options={deficiencySeverityField.options ?? []}
+                                        value={String(row[deficiencySeverityField.id] ?? "")}
+                                      />
                                     </div>
                                   ) : null}
                                   {deficiencyNotesField ? (
@@ -1162,10 +1262,13 @@ export function ReportEditor({ data }: { data: EditorData }) {
                       {(draft.sections[activeSection.id]?.fields?.[field.id] as boolean) ? normalizeOptionLabel("Yes") : normalizeOptionLabel("No")}
                     </button>
                   ) : field.type === "select" ? (
-                    <select className={`min-h-14 uppercase ${fieldShellClassName(field.readOnly)}`} disabled={isFieldDisabled(data.canEdit, data.reportStatus, field)} onChange={(event) => updateSectionField(activeSection.id, field.id, event.target.value)} value={String(draft.sections[activeSection.id]?.fields?.[field.id] ?? "")}>
-                      <option value="">{normalizeOptionLabel("Select")}</option>
-                      {field.options?.map((option) => <option key={option.value} value={option.value}>{normalizeOptionLabel(option.label)}</option>)}
-                    </select>
+                    <ReportSelectControl
+                      className={fieldShellClassName(field.readOnly)}
+                      disabled={isFieldDisabled(data.canEdit, data.reportStatus, field)}
+                      onChange={(nextValue) => updateSectionField(activeSection.id, field.id, nextValue)}
+                      options={field.options ?? []}
+                      value={String(draft.sections[activeSection.id]?.fields?.[field.id] ?? "")}
+                    />
                   ) : field.type === "photo" ? (
                     <div className="space-y-3 rounded-[1.5rem] border border-slate-200 p-3">
                       {draft.sections[activeSection.id]?.fields?.[field.id] ? <Image alt={field.label} className="aspect-[4/3] w-full rounded-2xl object-cover" height={240} src={resolveStoredMediaSrc(data.reportId, String(draft.sections[activeSection.id]?.fields?.[field.id] ?? "")) ?? String(draft.sections[activeSection.id]?.fields?.[field.id] ?? "")} unoptimized width={320} /> : <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No photo attached.</p>}
@@ -1195,7 +1298,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
 
           <div className="overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel sm:rounded-[2rem] sm:p-5">
             <h3 className="text-xl font-semibold text-ink">Technician notes</h3>
-            <textarea className="mt-4 min-h-32 w-full resize-none overflow-hidden rounded-[1.5rem] border border-slate-200 px-4 py-4 text-base uppercase" data-auto-grow="on" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateDraft({ ...draft, overallNotes: normalizeEditorText(event.target.value) })} value={draft.overallNotes} />
+            <textarea className="mt-4 min-h-32 w-full resize-none overflow-hidden rounded-[1.5rem] border border-slate-200 px-4 py-4 text-base uppercase" data-auto-grow="on" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateDraft((currentDraft) => ({ ...currentDraft, overallNotes: normalizeEditorText(event.target.value) }))} value={draft.overallNotes} />
           </div>
 
           <div className="overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel sm:rounded-[2rem] sm:p-5">
@@ -1211,20 +1314,32 @@ export function ReportEditor({ data }: { data: EditorData }) {
                   <input className="min-h-12 w-full rounded-2xl border border-slate-200 px-4 py-3 uppercase" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateDeficiency(index, "title", event.target.value)} placeholder="Deficiency title" value={deficiency.title} />
                   <textarea className="min-h-24 w-full resize-none overflow-hidden rounded-2xl border border-slate-200 px-4 py-3 uppercase" data-auto-grow="on" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateDeficiency(index, "description", event.target.value)} placeholder="Describe the deficiency" value={deficiency.description} />
                   <div className="grid gap-3 md:grid-cols-2">
-                    <select className="min-h-12 rounded-2xl border border-slate-200 px-4 py-3 uppercase" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateDeficiency(index, "severity", event.target.value)} value={deficiency.severity}>
-                      <option value="low">{normalizeOptionLabel("Low")}</option>
-                      <option value="medium">{normalizeOptionLabel("Medium")}</option>
-                      <option value="high">{normalizeOptionLabel("High")}</option>
-                      <option value="critical">{normalizeOptionLabel("Critical")}</option>
-                    </select>
-                    <select className="min-h-12 rounded-2xl border border-slate-200 px-4 py-3 uppercase" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateDeficiency(index, "status", event.target.value)} value={deficiency.status}>
-                      <option value="open">{normalizeOptionLabel("Open")}</option>
-                      <option value="quoted">{normalizeOptionLabel("Quoted")}</option>
-                      <option value="approved">{normalizeOptionLabel("Approved")}</option>
-                      <option value="scheduled">{normalizeOptionLabel("Scheduled")}</option>
-                      <option value="resolved">{normalizeOptionLabel("Resolved")}</option>
-                      <option value="ignored">{normalizeOptionLabel("Ignored")}</option>
-                    </select>
+                    <ReportSelectControl
+                      className="rounded-2xl border border-slate-200 px-4 py-3"
+                      disabled={!data.canEdit || data.reportStatus === "finalized"}
+                      onChange={(nextValue) => updateDeficiency(index, "severity", nextValue)}
+                      options={[
+                        { label: "Low", value: "low" },
+                        { label: "Medium", value: "medium" },
+                        { label: "High", value: "high" },
+                        { label: "Critical", value: "critical" }
+                      ]}
+                      value={deficiency.severity}
+                    />
+                    <ReportSelectControl
+                      className="rounded-2xl border border-slate-200 px-4 py-3"
+                      disabled={!data.canEdit || data.reportStatus === "finalized"}
+                      onChange={(nextValue) => updateDeficiency(index, "status", nextValue)}
+                      options={[
+                        { label: "Open", value: "open" },
+                        { label: "Quoted", value: "quoted" },
+                        { label: "Approved", value: "approved" },
+                        { label: "Scheduled", value: "scheduled" },
+                        { label: "Resolved", value: "resolved" },
+                        { label: "Ignored", value: "ignored" }
+                      ]}
+                      value={deficiency.status}
+                    />
                   </div>
                   <button className="min-h-12 rounded-2xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700 disabled:opacity-50" disabled={!data.canEdit || data.reportStatus === "finalized"} onClick={() => removeDeficiency(index)} type="button">
                     Remove deficiency

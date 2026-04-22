@@ -986,6 +986,16 @@ const sprinklerManufacturers: ReportOption[] = [
   { label: "Other", value: "other" }
 ];
 
+const fusibleLinkTemperaturesNormalized: ReportOption[] = [
+  { label: "165°F", value: "165°F" },
+  { label: "212°F", value: "212°F" },
+  { label: "280°F", value: "280°F" },
+  { label: "286°F", value: "286°F" },
+  { label: "360°F", value: "360°F" },
+  { label: "450°F", value: "450°F" },
+  { label: "500°F", value: "500°F" }
+];
+
 export const reportOptionProviders = {
   acceptanceTestResultOptions,
   passFail: passFailOptions,
@@ -1070,7 +1080,7 @@ export const reportOptionProviders = {
   quantityZeroToFive,
   quantityZeroToTwenty,
   quantityZeroToHundred,
-  fusible_link_temperatures_common: fusibleLinkTemperaturesCommon,
+  fusible_link_temperatures_common: fusibleLinkTemperaturesNormalized,
   caps_used_types: capsUsedTypes,
   kitchen_suppression_manufacturers: kitchenSuppressionManufacturers,
   emergency_light_types: emergencyLightTypes,

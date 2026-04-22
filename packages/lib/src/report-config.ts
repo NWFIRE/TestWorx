@@ -1738,7 +1738,16 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
                 id: "temperature",
                 label: "Temperature",
                 type: "select",
-                optionProvider: "fusible_link_temperatures_common"
+                optionProvider: "fusible_link_temperatures_common",
+                legacyValueMap: {
+                  "165Â°F": "165°F",
+                  "212Â°F": "212°F",
+                  "280Â°F": "280°F",
+                  "286Â°F": "286°F",
+                  "360Â°F": "360°F",
+                  "450Â°F": "450°F",
+                  "500Â°F": "500°F"
+                }
               },
               {
                 id: "quantity",
