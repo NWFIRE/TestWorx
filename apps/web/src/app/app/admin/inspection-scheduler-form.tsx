@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChangeEvent, ReactNode } from "react";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CustomerOption, SiteOption, TechnicianOption } from "@testworx/types";
 import {
@@ -220,6 +220,13 @@ export function InspectionSchedulerForm({
   const isCreateWorkflow = !initialValues?.inspectionId && !reasonLabel;
   const { showToast } = useToast();
   const [selectedCustomerId, setSelectedCustomerId] = useState(initialValues?.customerCompanyId ?? "");
+  const [customerSearchQuery, setCustomerSearchQuery] = useState(() => {
+    if (!initialValues?.customerCompanyId) {
+      return "";
+    }
+
+    return customers.find((customer) => customer.id === initialValues.customerCompanyId)?.name ?? "";
+  });
   const [selectedSiteId, setSelectedSiteId] = useState(
     initialValues?.siteId ??
       (initialValues?.customerCompanyId && autoSelectGenericSiteOnCustomerChange
@@ -249,6 +256,19 @@ export function InspectionSchedulerForm({
   const [externalDocumentsCustomerVisible, setExternalDocumentsCustomerVisible] = useState(false);
   const [isUploadingExternalDocuments, setIsUploadingExternalDocuments] = useState(false);
   const serviceLineRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const deferredCustomerSearchQuery = useDeferredValue(customerSearchQuery);
+  const filteredCustomers = useMemo(() => {
+    const normalizedQuery = deferredCustomerSearchQuery.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return customers;
+    }
+
+    return customers.filter(
+      (customer) =>
+        customer.id === selectedCustomerId ||
+        customer.name.toLowerCase().includes(normalizedQuery)
+    );
+  }, [customers, deferredCustomerSearchQuery, selectedCustomerId]);
   const filteredSites = useMemo(
     () => sites.filter((site) => !selectedCustomerId || site.customerCompanyId === selectedCustomerId),
     [selectedCustomerId, sites]
@@ -489,20 +509,44 @@ export function InspectionSchedulerForm({
       <div className="grid min-w-0 gap-4 md:grid-cols-2">
         <div className="min-w-0">
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customerCompanyId">Customer</label>
+          <div className="mb-3">
+            <label className="sr-only" htmlFor="customerCompanySearch">Search customers</label>
+            <input
+              autoComplete="off"
+              className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-[15px] text-slate-900 outline-none transition focus:border-slateblue/40 focus:bg-white"
+              id="customerCompanySearch"
+              inputMode="search"
+              onChange={(event) => setCustomerSearchQuery(event.target.value)}
+              placeholder="Type to search customers"
+              type="search"
+              value={customerSearchQuery}
+            />
+          </div>
           <select
             className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 px-4 py-3.5"
             id="customerCompanyId"
             name="customerCompanyId"
             onChange={(event) => {
-              setSelectedCustomerId(event.target.value);
-              setSelectedSiteId(event.target.value && autoSelectGenericSiteOnCustomerChange ? genericInspectionSiteOptionValue : "");
+              const nextCustomerId = event.target.value;
+              setSelectedCustomerId(nextCustomerId);
+              setSelectedSiteId(nextCustomerId && autoSelectGenericSiteOnCustomerChange ? genericInspectionSiteOptionValue : "");
+              if (nextCustomerId) {
+                setCustomerSearchQuery(customers.find((customer) => customer.id === nextCustomerId)?.name ?? "");
+              }
             }}
             required
             value={selectedCustomerId}
           >
             <option value="">Select customer</option>
-            {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
+            {filteredCustomers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
           </select>
+          <p className="mt-2 text-sm leading-5 text-slate-500">
+            {customerSearchQuery.trim()
+              ? filteredCustomers.length
+                ? `${filteredCustomers.length} matching customer${filteredCustomers.length === 1 ? "" : "s"} shown.`
+                : "No customers match that search yet."
+              : "Start typing to narrow the customer list faster on mobile and desktop."}
+          </p>
         </div>
         <div className="min-w-0">
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="siteId">Site</label>
