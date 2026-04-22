@@ -30,6 +30,29 @@ function toConflictStatus(message: string | null | undefined) {
   return /locked|cannot edit|cannot be finalized|already finalized|already completed|does not have access/i.test(message ?? "");
 }
 
+function hasNewerQueueVersion(entry: SyncQueueEntry | null, syncMarker: string) {
+  return Boolean(entry && entry.updatedAt > syncMarker);
+}
+
+async function upsertPendingQueueEntry(
+  input: Omit<SyncQueueEntry, "status" | "retryCount" | "lastError" | "createdAt" | "updatedAt" | "lastAttemptAt">
+) {
+  const existing = await getSyncQueueEntry(input.id);
+  const timestamp = nowIso();
+  const nextEntry: SyncQueueEntry = {
+    ...input,
+    status: "pending",
+    retryCount: existing?.retryCount ?? 0,
+    lastError: null,
+    createdAt: existing?.createdAt ?? timestamp,
+    updatedAt: timestamp,
+    lastAttemptAt: existing?.lastAttemptAt ?? null
+  };
+
+  await putSyncQueueEntry(nextEntry);
+  return nextEntry;
+}
+
 async function syncReportAutosave(entry: SyncQueueEntry) {
   const response = await fetch("/api/reports/autosave", {
     method: "POST",
@@ -113,7 +136,14 @@ export async function processSyncQueue() {
         continue;
       }
 
-      await markQueueEntryStatus(current, "syncing", null);
+      const syncMarker = nowIso();
+      await putSyncQueueEntry({
+        ...current,
+        status: "syncing",
+        lastError: null,
+        lastAttemptAt: syncMarker,
+        updatedAt: syncMarker
+      });
 
       try {
         if (current.operation === "report_autosave") {
@@ -122,19 +152,55 @@ export async function processSyncQueue() {
           await syncReportFinalize(current);
         }
 
-        await deleteSyncQueueEntry(current.id);
-        await putOfflineMeta(LAST_SYNC_META_KEY, nowIso());
+        const latest = await getSyncQueueEntry(current.id);
+        if (hasNewerQueueVersion(latest, syncMarker)) {
+          await putSyncQueueEntry({
+            ...latest!,
+            status: "pending",
+            lastError: null
+          });
+
+          const local = await getLocalReportDraft(current.entityId);
+          if (local) {
+            await putLocalReportDraft({
+              ...local,
+              syncStatus: "pending",
+              lastError: null
+            });
+          }
+        } else {
+          await deleteSyncQueueEntry(current.id);
+          await putOfflineMeta(LAST_SYNC_META_KEY, nowIso());
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to sync this change.";
-        await markQueueEntryStatus(current, (error as { syncConflict?: boolean } | undefined)?.syncConflict ? "conflict" : "failed", message);
-
-        const local = await getLocalReportDraft(current.entityId);
-        if (local) {
-          await putLocalReportDraft({
-            ...local,
-            syncStatus: (error as { syncConflict?: boolean } | undefined)?.syncConflict ? "conflict" : "failed",
-            lastError: message
+        const latest = await getSyncQueueEntry(current.id);
+        if (hasNewerQueueVersion(latest, syncMarker)) {
+          await putSyncQueueEntry({
+            ...latest!,
+            status: "pending",
+            lastError: null
           });
+
+          const local = await getLocalReportDraft(current.entityId);
+          if (local) {
+            await putLocalReportDraft({
+              ...local,
+              syncStatus: "pending",
+              lastError: null
+            });
+          }
+        } else {
+          await markQueueEntryStatus(current, (error as { syncConflict?: boolean } | undefined)?.syncConflict ? "conflict" : "failed", message);
+
+          const local = await getLocalReportDraft(current.entityId);
+          if (local) {
+            await putLocalReportDraft({
+              ...local,
+              syncStatus: (error as { syncConflict?: boolean } | undefined)?.syncConflict ? "conflict" : "failed",
+              lastError: message
+            });
+          }
         }
       }
     }
@@ -176,7 +242,7 @@ export async function queueReportDraftSync(input: {
   contentJson: unknown;
   taskDisplayLabel: string | null;
 }) {
-  const entry: SyncQueueEntry = {
+  await upsertPendingQueueEntry({
     id: buildQueueId(input.reportId, "report_autosave"),
     entityType: "inspection_report",
     entityId: input.reportId,
@@ -185,16 +251,8 @@ export async function queueReportDraftSync(input: {
       inspectionReportId: input.inspectionReportId,
       contentJson: input.contentJson,
       taskDisplayLabel: input.taskDisplayLabel
-    },
-    status: "pending",
-    retryCount: 0,
-    lastError: null,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-    lastAttemptAt: null
-  };
-
-  await putSyncQueueEntry(entry);
+    }
+  });
   void processSyncQueue();
 }
 
@@ -204,7 +262,7 @@ export async function queueReportFinalizeSync(input: {
   contentJson: unknown;
   taskDisplayLabel: string | null;
 }) {
-  await putSyncQueueEntry({
+  await upsertPendingQueueEntry({
     id: buildQueueId(input.reportId, "report_finalize"),
     entityType: "inspection_report",
     entityId: input.reportId,
@@ -213,13 +271,7 @@ export async function queueReportFinalizeSync(input: {
       inspectionReportId: input.inspectionReportId,
       contentJson: input.contentJson,
       taskDisplayLabel: input.taskDisplayLabel
-    },
-    status: "pending",
-    retryCount: 0,
-    lastError: null,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-    lastAttemptAt: null
+    }
   });
   void processSyncQueue();
 }

@@ -355,7 +355,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
         serverUpdatedAt: data.reportUpdatedAt,
         localUpdatedAt: data.reportUpdatedAt,
         finalizedAt: data.finalizedAt,
-        syncStatus: data.reportStatus === "finalized" ? "synced" : "pending",
+        syncStatus: "synced",
         pendingFinalize: false,
         lastError: null
       };
