@@ -19,6 +19,11 @@ const technicianTabs: MobileTab[] = [
   { href: "/app/tech/profile", label: "Profile", matchPrefixes: ["/app/tech/profile"] }
 ];
 
+const defaultTechnicianTab: MobileTab = {
+  href: "/app/tech",
+  label: "Home"
+};
+
 function isActive(pathname: string, tab: MobileTab) {
   if (pathname === tab.href) {
     return true;
@@ -115,7 +120,7 @@ export function TechnicianMobileHeader({
   userName: string | null;
 }) {
   const activeTab = useMemo(
-    () => technicianTabs.find((tab) => isActive(pathname, tab)) ?? technicianTabs[0]!,
+    () => technicianTabs.find((tab) => isActive(pathname, tab)) ?? technicianTabs[0] ?? defaultTechnicianTab,
     [pathname]
   );
 
