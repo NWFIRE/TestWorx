@@ -8,6 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { BrandLoader } from "@/app/brand-loader";
 import { getAppNavItemsForRole, getCurrentAppNavItem, isAppNavItemActive, type AppNavItem } from "./app-nav-config";
 import { MobilePullToRefresh } from "./mobile-pull-to-refresh";
+import { TechnicianSyncBootstrap } from "./tech/offline/technician-sync-bootstrap";
 import { TechnicianMobileHeader, TechnicianMobileTabBar } from "./tech/technician-mobile-shell";
 
 const DRAWER_SELECTOR =
@@ -554,6 +555,7 @@ export function AppShell({
 
   return (
     <div className="bg-paper lg:flex lg:overflow-hidden" style={{ minHeight: "var(--app-height, 100dvh)" }}>
+      {isTechnician ? <TechnicianSyncBootstrap /> : null}
       {navItems.length > 0 ? (
         <aside
           aria-label="Primary navigation"

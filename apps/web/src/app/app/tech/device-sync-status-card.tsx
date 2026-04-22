@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { useSyncSummary } from "./offline/use-sync-summary";
+
 const LAST_ONLINE_KEY = "tradeworx.tech.last-online-at";
 
 function formatLastSeen(value: string | null) {
@@ -29,17 +31,15 @@ export function DeviceSyncStatusCard({
   pendingCount: number;
   savedManualCount: number;
 }) {
-  const [isOnline, setIsOnline] = useState(true);
+  const summary = useSyncSummary();
   const [lastOnlineAt, setLastOnlineAt] = useState<string | null>(null);
 
   useEffect(() => {
     const syncStatus = () => {
-      const online = window.navigator.onLine;
-      setIsOnline(online);
       const stored = window.localStorage.getItem(LAST_ONLINE_KEY);
       setLastOnlineAt(stored);
 
-      if (online) {
+      if (window.navigator.onLine) {
         const now = new Date().toISOString();
         window.localStorage.setItem(LAST_ONLINE_KEY, now);
         setLastOnlineAt(now);
@@ -61,24 +61,52 @@ export function DeviceSyncStatusCard({
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Sync status</p>
-          <h3 className="mt-2 text-lg font-semibold text-slate-950">{isOnline ? "Connected and ready" : "Working offline"}</h3>
+          <h3 className="mt-2 text-lg font-semibold text-slate-950">
+            {summary.conflict > 0
+              ? "Sync needs review"
+              : summary.failed > 0
+                ? "Sync retry needed"
+                : summary.pending > 0 || summary.syncing > 0
+                  ? "Changes waiting to sync"
+                  : summary.isOnline
+                    ? "Connected and ready"
+                    : "Working offline"}
+          </h3>
         </div>
         <span
-          className={isOnline
-            ? "inline-flex min-h-10 items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
-            : "inline-flex min-h-10 items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800"}
+          className={summary.conflict > 0
+            ? "inline-flex min-h-10 items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700"
+            : summary.failed > 0
+              ? "inline-flex min-h-10 items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800"
+              : summary.pending > 0 || summary.syncing > 0
+                ? "inline-flex min-h-10 items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700"
+                : summary.isOnline
+                  ? "inline-flex min-h-10 items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
+                  : "inline-flex min-h-10 items-center rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"}
         >
-          {isOnline ? "Syncing enabled" : "Saved offline"}
+          {summary.conflict > 0
+            ? "Conflict"
+            : summary.failed > 0
+              ? "Failed"
+              : summary.pending > 0 || summary.syncing > 0
+                ? summary.syncing > 0 ? "Syncing" : "Pending"
+                : summary.isOnline
+                  ? "Synced"
+                  : "Offline"}
         </span>
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      <div className="mt-4 grid gap-3 sm:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Last online</p>
           <p className="mt-2 text-sm font-semibold text-slate-950">{formatLastSeen(lastOnlineAt)}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Pending changes</p>
-          <p className="mt-2 text-sm font-semibold text-slate-950">{pendingCount} draft item{pendingCount === 1 ? "" : "s"}</p>
+          <p className="mt-2 text-sm font-semibold text-slate-950">{summary.pending + summary.failed + summary.conflict || pendingCount} change{(summary.pending + summary.failed + summary.conflict || pendingCount) === 1 ? "" : "s"}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Last sync</p>
+          <p className="mt-2 text-sm font-semibold text-slate-950">{formatLastSeen(summary.lastSyncAt)}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Saved manuals</p>

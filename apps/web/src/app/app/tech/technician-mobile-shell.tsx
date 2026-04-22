@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+
+import { useSyncSummary } from "./offline/use-sync-summary";
 
 type MobileTab = {
   href: string;
@@ -76,26 +78,31 @@ function MobileTabIcon({ label, active }: { label: string; active: boolean }) {
 }
 
 export function TechnicianSyncPill() {
-  const [isOnline, setIsOnline] = useState(true);
-
-  useEffect(() => {
-    const syncOnlineState = () => setIsOnline(window.navigator.onLine);
-    syncOnlineState();
-    window.addEventListener("online", syncOnlineState);
-    window.addEventListener("offline", syncOnlineState);
-    return () => {
-      window.removeEventListener("online", syncOnlineState);
-      window.removeEventListener("offline", syncOnlineState);
-    };
-  }, []);
+  const summary = useSyncSummary();
 
   return (
     <span
-      className={isOnline
-        ? "inline-flex min-h-9 items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
-        : "inline-flex min-h-9 items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800"}
+      className={summary.conflict > 0
+        ? "inline-flex min-h-9 items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700"
+        : summary.failed > 0
+          ? "inline-flex min-h-9 items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800"
+          : summary.pending > 0 || summary.syncing > 0
+            ? "inline-flex min-h-9 items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700"
+            : summary.isOnline
+              ? "inline-flex min-h-9 items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
+              : "inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"}
     >
-      {isOnline ? "Synced online" : "Offline mode"}
+      {summary.conflict > 0
+        ? `${summary.conflict} conflict${summary.conflict === 1 ? "" : "s"}`
+        : summary.failed > 0
+          ? `${summary.failed} failed`
+          : summary.syncing > 0
+            ? "Syncing..."
+            : summary.pending > 0
+              ? `${summary.pending} pending`
+              : summary.isOnline
+                ? "Synced"
+                : "Offline mode"}
     </span>
   );
 }
@@ -108,7 +115,7 @@ export function TechnicianMobileHeader({
   userName: string | null;
 }) {
   const activeTab = useMemo(
-    () => technicianTabs.find((tab) => isActive(pathname, tab)) ?? technicianTabs[0],
+    () => technicianTabs.find((tab) => isActive(pathname, tab)) ?? technicianTabs[0]!,
     [pathname]
   );
 

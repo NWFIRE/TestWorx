@@ -7,6 +7,9 @@ import { applyRepeaterBulkAction, applyRepeaterRowSmartUpdate, applySectionField
 import type { ReportDraft } from "@testworx/lib";
 import type { ReportFieldDefinition, ReportPrimitiveValue, ReportTemplateDefinition } from "@testworx/lib";
 
+import { getLocalReportDraft, putLocalReportDraft, subscribeToOfflineChanges } from "./offline/offline-db";
+import { initializeLocalReportRecord, queueReportDraftSync, queueReportFinalizeSync, startTechnicianSyncEngine } from "./offline/offline-sync";
+import type { LocalReportDraftRecord } from "./offline/offline-types";
 import { SignaturePad } from "./signature-pad";
 
 type EditorData = {
@@ -42,8 +45,41 @@ const saveStateTone: Record<string, string> = {
   Saving: "text-amber-700",
   Error: "text-rose-700",
   "Unsaved changes": "text-slate-700",
-  Finalized: "text-slate-700"
+  Finalized: "text-slate-700",
+  "Saved offline": "text-blue-700",
+  "Pending sync": "text-blue-700",
+  Syncing: "text-blue-700",
+  "Failed sync": "text-amber-700",
+  Conflict: "text-rose-700"
 };
+
+function buildReportSaveState(record: LocalReportDraftRecord | null, reportStatus: EditorData["reportStatus"]) {
+  if (!record) {
+    return reportStatus === "finalized" ? "Finalized" : "Saved";
+  }
+
+  if (record.reportStatus === "finalized" && !record.pendingFinalize) {
+    return "Finalized";
+  }
+
+  if (record.syncStatus === "conflict") {
+    return "Conflict";
+  }
+
+  if (record.syncStatus === "failed") {
+    return "Failed sync";
+  }
+
+  if (record.syncStatus === "syncing") {
+    return "Syncing";
+  }
+
+  if (record.syncStatus === "pending") {
+    return window.navigator.onLine ? "Pending sync" : "Saved offline";
+  }
+
+  return "Saved";
+}
 
 function resolveStoredMediaSrc(reportId: string, storageKey: string | null | undefined) {
   if (!storageKey) {
@@ -183,6 +219,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
   const latestDraftRef = useRef(draft);
   const saveDraftRef = useRef<((nextDraft: ReportDraft, reason: "timer" | "section" | "manual") => Promise<boolean>) | null>(null);
   const serverUpdatedAtRef = useRef(data.reportUpdatedAt);
+  const localRecordRef = useRef<LocalReportDraftRecord | null>(null);
   const backupKey = `report-draft:${data.reportId}`;
 
   const persistBackup = useCallback((nextDraft: ReportDraft, serverUpdatedAt: string) => {
@@ -236,6 +273,65 @@ export function ReportEditor({ data }: { data: EditorData }) {
   }, [data.reportStatus, draft, persistBackup]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function hydrateLocalDraft() {
+      startTechnicianSyncEngine();
+      const initialRecord: LocalReportDraftRecord = {
+        reportId: data.reportId,
+        inspectionId: "",
+        taskId: "",
+        draft: data.draft,
+        taskDisplayLabel: data.customInspectionTypeLabel ?? null,
+        reportStatus: data.reportStatus,
+        serverUpdatedAt: data.reportUpdatedAt,
+        localUpdatedAt: data.reportUpdatedAt,
+        finalizedAt: data.finalizedAt,
+        syncStatus: data.reportStatus === "finalized" ? "synced" : "pending",
+        pendingFinalize: false,
+        lastError: null
+      };
+
+      const localRecord = await initializeLocalReportRecord(initialRecord);
+      if (cancelled) {
+        return;
+      }
+
+      localRecordRef.current = localRecord;
+      setDraft(localRecord.draft as ReportDraft);
+      setTaskDisplayLabel(localRecord.taskDisplayLabel ?? data.customInspectionTypeLabel ?? "");
+      setSaveState(buildReportSaveState(localRecord, data.reportStatus));
+      if (localRecord.lastError) {
+        setErrorMessage(toTechnicianFacingSaveMessage(localRecord.lastError, localRecord.pendingFinalize ? "finalize" : "save"));
+      }
+    }
+
+    void hydrateLocalDraft();
+
+    const unsubscribe = subscribeToOfflineChanges(() => {
+      void (async () => {
+        const current = await getLocalReportDraft(data.reportId);
+        if (!current || cancelled) {
+          return;
+        }
+
+        localRecordRef.current = current;
+        setSaveState(buildReportSaveState(current, data.reportStatus));
+        if (current.lastError) {
+          setErrorMessage(toTechnicianFacingSaveMessage(current.lastError, current.pendingFinalize ? "finalize" : "save"));
+        } else if (!dirty) {
+          setErrorMessage(null);
+        }
+      })();
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [data.customInspectionTypeLabel, data.draft, data.finalizedAt, data.reportId, data.reportStatus, data.reportUpdatedAt, dirty]);
+
+  useEffect(() => {
     function beforeUnload(event: BeforeUnloadEvent) {
       if (!dirty && !saveInFlightRef.current) {
         return;
@@ -249,12 +345,44 @@ export function ReportEditor({ data }: { data: EditorData }) {
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [dirty]);
 
-  const saveDraft = useCallback(async (nextDraft: ReportDraft, reason: "timer" | "section" | "manual") => {
+  const persistDraftLocally = useCallback(async (
+    nextDraft: ReportDraft,
+    input?: {
+      reportStatus?: LocalReportDraftRecord["reportStatus"];
+      pendingFinalize?: boolean;
+      finalizedAt?: string | null;
+      syncStatus?: LocalReportDraftRecord["syncStatus"];
+      lastError?: string | null;
+    }
+  ) => {
+    const record: LocalReportDraftRecord = {
+      reportId: data.reportId,
+      inspectionId: localRecordRef.current?.inspectionId ?? "",
+      taskId: localRecordRef.current?.taskId ?? "",
+      draft: nextDraft,
+      taskDisplayLabel: taskDisplayLabel.trim() || null,
+      reportStatus: input?.reportStatus ?? "draft",
+      serverUpdatedAt: localRecordRef.current?.serverUpdatedAt ?? serverUpdatedAtRef.current,
+      localUpdatedAt: new Date().toISOString(),
+      finalizedAt: input?.finalizedAt ?? localRecordRef.current?.finalizedAt ?? null,
+      syncStatus: input?.syncStatus ?? "pending",
+      pendingFinalize: input?.pendingFinalize ?? false,
+      lastError: input?.lastError ?? null
+    };
+
+    localRecordRef.current = record;
+    await putLocalReportDraft(record);
+    setSaveState(buildReportSaveState(record, data.reportStatus));
+    return record;
+  }, [data.reportId, data.reportStatus, taskDisplayLabel]);
+
+  const saveDraft = useCallback(async (nextDraft: ReportDraft, _reason: "timer" | "section" | "manual") => {
+    void _reason;
     if (!data.canEdit || data.reportStatus === "finalized") {
       return true;
     }
 
-    if (saveInFlightRef.current || (reason === "timer" && autosaveBlockedRef.current)) {
+    if (saveInFlightRef.current) {
       return false;
     }
 
@@ -263,29 +391,21 @@ export function ReportEditor({ data }: { data: EditorData }) {
     setErrorMessage(null);
 
     try {
-      const response = await fetch("/api/reports/autosave", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          inspectionReportId: data.reportId,
-          contentJson: nextDraft,
-          taskDisplayLabel
-        })
-      });
-
-      const payload = await response.json();
-      if (!response.ok) {
-        if (response.status >= 400 && response.status < 500) {
-          autosaveBlockedRef.current = true;
-        }
-
-        throw new Error(payload.error ?? "Unable to save draft.");
-      }
-
       autosaveBlockedRef.current = false;
+      await persistDraftLocally(nextDraft, {
+        reportStatus: "draft",
+        pendingFinalize: false,
+        syncStatus: "pending",
+        lastError: null
+      });
+      await queueReportDraftSync({
+        reportId: data.reportId,
+        inspectionReportId: data.reportId,
+        contentJson: nextDraft,
+        taskDisplayLabel: taskDisplayLabel.trim() || null
+      });
       lastSavedAtRef.current = Date.now();
-      serverUpdatedAtRef.current = payload.updatedAt ?? serverUpdatedAtRef.current;
-      setSaveState(reason === "manual" ? "Saved" : "Saved");
+      setSaveState(window.navigator.onLine ? "Pending sync" : "Saved offline");
       setDirty(false);
       persistBackup(nextDraft, serverUpdatedAtRef.current);
       return true;
@@ -296,7 +416,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
     } finally {
       saveInFlightRef.current = false;
     }
-  }, [data.canEdit, data.reportId, data.reportStatus, persistBackup, taskDisplayLabel]);
+  }, [data.canEdit, data.reportId, data.reportStatus, persistBackup, persistDraftLocally, taskDisplayLabel]);
 
   useEffect(() => {
     saveDraftRef.current = saveDraft;
@@ -649,28 +769,24 @@ export function ReportEditor({ data }: { data: EditorData }) {
       }
     }
 
-    const response = await fetch("/api/reports/finalize", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        inspectionReportId: data.reportId,
-        contentJson: latestDraftRef.current,
-        taskDisplayLabel
-      })
-    });
-    const payload = await response.json();
-
-    if (!response.ok) {
-      setFinalizeErrorMessage(toTechnicianFacingSaveMessage(payload.error, "finalize"));
-      setSaveState("Error");
-      return;
-    }
-
     setFinalizeErrorMessage(null);
-    setSaveState("Finalized");
+    const finalizedAt = new Date().toISOString();
+    await persistDraftLocally(latestDraftRef.current, {
+      reportStatus: "submitted",
+      pendingFinalize: true,
+      finalizedAt,
+      syncStatus: "pending",
+      lastError: null
+    });
+    await queueReportFinalizeSync({
+      reportId: data.reportId,
+      inspectionReportId: data.reportId,
+      contentJson: latestDraftRef.current,
+      taskDisplayLabel: taskDisplayLabel.trim() || null
+    });
+    setSaveState(window.navigator.onLine ? "Pending sync" : "Saved offline");
     setDirty(false);
-    window.localStorage.removeItem(backupKey);
-    window.location.assign("/app/tech?report=finalized");
+    window.location.assign("/app/tech/inspections?finalize=queued");
   }
 
   const activeSection = data.template.sections.find((section) => section.id === activeSectionId) ?? data.template.sections[0];
@@ -737,10 +853,10 @@ export function ReportEditor({ data }: { data: EditorData }) {
             <p className={`mt-1 font-semibold ${saveStateTone[saveState] ?? "text-slate-700"}`}>{saveState}</p>
           </div>
         </div>
-        <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-          <p>Context: {draft.context.assetCount} matching assets at this site.</p>
+          <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+            <p>Context: {draft.context.assetCount} matching assets at this site.</p>
           {draft.context.priorReportSummary ? <p className="mt-2">Smart default: {draft.context.priorReportSummary}</p> : null}
-          <p className="mt-2">Autosave runs every few seconds and when you switch sections.</p>
+          <p className="mt-2">Every change saves to local device storage first and syncs in the background when service is available.</p>
           {data.finalizedAt ? <p className="mt-2">Finalized at {new Date(data.finalizedAt).toLocaleString()}</p> : null}
           {data.paymentCollectionNotice ? <p className="mt-2 font-semibold text-amber-900">{data.paymentCollectionNotice}</p> : null}
           {data.correctionNotice ? <p className="mt-2 font-medium text-amber-900">{data.correctionNotice}</p> : null}
