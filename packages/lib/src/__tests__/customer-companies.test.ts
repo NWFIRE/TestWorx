@@ -147,6 +147,7 @@ describe("customer company settings", () => {
       }),
       select: expect.any(Object)
     });
+    expect(prismaMock.customerCompany.create.mock.calls[0]?.[0]?.data).not.toHaveProperty("customerCompanyId");
     expect(quickBooksMock.syncTradeWorxCustomerCompanyToQuickBooks).not.toHaveBeenCalled();
     expect(result.quickBooksSynced).toBe(false);
     expect(result.quickBooksSyncError).toBeNull();
@@ -220,6 +221,7 @@ describe("customer company settings", () => {
       }),
       select: expect.any(Object)
     });
+    expect(prismaMock.customerCompany.update.mock.calls[0]?.[0]?.data).not.toHaveProperty("customerCompanyId");
     expect(result.quickBooksSynced).toBe(false);
     expect(result.quickBooksSyncError).toMatch(/QuickBooks unavailable/i);
   });

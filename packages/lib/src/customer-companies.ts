@@ -537,11 +537,12 @@ export async function createCustomerCompany(
   const parsedActor = parseActor(actor);
   ensureTenantAdmin(parsedActor);
   const parsedInput = normalizeCustomerCompanyInput(customerCompanyInputSchema.parse(input));
+  const { customerCompanyId: _customerCompanyId, ...customerData } = parsedInput;
 
   const existing = await prisma.customerCompany.findFirst({
     where: {
       tenantId: parsedActor.tenantId as string,
-      name: parsedInput.name
+      name: customerData.name
     },
     select: { id: true }
   });
@@ -553,19 +554,19 @@ export async function createCustomerCompany(
   const validatedBilling = await validateCustomerBillingSettingsTx(prisma, {
     tenantId: parsedActor.tenantId as string,
     billingSettings: {
-      billingType: parsedInput.billingType,
-      billToAccountId: parsedInput.billToAccountId ?? undefined,
-      contractProfileId: parsedInput.contractProfileId ?? undefined,
-      invoiceDeliverySettings: parsedInput.invoiceDeliverySettings,
-      autoBillingEnabled: parsedInput.autoBillingEnabled,
-      requiredBillingReferences: parsedInput.requiredBillingReferences
+      billingType: customerData.billingType,
+      billToAccountId: customerData.billToAccountId ?? undefined,
+      contractProfileId: customerData.contractProfileId ?? undefined,
+      invoiceDeliverySettings: customerData.invoiceDeliverySettings,
+      autoBillingEnabled: customerData.autoBillingEnabled,
+      requiredBillingReferences: customerData.requiredBillingReferences
     }
   });
 
   const customer = await prisma.customerCompany.create({
     data: {
       tenantId: parsedActor.tenantId as string,
-      ...parsedInput,
+      ...customerData,
       billingType: validatedBilling.billingSettings.billingType,
       billToAccountId: validatedBilling.billingSettings.billToAccountId ?? null,
       contractProfileId: validatedBilling.billingSettings.contractProfileId ?? null,
@@ -622,14 +623,15 @@ export async function updateCustomerCompany(
   const parsedActor = parseActor(actor);
   ensureTenantAdmin(parsedActor);
   const parsedInput = normalizeCustomerCompanyInput(customerCompanyInputSchema.parse(input));
+  const { customerCompanyId, ...customerData } = parsedInput;
 
-  if (!parsedInput.customerCompanyId) {
+  if (!customerCompanyId) {
     throw new Error("A customer id is required to update a customer.");
   }
 
   const existing = await prisma.customerCompany.findFirst({
     where: {
-      id: parsedInput.customerCompanyId,
+      id: customerCompanyId,
       tenantId: parsedActor.tenantId as string
     },
     select: {
@@ -645,7 +647,7 @@ export async function updateCustomerCompany(
   const nameConflict = await prisma.customerCompany.findFirst({
     where: {
       tenantId: parsedActor.tenantId as string,
-      name: parsedInput.name,
+      name: customerData.name,
       NOT: { id: existing.id }
     },
     select: { id: true }
@@ -658,19 +660,19 @@ export async function updateCustomerCompany(
   const validatedBilling = await validateCustomerBillingSettingsTx(prisma, {
     tenantId: parsedActor.tenantId as string,
     billingSettings: {
-      billingType: parsedInput.billingType,
-      billToAccountId: parsedInput.billToAccountId ?? undefined,
-      contractProfileId: parsedInput.contractProfileId ?? undefined,
-      invoiceDeliverySettings: parsedInput.invoiceDeliverySettings,
-      autoBillingEnabled: parsedInput.autoBillingEnabled,
-      requiredBillingReferences: parsedInput.requiredBillingReferences
+      billingType: customerData.billingType,
+      billToAccountId: customerData.billToAccountId ?? undefined,
+      contractProfileId: customerData.contractProfileId ?? undefined,
+      invoiceDeliverySettings: customerData.invoiceDeliverySettings,
+      autoBillingEnabled: customerData.autoBillingEnabled,
+      requiredBillingReferences: customerData.requiredBillingReferences
     }
   });
 
   const customer = await prisma.customerCompany.update({
     where: { id: existing.id },
     data: {
-      ...parsedInput,
+      ...customerData,
       billingType: validatedBilling.billingSettings.billingType,
       billToAccountId: validatedBilling.billingSettings.billToAccountId ?? null,
       contractProfileId: validatedBilling.billingSettings.contractProfileId ?? null,
