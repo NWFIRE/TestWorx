@@ -1156,7 +1156,17 @@ async function resolveQuickBooksPaymentTerms(connection: QuickBooksTenantConnect
 
   const normalizedTermName = quickbooksPaymentTermName?.trim().toLowerCase() || null;
 
-  if (!normalizedTermName || /due\s+on\s+receipt|due\s+upon\s+receipt|due\s+at\s+time\s+of\s+service|due\s+immediately/i.test(normalizedTermName)) {
+  if (!normalizedTermName) {
+    return {
+      paymentTermsCode: "net_30",
+      customPaymentTermsLabel: null,
+      customPaymentTermsDays: null,
+      quickbooksPaymentTermName,
+      quickbooksPaymentTermId
+    };
+  }
+
+  if (/due\s+on\s+receipt|due\s+upon\s+receipt|due\s+at\s+time\s+of\s+service|due\s+immediately/i.test(normalizedTermName)) {
     return {
       paymentTermsCode: "due_on_receipt",
       customPaymentTermsLabel: null,

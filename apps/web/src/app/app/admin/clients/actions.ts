@@ -74,7 +74,7 @@ function buildCustomerCompanyPayload(formData: FormData) {
     billingCountry: String(formData.get("billingCountry") ?? ""),
     notes: String(formData.get("notes") ?? ""),
     isActive: formData.get("isActive") === "on",
-    paymentTermsCode: String(formData.get("paymentTermsCode") ?? "due_on_receipt"),
+    paymentTermsCode: String(formData.get("paymentTermsCode") ?? "net_30"),
     customPaymentTermsLabel: String(formData.get("customPaymentTermsLabel") ?? ""),
     customPaymentTermsDays: (() => {
       const raw = String(formData.get("customPaymentTermsDays") ?? "").trim();

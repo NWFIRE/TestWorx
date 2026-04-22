@@ -237,7 +237,7 @@ async function main() {
           phone: optionalCustomer.phone,
           billingAddressSameAsService: true,
           isActive: true,
-          paymentTermsCode: "due_on_receipt"
+          paymentTermsCode: "net_30"
         }
       })
       : await prisma.customerCompany.create({
@@ -249,7 +249,7 @@ async function main() {
             phone: optionalCustomer.phone,
             billingAddressSameAsService: true,
             isActive: true,
-            paymentTermsCode: "due_on_receipt"
+            paymentTermsCode: "net_30"
           }
         });
 

@@ -422,7 +422,7 @@ model CustomerCompany {
   billingCountry            String?
   notes                     String?
   isActive                  Boolean  @default(true)
-  paymentTermsCode          String   @default("due_on_receipt")
+  paymentTermsCode          String   @default("net_30")
   customPaymentTermsLabel   String?
   customPaymentTermsDays    Int?
   billingType               BillingType @default(standard)

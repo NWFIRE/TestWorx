@@ -64,7 +64,7 @@ function buildCustomerCompany(overrides: Partial<Record<string, unknown>> = {}) 
     billingCountry: "USA",
     notes: null,
     isActive: true,
-    paymentTermsCode: "due_on_receipt",
+    paymentTermsCode: "net_30",
     customPaymentTermsLabel: null,
     customPaymentTermsDays: null,
     quickbooksCustomerId: null,
@@ -131,7 +131,6 @@ describe("customer company settings", () => {
         serviceCountry: "USA",
         billingAddressSameAsService: true,
         notes: "Collect payment on site.",
-        paymentTermsCode: "due_on_receipt",
         isActive: true
       }
     );
@@ -143,7 +142,7 @@ describe("customer company settings", () => {
         serviceAddressLine1: "123 Market Street",
         billingAddressLine1: "123 Market Street",
         isTaxExempt: true,
-        paymentTermsCode: "due_on_receipt",
+        paymentTermsCode: "net_30",
         isActive: true
       }),
       select: expect.any(Object)

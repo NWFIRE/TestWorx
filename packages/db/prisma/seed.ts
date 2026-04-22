@@ -315,7 +315,7 @@ async function main() {
       servicePostalCode: "60638",
       serviceCountry: "USA",
       billingAddressSameAsService: true,
-      paymentTermsCode: "due_on_receipt",
+      paymentTermsCode: "net_30",
       notes: "Collect payment on site for non-contracted emergency work."
     }
   });

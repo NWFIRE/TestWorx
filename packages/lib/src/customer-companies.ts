@@ -161,13 +161,13 @@ export function getCustomerPaymentTermsLabel(input: {
     return customerPaymentTermsLabels[input.paymentTermsCode as CustomerPaymentTermsCode];
   }
 
-  return customerPaymentTermsLabels.due_on_receipt;
+  return customerPaymentTermsLabels.net_30;
 }
 
 export function isDueAtTimeOfServiceCustomer(input: {
   paymentTermsCode?: string | null;
 }) {
-  return (input.paymentTermsCode ?? "due_on_receipt") === "due_on_receipt";
+  return (input.paymentTermsCode ?? "net_30") === "due_on_receipt";
 }
 
 export const customerCompanyInputSchema = z
@@ -199,9 +199,11 @@ export const customerCompanyInputSchema = z
     billingCountry: nullableTrimmedString(120),
     notes: nullableTrimmedString(2000),
     isActive: z.boolean().default(true),
-    paymentTermsCode: z.enum(customerPaymentTermsOptions, {
-      message: "Select payment terms."
-    }),
+    paymentTermsCode: z
+      .enum(customerPaymentTermsOptions, {
+        message: "Select payment terms."
+      })
+      .default("net_30"),
     customPaymentTermsLabel: nullableTrimmedString(120),
     customPaymentTermsDays: optionalPositiveInt(),
     billingType: z.enum(["standard", "third_party"]).default("standard"),
@@ -261,7 +263,7 @@ export const customerCompanyInputSchema = z
 
 function normalizeCustomerCompanyInput(input: z.infer<typeof customerCompanyInputSchema>) {
   const billingAddressSameAsService = input.billingAddressSameAsService ?? true;
-  const paymentTermsCode = input.paymentTermsCode ?? "due_on_receipt";
+  const paymentTermsCode = input.paymentTermsCode ?? "net_30";
   const customPaymentTermsLabel = paymentTermsCode === "custom" ? input.customPaymentTermsLabel ?? null : null;
   const customPaymentTermsDays = paymentTermsCode === "custom" ? input.customPaymentTermsDays ?? null : null;
   const billingSettings = customerBillingSettingsInputSchema.parse({

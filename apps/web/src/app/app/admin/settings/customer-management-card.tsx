@@ -163,7 +163,7 @@ function toFormValues(customer?: CustomerProfileSeed): CustomerFormValues {
     billingCountry: customer?.billingCountry ?? "",
     notes: customer?.notes ?? "",
     isActive: customer?.isActive ?? true,
-    paymentTermsCode: customer?.paymentTermsCode ?? "due_on_receipt",
+    paymentTermsCode: customer?.paymentTermsCode ?? "net_30",
     customPaymentTermsLabel: customer?.customPaymentTermsLabel ?? "",
     customPaymentTermsDays: customer?.customPaymentTermsDays ? String(customer.customPaymentTermsDays) : "",
     billingType: customer?.billingType ?? "standard",
@@ -213,7 +213,7 @@ export function CustomerProfileFields({
   const [billingAddressSameAsService, setBillingAddressSameAsService] = useState(
     customer?.billingAddressSameAsService ?? true
   );
-  const [paymentTermsCode, setPaymentTermsCode] = useState(customer?.paymentTermsCode ?? "due_on_receipt");
+  const [paymentTermsCode, setPaymentTermsCode] = useState(customer?.paymentTermsCode ?? "net_30");
   const initialValues = useMemo(() => toFormValues(customer), [customer]);
   const [billingType, setBillingType] = useState<"standard" | "third_party">(initialValues.billingType);
   const [billToAccountId, setBillToAccountId] = useState(initialValues.billToAccountId);
