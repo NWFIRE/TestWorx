@@ -132,7 +132,7 @@ export function HeroSection() {
                     </div>
                   </section>
 
-                  <section className="relative rounded-[24px] border border-slate-200 bg-white p-5">
+                  <section className="rounded-[24px] border border-slate-200 bg-white p-5">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-semibold text-slate-950">Inspection / Report Progress</p>
@@ -177,25 +177,15 @@ export function HeroSection() {
                       ))}
                     </div>
 
-                    <div className="hidden md:block">
-                      <div className="absolute bottom-5 right-5 w-[240px] rounded-[22px] border border-slate-200 bg-white shadow-[0_18px_42px_rgba(15,23,42,0.14)]">
-                        <div className="border-b border-slate-200 px-4 py-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Hosted report</p>
-                        </div>
-                        <div className="space-y-3 p-4">
+                    <div className="mt-4 rounded-[22px] border border-slate-200 bg-white shadow-[0_16px_36px_rgba(15,23,42,0.08)]">
+                      <div className="border-b border-slate-200 px-4 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Hosted report</p>
+                      </div>
+                      <div className="grid gap-4 p-4 lg:grid-cols-[1.25fr_0.8fr]">
+                        <div className="space-y-3">
                           <div>
                             <p className="text-sm font-semibold tracking-[-0.02em] text-slate-950">Wet Chemical System Acceptance Test</p>
                             <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">NFPA 17A hosted report</p>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Outcome</p>
-                              <p className="mt-2 text-sm font-semibold text-emerald-700">Pass</p>
-                            </div>
-                            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Signed</p>
-                              <p className="mt-2 text-sm font-semibold text-slate-950">2 of 2</p>
-                            </div>
                           </div>
                           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
                             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Summary</p>
@@ -206,6 +196,16 @@ export function HeroSection() {
                           <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm">
                             <span className="text-slate-600">Portal visibility</span>
                             <span className="font-semibold text-slate-950">Live</span>
+                          </div>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Outcome</p>
+                            <p className="mt-2 text-sm font-semibold text-emerald-700">Pass</p>
+                          </div>
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Signed</p>
+                            <p className="mt-2 text-sm font-semibold text-slate-950">2 of 2</p>
                           </div>
                         </div>
                       </div>
