@@ -244,8 +244,27 @@ describe("admin amendment management data", () => {
         status: "completed",
         createdAt: new Date("2026-03-10T09:00:00.000Z"),
         scheduledStart: new Date("2026-03-21T09:00:00.000Z"),
-        customerCompany: { name: "Land Run Historical Center" },
-        site: { name: "General / No Fixed Site" },
+        customerCompany: {
+          name: "Land Run Historical Center",
+          serviceAddressLine1: "100 Museum Way",
+          serviceAddressLine2: null,
+          serviceCity: "Enid",
+          serviceState: "OK",
+          servicePostalCode: "73701",
+          billingAddressLine1: null,
+          billingAddressLine2: null,
+          billingCity: null,
+          billingState: null,
+          billingPostalCode: null
+        },
+        site: {
+          name: "General / No Fixed Site",
+          addressLine1: "No fixed service address",
+          addressLine2: null,
+          city: "Unknown",
+          state: "Unknown",
+          postalCode: "Unknown"
+        },
         assignedTechnician: { name: "Taylor Tech" },
         technicianAssignments: [],
         closeoutRequest: null,
@@ -266,7 +285,7 @@ describe("admin amendment management data", () => {
 
     expect(result.items[0]?.primaryTitle).toBe("Land Run Historical Center");
     expect(result.items[0]?.customerLabel).toBe("Land Run Historical Center");
-    expect(result.items[0]?.locationLabel).toBe("No fixed service address");
+    expect(result.items[0]?.locationLabel).toBe("100 Museum Way, Enid OK 73701");
     expect(result.items[0]?.secondaryTitle).toBeNull();
   });
 

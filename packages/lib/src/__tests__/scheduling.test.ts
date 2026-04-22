@@ -404,12 +404,16 @@ describe("month defaults and past-due status", () => {
     expect(
       getInspectionDisplayLabels({
         siteName: "General / No Fixed Site",
-        customerName: "NW Fire"
+        customerName: "NW Fire",
+        customerServiceAddressLine1: "800 Harbor Dr",
+        customerServiceCity: "Chicago",
+        customerServiceState: "IL",
+        customerServicePostalCode: "60611"
       })
     ).toEqual({
       isGenericSite: true,
       customerLabel: "NW Fire",
-      locationLabel: "No fixed service address",
+      locationLabel: "800 Harbor Dr, Chicago IL 60611",
       primaryTitle: "NW Fire",
       secondaryTitle: null
     });

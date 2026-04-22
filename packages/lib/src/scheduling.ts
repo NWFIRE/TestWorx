@@ -417,12 +417,47 @@ export function formatCustomerFacingInspectionAddress(input: CustomerFacingAddre
 export function getInspectionDisplayLabels(input: {
   siteName: string | null | undefined;
   customerName: string | null | undefined;
+  siteAddressLine1?: string | null;
+  siteAddressLine2?: string | null;
+  siteCity?: string | null;
+  siteState?: string | null;
+  sitePostalCode?: string | null;
+  customerServiceAddressLine1?: string | null;
+  customerServiceAddressLine2?: string | null;
+  customerServiceCity?: string | null;
+  customerServiceState?: string | null;
+  customerServicePostalCode?: string | null;
+  customerBillingAddressLine1?: string | null;
+  customerBillingAddressLine2?: string | null;
+  customerBillingCity?: string | null;
+  customerBillingState?: string | null;
+  customerBillingPostalCode?: string | null;
 }) {
   const siteName = (input.siteName ?? "").trim();
   const customerName = (input.customerName ?? "").trim();
   const isGenericSite = isGenericInspectionSiteName(siteName);
   const customerLabel = customerName || siteName || "Untitled inspection";
-  const locationLabel = getCustomerFacingSiteLabel(siteName) ?? genericInspectionSiteAddressLine1;
+  const locationLabel = (
+    getCustomerFacingSiteLabel(siteName) ??
+    formatCustomerFacingInspectionAddress({
+      siteName,
+      siteAddressLine1: input.siteAddressLine1,
+      siteAddressLine2: input.siteAddressLine2,
+      siteCity: input.siteCity,
+      siteState: input.siteState,
+      sitePostalCode: input.sitePostalCode,
+      customerServiceAddressLine1: input.customerServiceAddressLine1,
+      customerServiceAddressLine2: input.customerServiceAddressLine2,
+      customerServiceCity: input.customerServiceCity,
+      customerServiceState: input.customerServiceState,
+      customerServicePostalCode: input.customerServicePostalCode,
+      customerBillingAddressLine1: input.customerBillingAddressLine1,
+      customerBillingAddressLine2: input.customerBillingAddressLine2,
+      customerBillingCity: input.customerBillingCity,
+      customerBillingState: input.customerBillingState,
+      customerBillingPostalCode: input.customerBillingPostalCode
+    })
+  ) || genericInspectionSiteAddressLine1;
 
   return {
     isGenericSite,
@@ -3330,7 +3365,22 @@ export async function getInspectionForEdit(actor: ActorContext, inspectionId: st
     outgoingAmendment,
     ...getInspectionDisplayLabels({
       siteName: inspection.site.name,
-      customerName: inspection.customerCompany.name
+      customerName: inspection.customerCompany.name,
+      siteAddressLine1: inspection.site.addressLine1,
+      siteAddressLine2: inspection.site.addressLine2,
+      siteCity: inspection.site.city,
+      siteState: inspection.site.state,
+      sitePostalCode: inspection.site.postalCode,
+      customerServiceAddressLine1: inspection.customerCompany.serviceAddressLine1,
+      customerServiceAddressLine2: inspection.customerCompany.serviceAddressLine2,
+      customerServiceCity: inspection.customerCompany.serviceCity,
+      customerServiceState: inspection.customerCompany.serviceState,
+      customerServicePostalCode: inspection.customerCompany.servicePostalCode,
+      customerBillingAddressLine1: inspection.customerCompany.billingAddressLine1,
+      customerBillingAddressLine2: inspection.customerCompany.billingAddressLine2,
+      customerBillingCity: inspection.customerCompany.billingCity,
+      customerBillingState: inspection.customerCompany.billingState,
+      customerBillingPostalCode: inspection.customerCompany.billingPostalCode
     }),
     lifecycle,
     displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
@@ -3433,7 +3483,22 @@ export async function getAdminDashboardData(actor: ActorContext) {
     };
     const displayLabels = getInspectionDisplayLabels({
       siteName: inspection.site.name,
-      customerName: inspection.customerCompany.name
+      customerName: inspection.customerCompany.name,
+      siteAddressLine1: inspection.site.addressLine1,
+      siteAddressLine2: inspection.site.addressLine2,
+      siteCity: inspection.site.city,
+      siteState: inspection.site.state,
+      sitePostalCode: inspection.site.postalCode,
+      customerServiceAddressLine1: inspection.customerCompany.serviceAddressLine1,
+      customerServiceAddressLine2: inspection.customerCompany.serviceAddressLine2,
+      customerServiceCity: inspection.customerCompany.serviceCity,
+      customerServiceState: inspection.customerCompany.serviceState,
+      customerServicePostalCode: inspection.customerCompany.servicePostalCode,
+      customerBillingAddressLine1: inspection.customerCompany.billingAddressLine1,
+      customerBillingAddressLine2: inspection.customerCompany.billingAddressLine2,
+      customerBillingCity: inspection.customerCompany.billingCity,
+      customerBillingState: inspection.customerCompany.billingState,
+      customerBillingPostalCode: inspection.customerCompany.billingPostalCode
     });
 
     return {
@@ -3528,7 +3593,22 @@ export async function getAdminUpcomingInspectionsData(
     tasks: withInspectionTaskDisplayLabels(inspection.tasks),
     ...getInspectionDisplayLabels({
       siteName: inspection.site.name,
-      customerName: inspection.customerCompany.name
+      customerName: inspection.customerCompany.name,
+      siteAddressLine1: inspection.site.addressLine1,
+      siteAddressLine2: inspection.site.addressLine2,
+      siteCity: inspection.site.city,
+      siteState: inspection.site.state,
+      sitePostalCode: inspection.site.postalCode,
+      customerServiceAddressLine1: inspection.customerCompany.serviceAddressLine1,
+      customerServiceAddressLine2: inspection.customerCompany.serviceAddressLine2,
+      customerServiceCity: inspection.customerCompany.serviceCity,
+      customerServiceState: inspection.customerCompany.serviceState,
+      customerServicePostalCode: inspection.customerCompany.servicePostalCode,
+      customerBillingAddressLine1: inspection.customerCompany.billingAddressLine1,
+      customerBillingAddressLine2: inspection.customerCompany.billingAddressLine2,
+      customerBillingCity: inspection.customerCompany.billingCity,
+      customerBillingState: inspection.customerCompany.billingState,
+      customerBillingPostalCode: inspection.customerCompany.billingPostalCode
     }),
     displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
     assignedTechnicianNames: formatAssignedTechnicianNames({
@@ -3652,14 +3732,29 @@ export async function getAdminSchedulingQueueData(
     return {
       ...inspection,
       tasks: currentTasks,
-    ...getInspectionDisplayLabels({
-      siteName: inspection.site.name,
-      customerName: inspection.customerCompany.name
-    }),
-    displayStatus: getInspectionDisplayStatus({
-      status: inspection.status,
-      scheduledStart: inspection.scheduledStart
-    }),
+      ...getInspectionDisplayLabels({
+        siteName: inspection.site.name,
+        customerName: inspection.customerCompany.name,
+        siteAddressLine1: inspection.site.addressLine1,
+        siteAddressLine2: inspection.site.addressLine2,
+        siteCity: inspection.site.city,
+        siteState: inspection.site.state,
+        sitePostalCode: inspection.site.postalCode,
+        customerServiceAddressLine1: inspection.customerCompany.serviceAddressLine1,
+        customerServiceAddressLine2: inspection.customerCompany.serviceAddressLine2,
+        customerServiceCity: inspection.customerCompany.serviceCity,
+        customerServiceState: inspection.customerCompany.serviceState,
+        customerServicePostalCode: inspection.customerCompany.servicePostalCode,
+        customerBillingAddressLine1: inspection.customerCompany.billingAddressLine1,
+        customerBillingAddressLine2: inspection.customerCompany.billingAddressLine2,
+        customerBillingCity: inspection.customerCompany.billingCity,
+        customerBillingState: inspection.customerCompany.billingState,
+        customerBillingPostalCode: inspection.customerCompany.billingPostalCode
+      }),
+      displayStatus: getInspectionDisplayStatus({
+        status: inspection.status,
+        scheduledStart: inspection.scheduledStart
+      }),
       assignedTechnicianNames: formatAssignedTechnicianNames({
         assignedTechnician: inspection.assignedTechnician,
         technicianAssignments: readTechnicianNameAssignments(inspection)
@@ -3994,7 +4089,22 @@ export async function getAdminAmendmentManagementData(
       lifecycle,
       ...getInspectionDisplayLabels({
         siteName: inspection.site.name,
-        customerName: inspection.customerCompany.name
+        customerName: inspection.customerCompany.name,
+        siteAddressLine1: inspection.site.addressLine1,
+        siteAddressLine2: inspection.site.addressLine2,
+        siteCity: inspection.site.city,
+        siteState: inspection.site.state,
+        sitePostalCode: inspection.site.postalCode,
+        customerServiceAddressLine1: inspection.customerCompany.serviceAddressLine1,
+        customerServiceAddressLine2: inspection.customerCompany.serviceAddressLine2,
+        customerServiceCity: inspection.customerCompany.serviceCity,
+        customerServiceState: inspection.customerCompany.serviceState,
+        customerServicePostalCode: inspection.customerCompany.servicePostalCode,
+        customerBillingAddressLine1: inspection.customerCompany.billingAddressLine1,
+        customerBillingAddressLine2: inspection.customerCompany.billingAddressLine2,
+        customerBillingCity: inspection.customerCompany.billingCity,
+        customerBillingState: inspection.customerCompany.billingState,
+        customerBillingPostalCode: inspection.customerCompany.billingPostalCode
       }),
       displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
       assignedTechnicianNames: formatAssignedTechnicianNames({
@@ -4045,13 +4155,47 @@ function buildMonthCalendar(inspections: Array<{
   status: InspectionStatus;
   inspectionClassification: InspectionClassification;
   isPriority: boolean;
-  site: { name: string };
-  customerCompany: { name: string };
+  site: {
+    name: string;
+    addressLine1: string | null;
+    addressLine2: string | null;
+    city: string | null;
+    state: string | null;
+    postalCode: string | null;
+  };
+  customerCompany: {
+    name: string;
+    serviceAddressLine1: string | null;
+    serviceAddressLine2: string | null;
+    serviceCity: string | null;
+    serviceState: string | null;
+    servicePostalCode: string | null;
+    billingAddressLine1: string | null;
+    billingAddressLine2: string | null;
+    billingCity: string | null;
+    billingState: string | null;
+    billingPostalCode: string | null;
+  };
 }>) {
   return inspections.map((inspection) => ({
     ...getInspectionDisplayLabels({
       siteName: inspection.site.name,
-      customerName: inspection.customerCompany.name
+      customerName: inspection.customerCompany.name,
+      siteAddressLine1: inspection.site.addressLine1,
+      siteAddressLine2: inspection.site.addressLine2,
+      siteCity: inspection.site.city,
+      siteState: inspection.site.state,
+      sitePostalCode: inspection.site.postalCode,
+      customerServiceAddressLine1: inspection.customerCompany.serviceAddressLine1,
+      customerServiceAddressLine2: inspection.customerCompany.serviceAddressLine2,
+      customerServiceCity: inspection.customerCompany.serviceCity,
+      customerServiceState: inspection.customerCompany.serviceState,
+      customerServicePostalCode: inspection.customerCompany.servicePostalCode,
+      customerBillingAddressLine1: inspection.customerCompany.billingAddressLine1,
+      customerBillingAddressLine2: inspection.customerCompany.billingAddressLine2,
+      customerBillingCity: inspection.customerCompany.billingCity,
+      customerBillingState: inspection.customerCompany.billingState,
+      customerBillingPostalCode: inspection.customerCompany.billingPostalCode
     }),
     dayKey: format(inspection.scheduledStart, "yyyy-MM-dd"),
     label: format(inspection.scheduledStart, "MMM d"),
@@ -4159,7 +4303,22 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
     ...inspection,
     ...getInspectionDisplayLabels({
       siteName: inspection.site.name,
-      customerName: inspection.customerCompany.name
+      customerName: inspection.customerCompany.name,
+      siteAddressLine1: inspection.site.addressLine1,
+      siteAddressLine2: inspection.site.addressLine2,
+      siteCity: inspection.site.city,
+      siteState: inspection.site.state,
+      sitePostalCode: inspection.site.postalCode,
+      customerServiceAddressLine1: inspection.customerCompany.serviceAddressLine1,
+      customerServiceAddressLine2: inspection.customerCompany.serviceAddressLine2,
+      customerServiceCity: inspection.customerCompany.serviceCity,
+      customerServiceState: inspection.customerCompany.serviceState,
+      customerServicePostalCode: inspection.customerCompany.servicePostalCode,
+      customerBillingAddressLine1: inspection.customerCompany.billingAddressLine1,
+      customerBillingAddressLine2: inspection.customerCompany.billingAddressLine2,
+      customerBillingCity: inspection.customerCompany.billingCity,
+      customerBillingState: inspection.customerCompany.billingState,
+      customerBillingPostalCode: inspection.customerCompany.billingPostalCode
     }),
     closeoutRequest: inspection.closeoutRequest,
     displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
@@ -4183,7 +4342,22 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
         ),
         ...getInspectionDisplayLabels({
           siteName: inspection.site.name,
-          customerName: inspection.customerCompany.name
+          customerName: inspection.customerCompany.name,
+          siteAddressLine1: inspection.site.addressLine1,
+          siteAddressLine2: inspection.site.addressLine2,
+          siteCity: inspection.site.city,
+          siteState: inspection.site.state,
+          sitePostalCode: inspection.site.postalCode,
+          customerServiceAddressLine1: inspection.customerCompany.serviceAddressLine1,
+          customerServiceAddressLine2: inspection.customerCompany.serviceAddressLine2,
+          customerServiceCity: inspection.customerCompany.serviceCity,
+          customerServiceState: inspection.customerCompany.serviceState,
+          customerServicePostalCode: inspection.customerCompany.servicePostalCode,
+          customerBillingAddressLine1: inspection.customerCompany.billingAddressLine1,
+          customerBillingAddressLine2: inspection.customerCompany.billingAddressLine2,
+          customerBillingCity: inspection.customerCompany.billingCity,
+          customerBillingState: inspection.customerCompany.billingState,
+          customerBillingPostalCode: inspection.customerCompany.billingPostalCode
         }),
         displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
         assignedTechnicianNames: formatAssignedTechnicianNames({
@@ -4197,7 +4371,22 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
       tasks: withInspectionTaskDisplayLabels(inspection.tasks),
       ...getInspectionDisplayLabels({
         siteName: inspection.site.name,
-        customerName: inspection.customerCompany.name
+        customerName: inspection.customerCompany.name,
+        siteAddressLine1: inspection.site.addressLine1,
+        siteAddressLine2: inspection.site.addressLine2,
+        siteCity: inspection.site.city,
+        siteState: inspection.site.state,
+        sitePostalCode: inspection.site.postalCode,
+        customerServiceAddressLine1: inspection.customerCompany.serviceAddressLine1,
+        customerServiceAddressLine2: inspection.customerCompany.serviceAddressLine2,
+        customerServiceCity: inspection.customerCompany.serviceCity,
+        customerServiceState: inspection.customerCompany.serviceState,
+        customerServicePostalCode: inspection.customerCompany.servicePostalCode,
+        customerBillingAddressLine1: inspection.customerCompany.billingAddressLine1,
+        customerBillingAddressLine2: inspection.customerCompany.billingAddressLine2,
+        customerBillingCity: inspection.customerCompany.billingCity,
+        customerBillingState: inspection.customerCompany.billingState,
+        customerBillingPostalCode: inspection.customerCompany.billingPostalCode
       }),
       displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
       assignedTechnicianNames: formatAssignedTechnicianNames({
