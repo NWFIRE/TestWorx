@@ -3,6 +3,7 @@ import { InspectionClassification, InspectionStatus } from "@prisma/client";
 
 import {
   defaultScheduledStartForMonth,
+  formatCustomerFacingInspectionAddress,
   genericInspectionSiteOptionValue,
   getCustomerFacingSiteLabel,
   getInspectionDisplayLabels,
@@ -432,5 +433,21 @@ describe("month defaults and past-due status", () => {
   it("hides the generic site label from customer-facing displays", () => {
     expect(getCustomerFacingSiteLabel("General / No Fixed Site")).toBeNull();
     expect(getCustomerFacingSiteLabel("Main Campus")).toBe("Main Campus");
+  });
+
+  it("uses the customer address for generic-site customer-facing address output", () => {
+    expect(
+      formatCustomerFacingInspectionAddress({
+        siteName: "General / No Fixed Site",
+        siteAddressLine1: "No fixed service address",
+        siteCity: "Unknown",
+        siteState: "Unknown",
+        sitePostalCode: "Unknown",
+        customerServiceAddressLine1: "800 Harbor Dr",
+        customerServiceCity: "Chicago",
+        customerServiceState: "IL",
+        customerServicePostalCode: "60611"
+      })
+    ).toBe("800 Harbor Dr, Chicago IL 60611");
   });
 });

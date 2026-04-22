@@ -14,6 +14,8 @@ import type { JsonInputValue, JsonObject, JsonValue } from "./json-types";
 import { assertTenantContext } from "./permissions";
 import { resolveReportTemplate } from "./report-config";
 import {
+  formatCustomerFacingInspectionAddress,
+  getCustomerFacingInspectionAddress,
   getCustomerFacingSiteLabel,
   getInspectionAssignedTechnicianIds,
   isActiveOperationalInspectionStatus,
@@ -998,7 +1000,24 @@ export async function getInspectionReportDraft(actor: ActorContext, inspectionId
     siteDefaults: {
       siteName: report.inspection.site.name,
       customerName: report.inspection.customerCompany.name,
-      siteAddress: report.inspection.site.addressLine1
+      siteAddress: formatCustomerFacingInspectionAddress({
+        siteName: report.inspection.site.name,
+        siteAddressLine1: report.inspection.site.addressLine1,
+        siteAddressLine2: report.inspection.site.addressLine2,
+        siteCity: report.inspection.site.city,
+        siteState: report.inspection.site.state,
+        sitePostalCode: report.inspection.site.postalCode,
+        customerServiceAddressLine1: report.inspection.customerCompany.serviceAddressLine1,
+        customerServiceAddressLine2: report.inspection.customerCompany.serviceAddressLine2,
+        customerServiceCity: report.inspection.customerCompany.serviceCity,
+        customerServiceState: report.inspection.customerCompany.serviceState,
+        customerServicePostalCode: report.inspection.customerCompany.servicePostalCode,
+        customerBillingAddressLine1: report.inspection.customerCompany.billingAddressLine1,
+        customerBillingAddressLine2: report.inspection.customerCompany.billingAddressLine2,
+        customerBillingCity: report.inspection.customerCompany.billingCity,
+        customerBillingState: report.inspection.customerCompany.billingState,
+        customerBillingPostalCode: report.inspection.customerCompany.billingPostalCode
+      })
     } satisfies Record<string, ReportPrimitiveValue>,
     tenantBrandingDefaults: {
       legalBusinessName: tenantBranding.legalBusinessName,
@@ -1262,17 +1281,35 @@ async function replaceGeneratedReportPdfTx(
     (attachment: GeneratedPdfAttachmentRecord) => attachment.kind === AttachmentKind.photo
   );
   const customerFacingSiteName = getCustomerFacingSiteLabel(input.report.inspection.site.name);
+  const customerFacingAddress = getCustomerFacingInspectionAddress({
+    siteName: input.report.inspection.site.name,
+    siteAddressLine1: input.report.inspection.site.addressLine1,
+    siteAddressLine2: input.report.inspection.site.addressLine2,
+    siteCity: input.report.inspection.site.city,
+    siteState: input.report.inspection.site.state,
+    sitePostalCode: input.report.inspection.site.postalCode,
+    customerServiceAddressLine1: input.report.inspection.customerCompany.serviceAddressLine1,
+    customerServiceAddressLine2: input.report.inspection.customerCompany.serviceAddressLine2,
+    customerServiceCity: input.report.inspection.customerCompany.serviceCity,
+    customerServiceState: input.report.inspection.customerCompany.serviceState,
+    customerServicePostalCode: input.report.inspection.customerCompany.servicePostalCode,
+    customerBillingAddressLine1: input.report.inspection.customerCompany.billingAddressLine1,
+    customerBillingAddressLine2: input.report.inspection.customerCompany.billingAddressLine2,
+    customerBillingCity: input.report.inspection.customerCompany.billingCity,
+    customerBillingState: input.report.inspection.customerCompany.billingState,
+    customerBillingPostalCode: input.report.inspection.customerCompany.billingPostalCode
+  });
   const pdfBytes = await generateInspectionReportPdf({
     tenant: { name: input.report.tenant.name, branding: input.report.tenant.branding },
     customerCompany: input.report.inspection.customerCompany as any,
     site: {
       ...input.report.inspection.site,
       name: customerFacingSiteName ?? "",
-      addressLine1: customerFacingSiteName ? input.report.inspection.site.addressLine1 : "",
-      addressLine2: customerFacingSiteName ? input.report.inspection.site.addressLine2 : null,
-      city: customerFacingSiteName ? input.report.inspection.site.city : "",
-      state: customerFacingSiteName ? input.report.inspection.site.state : "",
-      postalCode: customerFacingSiteName ? input.report.inspection.site.postalCode : ""
+      addressLine1: customerFacingAddress.addressLine1,
+      addressLine2: customerFacingAddress.addressLine2,
+      city: customerFacingAddress.city,
+      state: customerFacingAddress.state,
+      postalCode: customerFacingAddress.postalCode
     },
     inspection: input.report.inspection as any,
     task: input.report.task as any,

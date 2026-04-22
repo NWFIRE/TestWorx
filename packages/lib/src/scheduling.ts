@@ -320,6 +320,100 @@ export function getCustomerFacingSiteLabel(siteName: string | null | undefined) 
   return normalized;
 }
 
+type CustomerFacingAddressInput = {
+  siteName?: string | null;
+  siteAddressLine1?: string | null;
+  siteAddressLine2?: string | null;
+  siteCity?: string | null;
+  siteState?: string | null;
+  sitePostalCode?: string | null;
+  customerServiceAddressLine1?: string | null;
+  customerServiceAddressLine2?: string | null;
+  customerServiceCity?: string | null;
+  customerServiceState?: string | null;
+  customerServicePostalCode?: string | null;
+  customerBillingAddressLine1?: string | null;
+  customerBillingAddressLine2?: string | null;
+  customerBillingCity?: string | null;
+  customerBillingState?: string | null;
+  customerBillingPostalCode?: string | null;
+};
+
+type CustomerFacingAddress = {
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+};
+
+function normalizeCustomerFacingAddress(input: {
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+}): CustomerFacingAddress {
+  return {
+    addressLine1: input.addressLine1?.trim() ?? "",
+    addressLine2: input.addressLine2?.trim() || null,
+    city: input.city?.trim() ?? "",
+    state: input.state?.trim() ?? "",
+    postalCode: input.postalCode?.trim() ?? ""
+  };
+}
+
+function hasCustomerFacingAddressContent(input: CustomerFacingAddress) {
+  return Boolean(input.addressLine1 || input.addressLine2 || input.city || input.state || input.postalCode);
+}
+
+export function getCustomerFacingInspectionAddress(input: CustomerFacingAddressInput): CustomerFacingAddress {
+  const siteAddress = normalizeCustomerFacingAddress({
+    addressLine1: input.siteAddressLine1,
+    addressLine2: input.siteAddressLine2,
+    city: input.siteCity,
+    state: input.siteState,
+    postalCode: input.sitePostalCode
+  });
+
+  if (!isGenericInspectionSiteName(input.siteName) && hasCustomerFacingAddressContent(siteAddress)) {
+    return siteAddress;
+  }
+
+  const customerServiceAddress = normalizeCustomerFacingAddress({
+    addressLine1: input.customerServiceAddressLine1,
+    addressLine2: input.customerServiceAddressLine2,
+    city: input.customerServiceCity,
+    state: input.customerServiceState,
+    postalCode: input.customerServicePostalCode
+  });
+
+  if (hasCustomerFacingAddressContent(customerServiceAddress)) {
+    return customerServiceAddress;
+  }
+
+  const customerBillingAddress = normalizeCustomerFacingAddress({
+    addressLine1: input.customerBillingAddressLine1,
+    addressLine2: input.customerBillingAddressLine2,
+    city: input.customerBillingCity,
+    state: input.customerBillingState,
+    postalCode: input.customerBillingPostalCode
+  });
+
+  if (hasCustomerFacingAddressContent(customerBillingAddress)) {
+    return customerBillingAddress;
+  }
+
+  return siteAddress;
+}
+
+export function formatCustomerFacingInspectionAddress(input: CustomerFacingAddressInput) {
+  const address = getCustomerFacingInspectionAddress(input);
+  return [address.addressLine1, address.addressLine2, [address.city, address.state, address.postalCode].filter(Boolean).join(" ")]
+    .filter(Boolean)
+    .join(", ");
+}
+
 export function getInspectionDisplayLabels(input: {
   siteName: string | null | undefined;
   customerName: string | null | undefined;
