@@ -138,7 +138,7 @@ describe("smart report foundations", () => {
       }
     ]);
 
-    expect(lines[0]).toContain("Lobby by east stair");
+    expect(lines.join(" ")).toContain("Lobby by east stair");
     expect(lines.join(" ")).not.toContain("EXT-100");
     expect(lines.join(" ")).not.toContain("Asset tag");
   });

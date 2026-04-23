@@ -121,6 +121,6 @@ describe("smart report service tenant scoping", () => {
 
     await expect(
       getInspectionReportDraft({ userId: "tech_1", role: "technician", tenantId: "tenant_1" }, "inspection_1", "task_1")
-    ).rejects.toThrow(/completed inspections are no longer available/i);
+    ).rejects.toThrow(/closed inspections are no longer available/i);
   });
 });

@@ -1135,10 +1135,6 @@ export function shouldAutosaveDraft(input: { dirty: boolean; millisecondsSinceLa
 }
 
 export function canEditReport(actorRole: UserRole | string, reportStatus: ReportStatus) {
-  if (reportStatus === "finalized" && ["platform_admin", "tenant_admin", "office_admin"].includes(actorRole)) {
-    return true;
-  }
-
   if (reportStatus === "finalized") {
     return false;
   }

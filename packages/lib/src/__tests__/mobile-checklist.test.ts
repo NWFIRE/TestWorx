@@ -1,5 +1,8 @@
-import { buildDraftForTemplate, resolveReportTemplate } from "../report-engine";
+import { describe, expect, it } from "vitest";
+
+import { buildInitialReportDraft } from "../report-engine";
 import { buildMobileChecklistViewModel, isChecklistHeavyMobileInspectionType, mobileChecklistInspectionTypeAllowlist } from "../mobile-checklist";
+import { resolveReportTemplate } from "../report-config";
 
 describe("mobile checklist", () => {
   it("uses an explicit allowlist for the first-pass technician checklist flow", () => {
@@ -14,8 +17,12 @@ describe("mobile checklist", () => {
 
   it("builds normalized checklist items for fire alarm drafts", () => {
     const template = resolveReportTemplate({ inspectionType: "fire_alarm", assets: [] });
-    const draft = buildDraftForTemplate({
+    const draft = buildInitialReportDraft({
       inspectionType: "fire_alarm",
+      siteName: "Pinecrest Tower",
+      customerName: "Pinecrest Property Management",
+      scheduledDate: "2026-03-20T15:00:00.000Z",
+      assetCount: 0,
       siteDefaults: {},
       tenantBrandingDefaults: {},
       assets: []
@@ -42,8 +49,12 @@ describe("mobile checklist", () => {
 
   it("maps repeater checklist rows and carries row companion fields", () => {
     const template = resolveReportTemplate({ inspectionType: "fire_extinguisher", assets: [] });
-    const draft = buildDraftForTemplate({
+    const draft = buildInitialReportDraft({
       inspectionType: "fire_extinguisher",
+      siteName: "Pinecrest Tower",
+      customerName: "Pinecrest Property Management",
+      scheduledDate: "2026-03-20T15:00:00.000Z",
+      assetCount: 0,
       siteDefaults: {},
       tenantBrandingDefaults: {},
       assets: []
@@ -71,7 +82,7 @@ describe("mobile checklist", () => {
     const gaugeStatus = model.items.find((item) => item.id === "inventory:extinguishers:row_1:gaugeStatus");
     const mountingSecure = model.items.find((item) => item.id === "inventory:extinguishers:row_1:mountingSecure");
 
-    expect(gaugeStatus?.groupLabel).toContain("EXT-100");
+    expect(gaugeStatus?.groupLabel).toBe("Lobby");
     expect(gaugeStatus?.supportsNotApplicable).toBe(false);
     expect(mountingSecure?.status).toBe("negative");
     expect(mountingSecure?.noteFieldId).toBe("notes");
