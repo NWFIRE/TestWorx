@@ -979,7 +979,8 @@ export async function getInspectionReportDraft(actor: ActorContext, inspectionId
   const labeledTasks = withInspectionTaskDisplayLabels(report.inspection.tasks);
   const reportTask = labeledTasks.find((task) => task.id === report.task.id);
   const relatedTasks = labeledTasks.map((task, index) => {
-    const siblingDraft = task.report?.contentJson ? reportDraftSchema.parse(task.report.contentJson) : null;
+    const siblingDraftResult = task.report?.contentJson ? reportDraftSchema.safeParse(task.report.contentJson) : null;
+    const siblingDraft = siblingDraftResult?.success ? siblingDraftResult.data : null;
     const progress = siblingDraft ? buildTaskProgressSummary(siblingDraft) : {
       hasMeaningfulProgress: false,
       completedCount: null,
