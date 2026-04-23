@@ -4,7 +4,6 @@
 import Link from "next/link";
 import { format } from "date-fns";
 
-import { DeviceSyncStatusCard } from "./device-sync-status-card";
 import { useOfflineScreenSnapshot } from "./offline/use-offline-screen-snapshot";
 import { toDateValue } from "./date-value";
 
@@ -104,9 +103,6 @@ export function TechnicianHomeScreen({
         <h2 className="mt-2 text-[28px] font-semibold leading-tight">
           {userFirstName ? `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${userFirstName}.` : "Ready for the field."}
         </h2>
-        <p className="mt-3 max-w-xl text-sm leading-6 text-white/72">
-          Start with today’s assigned work, resume unfinished inspections quickly, and keep manuals ready when you lose service.
-        </p>
         <div className="mt-5 grid grid-cols-3 gap-3">
           <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">Today</p>
@@ -122,8 +118,6 @@ export function TechnicianHomeScreen({
           </div>
         </div>
       </section>
-
-      <DeviceSyncStatusCard pendingCount={draftTaskCount} savedManualCount={savedManualCount} />
 
       <section className="space-y-3">
         <div className="flex items-end justify-between gap-3">
@@ -148,33 +142,6 @@ export function TechnicianHomeScreen({
 
       <section className="space-y-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Quick actions</p>
-          <h3 className="mt-1 text-xl font-semibold text-slate-950">Move faster in the field</h3>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Link className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" href={resumeAction?.href ?? "/app/tech/inspections"}>
-            <p className="text-base font-semibold text-slate-950">{resumeAction ? "Resume draft inspection" : "Open inspections"}</p>
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              {resumeAction ? "Jump back into the next in-progress report without hunting through the queue." : "See active work, drafts, and closeout-ready inspections."}
-            </p>
-          </Link>
-          <Link className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" href="/app/manuals">
-            <p className="text-base font-semibold text-slate-950">Search manuals</p>
-            <p className="mt-2 text-sm leading-6 text-slate-500">Open favorites, recent manuals, and offline-saved references while you’re on site.</p>
-          </Link>
-          <Link className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" href="/app/tech/work?filter=overdue">
-            <p className="text-base font-semibold text-slate-950">View pending sync</p>
-            <p className="mt-2 text-sm leading-6 text-slate-500">Focus on overdue or unfinished jobs and any changes that still need to sync.</p>
-          </Link>
-          <Link className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" href="/app/tech/profile">
-            <p className="text-base font-semibold text-slate-950">Check sync status</p>
-            <p className="mt-2 text-sm leading-6 text-slate-500">Review connection state, pending changes, and offline-readiness before heading out.</p>
-          </Link>
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Upcoming</p>
           <h3 className="mt-1 text-xl font-semibold text-slate-950">What’s next after today</h3>
         </div>
@@ -186,6 +153,33 @@ export function TechnicianHomeScreen({
               No additional upcoming work is assigned yet.
             </div>
           )}
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Quick actions</p>
+          <h3 className="mt-1 text-xl font-semibold text-slate-950">Move faster in the field</h3>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Link className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" href={resumeAction?.href ?? "/app/tech/inspections"}>
+            <p className="text-base font-semibold text-slate-950">{resumeAction ? "Continue inspection" : "Open inspections"}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              {resumeAction ? "Jump back into current inspection work without searching through the queue." : "Open active inspections and keep field work moving."}
+            </p>
+          </Link>
+          <Link className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" href="/app/manuals">
+            <p className="text-base font-semibold text-slate-950">Search manuals</p>
+            <p className="mt-2 text-sm leading-6 text-slate-500">Open favorites, recent manuals, and offline-saved references while you’re on site.</p>
+          </Link>
+          <Link className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" href="/app/tech/work?filter=overdue">
+            <p className="text-base font-semibold text-slate-950">Open overdue work</p>
+            <p className="mt-2 text-sm leading-6 text-slate-500">Focus on overdue assigned jobs that still need field attention.</p>
+          </Link>
+          <Link className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" href="/app/tech/profile">
+            <p className="text-base font-semibold text-slate-950">Open profile</p>
+            <p className="mt-2 text-sm leading-6 text-slate-500">Check sync details, offline status, saved manuals, and account info.</p>
+          </Link>
         </div>
       </section>
     </div>

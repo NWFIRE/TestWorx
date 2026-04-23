@@ -13,11 +13,8 @@ export function ManualsPageHeader({
             Manuals
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-950 md:text-4xl">
-            Field manuals, without the file-dump feel.
+            Search manuals by system, manufacturer, or model.
           </h1>
-          <p className="mt-3 text-sm leading-6 text-[color:var(--text-secondary)] md:text-base">
-            Quick access to wet chemical and industrial dry chemical documentation, with favorites and recent manuals kept front and center.
-          </p>
         </div>
         {canManage ? (
           <div className="flex flex-wrap items-center gap-3">

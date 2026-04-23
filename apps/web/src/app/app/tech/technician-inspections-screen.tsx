@@ -25,15 +25,11 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
 
   const dashboard = snapshot.dashboard;
   const active = dashboard.assigned.filter((inspection: any) => activeTasks(inspection).length > 0);
-  const drafts = dashboard.assigned.filter((inspection: any) => inspection.tasks.some((task: any) => task.report?.status === "draft" || task.report?.status === "submitted"));
   return (
     <div className="space-y-5 pb-4">
       <section className="rounded-[1.85rem] bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(30,41,59,0.92))] p-5 text-white shadow-[0_24px_60px_rgba(15,23,42,0.2)]">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">Draft inspection in progress</p>
-        <h2 className="mt-2 text-[28px] font-semibold leading-tight">Continue where you left off.</h2>
-        <p className="mt-3 max-w-xl text-sm leading-6 text-white/72">
-          Checklist answers, notes, signatures, and offline save state stay with the inspection so field work can keep moving without losing progress.
-        </p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">Inspection workflow</p>
+        <h2 className="mt-2 text-[28px] font-semibold leading-tight">Continue inspection</h2>
       </section>
 
       <section className="space-y-3">
@@ -63,29 +59,6 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
         )) : (
           <div className="rounded-[1.75rem] border border-dashed border-slate-200 bg-white p-5 text-sm text-slate-500">
             No active inspections are in progress right now.
-          </div>
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Drafts</p>
-          <h3 className="mt-1 text-xl font-semibold text-slate-950">Saved and ready to resume</h3>
-        </div>
-        {drafts.length > 0 ? drafts.map((inspection: any) => (
-          <article className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" key={inspection.id}>
-            <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
-            {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
-            <p className="mt-3 text-sm text-slate-600">Draft answers are saved locally first. Reopen the inspection to continue checklist, notes, photos, and signatures.</p>
-            <div className="mt-4">
-              <Link className="flex min-h-12 items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white" href={openTaskLink(inspection)}>
-                Resume inspection
-              </Link>
-            </div>
-          </article>
-        )) : (
-          <div className="rounded-[1.75rem] border border-dashed border-slate-200 bg-white p-5 text-sm text-slate-500">
-            Draft inspections will appear here once field work has started.
           </div>
         )}
       </section>

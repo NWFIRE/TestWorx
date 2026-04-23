@@ -10,7 +10,7 @@ import { ClaimButton } from "./claim-button";
 import { useOfflineScreenSnapshot } from "./offline/use-offline-screen-snapshot";
 import { toDateValue } from "./date-value";
 
-type WorkFilter = "today" | "upcoming" | "overdue" | "completed";
+type WorkFilter = "today" | "upcoming" | "overdue" | "open";
 
 function firstOpenTask(inspection: any) {
   return inspection.tasks.find((task: any) => task.report?.status !== "finalized") ?? inspection.tasks[0] ?? null;
@@ -41,15 +41,17 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
 
   const filtered = useMemo(() => {
     if (!snapshot) {
-      return { assigned: [], claimable: [], completed: [] };
+      return { assigned: [], claimable: [], open: [] };
     }
 
     const dashboard = snapshot.dashboard;
-    if (filter === "completed") {
+    if (filter === "open") {
       return {
-        assigned: [],
+        assigned: dashboard.assigned
+          .filter((inspection: any) => inspection.tasks.some((task: any) => task.report?.status !== "finalized"))
+          .filter((inspection: any) => matchesQuery(inspection, query)),
         claimable: [],
-        completed: dashboard.recentCompleted.filter((inspection: any) => matchesQuery(inspection, query))
+        open: []
       };
     }
 
@@ -71,7 +73,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
     return {
       assigned: assignedSource.filter((inspection: any) => matchesQuery(inspection, query)),
       claimable: claimableSource.filter((inspection: any) => matchesQuery(inspection, query)),
-      completed: []
+      open: []
     };
   }, [filter, query, snapshot]);
 
@@ -95,7 +97,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
               ["today", "Today"],
               ["upcoming", "Upcoming"],
               ["overdue", "Overdue"],
-              ["completed", "Completed"]
+              ["open", "Open"]
             ].map(([value, label]) => (
               <button
                 key={value}
@@ -113,19 +115,19 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
         </form>
       </section>
 
-      {filter === "completed" ? (
+      {filter === "open" ? (
         <section className="space-y-3">
-          {filtered.completed.length > 0 ? filtered.completed.map((inspection: any) => (
+          {filtered.assigned.length > 0 ? filtered.assigned.map((inspection: any) => (
             <article className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" key={inspection.id}>
               <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
               {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
               <p className="mt-3 text-sm text-slate-600">
-                Completed {format(toDateValue(inspection.scheduledStart), "MMM d, h:mm a")}
+                Open {format(toDateValue(inspection.scheduledStart), "MMM d, h:mm a")}
               </p>
             </article>
           )) : (
             <div className="rounded-[1.75rem] border border-dashed border-slate-200 bg-white p-5 text-sm text-slate-500">
-              No recently completed work matches this filter.
+              No open assigned work matches this filter.
             </div>
           )}
         </section>
