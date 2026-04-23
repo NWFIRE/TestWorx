@@ -288,6 +288,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
   const saveDraftRef = useRef<((nextDraft: ReportDraft, reason: "timer" | "section" | "manual") => Promise<boolean>) | null>(null);
   const serverUpdatedAtRef = useRef(data.reportUpdatedAt);
   const localRecordRef = useRef<LocalReportDraftRecord | null>(null);
+  const localInteractionStartedRef = useRef(false);
   const backupKey = `report-draft:${data.reportId}`;
 
   const persistBackup = useCallback((nextDraft: ReportDraft, serverUpdatedAt: string) => {
@@ -366,8 +367,10 @@ export function ReportEditor({ data }: { data: EditorData }) {
       }
 
       localRecordRef.current = localRecord;
-      setDraft(localRecord.draft as ReportDraft);
-      setTaskDisplayLabel(localRecord.taskDisplayLabel ?? data.customInspectionTypeLabel ?? "");
+      if (!localInteractionStartedRef.current) {
+        setDraft(localRecord.draft as ReportDraft);
+        setTaskDisplayLabel(localRecord.taskDisplayLabel ?? data.customInspectionTypeLabel ?? "");
+      }
       setSaveState(buildReportSaveState(localRecord, data.reportStatus));
       if (localRecord.lastError) {
         setErrorMessage(toTechnicianFacingSaveMessage(localRecord.lastError, localRecord.pendingFinalize ? "finalize" : "save"));
@@ -505,6 +508,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
   }, [data.canEdit, data.reportStatus, dirty]);
 
   function updateDraft(nextDraft: ReportDraft | ((current: ReportDraft) => ReportDraft)) {
+    localInteractionStartedRef.current = true;
     autosaveBlockedRef.current = false;
     setDraft((current) => {
       const resolvedDraft = typeof nextDraft === "function"
@@ -519,6 +523,7 @@ export function ReportEditor({ data }: { data: EditorData }) {
   }
 
   async function handleSectionChange(nextSectionId: string) {
+    localInteractionStartedRef.current = true;
     const nextDraft = { ...draft, activeSectionId: nextSectionId };
     updateDraft(nextDraft);
     setActiveSectionId(nextSectionId);
