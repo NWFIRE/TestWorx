@@ -54,6 +54,7 @@ type QuoteLineValue = {
 type QuoteFormValue = {
   customerCompanyId: string;
   siteId: string;
+  customSiteName: string;
   contactName: string;
   recipientEmail: string;
   proposalType: string;
@@ -134,6 +135,7 @@ export function QuoteEditorForm({
     () => sites.filter((site) => !value.customerCompanyId || site.customerCompanyId === value.customerCompanyId),
     [sites, value.customerCompanyId]
   );
+  const siteSelectionValue = value.siteId ? value.siteId : value.customSiteName.trim() ? "__custom__" : "";
 
   const subtotal = useMemo(
     () =>
@@ -272,6 +274,7 @@ export function QuoteEditorForm({
                     ...current,
                     customerCompanyId: event.target.value,
                     siteId: "",
+                    customSiteName: "",
                     contactName: customer?.contactName ?? current.contactName,
                     recipientEmail: customer?.billingEmail ?? current.recipientEmail
                   }));
@@ -289,13 +292,20 @@ export function QuoteEditorForm({
 
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">Site</span>
+              <input name="siteId" type="hidden" value={value.siteId} />
               <select
                 className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
-                name="siteId"
-                onChange={(event) => setValue((current) => ({ ...current, siteId: event.target.value }))}
-                value={value.siteId}
+                onChange={(event) =>
+                  setValue((current) => ({
+                    ...current,
+                    siteId: event.target.value === "__custom__" ? "" : event.target.value,
+                    customSiteName: event.target.value === "__custom__" ? current.customSiteName : ""
+                  }))
+                }
+                value={siteSelectionValue}
               >
                 <option value="">No site selected</option>
+                <option value="__custom__">Custom site entry</option>
                 {availableSites.map((site) => (
                   <option key={site.id} value={site.id}>
                     {site.name}{site.city ? ` - ${site.city}` : ""}
@@ -303,6 +313,21 @@ export function QuoteEditorForm({
                 ))}
               </select>
             </label>
+
+            {siteSelectionValue === "__custom__" ? (
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Custom site</span>
+                <input
+                  className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
+                  name="customSiteName"
+                  onChange={(event) => setValue((current) => ({ ...current, customSiteName: event.target.value, siteId: "" }))}
+                  placeholder="Enter site name"
+                  value={value.customSiteName}
+                />
+              </label>
+            ) : (
+              <input name="customSiteName" type="hidden" value="" />
+            )}
 
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">Customer contact</span>

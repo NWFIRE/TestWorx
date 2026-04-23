@@ -56,6 +56,7 @@ export default async function NewQuotePage({
         initialValue={{
           customerCompanyId: resolvedCustomerId,
           siteId: resolvedSiteId,
+          customSiteName: "",
           contactName: selectedCustomer?.contactName ?? "",
           recipientEmail: selectedCustomer?.billingEmail ?? "",
           proposalType: "",

@@ -781,6 +781,7 @@ model Quote {
   quoteNumber             String
   customerCompanyId       String
   siteId                  String?
+  customSiteName          String?
   contactName             String?
   recipientEmail          String?
   proposalType            String?

@@ -92,6 +92,7 @@ function parseQuoteFormData(formData: FormData) {
   return quoteInputSchema.parse({
     customerCompanyId: String(formData.get("customerCompanyId") ?? ""),
     siteId: String(formData.get("siteId") ?? "").trim() || null,
+    customSiteName: String(formData.get("customSiteName") ?? "").trim() || null,
     contactName: String(formData.get("contactName") ?? "").trim() || null,
     recipientEmail: String(formData.get("recipientEmail") ?? "").trim() || null,
     proposalType: String(formData.get("proposalType") ?? "").trim() || null,

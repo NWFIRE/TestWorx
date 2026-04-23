@@ -224,6 +224,7 @@ export const quoteLineItemInputSchema = z.object({
 export const quoteInputSchema = z.object({
   customerCompanyId: z.string().trim().min(1, "Select a customer."),
   siteId: z.string().trim().optional().nullable(),
+  customSiteName: z.string().trim().max(160).optional().nullable(),
   contactName: z.string().trim().max(160).optional().nullable(),
   recipientEmail: z.string().trim().email("Enter a valid recipient email.").optional().nullable(),
   proposalType: z.enum(quoteProposalTypeValues).optional().nullable(),
@@ -236,6 +237,62 @@ export const quoteInputSchema = z.object({
 });
 
 export type QuoteInput = z.infer<typeof quoteInputSchema>;
+
+function normalizeQuoteCustomSiteName(input: {
+  siteId?: string | null;
+  customSiteName?: string | null;
+}) {
+  if (normalizeNullableString(input.siteId)) {
+    return null;
+  }
+
+  return normalizeNullableString(input.customSiteName);
+}
+
+function buildQuoteSiteRecord(input: {
+  siteId?: string | null;
+  site?: {
+    id: string;
+    name: string | null;
+    addressLine1: string | null;
+    addressLine2: string | null;
+    city: string | null;
+    state: string | null;
+    postalCode: string | null;
+  } | null;
+  customSiteName?: string | null;
+}) {
+  if (input.site) {
+    return input.site;
+  }
+
+  const customSiteName = normalizeNullableString(input.customSiteName);
+  if (customSiteName) {
+    return {
+      id: input.siteId ?? `custom:${customSiteName}`,
+      name: customSiteName,
+      addressLine1: null,
+      addressLine2: null,
+      city: null,
+      state: null,
+      postalCode: null
+    };
+  }
+
+  if (input.siteId) {
+    return {
+      id: input.siteId,
+      name: "Archived site",
+      addressLine1: null,
+      addressLine2: null,
+      city: null,
+      state: null,
+      postalCode: null
+    };
+  }
+
+  return null;
+}
 
 function parseActor(actor: ActorContext) {
   const parsed = actorContextSchema.parse(actor);
@@ -1085,7 +1142,11 @@ async function getQuoteByIdForTenant(tenantId: string, quoteId: string) {
       billingEmail: null,
       phone: null
     },
-    site: site ?? (quote.siteId ? { id: quote.siteId, name: "Archived site", addressLine1: null, addressLine2: null, city: null, state: null, postalCode: null } : null)
+    site: buildQuoteSiteRecord({
+      siteId: quote.siteId,
+      site,
+      customSiteName: quote.customSiteName
+    })
   };
 }
 
@@ -1255,6 +1316,7 @@ export async function createQuote(actor: ActorContext, input: QuoteInput) {
       quoteNumber,
       customerCompanyId: parsedInput.customerCompanyId,
       siteId: normalizeNullableString(parsedInput.siteId),
+      customSiteName: normalizeQuoteCustomSiteName(parsedInput),
       contactName: normalizeNullableString(parsedInput.contactName),
       recipientEmail: normalizeNullableString(parsedInput.recipientEmail),
       proposalType: parsedInput.proposalType ?? null,
@@ -1320,6 +1382,7 @@ export async function updateQuote(actor: ActorContext, quoteId: string, input: Q
     data: {
       customerCompanyId: parsedInput.customerCompanyId,
       siteId: normalizeNullableString(parsedInput.siteId),
+      customSiteName: normalizeQuoteCustomSiteName(parsedInput),
       contactName: normalizeNullableString(parsedInput.contactName),
       recipientEmail: normalizeNullableString(parsedInput.recipientEmail),
       proposalType: parsedInput.proposalType ?? null,
@@ -1535,7 +1598,9 @@ export async function getQuoteWorkspaceData(
       };
       const site = quote.siteId
         ? siteMap.get(quote.siteId) ?? { id: quote.siteId, name: "Archived site" }
-        : null;
+        : normalizeNullableString(quote.customSiteName)
+          ? { id: `custom:${quote.id}`, name: normalizeNullableString(quote.customSiteName)! }
+          : null;
       return {
         ...quote,
         customerCompany,
@@ -1788,16 +1853,21 @@ export async function getAuthorizedQuotePdf(actor: ActorContext, quoteId: string
       phone: customerCompany?.phone ?? null
     },
     site: toCustomerFacingQuoteSite(
-      site
-        ? {
-            name: site.name,
-            addressLine1: site.addressLine1,
-            addressLine2: site.addressLine2,
-            city: site.city,
-            state: site.state,
-            postalCode: site.postalCode
-          }
-        : null
+      buildQuoteSiteRecord({
+        siteId: quote.siteId,
+        site: site
+          ? {
+              id: site.id,
+              name: site.name,
+              addressLine1: site.addressLine1,
+              addressLine2: site.addressLine2,
+              city: site.city,
+              state: site.state,
+              postalCode: site.postalCode
+            }
+          : null,
+        customSiteName: quote.customSiteName
+      })
     ),
     lineItems: quote.lineItems.map((line) => ({
       title: line.title,
@@ -1902,7 +1972,7 @@ export async function sendQuote(actor: ActorContext, quoteId: string, input?: { 
     tenantName: companyName,
     quoteNumber: quote.quoteNumber,
     customerName: customerCompany?.name ?? "Archived customer",
-    siteName: site?.name ?? null,
+    siteName: site?.name ?? quote.customSiteName ?? null,
     quoteUrl: customerUrl,
     subjectLine: subject,
     messageBody: body,
@@ -2141,7 +2211,7 @@ async function sendQuoteReminderInternal(input: {
     tenantName: quote.tenant.name,
     quoteNumber: quote.quoteNumber,
     customerName: quote.customerCompany.name,
-    siteName: quote.site?.name ?? null,
+    siteName: quote.site?.name ?? quote.customSiteName ?? null,
     quoteUrl: hostedQuoteUrl,
     quoteTotal: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(quote.total),
     reminderTitle: buildReminderTitle(input.reminderType, quote.quoteNumber),
@@ -2793,16 +2863,21 @@ export async function getPublicQuotePdfByAccessToken(token: string) {
       phone: quote.customerCompany.phone ?? null
     },
     site: toCustomerFacingQuoteSite(
-      quote.site
-        ? {
-            name: quote.site.name,
-            addressLine1: quote.site.addressLine1,
-            addressLine2: quote.site.addressLine2,
-            city: quote.site.city,
-            state: quote.site.state,
-            postalCode: quote.site.postalCode
-          }
-        : null
+      buildQuoteSiteRecord({
+        siteId: quote.siteId,
+        site: quote.site
+          ? {
+              id: quote.site.id,
+              name: quote.site.name,
+              addressLine1: quote.site.addressLine1,
+              addressLine2: quote.site.addressLine2,
+              city: quote.site.city,
+              state: quote.site.state,
+              postalCode: quote.site.postalCode
+            }
+          : null,
+        customSiteName: quote.customSiteName
+      })
     ),
     lineItems: quote.lineItems.map((line) => ({
       title: line.title,

@@ -123,6 +123,7 @@ export default async function QuoteDetailPage({
             initialValue={{
               customerCompanyId: detail.customerCompanyId,
               siteId: detail.siteId ?? "",
+              customSiteName: detail.customSiteName ?? "",
               contactName: detail.contactName ?? "",
               recipientEmail: detail.recipientEmail ?? "",
               proposalType: detail.proposalType ?? "",
