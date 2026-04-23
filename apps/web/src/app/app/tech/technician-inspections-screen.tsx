@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { format } from "date-fns";
+import { useSearchParams } from "next/navigation";
 
 import { useOfflineScreenSnapshot } from "./offline/use-offline-screen-snapshot";
 import { toDateValue } from "./date-value";
@@ -18,6 +19,7 @@ function openTaskLink(inspection: any) {
 
 export function TechnicianInspectionsScreen({ initialData }: { initialData: any }) {
   const snapshot = useOfflineScreenSnapshot("technician-inspections", initialData);
+  const searchParams = useSearchParams();
 
   if (!snapshot) {
     return <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 text-sm text-slate-500">Loading inspections…</div>;
@@ -25,6 +27,7 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
 
   const dashboard = snapshot.dashboard;
   const active = dashboard.assigned.filter((inspection: any) => activeTasks(inspection).length > 0);
+  const filter = searchParams.get("filter") ?? "all";
   return (
     <div className="space-y-5 pb-4">
       <section
@@ -68,6 +71,7 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
         )}
       </section>
 
+      {filter === "active" ? null : (
       <section className="space-y-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Recently completed</p>
@@ -85,6 +89,7 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
           </div>
         )}
       </section>
+      )}
     </div>
   );
 }

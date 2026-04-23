@@ -125,7 +125,7 @@ export function TechnicianMobileHeader({
   );
 
   const subtitleByTab: Record<string, string> = {
-    Home: "What needs attention right now",
+    Home: "Assignments, progress, and action items",
     Work: "Assigned jobs and claimable field work",
     Inspections: "Drafts, active inspections, and closeout",
     Manuals: "Field manuals and offline-ready references",

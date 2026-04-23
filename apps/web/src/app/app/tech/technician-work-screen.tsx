@@ -10,7 +10,7 @@ import { ClaimButton } from "./claim-button";
 import { useOfflineScreenSnapshot } from "./offline/use-offline-screen-snapshot";
 import { toDateValue } from "./date-value";
 
-type WorkFilter = "today" | "upcoming" | "overdue" | "open";
+type WorkFilter = "today" | "upcoming" | "overdue" | "open" | "claimable";
 
 function firstOpenTask(inspection: any) {
   return inspection.tasks.find((task: any) => task.report?.status !== "finalized") ?? inspection.tasks[0] ?? null;
@@ -51,6 +51,14 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
           .filter((inspection: any) => inspection.tasks.some((task: any) => task.report?.status !== "finalized"))
           .filter((inspection: any) => matchesQuery(inspection, query)),
         claimable: [],
+        open: []
+      };
+    }
+
+    if (filter === "claimable") {
+      return {
+        assigned: [],
+        claimable: dashboard.unassigned.filter((inspection: any) => matchesQuery(inspection, query)),
         open: []
       };
     }
@@ -97,7 +105,8 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
               ["today", "Today"],
               ["upcoming", "Upcoming"],
               ["overdue", "Overdue"],
-              ["open", "Open"]
+              ["open", "Open"],
+              ["claimable", "Claimable"]
             ].map(([value, label]) => (
               <button
                 key={value}
@@ -128,6 +137,23 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
           )) : (
             <div className="rounded-[1.75rem] border border-dashed border-slate-200 bg-white p-5 text-sm text-slate-500">
               No open assigned work matches this filter.
+            </div>
+          )}
+        </section>
+      ) : filter === "claimable" ? (
+        <section className="space-y-3">
+          {filtered.claimable.length > 0 ? filtered.claimable.map((inspection: any) => (
+            <article className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" key={inspection.id}>
+              <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
+              {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
+              <p className="mt-3 text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
+              <div className="mt-4">
+                <ClaimButton inspectionId={inspection.id} />
+              </div>
+            </article>
+          )) : (
+            <div className="rounded-[1.75rem] border border-dashed border-slate-200 bg-white p-5 text-sm text-slate-500">
+              No claimable work matches this filter.
             </div>
           )}
         </section>
