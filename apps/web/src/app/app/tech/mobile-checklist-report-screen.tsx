@@ -247,6 +247,14 @@ function formatChecklistTimestamp(label: string) {
   return `Started ${label}`;
 }
 
+function getLeadSupplementalSectionIds(inspectionType: string) {
+  if (inspectionType === "kitchen_suppression") {
+    return ["system-details"];
+  }
+
+  return [];
+}
+
 export function MobileChecklistReportScreen({
   data,
   inspectionId,
@@ -885,6 +893,7 @@ export function MobileChecklistReportScreen({
   }
 
   const activeChecklistSections = checklist.sections.filter((section) => section.items.length > 0);
+  const leadSupplementalSectionIds = getLeadSupplementalSectionIds(draft.inspectionType);
   const saveSummary = saveState === "Pending sync"
     ? `${checklist.completedCount - checklist.totalCount < 0 ? Math.max(0, checklist.totalCount - checklist.completedCount) : 0} changes pending`
     : saveState;
@@ -897,9 +906,125 @@ export function MobileChecklistReportScreen({
     );
   }
 
+  function renderSupplementalSection(section: TechnicianReportEditorData["template"]["sections"][number]) {
+    const supplemental = getSupplementalFields(section);
+    if (supplemental.scalarFields.length === 0 && supplemental.repeaterFields.length === 0) {
+      return null;
+    }
+
+    const sectionState = draft.sections[section.id] ?? { status: "pending", notes: "", fields: {} };
+    const openByDefault = leadSupplementalSectionIds.includes(section.id);
+
+    return (
+      <details key={section.id} className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-panel" open={openByDefault}>
+        <summary className="cursor-pointer list-none px-4 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Details</p>
+              <p className="mt-1 text-base font-semibold text-slate-950">{section.label}</p>
+            </div>
+            <span className="text-sm text-slate-500">Expand</span>
+          </div>
+        </summary>
+        <div className="border-t border-slate-200 px-4 py-4">
+          <div className="space-y-4">
+            {supplemental.scalarFields.map((field) => {
+              const value = sectionState.fields?.[field.id] as ReportPrimitiveValue;
+              return (
+                <div key={field.id} className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-900">{field.label}</label>
+                  {field.type === "boolean" ? (
+                    <SelectChips
+                      options={[
+                        { label: "Yes", value: "true" },
+                        { label: "No", value: "false" }
+                      ]}
+                      value={String(Boolean(value))}
+                      onChange={(nextValue) => updateSectionField(section.id, field.id, nextValue === "true")}
+                    />
+                  ) : field.type === "select" ? (
+                    <SelectChips
+                      options={(field.options ?? []).map((option) => ({ label: option.label, value: option.value }))}
+                      value={typeof value === "string" ? value : ""}
+                      onChange={(nextValue) => updateSectionField(section.id, field.id, nextValue)}
+                    />
+                  ) : (
+                    <input
+                      className="min-h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none"
+                      onChange={(event) => updateSectionField(section.id, field.id, field.type === "number" ? Number(event.target.value || 0) : event.target.value)}
+                      type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
+                      value={typeof value === "string" || typeof value === "number" ? String(value) : ""}
+                    />
+                  )}
+                </div>
+              );
+            })}
+
+            {supplemental.repeaterFields.map((field) => {
+              const rows = Array.isArray(sectionState.fields?.[field.id]) ? sectionState.fields[field.id] as unknown as Array<Record<string, ReportPrimitiveValue>> : [];
+              return (
+                <div key={field.id} className="space-y-3 rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-950">{field.label}</p>
+                      {field.description ? <p className="mt-1 text-sm text-slate-500">{field.description}</p> : null}
+                    </div>
+                    <button className="min-h-11 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700" onClick={() => addRepeaterRow(section.id, field)} type="button">
+                      {field.addLabel ?? "Add row"}
+                    </button>
+                  </div>
+                  {rows.length === 0 ? <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-500">No rows added yet.</p> : rows.map((row, rowIndex) => {
+                    const visibleRowFields = field.rowFields.filter((rowField) => !rowField.hidden && !rowField.readOnly && !isChecklistHeavyMobileField(rowField) && rowField.id !== "assetId" && rowField.id !== "assetTag" && rowField.id !== "comments" && rowField.id !== "notes");
+                    return (
+                      <div key={typeof row.__rowId === "string" ? row.__rowId : `${field.id}_${rowIndex}`} className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-semibold text-slate-900">{describeRepeaterRowLabel(row, rowIndex)}</p>
+                          <button className="text-sm font-semibold text-rose-700" onClick={() => removeRepeaterRow(section.id, field.id, rowIndex)} type="button">Remove</button>
+                        </div>
+                        <div className="mt-3 space-y-3">
+                          {visibleRowFields.map((rowField) => {
+                            const rowValue = row[rowField.id];
+                            return (
+                              <div key={rowField.id} className="space-y-2">
+                                <label className="text-sm font-semibold text-slate-900">{rowField.label}</label>
+                                {rowField.type === "select" ? (
+                                  <SelectChips
+                                    options={(rowField.options ?? []).map((option) => ({ label: option.label, value: option.value }))}
+                                    value={typeof rowValue === "string" ? rowValue : ""}
+                                    onChange={(nextValue) => updateRepeaterRowField(section.id, field, rowIndex, rowField.id, nextValue, { immediateQueue: true })}
+                                  />
+                                ) : (
+                                  <input
+                                    className="min-h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none"
+                                    onChange={(event) => updateRepeaterRowField(section.id, field, rowIndex, rowField.id, rowField.type === "number" ? Number(event.target.value || 0) : event.target.value, {
+                                      debounceKey: `${section.id}:${field.id}:${rowIndex}:${rowField.id}`
+                                    })}
+                                    type={rowField.type === "number" ? "number" : rowField.type === "date" ? "date" : "text"}
+                                    value={typeof rowValue === "string" || typeof rowValue === "number" ? String(rowValue) : ""}
+                                  />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </details>
+    );
+  }
+
   if (mode === "review") {
     return (
-      <div className="space-y-4 pb-32">
+      <div
+        className="space-y-4"
+        style={{ paddingBottom: "calc(var(--mobile-tab-bar-offset, 5.5rem) + 9rem)" }}
+      >
         <MobileInspectionWorkspaceShell
           currentMode="review"
           customerName={data.customerName}
@@ -1024,7 +1149,10 @@ export function MobileChecklistReportScreen({
   }
 
   return (
-    <div className="space-y-4 pb-32">
+    <div
+      className="space-y-4"
+      style={{ paddingBottom: "calc(var(--mobile-tab-bar-offset, 5.5rem) + 9rem)" }}
+    >
       <MobileInspectionWorkspaceShell
         currentMode="edit"
         customerName={data.customerName}
@@ -1045,6 +1173,10 @@ export function MobileChecklistReportScreen({
           </div>
         </div>
       ) : null}
+
+      {data.template.sections
+        .filter((section) => leadSupplementalSectionIds.includes(section.id))
+        .map((section) => renderSupplementalSection(section))}
 
       {activeChecklistSections.map((section) => (
         <div key={section.sectionId} className="space-y-3">
@@ -1159,116 +1291,9 @@ export function MobileChecklistReportScreen({
       ))}
 
       <div className="space-y-4">
-        {data.template.sections.map((section) => {
-          const supplemental = getSupplementalFields(section);
-          if (supplemental.scalarFields.length === 0 && supplemental.repeaterFields.length === 0) {
-            return null;
-          }
-
-          const sectionState = draft.sections[section.id] ?? { status: "pending", notes: "", fields: {} };
-          return (
-            <details key={section.id} className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-panel">
-              <summary className="cursor-pointer list-none px-4 py-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Details</p>
-                    <p className="mt-1 text-base font-semibold text-slate-950">{section.label}</p>
-                  </div>
-                  <span className="text-sm text-slate-500">Expand</span>
-                </div>
-              </summary>
-              <div className="border-t border-slate-200 px-4 py-4">
-                <div className="space-y-4">
-                  {supplemental.scalarFields.map((field) => {
-                    const value = sectionState.fields?.[field.id] as ReportPrimitiveValue;
-                    return (
-                      <div key={field.id} className="space-y-2">
-                        <label className="text-sm font-semibold text-slate-900">{field.label}</label>
-                        {field.type === "boolean" ? (
-                          <SelectChips
-                            options={[
-                              { label: "Yes", value: "true" },
-                              { label: "No", value: "false" }
-                            ]}
-                            value={String(Boolean(value))}
-                            onChange={(nextValue) => updateSectionField(section.id, field.id, nextValue === "true")}
-                          />
-                        ) : field.type === "select" ? (
-                          <SelectChips
-                            options={(field.options ?? []).map((option) => ({ label: option.label, value: option.value }))}
-                            value={typeof value === "string" ? value : ""}
-                            onChange={(nextValue) => updateSectionField(section.id, field.id, nextValue)}
-                          />
-                        ) : (
-                          <input
-                            className="min-h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none"
-                            onChange={(event) => updateSectionField(section.id, field.id, field.type === "number" ? Number(event.target.value || 0) : event.target.value)}
-                            type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
-                            value={typeof value === "string" || typeof value === "number" ? String(value) : ""}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {supplemental.repeaterFields.map((field) => {
-                    const rows = Array.isArray(sectionState.fields?.[field.id]) ? sectionState.fields[field.id] as unknown as Array<Record<string, ReportPrimitiveValue>> : [];
-                    return (
-                      <div key={field.id} className="space-y-3 rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold text-slate-950">{field.label}</p>
-                            {field.description ? <p className="mt-1 text-sm text-slate-500">{field.description}</p> : null}
-                          </div>
-                          <button className="min-h-11 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700" onClick={() => addRepeaterRow(section.id, field)} type="button">
-                            {field.addLabel ?? "Add row"}
-                          </button>
-                        </div>
-                        {rows.length === 0 ? <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-500">No rows added yet.</p> : rows.map((row, rowIndex) => {
-                          const visibleRowFields = field.rowFields.filter((rowField) => !rowField.hidden && !rowField.readOnly && !isChecklistHeavyMobileField(rowField) && rowField.id !== "assetId" && rowField.id !== "assetTag" && rowField.id !== "comments" && rowField.id !== "notes");
-                          return (
-                            <div key={typeof row.__rowId === "string" ? row.__rowId : `${field.id}_${rowIndex}`} className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                              <div className="flex items-center justify-between gap-3">
-                                <p className="text-sm font-semibold text-slate-900">{describeRepeaterRowLabel(row, rowIndex)}</p>
-                                <button className="text-sm font-semibold text-rose-700" onClick={() => removeRepeaterRow(section.id, field.id, rowIndex)} type="button">Remove</button>
-                              </div>
-                              <div className="mt-3 space-y-3">
-                                {visibleRowFields.map((rowField) => {
-                                  const rowValue = row[rowField.id];
-                                  return (
-                                    <div key={rowField.id} className="space-y-2">
-                                      <label className="text-sm font-semibold text-slate-900">{rowField.label}</label>
-                                      {rowField.type === "select" ? (
-                                        <SelectChips
-                                          options={(rowField.options ?? []).map((option) => ({ label: option.label, value: option.value }))}
-                                          value={typeof rowValue === "string" ? rowValue : ""}
-                                          onChange={(nextValue) => updateRepeaterRowField(section.id, field, rowIndex, rowField.id, nextValue, { immediateQueue: true })}
-                                        />
-                                      ) : (
-                                        <input
-                                          className="min-h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none"
-                                          onChange={(event) => updateRepeaterRowField(section.id, field, rowIndex, rowField.id, rowField.type === "number" ? Number(event.target.value || 0) : event.target.value, {
-                                            debounceKey: `${section.id}:${field.id}:${rowIndex}:${rowField.id}`
-                                          })}
-                                          type={rowField.type === "number" ? "number" : rowField.type === "date" ? "date" : "text"}
-                                          value={typeof rowValue === "string" || typeof rowValue === "number" ? String(rowValue) : ""}
-                                        />
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </details>
-          );
-        })}
+        {data.template.sections
+          .filter((section) => !leadSupplementalSectionIds.includes(section.id))
+          .map((section) => renderSupplementalSection(section))}
       </div>
 
       {(errorMessage || finalizeErrorMessage) ? (
