@@ -25,6 +25,7 @@ export function QuoteSendCard(props: QuoteSendCardProps) {
   const [activeAction, setActiveAction] = useState<"send" | "link" | null>(null);
   const [state, setState] = useState({
     recipientEmail: props.recipientEmail ?? "",
+    ccEmails: "",
     subject: props.deliverySubject ?? buildQuoteEmailSubject({ companyName: props.companyName, quoteNumber: props.quoteNumber }),
     message: props.deliveryBody ?? buildQuoteEmailDefaultMessage(),
     hostedQuoteUrl: props.hostedQuoteUrl,
@@ -38,6 +39,7 @@ export function QuoteSendCard(props: QuoteSendCardProps) {
       const formData = new FormData();
       formData.set("quoteId", props.quoteId);
       formData.set("recipientEmail", state.recipientEmail);
+      formData.set("ccEmails", state.ccEmails);
       formData.set("subject", state.subject);
       formData.set("message", state.message);
       const result = await sendQuoteAction(formData);
@@ -87,6 +89,16 @@ export function QuoteSendCard(props: QuoteSendCardProps) {
         <label className="block">
           <span className="mb-2 block text-sm font-medium text-slate-700">Recipient</span>
           <input className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900" onChange={(event) => setState((current) => ({ ...current, recipientEmail: event.target.value }))} type="email" value={state.recipientEmail} />
+        </label>
+        <label className="block">
+          <span className="mb-2 block text-sm font-medium text-slate-700">CC</span>
+          <input
+            className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
+            onChange={(event) => setState((current) => ({ ...current, ccEmails: event.target.value }))}
+            placeholder="accounting@example.com, manager@example.com"
+            value={state.ccEmails}
+          />
+          <span className="mt-2 block text-xs text-slate-500">Separate multiple CC addresses with commas.</span>
         </label>
         <label className="block">
           <span className="mb-2 block text-sm font-medium text-slate-700">Subject</span>

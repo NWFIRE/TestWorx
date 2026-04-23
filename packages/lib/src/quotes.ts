@@ -487,6 +487,35 @@ function normalizeNullableString(value: string | null | undefined) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function normalizeEmailList(value: string | null | undefined) {
+  const normalized = (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (normalized.length === 0) {
+    return [] as string[];
+  }
+
+  const seen = new Set<string>();
+  const unique = normalized.filter((email) => {
+    const lower = email.toLowerCase();
+    if (seen.has(lower)) {
+      return false;
+    }
+    seen.add(lower);
+    return true;
+  });
+
+  for (const email of unique) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new Error(`Enter a valid CC email address. "${email}" is not valid.`);
+    }
+  }
+
+  return unique;
+}
+
 function getDefaultQuoteReminderSettings(): QuoteReminderSettings {
   return quoteReminderSettingsSchema.parse({});
 }
@@ -1886,7 +1915,7 @@ export async function getAuthorizedQuotePdf(actor: ActorContext, quoteId: string
   };
 }
 
-export async function sendQuote(actor: ActorContext, quoteId: string, input?: { recipientEmail?: string | null; subject?: string | null; message?: string | null }) {
+export async function sendQuote(actor: ActorContext, quoteId: string, input?: { recipientEmail?: string | null; ccEmails?: string | null; subject?: string | null; message?: string | null }) {
   const parsedActor = parseActor(actor);
   assertQuoteManagementAccess(parsedActor);
   const quote = await prisma.quote.findFirst({
@@ -1932,6 +1961,10 @@ export async function sendQuote(actor: ActorContext, quoteId: string, input?: { 
   if (!recipientEmail) {
     throw new Error("Add a recipient email before sending this quote.");
   }
+  const ccEmails = normalizeEmailList(input?.ccEmails);
+  if (ccEmails.some((email) => email.toLowerCase() === recipientEmail.toLowerCase())) {
+    throw new Error("Do not include the primary recipient again in CC.");
+  }
 
   const access = quote.quoteAccessToken
     && !quote.quoteAccessTokenRevokedAt
@@ -1968,6 +2001,7 @@ export async function sendQuote(actor: ActorContext, quoteId: string, input?: { 
 
   const delivery = await sendQuoteEmail({
     recipientEmail,
+    ccEmails,
     recipientName: quote.contactName ?? customerCompany?.contactName ?? customerCompany?.name ?? "Customer",
     tenantName: companyName,
     quoteNumber: quote.quoteNumber,
@@ -2010,6 +2044,7 @@ export async function sendQuote(actor: ActorContext, quoteId: string, input?: { 
     quoteId: quote.id,
     metadata: {
       recipientEmail,
+      ccEmails,
       hostedQuoteUrl: customerUrl,
       provider: delivery.provider,
       reason: delivery.reason,

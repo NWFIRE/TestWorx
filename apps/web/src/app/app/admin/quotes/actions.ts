@@ -231,6 +231,7 @@ export async function sendQuoteAction(formData: FormData) {
     const actionSession = getQuoteActionSession(session);
     await sendQuote(getActor(actionSession), quoteId, {
       recipientEmail: String(formData.get("recipientEmail") ?? "").trim() || null,
+      ccEmails: String(formData.get("ccEmails") ?? "").trim() || null,
       subject: String(formData.get("subject") ?? "").trim() || null,
       message: String(formData.get("message") ?? "").trim() || null
     });

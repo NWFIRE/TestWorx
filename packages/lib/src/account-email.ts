@@ -13,6 +13,7 @@ export type TransactionalEmailDeliveryResult = {
 
 type BaseEmailPayload = {
   recipientEmail: string;
+  ccEmails?: string[];
   recipientName: string;
   tenantName: string;
 };
@@ -189,6 +190,7 @@ function buildShell({
 
 async function sendWithResend(input: {
   to: string;
+  cc?: string[];
   subject: string;
   html: string;
   attachments?: EmailAttachment[];
@@ -212,6 +214,7 @@ async function sendWithResend(input: {
     const result = await resend.emails.send({
       from: fromEmail,
       to: input.to,
+      cc: input.cc,
       subject: input.subject,
       html: input.html,
       attachments: input.attachments?.map((attachment) => ({
@@ -306,6 +309,7 @@ export async function sendQuoteEmail(payload: QuoteEmailPayload) {
   return sendWithResend({
     from: env.RESEND_FROM_EMAIL,
     to: payload.recipientEmail,
+    cc: payload.ccEmails,
     subject: payload.subjectLine,
     attachments: [payload.attachment],
     html: buildShell({

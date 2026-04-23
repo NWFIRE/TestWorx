@@ -46,6 +46,7 @@ describe("account email sender selection", () => {
 
     await sendQuoteEmail({
       recipientEmail: "customer@example.com",
+      ccEmails: ["accounting@example.com", "manager@example.com"],
       recipientName: "Taylor Customer",
       tenantName: "TradeWorx",
       quoteNumber: "Q-2026-0001",
@@ -61,7 +62,8 @@ describe("account email sender selection", () => {
 
     expect(sendMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        from: "quotes@tradeworx.net"
+        from: "quotes@tradeworx.net",
+        cc: ["accounting@example.com", "manager@example.com"]
       })
     );
   });
