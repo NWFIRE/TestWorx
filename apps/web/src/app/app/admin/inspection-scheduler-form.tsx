@@ -75,6 +75,17 @@ type ServiceLineDraft = {
   notes: string;
 };
 
+function buildCustomerSearchQuery(
+  customers: CustomerOption[],
+  customerCompanyId?: string
+) {
+  if (!customerCompanyId) {
+    return "";
+  }
+
+  return customers.find((customer) => customer.id === customerCompanyId)?.name ?? "";
+}
+
 export type InspectionSchedulerFormInitialValues = {
   inspectionId?: string;
   customerCompanyId?: string;
@@ -122,6 +133,34 @@ function buildInitialServiceLines(initialValues?: InspectionSchedulerFormInitial
   }
 
   return [createServiceLineDraft(inspectionMonth, scheduledStart)];
+}
+
+function serializeInitialValues(initialValues?: InspectionSchedulerFormInitialValues) {
+  if (!initialValues) {
+    return "";
+  }
+
+  return JSON.stringify({
+    inspectionId: initialValues.inspectionId ?? null,
+    customerCompanyId: initialValues.customerCompanyId ?? null,
+    siteId: initialValues.siteId ?? null,
+    inspectionClassification: initialValues.inspectionClassification ?? null,
+    isPriority: Boolean(initialValues.isPriority),
+    inspectionMonth: initialValues.inspectionMonth ?? null,
+    scheduledStart: initialValues.scheduledStart ?? null,
+    scheduledEnd: initialValues.scheduledEnd ?? null,
+    status: initialValues.status ?? null,
+    notes: initialValues.notes ?? null,
+    tasks: (initialValues.tasks ?? []).map((task) => ({
+      inspectionType: task.inspectionType,
+      frequency: task.frequency,
+      assignedTechnicianId: task.assignedTechnicianId ?? null,
+      dueMonth: task.dueMonth ?? null,
+      dueDate: task.dueDate ?? null,
+      schedulingStatus: task.schedulingStatus ?? null,
+      notes: task.notes ?? null
+    }))
+  });
 }
 
 function PickerField({
@@ -217,16 +256,13 @@ export function InspectionSchedulerForm({
   const externalDocumentsInputRef = useRef<HTMLInputElement>(null);
   const lastErrorRef = useRef<string | null>(null);
   const lastSuccessRef = useRef<string | null>(null);
+  const lastAppliedInitialValuesRef = useRef<string>(serializeInitialValues(initialValues));
   const isCreateWorkflow = !initialValues?.inspectionId && !reasonLabel;
   const { showToast } = useToast();
   const [selectedCustomerId, setSelectedCustomerId] = useState(initialValues?.customerCompanyId ?? "");
-  const [customerSearchQuery, setCustomerSearchQuery] = useState(() => {
-    if (!initialValues?.customerCompanyId) {
-      return "";
-    }
-
-    return customers.find((customer) => customer.id === initialValues.customerCompanyId)?.name ?? "";
-  });
+  const [customerSearchQuery, setCustomerSearchQuery] = useState(() =>
+    buildCustomerSearchQuery(customers, initialValues?.customerCompanyId)
+  );
   const [selectedSiteId, setSelectedSiteId] = useState(
     initialValues?.siteId ??
       (initialValues?.customerCompanyId && autoSelectGenericSiteOnCustomerChange
@@ -256,6 +292,7 @@ export function InspectionSchedulerForm({
   const [externalDocumentsCustomerVisible, setExternalDocumentsCustomerVisible] = useState(false);
   const [isUploadingExternalDocuments, setIsUploadingExternalDocuments] = useState(false);
   const serviceLineRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const initialValuesSignature = serializeInitialValues(initialValues);
   const deferredCustomerSearchQuery = useDeferredValue(customerSearchQuery);
   const filteredCustomers = useMemo(() => {
     const normalizedQuery = deferredCustomerSearchQuery.trim().toLowerCase();
@@ -313,6 +350,7 @@ export function InspectionSchedulerForm({
     const defaultStart = defaultScheduledStartForMonth(defaultMonth);
     formRef.current?.reset();
     setSelectedCustomerId("");
+    setCustomerSearchQuery("");
     setSelectedSiteId("");
     setInspectionClassification("standard");
     setIsPriority(false);
@@ -331,6 +369,36 @@ export function InspectionSchedulerForm({
       externalDocumentsInputRef.current.value = "";
     }
   };
+
+  useEffect(() => {
+    if (!initialValues || lastAppliedInitialValuesRef.current === initialValuesSignature) {
+      return;
+    }
+
+    lastAppliedInitialValuesRef.current = initialValuesSignature;
+    setSelectedCustomerId(initialValues.customerCompanyId ?? "");
+    setCustomerSearchQuery(buildCustomerSearchQuery(customers, initialValues.customerCompanyId));
+    setSelectedSiteId(
+      initialValues.siteId ??
+        (initialValues.customerCompanyId && autoSelectGenericSiteOnCustomerChange
+          ? genericInspectionSiteOptionValue
+          : "")
+    );
+    setInspectionClassification(initialValues.inspectionClassification ?? "standard");
+    setIsPriority(Boolean(initialValues.isPriority));
+
+    const nextInspectionMonth =
+      initialValues.inspectionMonth ??
+      (initialValues.scheduledStart ? initialValues.scheduledStart.slice(0, 7) : new Date().toISOString().slice(0, 7));
+    setInspectionMonth(nextInspectionMonth);
+    setScheduledStart(initialValues.scheduledStart ?? defaultScheduledStartForMonth(nextInspectionMonth));
+    setScheduledEnd(initialValues.scheduledEnd ?? "");
+    setStatus(initialValues.status ?? "to_be_completed");
+    setNotes(initialValues.notes ?? "");
+    setStartManuallyEdited(Boolean(initialValues.scheduledStart));
+    setServiceLines(buildInitialServiceLines(initialValues));
+    setShowProtectedSaveConfirm(false);
+  }, [autoSelectGenericSiteOnCustomerChange, customers, initialValues, initialValuesSignature]);
 
   const [state, formAction, pending] = useActionState(async (previousState: typeof initialState, formData: FormData) => {
     const result = await action(previousState, formData);
@@ -384,6 +452,9 @@ export function InspectionSchedulerForm({
       }
       showToast({ title: state.success!, tone: "success" });
       onSuccess?.(state);
+      if (!isCreateWorkflow && !state.redirectTo) {
+        router.refresh();
+      }
     };
 
     if (!allowDocumentUpload || !isCreateWorkflow || externalDocumentFiles.length === 0 || !state.createdInspectionId) {
