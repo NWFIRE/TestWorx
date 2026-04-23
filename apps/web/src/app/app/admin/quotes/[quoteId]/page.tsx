@@ -105,7 +105,7 @@ export default async function QuoteDetailPage({
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Delivery</p>
-                <p className="mt-2 text-base font-semibold text-slate-950">{detail.site?.name ?? "No site linked"}</p>
+                <p className="mt-2 text-base font-semibold text-slate-950">{detail.site?.name ?? detail.customSiteName ?? "No site linked"}</p>
                 <p className="mt-1 text-sm text-slate-500">{detail.recipientEmail ?? "No recipient email saved"}</p>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">

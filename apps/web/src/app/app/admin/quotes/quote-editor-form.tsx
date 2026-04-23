@@ -97,6 +97,10 @@ function formatCatalogOptionLabel(item: QuoteCatalogItem) {
   return `${item.title} (${item.code})`;
 }
 
+function formatSiteOptionLabel(site: SiteOption) {
+  return site.city ? `${site.name} - ${site.city}` : site.name;
+}
+
 export function QuoteEditorForm({
   action,
   submitLabel,
@@ -135,7 +139,28 @@ export function QuoteEditorForm({
     () => sites.filter((site) => !value.customerCompanyId || site.customerCompanyId === value.customerCompanyId),
     [sites, value.customerCompanyId]
   );
-  const siteSelectionValue = value.siteId ? value.siteId : value.customSiteName.trim() ? "__custom__" : "";
+  const [siteQuery, setSiteQuery] = useState(() => {
+    if (initialValue.siteId) {
+      const selectedSite = sites.find((site) => site.id === initialValue.siteId);
+      if (selectedSite) {
+        return formatSiteOptionLabel(selectedSite);
+      }
+    }
+
+    return initialValue.customSiteName;
+  });
+  const [sitePickerOpen, setSitePickerOpen] = useState(false);
+  const filteredSites = useMemo(() => {
+    const normalizedQuery = siteQuery.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return availableSites.slice(0, 8);
+    }
+
+    return availableSites.filter((site) => {
+      const haystack = [site.name, site.city].filter(Boolean).join(" ").toLowerCase();
+      return haystack.includes(normalizedQuery);
+    }).slice(0, 8);
+  }, [availableSites, siteQuery]);
 
   const subtotal = useMemo(
     () =>
@@ -238,6 +263,39 @@ export function QuoteEditorForm({
     setActiveCatalogIndex(null);
   }
 
+  function findExactSiteMatch(query: string) {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return null;
+    }
+
+    return availableSites.find((site) => {
+      const siteName = site.name.trim().toLowerCase();
+      const siteLabel = formatSiteOptionLabel(site).trim().toLowerCase();
+      return siteName === normalizedQuery || siteLabel === normalizedQuery;
+    }) ?? null;
+  }
+
+  function selectSite(site: SiteOption) {
+    setSiteQuery(formatSiteOptionLabel(site));
+    setSitePickerOpen(false);
+    setValue((current) => ({
+      ...current,
+      siteId: site.id,
+      customSiteName: ""
+    }));
+  }
+
+  function applySiteQuery(query: string) {
+    const exactMatch = findExactSiteMatch(query);
+    const trimmedQuery = query.trim();
+    setValue((current) => ({
+      ...current,
+      siteId: exactMatch?.id ?? "",
+      customSiteName: trimmedQuery && !exactMatch ? trimmedQuery : ""
+    }));
+  }
+
   return (
     <form
       className="space-y-6"
@@ -270,6 +328,8 @@ export function QuoteEditorForm({
                 name="customerCompanyId"
                 onChange={(event) => {
                   const customer = customers.find((item) => item.id === event.target.value);
+                  setSiteQuery("");
+                  setSitePickerOpen(false);
                   setValue((current) => ({
                     ...current,
                     customerCompanyId: event.target.value,
@@ -293,41 +353,57 @@ export function QuoteEditorForm({
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">Site</span>
               <input name="siteId" type="hidden" value={value.siteId} />
-              <select
-                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
-                onChange={(event) =>
-                  setValue((current) => ({
-                    ...current,
-                    siteId: event.target.value === "__custom__" ? "" : event.target.value,
-                    customSiteName: event.target.value === "__custom__" ? current.customSiteName : ""
-                  }))
-                }
-                value={siteSelectionValue}
-              >
-                <option value="">No site selected</option>
-                <option value="__custom__">Custom site entry</option>
-                {availableSites.map((site) => (
-                  <option key={site.id} value={site.id}>
-                    {site.name}{site.city ? ` - ${site.city}` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {siteSelectionValue === "__custom__" ? (
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Custom site</span>
-                <input
-                  className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
-                  name="customSiteName"
-                  onChange={(event) => setValue((current) => ({ ...current, customSiteName: event.target.value, siteId: "" }))}
-                  placeholder="Enter site name"
-                  value={value.customSiteName}
+              <input name="customSiteName" type="hidden" value={value.customSiteName} />
+              <div className="relative">
+                <SearchInput
+                  clearable={false}
+                  disabled={!value.customerCompanyId}
+                  onBlur={() => {
+                    window.setTimeout(() => {
+                      applySiteQuery(siteQuery);
+                      setSitePickerOpen(false);
+                    }, 120);
+                  }}
+                  onChange={(event) => {
+                    const nextQuery = event.target.value;
+                    setSiteQuery(nextQuery);
+                    setSitePickerOpen(true);
+                    applySiteQuery(nextQuery);
+                  }}
+                  onFocus={() => {
+                    if (value.customerCompanyId) {
+                      setSitePickerOpen(true);
+                    }
+                  }}
+                  placeholder={value.customerCompanyId ? "Select an existing site or type a custom site name" : "Select customer first"}
+                  value={siteQuery}
                 />
-              </label>
-            ) : (
-              <input name="customSiteName" type="hidden" value="" />
-            )}
+                {value.customerCompanyId && sitePickerOpen && filteredSites.length > 0 ? (
+                  <div className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_44px_rgba(15,23,42,0.14)]">
+                    {filteredSites.map((site) => (
+                      <button
+                        key={site.id}
+                        className="flex w-full items-start justify-between gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          selectSite(site);
+                        }}
+                        type="button"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-900">{site.name}</p>
+                          <p className="mt-1 text-xs text-slate-500">{site.city || "Existing customer site"}</p>
+                        </div>
+                        <p className="shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Site</p>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Type a site name here. Choose an existing site from the list, or leave your typed name to save it as a custom site.
+              </p>
+            </label>
 
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">Customer contact</span>
