@@ -10,6 +10,9 @@ import type { ReportFieldDefinition, ReportPrimitiveValue, ReportTemplateDefinit
 import { getLocalReportDraft, putLocalReportDraft, subscribeToOfflineChanges } from "./offline/offline-db";
 import { initializeLocalReportRecord, queueReportDraftSync, queueReportFinalizeSync, startTechnicianSyncEngine } from "./offline/offline-sync";
 import type { LocalReportDraftRecord } from "./offline/offline-types";
+import { buildSafeTaskProgressSummary } from "./mobile-inspection-workspace";
+import type { TechnicianMobileTaskWorkspaceSummary } from "./mobile-inspection-workspace";
+import { MobileInspectionWorkspaceShell } from "./mobile-inspection-workspace-shell";
 import { SignaturePad } from "./signature-pad";
 
 export type TechnicianReportEditorData = {
@@ -26,6 +29,12 @@ export type TechnicianReportEditorData = {
   siteName: string;
   customerName: string;
   scheduledDateLabel: string;
+  inspectionWorkspace: {
+    inspectionId: string;
+    totalTaskCount: number;
+    currentTaskIndex: number;
+    relatedTasks: TechnicianMobileTaskWorkspaceSummary[];
+  };
   dispatchNotes?: string | null;
   paymentCollectionNotice?: string | null;
   template: ReportTemplateDefinition;
@@ -912,6 +921,10 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
   const visibleErrorMessage = errorMessage ?? finalizeErrorMessage;
   const pendingSectionCount = preview.sectionSummaries.filter((summary) => summary.status === "pending").length;
   const hasRequiredSignatures = signatureCount === 2;
+  const safeProgress = buildSafeTaskProgressSummary({
+    completedCount: preview.sectionSummaries.reduce((sum, summary) => sum + summary.completedRows, 0),
+    totalCount: preview.sectionSummaries.reduce((sum, summary) => sum + summary.totalRows, 0)
+  });
   const finalizeReadinessMessage = pendingSectionCount > 0
     ? "Complete and mark every section before finalizing."
     : !hasRequiredSignatures
@@ -922,14 +935,22 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
 
   return (
     <div className="space-y-4 pb-36 sm:space-y-6 md:pb-32 lg:pb-8">
+      <MobileInspectionWorkspaceShell
+        currentMode="edit"
+        customerName={data.customerName}
+        saveState={saveState}
+        scheduledDateLabel={data.scheduledDateLabel}
+        siteName={data.siteName}
+        workspace={data.inspectionWorkspace}
+      />
       <div className="overflow-hidden rounded-[1.75rem] bg-white p-4 shadow-panel sm:rounded-[2rem] sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0 flex-1">
-            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">{data.defaultInspectionTypeLabel}</p>
+            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Current report</p>
             <h2 className="mt-2 text-3xl font-semibold text-ink">
               {(taskDisplayLabel.trim() || data.defaultInspectionTypeLabel)}
             </h2>
-          <p className="mt-2 text-sm text-slate-500">{data.siteName} | {data.customerName} | {data.scheduledDateLabel}</p>
+          <p className="mt-2 text-sm text-slate-500">{data.defaultInspectionTypeLabel}</p>
           <DispatchNotesBanner notes={data.dispatchNotes} />
           {data.canEdit && data.reportStatus !== "finalized" ? (
             <div className="mt-4 max-w-xl">
@@ -970,7 +991,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
         <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
           {[
             ["Sections complete", `${completedSectionCount}/${data.template.sections.length}`],
-            ["Inspection progress", `${Math.round(preview.reportCompletion * 100)}% complete`],
+            ...(safeProgress ? [["Report progress", `${safeProgress.percent}% complete`]] : []),
             ["Detected deficiencies", String(preview.deficiencyCount)],
             ["Manual deficiencies", String(draft.deficiencies.length)],
             ["Photos", String(draft.attachments.length)],

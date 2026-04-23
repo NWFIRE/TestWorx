@@ -26,6 +26,8 @@ import type { TechnicianReportEditorData } from "./report-editor";
 import { getLocalReportDraft, putLocalReportDraft, subscribeToOfflineChanges } from "./offline/offline-db";
 import { initializeLocalReportRecord, queueReportDraftSync, queueReportFinalizeSync, startTechnicianSyncEngine } from "./offline/offline-sync";
 import type { LocalReportDraftRecord } from "./offline/offline-types";
+import { buildSafeTaskProgressSummary } from "./mobile-inspection-workspace";
+import { MobileInspectionWorkspaceShell } from "./mobile-inspection-workspace-shell";
 import { SignaturePad } from "./signature-pad";
 
 const saveStateTone: Record<string, string> = {
@@ -270,6 +272,11 @@ export function MobileChecklistReportScreen({
   const preview = useMemo(() => buildReportPreview(draft), [draft]);
   const checklist = useMemo(() => buildMobileChecklistViewModel(data.template, draft), [data.template, draft]);
   const progressPercent = checklist.totalCount > 0 ? Math.round((checklist.completedCount / checklist.totalCount) * 100) : 0;
+  const safeChecklistProgress = buildSafeTaskProgressSummary({
+    completedCount: checklist.completedCount,
+    totalCount: checklist.totalCount,
+    percent: progressPercent
+  });
   const missingTechnicianSignature = !(draft.signatures.technician?.signerName && draft.signatures.technician?.imageDataUrl);
   const missingCustomerSignature = !(draft.signatures.customer?.signerName && draft.signatures.customer?.imageDataUrl);
 
@@ -892,6 +899,14 @@ export function MobileChecklistReportScreen({
   if (mode === "review") {
     return (
       <div className="space-y-4 pb-32">
+        <MobileInspectionWorkspaceShell
+          currentMode="review"
+          customerName={data.customerName}
+          saveState={saveState}
+          scheduledDateLabel={data.scheduledDateLabel}
+          siteName={data.siteName}
+          workspace={data.inspectionWorkspace}
+        />
         <div className="rounded-[1.75rem] bg-white p-5 shadow-panel">
           <div className="flex items-center justify-between gap-3">
             <button
@@ -906,10 +921,6 @@ export function MobileChecklistReportScreen({
               <h1 className="mt-1 text-lg font-semibold text-slate-950">{data.inspectionTypeLabel}</h1>
             </div>
             <div className={`text-sm font-semibold ${saveStateTone[saveState] ?? "text-slate-700"}`}>{saveState}</div>
-          </div>
-          <div className="mt-4 rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-sm font-medium text-slate-950">{data.siteName}</p>
-            <p className="mt-1 text-sm text-slate-500">{data.defaultInspectionTypeLabel}</p>
           </div>
         </div>
 
@@ -1010,34 +1021,26 @@ export function MobileChecklistReportScreen({
 
   return (
     <div className="space-y-4 pb-32">
-      <div className="rounded-[1.75rem] bg-white p-5 shadow-panel">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">In Progress</p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">{data.inspectionTypeLabel}</h1>
-            <p className="mt-2 text-sm text-slate-500">{formatChecklistTimestamp(data.scheduledDateLabel)}</p>
-          </div>
-          <div className={`rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold ${saveStateTone[saveState] ?? "text-slate-700"}`}>
-            {saveState}
-          </div>
-        </div>
-        <div className="mt-4 space-y-3">
-          <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-sm font-medium text-slate-950">{data.siteName}</p>
-            <p className="mt-1 text-sm text-slate-500">{data.defaultInspectionTypeLabel}</p>
-          </div>
-          <DispatchNotesBanner notes={data.dispatchNotes} />
-        </div>
-        <div className="mt-4">
+      <MobileInspectionWorkspaceShell
+        currentMode="edit"
+        customerName={data.customerName}
+        saveState={saveState}
+        scheduledDateLabel={formatChecklistTimestamp(data.scheduledDateLabel)}
+        siteName={data.siteName}
+        workspace={data.inspectionWorkspace}
+      />
+      <DispatchNotesBanner notes={data.dispatchNotes} />
+      {safeChecklistProgress ? (
+        <div className="rounded-[1.75rem] bg-white p-5 shadow-panel">
           <div className="flex items-center justify-between text-sm text-slate-600">
-            <span>{checklist.completedCount} of {checklist.totalCount} completed</span>
-            <span>{progressPercent}%</span>
+            <span>{safeChecklistProgress.label}</span>
+            <span>{safeChecklistProgress.percent}%</span>
           </div>
           <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100">
-            <div className="h-full rounded-full bg-[var(--tenant-primary)] transition-all" style={{ width: `${progressPercent}%` }} />
+            <div className="h-full rounded-full bg-[var(--tenant-primary)] transition-all" style={{ width: `${safeChecklistProgress.percent}%` }} />
           </div>
         </div>
-      </div>
+      ) : null}
 
       {activeChecklistSections.map((section) => (
         <div key={section.sectionId} className="space-y-3">

@@ -347,16 +347,27 @@ async function getAuthorizedReport(actor: ActorContext, inspectionId: string, ta
       tenantId: parsedActor.tenantId as string
     },
     include: {
-      inspection: {
-        include: {
-          site: true,
-          customerCompany: true,
-          tenant: true,
-          assignedTechnician: true,
-          technicianAssignments: { select: { technicianId: true } },
-          tasks: { select: { id: true, inspectionType: true, customDisplayLabel: true } }
-        }
-      },
+        inspection: {
+          include: {
+            site: true,
+            customerCompany: true,
+            tenant: true,
+            assignedTechnician: true,
+            technicianAssignments: { select: { technicianId: true } },
+            tasks: {
+              include: {
+                report: {
+                  select: {
+                    id: true,
+                    status: true,
+                    finalizedAt: true,
+                    contentJson: true
+                  }
+                }
+              }
+            }
+          }
+        },
       task: {
         include: {
           assignedTechnician: true
@@ -411,6 +422,34 @@ async function getAuthorizedReport(actor: ActorContext, inspectionId: string, ta
   }
 
   return { parsedActor, report };
+}
+
+function buildTaskProgressSummary(draft: ReportDraft) {
+  const preview = buildReportPreview(draft);
+  const completedCount = preview.sectionSummaries.reduce((sum, section) => sum + section.completedRows, 0);
+  const totalCount = preview.sectionSummaries.reduce((sum, section) => sum + section.totalRows, 0);
+
+  if (totalCount <= 0 || completedCount < 0 || completedCount > totalCount) {
+    return {
+      hasMeaningfulProgress:
+        preview.deficiencyCount > 0 ||
+        preview.manualDeficiencyCount > 0 ||
+        preview.attachmentCount > 0 ||
+        Object.values(draft.signatures).some((signature) => Boolean(signature?.signerName && signature?.imageDataUrl)) ||
+        draft.overallNotes.trim().length > 0 ||
+        preview.sectionSummaries.some((section) => section.status !== "pending" || section.notes.trim().length > 0),
+      completedCount: null,
+      totalCount: null,
+      percent: null
+    };
+  }
+
+  return {
+    hasMeaningfulProgress: completedCount > 0 || totalCount > 0,
+    completedCount,
+    totalCount,
+    percent: Math.round((completedCount / totalCount) * 100)
+  };
 }
 
 function hydrateDraftFromReport(report: any) {
@@ -939,6 +978,30 @@ export async function getInspectionReportDraft(actor: ActorContext, inspectionId
   const { parsedActor, report } = authorized;
   const labeledTasks = withInspectionTaskDisplayLabels(report.inspection.tasks);
   const reportTask = labeledTasks.find((task) => task.id === report.task.id);
+  const relatedTasks = labeledTasks.map((task, index) => {
+    const siblingDraft = task.report?.contentJson ? reportDraftSchema.parse(task.report.contentJson) : null;
+    const progress = siblingDraft ? buildTaskProgressSummary(siblingDraft) : {
+      hasMeaningfulProgress: false,
+      completedCount: null,
+      totalCount: null,
+      percent: null
+    };
+
+    return {
+      id: task.id,
+      inspectionType: task.inspectionType,
+      customDisplayLabel: task.customDisplayLabel ?? null,
+      displayLabel: task.displayLabel,
+      reportStatus: task.report?.status ?? null,
+      finalizedAt: task.report?.finalizedAt?.toISOString() ?? null,
+      currentTaskIndex: index + 1,
+      isCurrent: task.id === report.task.id,
+      hasMeaningfulProgress: progress.hasMeaningfulProgress,
+      progressCompletedCount: progress.completedCount,
+      progressTotalCount: progress.totalCount,
+      progressPercent: progress.percent
+    };
+  });
   const priorReport = await prisma.inspectionReport.findFirst({
     where: {
       tenantId: parsedActor.tenantId as string,
@@ -1047,6 +1110,7 @@ export async function getInspectionReportDraft(actor: ActorContext, inspectionId
       customDisplayLabel: report.task.customDisplayLabel ?? null,
       displayLabel: reportTask?.displayLabel ?? resolvedTemplate.label
     },
+    relatedTasks,
     template: resolvedTemplate,
     draft,
     preview: buildReportPreview(draft),

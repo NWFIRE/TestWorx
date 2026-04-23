@@ -68,6 +68,21 @@ export async function loadTechnicianReportData(inspectionId: string, taskId: str
     siteName: inspectionDisplay.primaryTitle,
     customerName: inspectionDisplay.secondaryTitle || report.inspection.customerCompany.name,
     scheduledDateLabel: format(report.inspection.scheduledStart, "MMM d, yyyy h:mm a"),
+    inspectionWorkspace: {
+      inspectionId,
+      totalTaskCount: report.relatedTasks.length,
+      currentTaskIndex: report.relatedTasks.find((task) => task.isCurrent)?.currentTaskIndex ?? 1,
+      relatedTasks: report.relatedTasks.map((task) => ({
+        id: task.id,
+        displayLabel: task.displayLabel,
+        reportStatus: task.reportStatus,
+        hasMeaningfulProgress: task.hasMeaningfulProgress,
+        progressCompletedCount: task.progressCompletedCount,
+        progressTotalCount: task.progressTotalCount,
+        progressPercent: task.progressPercent,
+        isCurrent: task.isCurrent
+      }))
+    },
     dispatchNotes: report.inspection.notes,
     paymentCollectionNotice: isDueAtTimeOfServiceCustomer(report.inspection.customerCompany)
       ? "Payment due at time of service. Collect payment before leaving the site."

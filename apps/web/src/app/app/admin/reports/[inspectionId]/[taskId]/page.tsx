@@ -59,6 +59,19 @@ export default async function AdminReportCorrectionPage({ params }: { params: Pr
         siteName: report.inspection.site.name,
         customerName: report.inspection.customerCompany.name,
         scheduledDateLabel: format(report.inspection.scheduledStart, "MMM d, yyyy h:mm a"),
+        inspectionWorkspace: {
+          inspectionId,
+          totalTaskCount: 1,
+          currentTaskIndex: 1,
+          relatedTasks: [
+            {
+              id: taskId,
+              displayLabel: report.task.displayLabel ?? report.template.label,
+              reportStatus: adminOverrideForFinalized ? "draft" : report.status,
+              isCurrent: true
+            }
+          ]
+        },
         template: report.template,
         draft: report.draft
       }}
