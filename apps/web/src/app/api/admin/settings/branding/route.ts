@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
@@ -86,6 +87,16 @@ export async function POST(request: Request) {
 
     response.cookies.set(BRAND_PRIMARY_COOKIE, primaryColor, cookieOptions);
     response.cookies.set(BRAND_ACCENT_COOKIE, accentColor, cookieOptions);
+
+    revalidatePath("/app/admin/settings");
+    revalidatePath("/app/admin");
+    revalidatePath("/app/tech");
+    revalidatePath("/app/customer");
+    revalidatePath("/login");
+    revalidatePath("/accept-invite");
+    revalidatePath("/reset-password");
+    revalidatePath("/app", "layout");
+    revalidatePath("/", "layout");
 
     return response;
   } catch (error) {
