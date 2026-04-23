@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { PDFDocument } from "pdf-lib";
 
-import { applyRepeaterBulkAction, applyRepeaterRowSmartUpdate, buildInitialReportDraft, buildRepeaterRowDefaults, buildReportPreview, describeRepeaterValueLines, duplicateRepeaterRows, validateDraftForTemplate, validateFinalizationDraft } from "../report-engine";
+import { applyRepeaterBulkAction, applyRepeaterRowSmartUpdate, buildInitialReportDraft, buildRepeaterRowDefaults, buildReportPreview, describeRepeaterRowLabel, describeRepeaterValueLines, duplicateRepeaterRows, validateDraftForTemplate, validateFinalizationDraft } from "../report-engine";
 import { generateInspectionReportPdf } from "../pdf-report";
 import { buildDataUrlStorageKey } from "../storage";
 import { resolveReportTemplate } from "../report-config";
@@ -11,6 +11,18 @@ const tinyPngBytes = Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAA
 const tinyPngDataUrl = buildDataUrlStorageKey({ mimeType: "image/png", bytes: tinyPngBytes });
 
 describe("smart report foundations", () => {
+  it("falls back to numbered extinguisher labels when a duplicated row carries a duplicate action label", () => {
+    expect(
+      describeRepeaterRowLabel(
+        {
+          itemLabel: "Duplicate Extinguisher",
+          extinguisherType: "5 lb ABC"
+        },
+        1
+      )
+    ).toBe("Extinguisher #2");
+  });
+
   it("prefills fire extinguisher rows from asset data and prior finalized reports using the required priority", () => {
     const draft = buildInitialReportDraft({
       inspectionType: "fire_extinguisher",

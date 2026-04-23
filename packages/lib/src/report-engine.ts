@@ -1153,8 +1153,10 @@ export function canFinalizeReport(actorRole: UserRole | string, reportStatus: Re
 
 export function describeRepeaterRowLabel(row: Record<string, ReportPrimitiveValue>, rowIndex: number) {
   const itemLabel = typeof row.itemLabel === "string" && row.itemLabel ? row.itemLabel : null;
+  const normalizedItemLabel = itemLabel?.trim() ?? null;
   const systemIdentifier = typeof row.systemIdentifier === "string" && row.systemIdentifier ? row.systemIdentifier : null;
   const location = typeof row.location === "string" && row.location ? row.location : null;
+  const extinguisherType = typeof row.extinguisherType === "string" && row.extinguisherType ? row.extinguisherType : null;
   const fixtureType = typeof row.fixtureType === "string" && row.fixtureType ? row.fixtureType : null;
   const appliance = typeof row.appliance === "string" && row.appliance ? row.appliance : null;
   const hoodName = typeof row.hoodName === "string" && row.hoodName ? row.hoodName : null;
@@ -1163,8 +1165,12 @@ export function describeRepeaterRowLabel(row: Record<string, ReportPrimitiveValu
   const protectedProcess = typeof row.protectedProcess === "string" && row.protectedProcess ? row.protectedProcess : null;
   const assemblyType = typeof row.assemblyType === "string" && row.assemblyType ? row.assemblyType : null;
 
-  if (itemLabel) {
-    return itemLabel;
+  if (normalizedItemLabel && !/^duplicate\s+/i.test(normalizedItemLabel)) {
+    return normalizedItemLabel;
+  }
+
+  if (/duplicate\s+extinguisher/i.test(normalizedItemLabel ?? "") || extinguisherType) {
+    return `Extinguisher #${rowIndex + 1}`;
   }
 
   if (systemIdentifier) {
