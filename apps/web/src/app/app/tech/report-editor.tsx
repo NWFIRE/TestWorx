@@ -931,7 +931,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
       ? "Technician and customer signatures are required before finalizing."
       : null;
   const canFinalizeNow = data.canFinalize && data.reportStatus !== "finalized" && !saveInFlightRef.current && !finalizeReadinessMessage;
-  const footerStatus = `${saveState} • ${Math.round(preview.reportCompletion * 100)}% complete`;
+  const footerStatus = safeProgress ? `${saveState} | ${safeProgress.percent}% complete` : saveState;
 
   return (
     <div className="space-y-4 pb-36 sm:space-y-6 md:pb-32 lg:pb-8">
@@ -1437,7 +1437,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
                 <div className="rounded-2xl border border-slate-200 p-4">
                   <p className="font-semibold text-ink">Totals</p>
                   <p className="mt-1">Inspection status: {preview.inspectionStatus === "deficiencies_found" ? "Deficiencies Found" : "Pass"}</p>
-                  <p className="mt-1">Progress: {Math.round(preview.reportCompletion * 100)}% complete</p>
+                  <p className="mt-1">Progress: {safeProgress ? `${safeProgress.percent}% complete` : "Not available yet"}</p>
                   <p className="mt-1">Detected deficiencies: {preview.deficiencyCount}</p>
                   <p className="mt-1">Manual deficiencies: {preview.manualDeficiencyCount}</p>
                   <p className="mt-1">Attachments: {preview.attachmentCount}</p>

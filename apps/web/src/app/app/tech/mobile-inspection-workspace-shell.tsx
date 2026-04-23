@@ -15,6 +15,31 @@ type InspectionWorkspaceData = {
   relatedTasks: TechnicianMobileTaskWorkspaceSummary[];
 };
 
+function resolveWorkspaceTaskStatusLabel({
+  task,
+  currentMode
+}: {
+  task: TechnicianMobileTaskWorkspaceSummary;
+  currentMode: "edit" | "review";
+}) {
+  if (task.isCurrent) {
+    if (task.reportStatus === "finalized") {
+      return "Finalized";
+    }
+
+    if (currentMode === "review" || task.reportStatus === "submitted") {
+      return "Ready for Review";
+    }
+
+    return "In Progress";
+  }
+
+  return getTechnicianMobileTaskStatusLabel({
+    reportStatus: task.reportStatus,
+    hasMeaningfulProgress: task.hasMeaningfulProgress
+  });
+}
+
 export function MobileInspectionWorkspaceShell({
   workspace,
   siteName,
@@ -76,10 +101,7 @@ export function MobileInspectionWorkspaceShell({
                 totalCount: task.progressTotalCount,
                 percent: task.progressPercent
               });
-              const statusLabel = getTechnicianMobileTaskStatusLabel({
-                reportStatus: task.reportStatus,
-                hasMeaningfulProgress: task.hasMeaningfulProgress
-              });
+              const statusLabel = resolveWorkspaceTaskStatusLabel({ task, currentMode });
               const href = currentMode === "review"
                 ? `/app/tech/reports/${encodeURIComponent(workspace.inspectionId)}/${encodeURIComponent(task.id)}/review`
                 : `/app/tech/reports/${encodeURIComponent(workspace.inspectionId)}/${encodeURIComponent(task.id)}`;
@@ -145,10 +167,7 @@ export function MobileInspectionWorkspaceShell({
               <p className="mt-2 text-base font-semibold text-slate-950">{currentTask.displayLabel}</p>
             </div>
             <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-              {getTechnicianMobileTaskStatusLabel({
-                reportStatus: currentTask.reportStatus,
-                hasMeaningfulProgress: currentTask.hasMeaningfulProgress
-              })}
+              {resolveWorkspaceTaskStatusLabel({ task: currentTask, currentMode })}
             </div>
           </div>
         </div>

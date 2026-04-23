@@ -277,6 +277,7 @@ export function MobileChecklistReportScreen({
     totalCount: checklist.totalCount,
     percent: progressPercent
   });
+  const checklistProgressLabel = safeChecklistProgress ? `${safeChecklistProgress.percent}% complete` : null;
   const missingTechnicianSignature = !(draft.signatures.technician?.signerName && draft.signatures.technician?.imageDataUrl);
   const missingCustomerSignature = !(draft.signatures.customer?.signerName && draft.signatures.customer?.imageDataUrl);
 
@@ -995,7 +996,10 @@ export function MobileChecklistReportScreen({
           style={{ bottom: "var(--mobile-tab-bar-offset, 5.5rem)", paddingBottom: "0.75rem" }}
         >
           <div className="mx-auto max-w-5xl">
-            <p className="text-xs font-medium text-slate-600">{saveState} • {progressPercent}% checklist complete</p>
+            <div className="flex items-center justify-between gap-3 text-xs font-medium text-slate-600">
+              <p>{saveState}</p>
+              {checklistProgressLabel ? <p>{checklistProgressLabel}</p> : null}
+            </div>
             <div className="mt-3 grid grid-cols-2 gap-3">
               <button
                 className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
@@ -1280,7 +1284,7 @@ export function MobileChecklistReportScreen({
         <div className="mx-auto max-w-5xl">
           <div className="mb-3 flex items-center justify-between gap-3 text-xs font-medium text-slate-600">
             <p>{saveSummary}</p>
-            <p>{progressPercent}% complete</p>
+            {checklistProgressLabel ? <p>{checklistProgressLabel}</p> : null}
           </div>
           <button
             className="min-h-12 w-full rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)]"

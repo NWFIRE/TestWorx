@@ -412,6 +412,18 @@ export function AppShell({
   }, [drawerOpen]);
 
   useEffect(() => {
+    const container = contentRef.current;
+    if (!container) {
+      return;
+    }
+
+    container.scrollTo({
+      top: 0,
+      behavior: "auto"
+    });
+  }, [pathname]);
+
+  useEffect(() => {
     updateViewportMetrics();
 
     const viewport = window.visualViewport;
