@@ -34,7 +34,7 @@ export function AddReportTypeControl({ inspectionId }: { inspectionId: string })
                     key={inspectionType}
                     className={`min-h-12 rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
                       isActive
-                        ? "border-slateblue bg-slateblue text-white"
+                        ? "border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary)] text-[var(--tenant-primary-contrast)]"
                         : "border-slate-200 bg-white text-slate-700"
                     } disabled:opacity-60`}
                     disabled={isPending}
@@ -61,7 +61,7 @@ export function AddReportTypeControl({ inspectionId }: { inspectionId: string })
           </select>
         </div>
         <button
-          className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-60"
+          className="min-h-12 rounded-2xl border border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary-soft)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary)] disabled:opacity-60"
           disabled={isPending}
           onClick={() => {
             const selectedLabel = inspectionTypeRegistry[selectedType].label;

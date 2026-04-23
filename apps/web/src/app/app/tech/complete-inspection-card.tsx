@@ -54,7 +54,7 @@ export function CompleteInspectionCard({ inspectionId }: { inspectionId: string 
               <label key={option.value} className="flex cursor-pointer items-start gap-3 rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3">
                 <input
                   checked={requestType === option.value}
-                  className="mt-1 h-4 w-4 border-slate-300 text-slateblue"
+                  className="mt-1 h-4 w-4 border-slate-300 text-[var(--tenant-primary)]"
                   name={`closeout-request-${inspectionId}`}
                   onChange={() => setRequestType(option.value)}
                   type="radio"
@@ -73,7 +73,7 @@ export function CompleteInspectionCard({ inspectionId }: { inspectionId: string 
                 Request note
               </label>
               <textarea
-                className="mt-2 min-h-28 w-full resize-none overflow-hidden rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3 text-sm text-ink shadow-sm outline-none transition focus:border-slateblue focus:ring-2 focus:ring-slateblue/10"
+                className="mt-2 min-h-28 w-full resize-none overflow-hidden rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3 text-sm text-ink shadow-sm outline-none transition focus:border-[color:rgb(var(--tenant-primary-rgb)/0.38)] focus:ring-2 focus:ring-[color:rgb(var(--tenant-primary-rgb)/0.10)]"
                 data-auto-grow="on"
                 id={`closeout-note-${inspectionId}`}
                 onChange={(event) => setNote(event.target.value)}

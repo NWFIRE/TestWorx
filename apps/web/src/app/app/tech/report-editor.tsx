@@ -241,7 +241,7 @@ function ReportSelectControl({
                 key={option.value}
                 className={`min-h-12 rounded-2xl border px-4 py-3 text-sm font-semibold uppercase tracking-[0.12em] transition ${
                   isActive
-                    ? "border-slateblue bg-slateblue text-white"
+                    ? "border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary)] text-[var(--tenant-primary-contrast)]"
                     : "border-slate-200 bg-white text-slate-600"
                 } disabled:opacity-50`}
                 disabled={disabled}
@@ -1014,7 +1014,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
               return (
                 <button
                   key={section.id}
-                  className={`min-h-[5.5rem] w-[14rem] shrink-0 snap-start rounded-2xl border px-4 py-4 text-left ${activeSectionId === section.id ? "border-slateblue bg-slateblue text-white" : "border-slate-200 bg-white text-ink"}`}
+                  className={`min-h-[5.5rem] w-[14rem] shrink-0 snap-start rounded-2xl border px-4 py-4 text-left ${activeSectionId === section.id ? "border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary)] text-[var(--tenant-primary-contrast)]" : "border-slate-200 bg-white text-ink"}`}
                   onClick={() => { void handleSectionChange(section.id); }}
                   title={summaryLabel}
                   type="button"
@@ -1044,7 +1044,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
               return (
                 <button
                   key={section.id}
-                  className={`min-h-[5.5rem] rounded-2xl border px-4 py-4 text-left ${activeSectionId === section.id ? "border-slateblue bg-slateblue text-white" : "border-slate-200 bg-white text-ink"}`}
+                  className={`min-h-[5.5rem] rounded-2xl border px-4 py-4 text-left ${activeSectionId === section.id ? "border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary)] text-[var(--tenant-primary-contrast)]" : "border-slate-200 bg-white text-ink"}`}
                   onClick={() => { void handleSectionChange(section.id); }}
                   title={summaryLabel}
                   type="button"
@@ -1069,7 +1069,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
               <button className="min-h-10 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-ink" onClick={() => setShowPreview((current) => !current)} type="button">
                 {showPreview ? "Hide preview" : "Preview"}
               </button>
-              <button className="min-h-10 rounded-2xl bg-slateblue px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={!nextSectionId} onClick={() => { if (nextSectionId) { void handleSectionChange(nextSectionId); } }} type="button">
+              <button className="min-h-10 rounded-2xl bg-[var(--tenant-primary)] px-4 py-2 text-sm font-semibold text-[var(--tenant-primary-contrast)] disabled:opacity-50" disabled={!nextSectionId} onClick={() => { if (nextSectionId) { void handleSectionChange(nextSectionId); } }} type="button">
                 Next
               </button>
               {canFinalizeNow ? (
@@ -1462,7 +1462,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
                 Finalize
               </button>
             ) : (
-              <button className="rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={!nextSectionId} onClick={() => { if (nextSectionId) { void handleSectionChange(nextSectionId); } }} type="button">
+              <button className="rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)] disabled:opacity-50" disabled={!nextSectionId} onClick={() => { if (nextSectionId) { void handleSectionChange(nextSectionId); } }} type="button">
                 Next
               </button>
             )}

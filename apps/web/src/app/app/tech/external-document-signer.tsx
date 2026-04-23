@@ -481,7 +481,7 @@ export function ExternalDocumentSigner({
 
             <div className="flex flex-wrap items-center gap-3">
               <a
-                className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
+                className="inline-flex rounded-2xl border border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary-soft)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary)]"
                 href={originalPdfUrl}
                 rel="noreferrer"
                 target="_blank"
@@ -490,7 +490,7 @@ export function ExternalDocumentSigner({
               </a>
               {savedVariantHref ? (
                 <a
-                  className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
+                  className="inline-flex rounded-2xl border border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary-soft)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary)]"
                   href={savedVariantHref}
                   rel="noreferrer"
                   target="_blank"
@@ -556,7 +556,9 @@ export function ExternalDocumentSigner({
                 <button
                   key={option.value}
                   className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold ${
-                    activeColor === option.value ? "border-slateblue bg-white text-slateblue" : "border-slate-200 bg-white text-slate-700"
+                    activeColor === option.value
+                      ? "border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary-soft)] text-[var(--tenant-primary)]"
+                      : "border-slate-200 bg-white text-slate-700"
                   }`}
                   onClick={() => setActiveColor(option.value)}
                   type="button"
@@ -571,7 +573,9 @@ export function ExternalDocumentSigner({
                 <button
                   key={option.label}
                   className={`inline-flex min-h-11 items-center justify-center rounded-xl border px-3 py-2 text-sm font-semibold ${
-                    activeWidth === option.value ? "border-slateblue bg-white text-slateblue" : "border-slate-200 bg-white text-slate-700"
+                    activeWidth === option.value
+                      ? "border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary-soft)] text-[var(--tenant-primary)]"
+                      : "border-slate-200 bg-white text-slate-700"
                   }`}
                   onClick={() => setActiveWidth(option.value)}
                   type="button"
@@ -611,7 +615,7 @@ export function ExternalDocumentSigner({
           {state.error ? <p className="text-sm text-rose-600">{state.error}</p> : null}
           {state.success ? <p className="text-sm text-emerald-600">{state.success}</p> : null}
           <button
-            className="w-full rounded-2xl bg-slateblue px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
+            className="w-full rounded-2xl bg-[var(--tenant-primary)] px-5 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)] disabled:opacity-60"
             disabled={pending || totalStrokeCount === 0 || Boolean(pdfError) || loadingPdf}
             type="submit"
           >

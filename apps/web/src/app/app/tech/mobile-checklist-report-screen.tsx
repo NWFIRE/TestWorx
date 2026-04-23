@@ -133,7 +133,9 @@ function SelectChips({
           <button
             key={option.value}
             className={`min-h-11 rounded-2xl border px-4 py-2.5 text-sm font-semibold transition ${
-              active ? "border-slateblue bg-slateblue text-white" : "border-slate-200 bg-white text-slate-700"
+              active
+                ? "border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary)] text-[var(--tenant-primary-contrast)]"
+                : "border-slate-200 bg-white text-slate-700"
             } disabled:opacity-50`}
             disabled={disabled}
             onClick={() => onChange(option.value)}
@@ -992,7 +994,7 @@ export function MobileChecklistReportScreen({
                 Back to Checklist
               </button>
               <button
-                className="min-h-12 rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                className="min-h-12 rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)] disabled:opacity-50"
                 disabled={blockingIssues.length > 0 || finalizeInFlightRef.current}
                 onClick={() => { void finalizeInspection(); }}
                 type="button"
@@ -1032,7 +1034,7 @@ export function MobileChecklistReportScreen({
             <span>{progressPercent}%</span>
           </div>
           <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100">
-            <div className="h-full rounded-full bg-slateblue transition-all" style={{ width: `${progressPercent}%` }} />
+            <div className="h-full rounded-full bg-[var(--tenant-primary)] transition-all" style={{ width: `${progressPercent}%` }} />
           </div>
         </div>
       </div>
@@ -1278,7 +1280,7 @@ export function MobileChecklistReportScreen({
             <p>{progressPercent}% complete</p>
           </div>
           <button
-            className="min-h-12 w-full rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white"
+            className="min-h-12 w-full rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)]"
             onClick={() => {
               trackChecklistEvent("review_screen_opened", { reportId: data.reportId });
               router.push(`/app/tech/reports/${encodeURIComponent(inspectionId)}/${encodeURIComponent(taskId)}/review`);
