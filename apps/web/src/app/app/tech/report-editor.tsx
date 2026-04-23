@@ -1436,7 +1436,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
           {(visibleErrorMessage || backupWarning) ? (
             <div
               className="mobile-keyboard-hide fixed inset-x-0 z-20 px-4 transition-all duration-150 ease-out lg:hidden"
-              style={{ bottom: "calc(5.5rem + env(safe-area-inset-bottom))" }}
+              style={{ bottom: "calc(var(--mobile-tab-bar-offset, 5.5rem) + 0.75rem)" }}
             >
               <div className="mx-auto max-w-7xl space-y-2">
                 {visibleErrorMessage ? <p className="rounded-2xl border border-rose-200 bg-white/95 px-4 py-3 text-sm text-rose-700 shadow-xl backdrop-blur">{visibleErrorMessage}</p> : null}
@@ -1445,8 +1445,8 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
             </div>
           ) : null}
         <div
-          className="mobile-keyboard-hide fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur transition-all duration-150 ease-out lg:hidden"
-          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+          className="mobile-keyboard-hide fixed inset-x-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur transition-all duration-150 ease-out lg:hidden"
+          style={{ bottom: "var(--mobile-tab-bar-offset, 5.5rem)", paddingBottom: "0.75rem" }}
         >
           <div className="mx-auto max-w-7xl">
             <div className="mb-3 text-xs font-medium text-slate-600">

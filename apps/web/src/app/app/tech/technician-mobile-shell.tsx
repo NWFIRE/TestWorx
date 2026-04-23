@@ -150,24 +150,29 @@ export function TechnicianMobileTabBar({ pathname }: { pathname: string }) {
   return (
     <nav
       aria-label="Technician mobile navigation"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/96 px-2 pb-[calc(max(0.75rem,env(safe-area-inset-bottom)))] pt-2 backdrop-blur lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 lg:hidden"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="grid grid-cols-5 gap-1">
-        {technicianTabs.map((tab) => {
-          const active = isActive(pathname, tab);
-          return (
-            <Link
-              key={tab.href}
-              className={active
-                ? "flex min-h-[64px] flex-col items-center justify-center rounded-2xl bg-[var(--tenant-primary-soft)] px-2 py-2 text-[11px] font-semibold text-[var(--tenant-primary)]"
-                : "flex min-h-[64px] flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium text-slate-500"}
-              href={tab.href}
-            >
-              <MobileTabIcon active={active} label={tab.label} />
-              <span className="mt-1.5 text-center leading-4">{tab.label}</span>
-            </Link>
-          );
-        })}
+      <div className="pointer-events-none mx-auto w-full max-w-screen-sm px-2">
+        <div className="pointer-events-auto rounded-t-[1.6rem] border border-b-0 border-slate-200 bg-white/96 px-2 pb-3 pt-2 shadow-[0_-12px_30px_rgba(15,23,42,0.10)] backdrop-blur">
+          <div className="grid grid-cols-5 gap-1">
+            {technicianTabs.map((tab) => {
+              const active = isActive(pathname, tab);
+              return (
+                <Link
+                  key={tab.href}
+                  className={active
+                    ? "flex min-h-[64px] flex-col items-center justify-center rounded-2xl bg-[var(--tenant-primary-soft)] px-2 py-2 text-[11px] font-semibold text-[var(--tenant-primary)]"
+                    : "flex min-h-[64px] flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium text-slate-500"}
+                  href={tab.href}
+                >
+                  <MobileTabIcon active={active} label={tab.label} />
+                  <span className="mt-1.5 text-center leading-4">{tab.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </nav>
   );

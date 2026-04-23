@@ -7,6 +7,7 @@
   --app-height: 100dvh;
   --keyboard-offset: 0px;
   --mobile-header-offset: 88px;
+  --mobile-tab-bar-offset: calc(5.5rem + env(safe-area-inset-bottom));
   --app-bg: #F3F6FB;
   --surface-base: #FFFFFF;
   --surface-subtle: #F8FAFC;

@@ -980,8 +980,8 @@ export function MobileChecklistReportScreen({
         ) : null}
 
         <div
-          className="mobile-keyboard-hide fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur"
-          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+          className="mobile-keyboard-hide fixed inset-x-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur"
+          style={{ bottom: "var(--mobile-tab-bar-offset, 5.5rem)", paddingBottom: "0.75rem" }}
         >
           <div className="mx-auto max-w-5xl">
             <p className="text-xs font-medium text-slate-600">{saveState} • {progressPercent}% checklist complete</p>
@@ -1271,8 +1271,8 @@ export function MobileChecklistReportScreen({
       ) : null}
 
       <div
-        className="mobile-keyboard-hide fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur"
-        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        className="mobile-keyboard-hide fixed inset-x-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur"
+        style={{ bottom: "var(--mobile-tab-bar-offset, 5.5rem)", paddingBottom: "0.75rem" }}
       >
         <div className="mx-auto max-w-5xl">
           <div className="mb-3 flex items-center justify-between gap-3 text-xs font-medium text-slate-600">

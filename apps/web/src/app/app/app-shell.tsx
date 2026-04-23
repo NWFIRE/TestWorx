@@ -701,11 +701,11 @@ export function AppShell({
           ref={contentRef}
           style={{
             paddingBottom: isTechnician
-              ? "calc(max(6.5rem, env(safe-area-inset-bottom) + 5.25rem) + var(--keyboard-offset, 0px))"
+              ? "calc(var(--mobile-tab-bar-offset, 5.5rem) + 1rem + var(--keyboard-offset, 0px))"
               : "calc(max(1.5rem, env(safe-area-inset-bottom)) + var(--keyboard-offset, 0px))",
             scrollPaddingTop: "calc(var(--mobile-header-offset, 88px) + 1rem)",
             scrollPaddingBottom: isTechnician
-              ? "calc(var(--keyboard-offset, 0px) + 8rem + env(safe-area-inset-bottom))"
+              ? "calc(var(--keyboard-offset, 0px) + var(--mobile-tab-bar-offset, 5.5rem) + 2rem)"
               : "calc(var(--keyboard-offset, 0px) + 7rem + env(safe-area-inset-bottom))"
           }}
         >
@@ -713,8 +713,8 @@ export function AppShell({
             <div className="mx-auto w-full max-w-[1700px] min-w-0">{children}</div>
           </MobilePullToRefresh>
         </main>
-        {isTechnician ? <TechnicianMobileTabBar pathname={pathname} /> : null}
       </div>
+      {isTechnician ? <TechnicianMobileTabBar pathname={pathname} /> : null}
     </div>
   );
 }
