@@ -102,7 +102,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
               <button
                 key={value}
                 className={filter === value
-                  ? "min-h-11 rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white"
+                  ? "min-h-11 rounded-2xl bg-[var(--tenant-primary)] px-4 py-2 text-sm font-semibold text-[var(--tenant-primary-contrast)]"
                   : "min-h-11 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600"}
                 name="filter"
                 type="submit"
@@ -154,7 +154,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                   <p className="mt-3 text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     {action ? (
-                      <Link className="flex min-h-12 items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white" href={`/app/tech/reports/${inspection.id}/${action.id}`}>
+                      <Link className="flex min-h-12 items-center justify-center rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)]" href={`/app/tech/reports/${inspection.id}/${action.id}`}>
                         {action.report?.status === "draft" || action.report?.status === "submitted" ? "Resume inspection" : "Start inspection"}
                       </Link>
                     ) : null}

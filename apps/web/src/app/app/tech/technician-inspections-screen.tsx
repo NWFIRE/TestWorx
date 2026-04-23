@@ -27,7 +27,12 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
   const active = dashboard.assigned.filter((inspection: any) => activeTasks(inspection).length > 0);
   return (
     <div className="space-y-5 pb-4">
-      <section className="rounded-[1.85rem] bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(30,41,59,0.92))] p-5 text-white shadow-[0_24px_60px_rgba(15,23,42,0.2)]">
+      <section
+        className="rounded-[1.85rem] p-5 text-[var(--tenant-primary-contrast)] shadow-[0_24px_60px_rgb(var(--tenant-primary-rgb)/0.2)]"
+        style={{
+          background: "linear-gradient(180deg, rgb(var(--tenant-primary-rgb) / 0.96), rgb(var(--tenant-primary-rgb) / 0.82))"
+        }}
+      >
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">Inspection workflow</p>
         <h2 className="mt-2 text-[28px] font-semibold leading-tight">Continue inspection</h2>
       </section>
@@ -42,13 +47,13 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
             <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
             {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
+              <span className="rounded-full border border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--tenant-primary)]">
                 {inspection.tasks.some((task: any) => task.report?.status === "draft" || task.report?.status === "submitted") ? "Draft" : "In Progress"}
               </span>
               <p className="text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Link className="flex min-h-12 items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white" href={openTaskLink(inspection)}>
+              <Link className="flex min-h-12 items-center justify-center rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)]" href={openTaskLink(inspection)}>
                 {inspection.tasks.some((task: any) => task.report?.status === "draft" || task.report?.status === "submitted") ? "Continue inspection" : "Start inspection"}
               </Link>
               <div className="flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">

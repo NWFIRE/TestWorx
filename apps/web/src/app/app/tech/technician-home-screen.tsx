@@ -34,7 +34,7 @@ function WorkCard({ inspection, emphasizeToday = false }: { inspection: any; emp
           {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
         </div>
         <span className={emphasizeToday
-          ? "inline-flex min-h-9 items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700"
+          ? "inline-flex min-h-9 items-center rounded-full border border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary-soft)] px-3 py-1 text-xs font-semibold text-[var(--tenant-primary)]"
           : "inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600"}
         >
           {format(toDateValue(inspection.scheduledStart), "h:mm a")}
@@ -59,7 +59,7 @@ function WorkCard({ inspection, emphasizeToday = false }: { inspection: any; emp
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {primaryAction ? (
-          <Link className="flex min-h-12 items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white" href={primaryAction.href}>
+          <Link className="flex min-h-12 items-center justify-center rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)]" href={primaryAction.href}>
             {primaryAction.label}
           </Link>
         ) : (
@@ -98,21 +98,26 @@ export function TechnicianHomeScreen({
 
   return (
     <div className="space-y-6 pb-4">
-      <section className="rounded-[2rem] bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(30,41,59,0.92))] p-5 text-white shadow-[0_24px_60px_rgba(15,23,42,0.22)]">
+      <section
+        className="rounded-[2rem] p-5 text-[var(--tenant-primary-contrast)] shadow-[0_24px_60px_rgb(var(--tenant-primary-rgb)/0.22)]"
+        style={{
+          background: "linear-gradient(180deg, rgb(var(--tenant-primary-rgb) / 0.96), rgb(var(--tenant-primary-rgb) / 0.82))"
+        }}
+      >
         <p className="text-sm text-white/70">{format(new Date(), "EEEE, MMMM d")}</p>
         <h2 className="mt-2 text-[28px] font-semibold leading-tight">
           {userFirstName ? `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${userFirstName}.` : "Ready for the field."}
         </h2>
         <div className="mt-5 grid grid-cols-3 gap-3">
-          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+          <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">Today</p>
             <p className="mt-2 text-2xl font-semibold">{dashboard.today.length}</p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+          <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">Drafts</p>
             <p className="mt-2 text-2xl font-semibold">{draftTaskCount}</p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+          <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">Manuals</p>
             <p className="mt-2 text-2xl font-semibold">{savedManualCount}</p>
           </div>
