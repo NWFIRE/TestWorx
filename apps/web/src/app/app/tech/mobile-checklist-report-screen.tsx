@@ -252,6 +252,10 @@ function getLeadSupplementalSectionIds(inspectionType: string) {
     return ["system-details"];
   }
 
+  if (inspectionType === "fire_alarm") {
+    return ["control-panel"];
+  }
+
   return [];
 }
 
