@@ -29,10 +29,10 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
   return (
     <div className="space-y-5 pb-4">
       <section className="rounded-[1.85rem] bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(30,41,59,0.92))] p-5 text-white shadow-[0_24px_60px_rgba(15,23,42,0.2)]">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">Inspection workflow</p>
-        <h2 className="mt-2 text-[28px] font-semibold leading-tight">Keep field progress moving, even when service drops.</h2>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">Draft inspection in progress</p>
+        <h2 className="mt-2 text-[28px] font-semibold leading-tight">Continue where you left off.</h2>
         <p className="mt-3 max-w-xl text-sm leading-6 text-white/72">
-          Draft checklist state, notes, signatures, and final review stay organized around the actual inspection flow so technicians can work fast without hunting through office tools.
+          Checklist answers, notes, signatures, and offline save state stay with the inspection so field work can keep moving without losing progress.
         </p>
       </section>
 
@@ -45,13 +45,18 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
           <article className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" key={inspection.id}>
             <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
             {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
-            <p className="mt-3 text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
+                {inspection.tasks.some((task: any) => task.report?.status === "draft" || task.report?.status === "submitted") ? "Draft" : "In Progress"}
+              </span>
+              <p className="text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
+            </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <Link className="flex min-h-12 items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white" href={openTaskLink(inspection)}>
-                {inspection.tasks.some((task: any) => task.report?.status === "draft" || task.report?.status === "submitted") ? "Resume draft" : "Start inspection"}
+                {inspection.tasks.some((task: any) => task.report?.status === "draft" || task.report?.status === "submitted") ? "Continue inspection" : "Start inspection"}
               </Link>
               <div className="flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
-                {format(toDateValue(inspection.scheduledStart), "MMM d, h:mm a")}
+                Last updated: {format(toDateValue(inspection.scheduledStart), "MMM d, h:mm a")}
               </div>
             </div>
           </article>

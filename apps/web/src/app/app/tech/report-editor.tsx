@@ -12,7 +12,7 @@ import { initializeLocalReportRecord, queueReportDraftSync, queueReportFinalizeS
 import type { LocalReportDraftRecord } from "./offline/offline-types";
 import { SignaturePad } from "./signature-pad";
 
-type EditorData = {
+export type TechnicianReportEditorData = {
   reportId: string;
   reportStatus: "draft" | "submitted" | "finalized";
   reportUpdatedAt: string;
@@ -60,7 +60,7 @@ const sectionStatusOptions = [
   { value: "fail", label: "Fail", activeClassName: "border-rose-200 bg-rose-50 text-rose-800" }
 ] as const;
 
-function buildReportSaveState(record: LocalReportDraftRecord | null, reportStatus: EditorData["reportStatus"]) {
+function buildReportSaveState(record: LocalReportDraftRecord | null, reportStatus: TechnicianReportEditorData["reportStatus"]) {
   if (!record) {
     return reportStatus === "finalized" ? "Finalized" : "Saved";
   }
@@ -101,7 +101,7 @@ function resolveStoredMediaSrc(reportId: string, storageKey: string | null | und
   return `/api/reports/storage?${params.toString()}`;
 }
 
-function isFieldDisabled(canEdit: boolean, reportStatus: EditorData["reportStatus"], field: ReportFieldDefinition) {
+function isFieldDisabled(canEdit: boolean, reportStatus: TechnicianReportEditorData["reportStatus"], field: ReportFieldDefinition) {
   return !canEdit || reportStatus === "finalized" || Boolean(field.readOnly);
 }
 
@@ -271,7 +271,7 @@ function ReportSelectControl({
   );
 }
 
-export function ReportEditor({ data }: { data: EditorData }) {
+export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
   const [draft, setDraft] = useState<ReportDraft>(data.draft);
   const [taskDisplayLabel, setTaskDisplayLabel] = useState(data.customInspectionTypeLabel ?? "");
   const [activeSectionId, setActiveSectionId] = useState<string>(data.draft.activeSectionId ?? data.template.sections[0]?.id ?? "");
