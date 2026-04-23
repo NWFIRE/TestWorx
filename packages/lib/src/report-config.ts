@@ -389,6 +389,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
                 id: "assetTag",
                 label: "Asset tag",
                 type: "text",
+                hidden: true,
                 placeholder: "EXT-100",
                 prefill: [
                   { source: "asset", key: "assetTag" },
@@ -568,6 +569,12 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
                 }
               },
               {
+                id: "notes",
+                label: "Notes",
+                type: "text",
+                placeholder: "Add extinguisher notes"
+              },
+              {
                 id: "gaugeStatus",
                 label: "Gauge status",
                 type: "select",
@@ -580,12 +587,6 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
                 type: "select",
                 optionProvider: "pass_fail",
                 prefill: [{ source: "reportDefault", value: "pass" }]
-              },
-              {
-                id: "notes",
-                label: "Notes",
-                type: "text",
-                placeholder: "Add extinguisher notes"
               }
             ]
           },
@@ -710,7 +711,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
                   }
                 ]
               },
-              { id: "assetTag", label: "Asset tag", type: "text", placeholder: "FAP-100", prefill: [{ source: "asset", key: "assetTag" }, { source: "priorField", sectionId: "control-panel", fieldId: "assetTag" }] },
+              { id: "assetTag", label: "Asset tag", type: "text", hidden: true, placeholder: "FAP-100", prefill: [{ source: "asset", key: "assetTag" }, { source: "priorField", sectionId: "control-panel", fieldId: "assetTag" }] },
               { id: "panelName", label: "Panel name", type: "text", placeholder: "Main fire alarm panel", prefill: [{ source: "assetMetadata", key: "panelName" }, { source: "asset", key: "name" }, { source: "priorField", sectionId: "control-panel", fieldId: "panelName" }] },
               { id: "manufacturer", label: "Manufacturer", type: "text", placeholder: "Notifier", prefill: [{ source: "assetMetadata", key: "manufacturer" }, { source: "priorField", sectionId: "control-panel", fieldId: "manufacturer" }] },
               { id: "model", label: "Model", type: "text", placeholder: "NFS2-3030", prefill: [{ source: "assetMetadata", key: "model" }, { source: "assetMetadata", key: "panelModel" }, { source: "priorField", sectionId: "control-panel", fieldId: "model" }] },
@@ -861,7 +862,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
                   }
                 ]
               },
-              { id: "assetTag", label: "Asset tag", type: "text", placeholder: "FAI-101", prefill: [{ source: "asset", key: "assetTag" }, { source: "priorField", sectionId: "initiating-devices", fieldId: "assetTag" }] },
+              { id: "assetTag", label: "Asset tag", type: "text", hidden: true, placeholder: "FAI-101", prefill: [{ source: "asset", key: "assetTag" }, { source: "priorField", sectionId: "initiating-devices", fieldId: "assetTag" }] },
               {
                 id: "deviceType",
                 label: "Device type",
@@ -1083,6 +1084,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
                 id: "assetTag",
                 label: "Asset tag",
                 type: "text",
+                hidden: true,
                 placeholder: "PMP-220",
                 prefill: [
                   { source: "asset", key: "assetTag" },
@@ -1240,6 +1242,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
                 id: "assetTag",
                 label: "Asset tag",
                 type: "text",
+                hidden: true,
                 placeholder: "DRY-300",
                 prefill: [
                   { source: "asset", key: "assetTag" },
@@ -1855,6 +1858,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
                 id: "assetTag",
                 label: "Asset tag",
                 type: "text",
+                hidden: true,
                 placeholder: "IND-301",
                 prefill: [
                   { source: "asset", key: "assetTag" },

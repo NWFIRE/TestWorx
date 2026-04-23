@@ -143,6 +143,26 @@ describe("smart report foundations", () => {
     expect(lines.join(" ")).not.toContain("Asset tag");
   });
 
+  it("keeps extinguisher gauge and mounting fields at the bottom while hiding the asset tag field", () => {
+    const template = resolveReportTemplate({
+      inspectionType: "fire_extinguisher",
+      assets: []
+    });
+
+    const repeater = template.sections[0]?.fields.find((field) => field.id === "extinguishers");
+    if (!repeater || repeater.type !== "repeater") {
+      throw new Error("Expected extinguisher repeater field.");
+    }
+
+    const fieldIds = repeater.rowFields.map((rowField) => rowField.id);
+    const assetTagField = repeater.rowFields.find((rowField) => rowField.id === "assetTag");
+
+    expect(assetTagField?.hidden).toBe(true);
+    expect(fieldIds.indexOf("notes")).toBeLessThan(fieldIds.indexOf("gaugeStatus"));
+    expect(fieldIds.indexOf("gaugeStatus")).toBeLessThan(fieldIds.indexOf("mountingSecure"));
+    expect(fieldIds.at(-1)).toBe("mountingSecure");
+  });
+
   it("auto-populates linked extinguisher fields, ul rating, and next hydro when the asset row selection changes", () => {
     const template = resolveReportTemplate({
       inspectionType: "fire_extinguisher",

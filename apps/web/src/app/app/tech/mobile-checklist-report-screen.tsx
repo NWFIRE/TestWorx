@@ -10,6 +10,7 @@ import {
   buildMobileChecklistViewModel,
   buildRepeaterRowDefaults,
   buildReportPreview,
+  describeRepeaterRowLabel,
   getReportPhotoValidationError,
   isChecklistHeavyMobileField,
   prepareReportPhotoForDraft,
@@ -1215,11 +1216,11 @@ export function MobileChecklistReportScreen({
                           </button>
                         </div>
                         {rows.length === 0 ? <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-500">No rows added yet.</p> : rows.map((row, rowIndex) => {
-                          const visibleRowFields = field.rowFields.filter((rowField) => !rowField.hidden && !rowField.readOnly && !isChecklistHeavyMobileField(rowField) && rowField.id !== "comments" && rowField.id !== "notes");
+                          const visibleRowFields = field.rowFields.filter((rowField) => !rowField.hidden && !rowField.readOnly && !isChecklistHeavyMobileField(rowField) && rowField.id !== "assetId" && rowField.id !== "assetTag" && rowField.id !== "comments" && rowField.id !== "notes");
                           return (
                             <div key={typeof row.__rowId === "string" ? row.__rowId : `${field.id}_${rowIndex}`} className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
                               <div className="flex items-center justify-between gap-3">
-                                <p className="text-sm font-semibold text-slate-900">{row.assetTag || row.location || `${field.label} ${rowIndex + 1}`}</p>
+                                <p className="text-sm font-semibold text-slate-900">{describeRepeaterRowLabel(row, rowIndex)}</p>
                                 <button className="text-sm font-semibold text-rose-700" onClick={() => removeRepeaterRow(section.id, field.id, rowIndex)} type="button">Remove</button>
                               </div>
                               <div className="mt-3 space-y-3">
