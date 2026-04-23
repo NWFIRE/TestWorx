@@ -298,6 +298,61 @@ describe("quickbooks billing sync hardening", () => {
     });
   });
 
+  it("uses linked catalog pricing when a persisted billing item is missing unit price", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: null });
+    prismaMock.customerCompany.update.mockResolvedValue(undefined);
+    prismaMock.site.findFirst.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
+    prismaMock.quickBooksCatalogItem.findFirst
+      .mockResolvedValueOnce({
+        unitPrice: 33.5
+      })
+      .mockResolvedValueOnce(null);
+    prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue({
+      ...buildBillingSummary(),
+      items: [
+        {
+          id: "item_1",
+          description: "Recharge (5 lb ABC)",
+          quantity: 1,
+          unitPrice: null,
+          amount: null,
+          unit: "ea",
+          category: "material",
+          code: "RECHARGE_5LB_ABC",
+          linkedCatalogItemId: "catalog_recharge_5lb",
+          linkedQuickBooksItemId: "mapped_item_1",
+          linkedCatalogItemName: "Recharge - 5# ABC"
+        }
+      ]
+    });
+    prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
+    prismaMock.auditLog.create.mockResolvedValue(undefined);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
+      .mockResolvedValueOnce(jsonResponse({}));
+
+    const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
+
+    await syncBillingSummaryToQuickBooks(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/invoice"),
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining("\"UnitPrice\":33.5")
+      })
+    );
+  });
+
   it("keeps invoice synced and marks send skipped when billing email is missing", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
     prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: null });

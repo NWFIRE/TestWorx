@@ -87,6 +87,9 @@ type QuickBooksBillingSummary = {
     amount?: number | null;
     unit?: string;
     category: string;
+    linkedCatalogItemId?: string | null;
+    linkedQuickBooksItemId?: string | null;
+    linkedCatalogItemName?: string | null;
   }>;
   quickbooksSyncStatus: string | null;
   quickbooksSendStatus: string | null;
@@ -2758,6 +2761,69 @@ function requirePrice(item: QuickBooksBillingSummary["items"][number]) {
   return item.unitPrice;
 }
 
+async function resolveBillingItemUnitPriceForQuickBooks(input: {
+  tenantId: string;
+  integrationId: string;
+  item: QuickBooksBillingSummary["items"][number];
+}) {
+  if (typeof input.item.unitPrice === "number") {
+    return input.item.unitPrice;
+  }
+
+  if (input.item.linkedCatalogItemId || input.item.linkedQuickBooksItemId) {
+    const linkedCatalogItem = await prisma.quickBooksCatalogItem.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        OR: [
+          ...(input.item.linkedCatalogItemId ? [{ id: input.item.linkedCatalogItemId }] : []),
+          ...(input.item.linkedQuickBooksItemId ? [{ quickbooksItemId: input.item.linkedQuickBooksItemId }] : [])
+        ]
+      },
+      select: {
+        unitPrice: true
+      }
+    });
+
+    if (typeof linkedCatalogItem?.unitPrice === "number") {
+      return linkedCatalogItem.unitPrice;
+    }
+  }
+
+  const billingCode = input.item.code?.trim();
+  if (billingCode) {
+    const codeMapping = await prisma.quickBooksItemMap.findUnique({
+      where: {
+        tenantId_integrationId_internalCode: {
+          tenantId: input.tenantId,
+          integrationId: input.integrationId,
+          internalCode: billingCode
+        }
+      },
+      select: {
+        qbItemId: true
+      }
+    });
+
+    if (codeMapping?.qbItemId) {
+      const mappedCatalogItem = await prisma.quickBooksCatalogItem.findFirst({
+        where: {
+          tenantId: input.tenantId,
+          quickbooksItemId: codeMapping.qbItemId
+        },
+        select: {
+          unitPrice: true
+        }
+      });
+
+      if (typeof mappedCatalogItem?.unitPrice === "number") {
+        return mappedCatalogItem.unitPrice;
+      }
+    }
+  }
+
+  return null;
+}
+
 function toQuickBooksInvoiceLine(input: {
   amount: number;
   description: string;
@@ -3958,7 +4024,14 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
     const invoiceLines = [] as Array<Record<string, unknown>>;
 
     for (const item of normalizedSummary.items) {
-      const unitPrice = requirePrice(item);
+      const unitPrice = requirePrice({
+        ...item,
+        unitPrice: await resolveBillingItemUnitPriceForQuickBooks({
+          tenantId: parsedActor.tenantId as string,
+          integrationId,
+          item
+        })
+      });
       const billingCode = item.code?.trim();
       if (!billingCode) {
         throw new Error(`Billing item "${item.description}" is missing a stable billing code. Add a billing code before syncing to QuickBooks.`);
