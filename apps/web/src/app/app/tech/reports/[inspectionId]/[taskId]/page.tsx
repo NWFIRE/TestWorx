@@ -2,6 +2,7 @@ import { isChecklistHeavyMobileInspectionType } from "@testworx/lib";
 
 import { ReportEditor } from "../../../report-editor";
 import { MobileChecklistReportScreen } from "../../../mobile-checklist-report-screen";
+import { MobileFireAlarmReportScreen } from "../../../mobile-fire-alarm-report-screen";
 import { buildAcceptanceTestViewModel } from "../../../../../reports/acceptance-test/buildAcceptanceTestViewModel";
 import { AcceptanceReportEditView } from "../../../../../reports/acceptance-test/pages/AcceptanceReportEditView";
 import { loadTechnicianReportData } from "./load-technician-report-data";
@@ -39,6 +40,10 @@ export default async function TechnicianReportPage({ params }: { params: Promise
     });
 
     return <AcceptanceReportEditView model={model} editor={editor} />;
+  }
+
+  if (report.task.inspectionType === "fire_alarm") {
+    return <MobileFireAlarmReportScreen data={data} inspectionId={inspectionId} mode="edit" taskId={taskId} />;
   }
 
   if (isChecklistHeavyMobileInspectionType(report.task.inspectionType)) {
