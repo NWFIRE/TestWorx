@@ -308,6 +308,24 @@ function normalizePrimitiveField(field: Exclude<ReportFieldDefinition, { type: "
     return defaultPrimitiveFieldValue(field.type);
   }
 
+  if (field.type === "boolean") {
+    if (typeof primitive === "string") {
+      const normalizedBoolean = primitive.trim().toLowerCase();
+      if (["true", "yes", "y", "1", "checked", "on"].includes(normalizedBoolean)) {
+        return true;
+      }
+      if (["false", "no", "n", "0", "unchecked", "off", "na", "n/a", ""].includes(normalizedBoolean)) {
+        return false;
+      }
+    }
+
+    if (typeof primitive === "number") {
+      return primitive > 0;
+    }
+
+    return Boolean(primitive);
+  }
+
   if (field.normalizeEmptyToDefault && isEmptyValue(primitive)) {
     const configuredDefault = field.prefill?.find((prefill) => prefill.source === "reportDefault")?.value;
     if (!isEmptyValue(configuredDefault)) {
@@ -612,7 +630,14 @@ function applyCalculatedFields(
     const sourceValues = "sourceFieldIds" in calculation
       ? calculation.sourceFieldIds.map((fieldId) => (sourceSection?.fields?.[fieldId] as ReportPrimitiveValue | undefined) ?? null)
       : "sourceFields" in calculation
-        ? calculation.sourceFields.map((source) => (sections[source.sectionId ?? currentSectionId]?.fields?.[source.fieldId] as ReportPrimitiveValue | undefined) ?? null)
+        ? calculation.sourceFields.map((source) => {
+            const targetSectionId = source.sectionId ?? currentSectionId;
+            if (targetSectionId === currentSectionId) {
+              return (nextFields[source.fieldId] as ReportPrimitiveValue | undefined) ?? null;
+            }
+
+            return (sections[targetSectionId]?.fields?.[source.fieldId] as ReportPrimitiveValue | undefined) ?? null;
+          })
         : undefined;
     nextFields[field.id] = runCalculation(calculation.key, {
       sourceValue,

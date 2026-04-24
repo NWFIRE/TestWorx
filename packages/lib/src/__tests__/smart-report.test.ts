@@ -374,9 +374,9 @@ describe("smart report foundations", () => {
     expect(controlPanels[0].manufacturer).toBe("Notifier");
     expect(controlPanels[0].model).toBe("NFS2-3030");
     expect(controlPanels[0].communicationPathType).toBe("dual_path");
-    expect(draft.sections["control-panel"]?.fields.batterySize).toBe("other");
-    expect(draft.sections["control-panel"]?.fields.batterySizeOther).toBe("Legacy custom battery setup");
-    expect(draft.sections["control-panel"]?.fields.batteryQuantity).toBe("2");
+    expect(controlPanels[0].batterySize).toBe("12v_18ah");
+    expect(controlPanels[0].batterySizeOther).toBe("Legacy custom battery setup");
+    expect(controlPanels[0].batteryQuantity).toBe("2");
     expect(initiatingRows[0].deviceType).toBe("pull_station");
     expect(initiatingRows[1].deviceType).toBe("smoke_detector");
     expect(notificationRows[0].applianceType).toBe("horn_strobe");
@@ -530,22 +530,32 @@ describe("smart report foundations", () => {
           notes: "",
           fields: {
             controlPanels: [
-              { assetId: "asset_1", assetTag: "FAP-100", panelName: "Main fire alarm panel", manufacturer: "Notifier", model: "NFS2-3030", serialNumber: "FAP-3030-001", location: "Ground floor electrical room", panelPhoto: "", communicationPathType: "dual_path" }
+              {
+                assetId: "asset_1",
+                assetTag: "FAP-100",
+                panelName: "Main fire alarm panel",
+                manufacturer: "Notifier",
+                model: "NFS2-3030",
+                serialNumber: "FAP-3030-001",
+                location: "Ground floor electrical room",
+                panelPhoto: "",
+                communicationPathType: "dual_path",
+                batteryDateCode: "",
+                batterySize: "",
+                batterySizeOther: "26.8 VDC / 18 AH",
+                batteryQuantity: "2",
+                batteryChargeLevel: "low",
+                batteryLoadTest: "fail",
+                batteriesReplacementNeeded: true,
+                replacementBatterySize: "12v_18ah",
+                replacementBatteryQuantity: "2"
+              }
             ],
             controlPanelsInspected: 99,
             lineVoltageStatus: "normal",
             acPowerIndicator: "yes",
             acBreakerLocked: "yes",
             powerSupplyCondition: "deficiency",
-            batteryDateCode: "",
-            batterySize: "",
-            batterySizeOther: "26.8 VDC / 18 AH",
-            batteryQuantity: "2",
-            batteryChargeLevel: "low",
-            batteryLoadTest: "fail",
-            batteriesReplacementNeeded: "yes",
-            replacementBatterySize: "12v_18ah",
-            replacementBatteryQuantity: "2",
             audibleAlarm: "pass",
             visualAlarm: "pass",
             audibleTrouble: "pass",
@@ -617,13 +627,14 @@ describe("smart report foundations", () => {
 
     expect((normalized.sections["control-panel"]?.fields.controlPanels as Array<unknown>).length).toBe(1);
     expect(normalized.sections["control-panel"]?.fields.controlPanelsInspected).toBe(1);
-    expect(normalized.sections["control-panel"]?.fields.batterySize).toBe("other");
-    expect(normalized.sections["control-panel"]?.fields.controlPanelDeficiencyCount).toBe(6);
+    expect((normalized.sections["control-panel"]?.fields.controlPanels as Array<Record<string, unknown>>)[0]?.batterySize).toBe("other");
+    expect((normalized.sections["control-panel"]?.fields.controlPanels as Array<Record<string, unknown>>)[0]?.batteriesReplacementNeeded).toBe(true);
+    expect(normalized.sections["control-panel"]?.fields.controlPanelDeficiencyCount).toBe(4);
     expect(normalized.sections["initiating-devices"]?.fields.initiatingDevicesInspected).toBe(2);
     expect(normalized.sections["initiating-devices"]?.fields.initiatingDeviceDeficiencyCount).toBe(1);
     expect(normalized.sections.notification?.fields.notificationAppliancesInspected).toBe(2);
     expect(normalized.sections.notification?.fields.notificationDeficiencyCount).toBe(1);
-    expect(normalized.sections["system-summary"]?.fields.deficiencyCount).toBe(8);
+    expect(normalized.sections["system-summary"]?.fields.deficiencyCount).toBe(6);
     expect(normalized.sections["system-summary"]?.fields.deficienciesFound).toBe(true);
 
     const invalidFireAlarmDraft = validateDraftForTemplate({

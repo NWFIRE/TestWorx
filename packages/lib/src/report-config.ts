@@ -718,7 +718,80 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
               { id: "serialNumber", label: "Serial number", type: "text", placeholder: "SN-0001", prefill: [{ source: "assetMetadata", key: "serialNumber" }, { source: "priorField", sectionId: "control-panel", fieldId: "serialNumber" }] },
               { id: "location", label: "Location", type: "text", placeholder: "Ground floor electrical room", prefill: [{ source: "assetMetadata", key: "location" }, { source: "priorField", sectionId: "control-panel", fieldId: "location" }, { source: "siteDefault", key: "siteName" }] },
               { id: "panelPhoto", label: "Panel photo reference", type: "text", placeholder: "Use report photo attachments below for panel photo capture", prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "panelPhoto" }] },
-              { id: "communicationPathType", label: "Communication path", type: "select", optionProvider: "communicationPathTypes", prefill: [{ source: "assetMetadata", key: "communicationPathType" }, { source: "priorField", sectionId: "control-panel", fieldId: "communicationPathType" }] }
+              { id: "communicationPathType", label: "Communication path", type: "select", optionProvider: "communicationPathTypes", prefill: [{ source: "assetMetadata", key: "communicationPathType" }, { source: "priorField", sectionId: "control-panel", fieldId: "communicationPathType" }] },
+              { id: "batteryDateCode", label: "Battery date code", type: "text", placeholder: "2025-08", prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "batteryDateCode" }] },
+              {
+                id: "batterySize",
+                label: "Battery size",
+                type: "select",
+                optionProvider: "fireAlarmBatterySizes",
+                customValueFieldId: "batterySizeOther",
+                customValueTrigger: "other",
+                prefill: [
+                  { source: "assetMetadata", key: "batterySize" },
+                  { source: "priorField", sectionId: "control-panel", fieldId: "batterySize" },
+                  { source: "priorAnyField", sectionId: "control-panel", fieldIds: ["batterySizeOther", "batteryConfiguration", "batteryConfigurationCustom", "batteryVoltage", "batteryAmpHourRating"], value: "other" }
+                ]
+              },
+              {
+                id: "batterySizeOther",
+                label: "Other battery size",
+                type: "text",
+                placeholder: "Example: 12V 18AH",
+                visibleWhen: { fieldId: "batterySize", values: ["other"] },
+                prefill: [
+                  { source: "priorField", sectionId: "control-panel", fieldId: "batterySizeOther" },
+                  { source: "priorField", sectionId: "control-panel", fieldId: "batteryConfigurationCustom" },
+                  { source: "priorFieldsJoined", sectionId: "control-panel", fieldIds: ["batteryVoltage", "batteryAmpHourRating"], separator: " / " }
+                ]
+              },
+              {
+                id: "batteryQuantity",
+                label: "Battery quantity",
+                type: "select",
+                optionProvider: "quantityZeroToTwenty",
+                prefill: [
+                  { source: "assetMetadata", key: "batteryQuantity" },
+                  { source: "priorField", sectionId: "control-panel", fieldId: "batteryQuantity" }
+                ]
+              },
+              { id: "batteryChargeLevel", label: "Battery charge level", type: "select", optionProvider: "normalLowHighNA", prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "batteryChargeLevel" }] },
+              { id: "batteryLoadTest", label: "Battery load test", type: "select", optionProvider: "passFailNA", prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "batteryLoadTest" }] },
+              {
+                id: "batteriesReplacementNeeded",
+                label: "Batteries replaced?",
+                type: "boolean",
+                prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "batteriesReplacementNeeded" }]
+              },
+              {
+                id: "replacementBatterySize",
+                label: "Replacement battery size",
+                type: "select",
+                optionProvider: "fireAlarmBatterySizes",
+                customValueFieldId: "replacementBatterySizeOther",
+                customValueTrigger: "other",
+                visibleWhen: { fieldId: "batteriesReplacementNeeded", values: [true] },
+                prefill: [
+                  { source: "priorField", sectionId: "control-panel", fieldId: "replacementBatterySize" },
+                  { source: "priorAnyField", sectionId: "control-panel", fieldIds: ["replacementBatterySizeOther"], value: "other" }
+                ]
+              },
+              {
+                id: "replacementBatterySizeOther",
+                label: "Other replacement battery size",
+                type: "text",
+                placeholder: "Example: 12V 18AH",
+                visibleWhen: { fieldId: "replacementBatterySize", values: ["other"] },
+                prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "replacementBatterySizeOther" }]
+              },
+              {
+                id: "replacementBatteryQuantity",
+                label: "Replacement battery quantity",
+                type: "select",
+                optionProvider: "quantityZeroToTwenty",
+                visibleWhen: { fieldId: "batteriesReplacementNeeded", values: [true] },
+                prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "replacementBatteryQuantity" }]
+              }
             ]
           },
           { id: "controlPanelsInspected", label: "Control panels inspected", type: "number", placeholder: "0", calculation: { key: "assetCountFromRepeater", sourceFieldId: "controlPanels" }, readOnly: true },
@@ -726,74 +799,6 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
           { id: "acPowerIndicator", label: "AC power indicator", type: "select", optionProvider: "yesNoNA", prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "acPowerIndicator" }, { source: "reportDefault", value: "yes" }] },
           { id: "acBreakerLocked", label: "AC breaker locked", type: "select", optionProvider: "yesNoNA", prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "acBreakerLocked" }] },
           { id: "powerSupplyCondition", label: "Power supply condition", type: "select", optionProvider: "panelConditionOptions", prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "powerSupplyCondition" }] },
-          { id: "batteryDateCode", label: "Battery date code", type: "text", placeholder: "2025-08", prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "batteryDateCode" }] },
-          {
-            id: "batterySize",
-            label: "Battery size",
-            type: "select",
-            optionProvider: "fireAlarmBatterySizes",
-            customValueFieldId: "batterySizeOther",
-            customValueTrigger: "other",
-            prefill: [
-              { source: "assetMetadata", key: "batterySize" },
-              { source: "priorField", sectionId: "control-panel", fieldId: "batterySize" },
-              { source: "priorAnyField", sectionId: "control-panel", fieldIds: ["batterySizeOther", "batteryConfiguration", "batteryConfigurationCustom", "batteryVoltage", "batteryAmpHourRating"], value: "other" }
-            ]
-          },
-          {
-            id: "batterySizeOther",
-            label: "Other battery size",
-            type: "text",
-            placeholder: "Example: 12V 18AH",
-            visibleWhen: { fieldId: "batterySize", values: ["other"] },
-            prefill: [
-              { source: "priorField", sectionId: "control-panel", fieldId: "batterySizeOther" },
-              { source: "priorField", sectionId: "control-panel", fieldId: "batteryConfigurationCustom" },
-              { source: "priorFieldsJoined", sectionId: "control-panel", fieldIds: ["batteryVoltage", "batteryAmpHourRating"], separator: " / " }
-            ]
-          },
-          {
-            id: "batteryQuantity",
-            label: "Quantity",
-            type: "select",
-            optionProvider: "quantityZeroToTwenty",
-            prefill: [
-              { source: "assetMetadata", key: "batteryQuantity" },
-              { source: "priorField", sectionId: "control-panel", fieldId: "batteryQuantity" }
-            ]
-          },
-          { id: "batteryChargeLevel", label: "Battery charge level", type: "select", optionProvider: "normalLowHighNA", prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "batteryChargeLevel" }] },
-          { id: "batteryLoadTest", label: "Battery load test", type: "select", optionProvider: "passFailNA", prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "batteryLoadTest" }] },
-          { id: "batteriesReplacementNeeded", label: "Batteries Replaced During Inspection?", type: "select", optionProvider: "yesNoNA", prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "batteriesReplacementNeeded" }] },
-          {
-            id: "replacementBatterySize",
-            label: "Replacement battery size",
-            type: "select",
-            optionProvider: "fireAlarmBatterySizes",
-            customValueFieldId: "replacementBatterySizeOther",
-            customValueTrigger: "other",
-            visibleWhen: { fieldId: "batteriesReplacementNeeded", values: ["yes"] },
-            prefill: [
-              { source: "priorField", sectionId: "control-panel", fieldId: "replacementBatterySize" },
-              { source: "priorAnyField", sectionId: "control-panel", fieldIds: ["replacementBatterySizeOther"], value: "other" }
-            ]
-          },
-          {
-            id: "replacementBatterySizeOther",
-            label: "Other replacement battery size",
-            type: "text",
-            placeholder: "Example: 12V 18AH",
-            visibleWhen: { fieldId: "replacementBatterySize", values: ["other"] },
-            prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "replacementBatterySizeOther" }]
-          },
-          {
-            id: "replacementBatteryQuantity",
-            label: "Replacement battery quantity",
-            type: "select",
-            optionProvider: "quantityZeroToTwenty",
-            visibleWhen: { fieldId: "batteriesReplacementNeeded", values: ["yes"] },
-            prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "replacementBatteryQuantity" }]
-          },
           { id: "audibleAlarm", label: "Audible alarm indication", type: "select", optionProvider: "passFailNA", prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "audibleAlarm" }] },
           { id: "visualAlarm", label: "Visual alarm indication", type: "select", optionProvider: "passFailNA", prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "visualAlarm" }] },
           { id: "audibleTrouble", label: "Audible trouble indication", type: "select", optionProvider: "passFailNA", prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "audibleTrouble" }] },
@@ -805,7 +810,9 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
           { id: "remoteIndicators", label: "Remote indicators", type: "select", optionProvider: "passFailNA", prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "remoteIndicators" }] },
           { id: "doorAndLockCondition", label: "Door and lock condition", type: "select", optionProvider: "panelConditionOptions", prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "doorAndLockCondition" }] },
           { id: "controlPanelCondition", label: "Control panel condition", type: "select", optionProvider: "passFailDeficiency", prefill: [{ source: "priorField", sectionId: "control-panel", fieldId: "controlPanelCondition" }] },
-          { id: "controlPanelDeficiencyCount", label: "Control panel deficiencies", type: "number", calculation: { key: "countFieldsMatchingValues", sourceFieldIds: ["powerSupplyCondition", "batteryChargeLevel", "batteryLoadTest", "batteriesReplacementNeeded", "centralStationSignalTest", "doorAndLockCondition", "controlPanelCondition"], values: ["attention", "low", "high", "fail", "deficiency", "yes"] }, readOnly: true },
+          { id: "controlPanelBatteryDeficiencyCount", label: "Control panel battery deficiencies", type: "number", hidden: true, calculation: { key: "countRowsMatchingAnyValues", sourceFieldId: "controlPanels", rowFieldIds: ["batteryChargeLevel", "batteryLoadTest"], values: ["low", "high", "fail", "deficiency"] }, readOnly: true },
+          { id: "controlPanelSignalDeficiencyCount", label: "Control panel signal deficiencies", type: "number", hidden: true, calculation: { key: "countFieldsMatchingValues", sourceFieldIds: ["powerSupplyCondition", "centralStationSignalTest", "doorAndLockCondition", "controlPanelCondition"], values: ["attention", "low", "high", "fail", "deficiency"] }, readOnly: true },
+          { id: "controlPanelDeficiencyCount", label: "Control panel deficiencies", type: "number", calculation: { key: "sumFields", sourceFields: [{ fieldId: "controlPanelBatteryDeficiencyCount" }, { fieldId: "controlPanelSignalDeficiencyCount" }] }, readOnly: true },
           { id: "controlPanelComments", label: "Control panel comments", type: "text", placeholder: "Document primary power, battery, indication, monitoring, or cabinet concerns" }
         ]
       },
