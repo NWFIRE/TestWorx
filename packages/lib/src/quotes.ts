@@ -30,7 +30,7 @@ import {
   validateMappedQbItem
 } from "./quickbooks";
 import { createInspection, getCustomerFacingSiteLabel } from "./scheduling";
-import { assertTenantContext } from "./permissions";
+import { assertTenantContext, canAccessQuoteWorkspace } from "./permissions";
 
 const quoteStatusValues = Object.values(QuoteStatus);
 const quoteSyncStatusValues = Object.values(QuoteSyncStatus);
@@ -304,15 +304,7 @@ export function hasQuoteManagementAccess(input: {
   role: string;
   allowances?: Record<string, boolean> | null;
 }) {
-  if (input.role === "platform_admin" || input.role === "tenant_admin") {
-    return true;
-  }
-
-  if (input.role === "office_admin") {
-    return input.allowances?.quoteAccess ?? true;
-  }
-
-  return input.allowances?.quoteAccess ?? false;
+  return canAccessQuoteWorkspace(input.role, input.allowances);
 }
 
 function assertQuoteManagementAccess(actor: Pick<ActorContext, "role" | "allowances">) {

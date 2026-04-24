@@ -3,15 +3,19 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-const allowedNativePrefixes = [
+import { canAccessQuoteWorkspace } from "@testworx/lib";
+
+const baseAllowedNativePrefixes = [
   "/app/tech",
   "/app/manuals"
 ];
 
 export function NativeTechnicianRouteGuard({
-  role
+  role,
+  allowances
 }: {
   role: string;
+  allowances?: Record<string, boolean> | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -30,6 +34,9 @@ export function NativeTechnicianRouteGuard({
         return;
       }
 
+      const allowedNativePrefixes = canAccessQuoteWorkspace(role, allowances)
+        ? [...baseAllowedNativePrefixes, "/app/admin/quotes"]
+        : baseAllowedNativePrefixes;
       const allowed = allowedNativePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
       if (!allowed) {
         router.replace("/app/tech");
@@ -41,7 +48,7 @@ export function NativeTechnicianRouteGuard({
     return () => {
       mounted = false;
     };
-  }, [pathname, role, router]);
+  }, [allowances, pathname, role, router]);
 
   return null;
 }

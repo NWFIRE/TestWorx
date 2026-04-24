@@ -1,3 +1,5 @@
+import { canAccessQuoteWorkspace } from "@testworx/lib";
+
 export type AppNavItem = {
   href: string;
   label: string;
@@ -12,17 +14,17 @@ export type AppNavItem = {
 
 type InternalAllowances = Record<string, boolean> | null | undefined;
 
-function hasQuoteAccessForRole(role: string, allowances?: InternalAllowances) {
-  if (role === "platform_admin" || role === "tenant_admin") {
-    return true;
-  }
-
-  if (role === "office_admin") {
-    return allowances?.quoteAccess ?? true;
-  }
-
-  return allowances?.quoteAccess ?? false;
-}
+const quotesNavItem: AppNavItem = {
+  href: "/app/admin/quotes",
+  label: "Quotes",
+  shortLabel: "Quotes",
+  abbreviation: "QT",
+  icon: "invoice",
+  description: "Create, send, approve, and sync quotes",
+  tone: "blue",
+  matchMode: "exact",
+  matchPrefixes: ["/app/admin/quotes"]
+};
 
 const adminNavItems: AppNavItem[] = [
   {
@@ -56,15 +58,7 @@ const adminNavItems: AppNavItem[] = [
     description: "Visit review, follow-up requests, and linked history",
     tone: "violet"
   },
-  {
-    href: "/app/admin/quotes",
-    label: "Quotes",
-    shortLabel: "Quotes",
-    abbreviation: "QT",
-    icon: "invoice",
-    description: "Create, send, approve, and sync quotes",
-    tone: "blue"
-  },
+  quotesNavItem,
   {
     href: "/app/deficiencies",
     label: "Deficiency Center",
@@ -257,9 +251,15 @@ const navByRole: Record<string, AppNavItem[]> = {
 };
 
 export function getAppNavItemsForRole(role: string, allowances?: InternalAllowances) {
-  const baseItems = navByRole[role] ?? [];
+  let baseItems = navByRole[role] ?? [];
 
-  if (!hasQuoteAccessForRole(role, allowances)) {
+  if (role === "technician" && canAccessQuoteWorkspace(role, allowances)) {
+    const profileItem = baseItems.find((item) => item.href === "/app/tech/profile");
+    const itemsWithoutProfile = baseItems.filter((item) => item.href !== "/app/tech/profile");
+    baseItems = profileItem ? [...itemsWithoutProfile, quotesNavItem, profileItem] : [...itemsWithoutProfile, quotesNavItem];
+  }
+
+  if (!canAccessQuoteWorkspace(role, allowances)) {
     return baseItems.filter((item) => item.href !== "/app/admin/quotes");
   }
 

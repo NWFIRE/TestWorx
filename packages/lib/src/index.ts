@@ -2,6 +2,7 @@ export * from "./inspection-types-shared";
 export * from "./manuals-shared";
 export * from "./mobile-checklist";
 export * from "./mobile-inspection-progress";
+export * from "./permissions";
 export * from "./quickbooks-shared";
 export * from "./quote-email";
 export * from "./quotes-shared";

@@ -12,7 +12,7 @@ type MobileTab = {
   matchPrefixes?: string[];
 };
 
-const technicianTabs: MobileTab[] = [
+const baseTechnicianTabs: MobileTab[] = [
   { href: "/app/tech", label: "Home" },
   { href: "/app/tech/work", label: "Work", matchPrefixes: ["/app/tech/work"] },
   { href: "/app/tech/inspections", label: "Inspections", matchPrefixes: ["/app/tech/inspections", "/app/tech/reports"] },
@@ -20,10 +20,31 @@ const technicianTabs: MobileTab[] = [
   { href: "/app/tech/profile", label: "Profile", matchPrefixes: ["/app/tech/profile"] }
 ];
 
+const quotesMobileTab: MobileTab = {
+  href: "/app/admin/quotes",
+  label: "Quotes",
+  matchPrefixes: ["/app/admin/quotes"]
+};
+
 const defaultTechnicianTab: MobileTab = {
   href: "/app/tech",
   label: "Home"
 };
+
+function getTechnicianTabs(allowances?: Record<string, boolean> | null) {
+  if (!allowances?.quoteAccess) {
+    return baseTechnicianTabs;
+  }
+
+  return [
+    baseTechnicianTabs[0] ?? defaultTechnicianTab,
+    baseTechnicianTabs[1] ?? defaultTechnicianTab,
+    baseTechnicianTabs[2] ?? defaultTechnicianTab,
+    quotesMobileTab,
+    baseTechnicianTabs[3] ?? defaultTechnicianTab,
+    baseTechnicianTabs[4] ?? defaultTechnicianTab
+  ];
+}
 
 function isActive(pathname: string, tab: MobileTab) {
   if (pathname === tab.href) {
@@ -71,6 +92,13 @@ function MobileTabIcon({ label, active }: { label: string; active: boolean }) {
           <path {...shared} d="M7.5 3A2.5 2.5 0 0 0 5 5.5V19m4-11h6m-6 4h6" />
         </svg>
       );
+    case "Quotes":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <path {...shared} d="M7 3h8l4 4v13l-2-1.2L15 20l-3-1.2L9 20l-2-1.2L5 20V5a2 2 0 0 1 2-2Z" />
+          <path {...shared} d="M9 9h6M9 13h6M9 17h4" />
+        </svg>
+      );
     case "Profile":
       return (
         <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
@@ -115,20 +143,24 @@ export function TechnicianSyncPill() {
 
 export function TechnicianMobileHeader({
   pathname,
-  userName
+  userName,
+  allowances
 }: {
   pathname: string;
   userName: string | null;
+  allowances?: Record<string, boolean> | null;
 }) {
+  const technicianTabs = useMemo(() => getTechnicianTabs(allowances), [allowances]);
   const activeTab = useMemo(
     () => technicianTabs.find((tab) => isActive(pathname, tab)) ?? technicianTabs[0] ?? defaultTechnicianTab,
-    [pathname]
+    [pathname, technicianTabs]
   );
 
   const subtitleByTab: Record<string, string> = {
     Home: "Assignments, progress, and action items",
     Work: "Assigned jobs and claimable field work",
     Inspections: "Drafts, active inspections, and closeout",
+    Quotes: "Customer quotes, follow-up, and approvals",
     Manuals: "Field manuals and offline-ready references",
     Profile: "Sync, readiness, and technician tools"
   };
@@ -147,8 +179,15 @@ export function TechnicianMobileHeader({
   );
 }
 
-export function TechnicianMobileTabBar({ pathname }: { pathname: string }) {
+export function TechnicianMobileTabBar({
+  pathname,
+  allowances
+}: {
+  pathname: string;
+  allowances?: Record<string, boolean> | null;
+}) {
   const notifications = useTechnicianNotifications();
+  const technicianTabs = useMemo(() => getTechnicianTabs(allowances), [allowances]);
 
   return (
     <nav
@@ -158,7 +197,7 @@ export function TechnicianMobileTabBar({ pathname }: { pathname: string }) {
     >
       <div className="pointer-events-none mx-auto w-full max-w-screen-sm px-2">
         <div className="pointer-events-auto rounded-t-[1.6rem] border border-b-0 border-slate-200 bg-white/96 px-2 pb-3 pt-2 shadow-[0_-12px_30px_rgba(15,23,42,0.10)] backdrop-blur">
-          <div className="grid grid-cols-5 gap-1">
+          <div className={`grid gap-1 ${technicianTabs.length > 5 ? "grid-cols-6" : "grid-cols-5"}`}>
             {technicianTabs.map((tab) => {
               const active = isActive(pathname, tab);
               const badgeCount = tab.label === "Work"

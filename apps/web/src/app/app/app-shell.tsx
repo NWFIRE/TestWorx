@@ -665,7 +665,7 @@ export function AppShell({
             style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
           >
             {isTechnician ? (
-              <TechnicianMobileHeader pathname={pathname} userName={user.name} />
+              <TechnicianMobileHeader allowances={allowances} pathname={pathname} userName={user.name} />
             ) : (
               <>
                 <div className="flex min-w-0 items-center gap-3">
@@ -729,7 +729,7 @@ export function AppShell({
           </MobilePullToRefresh>
         </main>
       </div>
-      {isTechnician ? <TechnicianMobileTabBar pathname={pathname} /> : null}
+      {isTechnician ? <TechnicianMobileTabBar allowances={allowances} pathname={pathname} /> : null}
     </div>
   );
 
@@ -739,7 +739,7 @@ export function AppShell({
 
   return (
     <TechnicianNotificationProvider>
-      <NativeTechnicianRouteGuard role={role} />
+      <NativeTechnicianRouteGuard allowances={allowances} role={role} />
       <TechnicianNotificationQueryBridge />
       <NativeTechnicianBridge />
       {shell}
