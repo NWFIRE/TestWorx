@@ -271,11 +271,13 @@ export function MobileChecklistReportScreen({
   mode: "checklist" | "review";
 }) {
   const router = useRouter();
-  const [draft, setDraft] = useState<ReportDraft>(() => createDerivedDraft(data.template, data.draft));
+  const initialDraft = createDerivedDraft(data.template, data.draft);
+  const [draft, setDraft] = useState<ReportDraft>(initialDraft);
   const [saveState, setSaveState] = useState(data.reportStatus === "finalized" ? "Finalized" : "Saved");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [finalizeErrorMessage, setFinalizeErrorMessage] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const draftRef = useRef<ReportDraft>(initialDraft);
   const localRecordRef = useRef<LocalReportDraftRecord | null>(null);
   const queueTimerRef = useRef<number | null>(null);
   const fieldTimerRef = useRef<Map<string, number>>(new Map());
@@ -359,7 +361,8 @@ export function MobileChecklistReportScreen({
       }
 
       localRecordRef.current = localRecord;
-      setDraft(createDerivedDraft(data.template, localRecord.draft as ReportDraft));
+      draftRef.current = createDerivedDraft(data.template, localRecord.draft as ReportDraft);
+      setDraft(draftRef.current);
       setSaveState(buildReportSaveState(localRecord, data.reportStatus));
       if (localRecord.lastError) {
         setErrorMessage(toTechnicianFacingSaveMessage(localRecord.lastError, localRecord.pendingFinalize ? "finalize" : "save"));
@@ -376,6 +379,8 @@ export function MobileChecklistReportScreen({
         }
 
         localRecordRef.current = current;
+        draftRef.current = createDerivedDraft(data.template, current.draft as ReportDraft);
+        setDraft(draftRef.current);
         setSaveState(buildReportSaveState(current, data.reportStatus));
         if (current.lastError) {
           setErrorMessage(toTechnicianFacingSaveMessage(current.lastError, current.pendingFinalize ? "finalize" : "save"));
@@ -462,7 +467,8 @@ export function MobileChecklistReportScreen({
       eventDetail?: Record<string, unknown>;
     }
   ) {
-    const nextDraft = createDerivedDraft(data.template, mutation(draft));
+    const nextDraft = createDerivedDraft(data.template, mutation(draftRef.current));
+    draftRef.current = nextDraft;
     setDraft(nextDraft);
     setFinalizeErrorMessage(null);
     setErrorMessage(null);
@@ -851,7 +857,8 @@ export function MobileChecklistReportScreen({
       return;
     }
 
-    const nextDraft = createDerivedDraft(data.template, draft);
+    const nextDraft = createDerivedDraft(data.template, draftRef.current);
+    draftRef.current = nextDraft;
     setDraft(nextDraft);
     setFinalizeErrorMessage(null);
 
