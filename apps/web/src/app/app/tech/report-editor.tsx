@@ -280,6 +280,47 @@ function ReportSelectControl({
   );
 }
 
+function ReportBooleanControl({
+  value,
+  onChange,
+  disabled,
+  className
+}: {
+  value: boolean;
+  onChange: (value: boolean) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={`grid grid-cols-2 gap-2 ${className ?? ""}`.trim()}>
+      <button
+        className={`min-h-14 rounded-2xl border px-4 py-4 text-base font-medium uppercase transition ${
+          value
+            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+            : "border-slate-200 bg-white text-slate-500"
+        }`}
+        disabled={disabled}
+        onClick={() => onChange(true)}
+        type="button"
+      >
+        Yes
+      </button>
+      <button
+        className={`min-h-14 rounded-2xl border px-4 py-4 text-base font-medium uppercase transition ${
+          !value
+            ? "border-slate-300 bg-slate-900 text-white"
+            : "border-slate-200 bg-white text-slate-500"
+        }`}
+        disabled={disabled}
+        onClick={() => onChange(false)}
+        type="button"
+      >
+        No
+      </button>
+    </div>
+  );
+}
+
 export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
   const [draft, setDraft] = useState<ReportDraft>(data.draft);
   const [taskDisplayLabel, setTaskDisplayLabel] = useState(data.customInspectionTypeLabel ?? "");
@@ -1201,9 +1242,11 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
                                     <label className="block text-sm font-medium text-slate-600">{rowField.label}</label>
                                   </div>
                                   {rowField.type === "boolean" ? (
-                                    <button className={`min-h-14 w-full rounded-2xl border px-4 py-4 text-left text-base font-medium uppercase ${row[rowField.id] ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-500"}`} disabled={isFieldDisabled(data.canEdit, data.reportStatus, rowField)} onClick={() => updateRepeaterRowField(activeSection.id, field, rowIndex, rowField.id, !(row[rowField.id] as boolean))} type="button">
-                                      {row[rowField.id] ? normalizeOptionLabel("Yes") : normalizeOptionLabel("No")}
-                                    </button>
+                                    <ReportBooleanControl
+                                      disabled={isFieldDisabled(data.canEdit, data.reportStatus, rowField)}
+                                      onChange={(nextValue) => updateRepeaterRowField(activeSection.id, field, rowIndex, rowField.id, nextValue)}
+                                      value={Boolean(row[rowField.id])}
+                                    />
                                   ) : rowField.type === "select" ? (
                                     <ReportSelectControl
                                       className={fieldShellClassName(rowField.readOnly)}
@@ -1284,9 +1327,11 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
                       </button>
                     </div>
                   ) : field.type === "boolean" ? (
-                    <button className={`min-h-14 w-full rounded-2xl border px-4 py-4 text-left text-base font-medium uppercase ${draft.sections[activeSection.id]?.fields?.[field.id] ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-500"}`} disabled={isFieldDisabled(data.canEdit, data.reportStatus, field)} onClick={() => updateSectionField(activeSection.id, field.id, !(draft.sections[activeSection.id]?.fields?.[field.id] as boolean))} type="button">
-                      {(draft.sections[activeSection.id]?.fields?.[field.id] as boolean) ? normalizeOptionLabel("Yes") : normalizeOptionLabel("No")}
-                    </button>
+                    <ReportBooleanControl
+                      disabled={isFieldDisabled(data.canEdit, data.reportStatus, field)}
+                      onChange={(nextValue) => updateSectionField(activeSection.id, field.id, nextValue)}
+                      value={Boolean(draft.sections[activeSection.id]?.fields?.[field.id])}
+                    />
                   ) : field.type === "select" ? (
                     <ReportSelectControl
                       className={fieldShellClassName(field.readOnly)}

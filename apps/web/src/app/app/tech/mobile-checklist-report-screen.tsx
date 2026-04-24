@@ -151,6 +151,45 @@ function SelectChips({
   );
 }
 
+function BooleanChips({
+  value,
+  onChange,
+  disabled
+}: {
+  value: boolean;
+  onChange: (value: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <button
+        className={`min-h-11 rounded-2xl border px-4 py-2.5 text-sm font-semibold transition ${
+          value
+            ? "border-emerald-200 bg-emerald-600 text-white"
+            : "border-slate-200 bg-white text-slate-700"
+        } disabled:opacity-50`}
+        disabled={disabled}
+        onClick={() => onChange(true)}
+        type="button"
+      >
+        Yes
+      </button>
+      <button
+        className={`min-h-11 rounded-2xl border px-4 py-2.5 text-sm font-semibold transition ${
+          !value
+            ? "border-slate-300 bg-slate-700 text-white"
+            : "border-slate-200 bg-white text-slate-700"
+        } disabled:opacity-50`}
+        disabled={disabled}
+        onClick={() => onChange(false)}
+        type="button"
+      >
+        No
+      </button>
+    </div>
+  );
+}
+
 function DispatchNotesBanner({ notes }: { notes: string | null | undefined }) {
   const trimmedNotes = notes?.trim();
   if (!trimmedNotes) {
@@ -998,7 +1037,12 @@ export function MobileChecklistReportScreen({
                             return (
                               <div key={rowField.id} className="space-y-2">
                                 <label className="text-sm font-semibold text-slate-900">{rowField.label}</label>
-                                {rowField.type === "select" ? (
+                                {rowField.type === "boolean" ? (
+                                  <BooleanChips
+                                    onChange={(nextValue) => updateRepeaterRowField(section.id, field, rowIndex, rowField.id, nextValue, { immediateQueue: true })}
+                                    value={Boolean(rowValue)}
+                                  />
+                                ) : rowField.type === "select" ? (
                                   <SelectChips
                                     options={(rowField.options ?? []).map((option) => ({ label: option.label, value: option.value }))}
                                     value={typeof rowValue === "string" ? rowValue : ""}
