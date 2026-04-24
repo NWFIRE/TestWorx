@@ -19,6 +19,10 @@ import type { JsonInputValue, JsonObject } from "./json-types";
 import { getDefaultInspectionRecurrenceFrequency, inspectionTypeRegistry } from "./report-config";
 import { deleteStoredFile } from "./storage";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
+import {
+  createPriorityInspectionAssignedNotificationsTx,
+  createWorkOrderReassignedNotificationsTx
+} from "./technician-notifications";
 
 const inspectionTypeEnum = z.enum(Object.keys(inspectionTypeRegistry) as [keyof typeof inspectionTypeRegistry, ...(keyof typeof inspectionTypeRegistry)[]]);
 export const inspectionClassificationValues = [
@@ -1985,29 +1989,37 @@ export async function createInspection(actor: ActorContext, input: z.infer<typeo
         });
       }
 
-      if (assignedTechnicianIds.length > 0) {
-      await createAuditLog(tx, {
-        tenantId,
-        actorUserId: parsedActor.userId,
-        action: "inspection.assigned",
-        entityId: inspection.id,
-        metadata: {
-          assignedTechnicianIds
+    if (assignedTechnicianIds.length > 0) {
+        await createAuditLog(tx, {
+          tenantId,
+          actorUserId: parsedActor.userId,
+          action: "inspection.assigned",
+          entityId: inspection.id,
+          metadata: {
+            assignedTechnicianIds
+          }
+        });
+      }
+
+      if (priorityState.isPriority && assignedTechnicianIds.length > 0) {
+        await createPriorityInspectionAssignedNotificationsTx(tx, {
+          tenantId,
+          inspectionId: inspection.id,
+          technicianIds: assignedTechnicianIds
+        });
+      }
+
+      return tx.inspection.findUniqueOrThrow({
+        where: { id: inspection.id },
+        include: {
+          site: true,
+          customerCompany: true,
+          assignedTechnician: true,
+          technicianAssignments: { include: { technician: true } },
+          tasks: { include: { recurrence: true } }
         }
       });
-    }
-
-    return tx.inspection.findUniqueOrThrow({
-      where: { id: inspection.id },
-      include: {
-        site: true,
-        customerCompany: true,
-        assignedTechnician: true,
-        technicianAssignments: { include: { technician: true } },
-        tasks: { include: { recurrence: true } }
-      }
     });
-  });
 }
 
 export async function updateInspection(actor: ActorContext, inspectionId: string, input: z.infer<typeof scheduleInspectionSchema>) {
@@ -2147,6 +2159,24 @@ export async function updateInspection(actor: ActorContext, inspectionId: string
           nextPriority: false,
           reason: input.status === InspectionStatus.completed ? "Priority cleared automatically when inspection was marked Completed." : null
         }
+      });
+    }
+
+    const newlyAssignedTechnicianIds = assignedTechnicianIds.filter((technicianId) => !previousAssignedTechnicianIds.includes(technicianId));
+
+    if (priorityState.isPriority && (!existing.isPriority || newlyAssignedTechnicianIds.length > 0) && assignedTechnicianIds.length > 0) {
+      await createPriorityInspectionAssignedNotificationsTx(tx, {
+        tenantId,
+        inspectionId,
+        technicianIds: assignedTechnicianIds
+      });
+    }
+
+    if (newlyAssignedTechnicianIds.length > 0) {
+      await createWorkOrderReassignedNotificationsTx(tx, {
+        tenantId,
+        inspectionId,
+        technicianIds: newlyAssignedTechnicianIds
       });
     }
 
@@ -2997,6 +3027,22 @@ export async function createInspectionAmendment(actor: ActorContext, inspectionI
           assignedTechnicianIds,
           amendmentId: amendment.id
         }
+      });
+    }
+
+    if (input.isPriority && assignedTechnicianIds.length > 0) {
+      await createPriorityInspectionAssignedNotificationsTx(tx, {
+        tenantId,
+        inspectionId: replacementInspection.id,
+        technicianIds: assignedTechnicianIds
+      });
+    }
+
+    if (amendmentType === "reassignment" && assignedTechnicianIds.length > 0) {
+      await createWorkOrderReassignedNotificationsTx(tx, {
+        tenantId,
+        inspectionId: replacementInspection.id,
+        technicianIds: assignedTechnicianIds
       });
     }
 

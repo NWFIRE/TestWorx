@@ -42,6 +42,7 @@ export * from "../report-service";
 export * from "../scheduling";
 export * from "../service-fees";
 export * from "../storage";
+export * from "../technician-notifications";
 export * from "../third-party-billing";
 
 type TeamManagementModule = typeof import("../team-management");

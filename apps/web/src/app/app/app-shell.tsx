@@ -8,7 +8,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { BrandLoader } from "@/app/brand-loader";
 import { getAppNavItemsForRole, getCurrentAppNavItem, isAppNavItemActive, type AppNavItem } from "./app-nav-config";
 import { MobilePullToRefresh } from "./mobile-pull-to-refresh";
+import { NativeTechnicianRouteGuard } from "./native-technician-route-guard";
 import { TechnicianSyncBootstrap } from "./tech/offline/technician-sync-bootstrap";
+import { NativeTechnicianBridge } from "./tech/native-technician-bridge";
+import { TechnicianNotificationProvider, TechnicianNotificationQueryBridge } from "./tech/technician-notifications-client";
 import { TechnicianMobileHeader, TechnicianMobileTabBar } from "./tech/technician-mobile-shell";
 
 const DRAWER_SELECTOR =
@@ -565,7 +568,7 @@ export function AppShell({
 
   const closeDrawer = () => setDrawerOpen(false);
 
-  return (
+  const shell = (
     <div className="bg-paper lg:flex lg:overflow-hidden" style={{ minHeight: "var(--app-height, 100dvh)" }}>
       {isTechnician ? <TechnicianSyncBootstrap /> : null}
       {navItems.length > 0 ? (
@@ -728,5 +731,18 @@ export function AppShell({
       </div>
       {isTechnician ? <TechnicianMobileTabBar pathname={pathname} /> : null}
     </div>
+  );
+
+  if (!isTechnician) {
+    return shell;
+  }
+
+  return (
+    <TechnicianNotificationProvider>
+      <NativeTechnicianRouteGuard role={role} />
+      <TechnicianNotificationQueryBridge />
+      <NativeTechnicianBridge />
+      {shell}
+    </TechnicianNotificationProvider>
   );
 }

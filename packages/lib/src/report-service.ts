@@ -22,6 +22,7 @@ import {
   isTechnicianAssignedToInspection,
   withInspectionTaskDisplayLabels
 } from "./scheduling";
+import { createInspectionCorrectionReissuedNotificationTx } from "./technician-notifications";
 import {
   type ReportAssetRecord,
   type ReportDetectedDeficiency,
@@ -1144,7 +1145,7 @@ export async function reopenCompletedReportForCorrection(actor: ActorContext, in
     const report = await tx.inspectionReport.findFirst({
       where: { id: input.inspectionReportId, tenantId },
       include: {
-        inspection: { include: { technicianAssignments: { select: { technicianId: true } } } },
+        inspection: { include: { site: { select: { name: true } }, technicianAssignments: { select: { technicianId: true } } } },
         task: true,
         attachments: true,
         signatures: true
@@ -1245,6 +1246,27 @@ export async function reopenCompletedReportForCorrection(actor: ActorContext, in
         reason
       }
     });
+
+    if (input.correctionMode === "reissue_to_technician") {
+      const technicianIds = Array.from(new Set([
+        report.task.assignedTechnicianId,
+        ...getInspectionAssignedTechnicianIds({
+          assignedTechnicianId: report.inspection.assignedTechnicianId,
+          technicianAssignments: readTechnicianAssignments(report.inspection)
+        })
+      ].filter((value): value is string => Boolean(value))));
+
+      for (const userId of technicianIds) {
+        await createInspectionCorrectionReissuedNotificationTx(tx, {
+          tenantId,
+          userId,
+          inspectionId: report.inspectionId,
+          taskId: report.inspectionTaskId,
+          reportId: report.id,
+          siteName: report.inspection.site.name
+        });
+      }
+    }
 
     return {
       reportId: report.id,

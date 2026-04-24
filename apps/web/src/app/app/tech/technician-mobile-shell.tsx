@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 
 import { useSyncSummary } from "./offline/use-sync-summary";
+import { useTechnicianNotifications } from "./technician-notifications-client";
 
 type MobileTab = {
   href: string;
@@ -147,6 +148,8 @@ export function TechnicianMobileHeader({
 }
 
 export function TechnicianMobileTabBar({ pathname }: { pathname: string }) {
+  const notifications = useTechnicianNotifications();
+
   return (
     <nav
       aria-label="Technician mobile navigation"
@@ -158,14 +161,24 @@ export function TechnicianMobileTabBar({ pathname }: { pathname: string }) {
           <div className="grid grid-cols-5 gap-1">
             {technicianTabs.map((tab) => {
               const active = isActive(pathname, tab);
+              const badgeCount = tab.label === "Work"
+                ? notifications.counts.work
+                : tab.label === "Inspections"
+                  ? notifications.counts.inspections
+                  : 0;
               return (
                 <Link
                   key={tab.href}
                   className={active
-                    ? "flex min-h-[64px] flex-col items-center justify-center rounded-2xl bg-[var(--tenant-primary-soft)] px-2 py-2 text-[11px] font-semibold text-[var(--tenant-primary)]"
-                    : "flex min-h-[64px] flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium text-slate-500"}
+                    ? "relative flex min-h-[64px] flex-col items-center justify-center rounded-2xl bg-[var(--tenant-primary-soft)] px-2 py-2 text-[11px] font-semibold text-[var(--tenant-primary)]"
+                    : "relative flex min-h-[64px] flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium text-slate-500"}
                   href={tab.href}
                 >
+                  {badgeCount > 0 ? (
+                    <span className="absolute right-3 top-2 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold leading-none text-white">
+                      {badgeCount > 9 ? "9+" : badgeCount}
+                    </span>
+                  ) : null}
                   <MobileTabIcon active={active} label={tab.label} />
                   <span className="mt-1.5 text-center leading-4">{tab.label}</span>
                 </Link>

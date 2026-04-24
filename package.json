@@ -11,6 +11,8 @@
                     "build":  "turbo run build",
                     "lint":  "turbo run lint",
                     "test":  "turbo run test",
+                    "native:sync:ios": "npx cap sync ios",
+                    "native:open:ios": "npx cap open ios",
                     "db:generate":  "npm run prisma:generate --workspace @testworx/db",
                     "db:status":  "npm run prisma:status --workspace @testworx/db",
                     "db:migrate":  "npm run prisma:migrate --workspace @testworx/db",

@@ -6,22 +6,7 @@ import { format } from "date-fns";
 
 import { useSyncSummary } from "./offline/use-sync-summary";
 import { useOfflineScreenSnapshot } from "./offline/use-offline-screen-snapshot";
-
-function firstOpenTask(inspection: any) {
-  return inspection.tasks.find((task: any) => task.report?.status !== "finalized") ?? inspection.tasks[0] ?? null;
-}
-
-function inspectionAction(inspection: any) {
-  const task = firstOpenTask(inspection);
-  if (!task) {
-    return null;
-  }
-
-  return {
-    href: `/app/tech/reports/${inspection.id}/${task.id}`,
-    label: task.report?.status === "draft" || task.report?.status === "submitted" ? "Continue inspection" : "Start inspection"
-  };
-}
+import { useTechnicianNotifications } from "./technician-notifications-client";
 
 function QueueStatusCard({
   title,
@@ -84,6 +69,7 @@ export function TechnicianHomeScreen({
 }) {
   const snapshot = useOfflineScreenSnapshot("technician-home", initialData);
   const syncSummary = useSyncSummary();
+  const notifications = useTechnicianNotifications();
 
   if (!snapshot) {
     return <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 text-sm text-slate-500">Loading field workspace...</div>;
@@ -97,43 +83,34 @@ export function TechnicianHomeScreen({
     inspection.tasks.some((task: any) => task.report?.status === "draft" || task.report?.status === "submitted")
   );
 
-  const priorityInspection = dashboard.assigned.find((inspection: any) => inspection.isPriority);
-  const correctionInspection = dashboard.assigned.find((inspection: any) =>
-    inspection.tasks.some((task: any) => task.report?.correctionState === "reissued_to_technician")
-  );
-  const overdueInspection = dashboard.assigned.find((inspection: any) => inspection.displayStatus === "past_due");
-
   const attentionItems = [
-    priorityInspection
-      ? {
-          key: `priority-${priorityInspection.id}`,
-          eyebrow: "Priority inspection",
-          title: priorityInspection.primaryTitle,
-          body: `${priorityInspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")} is assigned and marked priority.`,
-          href: inspectionAction(priorityInspection)?.href ?? "/app/tech/work?filter=open",
-          tone: "priority" as const
-        }
-      : null,
-    correctionInspection
-      ? {
-          key: `correction-${correctionInspection.id}`,
-          eyebrow: "Correction required",
-          title: correctionInspection.primaryTitle,
-          body: "A report was re-issued for correction and needs technician follow-up.",
-          href: inspectionAction(correctionInspection)?.href ?? "/app/tech/inspections?filter=active",
-          tone: "warning" as const
-        }
-      : null,
-    overdueInspection
-      ? {
-          key: `overdue-${overdueInspection.id}`,
-          eyebrow: "Overdue inspection",
-          title: overdueInspection.primaryTitle,
-          body: "Assigned work is overdue and should be reviewed or completed now.",
-          href: inspectionAction(overdueInspection)?.href ?? "/app/tech/work?filter=overdue",
-          tone: "danger" as const
-        }
-      : null,
+    ...notifications.items
+      .filter((item) => !item.isRead)
+      .slice(0, 5)
+      .map((item) => ({
+        key: item.id,
+        eyebrow:
+          item.type === "priority_inspection_assigned"
+            ? "Priority inspection assigned"
+            : item.type === "inspection_reissued_for_correction"
+              ? "Correction required"
+              : item.type === "work_order_reassigned"
+                ? "Work order reassigned"
+                : item.type === "inspection_overdue"
+                  ? "Overdue inspection"
+                  : "Needs attention",
+        title: item.title,
+        body: item.body,
+        href: item.href,
+        tone:
+          item.priority === "urgent"
+            ? ("priority" as const)
+            : item.type === "inspection_overdue"
+              ? ("danger" as const)
+              : item.type === "inspection_reissued_for_correction"
+                ? ("warning" as const)
+                : ("default" as const)
+      })),
     (syncSummary.failed > 0 || syncSummary.conflict > 0 || syncSummary.pending > 0)
       ? {
           key: "sync-attention",

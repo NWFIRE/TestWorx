@@ -255,6 +255,32 @@ enum QuoteDeliveryStatus {
   error
 }
 
+enum TechnicianNotificationType {
+  priority_inspection_assigned
+  inspection_reissued_for_correction
+  work_order_reassigned
+  inspection_overdue
+  sync_attention_required
+}
+
+enum TechnicianNotificationPriority {
+  normal
+  high
+  urgent
+}
+
+enum TechnicianNotificationRelatedEntityType {
+  work_order
+  inspection
+  report
+  sync_item
+}
+
+enum MobileDevicePlatform {
+  ios
+  android
+}
+
 enum QuoteReminderType {
   sent_not_viewed_first
   sent_not_viewed_second
@@ -355,6 +381,8 @@ model Tenant {
   quoteLineItems            QuoteLineItem[]
   quoteReminderDispatches   QuoteReminderDispatch[]
   emailReminderSendLogs     EmailReminderSendLog[]
+  technicianNotifications   TechnicianNotification[]
+  technicianDeviceRegistrations TechnicianDeviceRegistration[]
 }
 
 model User {
@@ -397,6 +425,52 @@ model User {
   createdManuals       Manual[]                @relation("ManualCreatedBy")
   updatedManuals       Manual[]                @relation("ManualUpdatedBy")
   manualStates         UserManualState[]
+  technicianNotifications TechnicianNotification[]
+  technicianDeviceRegistrations TechnicianDeviceRegistration[]
+}
+
+model TechnicianNotification {
+  id                String                                  @id @default(cuid())
+  tenantId          String
+  userId            String
+  type              TechnicianNotificationType
+  title             String
+  body              String
+  relatedEntityType TechnicianNotificationRelatedEntityType
+  relatedEntityId   String
+  priority          TechnicianNotificationPriority          @default(normal)
+  isRead            Boolean                                 @default(false)
+  isDismissed       Boolean                                 @default(false)
+  metadata          Json?
+  createdAt         DateTime                                @default(now())
+  readAt            DateTime?
+  dismissedAt       DateTime?
+  tenant            Tenant                                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user              User                                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId, isRead, isDismissed, createdAt])
+  @@index([tenantId, relatedEntityType, relatedEntityId])
+}
+
+model TechnicianDeviceRegistration {
+  id               String               @id @default(cuid())
+  tenantId         String
+  userId           String
+  platform         MobileDevicePlatform
+  token            String
+  deviceName       String?
+  appBuild         String?
+  nativeAppVersion String?
+  isActive         Boolean              @default(true)
+  lastBadgeCount   Int                  @default(0)
+  lastSeenAt       DateTime             @default(now())
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  tenant           Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([platform, token])
+  @@index([tenantId, userId, isActive])
 }
 
 model CustomerCompany {
