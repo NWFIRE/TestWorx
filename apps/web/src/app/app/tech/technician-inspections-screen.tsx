@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { useSearchParams } from "next/navigation";
 
 import { buildInspectionTaskSummaryLine } from "./mobile-inspection-workspace";
+import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
 import { useOfflineScreenSnapshot } from "./offline/use-offline-screen-snapshot";
 import { toDateValue } from "./date-value";
 
@@ -59,6 +60,14 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
             {inspection.tasks.length > 1 ? (
               <p className="mt-3 text-sm text-slate-500">{buildInspectionTaskSummaryLine(inspection.tasks)}</p>
             ) : null}
+            <div className="mt-4">
+              <InspectionCustomerContactCard
+                compact
+                contactName={inspection.customerCompany?.contactName}
+                email={inspection.customerCompany?.billingEmail}
+                phone={inspection.customerCompany?.phone}
+              />
+            </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <Link className="flex min-h-12 items-center justify-center rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)]" href={openTaskLink(inspection)}>
                 {inspection.tasks.some((task: any) => task.report?.status === "draft" || task.report?.status === "submitted") ? "Continue inspection" : "Start inspection"}

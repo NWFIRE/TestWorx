@@ -7,6 +7,7 @@ import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { ClaimButton } from "./claim-button";
+import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
 import { useOfflineScreenSnapshot } from "./offline/use-offline-screen-snapshot";
 import { toDateValue } from "./date-value";
 
@@ -148,6 +149,14 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
               {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
               <p className="mt-3 text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
               <div className="mt-4">
+                <InspectionCustomerContactCard
+                  compact
+                  contactName={inspection.customerCompany?.contactName}
+                  email={inspection.customerCompany?.billingEmail}
+                  phone={inspection.customerCompany?.phone}
+                />
+              </div>
+              <div className="mt-4">
                 <ClaimButton inspectionId={inspection.id} />
               </div>
             </article>
@@ -178,6 +187,14 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                     </span>
                   </div>
                   <p className="mt-3 text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
+                  <div className="mt-4">
+                    <InspectionCustomerContactCard
+                      compact
+                      contactName={inspection.customerCompany?.contactName}
+                      email={inspection.customerCompany?.billingEmail}
+                      phone={inspection.customerCompany?.phone}
+                    />
+                  </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     {action ? (
                       <Link className="flex min-h-12 items-center justify-center rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)]" href={`/app/tech/reports/${inspection.id}/${action.id}`}>
@@ -207,6 +224,14 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                 <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
                 {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
                 <p className="mt-3 text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
+                <div className="mt-4">
+                  <InspectionCustomerContactCard
+                    compact
+                    contactName={inspection.customerCompany?.contactName}
+                    email={inspection.customerCompany?.billingEmail}
+                    phone={inspection.customerCompany?.phone}
+                  />
+                </div>
                 <div className="mt-4">
                   <ClaimButton inspectionId={inspection.id} />
                 </div>

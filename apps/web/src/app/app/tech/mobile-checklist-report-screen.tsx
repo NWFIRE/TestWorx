@@ -1082,7 +1082,10 @@ export function MobileChecklistReportScreen({
       >
         <MobileInspectionWorkspaceShell
           currentMode="review"
+          customerContactName={data.customerContactName}
+          customerEmail={data.customerEmail}
           customerName={data.customerName}
+          customerPhone={data.customerPhone}
           saveState={saveState}
           scheduledDateLabel={data.scheduledDateLabel}
           siteName={data.siteName}
@@ -1210,7 +1213,10 @@ export function MobileChecklistReportScreen({
     >
       <MobileInspectionWorkspaceShell
         currentMode="edit"
+        customerContactName={data.customerContactName}
+        customerEmail={data.customerEmail}
         customerName={data.customerName}
+        customerPhone={data.customerPhone}
         saveState={saveState}
         scheduledDateLabel={formatChecklistTimestamp(data.scheduledDateLabel)}
         siteName={data.siteName}

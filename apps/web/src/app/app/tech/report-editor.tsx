@@ -28,6 +28,9 @@ export type TechnicianReportEditorData = {
   customInspectionTypeLabel?: string | null;
   siteName: string;
   customerName: string;
+  customerContactName?: string | null;
+  customerPhone?: string | null;
+  customerEmail?: string | null;
   scheduledDateLabel: string;
   inspectionWorkspace: {
     inspectionId: string;
@@ -978,7 +981,10 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
     <div className="space-y-4 pb-36 sm:space-y-6 md:pb-32 lg:pb-8">
       <MobileInspectionWorkspaceShell
         currentMode="edit"
+        customerContactName={data.customerContactName}
+        customerEmail={data.customerEmail}
         customerName={data.customerName}
+        customerPhone={data.customerPhone}
         saveState={saveState}
         scheduledDateLabel={data.scheduledDateLabel}
         siteName={data.siteName}

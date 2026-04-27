@@ -506,6 +506,9 @@ export function MobileFireAlarmReportScreen({
       saveState={controller.saveState}
       sections={progress.sections}
       customerName={data.customerName}
+      customerContactName={data.customerContactName}
+      customerEmail={data.customerEmail}
+      customerPhone={data.customerPhone}
       siteName={data.siteName}
       stickyFooter={(
         <div>
@@ -618,6 +621,9 @@ function MobileReportSummaryBanner({
       saveState={saveState}
       sections={[]}
       customerName={data.customerName}
+      customerContactName={data.customerContactName}
+      customerEmail={data.customerEmail}
+      customerPhone={data.customerPhone}
       siteName={data.siteName}
       title={data.inspectionTypeLabel}
       workspace={data.inspectionWorkspace}

@@ -67,6 +67,9 @@ export async function loadTechnicianReportData(inspectionId: string, taskId: str
     customInspectionTypeLabel: report.task.customDisplayLabel ?? null,
     siteName: inspectionDisplay.primaryTitle,
     customerName: inspectionDisplay.secondaryTitle || report.inspection.customerCompany.name,
+    customerContactName: report.inspection.customerCompany.contactName ?? null,
+    customerPhone: report.inspection.customerCompany.phone ?? null,
+    customerEmail: report.inspection.customerCompany.billingEmail ?? null,
     scheduledDateLabel: format(report.inspection.scheduledStart, "MMM d, yyyy h:mm a"),
     inspectionWorkspace: {
       inspectionId,

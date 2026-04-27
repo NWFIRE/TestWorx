@@ -7,6 +7,7 @@ import {
   getTechnicianMobileTaskStatusLabel,
   type TechnicianMobileTaskWorkspaceSummary
 } from "./mobile-inspection-workspace";
+import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
 
 type InspectionWorkspaceData = {
   inspectionId: string;
@@ -44,6 +45,9 @@ export function MobileInspectionWorkspaceShell({
   workspace,
   siteName,
   customerName,
+  customerContactName,
+  customerPhone,
+  customerEmail,
   scheduledDateLabel,
   currentMode,
   saveState
@@ -51,6 +55,9 @@ export function MobileInspectionWorkspaceShell({
   workspace: InspectionWorkspaceData;
   siteName: string;
   customerName: string;
+  customerContactName?: string | null;
+  customerPhone?: string | null;
+  customerEmail?: string | null;
   scheduledDateLabel: string;
   currentMode: "edit" | "review";
   saveState?: string | null;
@@ -58,6 +65,7 @@ export function MobileInspectionWorkspaceShell({
   const isMultiTaskInspection = workspace.totalTaskCount > 1;
   const currentTask = workspace.relatedTasks.find((task) => task.isCurrent) ?? workspace.relatedTasks[0] ?? null;
   const modeLabel = currentMode === "review" ? "Review mode" : "Inspection workspace";
+  const hasCustomerContact = Boolean(customerContactName?.trim() || customerPhone?.trim() || customerEmail?.trim());
 
   return (
     <section className="rounded-[1.85rem] border border-slate-200 bg-white p-5 shadow-panel">
@@ -90,6 +98,17 @@ export function MobileInspectionWorkspaceShell({
           </p>
         ) : null}
       </div>
+
+      {hasCustomerContact ? (
+        <div className="mt-4">
+          <InspectionCustomerContactCard
+            compact
+            contactName={customerContactName}
+            email={customerEmail}
+            phone={customerPhone}
+          />
+        </div>
+      ) : null}
 
       {isMultiTaskInspection ? (
         <div className="mt-4 space-y-3">
