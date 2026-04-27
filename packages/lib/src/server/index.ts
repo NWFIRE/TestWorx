@@ -16,6 +16,7 @@ export type {
 
 export * from "../auth";
 export * from "../account-email";
+export * from "../billing-queue";
 export * from "../billing";
 export * from "../branding";
 export * from "../client-profile";

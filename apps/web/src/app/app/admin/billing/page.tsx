@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getAdminBillingSummaries } from "@testworx/lib/server/index";
+import { filterBillingSummariesForQueue, getAdminBillingSummaries, isOpenBillingQueueStatus } from "@testworx/lib/server/index";
 
 import {
   AppPageShell,
@@ -25,7 +25,7 @@ const statusTones = {
 } as const;
 
 const statusOptions = [
-  { value: "all", label: "All summaries" },
+  { value: "all", label: "Open work" },
   { value: "draft", label: "Invoice Draft" },
   { value: "reviewed", label: "Ready to Bill" },
   { value: "invoiced", label: "Invoiced" }
@@ -178,11 +178,9 @@ export default async function AdminBillingPage({
     role: session.user.role,
     tenantId: session.user.tenantId
   });
-  const openSummaries = summaries.filter((summary: AdminBillingSummary) => summary.status !== "invoiced");
+  const openSummaries = summaries.filter((summary: AdminBillingSummary) => isOpenBillingQueueStatus(summary.status));
   const invoicedSummaries = summaries.filter((summary: AdminBillingSummary) => summary.status === "invoiced");
-  const filteredSummaries = selectedStatus === "all"
-    ? summaries
-    : summaries.filter((summary) => summary.status === selectedStatus);
+  const filteredSummaries = filterBillingSummariesForQueue(summaries, selectedStatus);
 
   return (
     <AppPageShell>
@@ -219,6 +217,7 @@ export default async function AdminBillingPage({
           value={summaries.filter((summary) => summary.status === "reviewed").length}
         />
         <KPIStatCard
+          href={buildBillingHref("invoiced")}
           label="Invoiced"
           note="Archived summaries already moved through invoicing."
           tone="emerald"
@@ -233,7 +232,7 @@ export default async function AdminBillingPage({
       </section>
 
       <FilterBar
-        description="Move between draft, ready, and invoiced billing queues without losing context."
+        description="Open work shows only summaries that still need billing action. Use Invoiced for completed invoice history."
         title="Queue filters"
       >
         {statusOptions.map((option) => (
@@ -249,7 +248,7 @@ export default async function AdminBillingPage({
 
       <SummaryQueueSection
         ctaLabel={selectedStatus === "invoiced" ? "View invoice detail" : "Review billing"}
-        description="Operational billing work that still needs review, pricing, or invoice completion."
+        description={selectedStatus === "all" ? "Operational billing work that still needs review, pricing, or invoice completion. Invoiced work is archived below." : "Billing summaries matching the selected queue."}
         emptyText="No billing summaries match the current queue filter."
         emptyTitle="No billing summaries in this queue"
         summaries={filteredSummaries}
