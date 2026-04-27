@@ -211,6 +211,10 @@ export async function processSyncQueue() {
   return syncInFlight;
 }
 
+export async function recordSuccessfulSync(timestamp = nowIso()) {
+  await putOfflineMeta(LAST_SYNC_META_KEY, timestamp);
+}
+
 export function startTechnicianSyncEngine() {
   if (syncStarted || typeof window === "undefined") {
     return;
