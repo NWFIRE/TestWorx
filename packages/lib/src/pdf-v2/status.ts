@@ -13,7 +13,7 @@ export function mapCustomerFacingReportStatus(input: {
 
   return {
     documentStatus: "Draft",
-    inspectionStatus: "Scheduled"
+    inspectionStatus: "To Be Completed"
   };
 }
 

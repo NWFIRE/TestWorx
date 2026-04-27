@@ -187,7 +187,7 @@ export function MobileReportNavigator({
           });
           const status = task.isCurrent
             ? currentMode === "review" && task.reportStatus !== "finalized"
-              ? "Ready for Review"
+              ? "Ready for Completion"
               : getTechnicianMobileTaskStatusLabel({ reportStatus: task.reportStatus, hasMeaningfulProgress: task.hasMeaningfulProgress })
             : getTechnicianMobileTaskStatusLabel({ reportStatus: task.reportStatus, hasMeaningfulProgress: task.hasMeaningfulProgress });
 

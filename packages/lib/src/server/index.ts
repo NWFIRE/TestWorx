@@ -29,6 +29,7 @@ export * from "../env";
 export * from "../inspection-billing";
 export * from "../inspection-archive";
 export * from "../inspection-documents";
+export * from "../inspection-lifecycle";
 export * from "../manuals";
 export * from "../permissions";
 export * from "../pilot-readiness";

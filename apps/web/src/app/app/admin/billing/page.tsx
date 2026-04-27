@@ -26,8 +26,8 @@ const statusTones = {
 
 const statusOptions = [
   { value: "all", label: "All summaries" },
-  { value: "draft", label: "Draft billing" },
-  { value: "reviewed", label: "Ready for review" },
+  { value: "draft", label: "Invoice Draft" },
+  { value: "reviewed", label: "Ready to Bill" },
   { value: "invoiced", label: "Invoiced" }
 ] as const;
 
@@ -40,6 +40,19 @@ function normalizeBillingStatus(status?: string) {
 
 function buildBillingHref(status?: string) {
   return status && status !== "all" ? `/app/admin/billing?status=${status}` : "/app/admin/billing";
+}
+
+function formatBillingSummaryStatus(status: string) {
+  if (status === "reviewed") {
+    return "Ready to Bill";
+  }
+  if (status === "draft") {
+    return "Invoice Draft";
+  }
+  if (status === "invoiced") {
+    return "Invoiced";
+  }
+  return status.replaceAll("_", " ");
 }
 
 function SummaryQueueSection({
@@ -83,7 +96,7 @@ function SummaryQueueSection({
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-lg font-semibold text-slate-950">{summary.customerName}</p>
                     <StatusBadge
-                      label={summary.status}
+                      label={formatBillingSummaryStatus(summary.status)}
                       tone={statusTones[summary.status as keyof typeof statusTones] ?? "slate"}
                     />
                   </div>
@@ -186,22 +199,22 @@ export default async function AdminBillingPage({
           </div>
         }
         description="Review visit-level labor, materials, services, and fees extracted from finalized inspection reports before invoicing."
-        eyebrow="Billing review"
+        eyebrow="Billing"
         title="Inspection billing summaries"
       />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KPIStatCard
           href={buildBillingHref("draft")}
-          label="Draft billing"
+          label="Invoice Draft"
           note="Summaries still missing final pricing or review decisions."
           tone="amber"
           value={summaries.filter((summary) => summary.status === "draft").length}
         />
         <KPIStatCard
           href={buildBillingHref("reviewed")}
-          label="Ready to invoice"
-          note="Completed billing summaries ready for invoice follow-through."
+          label="Ready to Bill"
+          note="Completed, finalized work ready for invoice follow-through."
           tone="blue"
           value={summaries.filter((summary) => summary.status === "reviewed").length}
         />
@@ -240,7 +253,7 @@ export default async function AdminBillingPage({
         emptyText="No billing summaries match the current queue filter."
         emptyTitle="No billing summaries in this queue"
         summaries={filteredSummaries}
-        title={selectedStatus === "all" ? "Billing queue" : `${selectedStatus.replaceAll("_", " ")} queue`}
+        title={selectedStatus === "all" ? "Billing work queue" : `${statusOptions.find((option) => option.value === selectedStatus)?.label ?? selectedStatus} queue`}
       />
 
       {selectedStatus === "all" ? (

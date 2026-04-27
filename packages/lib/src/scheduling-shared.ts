@@ -33,7 +33,7 @@ export const customInspectionSiteName = "Create one-time site";
 
 export const inspectionStatusLabels = {
   to_be_completed: "To Be Completed",
-  scheduled: "Scheduled",
+  scheduled: "To Be Completed",
   in_progress: "In Progress",
   completed: "Completed",
   invoiced: "Invoiced",

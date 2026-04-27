@@ -144,7 +144,7 @@ function buildAlertItems(data: AdminDashboardData, inspectionNotice?: string) {
   ).length;
   if (reviewedBillingCount > 0) {
     alerts.push(
-      `${reviewedBillingCount} completed report${reviewedBillingCount === 1 ? "" : "s"} are ready for billing review.`
+      `${reviewedBillingCount} completed report${reviewedBillingCount === 1 ? "" : "s"} are ready to bill.`
     );
   }
 
@@ -176,8 +176,8 @@ function calculateBillingPipeline(
 
   return [
     { label: "Draft billing", value: Math.round((draft / total) * 100), tone: "bg-slate-900" },
-    { label: "Awaiting approval", value: Math.round((reviewed / total) * 100), tone: "bg-slateblue" },
-    { label: "Ready to invoice", value: Math.round((invoiced / total) * 100), tone: "bg-emerald-500" }
+    { label: "Ready to Bill", value: Math.round((reviewed / total) * 100), tone: "bg-slateblue" },
+    { label: "Invoiced", value: Math.round((invoiced / total) * 100), tone: "bg-emerald-500" }
   ];
 }
 
@@ -188,7 +188,7 @@ function formatBillingReady(inspections: CompletedDashboardInspection[]) {
 
   return {
     value: reviewedCount.toString(),
-    change: reviewedCount ? "Ready for invoice review" : "No billing items queued"
+    change: reviewedCount ? "Ready to Bill" : "No billing items queued"
   };
 }
 
@@ -304,7 +304,7 @@ export default async function AdminDashboardPage({
   const greeting = getGreetingByHour(new Date(), data.timezone);
   const firstName = getGreetingName(session.user.name);
   const openInspectionCount = schedulingQueueData.inspections.length;
-  const reportsAwaitingReview = reportReviewData.counts.awaitingReview;
+  const readyToBillReportCount = reportReviewData.counts.readyToBill;
   const billingReady = formatBillingReady(data.completedInspections);
   const alerts = buildAlertItems(data, inspectionNotice);
   const complianceFlags = deficiencyData.deficiencies.filter(
@@ -329,14 +329,14 @@ export default async function AdminDashboardPage({
       tone: "blue" as const
     },
     {
-      label: "Reports awaiting review",
-      value: reportsAwaitingReview.toString(),
-      change: reportsAwaitingReview
-        ? "Completed work still needs office review"
-        : "Review queue is clear",
+      label: "Ready to bill",
+      value: readyToBillReportCount.toString(),
+      change: readyToBillReportCount
+        ? "Finalized work still needs invoice action"
+        : "Ready-to-bill queue is clear",
       icon: FileText,
-      href: "/app/admin/reports?status=awaiting-review",
-      tone: "violet" as const
+      href: "/app/admin/reports",
+      tone: "emerald" as const
     },
     {
       label: "Billing ready",
@@ -465,7 +465,7 @@ export default async function AdminDashboardPage({
                       Keep field work moving.
                     </h2>
                     <p className="mt-3 text-sm leading-7 text-white/80 lg:mt-4 lg:max-w-2xl lg:text-base">
-                      Review inspections, finalize reports, and keep billing close to done.
+                      Move field work, finalize reports, and invoice only the work that still requires action.
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-3 lg:w-[360px]">
@@ -497,7 +497,7 @@ export default async function AdminDashboardPage({
                       href="/app/admin/amendments"
                     >
                       <CalendarDays className="h-4 w-4" />
-                      <span className="hidden lg:inline">Inspection Review</span>
+                      <span className="hidden lg:inline">Next-step requests</span>
                     </Link>
                   </div>
 
@@ -638,8 +638,8 @@ export default async function AdminDashboardPage({
 
                 <div className="mt-5 space-y-3">
                   {[
-                    { label: "Finalize pending reports", href: "/app/admin/reports?status=awaiting-review" },
-                    { label: "Review auto-generated billing", href: "/app/admin/billing?status=ready" },
+                    { label: "Create invoices for ready work", href: "/app/admin/reports" },
+                    { label: "Resolve billing drafts", href: "/app/admin/billing?status=draft" },
                     { label: "Follow up on open deficiencies", href: "/app/deficiencies?status=open" }
                   ].map((item) => (
                     <Link

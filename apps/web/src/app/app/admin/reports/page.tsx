@@ -51,31 +51,37 @@ export default async function AdminReportsQueuePage({
     <AppPageShell>
       <PageHeader
         backNavigation={{ label: "Back to admin", fallbackHref: "/app/admin" }}
-        description="Review completed inspections for the selected month before final billing or follow-up."
-        eyebrow="Reports / review"
-        title="Inspection review"
+        description="Completed inspections with finalized reports that still require invoice action. Invoiced and closed work stays out of this queue."
+        eyebrow="Ready to bill"
+        title="Ready to bill"
       />
 
       <WorkQueueNav activeKey="review" />
 
       <section className="grid gap-3 md:grid-cols-2">
         <KPIStatCard
-          label="Awaiting review"
-          note="Completed inspections in the selected month still needing office review or downstream action."
-          tone="blue"
-          value={data.counts.awaitingReview}
+          label="Ready to bill"
+          note="Finalized, non-invoiced work requiring invoice follow-through."
+          tone="emerald"
+          value={data.counts.readyToBill}
         />
         <KPIStatCard
-          label="Completed reports"
-          note="Completed inspections in the selected month with finalized reports ready for office access."
+          label="Sync issues"
+          note="Finalized work with a sync failure that needs technical review instead of billing action."
+          tone="rose"
+          value={data.counts.syncIssues}
+        />
+        <KPIStatCard
+          label="Finalized this month"
+          note="Completed inspections in the selected month with finalized report history."
           tone="slate"
           value={data.counts.completed}
         />
       </section>
 
       <FilterBar
-        description="The review queue defaults to the current month. Switch months to review older completed inspections."
-        title="Review filters"
+        description="The ready-to-bill queue defaults to the current month. Switch months to find older finalized, non-invoiced work."
+        title="Queue filters"
       >
         <LiveUrlSelectFilter options={data.options.months} paramKey="month" value={data.filters.month} />
       </FilterBar>
@@ -84,10 +90,10 @@ export default async function AdminReportsQueuePage({
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-              Review queue
+              Action queue
             </p>
             <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">
-              Completed inspections
+              Finalized work ready for invoice
             </h2>
           </div>
           <p className="text-sm text-slate-500">
@@ -98,8 +104,8 @@ export default async function AdminReportsQueuePage({
         <div className="mt-4 space-y-3">
           {data.inspections.length === 0 ? (
             <EmptyState
-              description="No completed inspections were found for the selected month."
-              title="Nothing to review"
+              description="No finalized, non-invoiced inspections require billing action for the selected month."
+              title="Ready-to-bill queue is clear"
             />
           ) : (
             data.inspections.map((inspection) => (
@@ -113,7 +119,7 @@ export default async function AdminReportsQueuePage({
                       <p className="text-base font-semibold text-slate-950">
                         {inspection.primaryTitle ?? inspection.site.name}
                       </p>
-                      <StatusBadge label={inspection.billingStatus ?? "not invoiced"} tone="blue" />
+                      <StatusBadge label={inspection.lifecycleSummary.primaryLabel} tone="emerald" />
                     </div>
                     <p className="text-sm leading-5 text-slate-500">
                       {[inspection.secondaryTitle, format(inspection.completedAt ?? inspection.scheduledStart, "MMM d, yyyy")].filter(Boolean).join(" - ")}
@@ -123,7 +129,7 @@ export default async function AdminReportsQueuePage({
                     </p>
                     <div className="grid gap-2.5 md:grid-cols-2">
                       <div className="rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-600">
-                        <p className="font-medium text-slate-800">Reviewable report types</p>
+                        <p className="font-medium text-slate-800">Finalized report types</p>
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           {inspection.reviewTasks.map((task) => (
                             <span
@@ -137,6 +143,7 @@ export default async function AdminReportsQueuePage({
                       </div>
                       <div className="rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-600">
                         <p>Billing status: {inspection.billingStatus ?? "Not started"}</p>
+                        <p className="mt-1">Action needed: {inspection.lifecycleSummary.nextAction ?? "Create Invoice"}</p>
                         <p className="mt-1">Finalized reports: {inspection.reviewTasks.length}</p>
                       </div>
                     </div>
@@ -147,14 +154,14 @@ export default async function AdminReportsQueuePage({
                         className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white"
                         href={`/app/admin/reports/${inspection.id}/${inspection.reviewTasks[0].id}`}
                       >
-                        Open report review
+                        Open finalized report
                       </Link>
                     ) : null}
                     <Link
                       className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
-                      href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`}
+                      href={`/app/admin/billing/${inspection.id}?from=${encodeURIComponent(currentPath)}`}
                     >
-                      View inspection
+                      Create invoice
                     </Link>
                   </div>
                 </div>

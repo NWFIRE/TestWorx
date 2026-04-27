@@ -108,11 +108,11 @@ const adminNavItems: AppNavItem[] = [
   },
   {
     href: "/app/admin/billing",
-    label: "Billing Review",
+    label: "Billing",
     shortLabel: "Billing",
-    abbreviation: "BR",
+    abbreviation: "BL",
     icon: "invoice",
-    description: "Review line items and invoicing",
+    description: "Invoice drafts, ready-to-bill work, and invoiced history",
     tone: "emerald"
   },
   {

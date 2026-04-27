@@ -23,8 +23,8 @@ import {
 type ReviewItem = Awaited<ReturnType<typeof getAdminAmendmentManagementData>>["items"][number];
 
 const reviewOptions = [
-  { value: "all", label: "All inspections" },
-  { value: "needs_review", label: "Needs review" },
+  { value: "all", label: "All records" },
+  { value: "needs_review", label: "Needs attention" },
   { value: "pending_follow_up_request", label: "Pending requests" },
   { value: "approved_created", label: "Approved / created" },
   { value: "dismissed", label: "Dismissed" },
@@ -86,15 +86,15 @@ export default async function AdminAmendmentsPage({
     <AppPageShell>
       <PageHeader
         backNavigation={{ label: "Back to admin", fallbackHref: "/app/admin" }}
-        description="Review completed visits, confirm the packet is complete, and respond to technician requests for the next inspection without dropping into the full edit workspace."
-        eyebrow="Post-visit review"
-        title="Visit review and next-step requests"
+        description="Action-required visit issues, technician next-step requests, and amendment history without mixing in invoiced work as review-ready."
+        eyebrow="Needs attention"
+        title="Visit next-step requests"
       />
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <KPIStatCard
-          label="Needs review"
-          note="Inspections with unfinished packet details or a pending technician request."
+          label="Needs attention"
+          note="Records with an explicit unresolved action or pending technician request."
           tone="violet"
           value={data.filterCounts.needs_review}
         />
@@ -119,8 +119,8 @@ export default async function AdminAmendmentsPage({
       </section>
 
       <FilterBar
-        description="Filter the review queue by technician request state, readiness, and linked visit history."
-        title="Review filters"
+        description="Filter action-required records and linked visit history without treating closed invoices as active review work."
+        title="Action filters"
       >
         {reviewOptions.map((option) => (
           <FilterChipLink
@@ -137,10 +137,10 @@ export default async function AdminAmendmentsPage({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-              Review queue
+              Action queue
             </p>
             <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-              Completed visits ready for office review
+              Visits needing follow-through
             </h2>
           </div>
           <p className="text-sm text-slate-500">
@@ -152,7 +152,7 @@ export default async function AdminAmendmentsPage({
           {data.items.length === 0 ? (
             <EmptyState
               description="No inspections matched the selected review filter."
-              title="Nothing to review with these filters"
+              title="No action records match these filters"
             />
           ) : (
             data.items.map((inspection) => {
@@ -167,7 +167,7 @@ export default async function AdminAmendmentsPage({
                     <div className="space-y-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-lg font-semibold text-slate-950">{inspection.primaryTitle ?? inspection.site.name}</p>
-                        {inspection.needsReview ? <StatusBadge label="Needs review" tone="violet" /> : <StatusBadge label="Review ready" tone="emerald" />}
+                        {inspection.needsReview ? <StatusBadge label={inspection.lifecycleSummary.primaryLabel} tone="violet" /> : <StatusBadge label="No action required" tone="emerald" />}
                         {inspection.closeoutRequest ? (
                           <StatusBadge
                             label={formatInspectionCloseoutRequestStatusLabel(inspection.closeoutRequest.status)}
@@ -206,7 +206,7 @@ export default async function AdminAmendmentsPage({
                             Packet readiness
                           </p>
                           <p className="mt-2 text-sm text-slate-700">
-                            {inspection.reviewSummary.readyForOfficeReview ? "Ready for review" : "Needs attention"}
+                            {inspection.needsReview ? inspection.lifecycleSummary.primaryLabel : "No action required"}
                           </p>
                           <p className="mt-1 text-sm text-slate-500">
                             PDFs / docs: {inspection.reviewSummary.documentCount} | Attachments: {inspection.reviewSummary.attachmentCount}

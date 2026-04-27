@@ -66,5 +66,49 @@ describe("report review queue", () => {
     expect(result.counts.completed).toBe(1);
     expect(result.inspections[0]?.completedAt).toEqual(finalizedAt);
     expect(result.inspections[0]?.customerLabel).toBe("Commercial Fire LLC");
+  }, 10000);
+
+  it("excludes completed finalized inspections that are already invoiced from the action queue", async () => {
+    prismaMock.inspection.findMany.mockResolvedValue([
+      {
+        id: "inspection_invoiced",
+        status: "completed",
+        scheduledStart: new Date("2026-04-01T14:00:00.000Z"),
+        completedAt: new Date("2026-04-01T16:00:00.000Z"),
+        site: { name: "General / No Fixed Site" },
+        customerCompany: { name: "Anderson Burris Funeral Home" },
+        assignedTechnician: { name: "Eli Rodriguez" },
+        technicianAssignments: [],
+        billingSummary: {
+          status: "invoiced",
+          quickbooksSyncStatus: "synced",
+          quickbooksInvoiceId: "qb_invoice_1",
+          quickbooksInvoiceNumber: "1001"
+        },
+        tasks: [
+          {
+            id: "task_1",
+            inspectionType: "fire_alarm",
+            customDisplayLabel: null,
+            recurrence: null,
+            report: {
+              id: "report_1",
+              status: reportStatuses.finalized,
+              finalizedAt: new Date("2026-04-01T15:30:00.000Z")
+            }
+          }
+        ]
+      }
+    ]);
+
+    const { getAdminReportReviewQueueData } = await import("../scheduling");
+    const result = await getAdminReportReviewQueueData(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { month: "2026-04" }
+    );
+
+    expect(result.counts.readyToBill).toBe(0);
+    expect(result.counts.awaitingReview).toBe(0);
+    expect(result.inspections).toEqual([]);
   });
 });

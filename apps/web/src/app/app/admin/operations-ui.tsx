@@ -210,13 +210,13 @@ const workQueueItems = [
   },
   {
     key: "review",
-    label: "Awaiting review",
-    href: "/app/admin/reports?status=awaiting-review",
-    tone: "violet" as const
+    label: "Ready to bill",
+    href: "/app/admin/reports",
+    tone: "emerald" as const
   },
   {
     key: "billing",
-    label: "Billing ready",
+    label: "Billing work",
     href: "/app/admin/billing?status=ready",
     tone: "emerald" as const
   },

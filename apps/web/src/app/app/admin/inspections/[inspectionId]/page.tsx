@@ -369,7 +369,7 @@ export default async function EditInspectionPage({
       <div className="rounded-[2rem] border border-[color:rgb(203_215_230_/_0.92)] bg-white p-6 shadow-panel">
         <PageBackControl className="mb-2" fallbackHref={originPath} label={backLabel} />
         <p className="text-sm uppercase tracking-[0.25em] text-[color:var(--text-secondary)]">
-          {isReviewMode ? "Inspection review command center" : "Inspection command center"}
+          {isReviewMode ? "Inspection action command center" : "Inspection command center"}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h2 className="text-3xl font-semibold text-ink">{inspectionDisplay.primaryTitle}</h2>
@@ -377,7 +377,7 @@ export default async function EditInspectionPage({
             {formatLifecycleLabel(inspectionView.lifecycle ?? "original")}
           </span>
           <Link className="inline-flex rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slateblue" href="/app/admin/amendments">
-            Review queue
+            Needs attention
           </Link>
           {isReviewMode ? (
             <Link className="inline-flex rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slateblue" href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(originPath)}`}>
@@ -388,7 +388,7 @@ export default async function EditInspectionPage({
         <p className="mt-3 text-[color:var(--text-secondary)]">
           {inspectionDisplay.secondaryTitle ? `${inspectionDisplay.secondaryTitle} | ` : ""}
           {isReviewMode
-            ? "Review status, report completion, signatures, documents, and technician-requested next steps from one focused operational workspace."
+            ? "Check action state, report completion, signatures, documents, and technician-requested next steps from one focused operational workspace."
             : "Coordinate assignment, status, recurrence mix, scheduling details, and customer-facing outputs for this visit from one focused workspace."}
         </p>
         {inspectionView.hasStartedWork ? <p className="mt-3 text-sm text-amber-700">This visit already has work recorded. Changes here will create a new visit so the original stays in history.</p> : null}

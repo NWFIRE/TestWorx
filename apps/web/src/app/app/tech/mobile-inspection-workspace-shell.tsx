@@ -29,7 +29,7 @@ function resolveWorkspaceTaskStatusLabel({
     }
 
     if (currentMode === "review" || task.reportStatus === "submitted") {
-      return "Ready for Review";
+      return "Ready for Completion";
     }
 
     return "In Progress";

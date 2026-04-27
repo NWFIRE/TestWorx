@@ -23,6 +23,7 @@ import {
   createPriorityInspectionAssignedNotificationsTx,
   createWorkOrderReassignedNotificationsTx
 } from "./technician-notifications";
+import { resolveInspectionLifecycleSummary } from "./inspection-lifecycle";
 
 const inspectionTypeEnum = z.enum(Object.keys(inspectionTypeRegistry) as [keyof typeof inspectionTypeRegistry, ...(keyof typeof inspectionTypeRegistry)[]]);
 export const inspectionClassificationValues = [
@@ -103,7 +104,7 @@ const genericInspectionSiteState = "Unknown";
 const genericInspectionSitePostalCode = "Unknown";
 export const inspectionStatusLabels: Record<InspectionStatus | "past_due", string> = {
   to_be_completed: "To Be Completed",
-  scheduled: "Scheduled",
+  scheduled: "To Be Completed",
   in_progress: "In Progress",
   completed: "Completed",
   invoiced: "Invoiced",
@@ -3899,7 +3900,10 @@ export async function getAdminReportReviewQueueData(
       technicianAssignments: { include: { technician: true } },
       billingSummary: {
         select: {
-          status: true
+          status: true,
+          quickbooksSyncStatus: true,
+          quickbooksInvoiceId: true,
+          quickbooksInvoiceNumber: true
         }
       },
       tasks: {
@@ -3923,6 +3927,21 @@ export async function getAdminReportReviewQueueData(
         .map((task) => task.report?.finalizedAt ?? null)
         .filter((value): value is Date => value instanceof Date)
         .sort((left, right) => right.getTime() - left.getTime())[0] ?? null;
+      const lifecycleSummary = resolveInspectionLifecycleSummary({
+        inspectionStatus: inspection.status,
+        assignedTechnicianCount: readTechnicianNameAssignments(inspection).length + (inspection.assignedTechnician ? 1 : 0),
+        hasStartedWork: true,
+        reports: tasks.map((task) => ({
+          status: task.report?.status,
+          correctionState: task.report?.correctionState,
+          correctionResolvedAt: task.report?.correctionResolvedAt,
+          finalizedAt: task.report?.finalizedAt
+        })),
+        billingStatus: inspection.billingSummary?.status ?? null,
+        quickbooksSyncStatus: inspection.billingSummary?.quickbooksSyncStatus ?? null,
+        quickbooksInvoiceId: inspection.billingSummary?.quickbooksInvoiceId ?? null,
+        quickbooksInvoiceNumber: inspection.billingSummary?.quickbooksInvoiceNumber ?? null
+      });
 
       return {
         ...inspection,
@@ -3930,6 +3949,7 @@ export async function getAdminReportReviewQueueData(
         tasks,
         reviewTasks,
         billingStatus: inspection.billingSummary?.status ?? null,
+        lifecycleSummary,
         ...getInspectionDisplayLabels({
           siteName: inspection.site.name,
           customerName: inspection.customerCompany.name
@@ -3942,9 +3962,8 @@ export async function getAdminReportReviewQueueData(
     })
     .filter((inspection) => inspection.reviewTasks.length > 0);
 
-  const awaitingReviewInspections = mapped.filter(
-    (inspection) => !inspection.billingStatus || inspection.billingStatus === "draft"
-  );
+  const readyToBillInspections = mapped.filter((inspection) => inspection.lifecycleSummary.actionState === "ready_to_bill");
+  const syncIssueInspections = mapped.filter((inspection) => inspection.lifecycleSummary.actionState === "sync_issue");
 
   const monthOptions = Array.from({ length: 12 }, (_, index) => {
     const monthDate = subMonths(currentMonthStart, index);
@@ -3959,13 +3978,15 @@ export async function getAdminReportReviewQueueData(
       month: format(monthStart, "yyyy-MM")
     },
     counts: {
-      awaitingReview: awaitingReviewInspections.length,
+      awaitingReview: readyToBillInspections.length,
+      readyToBill: readyToBillInspections.length,
+      syncIssues: syncIssueInspections.length,
       completed: mapped.length
     },
     options: {
       months: monthOptions
     },
-    inspections: awaitingReviewInspections
+    inspections: readyToBillInspections
   };
 }
 
@@ -4007,6 +4028,8 @@ export async function getAdminAmendmentManagementData(
             select: {
               id: true,
               status: true,
+              correctionState: true,
+              correctionResolvedAt: true,
               finalizedAt: true
             }
           }
@@ -4022,6 +4045,14 @@ export async function getAdminAmendmentManagementData(
       attachments: {
         select: {
           id: true
+        }
+      },
+      billingSummary: {
+        select: {
+          status: true,
+          quickbooksSyncStatus: true,
+          quickbooksInvoiceId: true,
+          quickbooksInvoiceNumber: true
         }
       },
       amendments: {
@@ -4111,8 +4142,25 @@ export async function getAdminAmendmentManagementData(
       documents: inspection.documents,
       attachments: inspection.attachments
     });
+    const lifecycleSummary = resolveInspectionLifecycleSummary({
+      inspectionStatus: inspection.status,
+      assignedTechnicianCount: readTechnicianNameAssignments(inspection).length + (inspection.assignedTechnician ? 1 : 0),
+      hasStartedWork,
+      reports: inspection.tasks.map((task) => ({
+        status: task.report?.status,
+        correctionState: task.report?.correctionState,
+        correctionResolvedAt: task.report?.correctionResolvedAt,
+        finalizedAt: task.report?.finalizedAt
+      })),
+      billingStatus: inspection.billingSummary?.status ?? null,
+      quickbooksSyncStatus: inspection.billingSummary?.quickbooksSyncStatus ?? null,
+      quickbooksInvoiceId: inspection.billingSummary?.quickbooksInvoiceId ?? null,
+      quickbooksInvoiceNumber: inspection.billingSummary?.quickbooksInvoiceNumber ?? null
+    });
     const hasAmendmentLinkage = Boolean(originalAmendment || outgoingAmendment);
-    const needsReview = !reviewSummary.readyForOfficeReview || inspection.closeoutRequest?.status === InspectionCloseoutRequestStatus.pending;
+    const needsReview =
+      lifecycleSummary.actionState !== "none" ||
+      inspection.closeoutRequest?.status === InspectionCloseoutRequestStatus.pending;
 
     if (needsReview) {
       filterCounts.needs_review += 1;
@@ -4159,6 +4207,7 @@ export async function getAdminAmendmentManagementData(
       }),
       hasStartedWork,
       needsReview,
+      lifecycleSummary,
       reviewSummary,
       hasAmendmentLinkage,
       reportActivityCount: reportActivityCounts.get(inspection.id) ?? 0,

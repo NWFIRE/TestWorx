@@ -1,7 +1,7 @@
 export type TechnicianMobileTaskStatusLabel =
   | "Not Started"
   | "In Progress"
-  | "Ready for Review"
+  | "Ready for Completion"
   | "Finalized";
 
 export type TechnicianMobileTaskWorkspaceSummary = {
@@ -30,7 +30,7 @@ export function getTechnicianMobileTaskStatusLabel(input: {
   }
 
   if (input.reportStatus === "submitted") {
-    return "Ready for Review";
+    return "Ready for Completion";
   }
 
   if (input.reportStatus === "draft") {
@@ -74,7 +74,7 @@ export function summarizeTechnicianTaskStatuses(tasks: TaskLike[]) {
     total: tasks.length,
     notStarted: 0,
     inProgress: 0,
-    readyForReview: 0,
+    readyForCompletion: 0,
     finalized: 0
   };
 
@@ -87,8 +87,8 @@ export function summarizeTechnicianTaskStatuses(tasks: TaskLike[]) {
       summary.notStarted += 1;
     } else if (status === "In Progress") {
       summary.inProgress += 1;
-    } else if (status === "Ready for Review") {
-      summary.readyForReview += 1;
+    } else if (status === "Ready for Completion") {
+      summary.readyForCompletion += 1;
     } else if (status === "Finalized") {
       summary.finalized += 1;
     }
@@ -108,8 +108,8 @@ export function buildInspectionTaskSummaryLine(tasks: TaskLike[]) {
   if (summary.inProgress > 0) {
     parts.push(`${summary.inProgress} in progress`);
   }
-  if (summary.readyForReview > 0) {
-    parts.push(`${summary.readyForReview} ready for review`);
+  if (summary.readyForCompletion > 0) {
+    parts.push(`${summary.readyForCompletion} ready for completion`);
   }
   if (summary.notStarted > 0) {
     parts.push(`${summary.notStarted} not started`);
