@@ -1892,6 +1892,61 @@ describe("inspection billing persistence and admin review", () => {
     );
   });
 
+  it("matches invoice items with common weight shorthand and broad catalog search", async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      {
+        id: "summary_1",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        status: "draft",
+        subtotal: 125,
+        notes: "Review pricing",
+        quickbooksSyncStatus: null,
+        quickbooksInvoiceId: null,
+        items: [
+          {
+            id: "line_1",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "fire_extinguisher",
+            category: "material",
+            description: "Recharge (5 lb ABC)",
+            quantity: 1
+          }
+        ]
+      }
+    ]);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([
+      {
+        id: "catalog_recharge",
+        quickbooksItemId: "qb_recharge",
+        name: "Recharge - 5# ABC Fire Extinguisher",
+        sku: "RECHG-5ABC",
+        itemType: "Service",
+        unitPrice: 33.5
+      }
+    ]);
+    prismaMock.quickBooksCatalogItemAlias.findMany.mockResolvedValue([]);
+
+    const result = await searchBillingSummaryItemCatalogMatches(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { summaryId: "summary_1", itemId: "line_1", query: "Recharge (5 lb ABC)" }
+    );
+
+    expect(prismaMock.quickBooksCatalogItem.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.not.objectContaining({ OR: expect.any(Array) })
+      })
+    );
+    expect(result.results[0]).toEqual(
+      expect.objectContaining({
+        name: "Recharge - 5# ABC Fire Extinguisher",
+        unitPrice: 33.5
+      })
+    );
+  });
+
   it("blocks manual catalog searching for service fee lines", async () => {
     prismaMock.$queryRaw.mockResolvedValueOnce([
       {

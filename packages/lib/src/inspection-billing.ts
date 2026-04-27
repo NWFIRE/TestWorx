@@ -82,7 +82,7 @@ type BillingItemCatalogMatchRecord = {
 
 const AUTO_MATCH_CONFIDENCE_THRESHOLD = 0.96;
 const SUGGESTED_MATCH_CONFIDENCE_THRESHOLD = 0.72;
-const MANUAL_SEARCH_CONFIDENCE_THRESHOLD = 0;
+const MANUAL_SEARCH_CONFIDENCE_THRESHOLD = 0.15;
 
 function isRuleControlledFeeItem(item: BillableItem) {
   return item.category === "fee";
@@ -422,6 +422,8 @@ function isAdminRole(role: string) {
 function normalizeMatchText(value: string | null | undefined) {
   return (value ?? "")
     .toLowerCase()
+    .replace(/#/g, " lb ")
+    .replace(/(\d)(lb|lbs|pound|pounds)\b/g, "$1 $2")
     .replace(/&/g, " and ")
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
@@ -429,6 +431,10 @@ function normalizeMatchText(value: string | null | undefined) {
 }
 
 function singularizeToken(token: string) {
+  if (["lb", "lbs", "pound", "pounds"].includes(token)) {
+    return "lb";
+  }
+
   if (token.endsWith("ies") && token.length > 4) {
     return `${token.slice(0, -3)}y`;
   }
@@ -1301,15 +1307,19 @@ async function searchCatalogCandidates(
       where: {
         tenantId,
         active: true,
-        OR: [
-          { name: { contains: rawQuery, mode: "insensitive" } },
-          ...(tokenizedQuery.length > 0
-            ? tokenizedQuery.map((token) => ({
-                name: { contains: token, mode: "insensitive" as const }
-              }))
-            : []),
-          ...(rawQuery ? [{ sku: { contains: rawQuery, mode: "insensitive" as const } }] : [])
-        ]
+        ...(options?.mode === "manual"
+          ? {}
+          : {
+              OR: [
+                { name: { contains: rawQuery, mode: "insensitive" as const } },
+                ...(tokenizedQuery.length > 0
+                  ? tokenizedQuery.map((token) => ({
+                      name: { contains: token, mode: "insensitive" as const }
+                    }))
+                  : []),
+                ...(rawQuery ? [{ sku: { contains: rawQuery, mode: "insensitive" as const } }] : [])
+              ]
+            })
       },
       select: {
         id: true,

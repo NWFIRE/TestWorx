@@ -722,7 +722,10 @@ export function normalizeQbName(input: string) {
   return input
     .toLowerCase()
     .trim()
+    .replace(/#/g, " lb ")
+    .replace(/(\d)(lb|lbs|pound|pounds)\b/g, "$1 $2")
     .replace(/&/g, "and")
+    .replace(/\b(lbs|pound|pounds)\b/g, "lb")
     .replace(/\b(service|services|inspection|inspections|system|systems)\b/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
