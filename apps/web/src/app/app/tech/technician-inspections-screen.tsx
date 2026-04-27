@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 
 import { buildInspectionTaskSummaryLine } from "./mobile-inspection-workspace";
 import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
+import { MobileInspectionPdfAccessCard } from "./mobile-inspection-pdf-access-card";
 import { useOfflineScreenSnapshot } from "./offline/use-offline-screen-snapshot";
 import { toDateValue } from "./date-value";
 
@@ -17,6 +18,10 @@ function activeTasks(inspection: any) {
 function openTaskLink(inspection: any) {
   const task = activeTasks(inspection)[0] ?? inspection.tasks[0] ?? null;
   return task ? `/app/tech/reports/${inspection.id}/${task.id}` : "/app/tech";
+}
+
+function hasAttachedPdfs(inspection: any) {
+  return (inspection.documents?.length ?? 0) > 0 || (inspection.attachments?.length ?? 0) > 0;
 }
 
 export function TechnicianInspectionsScreen({ initialData }: { initialData: any }) {
@@ -68,6 +73,15 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
                 phone={inspection.customerCompany?.phone}
               />
             </div>
+            {hasAttachedPdfs(inspection) ? (
+              <div className="mt-4">
+                <MobileInspectionPdfAccessCard
+                  attachments={inspection.attachments}
+                  documents={inspection.documents}
+                  inspectionId={inspection.id}
+                />
+              </div>
+            ) : null}
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <Link className="flex min-h-12 items-center justify-center rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)]" href={openTaskLink(inspection)}>
                 {inspection.tasks.some((task: any) => task.report?.status === "draft" || task.report?.status === "submitted") ? "Continue inspection" : "Start inspection"}

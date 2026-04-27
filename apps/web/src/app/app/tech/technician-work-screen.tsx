@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation";
 
 import { ClaimButton } from "./claim-button";
 import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
+import { MobileInspectionPdfAccessCard } from "./mobile-inspection-pdf-access-card";
 import { useOfflineScreenSnapshot } from "./offline/use-offline-screen-snapshot";
 import { toDateValue } from "./date-value";
 
@@ -15,6 +16,10 @@ type WorkFilter = "today" | "upcoming" | "overdue" | "open" | "claimable";
 
 function firstOpenTask(inspection: any) {
   return inspection.tasks.find((task: any) => task.report?.status !== "finalized") ?? inspection.tasks[0] ?? null;
+}
+
+function hasAttachedPdfs(inspection: any) {
+  return (inspection.documents?.length ?? 0) > 0 || (inspection.attachments?.length ?? 0) > 0;
 }
 
 function matchesQuery(inspection: any, query: string) {
@@ -134,6 +139,15 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
               <p className="mt-3 text-sm text-slate-600">
                 Open {format(toDateValue(inspection.scheduledStart), "MMM d, h:mm a")}
               </p>
+              {hasAttachedPdfs(inspection) ? (
+                <div className="mt-4">
+                  <MobileInspectionPdfAccessCard
+                    attachments={inspection.attachments}
+                    documents={inspection.documents}
+                    inspectionId={inspection.id}
+                  />
+                </div>
+              ) : null}
             </article>
           )) : (
             <div className="rounded-[1.75rem] border border-dashed border-slate-200 bg-white p-5 text-sm text-slate-500">
@@ -195,6 +209,15 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                       phone={inspection.customerCompany?.phone}
                     />
                   </div>
+                  {hasAttachedPdfs(inspection) ? (
+                    <div className="mt-4">
+                      <MobileInspectionPdfAccessCard
+                        attachments={inspection.attachments}
+                        documents={inspection.documents}
+                        inspectionId={inspection.id}
+                      />
+                    </div>
+                  ) : null}
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     {action ? (
                       <Link className="flex min-h-12 items-center justify-center rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)]" href={`/app/tech/reports/${inspection.id}/${action.id}`}>

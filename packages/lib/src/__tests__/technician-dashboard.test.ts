@@ -1,4 +1,4 @@
-import { InspectionStatus } from "@prisma/client";
+import { AttachmentKind, InspectionStatus } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock } = vi.hoisted(() => ({
@@ -44,9 +44,33 @@ describe("technician dashboard inspection access", () => {
               report: null
             }
           ],
-          documents: []
+          attachments: [
+            {
+              id: "attachment_pdf_1",
+              fileName: "floor-plan.pdf",
+              mimeType: "application/pdf",
+              source: "uploaded",
+              customerVisible: false,
+              createdAt: new Date("2026-03-16T09:00:00.000Z")
+            }
+          ],
+          documents: [
+            {
+              id: "document_1",
+              label: "Customer form",
+              fileName: "customer-form.pdf",
+              fileSize: 12000,
+              mimeType: "application/pdf",
+              requiresSignature: true,
+              status: "READY_FOR_SIGNATURE",
+              annotatedStorageKey: null,
+              signedStorageKey: null,
+              signedAt: null
+            }
+          ]
         }
       ])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
     const result = await getTechnicianDashboardData({ userId: "tech_1", role: "technician", tenantId: "tenant_1" });
@@ -62,10 +86,30 @@ describe("technician dashboard inspection access", () => {
             InspectionStatus.follow_up_required
           ]
         }
+      }),
+      include: expect.objectContaining({
+        attachments: expect.objectContaining({
+          where: { kind: AttachmentKind.pdf },
+          select: expect.objectContaining({
+            id: true,
+            fileName: true,
+            mimeType: true
+          })
+        }),
+        documents: expect.objectContaining({
+          select: expect.objectContaining({
+            id: true,
+            fileName: true,
+            fileSize: true,
+            mimeType: true
+          })
+        })
       })
     }));
     expect(result.assigned).toHaveLength(1);
     expect(result.assigned[0]?.id).toBe("inspection_1");
+    expect(result.assigned[0]?.documents).toHaveLength(1);
+    expect(result.assigned[0]?.attachments).toHaveLength(1);
   });
 
   it("shows unassigned claimable inspections in the shared queue for technicians", async () => {
@@ -94,7 +138,8 @@ describe("technician dashboard inspection access", () => {
             }
           ]
         }
-      ]);
+      ])
+      .mockResolvedValueOnce([]);
 
     const result = await getTechnicianDashboardData({ userId: "tech_2", role: "technician", tenantId: "tenant_1" });
 

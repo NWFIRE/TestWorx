@@ -1,5 +1,6 @@
 import { addMonths, endOfMonth, endOfWeek, format, isAfter, isSameDay, startOfDay, startOfMonth, subDays, subMonths } from "date-fns";
 import {
+  AttachmentKind,
   InspectionClassification,
   InspectionCloseoutRequestStatus,
   InspectionCloseoutRequestType,
@@ -4345,12 +4346,26 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
           }
         },
         tasks: { include: { recurrence: true, report: true, assignedTechnician: true } },
+        attachments: {
+          where: { kind: AttachmentKind.pdf },
+          orderBy: [{ createdAt: "desc" }],
+          select: {
+            id: true,
+            fileName: true,
+            mimeType: true,
+            source: true,
+            customerVisible: true,
+            createdAt: true
+          }
+        },
         documents: {
           orderBy: [{ createdAt: "desc" }],
           select: {
             id: true,
             label: true,
             fileName: true,
+            fileSize: true,
+            mimeType: true,
             requiresSignature: true,
             status: true,
             annotatedStorageKey: true,
