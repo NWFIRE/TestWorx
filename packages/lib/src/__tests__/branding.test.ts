@@ -37,6 +37,23 @@ describe("branding propagation", () => {
     expect(branding.website).toBe("https://evergreenfire.example.com/");
   });
 
+  it("preserves tenant sidebar ordering in branding settings", () => {
+    const branding = resolveTenantBranding({
+      tenantName: "Evergreen Fire Protection",
+      billingEmail: "billing@evergreenfire.com",
+      branding: {
+        primaryColor: "#102A43",
+        sidebarOrder: ["/app/admin/billing", "/app/admin/inspections", "/app/deficiencies"]
+      }
+    });
+
+    expect(branding.sidebarOrder).toEqual([
+      "/app/admin/billing",
+      "/app/admin/inspections",
+      "/app/deficiencies"
+    ]);
+  });
+
   it("propagates tenant business branding into generated PDFs", async () => {
     const bytes = await generateInspectionReportPdf({
       tenant: {

@@ -14,13 +14,15 @@ export default async function AppLayout({ children }: Readonly<{ children: React
     redirect("/login");
   }
 
+  let sidebarOrder: string[] | null = null;
   if (session.user.tenantId) {
     try {
-      await getTenantBrandingSettings({
+      const tenantSettings = await getTenantBrandingSettings({
         userId: session.user.id,
         role: session.user.role,
         tenantId: session.user.tenantId
       });
+      sidebarOrder = tenantSettings.branding.sidebarOrder;
     } catch (error) {
       if (isStaleSessionError(error)) {
         redirect("/login?session=stale");
@@ -39,6 +41,7 @@ export default async function AppLayout({ children }: Readonly<{ children: React
       <AppShell
         allowances={session.user.allowances ?? null}
         role={session.user.role}
+        sidebarOrder={sidebarOrder}
         signOutAction={signOutAction}
         user={{ email: session.user.email ?? null, name: session.user.name ?? null }}
       >

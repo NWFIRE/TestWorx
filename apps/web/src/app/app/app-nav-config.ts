@@ -250,7 +250,55 @@ const navByRole: Record<string, AppNavItem[]> = {
   ]
 };
 
-export function getAppNavItemsForRole(role: string, allowances?: InternalAllowances) {
+export const defaultAdminSidebarOrder = adminNavItems.map((item) => item.href);
+
+function orderAppNavItems(items: AppNavItem[], sidebarOrder?: string[] | null) {
+  if (!sidebarOrder?.length) {
+    return items;
+  }
+
+  const orderRank = new Map<string, number>();
+  for (const href of sidebarOrder) {
+    if (!orderRank.has(href)) {
+      orderRank.set(href, orderRank.size);
+    }
+  }
+
+  return [...items].sort((first, second) => {
+    const firstRank = orderRank.get(first.href);
+    const secondRank = orderRank.get(second.href);
+
+    if (firstRank === undefined && secondRank === undefined) {
+      return items.indexOf(first) - items.indexOf(second);
+    }
+
+    if (firstRank === undefined) {
+      return 1;
+    }
+
+    if (secondRank === undefined) {
+      return -1;
+    }
+
+    return firstRank - secondRank;
+  });
+}
+
+function applyAdminSidebarOrder(role: string, items: AppNavItem[], sidebarOrder?: string[] | null) {
+  if (!["tenant_admin", "office_admin", "platform_admin"].includes(role)) {
+    return items;
+  }
+
+  if (role !== "platform_admin") {
+    return orderAppNavItems(items, sidebarOrder);
+  }
+
+  const platformItems = items.filter((item) => item.href === "/app/platform");
+  const adminItems = items.filter((item) => item.href !== "/app/platform");
+  return [...platformItems, ...orderAppNavItems(adminItems, sidebarOrder)];
+}
+
+export function getAppNavItemsForRole(role: string, allowances?: InternalAllowances, sidebarOrder?: string[] | null) {
   let baseItems = navByRole[role] ?? [];
 
   if (role === "technician" && canAccessQuoteWorkspace(role, allowances)) {
@@ -260,10 +308,10 @@ export function getAppNavItemsForRole(role: string, allowances?: InternalAllowan
   }
 
   if (!canAccessQuoteWorkspace(role, allowances)) {
-    return baseItems.filter((item) => item.href !== "/app/admin/quotes");
+    return applyAdminSidebarOrder(role, baseItems.filter((item) => item.href !== "/app/admin/quotes"), sidebarOrder);
   }
 
-  return baseItems;
+  return applyAdminSidebarOrder(role, baseItems, sidebarOrder);
 }
 
 export function isAppNavItemActive(pathname: string, item: AppNavItem) {
@@ -284,6 +332,6 @@ export function isAppNavItemActive(pathname: string, item: AppNavItem) {
   return pathname.startsWith(`${item.href}/`);
 }
 
-export function getCurrentAppNavItem(role: string, pathname: string, allowances?: InternalAllowances) {
-  return getAppNavItemsForRole(role, allowances).find((item) => isAppNavItemActive(pathname, item)) ?? null;
+export function getCurrentAppNavItem(role: string, pathname: string, allowances?: InternalAllowances, sidebarOrder?: string[] | null) {
+  return getAppNavItemsForRole(role, allowances, sidebarOrder).find((item) => isAppNavItemActive(pathname, item)) ?? null;
 }

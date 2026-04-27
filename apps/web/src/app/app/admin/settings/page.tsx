@@ -17,6 +17,7 @@ import {
 
 import { AppPageShell, KPIStatCard, PageHeader, SectionCard, WorkspaceSplit } from "../operations-ui";
 import { BrandLoader } from "@/app/brand-loader";
+import { getAppNavItemsForRole } from "../../app-nav-config";
 
 import {
   createBillingContractProfileAction,
@@ -38,7 +39,8 @@ import {
   startBillingCheckoutAction,
   updateComplianceReportingFeeRuleAction,
   updateDefaultServiceFeeAction,
-  updateServiceFeeRuleAction
+  updateServiceFeeRuleAction,
+  updateTenantSidebarOrderAction
 } from "./actions";
 import { BillingPlansSection } from "./billing-plans-section";
 import { BillingContractProfileSettingsCard } from "./billing-contract-profile-settings-card";
@@ -48,6 +50,7 @@ import { QuickBooksItemMappingCard } from "./quickbooks-item-mapping-card";
 import { ServiceFeeSettingsCard } from "./service-fee-settings-card";
 import { QuickBooksSettingsCard } from "./quickbooks-settings-card";
 import { SettingsDisclosureCard } from "./settings-disclosure-card";
+import { SidebarOrderForm } from "./sidebar-order-form";
 import { TenantBrandingForm } from "./tenant-branding-form";
 
 type SettingsSearchParams = Record<string, string | string[] | undefined>;
@@ -326,6 +329,13 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
       : null;
   const payerAccountsOpen = isSectionOpen(params, "payerAccountsOpen", payerAccountsNotice);
   const contractProfilesOpen = isSectionOpen(params, "contractProfilesOpen", contractProfilesNotice);
+  const sidebarItems = getAppNavItemsForRole(session.user.role, session.user.allowances ?? null)
+    .filter((item) => item.href !== "/app/platform")
+    .map((item) => ({
+      href: item.href,
+      label: item.shortLabel || item.label,
+      description: item.description
+    }));
 
   return (
     <AppPageShell density="wide">
@@ -367,6 +377,11 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
       >
         <div className="space-y-6">
           <TenantBrandingForm values={{ ...brandingSettings.branding, billingEmail: brandingSettings.billingEmail }} />
+          <SidebarOrderForm
+            items={sidebarItems}
+            savedOrder={brandingSettings.branding.sidebarOrder}
+            updateAction={updateTenantSidebarOrderAction}
+          />
           <QuickBooksSettingsCard
             companyName={quickBooksSettings.tenant.quickbooksCompanyName}
             configured={quickBooksSettings.config.enabled}

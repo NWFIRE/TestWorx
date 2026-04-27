@@ -53,18 +53,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     const accentColor = readColorCookie(cookieStore.get(BRAND_ACCENT_COOKIE)?.value);
     if (primaryColor || accentColor) {
       theme = buildTenantBrandingCss({
-        logoDataUrl: "",
         primaryColor: primaryColor ?? "#1E3A5F",
-        accentColor: accentColor ?? "#C2410C",
-        legalBusinessName: "",
-        phone: "",
-        email: "",
-        website: "",
-        addressLine1: "",
-        addressLine2: "",
-        city: "",
-        state: "",
-        postalCode: ""
+        accentColor: accentColor ?? "#C2410C"
       });
     }
   }

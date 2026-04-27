@@ -8,6 +8,7 @@ import { assertTenantContext } from "./permissions";
 
 const hexColorSchema = z.string().regex(/^#(?:[0-9a-fA-F]{3}){1,2}$/i, "Enter a valid hex color.");
 const imageDataUrlSchema = z.string().refine((value) => value === "" || /^data:image\/.+;base64,/i.test(value), "Logos must be stored as image data URLs.");
+const sidebarOrderSchema = z.array(z.string().trim().min(1)).max(80).optional().default([]);
 const websiteSchema = z.string().trim().transform((value, ctx) => {
   if (value === "") {
     return "";
@@ -43,7 +44,8 @@ export const tenantBrandingSchema = z.object({
   addressLine2: z.string().max(160).optional().default(""),
   city: z.string().max(80).optional().default(""),
   state: z.string().max(40).optional().default(""),
-  postalCode: z.string().max(20).optional().default("")
+  postalCode: z.string().max(20).optional().default(""),
+  sidebarOrder: sidebarOrderSchema
 });
 
 export type TenantBranding = z.infer<typeof tenantBrandingSchema>;
@@ -71,7 +73,8 @@ export function resolveTenantBranding(input: { tenantName: string; branding: unk
     addressLine2: parseBrandingField(z.string().max(160), rawBranding.addressLine2, ""),
     city: parseBrandingField(z.string().max(80), rawBranding.city, ""),
     state: parseBrandingField(z.string().max(40), rawBranding.state, ""),
-    postalCode: parseBrandingField(z.string().max(20), rawBranding.postalCode, "")
+    postalCode: parseBrandingField(z.string().max(20), rawBranding.postalCode, ""),
+    sidebarOrder: parseBrandingField(sidebarOrderSchema, rawBranding.sidebarOrder, [])
   });
   return {
     ...branding,
@@ -82,7 +85,7 @@ export function resolveTenantBranding(input: { tenantName: string; branding: unk
   };
 }
 
-export function buildTenantBrandingCss(branding: TenantBranding) {
+export function buildTenantBrandingCss(branding: Pick<TenantBranding, "primaryColor" | "accentColor">) {
   const primaryColor = branding.primaryColor || "#1E3A5F";
   const accentColor = branding.accentColor || "#C2410C";
   const primaryRgb = hexToRgbChannels(primaryColor);
@@ -138,6 +141,10 @@ export const updateTenantBrandingSchema = tenantBrandingSchema.extend({
   billingEmail: z.string().email().or(z.literal("")).default("")
 });
 
+export const updateTenantSidebarOrderSchema = z.object({
+  sidebarOrder: sidebarOrderSchema
+});
+
 export async function getTenantBrandingSettings(actor: ActorContext) {
   const parsedActor = parseActor(actor);
   const tenant = await prisma.tenant.findFirst({
@@ -158,13 +165,15 @@ export async function getTenantBrandingSettings(actor: ActorContext) {
   };
 }
 
-export async function updateTenantBranding(actor: ActorContext, input: z.infer<typeof updateTenantBrandingSchema>) {
+export async function updateTenantBranding(actor: ActorContext, input: z.input<typeof updateTenantBrandingSchema>) {
   const parsedActor = parseActor(actor);
   if (!["tenant_admin", "platform_admin", "office_admin"].includes(parsedActor.role)) {
     throw new Error("Only administrators can update branding.");
   }
 
   const parsedInput = updateTenantBrandingSchema.parse(input);
+  const inputIncludesSidebarOrder = Object.prototype.hasOwnProperty.call(input, "sidebarOrder");
+  const { sidebarOrder, ...brandingInput } = parsedInput;
   const tenant = await prisma.tenant.findFirst({ where: { id: parsedActor.tenantId as string } });
   if (!tenant) {
     throw new Error("Tenant not found.");
@@ -175,7 +184,8 @@ export async function updateTenantBranding(actor: ActorContext, input: z.infer<t
     billingEmail: parsedInput.billingEmail,
     branding: {
       ...(tenant.branding && typeof tenant.branding === "object" ? tenant.branding as Record<string, unknown> : {}),
-      ...parsedInput
+      ...brandingInput,
+      ...(inputIncludesSidebarOrder ? { sidebarOrder } : {})
     }
   });
 
@@ -195,6 +205,46 @@ export async function updateTenantBranding(actor: ActorContext, input: z.infer<t
       entityType: "Tenant",
       entityId: tenant.id,
       metadata: { primaryColor: mergedBranding.primaryColor, billingEmail: updated.billingEmail }
+    }
+  });
+
+  return updated;
+}
+
+export async function updateTenantSidebarOrder(actor: ActorContext, input: z.input<typeof updateTenantSidebarOrderSchema>) {
+  const parsedActor = parseActor(actor);
+  if (!["tenant_admin", "platform_admin", "office_admin"].includes(parsedActor.role)) {
+    throw new Error("Only administrators can update sidebar order.");
+  }
+
+  const parsedInput = updateTenantSidebarOrderSchema.parse(input);
+  const tenant = await prisma.tenant.findFirst({ where: { id: parsedActor.tenantId as string } });
+  if (!tenant) {
+    throw new Error("Tenant not found.");
+  }
+
+  const mergedBranding = resolveTenantBranding({
+    tenantName: tenant.name,
+    billingEmail: tenant.billingEmail,
+    branding: {
+      ...(tenant.branding && typeof tenant.branding === "object" ? tenant.branding as Record<string, unknown> : {}),
+      sidebarOrder: parsedInput.sidebarOrder
+    }
+  });
+
+  const updated = await prisma.tenant.update({
+    where: { id: tenant.id },
+    data: { branding: mergedBranding }
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      tenantId: tenant.id,
+      actorUserId: parsedActor.userId,
+      action: "tenant.sidebar_order_updated",
+      entityType: "Tenant",
+      entityId: tenant.id,
+      metadata: { sidebarOrder: mergedBranding.sidebarOrder }
     }
   });
 

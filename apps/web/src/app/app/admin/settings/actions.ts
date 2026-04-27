@@ -39,7 +39,8 @@ import {
   updateQuickBooksCatalogItem,
   updateServiceFeeRule,
   updateTenantBranding,
-  updateTenantDefaultServiceFee
+  updateTenantDefaultServiceFee,
+  updateTenantSidebarOrder
 } from "@testworx/lib/server/index";
 
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
@@ -293,6 +294,32 @@ export async function updateTenantBrandingAction(_: { error: string | null; succ
     return { error: null, success: "Branding updated." };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unable to update branding.", success: null };
+  }
+}
+
+export async function updateTenantSidebarOrderAction(_: { error: string | null; success: string | null }, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { error: "Unauthorized", success: null };
+  }
+
+  try {
+    const rawOrder = String(formData.get("sidebarOrder") ?? "[]");
+    const parsedOrder = JSON.parse(rawOrder);
+    if (!Array.isArray(parsedOrder) || parsedOrder.some((item) => typeof item !== "string")) {
+      throw new Error("Sidebar order is invalid.");
+    }
+
+    await updateTenantSidebarOrder(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      { sidebarOrder: parsedOrder }
+    );
+
+    revalidatePath("/app/admin/settings");
+    revalidatePath("/app", "layout");
+    return { error: null, success: "Sidebar order updated." };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Unable to update sidebar order.", success: null };
   }
 }
 

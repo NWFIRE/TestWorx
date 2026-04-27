@@ -296,12 +296,14 @@ export function AppShell({
   children,
   role,
   allowances,
+  sidebarOrder,
   user,
   signOutAction
 }: {
   children: React.ReactNode;
   role: string;
   allowances?: Record<string, boolean> | null;
+  sidebarOrder?: string[] | null;
   user: {
     name: string | null;
     email: string | null;
@@ -311,8 +313,8 @@ export function AppShell({
   const router = useRouter();
   const pathname = usePathname();
   const isTechnician = role === "technician";
-  const navItems = useMemo(() => getAppNavItemsForRole(role, allowances), [allowances, role]);
-  const currentItem = useMemo(() => getCurrentAppNavItem(role, pathname, allowances), [allowances, pathname, role]);
+  const navItems = useMemo(() => getAppNavItemsForRole(role, allowances, sidebarOrder), [allowances, role, sidebarOrder]);
+  const currentItem = useMemo(() => getCurrentAppNavItem(role, pathname, allowances, sidebarOrder), [allowances, pathname, role, sidebarOrder]);
   const [isRefreshing, startRefreshTransition] = useTransition();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window === "undefined" || window.innerWidth < EXPANDED_SIDEBAR_BREAKPOINT
