@@ -8,6 +8,8 @@
   --keyboard-offset: 0px;
   --mobile-header-offset: 88px;
   --mobile-tab-bar-offset: calc(5.5rem + env(safe-area-inset-bottom));
+  --mobile-report-action-bar-height: 7.5rem;
+  --mobile-report-bottom-clearance: calc(var(--mobile-tab-bar-offset) + var(--mobile-report-action-bar-height) + var(--keyboard-offset, 0px) + 2rem);
   --app-bg: #F3F6FB;
   --surface-base: #FFFFFF;
   --surface-subtle: #F8FAFC;
@@ -35,6 +37,12 @@
   --tenant-accent-soft: rgb(194 65 12 / 0.12);
   --tenant-accent-border: rgb(194 65 12 / 0.28);
   --tenant-accent-contrast: #FFFFFF;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --mobile-report-bottom-clearance: 2rem;
+  }
 }
 
 html {
@@ -66,7 +74,7 @@ body {
   textarea {
     color: var(--text-primary);
     scroll-margin-top: calc(var(--mobile-header-offset, 88px) + 0.75rem);
-    scroll-margin-bottom: calc(var(--keyboard-offset, 0px) + 7rem + env(safe-area-inset-bottom));
+    scroll-margin-bottom: var(--mobile-report-bottom-clearance);
   }
 
   input::placeholder,

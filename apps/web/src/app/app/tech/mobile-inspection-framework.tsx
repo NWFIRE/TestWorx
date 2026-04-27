@@ -59,7 +59,7 @@ export function MobileInspectionShell({
   return (
     <div
       className="space-y-4"
-      style={{ paddingBottom: "calc(var(--mobile-tab-bar-offset, 5.5rem) + env(safe-area-inset-bottom, 0px) + 9rem)" }}
+      style={{ paddingBottom: "var(--mobile-report-bottom-clearance, calc(var(--mobile-tab-bar-offset, 5.5rem) + 12rem))" }}
     >
       <div className="sticky top-0 z-20 -mx-4 border-b border-slate-200 bg-[rgb(248_250_252/0.95)] px-4 pb-4 pt-2 backdrop-blur md:-mx-6 md:px-6">
         <div className="space-y-4">
@@ -148,7 +148,7 @@ export function MobileInspectionShell({
       {stickyFooter ? (
         <div
           className="mobile-keyboard-hide fixed inset-x-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur"
-          style={{ bottom: "var(--mobile-tab-bar-offset, 5.5rem)", paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
+          style={{ bottom: "calc(var(--mobile-tab-bar-offset, 5.5rem) + var(--keyboard-offset, 0px))", paddingBottom: "0.75rem" }}
         >
           <div className="mx-auto max-w-5xl">{stickyFooter}</div>
         </div>
@@ -529,7 +529,7 @@ export function MobileReviewScreen({
   return (
     <div
       className="space-y-4"
-      style={{ paddingBottom: "calc(var(--mobile-tab-bar-offset, 5.5rem) + env(safe-area-inset-bottom, 0px) + 9rem)" }}
+      style={{ paddingBottom: "var(--mobile-report-bottom-clearance, calc(var(--mobile-tab-bar-offset, 5.5rem) + 12rem))" }}
     >
       <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-panel">
         <div className="flex items-start justify-between gap-4">

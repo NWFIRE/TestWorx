@@ -989,7 +989,10 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
   const footerStatus = safeProgress ? `${saveState} | ${safeProgress.percent}% complete` : saveState;
 
   return (
-    <div className="space-y-4 pb-36 sm:space-y-6 md:pb-32 lg:pb-8">
+    <div
+      className="space-y-4 sm:space-y-6 lg:pb-8"
+      style={{ paddingBottom: "var(--mobile-report-bottom-clearance, calc(var(--mobile-tab-bar-offset, 5.5rem) + 12rem))" }}
+    >
       <MobileInspectionWorkspaceShell
         currentMode="edit"
         customerContactName={data.customerContactName}
@@ -1519,7 +1522,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
           {(visibleErrorMessage || backupWarning) ? (
             <div
               className="mobile-keyboard-hide fixed inset-x-0 z-20 px-4 transition-all duration-150 ease-out lg:hidden"
-              style={{ bottom: "calc(var(--mobile-tab-bar-offset, 5.5rem) + 0.75rem)" }}
+              style={{ bottom: "calc(var(--mobile-tab-bar-offset, 5.5rem) + var(--mobile-report-action-bar-height, 7.5rem) + 0.75rem)" }}
             >
               <div className="mx-auto max-w-7xl space-y-2">
                 {visibleErrorMessage ? <p className="rounded-2xl border border-rose-200 bg-white/95 px-4 py-3 text-sm text-rose-700 shadow-xl backdrop-blur">{visibleErrorMessage}</p> : null}
@@ -1529,7 +1532,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
           ) : null}
         <div
           className="mobile-keyboard-hide fixed inset-x-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur transition-all duration-150 ease-out lg:hidden"
-          style={{ bottom: "var(--mobile-tab-bar-offset, 5.5rem)", paddingBottom: "0.75rem" }}
+          style={{ bottom: "calc(var(--mobile-tab-bar-offset, 5.5rem) + var(--keyboard-offset, 0px))", paddingBottom: "0.75rem" }}
         >
           <div className="mx-auto max-w-7xl">
             <div className="mb-3 text-xs font-medium text-slate-600">

@@ -1089,7 +1089,7 @@ export function MobileChecklistReportScreen({
     return (
       <div
         className="space-y-4"
-        style={{ paddingBottom: "calc(var(--mobile-tab-bar-offset, 5.5rem) + 9rem)" }}
+        style={{ paddingBottom: "var(--mobile-report-bottom-clearance, calc(var(--mobile-tab-bar-offset, 5.5rem) + 12rem))" }}
       >
         <MobileInspectionWorkspaceShell
           currentMode="review"
@@ -1187,7 +1187,7 @@ export function MobileChecklistReportScreen({
 
         <div
           className="mobile-keyboard-hide fixed inset-x-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur"
-          style={{ bottom: "var(--mobile-tab-bar-offset, 5.5rem)", paddingBottom: "0.75rem" }}
+          style={{ bottom: "calc(var(--mobile-tab-bar-offset, 5.5rem) + var(--keyboard-offset, 0px))", paddingBottom: "0.75rem" }}
         >
           <div className="mx-auto max-w-5xl">
             <div className="flex items-center justify-between gap-3 text-xs font-medium text-slate-600">
@@ -1220,7 +1220,7 @@ export function MobileChecklistReportScreen({
   return (
     <div
       className="space-y-4"
-      style={{ paddingBottom: "calc(var(--mobile-tab-bar-offset, 5.5rem) + 9rem)" }}
+      style={{ paddingBottom: "var(--mobile-report-bottom-clearance, calc(var(--mobile-tab-bar-offset, 5.5rem) + 12rem))" }}
     >
       <MobileInspectionWorkspaceShell
         currentMode="edit"
@@ -1376,7 +1376,7 @@ export function MobileChecklistReportScreen({
 
       <div
         className="mobile-keyboard-hide fixed inset-x-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur"
-        style={{ bottom: "var(--mobile-tab-bar-offset, 5.5rem)", paddingBottom: "0.75rem" }}
+        style={{ bottom: "calc(var(--mobile-tab-bar-offset, 5.5rem) + var(--keyboard-offset, 0px))", paddingBottom: "0.75rem" }}
       >
         <div className="mx-auto max-w-5xl">
           <div className="mb-3 flex items-center justify-between gap-3 text-xs font-medium text-slate-600">
