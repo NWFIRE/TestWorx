@@ -113,8 +113,9 @@ export function formatInspectionStatusLabel(status: keyof typeof inspectionStatu
 export function getInspectionStatusTone(status: keyof typeof inspectionStatusLabels) {
   switch (status) {
     case "completed":
-    case "invoiced":
       return "emerald" as const;
+    case "invoiced":
+      return "violet" as const;
     case "follow_up_required":
     case "past_due":
       return "amber" as const;

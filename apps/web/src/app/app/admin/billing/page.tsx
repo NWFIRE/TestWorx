@@ -21,7 +21,7 @@ type AdminBillingSummary = Awaited<ReturnType<typeof getAdminBillingSummaries>>[
 const statusTones = {
   draft: "amber",
   reviewed: "blue",
-  invoiced: "emerald"
+  invoiced: "violet"
 } as const;
 
 const statusOptions = [

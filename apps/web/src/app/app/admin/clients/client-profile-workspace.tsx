@@ -117,8 +117,11 @@ function toneForQuoteStatus(status: string) {
 }
 
 function toneForInspectionStatus(status: string) {
-  if (status === "completed" || status === "invoiced") {
+  if (status === "completed") {
     return "emerald" as const;
+  }
+  if (status === "invoiced") {
+    return "violet" as const;
   }
   if (status === "follow_up_required") {
     return "amber" as const;

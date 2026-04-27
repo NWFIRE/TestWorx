@@ -11,6 +11,7 @@ import {
   getDefaultInspectionRecurrenceFrequency,
   withInspectionTaskDisplayLabels,
   getInspectionDisplayStatus,
+  getInspectionStatusTone,
   isInspectionPastDue,
   nextDueFrom,
   parseCreateInspectionFormData,
@@ -399,6 +400,11 @@ describe("month defaults and past-due status", () => {
         now: new Date("2026-03-20T00:00:00.000Z")
       })
     ).toBe("scheduled");
+  });
+
+  it("uses visually distinct tones for completed and invoiced inspection statuses", () => {
+    expect(getInspectionStatusTone(InspectionStatus.completed)).toBe("emerald");
+    expect(getInspectionStatusTone(InspectionStatus.invoiced)).toBe("violet");
   });
 
   it("shows customer-first labels for generic-site inspections", () => {

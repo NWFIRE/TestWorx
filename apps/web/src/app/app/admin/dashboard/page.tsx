@@ -177,7 +177,7 @@ function calculateBillingPipeline(
   return [
     { label: "Draft billing", value: Math.round((draft / total) * 100), tone: "bg-slate-900" },
     { label: "Ready to Bill", value: Math.round((reviewed / total) * 100), tone: "bg-slateblue" },
-    { label: "Invoiced", value: Math.round((invoiced / total) * 100), tone: "bg-emerald-500" }
+    { label: "Invoiced", value: Math.round((invoiced / total) * 100), tone: "bg-violet-500" }
   ];
 }
 
