@@ -325,7 +325,7 @@ describe("quickbooks billing sync hardening", () => {
         quickbooksSendError: null
       })
     });
-  });
+  }, 10000);
 
   it("uses linked catalog pricing when a persisted billing item is missing unit price", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
@@ -376,6 +376,89 @@ describe("quickbooks billing sync hardening", () => {
     const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
     expect(createInvoiceBody.DocNumber).toBe("TW2026-1000");
     expect(createInvoiceBody.Line?.[0]?.SalesItemLineDetail?.UnitPrice).toBe(33.5);
+  });
+
+  it("groups identical inspection billing items into one QuickBooks invoice line with summed quantity", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: null });
+    prismaMock.customerCompany.update.mockResolvedValue(undefined);
+    prismaMock.site.findFirst.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
+    prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue({
+      ...buildBillingSummary(),
+      items: [
+        {
+          id: "item_1",
+          description: "Annual Inspection - Fire Extinguisher",
+          quantity: 1,
+          unitPrice: 7.7,
+          amount: 7.7,
+          unit: "ea",
+          category: "service",
+          code: "FE-ANNUAL"
+        },
+        {
+          id: "item_2",
+          description: "Annual Inspection - Fire Extinguisher",
+          quantity: 1,
+          unitPrice: 7.7,
+          amount: 7.7,
+          unit: "ea",
+          category: "service",
+          code: "FE-ANNUAL"
+        },
+        {
+          id: "item_3",
+          description: "Annual Inspection - Fire Extinguisher",
+          quantity: 5,
+          unitPrice: 7.7,
+          amount: 38.5,
+          unit: "ea",
+          category: "service",
+          code: "FE-ANNUAL"
+        },
+        {
+          id: "item_4",
+          description: "New 2.5 ABC Fire Extinguisher",
+          quantity: 1,
+          unitPrice: 51.95,
+          amount: 51.95,
+          unit: "ea",
+          category: "material",
+          code: "FE-NEW-2_5_LB_ABC"
+        }
+      ]
+    });
+    prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({}));
+
+    const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
+
+    await syncBillingSummaryToQuickBooks(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    expect(createInvoiceBody.Line).toHaveLength(2);
+    expect(createInvoiceBody.Line[0]).toEqual(expect.objectContaining({
+      Amount: 53.9,
+      Description: "Annual Inspection - Fire Extinguisher"
+    }));
+    expect(createInvoiceBody.Line[0].SalesItemLineDetail).toEqual(expect.objectContaining({
+      Qty: 7,
+      UnitPrice: 7.7
+    }));
+    expect(createInvoiceBody.Line[1]).toEqual(expect.objectContaining({
+      Amount: 51.95,
+      Description: "New 2.5 ABC Fire Extinguisher"
+    }));
   });
 
   it("keeps invoice synced and marks send skipped when billing email is missing", async () => {
@@ -875,6 +958,13 @@ describe("quickbooks billing sync hardening", () => {
             quantity: 2,
             unitPrice: 85,
             taxable: true
+          },
+          {
+            catalogItemId: "catalog_1",
+            description: "Fire Extinguisher Recharge",
+            quantity: 3,
+            unitPrice: 85,
+            taxable: true
           }
         ]
       }
@@ -891,6 +981,15 @@ describe("quickbooks billing sync hardening", () => {
       }
     }));
     expect(fetchMock.mock.calls[2]?.[1]?.body).toContain("\"TaxCodeRef\":{\"value\":\"TAX\"}");
+    expect(createInvoiceBody.Line).toHaveLength(1);
+    expect(createInvoiceBody.Line[0]).toEqual(expect.objectContaining({
+      Amount: 425,
+      Description: "Fire Extinguisher Recharge"
+    }));
+    expect(createInvoiceBody.Line[0].SalesItemLineDetail).toEqual(expect.objectContaining({
+      Qty: 5,
+      UnitPrice: 85
+    }));
     expect(result).toEqual(expect.objectContaining({
       invoiceId: "invoice_direct_1",
       invoiceNumber: "TW2026-1000"

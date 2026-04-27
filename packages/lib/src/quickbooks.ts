@@ -2987,6 +2987,45 @@ function toQuickBooksInvoiceLine(input: {
   };
 }
 
+type QuickBooksInvoiceLinePayload = ReturnType<typeof toQuickBooksInvoiceLine>;
+
+function buildQuickBooksInvoiceLineGroupingKey(line: QuickBooksInvoiceLinePayload) {
+  const detail = line.SalesItemLineDetail;
+  return JSON.stringify({
+    description: line.Description.trim(),
+    itemId: detail.ItemRef.value,
+    itemName: detail.ItemRef.name ?? "",
+    unitPrice: detail.UnitPrice,
+    taxCode: detail.TaxCodeRef.value
+  });
+}
+
+function groupQuickBooksInvoiceLines(lines: QuickBooksInvoiceLinePayload[]) {
+  const grouped = new Map<string, QuickBooksInvoiceLinePayload>();
+
+  for (const line of lines) {
+    const key = buildQuickBooksInvoiceLineGroupingKey(line);
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, {
+        ...line,
+        SalesItemLineDetail: {
+          ...line.SalesItemLineDetail,
+          ItemRef: { ...line.SalesItemLineDetail.ItemRef },
+          TaxCodeRef: { ...line.SalesItemLineDetail.TaxCodeRef }
+        }
+      });
+      continue;
+    }
+
+    const nextQuantity = existing.SalesItemLineDetail.Qty + line.SalesItemLineDetail.Qty;
+    existing.SalesItemLineDetail.Qty = nextQuantity;
+    existing.Amount = Number((existing.SalesItemLineDetail.UnitPrice * nextQuantity).toFixed(2));
+  }
+
+  return [...grouped.values()];
+}
+
 export async function getTenantQuickBooksSettings(actor: ActorContext, filters?: QuickBooksCatalogFilterInput) {
   const [connection, catalog] = await Promise.all([
     getTenantQuickBooksConnectionSettings(actor),
@@ -4157,7 +4196,7 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
       : payerAccount?.billingEmail ?? summary.customerCompany.billingEmail;
 
     const itemRefCache = new Map<string, { qbItemId: string; qbItemName: string }>();
-    const invoiceLines = [] as Array<Record<string, unknown>>;
+    const invoiceLines = [] as QuickBooksInvoiceLinePayload[];
 
     for (const item of normalizedSummary.items) {
       const unitPrice = requirePrice({
@@ -4221,7 +4260,7 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
         CustomerRef: { value: customerId },
         ...(sendToEmail ? { BillEmail: { Address: sendToEmail } } : {}),
         PrivateNote: summary.notes ?? `Synced from TradeWorx inspection ${summary.inspectionId}`,
-        Line: invoiceLines
+        Line: groupQuickBooksInvoiceLines(invoiceLines)
       }
     });
 
@@ -4755,7 +4794,7 @@ export async function createDirectQuickBooksInvoice(
         TxnDate: issueDate.toISOString().slice(0, 10),
         ...(dueDate ? { DueDate: dueDate.toISOString().slice(0, 10) } : {}),
         ...(parsedInput.memo?.trim() ? { CustomerMemo: { value: parsedInput.memo.trim() } } : {}),
-        Line: invoiceLines
+        Line: groupQuickBooksInvoiceLines(invoiceLines)
       }
     });
 
