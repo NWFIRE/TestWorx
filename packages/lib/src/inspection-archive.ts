@@ -54,6 +54,21 @@ function buildArchiveResultStatus(input: {
   return "Completed";
 }
 
+export function getArchiveResultStatusTone(input: {
+  resultStatus: string;
+  hasDeficiencies: boolean;
+}) {
+  if (input.resultStatus.trim().toLowerCase() === "invoiced") {
+    return "violet" as const;
+  }
+
+  if (input.hasDeficiencies) {
+    return "amber" as const;
+  }
+
+  return "emerald" as const;
+}
+
 function buildInspectionArchiveSnapshot(input: {
   status: InspectionStatus;
   completedAt: Date | null;

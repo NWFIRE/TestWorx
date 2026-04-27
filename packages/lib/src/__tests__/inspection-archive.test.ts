@@ -75,6 +75,14 @@ describe("inspection archive", () => {
     expect(prismaMock.inspection.findMany).toHaveBeenCalled();
   });
 
+  it("uses a distinct archive badge tone for invoiced results", async () => {
+    const { getArchiveResultStatusTone } = await import("../inspection-archive");
+
+    expect(getArchiveResultStatusTone({ resultStatus: "Completed", hasDeficiencies: false })).toBe("emerald");
+    expect(getArchiveResultStatusTone({ resultStatus: "Invoiced", hasDeficiencies: false })).toBe("violet");
+    expect(getArchiveResultStatusTone({ resultStatus: "Deficiencies found", hasDeficiencies: true })).toBe("amber");
+  });
+
   it("stores archive snapshot data when an inspection is archived", async () => {
     prismaMock.inspection.findFirst.mockResolvedValue({
       id: "inspection_1",

@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getAdminInspectionArchiveDetail, getInspectionStatusTone, inspectionStatusLabels } from "@testworx/lib/server/index";
+import { getAdminInspectionArchiveDetail, getArchiveResultStatusTone, getInspectionStatusTone, inspectionStatusLabels } from "@testworx/lib/server/index";
 
 import { InspectionPacketCard } from "../../../inspection-packet-card";
 import { AppPageShell, PageHeader, SectionCard, StatusBadge, WorkspaceSplit } from "../../operations-ui";
@@ -74,7 +74,13 @@ export default async function InspectionArchiveDetailPage({
         <SectionCard>
           <p className="text-sm text-slate-500">Result</p>
           <div className="mt-3">
-            <StatusBadge label={detail.resultStatus} tone={detail.deficiencies.length > 0 ? "amber" : "emerald"} />
+            <StatusBadge
+              label={detail.resultStatus}
+              tone={getArchiveResultStatusTone({
+                resultStatus: detail.resultStatus,
+                hasDeficiencies: detail.deficiencies.length > 0
+              })}
+            />
           </div>
         </SectionCard>
         <SectionCard>

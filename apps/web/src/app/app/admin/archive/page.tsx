@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import {
-  getAdminInspectionArchiveData
+  getAdminInspectionArchiveData,
+  getArchiveResultStatusTone
 } from "@testworx/lib/server/index";
 
 import { LiveUrlDateFilter } from "@/app/live-url-date-filter";
@@ -300,7 +301,10 @@ export default async function InspectionArchivePage({
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge
                       label={inspection.resultStatus}
-                      tone={inspection.hasDeficiencies ? "amber" : "emerald"}
+                      tone={getArchiveResultStatusTone({
+                        resultStatus: inspection.resultStatus,
+                        hasDeficiencies: inspection.hasDeficiencies
+                      })}
                     />
                   </div>
                   <div>
