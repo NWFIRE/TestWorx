@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
+
+import { SearchSelect, type SearchSelectOption } from "@/app/search-select";
 
 type MappingRow = {
   internalCode: string;
@@ -135,6 +137,15 @@ function MappingRowCard({
   const [selectedManualItemId, setSelectedManualItemId] = useState(row.currentMapping?.qbItemId ?? "");
   const [saveState, saveFormAction, savePending] = useActionState(saveMappingAction, initialSaveState);
   const [clearState, clearFormAction, clearPending] = useActionState(clearMappingAction, initialClearState);
+  const manualItemOptions = useMemo<SearchSelectOption[]>(
+    () => availableItems.map((item) => ({
+      value: item.qbItemId,
+      label: item.qbItemName,
+      secondaryLabel: item.qbItemType ?? "QuickBooks item",
+      badge: item.qbActive ? "Active" : "Inactive"
+    })),
+    [availableItems]
+  );
 
   useEffect(() => {
     if (saveState.success && saveState.internalCode === row.internalCode && saveState.mapping) {
@@ -234,23 +245,15 @@ function MappingRowCard({
               <input name="internalCode" type="hidden" value={row.internalCode} />
               <input name="internalName" type="hidden" value={row.internalName} />
               <div className="min-w-0 flex-1">
-                <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`manual-map-${row.internalCode}`}>
-                  QuickBooks item
-                </label>
-                <select
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"
+                <SearchSelect
                   id={`manual-map-${row.internalCode}`}
+                  label="QuickBooks item"
                   name="qbItemId"
-                  onChange={(event) => setSelectedManualItemId(event.target.value)}
+                  onChange={(itemId) => setSelectedManualItemId(itemId)}
+                  options={manualItemOptions}
+                  placeholder="Search QuickBooks items"
                   value={selectedManualItemId}
-                >
-                  <option value="">Select a QuickBooks item</option>
-                  {availableItems.map((item) => (
-                    <option key={item.qbItemId} value={item.qbItemId}>
-                      {item.qbItemName}{item.qbItemType ? ` (${item.qbItemType})` : ""}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
               <button
                 className="pressable pressable-filled inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"

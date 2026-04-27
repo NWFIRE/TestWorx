@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChangeEvent, ReactNode } from "react";
-import { useActionState, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CustomerOption, SiteOption, TechnicianOption } from "@testworx/types";
 import {
@@ -21,6 +21,7 @@ import {
   inspectionTypeRegistry
 } from "@testworx/lib";
 
+import { SearchSelect, type SearchSelectOption } from "@/app/search-select";
 import { useToast } from "@/app/toast-provider";
 
 type InspectionType = keyof typeof inspectionTypeRegistry;
@@ -74,17 +75,6 @@ type ServiceLineDraft = {
   schedulingStatus: InspectionTaskSchedulingStatus;
   notes: string;
 };
-
-function buildCustomerSearchQuery(
-  customers: CustomerOption[],
-  customerCompanyId?: string
-) {
-  if (!customerCompanyId) {
-    return "";
-  }
-
-  return customers.find((customer) => customer.id === customerCompanyId)?.name ?? "";
-}
 
 export type InspectionSchedulerFormInitialValues = {
   inspectionId?: string;
@@ -260,9 +250,6 @@ export function InspectionSchedulerForm({
   const isCreateWorkflow = !initialValues?.inspectionId && !reasonLabel;
   const { showToast } = useToast();
   const [selectedCustomerId, setSelectedCustomerId] = useState(initialValues?.customerCompanyId ?? "");
-  const [customerSearchQuery, setCustomerSearchQuery] = useState(() =>
-    buildCustomerSearchQuery(customers, initialValues?.customerCompanyId)
-  );
   const [selectedSiteId, setSelectedSiteId] = useState(
     initialValues?.siteId ??
       (initialValues?.customerCompanyId && autoSelectGenericSiteOnCustomerChange
@@ -293,23 +280,34 @@ export function InspectionSchedulerForm({
   const [isUploadingExternalDocuments, setIsUploadingExternalDocuments] = useState(false);
   const serviceLineRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const initialValuesSignature = serializeInitialValues(initialValues);
-  const deferredCustomerSearchQuery = useDeferredValue(customerSearchQuery);
-  const filteredCustomers = useMemo(() => {
-    const normalizedQuery = deferredCustomerSearchQuery.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return customers;
-    }
-
-    return customers.filter(
-      (customer) =>
-        customer.id === selectedCustomerId ||
-        customer.name.toLowerCase().includes(normalizedQuery)
-    );
-  }, [customers, deferredCustomerSearchQuery, selectedCustomerId]);
   const filteredSites = useMemo(
     () => sites.filter((site) => !selectedCustomerId || site.customerCompanyId === selectedCustomerId),
     [selectedCustomerId, sites]
   );
+  const customerOptions = useMemo<SearchSelectOption[]>(
+    () => customers.map((customer) => ({
+      value: customer.id,
+      label: customer.name
+    })),
+    [customers]
+  );
+  const siteOptions = useMemo<SearchSelectOption[]>(() => {
+    if (!selectedCustomerId) {
+      return [];
+    }
+
+    return [
+      { value: genericInspectionSiteOptionValue, label: genericInspectionSiteName, secondaryLabel: "Not tied to a fixed service address" },
+      ...(allowCustomOneTimeSite
+        ? [{ value: customInspectionSiteOptionValue, label: customInspectionSiteName, secondaryLabel: "Create a one-time site for this inspection" }]
+        : []),
+      ...filteredSites.map((site) => ({
+        value: site.id,
+        label: site.name,
+        secondaryLabel: site.city || "Customer site"
+      }))
+    ];
+  }, [allowCustomOneTimeSite, filteredSites, selectedCustomerId]);
   const resolvedSiteId =
     filteredSites.some((site) => site.id === selectedSiteId) ||
     selectedSiteId === genericInspectionSiteOptionValue ||
@@ -350,7 +348,6 @@ export function InspectionSchedulerForm({
     const defaultStart = defaultScheduledStartForMonth(defaultMonth);
     formRef.current?.reset();
     setSelectedCustomerId("");
-    setCustomerSearchQuery("");
     setSelectedSiteId("");
     setInspectionClassification("standard");
     setIsPriority(false);
@@ -377,7 +374,6 @@ export function InspectionSchedulerForm({
 
     lastAppliedInitialValuesRef.current = initialValuesSignature;
     setSelectedCustomerId(initialValues.customerCompanyId ?? "");
-    setCustomerSearchQuery(buildCustomerSearchQuery(customers, initialValues.customerCompanyId));
     setSelectedSiteId(
       initialValues.siteId ??
         (initialValues.customerCompanyId && autoSelectGenericSiteOnCustomerChange
@@ -398,7 +394,7 @@ export function InspectionSchedulerForm({
     setStartManuallyEdited(Boolean(initialValues.scheduledStart));
     setServiceLines(buildInitialServiceLines(initialValues));
     setShowProtectedSaveConfirm(false);
-  }, [autoSelectGenericSiteOnCustomerChange, customers, initialValues, initialValuesSignature]);
+  }, [autoSelectGenericSiteOnCustomerChange, initialValues, initialValuesSignature]);
 
   const [state, formAction, pending] = useActionState(async (previousState: typeof initialState, formData: FormData) => {
     const result = await action(previousState, formData);
@@ -579,69 +575,33 @@ export function InspectionSchedulerForm({
       </div>
       <div className="grid min-w-0 gap-4 md:grid-cols-2">
         <div className="min-w-0">
-          <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customerCompanyId">Customer</label>
-          <div className="mb-3">
-            <label className="sr-only" htmlFor="customerCompanySearch">Search customers</label>
-            <input
-              autoComplete="off"
-              className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-[15px] text-slate-900 outline-none transition focus:border-slateblue/40 focus:bg-white"
-              id="customerCompanySearch"
-              inputMode="search"
-              onChange={(event) => setCustomerSearchQuery(event.target.value)}
-              placeholder="Type to search customers"
-              type="search"
-              value={customerSearchQuery}
-            />
-          </div>
-          <select
-            className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 px-4 py-3.5"
+          <SearchSelect
             id="customerCompanyId"
+            label="Customer"
             name="customerCompanyId"
-            onChange={(event) => {
-              const nextCustomerId = event.target.value;
+            onChange={(nextCustomerId) => {
               setSelectedCustomerId(nextCustomerId);
               setSelectedSiteId(nextCustomerId && autoSelectGenericSiteOnCustomerChange ? genericInspectionSiteOptionValue : "");
-              if (nextCustomerId) {
-                setCustomerSearchQuery(customers.find((customer) => customer.id === nextCustomerId)?.name ?? "");
-              }
             }}
+            options={customerOptions}
+            placeholder="Search customers"
             required
             value={selectedCustomerId}
-          >
-            <option value="">Select customer</option>
-            {filteredCustomers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
-          </select>
-          <p className="mt-2 text-sm leading-5 text-slate-500">
-            {customerSearchQuery.trim()
-              ? filteredCustomers.length
-                ? `${filteredCustomers.length} matching customer${filteredCustomers.length === 1 ? "" : "s"} shown.`
-                : "No customers match that search yet."
-              : "Start typing to narrow the customer list faster on mobile and desktop."}
-          </p>
+          />
         </div>
         <div className="min-w-0">
-          <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="siteId">Site</label>
-          <select
-            className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 px-4 py-3.5"
+          <SearchSelect
             disabled={selectedCustomerId === ""}
+            disabledPlaceholder="Select a customer first"
             id="siteId"
+            label="Site"
             name="siteId"
-            onChange={(event) => setSelectedSiteId(event.target.value)}
+            onChange={(nextSiteId) => setSelectedSiteId(nextSiteId)}
+            options={siteOptions}
+            placeholder={selectedCustomerId ? "Search sites" : "Select a customer first"}
             required
             value={resolvedSiteId}
-          >
-            <option value="">{selectedCustomerId ? genericInspectionSiteName : "Select customer first"}</option>
-            {selectedCustomerId ? <option value={genericInspectionSiteOptionValue}>{genericInspectionSiteName}</option> : null}
-            {selectedCustomerId && allowCustomOneTimeSite ? <option value={customInspectionSiteOptionValue}>{customInspectionSiteName}</option> : null}
-            {filteredSites.map((site) => <option key={site.id} value={site.id}>{site.name} - {site.city}</option>)}
-          </select>
-          <p className="mt-2 text-sm leading-5 text-slate-500">
-            {selectedCustomerId
-              ? filteredSites.length
-                ? `Only sites for the selected customer are shown.${allowCustomOneTimeSite ? " You can also create a one-time site for this inspection or use the generic site option when the visit is not tied to a specific location." : " Choose the generic site option when this visit is not tied to a specific location."}`
-                : `No sites are available for this customer yet.${allowCustomOneTimeSite ? " Create a one-time site or use the generic site option to keep scheduling moving safely." : " Use the generic site option to keep scheduling moving safely."}`
-              : "Pick a customer to narrow the site list and avoid mismatched scheduling."}
-          </p>
+          />
         </div>
       </div>
       {customSiteSelected ? (

@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 
 import { ActionButton } from "@/app/action-button";
-import { SearchInput } from "@/app/search-input";
+import { SearchSelect, type SearchSelectOption } from "@/app/search-select";
 import { useToast } from "@/app/toast-provider";
 
 type QuoteCatalogItem = {
@@ -87,16 +87,6 @@ function toCurrency(value: number) {
   }).format(value || 0);
 }
 
-function formatCatalogOptionLabel(item: QuoteCatalogItem) {
-  if (item.source === "quickbooks") {
-    const typeLabel = item.quickbooksItemType ? ` · ${item.quickbooksItemType}` : "";
-    const priceLabel = item.unitPrice !== null && item.unitPrice !== undefined ? ` · $${item.unitPrice.toFixed(2)}` : "";
-    return `${item.title}${typeLabel}${priceLabel}`;
-  }
-
-  return `${item.title} (${item.code})`;
-}
-
 function formatSiteOptionLabel(site: SiteOption) {
   return site.city ? `${site.name} - ${site.city}` : site.name;
 }
@@ -125,13 +115,6 @@ export function QuoteEditorForm({
   onResult?: (result: unknown) => void;
 }) {
   const [value, setValue] = useState<QuoteFormValue>(initialValue);
-  const [catalogQueries, setCatalogQueries] = useState<string[]>(() =>
-    initialValue.lineItems.map((line) => {
-      const matchedCatalogItem = catalog.find((item) => item.code === line.internalCode);
-      return matchedCatalogItem ? formatCatalogOptionLabel(matchedCatalogItem) : line.title;
-    })
-  );
-  const [activeCatalogIndex, setActiveCatalogIndex] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
   const { showToast } = useToast();
 
@@ -139,28 +122,38 @@ export function QuoteEditorForm({
     () => sites.filter((site) => !value.customerCompanyId || site.customerCompanyId === value.customerCompanyId),
     [sites, value.customerCompanyId]
   );
-  const [siteQuery, setSiteQuery] = useState(() => {
-    if (initialValue.siteId) {
-      const selectedSite = sites.find((site) => site.id === initialValue.siteId);
-      if (selectedSite) {
-        return formatSiteOptionLabel(selectedSite);
-      }
-    }
-
-    return initialValue.customSiteName;
-  });
-  const [sitePickerOpen, setSitePickerOpen] = useState(false);
-  const filteredSites = useMemo(() => {
-    const normalizedQuery = siteQuery.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return availableSites.slice(0, 8);
-    }
-
-    return availableSites.filter((site) => {
-      const haystack = [site.name, site.city].filter(Boolean).join(" ").toLowerCase();
-      return haystack.includes(normalizedQuery);
-    }).slice(0, 8);
-  }, [availableSites, siteQuery]);
+  const customerOptions = useMemo<SearchSelectOption[]>(
+    () => customers.map((customer) => ({
+      value: customer.id,
+      label: customer.name,
+      secondaryLabel: [customer.contactName, customer.billingEmail].filter(Boolean).join(" | ") || "Customer"
+    })),
+    [customers]
+  );
+  const siteOptions = useMemo<SearchSelectOption[]>(
+    () => availableSites.map((site) => ({
+      value: site.id,
+      label: formatSiteOptionLabel(site),
+      secondaryLabel: site.city || "Existing customer site",
+      badge: "Site"
+    })),
+    [availableSites]
+  );
+  const catalogOptions = useMemo<SearchSelectOption[]>(
+    () => catalog.map((item) => ({
+      value: item.code,
+      label: item.title,
+      secondaryLabel: item.source === "quickbooks"
+        ? `${item.quickbooksItemType ?? "QuickBooks item"}${item.description ? ` | ${item.description}` : ""}`
+        : `${item.code}${item.description ? ` | ${item.description}` : ""}`,
+      badge: item.unitPrice !== null && item.unitPrice !== undefined
+        ? toCurrency(item.unitPrice)
+        : item.source === "quickbooks"
+          ? "QuickBooks"
+          : "TradeWorx"
+    })),
+    [catalog]
+  );
 
   const subtotal = useMemo(
     () =>
@@ -186,14 +179,8 @@ export function QuoteEditorForm({
     }));
   }
 
-  function setCatalogQuery(index: number, query: string) {
-    setCatalogQueries((current) => current.map((value, queryIndex) => (queryIndex === index ? query : value)));
-  }
-
   function appendLine() {
     setValue((current) => ({ ...current, lineItems: [...current.lineItems, emptyLine()] }));
-    setCatalogQueries((current) => [...current, ""]);
-    setActiveCatalogIndex(value.lineItems.length);
   }
 
   function removeLine(index: number) {
@@ -201,16 +188,6 @@ export function QuoteEditorForm({
       ...current,
       lineItems: current.lineItems.filter((_, lineIndex) => lineIndex !== index)
     }));
-    setCatalogQueries((current) => current.filter((_, queryIndex) => queryIndex !== index));
-    setActiveCatalogIndex((current) => {
-      if (current === null) {
-        return null;
-      }
-      if (current === index) {
-        return null;
-      }
-      return current > index ? current - 1 : current;
-    });
   }
 
   function moveLine(index: number, direction: -1 | 1) {
@@ -226,32 +203,19 @@ export function QuoteEditorForm({
       next[swapIndex] = currentLine;
       return { ...current, lineItems: next };
     });
-    setCatalogQueries((current) => {
-      const swapIndex = index + direction;
-      const next = [...current];
-      const currentQuery = next[index];
-      const adjacentQuery = next[swapIndex];
-      if (currentQuery === undefined || adjacentQuery === undefined) {
-        return current;
-      }
-      next[index] = adjacentQuery;
-      next[swapIndex] = currentQuery;
-      return next;
-    });
-    setActiveCatalogIndex((current) => {
-      if (current === index) {
-        return index + direction;
-      }
-      if (current === index + direction) {
-        return index;
-      }
-      return current;
-    });
   }
 
   function applyCatalogSelection(index: number, code: string) {
+    if (!code) {
+      updateLine(index, {
+        internalCode: "",
+        inspectionType: null,
+        category: null
+      });
+      return;
+    }
+
     const match = catalog.find((item) => item.code === code);
-    setCatalogQuery(index, match ? formatCatalogOptionLabel(match) : "");
     updateLine(index, {
       internalCode: code,
       title: match?.title ?? "",
@@ -260,40 +224,6 @@ export function QuoteEditorForm({
       inspectionType: match?.inspectionType ?? null,
       category: match?.category ?? null
     });
-    setActiveCatalogIndex(null);
-  }
-
-  function findExactSiteMatch(query: string) {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return null;
-    }
-
-    return availableSites.find((site) => {
-      const siteName = site.name.trim().toLowerCase();
-      const siteLabel = formatSiteOptionLabel(site).trim().toLowerCase();
-      return siteName === normalizedQuery || siteLabel === normalizedQuery;
-    }) ?? null;
-  }
-
-  function selectSite(site: SiteOption) {
-    setSiteQuery(formatSiteOptionLabel(site));
-    setSitePickerOpen(false);
-    setValue((current) => ({
-      ...current,
-      siteId: site.id,
-      customSiteName: ""
-    }));
-  }
-
-  function applySiteQuery(query: string) {
-    const exactMatch = findExactSiteMatch(query);
-    const trimmedQuery = query.trim();
-    setValue((current) => ({
-      ...current,
-      siteId: exactMatch?.id ?? "",
-      customSiteName: trimmedQuery && !exactMatch ? trimmedQuery : ""
-    }));
   }
 
   return (
@@ -321,89 +251,54 @@ export function QuoteEditorForm({
 
       <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.04)]">
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-700">Customer</span>
-              <select
-                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
-                name="customerCompanyId"
-                onChange={(event) => {
-                  const customer = customers.find((item) => item.id === event.target.value);
-                  setSiteQuery("");
-                  setSitePickerOpen(false);
-                  setValue((current) => ({
-                    ...current,
-                    customerCompanyId: event.target.value,
-                    siteId: "",
-                    customSiteName: "",
-                    contactName: customer?.contactName ?? current.contactName,
-                    recipientEmail: customer?.billingEmail ?? current.recipientEmail
-                  }));
-                }}
-                value={value.customerCompanyId}
-              >
-                <option value="">Select customer</option>
-                {customers.map((customer) => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SearchSelect
+              label="Customer"
+              name="customerCompanyId"
+              onChange={(customerId) => {
+                const customer = customers.find((item) => item.id === customerId);
+                setValue((current) => ({
+                  ...current,
+                  customerCompanyId: customerId,
+                  siteId: "",
+                  customSiteName: "",
+                  contactName: customer?.contactName ?? current.contactName,
+                  recipientEmail: customer?.billingEmail ?? current.recipientEmail
+                }));
+              }}
+              options={customerOptions}
+              placeholder="Search customers"
+              value={value.customerCompanyId}
+            />
 
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-700">Site</span>
+            <div className="block">
               <input name="siteId" type="hidden" value={value.siteId} />
               <input name="customSiteName" type="hidden" value={value.customSiteName} />
-              <div className="relative">
-                <SearchInput
-                  clearable={false}
-                  disabled={!value.customerCompanyId}
-                  onBlur={() => {
-                    window.setTimeout(() => {
-                      applySiteQuery(siteQuery);
-                      setSitePickerOpen(false);
-                    }, 120);
-                  }}
-                  onChange={(event) => {
-                    const nextQuery = event.target.value;
-                    setSiteQuery(nextQuery);
-                    setSitePickerOpen(true);
-                    applySiteQuery(nextQuery);
-                  }}
-                  onFocus={() => {
-                    if (value.customerCompanyId) {
-                      setSitePickerOpen(true);
-                    }
-                  }}
-                  placeholder={value.customerCompanyId ? "Select an existing site or type a custom site name" : "Select customer first"}
-                  value={siteQuery}
-                />
-                {value.customerCompanyId && sitePickerOpen && filteredSites.length > 0 ? (
-                  <div className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_44px_rgba(15,23,42,0.14)]">
-                    {filteredSites.map((site) => (
-                      <button
-                        key={site.id}
-                        className="flex w-full items-start justify-between gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
-                        onMouseDown={(event) => {
-                          event.preventDefault();
-                          selectSite(site);
-                        }}
-                        type="button"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-slate-900">{site.name}</p>
-                          <p className="mt-1 text-xs text-slate-500">{site.city || "Existing customer site"}</p>
-                        </div>
-                        <p className="shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Site</p>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-              <p className="mt-2 text-xs text-slate-500">
-                Type a site name here. Choose an existing site from the list, or leave your typed name to save it as a custom site.
-              </p>
-            </label>
+              <SearchSelect
+                allowCustomValue
+                customValue={value.customSiteName}
+                disabled={!value.customerCompanyId}
+                disabledPlaceholder="Select a customer first"
+                emptyText="No existing sites found"
+                label="Site"
+                onChange={(siteId) => {
+                  setValue((current) => ({
+                    ...current,
+                    siteId,
+                    customSiteName: ""
+                  }));
+                }}
+                onCustomValueChange={(customSiteName) => {
+                  setValue((current) => ({
+                    ...current,
+                    siteId: "",
+                    customSiteName
+                  }));
+                }}
+                options={siteOptions}
+                placeholder={value.customerCompanyId ? "Search or enter a site name" : "Select a customer first"}
+                value={value.siteId}
+              />
+            </div>
 
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">Customer contact</span>
@@ -470,94 +365,25 @@ export function QuoteEditorForm({
       <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.04)]">
           <div className="mb-4">
             <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Line items</h2>
-            <p className="mt-1 text-sm text-slate-500">Type to search TradeWorx services and imported QuickBooks products, then refine description, pricing, and quantity.</p>
+            <p className="mt-1 text-sm text-slate-500">Choose TradeWorx services or imported QuickBooks products, then refine description, pricing, and quantity.</p>
           </div>
 
           <div className="space-y-4">
             {value.lineItems.map((line, index) => {
               const lineTotal = Math.max(0, line.quantity * line.unitPrice - line.discountAmount);
-              const normalizedQuery = (catalogQueries[index] ?? "").trim().toLowerCase();
-              const filteredCatalog = normalizedQuery.length === 0
-                ? catalog.slice(0, 8)
-                : catalog.filter((item) => {
-                    const haystack = [
-                      item.title,
-                      item.code,
-                      item.description,
-                      item.quickbooksItemType,
-                      item.quickbooksItemId,
-                      item.category,
-                      item.inspectionTypeLabel
-                    ]
-                      .filter(Boolean)
-                      .join(" ")
-                      .toLowerCase();
-                    return haystack.includes(normalizedQuery);
-                  }).slice(0, 8);
-              const showCatalogResults = activeCatalogIndex === index && filteredCatalog.length > 0;
 
               return (
                 <div key={line.id ?? `${line.internalCode}-${index}`} className="rounded-[24px] border border-slate-200/80 bg-slate-50/70 p-4">
                   <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_0.7fr_0.7fr_auto]">
-                    <div className="relative">
-                      <label className="block">
-                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Item search</span>
-                        <SearchInput
-                          clearable={false}
-                          onBlur={() => {
-                            window.setTimeout(() => setActiveCatalogIndex((current) => (current === index ? null : current)), 120);
-                          }}
-                          onChange={(event) => {
-                            const nextQuery = event.target.value;
-                            setCatalogQuery(index, nextQuery);
-                            setActiveCatalogIndex(index);
-
-                            if (!nextQuery.trim()) {
-                              updateLine(index, {
-                                internalCode: "",
-                                inspectionType: null,
-                                category: null
-                              });
-                            }
-                          }}
-                          onFocus={() => setActiveCatalogIndex(index)}
-                          placeholder="Type to search products and services"
-                          value={catalogQueries[index] ?? ""}
-                        />
-                      </label>
-                      {showCatalogResults ? (
-                        <div className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_44px_rgba(15,23,42,0.14)]">
-                          {filteredCatalog.map((item) => (
-                            <button
-                              key={item.code}
-                              className="flex w-full items-start justify-between gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
-                              onMouseDown={(event) => {
-                                event.preventDefault();
-                                applyCatalogSelection(index, item.code);
-                              }}
-                              type="button"
-                            >
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-slate-900">{item.title}</p>
-                                <p className="mt-1 line-clamp-2 text-xs text-slate-500">
-                                  {item.source === "quickbooks"
-                                    ? `${item.quickbooksItemType ?? "QuickBooks item"}${item.description ? ` · ${item.description}` : ""}`
-                                    : `${item.code}${item.description ? ` · ${item.description}` : ""}`}
-                                </p>
-                              </div>
-                              <div className="shrink-0 text-right">
-                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                                  {item.source === "quickbooks" ? "QuickBooks" : "TradeWorx"}
-                                </p>
-                                {item.unitPrice !== null && item.unitPrice !== undefined ? (
-                                  <p className="mt-1 text-sm font-semibold text-slate-700">{toCurrency(item.unitPrice)}</p>
-                                ) : null}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
+                    <SearchSelect
+                      className="min-w-0"
+                      emptyText="No products or services found"
+                      label="Item"
+                      onChange={(code) => applyCatalogSelection(index, code)}
+                      options={catalogOptions}
+                      placeholder="Search products and services"
+                      value={line.internalCode}
+                    />
 
                     <label className="block">
                       <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Title</span>
