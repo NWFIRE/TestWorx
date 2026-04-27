@@ -3,6 +3,8 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { LiveUrlSearchSelect } from "@/app/live-url-search-select";
+import type { SearchSelectOption } from "@/app/search-select";
 import {
   formatQuoteReminderStage,
   getQuoteReminderSettings,
@@ -24,7 +26,6 @@ import {
   SectionCard,
   StatusBadge
 } from "../operations-ui";
-import { LiveUrlSearchInput } from "@/app/live-url-search-input";
 import { QuoteReminderSettingsCard } from "../settings/quote-reminder-settings-card";
 import { SettingsDisclosureCard } from "../settings/settings-disclosure-card";
 import { updateQuoteReminderSettingsAction } from "./actions";
@@ -77,6 +78,18 @@ function buildHref(params: { status?: string; syncStatus?: string; query?: strin
   return query ? `/app/admin/quotes?${query}` : "/app/admin/quotes";
 }
 
+function uniqueSearchOptions(options: SearchSelectOption[]) {
+  const seen = new Set<string>();
+  return options.filter((option) => {
+    const valueKey = option.value.trim().toLowerCase();
+    if (!valueKey || seen.has(valueKey)) {
+      return false;
+    }
+    seen.add(valueKey);
+    return true;
+  });
+}
+
 export default async function QuotesPage({
   searchParams
 }: {
@@ -102,12 +115,52 @@ export default async function QuotesPage({
     allowances: session.user.allowances ?? null
   };
 
-  const [quotes, quoteReminderSettings] = await Promise.all([
+  const [quotes, quoteSearchSource, quoteReminderSettings] = await Promise.all([
     getQuoteWorkspaceData(
       actor,
       { status: selectedStatus, syncStatus: selectedSync, query }
     ),
+    getQuoteWorkspaceData(
+      actor,
+      { status: selectedStatus, syncStatus: selectedSync, query: "" }
+    ),
     getQuoteReminderSettings(actor)
+  ]);
+  const quoteSearchOptions = uniqueSearchOptions([
+    ...quoteSearchSource.map((quote) => ({
+      value: quote.quoteNumber,
+      label: quote.quoteNumber,
+      secondaryLabel: [quote.customerCompany.name, quote.site?.name].filter(Boolean).join(" | ") || "Quote",
+      badge: "Quote"
+    })),
+    ...quoteSearchSource.map((quote) => ({
+      value: quote.customerCompany.name,
+      label: quote.customerCompany.name,
+      secondaryLabel: "Customer",
+      badge: "Customer"
+    })),
+    ...quoteSearchSource.flatMap((quote) => quote.site
+      ? [{
+          value: quote.site.name,
+          label: quote.site.name,
+          secondaryLabel: quote.customerCompany.name,
+          badge: "Site"
+        }]
+      : []),
+    ...quoteSearchSource.flatMap((quote) => quote.recipientEmail
+      ? [{
+          value: quote.recipientEmail,
+          label: quote.recipientEmail,
+          secondaryLabel: quote.customerCompany.name,
+          badge: "Recipient"
+        }]
+      : []),
+    ...quoteSearchSource.flatMap((quote) => quote.lineItems.map((line) => ({
+      value: line.title,
+      label: line.title,
+      secondaryLabel: quote.quoteNumber,
+      badge: "Service"
+    })))
   ]);
 
   return (
@@ -157,8 +210,10 @@ export default async function QuotesPage({
 
       <SectionCard>
         <form action="/app/admin/quotes" className="grid gap-3 lg:grid-cols-[1.2fr_0.9fr_auto]">
-          <LiveUrlSearchInput
+          <LiveUrlSearchSelect
+            emptyText="No matching quotes, customers, sites, or services found"
             initialValue={query}
+            options={quoteSearchOptions}
             paramKey="query"
             placeholder="Search quote number, customer, site, or service"
           />

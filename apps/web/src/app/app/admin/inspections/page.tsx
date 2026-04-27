@@ -3,8 +3,9 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { LiveUrlSearchInput } from "@/app/live-url-search-input";
+import { LiveUrlSearchSelect } from "@/app/live-url-search-select";
 import { LiveUrlSelectFilter } from "@/app/live-url-select-filter";
+import type { SearchSelectOption } from "@/app/search-select";
 import {
   activeOperationalInspectionStatuses,
   formatInspectionTaskSummary,
@@ -102,6 +103,18 @@ function resolveTypeSelectValue(classifications: string[]) {
   return classifications.length === 1 ? classifications[0] ?? "" : "";
 }
 
+function uniqueSearchOptions(options: SearchSelectOption[]) {
+  const seen = new Set<string>();
+  return options.filter((option) => {
+    const valueKey = option.value.trim().toLowerCase();
+    if (!valueKey || seen.has(valueKey)) {
+      return false;
+    }
+    seen.add(valueKey);
+    return true;
+  });
+}
+
 export default async function AdminInspectionsPage({
   searchParams
 }: {
@@ -151,12 +164,19 @@ export default async function AdminInspectionsPage({
     tenantId: session.user.tenantId
   };
 
-  const [queueData, dashboardData] = await Promise.all([
+  const [queueData, queueSearchData, dashboardData] = await Promise.all([
     getAdminSchedulingQueueData(actor, {
       statuses: effectiveStatuses,
       classifications: requestedClassifications,
       priority: requestedPriority,
       query,
+      technicianId
+    }),
+    getAdminSchedulingQueueData(actor, {
+      statuses: effectiveStatuses,
+      classifications: requestedClassifications,
+      priority: requestedPriority,
+      query: "",
       technicianId
     }),
     getAdminDashboardData(actor)
@@ -169,6 +189,40 @@ export default async function AdminInspectionsPage({
   )
     ? requestedSiteId
     : undefined;
+  const inspectionSearchOptions = uniqueSearchOptions([
+    ...dashboardData.customers.map((customer) => ({
+      value: customer.name,
+      label: customer.name,
+      secondaryLabel: "Customer",
+      badge: "Customer"
+    })),
+    ...dashboardData.sites.map((site) => ({
+      value: site.name,
+      label: site.name,
+      secondaryLabel: site.city || "Service location",
+      badge: "Location"
+    })),
+    ...queueSearchData.inspections.map((inspection) => {
+      const customerLabel = inspection.customerLabel ?? inspection.customerCompany.name;
+      const locationLabel = inspection.isGenericSite
+        ? inspection.locationLabel ?? ""
+        : [
+            inspection.locationLabel,
+            inspection.site.addressLine1,
+            inspection.site.city
+          ]
+            .filter(Boolean)
+            .join(" - ");
+      return {
+        value: inspection.id,
+        label: `Inspection ${inspection.id.slice(0, 8)}`,
+        secondaryLabel: [customerLabel, locationLabel, format(inspection.scheduledStart, "MMM d, yyyy h:mm a")]
+          .filter(Boolean)
+          .join(" | "),
+        badge: "Inspection"
+      };
+    })
+  ]);
 
   return (
     <AppPageShell density="wide">
@@ -248,8 +302,10 @@ export default async function AdminInspectionsPage({
             </p>
           </div>
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,0.8fr))]">
-            <LiveUrlSearchInput
+            <LiveUrlSearchSelect
+              emptyText="No matching customers, locations, or inspections found"
               initialValue={queueData.filters.query}
+              options={inspectionSearchOptions}
               paramKey="q"
               placeholder="Search customer, location, address, or inspection reference"
             />
