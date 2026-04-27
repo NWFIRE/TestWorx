@@ -114,12 +114,12 @@ export function TechnicianHomeScreen({
     (syncSummary.failed > 0 || syncSummary.conflict > 0 || syncSummary.pending > 0)
       ? {
           key: "sync-attention",
-          eyebrow: "Sync attention",
-          title: syncSummary.failed > 0 || syncSummary.conflict > 0 ? "Sync needs review" : "Changes still pending",
+          eyebrow: "Save status",
+          title: syncSummary.failed > 0 || syncSummary.conflict > 0 ? "Saved changes need review" : "Changes still pending",
           body:
             syncSummary.failed > 0 || syncSummary.conflict > 0
-              ? "Open Profile to review failed or conflicting sync activity."
-              : `${syncSummary.pending} local change${syncSummary.pending === 1 ? "" : "s"} still need to sync.`,
+              ? "Open Profile to review device-saved changes before leaving the job."
+              : `${syncSummary.pending} local change${syncSummary.pending === 1 ? "" : "s"} still need to upload.`,
           href: "/app/tech/profile",
           tone: syncSummary.failed > 0 || syncSummary.conflict > 0 ? "danger" as const : "default" as const
         }

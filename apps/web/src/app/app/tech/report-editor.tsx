@@ -61,8 +61,8 @@ const saveStateTone: Record<string, string> = {
   "Saved offline": "text-blue-700",
   "Pending sync": "text-blue-700",
   Syncing: "text-blue-700",
-  "Failed sync": "text-amber-700",
-  Conflict: "text-rose-700"
+  "Saved on device": "text-amber-700",
+  "Needs review": "text-rose-700"
 };
 
 const sectionStatusOptions = [
@@ -82,11 +82,11 @@ function buildReportSaveState(record: LocalReportDraftRecord | null, reportStatu
   }
 
   if (record.syncStatus === "conflict") {
-    return "Conflict";
+    return "Needs review";
   }
 
   if (record.syncStatus === "failed") {
-    return "Failed sync";
+    return "Saved on device";
   }
 
   if (record.syncStatus === "syncing") {
@@ -206,6 +206,17 @@ function toTechnicianFacingSaveMessage(message: string | null | undefined, actio
   return action === "save"
     ? "Unable to save your report right now. Check your connection and try again."
     : "Unable to finalize this report right now. Review the report and try again.";
+}
+
+function toTechnicianFacingStoredSyncMessage(message: string | null | undefined, action: "save" | "finalize") {
+  const normalized = (message ?? "").trim();
+  if (/locked|cannot edit|cannot be finalized|already finalized|already completed/i.test(normalized)) {
+    return "Your work is saved on this iPad, but the office copy changed. Open Profile or contact the office before continuing.";
+  }
+
+  return action === "save"
+    ? "Your work is saved on this iPad. TradeWorx will keep trying to upload it."
+    : "Finalization is saved on this iPad. TradeWorx will keep trying to upload it.";
 }
 
 function DispatchNotesBanner({ notes }: { notes: string | null | undefined }) {
@@ -426,7 +437,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
       }
       setSaveState(buildReportSaveState(localRecord, data.reportStatus));
       if (localRecord.lastError) {
-        setErrorMessage(toTechnicianFacingSaveMessage(localRecord.lastError, localRecord.pendingFinalize ? "finalize" : "save"));
+        setErrorMessage(toTechnicianFacingStoredSyncMessage(localRecord.lastError, localRecord.pendingFinalize ? "finalize" : "save"));
       }
     }
 
@@ -442,7 +453,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
         localRecordRef.current = current;
         setSaveState(buildReportSaveState(current, data.reportStatus));
         if (current.lastError) {
-          setErrorMessage(toTechnicianFacingSaveMessage(current.lastError, current.pendingFinalize ? "finalize" : "save"));
+          setErrorMessage(toTechnicianFacingStoredSyncMessage(current.lastError, current.pendingFinalize ? "finalize" : "save"));
         } else if (!dirty) {
           setErrorMessage(null);
         }

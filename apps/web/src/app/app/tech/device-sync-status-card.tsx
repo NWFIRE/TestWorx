@@ -63,9 +63,9 @@ export function DeviceSyncStatusCard({
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Sync status</p>
           <h3 className="mt-2 text-lg font-semibold text-slate-950">
             {summary.conflict > 0
-              ? "Sync needs review"
+              ? "Saved changes need review"
               : summary.failed > 0
-                ? "Sync retry needed"
+                ? "Saved changes will retry"
                 : summary.pending > 0 || summary.syncing > 0
                   ? "Changes waiting to sync"
                   : summary.isOnline
@@ -85,9 +85,9 @@ export function DeviceSyncStatusCard({
                   : "inline-flex min-h-10 items-center rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"}
         >
           {summary.conflict > 0
-            ? "Conflict"
+            ? "Review"
             : summary.failed > 0
-              ? "Failed"
+              ? "Retrying"
               : summary.pending > 0 || summary.syncing > 0
                 ? summary.syncing > 0 ? "Syncing" : "Pending"
                 : summary.isOnline

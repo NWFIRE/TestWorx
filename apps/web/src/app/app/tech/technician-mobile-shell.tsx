@@ -127,9 +127,9 @@ export function TechnicianSyncPill() {
               : "inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"}
     >
       {summary.conflict > 0
-        ? `${summary.conflict} conflict${summary.conflict === 1 ? "" : "s"}`
+        ? "Needs review"
         : summary.failed > 0
-          ? `${summary.failed} failed`
+          ? "Will retry"
           : summary.syncing > 0
             ? "Syncing..."
             : summary.pending > 0

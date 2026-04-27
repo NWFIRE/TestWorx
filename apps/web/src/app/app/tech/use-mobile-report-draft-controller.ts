@@ -29,11 +29,11 @@ function buildReportSaveState(record: LocalReportDraftRecord | null, reportStatu
   }
 
   if (record.syncStatus === "conflict") {
-    return "Conflict";
+    return "Needs review";
   }
 
   if (record.syncStatus === "failed") {
-    return "Failed sync";
+    return "Saved on device";
   }
 
   if (record.syncStatus === "syncing") {
@@ -66,6 +66,17 @@ function toTechnicianFacingSaveMessage(message: string | null | undefined, actio
   return action === "save"
     ? "Unable to save your inspection right now. Check your connection and try again."
     : "Unable to finalize this inspection right now. Review the inspection and try again.";
+}
+
+function toTechnicianFacingStoredSyncMessage(message: string | null | undefined, action: "save" | "finalize") {
+  const normalized = (message ?? "").trim();
+  if (/locked|cannot edit|cannot be finalized|already finalized|already completed/i.test(normalized)) {
+    return "Your work is saved on this iPad, but the office copy changed. Open Profile or contact the office before continuing.";
+  }
+
+  return action === "save"
+    ? "Your work is saved on this iPad. TradeWorx will keep trying to upload it."
+    : "Finalization is saved on this iPad. TradeWorx will keep trying to upload it.";
 }
 
 export function useMobileReportDraftController({
@@ -221,7 +232,7 @@ export function useMobileReportDraftController({
       }
       setSaveState(buildReportSaveState(localRecord, data.reportStatus));
       if (localRecord.lastError) {
-        setErrorMessage(toTechnicianFacingSaveMessage(localRecord.lastError, localRecord.pendingFinalize ? "finalize" : "save"));
+        setErrorMessage(toTechnicianFacingStoredSyncMessage(localRecord.lastError, localRecord.pendingFinalize ? "finalize" : "save"));
       }
       setHydrated(true);
     }
@@ -241,7 +252,7 @@ export function useMobileReportDraftController({
         }
         setSaveState(buildReportSaveState(current, data.reportStatus));
         if (current.lastError) {
-          setErrorMessage(toTechnicianFacingSaveMessage(current.lastError, current.pendingFinalize ? "finalize" : "save"));
+          setErrorMessage(toTechnicianFacingStoredSyncMessage(current.lastError, current.pendingFinalize ? "finalize" : "save"));
         } else {
           setErrorMessage(null);
         }
