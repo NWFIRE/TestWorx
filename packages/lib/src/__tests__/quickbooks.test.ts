@@ -70,7 +70,8 @@ const prismaMock = {
   },
   auditLog: {
     create: vi.fn(),
-    findFirst: vi.fn()
+    findFirst: vi.fn(),
+    findMany: vi.fn()
   },
   $transaction: vi.fn()
 };
@@ -193,6 +194,7 @@ describe("quickbooks billing sync hardening", () => {
     prismaMock.tenantInvoiceSequence.upsert.mockResolvedValue({ nextNumber: 1001 });
     prismaMock.auditLog.create.mockResolvedValue(undefined);
     prismaMock.auditLog.findFirst.mockResolvedValue(null);
+    prismaMock.auditLog.findMany.mockResolvedValue([]);
     prismaMock.quickBooksItemMap.findUnique.mockResolvedValue({
       id: "mapping_1",
       tenantId: "tenant_1",
@@ -893,6 +895,111 @@ describe("quickbooks billing sync hardening", () => {
       invoiceId: "invoice_direct_1",
       invoiceNumber: "TW2026-1000"
     }));
+  });
+
+  it("falls back to existing invoice records when the invoice sequence migration is pending", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.tenantInvoiceSequence.upsert.mockRejectedValueOnce(Object.assign(
+      new Error("The table `public.TenantInvoiceSequence` does not exist in the current database."),
+      {
+        code: "P2021",
+        meta: { table: "public.TenantInvoiceSequence" }
+      }
+    ));
+    prismaMock.inspectionBillingSummary.findMany.mockResolvedValueOnce([
+      { quickbooksInvoiceNumber: "TW2026-1003" }
+    ]);
+    prismaMock.auditLog.findMany.mockResolvedValueOnce([
+      { metadata: { invoiceNumber: "TW2026-1007" } }
+    ]);
+    prismaMock.customerCompany.findFirst.mockResolvedValue({
+      id: "customer_1",
+      name: "Orr Energy Services",
+      contactName: null,
+      billingEmail: "ap@orr.example",
+      phone: "555-1212",
+      billingAddressLine1: null,
+      billingAddressLine2: null,
+      billingCity: null,
+      billingState: null,
+      billingPostalCode: null,
+      billingCountry: null,
+      serviceAddressLine1: null,
+      serviceAddressLine2: null,
+      serviceCity: null,
+      serviceState: null,
+      servicePostalCode: null,
+      serviceCountry: null,
+      notes: null
+    });
+    prismaMock.customerCompany.findUnique.mockResolvedValue({
+      quickbooksCustomerId: "qb_customer_1"
+    });
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([
+      {
+        id: "catalog_1",
+        quickbooksItemId: "qb_item_1",
+        name: "Fire Extinguisher Recharge",
+        taxable: true
+      }
+    ]);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({
+        Customer: {
+          Id: "qb_customer_1",
+          SyncToken: "2",
+          DisplayName: "Orr Energy Services",
+          PrimaryEmailAddr: { Address: "ap@orr.example" }
+        }
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        Customer: {
+          Id: "qb_customer_1",
+          SyncToken: "3",
+          DisplayName: "Orr Energy Services",
+          PrimaryEmailAddr: { Address: "ap@orr.example" }
+        }
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        Invoice: {
+          Id: "invoice_direct_3",
+          DocNumber: "TW2026-1008"
+        }
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        Invoice: {
+          Id: "invoice_direct_3",
+          DocNumber: "TW2026-1008"
+        }
+      }));
+
+    const { createDirectQuickBooksInvoice } = await import("../quickbooks");
+
+    const result = await createDirectQuickBooksInvoice(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        customerCompanyId: "customer_1",
+        walkInMode: true,
+        issueDate: "2026-04-27",
+        dueDate: "2026-05-27",
+        memo: "Counter sale",
+        sendEmail: false,
+        lineItems: [
+          {
+            catalogItemId: "catalog_1",
+            description: "Fire Extinguisher Recharge",
+            quantity: 1,
+            unitPrice: 85,
+            taxable: true
+          }
+        ]
+      }
+    );
+
+    const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    expect(createInvoiceBody.DocNumber).toBe("TW2026-1008");
+    expect(result.invoiceNumber).toBe("TW2026-1008");
   });
 
   it("applies service and compliance fee rules for customer invoices", async () => {

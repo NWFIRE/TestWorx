@@ -330,28 +330,109 @@ export function formatTradeWorxInvoiceNumber(year: number, sequence: number) {
   return `TW${year}-${String(sequence).padStart(4, "0")}`;
 }
 
+function readTradeWorxInvoiceSequence(invoiceNumber: string | null | undefined, year: number) {
+  const match = invoiceNumber?.match(/^TW(\d{4})-(\d{4,})$/);
+  if (!match || Number(match[1]) !== year) {
+    return null;
+  }
+
+  const sequence = Number(match[2]);
+  return Number.isInteger(sequence) ? sequence : null;
+}
+
+function isTenantInvoiceSequenceMigrationMissing(error: unknown) {
+  const candidate = error as { code?: unknown; message?: unknown; meta?: { modelName?: unknown; table?: unknown } };
+  const message = typeof candidate.message === "string" ? candidate.message : "";
+  const table = typeof candidate.meta?.table === "string" ? candidate.meta.table : "";
+  const modelName = typeof candidate.meta?.modelName === "string" ? candidate.meta.modelName : "";
+
+  return (
+    (candidate.code === "P2021" || candidate.code === "P2022")
+    && (
+      message.includes("TenantInvoiceSequence")
+      || table.includes("TenantInvoiceSequence")
+      || modelName === "TenantInvoiceSequence"
+    )
+  ) || message.includes("TenantInvoiceSequence");
+}
+
+function readInvoiceNumberFromAuditMetadata(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return null;
+  }
+
+  const invoiceNumber = (metadata as { invoiceNumber?: unknown }).invoiceNumber;
+  return typeof invoiceNumber === "string" ? invoiceNumber : null;
+}
+
+async function reserveTradeWorxInvoiceNumberFromExistingRecords(input: {
+  tenantId: string;
+  year: number;
+}) {
+  const prefix = `TW${input.year}-`;
+  const [billingSummaries, invoiceAuditLogs] = await Promise.all([
+    prisma.inspectionBillingSummary.findMany({
+      where: {
+        tenantId: input.tenantId,
+        quickbooksInvoiceNumber: { startsWith: prefix }
+      },
+      select: { quickbooksInvoiceNumber: true }
+    }),
+    prisma.auditLog.findMany({
+      where: {
+        tenantId: input.tenantId,
+        action: {
+          in: ["billing.quickbooks_synced", "billing.quickbooks_direct_invoice_created"]
+        }
+      },
+      orderBy: { createdAt: "desc" },
+      select: { metadata: true },
+      take: 1000
+    })
+  ]);
+
+  const maxSequence = [
+    ...billingSummaries.map((summary) => readTradeWorxInvoiceSequence(summary.quickbooksInvoiceNumber, input.year)),
+    ...invoiceAuditLogs.map((log) => readTradeWorxInvoiceSequence(readInvoiceNumberFromAuditMetadata(log.metadata), input.year))
+  ].reduce<number>((max, sequence) => sequence !== null && sequence > max ? sequence : max, TRADEWORX_INVOICE_SEQUENCE_START - 1);
+
+  return formatTradeWorxInvoiceNumber(input.year, maxSequence + 1);
+}
+
 async function reserveTradeWorxInvoiceNumber(input: {
   tenantId: string;
   issueDate?: Date | string | null;
 }) {
   const year = getTradeWorxInvoiceYear(input.issueDate);
-  const sequence = await prisma.tenantInvoiceSequence.upsert({
-    where: {
-      tenantId_year: {
+  let sequence: { nextNumber: number };
+  try {
+    sequence = await prisma.tenantInvoiceSequence.upsert({
+      where: {
+        tenantId_year: {
+          tenantId: input.tenantId,
+          year
+        }
+      },
+      create: {
+        tenantId: input.tenantId,
+        year,
+        nextNumber: TRADEWORX_INVOICE_SEQUENCE_START + 1
+      },
+      update: {
+        nextNumber: { increment: 1 }
+      },
+      select: { nextNumber: true }
+    });
+  } catch (error) {
+    if (isTenantInvoiceSequenceMigrationMissing(error)) {
+      return reserveTradeWorxInvoiceNumberFromExistingRecords({
         tenantId: input.tenantId,
         year
-      }
-    },
-    create: {
-      tenantId: input.tenantId,
-      year,
-      nextNumber: TRADEWORX_INVOICE_SEQUENCE_START + 1
-    },
-    update: {
-      nextNumber: { increment: 1 }
-    },
-    select: { nextNumber: true }
-  });
+      });
+    }
+
+    throw error;
+  }
 
   return formatTradeWorxInvoiceNumber(year, sequence.nextNumber - 1);
 }
