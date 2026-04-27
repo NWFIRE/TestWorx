@@ -87,6 +87,15 @@ function toCurrency(value: number) {
   }).format(value || 0);
 }
 
+function formatQuantityInputValue(quantity: number) {
+  return quantity > 0 ? String(Math.trunc(quantity)) : "";
+}
+
+function parseQuantityInputValue(value: string) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : 0;
+}
+
 function formatSiteOptionLabel(site: SiteOption) {
   return site.city ? `${site.name} - ${site.city}` : site.name;
 }
@@ -398,10 +407,13 @@ export function QuoteEditorForm({
                       <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Quantity</span>
                       <input
                         className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
-                        onChange={(event) => updateLine(index, { quantity: Number(event.target.value || "0") })}
-                        step="0.01"
+                        inputMode="numeric"
+                        min="1"
+                        onChange={(event) => updateLine(index, { quantity: parseQuantityInputValue(event.target.value) })}
+                        placeholder="1"
+                        step="1"
                         type="number"
-                        value={line.quantity}
+                        value={formatQuantityInputValue(line.quantity)}
                       />
                     </label>
 

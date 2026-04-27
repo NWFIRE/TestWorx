@@ -254,7 +254,7 @@ export const quickBooksCatalogItemInputSchema = z.object({
 const directQuickBooksInvoiceLineInputSchema = z.object({
   catalogItemId: z.string().trim().min(1, "Select a product or service."),
   description: z.string().trim().min(1, "Line item description is required."),
-  quantity: z.number().finite().positive("Quantity must be greater than zero."),
+  quantity: z.number().finite().int("Quantity must be a whole number.").positive("Quantity must be greater than zero."),
   unitPrice: z.number().finite().nonnegative("Unit price must be zero or greater."),
   taxable: z.boolean().default(false)
 });

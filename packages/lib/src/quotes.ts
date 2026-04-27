@@ -213,7 +213,7 @@ export const quoteLineItemInputSchema = z.object({
   internalCode: z.string().trim().min(1, "Select a service code."),
   title: z.string().trim().min(1, "Enter a line item title."),
   description: z.string().trim().max(2000).optional().nullable(),
-  quantity: z.coerce.number().positive("Quantity must be greater than zero."),
+  quantity: z.coerce.number().int("Quantity must be a whole number.").positive("Quantity must be greater than zero."),
   unitPrice: z.coerce.number().min(0, "Unit price must be zero or greater."),
   discountAmount: z.coerce.number().min(0).default(0),
   taxable: z.boolean().default(false),

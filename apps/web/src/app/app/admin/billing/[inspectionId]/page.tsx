@@ -92,6 +92,10 @@ function formatDeliveryMethod(value: unknown) {
   return "Payer billing email";
 }
 
+function formatEditableQuantity(quantity: number) {
+  return quantity > 0 ? String(Math.round(quantity)) : "";
+}
+
 function buildBillingItemContext(item: {
   code?: string | null;
   metadata?: Record<string, unknown> | null;
@@ -349,7 +353,7 @@ export default async function BillingSummaryDetailPage({
                         ))}
                         <label className="text-sm text-slate-600">
                           Quantity
-                          <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={item.quantity} disabled={isInvoiced} name="quantity" step="0.25" type="number" />
+                          <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={formatEditableQuantity(item.quantity)} disabled={isInvoiced} inputMode="numeric" min="1" name="quantity" placeholder="1" step="1" type="number" />
                         </label>
                         <label className="text-sm text-slate-600">
                           Unit price
