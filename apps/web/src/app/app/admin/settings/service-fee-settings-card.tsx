@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { isUserFacingSiteLabel } from "@testworx/lib";
 
 import { buildSettingsHref } from "./settings-query";
 
@@ -54,6 +55,7 @@ export function ServiceFeeSettingsCard({
   updateRuleAction,
   deleteRuleAction
 }: ServiceFeeSettingsCardProps) {
+  const visibleSites = sites.filter((site) => isUserFacingSiteLabel(site.name));
   const [defaultState, defaultFormAction, defaultPending] = useActionState(updateDefaultAction, initialState);
   const [createState, createFormAction, createPending] = useActionState(createRuleAction, initialState);
   const pathname = usePathname();
@@ -129,7 +131,7 @@ export function ServiceFeeSettingsCard({
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="siteId">Site override</label>
               <select className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue="" id="siteId" name="siteId">
                 <option value="">Any site</option>
-                {sites.map((site) => <option key={site.id} value={site.id}>{site.name} ({site.customerCompany.name})</option>)}
+                {visibleSites.map((site) => <option key={site.id} value={site.id}>{site.name} ({site.customerCompany.name})</option>)}
               </select>
             </div>
           </div>
@@ -231,7 +233,7 @@ export function ServiceFeeSettingsCard({
                     <label className="mb-2 block text-sm font-medium text-slate-600">Site</label>
                     <select className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.siteId ?? ""} name="siteId">
                       <option value="">Any site</option>
-                      {sites.map((site) => <option key={site.id} value={site.id}>{site.name} ({site.customerCompany.name})</option>)}
+                      {visibleSites.map((site) => <option key={site.id} value={site.id}>{site.name} ({site.customerCompany.name})</option>)}
                     </select>
                   </div>
                 </div>

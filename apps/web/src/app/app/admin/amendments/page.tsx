@@ -6,7 +6,8 @@ import { auth } from "@/auth";
 import {
   formatInspectionCloseoutRequestStatusLabel,
   formatInspectionCloseoutRequestTypeLabel,
-  getAdminAmendmentManagementData
+  getAdminAmendmentManagementData,
+  getInspectionDisplayLabels
 } from "@testworx/lib/server/index";
 
 import {
@@ -41,7 +42,10 @@ function getRelationshipSummary(item: ReviewItem) {
       label: "Updated from",
       inspectionId: item.originalAmendment.inspection.id,
       href: `/app/admin/inspections/${item.originalAmendment.inspection.id}`,
-      siteName: item.originalAmendment.inspection.site.name,
+      siteName: getInspectionDisplayLabels({
+        siteName: item.originalAmendment.inspection.site.name,
+        customerName: "Linked visit"
+      }).primaryTitle,
       scheduledStart: item.originalAmendment.inspection.scheduledStart
     };
   }
@@ -51,7 +55,10 @@ function getRelationshipSummary(item: ReviewItem) {
       label: "Updated by",
       inspectionId: item.outgoingAmendment.replacementInspection.id,
       href: `/app/admin/inspections/${item.outgoingAmendment.replacementInspection.id}`,
-      siteName: item.outgoingAmendment.replacementInspection.site.name,
+      siteName: getInspectionDisplayLabels({
+        siteName: item.outgoingAmendment.replacementInspection.site.name,
+        customerName: "Linked visit"
+      }).primaryTitle,
       scheduledStart: item.outgoingAmendment.replacementInspection.scheduledStart
     };
   }
@@ -227,7 +234,10 @@ export default async function AdminAmendmentsPage({
                           </p>
                           {inspection.closeoutRequest.createdInspection ? (
                             <p className="mt-2 text-xs text-blue-800">
-                              Created inspection: {inspection.closeoutRequest.createdInspection.site.name} | {inspection.closeoutRequest.createdInspection.customerCompany.name}
+                              Created inspection: {getInspectionDisplayLabels({
+                                siteName: inspection.closeoutRequest.createdInspection.site.name,
+                                customerName: inspection.closeoutRequest.createdInspection.customerCompany.name
+                              }).primaryTitle}
                             </p>
                           ) : null}
                         </div>

@@ -1,6 +1,7 @@
 import { resolveTenantBranding } from "../../../branding";
 import { inspectionTypeRegistry } from "../../../report-config";
 import { reportDraftSchema } from "../../../report-engine";
+import { getCustomerFacingSiteLabel } from "../../../scheduling";
 import type { PdfInput } from "../../types";
 import { formatDateTime, formatShortDate } from "../../core/formatting/dates";
 import { isNullEquivalent } from "../../core/formatting/empty";
@@ -29,6 +30,10 @@ function humanize(value: unknown) {
 }
 
 function cleanAddress(input: PdfInput) {
+  if (!getCustomerFacingSiteLabel(input.site.name)) {
+    return undefined;
+  }
+
   return joinNonEmpty([input.site.addressLine1, input.site.addressLine2, joinNonEmpty([input.site.city, input.site.state], ", "), input.site.postalCode], ", ");
 }
 
@@ -94,6 +99,7 @@ export function buildFireAlarmRenderModel(rawReport: unknown): FireAlarmReportRe
   });
   const result = status.result ?? "Pass";
   const scheduledWindow = joinNonEmpty([formatDateTime(input.inspection.scheduledStart), input.inspection.scheduledEnd ? formatDateTime(input.inspection.scheduledEnd) : undefined], " to ");
+  const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name);
 
   return {
     report: {
@@ -119,7 +125,7 @@ export function buildFireAlarmRenderModel(rawReport: unknown): FireAlarmReportRe
     },
     identity: {
       customerName: cleanTitleLikeText(input.customerCompany.name) ?? input.customerCompany.name,
-      siteName: cleanTitleLikeText(input.site.name),
+      siteName: cleanTitleLikeText(customerFacingSiteName),
       cleanAddress: cleanAddress(input),
       technicianName: cleanTitleLikeText(input.report.technicianName),
       billingContact: cleanTitleLikeText(input.customerCompany.contactName),

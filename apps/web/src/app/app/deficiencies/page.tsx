@@ -31,19 +31,13 @@ type DeficiencyListItem = {
   notes: string | null;
   photoStorageKey: string | null;
   customerName: string;
-  siteName: string;
+  siteName: string | null;
   inspection: { scheduledStart: Date };
 };
 
-const genericSiteName = "General / No Fixed Site";
-
-function isGenericSiteName(siteName: string) {
-  return siteName.trim().toLowerCase() === genericSiteName.toLowerCase();
-}
-
 function buildDeficiencyContext(deficiency: DeficiencyListItem) {
   const parts = [deficiency.customerName];
-  if (deficiency.siteName && !isGenericSiteName(deficiency.siteName)) {
+  if (deficiency.siteName && deficiency.siteName !== deficiency.customerName) {
     parts.push(deficiency.siteName);
   }
   parts.push(format(deficiency.inspection.scheduledStart, "MMM d, yyyy h:mm a"));

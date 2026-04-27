@@ -1254,7 +1254,7 @@ export async function getQuoteFormOptions(actor: ActorContext) {
 
   return {
     customers,
-    sites,
+    sites: sites.filter((site) => getCustomerFacingSiteLabel(site.name)),
     proposalTypes: quoteProposalTypes,
     catalog: [
       ...quoteCatalog.map((item) => ({
@@ -1622,10 +1622,20 @@ export async function getQuoteWorkspaceData(
         : normalizeNullableString(quote.customSiteName)
           ? { id: `custom:${quote.id}`, name: normalizeNullableString(quote.customSiteName)! }
           : null;
+      const customerFacingSite = site
+        ? toCustomerFacingQuoteSite({
+            ...site,
+            addressLine1: null,
+            addressLine2: null,
+            city: null,
+            state: null,
+            postalCode: null
+          })
+        : null;
       return {
         ...quote,
         customerCompany,
-        site,
+        site: customerFacingSite,
         effectiveStatus,
         engagementStatus: getHostedQuoteAvailability(quote),
         reminderStatus: quote.remindersPausedAt

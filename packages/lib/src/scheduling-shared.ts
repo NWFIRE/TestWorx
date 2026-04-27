@@ -28,8 +28,25 @@ export const inspectionTaskSchedulingStatuses = [
 
 export const genericInspectionSiteOptionValue = "__generic_site__";
 export const genericInspectionSiteName = "General / No Fixed Site";
+export const noFixedInspectionSiteLabel = "No site needed";
 export const customInspectionSiteOptionValue = "__custom_site__";
 export const customInspectionSiteName = "Create one-time site";
+
+const nonDisplayableSiteLabels = new Set([
+  genericInspectionSiteName.toLowerCase(),
+  "no fixed service address",
+  "no fixed service address on file"
+]);
+
+export function isUserFacingSiteLabel(siteName: string | null | undefined) {
+  const normalized = (siteName ?? "").trim();
+  return Boolean(normalized && !nonDisplayableSiteLabels.has(normalized.toLowerCase()));
+}
+
+export function getCustomerFacingSiteLabel(siteName: string | null | undefined) {
+  const normalized = (siteName ?? "").trim();
+  return isUserFacingSiteLabel(normalized) ? normalized : null;
+}
 
 export const inspectionStatusLabels = {
   to_be_completed: "To Be Completed",

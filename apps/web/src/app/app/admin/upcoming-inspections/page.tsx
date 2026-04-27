@@ -7,6 +7,7 @@ import {
   formatInspectionClassificationLabel,
   formatInspectionStatusLabel,
   getAdminUpcomingInspectionsData,
+  getCustomerFacingSiteLabel,
   getInspectionClassificationTone,
   getInspectionStatusTone,
   pickEarliestNextDueAt
@@ -194,7 +195,9 @@ export default async function UpcomingInspectionsPage({
                             <div className="grid gap-3 md:grid-cols-3">
                               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
                                 <p>Customer: {inspection.customerCompany.name}</p>
-                                <p className="mt-1">Site: {inspection.site.name}</p>
+                                {getCustomerFacingSiteLabel(inspection.site.name) ? (
+                                  <p className="mt-1">Site: {getCustomerFacingSiteLabel(inspection.site.name)}</p>
+                                ) : null}
                               </div>
                               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
                                 <p>Assigned: {inspection.assignedTechnicianNames.join(", ") || "Shared queue"}</p>

@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getInspectionReportDraft } from "@testworx/lib/server/index";
+import { getInspectionDisplayLabels, getInspectionReportDraft } from "@testworx/lib/server/index";
 
 import { ReportEditor } from "../../../../tech/report-editor";
 import { buildAcceptanceTestViewModel } from "../../../../../reports/acceptance-test/buildAcceptanceTestViewModel";
@@ -43,6 +43,10 @@ export default async function AdminReportCorrectionPage({ params }: { params: Pr
     ? "Admin override mode. Saving changes will return this report to draft until you finalize it again."
     : buildCorrectionNotice(report);
   const finalizedAtDate = report.finalizedAt ? new Date(report.finalizedAt) : null;
+  const inspectionDisplay = getInspectionDisplayLabels({
+    siteName: report.inspection.site.name,
+    customerName: report.inspection.customerCompany.name
+  });
   const editor = (
     <ReportEditor
       data={{
@@ -56,8 +60,8 @@ export default async function AdminReportCorrectionPage({ params }: { params: Pr
         inspectionTypeLabel: report.task.displayLabel ?? report.template.label,
         defaultInspectionTypeLabel: report.template.label,
         customInspectionTypeLabel: report.task.customDisplayLabel ?? null,
-        siteName: report.inspection.site.name,
-        customerName: report.inspection.customerCompany.name,
+        siteName: inspectionDisplay.primaryTitle,
+        customerName: inspectionDisplay.secondaryTitle || report.inspection.customerCompany.name,
         scheduledDateLabel: format(report.inspection.scheduledStart, "MMM d, yyyy h:mm a"),
         inspectionWorkspace: {
           inspectionId,

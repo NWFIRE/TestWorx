@@ -205,7 +205,7 @@ export default async function AdminInspectionsPage({
     ...queueSearchData.inspections.map((inspection) => {
       const customerLabel = inspection.customerLabel ?? inspection.customerCompany.name;
       const locationLabel = inspection.isGenericSite
-        ? inspection.locationLabel ?? ""
+        ? inspection.locationLabel ?? null
         : [
             inspection.locationLabel,
             inspection.site.addressLine1,
@@ -378,7 +378,7 @@ export default async function AdminInspectionsPage({
                 const scheduledLabel = format(inspection.scheduledStart, "MMM d, yyyy h:mm a");
                 const customerLabel = inspection.customerLabel ?? inspection.customerCompany.name;
                 const resolvedLocationLabel = inspection.isGenericSite
-                  ? inspection.locationLabel ?? "No fixed service address"
+                  ? inspection.locationLabel
                   : [
                       inspection.locationLabel,
                       inspection.site.addressLine1,
@@ -399,16 +399,20 @@ export default async function AdminInspectionsPage({
                       >
                         {customerLabel}
                       </Link>
-                      <p className="mt-1 text-sm text-[color:var(--text-secondary)] lg:hidden">
-                        {resolvedLocationLabel}
-                      </p>
+                      {resolvedLocationLabel && resolvedLocationLabel !== customerLabel ? (
+                        <p className="mt-1 text-sm text-[color:var(--text-secondary)] lg:hidden">
+                          {resolvedLocationLabel}
+                        </p>
+                      ) : null}
                       <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
                         {formatInspectionTaskSummary(inspection.tasks) || "Inspection workflow"}
                       </p>
                     </div>
 
                     <div className="min-w-0">
-                      <p className="truncate text-sm text-[color:var(--text-secondary)]">{resolvedLocationLabel}</p>
+                      <p className="truncate text-sm text-[color:var(--text-secondary)]">
+                        {resolvedLocationLabel && resolvedLocationLabel !== customerLabel ? resolvedLocationLabel : "Customer account"}
+                      </p>
                       <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
                         Next due: {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}
                       </p>

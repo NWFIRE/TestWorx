@@ -1424,7 +1424,7 @@ function buildSummaryFacts(input: PdfInput, factKeys: SummaryFactKey[]): KeyValu
       case "billingContact":
         return { label: "Billing Contact", value: input.customerCompany.billingEmail ?? input.customerCompany.phone ?? "" };
       case "siteAddress":
-        return { label: "Site Address", value: siteAddress ?? customerFacingFieldRules.addressFallback };
+        return { label: "Site Address", value: siteAddress ?? "" };
       case "scheduledWindow":
         return {
           label: "Scheduled Window",
@@ -1593,10 +1593,14 @@ async function renderWorkOrderReport(
   renderWorkOrderSummaryStrip(state, input, theme, boldFont, regularFont);
 
   drawSectionTitle(state, "Summary", "Customer, site, technician, and job summary details for this work order visit.", theme, boldFont, regularFont);
+  const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name);
+  const customerFacingSiteAddress = customerFacingSiteName
+    ? [input.site.addressLine1, input.site.addressLine2, [input.site.city, input.site.state, input.site.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ")
+    : "";
   renderKeyValueGrid(state, [
     { label: "Customer", value: input.customerCompany.name },
-    { label: "Site", value: input.site.name },
-    { label: "Site address", value: [input.site.addressLine1, input.site.addressLine2, [input.site.city, input.site.state, input.site.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ") },
+    { label: "Site", value: customerFacingSiteName ?? "" },
+    { label: "Site address", value: customerFacingSiteAddress },
     { label: "Customer contact", value: input.customerCompany.contactName ?? input.customerCompany.billingEmail ?? input.customerCompany.phone ?? "" },
     { label: "Technician", value: input.report.technicianName ?? "" },
     { label: "Work date", value: formatDate(input.inspection.scheduledStart) },

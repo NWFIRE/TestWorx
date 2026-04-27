@@ -110,7 +110,7 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
       customerCompany: detail.report.inspection.customerCompany,
       site: {
         ...detail.report.inspection.site,
-        name: customerFacingSiteName ?? detail.report.inspection.site.name
+        name: customerFacingSiteName ?? detail.report.inspection.customerCompany.name
       },
       inspection: detail.report.inspection,
       task: {
@@ -153,7 +153,7 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
             <StatusBadge label="Finalized" tone="emerald" />
             <StatusBadge label={model.report.result} tone={model.report.result === "Fail" ? "rose" : model.report.result === "Partial" ? "amber" : "emerald"} />
             <p className="text-sm text-slate-500">{reportView.inspection.customerCompany.name}</p>
-            <p className="text-sm text-slate-500">{customerFacingSiteName ?? reportView.inspection.site.name}</p>
+            {customerFacingSiteName ? <p className="text-sm text-slate-500">{customerFacingSiteName}</p> : null}
             <p className="text-sm text-slate-500">Completed {format(reportView.finalizedAt ?? reportView.updatedAt, "MMM d, yyyy h:mm a")}</p>
           </div>
         </SectionCard>
@@ -201,7 +201,7 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
           <StatusBadge label="Finalized" tone="emerald" />
           <StatusBadge label={formatHostedInspectionOutcome(preview.inspectionStatus)} tone={preview.inspectionStatus === "deficiencies_found" ? "amber" : "emerald"} />
           <p className="text-sm text-slate-500">{reportView.inspection.customerCompany.name}</p>
-          <p className="text-sm text-slate-500">{customerFacingSiteName ?? reportView.inspection.site.name}</p>
+          {customerFacingSiteName ? <p className="text-sm text-slate-500">{customerFacingSiteName}</p> : null}
           <p className="text-sm text-slate-500">Completed {format(reportView.finalizedAt ?? reportView.updatedAt, "MMM d, yyyy h:mm a")}</p>
         </div>
       </SectionCard>

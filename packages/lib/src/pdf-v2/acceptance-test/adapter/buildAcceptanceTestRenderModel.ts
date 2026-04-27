@@ -1,6 +1,7 @@
 import { acceptanceTestDefinitions, acceptanceTestInstallerDefaults } from "../../../acceptance-test-definition";
 import { resolveTenantBranding } from "../../../branding";
 import { reportDraftSchema } from "../../../report-engine";
+import { getCustomerFacingSiteLabel } from "../../../scheduling";
 import type { PdfInput } from "../../types";
 import { formatDateTime, formatShortDate } from "../../core/formatting/dates";
 import { cleanText, joinNonEmpty } from "../../core/formatting/text";
@@ -186,7 +187,7 @@ export function buildAcceptanceTestRenderModel(rawReport: unknown): AcceptanceTe
       licenseNumber: readLicense(input.tenant.branding) ?? acceptanceTestInstallerDefaults.licenseNumber
     },
     property: {
-      buildingName: cleanText(propertyFields?.buildingName) ?? cleanText(input.site.name),
+      buildingName: cleanText(propertyFields?.buildingName) ?? cleanText(getCustomerFacingSiteLabel(input.site.name)),
       address: cleanText(propertyFields?.address) ?? cleanSiteAddress(input),
       buildingOwner: cleanText(propertyFields?.buildingOwner) ?? cleanText(input.customerCompany.name),
       ownerContact: cleanText(propertyFields?.ownerContact) ?? cleanText(input.customerCompany.phone) ?? cleanText(input.customerCompany.billingEmail)

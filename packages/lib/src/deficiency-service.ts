@@ -5,7 +5,7 @@ import type { ActorContext } from "@testworx/types";
 import { actorContextSchema, reportStatuses } from "@testworx/types";
 
 import { assertTenantContext } from "./permissions";
-import { isTechnicianAssignedToInspection } from "./scheduling";
+import { getCustomerFacingSiteLabel, isTechnicianAssignedToInspection } from "./scheduling";
 import { buildFileDownloadResponse } from "./storage";
 
 type DeficiencyDashboardSite = {
@@ -104,7 +104,7 @@ export async function getAdminDeficiencyDashboardData(actor: ActorContext, filte
   });
 
   const [sites, deficiencies] = await Promise.all([siteQuery, deficiencyQuery] as const);
-  const typedSites = sites as DeficiencyDashboardSite[];
+  const typedSites = (sites as DeficiencyDashboardSite[]).filter((site) => getCustomerFacingSiteLabel(site.name));
   const typedDeficiencies = deficiencies as DeficiencyDashboardDeficiency[];
   const siteNames = new Map(typedSites.map((site: DeficiencyDashboardSite) => [site.id, site.name] as const));
 
@@ -122,7 +122,7 @@ export async function getAdminDeficiencyDashboardData(actor: ActorContext, filte
     deficiencies: typedDeficiencies.map((deficiency: DeficiencyDashboardDeficiency) => ({
       ...deficiency,
       customerName: deficiency.inspection.customerCompany.name,
-      siteName: siteNames.get(deficiency.siteId) ?? "Unknown site"
+      siteName: getCustomerFacingSiteLabel(siteNames.get(deficiency.siteId)) ?? null
     }))
   };
 }

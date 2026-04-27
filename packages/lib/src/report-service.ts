@@ -1052,10 +1052,11 @@ export async function getInspectionReportDraft(actor: ActorContext, inspectionId
   const cityStateZip = [tenantBranding.city, tenantBranding.state, tenantBranding.postalCode]
     .filter((value) => typeof value === "string" && value.trim().length > 0)
     .join(", ");
+  const userFacingSiteName = getCustomerFacingSiteLabel(report.inspection.site.name) ?? report.inspection.customerCompany.name;
 
   const draft = buildInitialReportDraft({
     inspectionType: report.task.inspectionType,
-    siteName: report.inspection.site.name,
+    siteName: userFacingSiteName,
     customerName: report.inspection.customerCompany.name,
     scheduledDate: report.inspection.scheduledStart.toISOString(),
     assetCount,
@@ -1063,7 +1064,7 @@ export async function getInspectionReportDraft(actor: ActorContext, inspectionId
     previousDraft: hydrateDraftFromReport(report),
     priorCompletedDraft: priorReport?.contentJson ?? undefined,
     siteDefaults: {
-      siteName: report.inspection.site.name,
+      siteName: userFacingSiteName,
       customerName: report.inspection.customerCompany.name,
       siteAddress: formatCustomerFacingInspectionAddress({
         siteName: report.inspection.site.name,
@@ -1333,7 +1334,13 @@ export async function saveReportDraft(actor: ActorContext, input: {
 }
 
 function buildGeneratedPdfName(report: { inspection: { customerCompany: { name: string }; site: { name: string } }; task: { inspectionType: string } }) {
-  return `${slugifyFileName(report.inspection.customerCompany.name)}-${slugifyFileName(report.inspection.site.name)}-${slugifyFileName(report.task.inspectionType)}-report.pdf`;
+  const customerFacingSiteName = getCustomerFacingSiteLabel(report.inspection.site.name);
+  return [
+    slugifyFileName(report.inspection.customerCompany.name),
+    customerFacingSiteName ? slugifyFileName(customerFacingSiteName) : null,
+    slugifyFileName(report.task.inspectionType),
+    "report.pdf"
+  ].filter(Boolean).join("-");
 }
 
 type GeneratedPdfAttachmentRecord = {
@@ -1901,8 +1908,9 @@ export async function getCustomerPortalData(actor: ActorContext) {
 
   const tenant = await prisma.tenant.findFirst({ where: { id: parsedActor.tenantId as string } });
 
-  const [siteCount, reportCount, openDeficiencyCount, recentInspections] = await Promise.all([
-    prisma.site.count({ where: { tenantId: parsedActor.tenantId as string, customerCompanyId: customerCompanyId as string } }),
+  const [customerCompany, customerSites, reportCount, openDeficiencyCount, recentInspections] = await Promise.all([
+    prisma.customerCompany.findFirst({ where: { id: customerCompanyId as string, tenantId: parsedActor.tenantId as string }, select: { name: true } }),
+    prisma.site.findMany({ where: { tenantId: parsedActor.tenantId as string, customerCompanyId: customerCompanyId as string }, select: { name: true } }),
     prisma.inspectionReport.count({ where: { tenantId: parsedActor.tenantId as string, status: reportStatuses.finalized, inspection: { customerCompanyId: customerCompanyId as string } } }),
     prisma.deficiency.count({ where: { tenantId: parsedActor.tenantId as string, status: "open", inspectionReport: { status: reportStatuses.finalized, inspection: { customerCompanyId: customerCompanyId as string } } } }),
     prisma.inspection.findMany({
@@ -1974,8 +1982,9 @@ export async function getCustomerPortalData(actor: ActorContext) {
 
   return {
     tenantName: tenant?.name ?? "",
+    customerName: customerCompany?.name ?? "",
     branding: resolveTenantBranding({ tenantName: tenant?.name ?? "", branding: tenant?.branding ?? {}, billingEmail: tenant?.billingEmail ?? null }),
-    siteCount,
+    siteCount: customerSites.filter((site) => getCustomerFacingSiteLabel(site.name)).length,
     reportCount,
     openDeficiencyCount,
     inspectionPackets

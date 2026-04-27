@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import type { CustomerOption, SiteOption, TechnicianOption } from "@testworx/types";
-import { getDefaultInspectionRecurrenceFrequency, inspectionTypeRegistry } from "@testworx/lib";
+import { getDefaultInspectionRecurrenceFrequency, inspectionTypeRegistry, isUserFacingSiteLabel } from "@testworx/lib";
 
 import { createInspectionAction } from "./actions";
 
@@ -28,7 +28,7 @@ export function CreateInspectionForm({ customers, sites, technicians }: { custom
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="siteId">Site</label>
           <select className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="siteId" name="siteId" required>
             <option value="">Select site</option>
-            {sites.map((site) => <option key={site.id} value={site.id}>{site.name} - {site.city}</option>)}
+            {sites.filter((site) => isUserFacingSiteLabel(site.name)).map((site) => <option key={site.id} value={site.id}>{site.name}{site.city ? ` - ${site.city}` : ""}</option>)}
           </select>
         </div>
       </div>

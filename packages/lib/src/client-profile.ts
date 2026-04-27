@@ -9,7 +9,7 @@ import { mapSiteProviderAssignmentForDisplay } from "./contract-provider-billing
 import { getQuickBooksCustomerInvoiceHistory } from "./quickbooks";
 import { quoteStatusLabels } from "./quotes";
 import { inspectionTypeRegistry } from "./report-config";
-import { inspectionStatusLabels } from "./scheduling";
+import { getCustomerFacingSiteLabel, inspectionStatusLabels } from "./scheduling";
 import { assertTenantContext } from "./permissions";
 import { invoiceDeliverySettingsSchema, requiredBillingReferencesSchema } from "./third-party-billing";
 
@@ -30,6 +30,10 @@ function humanizeValue(value: string) {
     .split("_")
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(" ");
+}
+
+function resolveClientSiteName(siteName: string | null | undefined, fallback = "Customer account") {
+  return getCustomerFacingSiteLabel(siteName) ?? fallback;
 }
 
 function maxDate(values: Array<Date | null | undefined>) {
@@ -256,7 +260,7 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
       id: inspection.id,
       inspectionNumber: inspection.id.slice(-8).toUpperCase(),
       scheduledStart: inspection.scheduledStart,
-      siteName: inspection.site.name,
+      siteName: resolveClientSiteName(inspection.site.name),
       status: inspection.status,
       statusLabel: inspectionStatusLabels[inspection.status],
       resultLabel:
@@ -287,7 +291,7 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
       id: inspection.id,
       inspectionNumber: inspection.id.slice(-8).toUpperCase(),
       scheduledStart: inspection.scheduledStart,
-      siteName: inspection.site.name,
+      siteName: resolveClientSiteName(inspection.site.name),
       statusLabel: inspectionStatusLabels[inspection.status],
       technicianName:
         inspection.assignedTechnician?.name
@@ -305,7 +309,7 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
     total: quote.total,
     status: quote.status,
     statusLabel: buildQuoteStatusLabel(quote.status),
-    siteName: quote.site?.name ?? "No site linked",
+    siteName: resolveClientSiteName(quote.site?.name),
     hostedQuoteUrl: quote.quoteAccessToken ? `/quote/${quote.quoteAccessToken}` : null,
     quickbooksEstimateNumber: quote.quickbooksEstimateNumber,
     detailLink: `/app/admin/quotes/${quote.id}`
@@ -317,7 +321,7 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
       title: document.label || document.fileName,
       type: "Inspection document",
       uploadedAt: document.uploadedAt,
-      siteName: document.inspection.site.name,
+      siteName: resolveClientSiteName(document.inspection.site.name),
       href: `/api/inspection-documents/${document.id}?variant=preferred`,
       relatedLink: `/app/admin/inspections/${document.inspection.id}`
     })),
@@ -326,7 +330,7 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
       title: attachment.fileName,
       type: "Inspection attachment",
       uploadedAt: attachment.createdAt,
-      siteName: attachment.inspectionReport?.inspection.site.name ?? "No site linked",
+      siteName: resolveClientSiteName(attachment.inspectionReport?.inspection.site.name),
       href: `/api/attachments/${attachment.id}`,
       relatedLink: attachment.inspectionReport?.inspection.id
         ? `/app/admin/inspections/${attachment.inspectionReport.inspection.id}`
@@ -337,7 +341,7 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
       title: `${quote.quoteNumber} PDF`,
       type: "Proposal PDF",
       uploadedAt: quote.updatedAt,
-      siteName: quote.site?.name ?? "No site linked",
+      siteName: resolveClientSiteName(quote.site?.name),
       href: `/api/quotes/${quote.id}/pdf`,
       relatedLink: `/app/admin/quotes/${quote.id}`
     }))
@@ -457,7 +461,7 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
         invoiceSummary.lastInvoiceAt
       ])
     },
-    sites: customer.sites.map((site) => ({
+    sites: customer.sites.filter((site) => getCustomerFacingSiteLabel(site.name)).map((site) => ({
       id: site.id,
       name: site.name,
       address: formatAddress(site),

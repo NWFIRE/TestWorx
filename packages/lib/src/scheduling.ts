@@ -103,6 +103,18 @@ const genericInspectionSiteAddressLine1 = "No fixed service address";
 const genericInspectionSiteCity = "Unknown";
 const genericInspectionSiteState = "Unknown";
 const genericInspectionSitePostalCode = "Unknown";
+const nonDisplayableSiteLabels = new Set([
+  genericInspectionSiteName.toLowerCase(),
+  genericInspectionSiteAddressLine1.toLowerCase(),
+  "no fixed service address on file"
+]);
+const nonDisplayableAddressParts = new Set([
+  genericInspectionSiteAddressLine1.toLowerCase(),
+  genericInspectionSiteCity.toLowerCase(),
+  genericInspectionSiteState.toLowerCase(),
+  genericInspectionSitePostalCode.toLowerCase(),
+  "no fixed service address on file"
+]);
 export const inspectionStatusLabels: Record<InspectionStatus | "past_due", string> = {
   to_be_completed: "To Be Completed",
   scheduled: "To Be Completed",
@@ -314,16 +326,29 @@ function normalizeTaskDueMonth(input: { dueMonth?: string | null; dueDate?: Date
 }
 
 export function isGenericInspectionSiteName(siteName: string | null | undefined) {
-  return (siteName ?? "").trim() === genericInspectionSiteName;
+  return (siteName ?? "").trim().toLowerCase() === genericInspectionSiteName.toLowerCase();
+}
+
+export function isUserFacingSiteLabel(siteName: string | null | undefined) {
+  const normalized = (siteName ?? "").trim();
+  return Boolean(normalized && !nonDisplayableSiteLabels.has(normalized.toLowerCase()));
 }
 
 export function getCustomerFacingSiteLabel(siteName: string | null | undefined) {
   const normalized = (siteName ?? "").trim();
-  if (!normalized || isGenericInspectionSiteName(normalized)) {
+  if (!isUserFacingSiteLabel(normalized)) {
     return null;
   }
 
   return normalized;
+}
+
+export function formatUserFacingSiteContext(input: {
+  siteName?: string | null;
+  customerName?: string | null;
+  fallback?: string | null;
+}) {
+  return getCustomerFacingSiteLabel(input.siteName) ?? input.customerName?.trim() ?? input.fallback?.trim() ?? null;
 }
 
 type CustomerFacingAddressInput = {
@@ -360,12 +385,21 @@ function normalizeCustomerFacingAddress(input: {
   state?: string | null;
   postalCode?: string | null;
 }): CustomerFacingAddress {
+  const cleanAddressPart = (value?: string | null) => {
+    const normalized = value?.trim() ?? "";
+    if (!normalized || nonDisplayableAddressParts.has(normalized.toLowerCase())) {
+      return "";
+    }
+
+    return normalized;
+  };
+
   return {
-    addressLine1: input.addressLine1?.trim() ?? "",
-    addressLine2: input.addressLine2?.trim() || null,
-    city: input.city?.trim() ?? "",
-    state: input.state?.trim() ?? "",
-    postalCode: input.postalCode?.trim() ?? ""
+    addressLine1: cleanAddressPart(input.addressLine1),
+    addressLine2: cleanAddressPart(input.addressLine2) || null,
+    city: cleanAddressPart(input.city),
+    state: cleanAddressPart(input.state),
+    postalCode: cleanAddressPart(input.postalCode)
   };
 }
 
@@ -443,7 +477,7 @@ export function getInspectionDisplayLabels(input: {
   const customerName = (input.customerName ?? "").trim();
   const isGenericSite = isGenericInspectionSiteName(siteName);
   const customerLabel = customerName || siteName || "Untitled inspection";
-  const locationLabel = (
+  const resolvedLocationLabel =
     getCustomerFacingSiteLabel(siteName) ??
     formatCustomerFacingInspectionAddress({
       siteName,
@@ -462,8 +496,8 @@ export function getInspectionDisplayLabels(input: {
       customerBillingCity: input.customerBillingCity,
       customerBillingState: input.customerBillingState,
       customerBillingPostalCode: input.customerBillingPostalCode
-    })
-  ) || genericInspectionSiteAddressLine1;
+    });
+  const locationLabel = resolvedLocationLabel || null;
 
   return {
     isGenericSite,
@@ -3570,7 +3604,9 @@ export async function getAdminDashboardData(actor: ActorContext) {
   return {
     timezone: tenant?.timezone ?? "America/Chicago",
     customers: customers.map((customer) => ({ id: customer.id, name: customer.name })),
-    sites: sites.map((site) => ({ id: site.id, name: site.name, city: site.city, customerCompanyId: site.customerCompanyId })),
+    sites: sites
+      .filter((site) => getCustomerFacingSiteLabel(site.name))
+      .map((site) => ({ id: site.id, name: site.name, city: site.city, customerCompanyId: site.customerCompanyId })),
     technicians: technicians.map((technician) => ({ id: technician.id, name: technician.name })),
     inspections: activeInspections.map(mapInspectionForDashboard),
     activeInspections: activeInspections.map(mapInspectionForDashboard),
@@ -3687,7 +3723,9 @@ export async function getAdminUpcomingInspectionsData(
     startMonth: format(monthStart, "yyyy-MM"),
     monthsAhead,
     customers: customers.map((customer) => ({ id: customer.id, name: customer.name })),
-    sites: sites.map((site) => ({ id: site.id, name: site.name, city: site.city, customerCompanyId: site.customerCompanyId })),
+    sites: sites
+      .filter((site) => getCustomerFacingSiteLabel(site.name))
+      .map((site) => ({ id: site.id, name: site.name, city: site.city, customerCompanyId: site.customerCompanyId })),
     technicians: technicians.map((technician) => ({ id: technician.id, name: technician.name })),
     summary: {
       totalUpcomingInspections: mappedInspections.length,
@@ -4295,7 +4333,7 @@ function buildMonthCalendar(inspections: Array<{
     }),
     dayKey: format(inspection.scheduledStart, "yyyy-MM-dd"),
     label: format(inspection.scheduledStart, "MMM d"),
-    siteName: inspection.site.name,
+    siteName: getCustomerFacingSiteLabel(inspection.site.name) ?? inspection.customerCompany.name,
     status: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
     inspectionClassification: inspection.inspectionClassification,
     isPriority: inspection.isPriority

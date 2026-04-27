@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 import { ActionButton } from "@/app/action-button";
 import { SearchSelect, type SearchSelectOption } from "@/app/search-select";
 import { useToast } from "@/app/toast-provider";
+import { isUserFacingSiteLabel } from "@testworx/lib";
 
 type QuoteCatalogItem = {
   code: string;
@@ -128,7 +129,7 @@ export function QuoteEditorForm({
   const { showToast } = useToast();
 
   const availableSites = useMemo(
-    () => sites.filter((site) => !value.customerCompanyId || site.customerCompanyId === value.customerCompanyId),
+    () => sites.filter((site) => isUserFacingSiteLabel(site.name) && (!value.customerCompanyId || site.customerCompanyId === value.customerCompanyId)),
     [sites, value.customerCompanyId]
   );
   const customerOptions = useMemo<SearchSelectOption[]>(

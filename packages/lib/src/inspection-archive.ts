@@ -8,6 +8,7 @@ import { mapInspectionTypeToComplianceReportingDivision } from "./compliance-rep
 import { assertTenantContext } from "./permissions";
 import { buildInspectionPacketDocuments } from "./report-service";
 import { inspectionTypeRegistry } from "./report-config";
+import { getCustomerFacingSiteLabel } from "./scheduling";
 
 function parseActor(actor: ActorContext) {
   const parsed = actorContextSchema.parse(actor);
@@ -363,7 +364,7 @@ export async function getAdminInspectionArchiveData(
     },
     options: {
       customers,
-      sites,
+      sites: sites.filter((site) => getCustomerFacingSiteLabel(site.name)),
       technicians,
       divisions: divisionOptions,
       inspectionTypes: (Object.entries(inspectionTypeRegistry) as Array<[InspectionType, { label: string }]>).map(([value, definition]) => ({
@@ -390,7 +391,7 @@ export async function getAdminInspectionArchiveData(
       inspectionNumber: row.id.slice(-8).toUpperCase(),
       completedAt: row.completedAt ?? row.archivedAt ?? row.updatedAt,
       customerName: row.archiveCustomerName ?? row.customerCompany.name,
-      siteName: row.archiveSiteName ?? row.site.name,
+      siteName: getCustomerFacingSiteLabel(row.archiveSiteName ?? row.site.name) ?? row.archiveCustomerName ?? row.customerCompany.name,
       siteAddress: row.archiveSiteAddress ?? formatSiteAddress(row.site),
       city: row.archiveSiteCity ?? row.site.city,
       technicianName: (
@@ -505,7 +506,7 @@ export async function getAdminInspectionArchiveDetail(actor: ActorContext, inspe
     resultStatus: inspection.archiveResultStatus ?? buildArchiveResultStatus({ status: inspection.status, deficiencyCount: inspection.archiveDeficiencyCount }),
     snapshot: {
       customerName: inspection.archiveCustomerName ?? inspection.customerCompany.name,
-      siteName: inspection.archiveSiteName ?? inspection.site.name,
+      siteName: getCustomerFacingSiteLabel(inspection.archiveSiteName ?? inspection.site.name) ?? inspection.archiveCustomerName ?? inspection.customerCompany.name,
       siteAddress: inspection.archiveSiteAddress ?? formatSiteAddress(inspection.site),
       city: inspection.archiveSiteCity ?? inspection.site.city,
       technicianName: (
@@ -523,7 +524,7 @@ export async function getAdminInspectionArchiveDetail(actor: ActorContext, inspe
     },
     site: {
       id: inspection.site.id,
-      name: inspection.site.name,
+      name: getCustomerFacingSiteLabel(inspection.site.name) ?? inspection.customerCompany.name,
       address: formatSiteAddress(inspection.site),
       city: inspection.site.city,
       state: inspection.site.state,

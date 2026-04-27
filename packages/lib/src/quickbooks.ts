@@ -11,6 +11,7 @@ import { syncInspectionArchiveStateTx } from "./inspection-archive";
 import type { JsonObject } from "./json-types";
 import { assertTenantContext } from "./permissions";
 import { resolveServiceFeeForLocationTx } from "./service-fees";
+import { getCustomerFacingSiteLabel } from "./scheduling";
 
 type QuickBooksTokenResponse = {
   access_token: string;
@@ -4184,7 +4185,7 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
           customerName: summary.customerCompany.name,
           billingEmail: summary.customerCompany.billingEmail,
           phone: summary.customerCompany.phone,
-          siteName: summary.site.name,
+          siteName: getCustomerFacingSiteLabel(summary.site.name) ?? summary.customerCompany.name,
           billingAddressLine1: summary.customerCompany.billingAddressLine1 ?? summary.customerCompany.serviceAddressLine1 ?? summary.site.addressLine1,
           billingAddressLine2: summary.customerCompany.billingAddressLine2 ?? summary.customerCompany.serviceAddressLine2 ?? summary.site.addressLine2,
           billingCity: summary.customerCompany.billingCity ?? summary.customerCompany.serviceCity ?? summary.site.city,

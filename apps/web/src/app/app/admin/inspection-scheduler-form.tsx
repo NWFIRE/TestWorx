@@ -13,12 +13,13 @@ import {
   formatInspectionStatusLabel,
   formatInspectionTaskSchedulingStatusLabel,
   formatInspectionTaskTypeLabel,
-  genericInspectionSiteName,
   genericInspectionSiteOptionValue,
   getDefaultInspectionRecurrenceFrequency,
   inspectionClassificationValues,
   inspectionTaskSchedulingStatuses,
-  inspectionTypeRegistry
+  inspectionTypeRegistry,
+  isUserFacingSiteLabel,
+  noFixedInspectionSiteLabel
 } from "@testworx/lib";
 
 import { SearchSelect, type SearchSelectOption } from "@/app/search-select";
@@ -281,7 +282,7 @@ export function InspectionSchedulerForm({
   const serviceLineRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const initialValuesSignature = serializeInitialValues(initialValues);
   const filteredSites = useMemo(
-    () => sites.filter((site) => !selectedCustomerId || site.customerCompanyId === selectedCustomerId),
+    () => sites.filter((site) => isUserFacingSiteLabel(site.name) && (!selectedCustomerId || site.customerCompanyId === selectedCustomerId)),
     [selectedCustomerId, sites]
   );
   const customerOptions = useMemo<SearchSelectOption[]>(
@@ -297,7 +298,7 @@ export function InspectionSchedulerForm({
     }
 
     return [
-      { value: genericInspectionSiteOptionValue, label: genericInspectionSiteName, secondaryLabel: "Not tied to a fixed service address" },
+      { value: genericInspectionSiteOptionValue, label: noFixedInspectionSiteLabel, secondaryLabel: "Use the customer account for this inspection" },
       ...(allowCustomOneTimeSite
         ? [{ value: customInspectionSiteOptionValue, label: customInspectionSiteName, secondaryLabel: "Create a one-time site for this inspection" }]
         : []),

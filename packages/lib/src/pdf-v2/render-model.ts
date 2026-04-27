@@ -37,7 +37,7 @@ function toCell(text: string, lines?: string[]): RenderTableCell {
 }
 
 function mapSummaryFact(input: PdfInput, factKey: SummaryFactKey): RenderKeyValueRow {
-  const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name) || input.site.name;
+  const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name);
   const siteAddress = formatPdfAddress({
     addressLine1: input.site.addressLine1,
     addressLine2: input.site.addressLine2,
@@ -56,7 +56,7 @@ function mapSummaryFact(input: PdfInput, factKey: SummaryFactKey): RenderKeyValu
     case "customer":
       return { label: "Customer", value: input.customerCompany.name };
     case "site":
-      return { label: "Site", value: customerFacingSiteName };
+      return { label: "Site", value: customerFacingSiteName ?? "" };
     case "inspectionDate":
       return { label: "Inspection Date", value: formatDate(input.inspection.scheduledStart) };
     case "completionDate":
@@ -455,7 +455,7 @@ export function buildReportRenderModelV2(input: PdfInput): ReportRenderModelV2 {
     identity: {
       title: config.title,
       customer: input.customerCompany.name,
-      site: getCustomerFacingSiteLabel(input.site.name) || input.site.name,
+      site: getCustomerFacingSiteLabel(input.site.name) ?? "",
       technician: input.report.technicianName ?? "",
       serviceDate: formatDate(input.inspection.scheduledStart)
     },

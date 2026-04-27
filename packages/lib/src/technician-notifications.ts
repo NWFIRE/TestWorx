@@ -12,7 +12,7 @@ import { prisma } from "@testworx/db";
 import type { ActorContext } from "@testworx/types";
 import { actorContextSchema } from "@testworx/types";
 
-import { activeOperationalInspectionStatuses, formatInspectionTaskTypeLabel } from "./scheduling";
+import { activeOperationalInspectionStatuses, formatInspectionTaskTypeLabel, formatUserFacingSiteContext, getCustomerFacingSiteLabel } from "./scheduling";
 import { assertTenantContext } from "./permissions";
 
 function parseActor(actor: ActorContext) {
@@ -210,6 +210,7 @@ async function getInspectionNotificationContextTx(tx: Prisma.TransactionClient, 
     where: { id: inspectionId, tenantId },
     include: {
       site: { select: { name: true } },
+      customerCompany: { select: { name: true } },
       tasks: {
         orderBy: [{ createdAt: "asc" }],
         include: {
@@ -231,9 +232,15 @@ async function getInspectionNotificationContextTx(tx: Prisma.TransactionClient, 
 
   const firstOpenTask = inspection.tasks.find((task) => task.report?.status !== "finalized") ?? inspection.tasks[0] ?? null;
   const displayTask = firstOpenTask ? formatInspectionTaskTypeLabel(firstOpenTask.inspectionType) : "Inspection";
+  const displayContext = formatUserFacingSiteContext({
+    siteName: inspection.site.name,
+    customerName: inspection.customerCompany.name,
+    fallback: "This inspection"
+  }) ?? "This inspection";
 
   return {
     inspection,
+    displayContext,
     displayTask,
     basePath: firstOpenTask ? `/app/tech/reports/${inspection.id}/${firstOpenTask.id}` : `/app/tech/work?inspectionId=${inspection.id}`
   };
@@ -266,7 +273,7 @@ export async function createPriorityInspectionAssignedNotificationsTx(
         userId,
         type: TechnicianNotificationType.priority_inspection_assigned,
         title: "Priority inspection assigned",
-        body: `${context.inspection.site.name} needs priority field action for ${context.displayTask}.`,
+        body: `${context.displayContext} needs priority field action for ${context.displayTask}.`,
         relatedEntityType: TechnicianNotificationRelatedEntityType.inspection,
         relatedEntityId: context.inspection.id,
         priority: TechnicianNotificationPriority.urgent,
@@ -307,7 +314,7 @@ export async function createWorkOrderReassignedNotificationsTx(
         userId,
         type: TechnicianNotificationType.work_order_reassigned,
         title: "Work order reassigned",
-        body: `${context.inspection.site.name} was reassigned and is ready for technician follow-up.`,
+        body: `${context.displayContext} was reassigned and is ready for technician follow-up.`,
         relatedEntityType: TechnicianNotificationRelatedEntityType.work_order,
         relatedEntityId: context.inspection.id,
         priority: TechnicianNotificationPriority.high,
@@ -333,7 +340,7 @@ export async function createInspectionCorrectionReissuedNotificationTx(
     userId: input.userId,
     type: TechnicianNotificationType.inspection_reissued_for_correction,
     title: "Correction required",
-    body: `${input.siteName} was returned for correction and needs review.`,
+    body: `${getCustomerFacingSiteLabel(input.siteName) ?? "This inspection"} was returned for correction and needs review.`,
     relatedEntityType: TechnicianNotificationRelatedEntityType.report,
     relatedEntityId: input.reportId,
     priority: TechnicianNotificationPriority.high,
@@ -361,6 +368,7 @@ async function ensureOverdueNotifications(actor: ReturnType<typeof parseActor>) 
     },
     include: {
       site: { select: { name: true } },
+      customerCompany: { select: { name: true } },
       tasks: {
         orderBy: [{ createdAt: "asc" }],
         include: {
@@ -373,12 +381,17 @@ async function ensureOverdueNotifications(actor: ReturnType<typeof parseActor>) 
   await prisma.$transaction(async (tx) => {
     for (const inspection of overdueInspections) {
       const firstOpenTask = inspection.tasks.find((task) => task.report?.status !== "finalized") ?? inspection.tasks[0] ?? null;
+      const displayContext = formatUserFacingSiteContext({
+        siteName: inspection.site.name,
+        customerName: inspection.customerCompany.name,
+        fallback: "This inspection"
+      }) ?? "This inspection";
       await createOrRefreshNotificationTx(tx, {
         tenantId,
         userId: actor.userId,
         type: TechnicianNotificationType.inspection_overdue,
         title: "Overdue inspection",
-        body: `${inspection.site.name} is overdue and needs field attention.`,
+        body: `${displayContext} is overdue and needs field attention.`,
         relatedEntityType: TechnicianNotificationRelatedEntityType.inspection,
         relatedEntityId: inspection.id,
         priority: TechnicianNotificationPriority.high,

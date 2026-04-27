@@ -7,6 +7,7 @@ import { LiveUrlSearchSelect } from "@/app/live-url-search-select";
 import type { SearchSelectOption } from "@/app/search-select";
 import {
   formatQuoteReminderStage,
+  getCustomerFacingSiteLabel,
   getQuoteReminderSettings,
   hasQuoteManagementAccess,
   getQuoteStatusTone,
@@ -130,7 +131,7 @@ export default async function QuotesPage({
     ...quoteSearchSource.map((quote) => ({
       value: quote.quoteNumber,
       label: quote.quoteNumber,
-      secondaryLabel: [quote.customerCompany.name, quote.site?.name].filter(Boolean).join(" | ") || "Quote",
+      secondaryLabel: [quote.customerCompany.name, getCustomerFacingSiteLabel(quote.site?.name)].filter(Boolean).join(" | ") || "Quote",
       badge: "Quote"
     })),
     ...quoteSearchSource.map((quote) => ({
@@ -139,14 +140,17 @@ export default async function QuotesPage({
       secondaryLabel: "Customer",
       badge: "Customer"
     })),
-    ...quoteSearchSource.flatMap((quote) => quote.site
-      ? [{
-          value: quote.site.name,
-          label: quote.site.name,
+    ...quoteSearchSource.flatMap((quote) => {
+      const siteLabel = getCustomerFacingSiteLabel(quote.site?.name);
+      return siteLabel
+        ? [{
+          value: siteLabel,
+          label: siteLabel,
           secondaryLabel: quote.customerCompany.name,
           badge: "Site"
         }]
-      : []),
+        : [];
+    }),
     ...quoteSearchSource.flatMap((quote) => quote.recipientEmail
       ? [{
           value: quote.recipientEmail,
@@ -244,7 +248,10 @@ export default async function QuotesPage({
           <EmptyState title="No quotes match this workspace filter" description="Adjust the lifecycle or sync filters, or create a new quote to start the workflow." />
         ) : (
           <div className="space-y-4">
-            {quotes.map((quote) => (
+            {quotes.map((quote) => {
+              const siteLabel = getCustomerFacingSiteLabel(quote.site?.name);
+
+              return (
               <div key={quote.id} className="rounded-[24px] border border-[color:rgb(203_215_230_/_0.92)] bg-[color:rgb(248_250_252_/_0.96)] p-5 transition hover:border-[color:var(--border-strong)] hover:bg-white">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="space-y-2">
@@ -254,7 +261,7 @@ export default async function QuotesPage({
                       <StatusBadge label={quoteSyncStatusLabels[quote.syncStatus]} tone={getQuoteSyncTone(quote.syncStatus)} />
                     </div>
                     <p className="text-sm text-[color:var(--text-secondary)]">
-                      {quote.customerCompany.name}{quote.site ? ` • ${quote.site.name}` : ""} • Issued {format(quote.issuedAt, "MMM d, yyyy")}
+                      {quote.customerCompany.name}{siteLabel ? ` • ${siteLabel}` : ""} • Issued {format(quote.issuedAt, "MMM d, yyyy")}
                     </p>
                     <div className="grid gap-3 pt-1 md:grid-cols-4">
                       <p className="text-sm text-slate-600">Line items: <span className="font-semibold text-slate-950">{quote.lineItems.length}</span></p>
@@ -284,7 +291,8 @@ export default async function QuotesPage({
                   </Link>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </SectionCard>

@@ -17,6 +17,7 @@ import {
 import { resolveInspectionServiceFeeTx } from "./service-fees";
 import { saveQuickBooksItemMappingForCode } from "./quickbooks";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
+import { getCustomerFacingSiteLabel } from "./scheduling";
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -2751,6 +2752,7 @@ export async function getAdminBillingSummaries(actor: ActorContext) {
     const reportTypes = [...new Set(items.map((item) => item.reportType).filter((reportType) => reportType !== INSPECTION_LEVEL_REPORT_TYPE))];
     return {
       ...row,
+      siteName: getCustomerFacingSiteLabel(row.siteName) ?? row.customerName,
       items,
       reportTypes,
       metrics: buildSummaryMetrics(items)
@@ -2885,6 +2887,7 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
   );
   return {
     ...row,
+    siteName: getCustomerFacingSiteLabel(row.siteName) ?? row.customerName,
     status: row.status as BillingSummaryStatus,
     billingType: normalizeBillingType(row.billingType),
     quickbooksSyncStatus: row.quickbooksSyncStatus ?? "not_synced",

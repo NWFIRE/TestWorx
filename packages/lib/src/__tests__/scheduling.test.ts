@@ -7,6 +7,7 @@ import {
   genericInspectionSiteOptionValue,
   getCustomerFacingSiteLabel,
   getInspectionDisplayLabels,
+  isUserFacingSiteLabel,
   getDefaultInspectionRecurrenceFrequency,
   withInspectionTaskDisplayLabels,
   getInspectionDisplayStatus,
@@ -436,7 +437,22 @@ describe("month defaults and past-due status", () => {
 
   it("hides the generic site label from customer-facing displays", () => {
     expect(getCustomerFacingSiteLabel("General / No Fixed Site")).toBeNull();
+    expect(getCustomerFacingSiteLabel("No fixed service address")).toBeNull();
+    expect(getCustomerFacingSiteLabel("No fixed service address on file")).toBeNull();
+    expect(isUserFacingSiteLabel("No fixed service address")).toBe(false);
     expect(getCustomerFacingSiteLabel("Main Campus")).toBe("Main Campus");
+  });
+
+  it("does not fall back to generic site address placeholders when no customer address exists", () => {
+    expect(
+      formatCustomerFacingInspectionAddress({
+        siteName: "General / No Fixed Site",
+        siteAddressLine1: "No fixed service address",
+        siteCity: "Unknown",
+        siteState: "Unknown",
+        sitePostalCode: "Unknown"
+      })
+    ).toBe("");
   });
 
   it("uses the customer address for generic-site customer-facing address output", () => {
