@@ -54,6 +54,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
 
   const filter = (searchParams.get("filter") as WorkFilter | null) ?? "today";
   const query = (searchParams.get("query") ?? "").trim().toLowerCase();
+  const claimableWorkCount = snapshot?.dashboard?.unassigned?.length ?? 0;
 
   const filtered = useMemo(() => {
     if (!snapshot) {
@@ -140,19 +141,34 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
               ["overdue", "Overdue"],
               ["open", "Open"],
               ["claimable", "Claimable"]
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                className={filter === value
-                  ? "min-h-11 rounded-2xl bg-[var(--tenant-primary)] px-4 py-2 text-sm font-semibold text-[var(--tenant-primary-contrast)]"
-                  : "min-h-11 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600"}
-                name="filter"
-                type="submit"
-                value={value}
-              >
-                {label}
-              </button>
-            ))}
+            ].map(([value, label]) => {
+              const isSelected = filter === value;
+              const showClaimableBadge = value === "claimable" && claimableWorkCount > 0;
+
+              return (
+                <button
+                  key={value}
+                  aria-label={showClaimableBadge ? `${label}, ${claimableWorkCount} claimable inspections available` : label}
+                  className={isSelected
+                    ? "relative flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[var(--tenant-primary)] px-4 py-2 text-sm font-semibold text-[var(--tenant-primary-contrast)]"
+                    : "relative flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600"}
+                  name="filter"
+                  type="submit"
+                  value={value}
+                >
+                  <span>{label}</span>
+                  {showClaimableBadge ? (
+                    <span
+                      className={isSelected
+                        ? "inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-[11px] font-bold leading-none text-[var(--tenant-primary)] shadow-sm"
+                        : "inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[var(--tenant-primary)] px-1.5 text-[11px] font-bold leading-none text-[var(--tenant-primary-contrast)] shadow-sm"}
+                    >
+                      {claimableWorkCount > 99 ? "99+" : claimableWorkCount}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         </form>
       </section>
