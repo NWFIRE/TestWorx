@@ -301,6 +301,61 @@ export const directQuickBooksInvoiceInputSchema = z.object({
   }
 });
 
+const TRADEWORX_INVOICE_SEQUENCE_START = 1000;
+
+function getTradeWorxInvoiceYear(dateInput?: Date | string | null) {
+  if (dateInput instanceof Date && !Number.isNaN(dateInput.getTime())) {
+    return dateInput.getFullYear();
+  }
+
+  if (typeof dateInput === "string" && dateInput.trim().length > 0) {
+    const parsed = new Date(dateInput);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.getFullYear();
+    }
+  }
+
+  return new Date().getFullYear();
+}
+
+export function formatTradeWorxInvoiceNumber(year: number, sequence: number) {
+  if (!Number.isInteger(year) || year < 2000 || year > 9999) {
+    throw new Error("Invoice year is invalid.");
+  }
+
+  if (!Number.isInteger(sequence) || sequence < 0) {
+    throw new Error("Invoice sequence is invalid.");
+  }
+
+  return `TW${year}-${String(sequence).padStart(4, "0")}`;
+}
+
+async function reserveTradeWorxInvoiceNumber(input: {
+  tenantId: string;
+  issueDate?: Date | string | null;
+}) {
+  const year = getTradeWorxInvoiceYear(input.issueDate);
+  const sequence = await prisma.tenantInvoiceSequence.upsert({
+    where: {
+      tenantId_year: {
+        tenantId: input.tenantId,
+        year
+      }
+    },
+    create: {
+      tenantId: input.tenantId,
+      year,
+      nextNumber: TRADEWORX_INVOICE_SEQUENCE_START + 1
+    },
+    update: {
+      nextNumber: { increment: 1 }
+    },
+    select: { nextNumber: true }
+  });
+
+  return formatTradeWorxInvoiceNumber(year, sequence.nextNumber - 1);
+}
+
 class QuickBooksRequestError extends Error {
   operation: string;
   httpStatus: number | null;
@@ -4073,7 +4128,10 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
       }));
     }
 
-    const docNumber = `TW-${summary.inspectionId.slice(-8).toUpperCase()}`;
+    const docNumber = normalizedSummary.quickbooksInvoiceNumber
+      ?? await reserveTradeWorxInvoiceNumber({
+        tenantId: parsedActor.tenantId as string
+      });
     const invoiceResponse = await quickBooksApiRequest<{ Invoice?: unknown }>(tenant, {
       path: "/invoice",
       method: "POST",
@@ -4570,11 +4628,11 @@ export async function createDirectQuickBooksInvoice(
       notes: selectedCustomer?.notes ?? null
     });
 
-      const invoiceLines = parsedInput.lineItems.map((line) => {
-        const catalogItem = catalogById.get(line.catalogItemId);
-        if (!catalogItem) {
-          throw new Error("Selected product or service is no longer available.");
-        }
+    const invoiceLines = parsedInput.lineItems.map((line) => {
+      const catalogItem = catalogById.get(line.catalogItemId);
+      if (!catalogItem) {
+        throw new Error("Selected product or service is no longer available.");
+      }
 
       return toQuickBooksInvoiceLine({
         amount: Number((line.quantity * line.unitPrice).toFixed(2)),
@@ -4583,29 +4641,35 @@ export async function createDirectQuickBooksInvoice(
         unitPrice: line.unitPrice,
         qbItemId: catalogItem.quickbooksItemId,
         qbItemName: catalogItem.name,
-          taxable: line.taxable
-        });
+        taxable: line.taxable
       });
+    });
 
-      if (selectedCustomer && !shouldSkipAutomaticFees) {
-        const automaticFeeLines = await buildDirectInvoiceAutomaticFeeLines({
-          tenantId: parsedActor.tenantId as string,
-          integrationId,
-          customerCompanyId: selectedCustomer.id,
-          proposalType: parsedInput.proposalType ?? null,
-          location: {
-            city: selectedCustomer.serviceCity ?? selectedCustomer.billingCity ?? null,
-            state: selectedCustomer.serviceState ?? selectedCustomer.billingState ?? null,
-            postalCode: selectedCustomer.servicePostalCode ?? selectedCustomer.billingPostalCode ?? null
-          }
-        });
-        invoiceLines.push(...automaticFeeLines);
-      }
+    if (selectedCustomer && !shouldSkipAutomaticFees) {
+      const automaticFeeLines = await buildDirectInvoiceAutomaticFeeLines({
+        tenantId: parsedActor.tenantId as string,
+        integrationId,
+        customerCompanyId: selectedCustomer.id,
+        proposalType: parsedInput.proposalType ?? null,
+        location: {
+          city: selectedCustomer.serviceCity ?? selectedCustomer.billingCity ?? null,
+          state: selectedCustomer.serviceState ?? selectedCustomer.billingState ?? null,
+          postalCode: selectedCustomer.servicePostalCode ?? selectedCustomer.billingPostalCode ?? null
+        }
+      });
+      invoiceLines.push(...automaticFeeLines);
+    }
 
-      const invoiceResponse = await quickBooksApiRequest<{ Invoice?: unknown }>(tenant, {
+    const docNumber = await reserveTradeWorxInvoiceNumber({
+      tenantId: parsedActor.tenantId as string,
+      issueDate
+    });
+
+    const invoiceResponse = await quickBooksApiRequest<{ Invoice?: unknown }>(tenant, {
       path: "/invoice",
       method: "POST",
       body: {
+        DocNumber: docNumber,
         CustomerRef: { value: customerId },
         TxnDate: issueDate.toISOString().slice(0, 10),
         ...(dueDate ? { DueDate: dueDate.toISOString().slice(0, 10) } : {}),
@@ -4622,7 +4686,7 @@ export async function createDirectQuickBooksInvoice(
 
     const verifiedInvoice = await fetchQuickBooksInvoice(tenant, {
       invoiceId: createdInvoice?.id ?? null,
-      docNumber: responseDocNumber ?? null
+      docNumber: responseDocNumber ?? docNumber
     });
     if (!verifiedInvoice) {
       throw new Error("QuickBooks did not verify the created invoice.");
@@ -4674,7 +4738,7 @@ export async function createDirectQuickBooksInvoice(
         entityId: parsedActor.tenantId as string,
         metadata: {
             invoiceId: verifiedInvoice.id,
-            invoiceNumber: verifiedInvoice.docNumber ?? responseDocNumber ?? null,
+            invoiceNumber: verifiedInvoice.docNumber ?? responseDocNumber ?? docNumber,
             customerId,
             customerName,
             source: shouldSkipAutomaticFees ? "walk_in" : "existing_customer",
@@ -4691,7 +4755,7 @@ export async function createDirectQuickBooksInvoice(
 
     return {
       invoiceId: verifiedInvoice.id,
-      invoiceNumber: verifiedInvoice.docNumber ?? responseDocNumber ?? null,
+      invoiceNumber: verifiedInvoice.docNumber ?? responseDocNumber ?? docNumber,
       invoiceUrl: buildQuickBooksInvoiceAppUrl(verifiedInvoice.id, connectionStatus.appMode),
       customerName,
       sendStatus: sendResult?.sendStatus ?? "not_sent",

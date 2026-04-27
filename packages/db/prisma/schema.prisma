@@ -355,6 +355,7 @@ model Tenant {
   signatures                Signature[]
   deficiencies              Deficiency[]
   billingSummaries          InspectionBillingSummary[]
+  invoiceSequences          TenantInvoiceSequence[]
   inspectionDocuments       InspectionDocument[]
   auditLogs                 AuditLog[]
   reportCorrectionEvents    ReportCorrectionEvent[]
@@ -1323,6 +1324,19 @@ model InspectionBillingSummary {
   @@index([tenantId, billToAccountId])
   @@index([tenantId, contractProfileId])
   @@index([tenantId, billingResolutionSnapshotId])
+}
+
+model TenantInvoiceSequence {
+  id         String   @id @default(cuid())
+  tenantId   String
+  year       Int
+  nextNumber Int      @default(1000)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, year])
+  @@index([tenantId])
 }
 
 model ServiceFeeRule {

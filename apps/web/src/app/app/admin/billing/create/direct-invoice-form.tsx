@@ -444,14 +444,14 @@ export function DirectInvoiceForm({
               ? "Walk-in invoices skip automatic service and compliance fee rules."
               : "Customer invoices apply service-fee and compliance rules during creation when they match the selected customer and invoice type."}
           </p>
-          <p className="mt-3 text-sm text-slate-500">QuickBooks assigns the live invoice number at creation time, and TradeWorx shows that assigned number immediately after success.</p>
+          <p className="mt-3 text-sm text-slate-500">TradeWorx assigns the live invoice number at creation time using the yearly TW format, then syncs that number to QuickBooks.</p>
         </section>
 
         {createdInvoice ? (
           <section className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-6 text-emerald-900 shadow-[0_12px_36px_rgba(16,185,129,0.08)]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700">QuickBooks invoice number</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700">TradeWorx invoice number</p>
             <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">
-              {createdInvoice.invoiceNumber ?? "Assigned by QuickBooks"}
+              {createdInvoice.invoiceNumber ?? "Assigned by TradeWorx"}
             </h3>
             <p className="mt-3 text-sm">
               Created in QuickBooks for {createdInvoice.customerName}.

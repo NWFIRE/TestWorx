@@ -7,6 +7,9 @@ const prismaMock = {
     findUnique: vi.fn(),
     update: vi.fn()
   },
+  tenantInvoiceSequence: {
+    upsert: vi.fn()
+  },
   customerCompany: {
     findFirst: vi.fn(),
     findMany: vi.fn(),
@@ -16,6 +19,7 @@ const prismaMock = {
     updateMany: vi.fn()
   },
   billingPayerAccount: {
+    findUnique: vi.fn(),
     findFirst: vi.fn(),
     update: vi.fn()
   },
@@ -61,6 +65,7 @@ const prismaMock = {
     updateMany: vi.fn()
   },
   inspection: {
+    findFirst: vi.fn(),
     update: vi.fn()
   },
   auditLog: {
@@ -185,6 +190,7 @@ describe("quickbooks billing sync hardening", () => {
     vi.stubEnv("QUICKBOOKS_CLIENT_ID", "client_id");
     vi.stubEnv("QUICKBOOKS_CLIENT_SECRET", "client_secret");
     vi.stubEnv("QUICKBOOKS_SANDBOX", "false");
+    prismaMock.tenantInvoiceSequence.upsert.mockResolvedValue({ nextNumber: 1001 });
     prismaMock.auditLog.create.mockResolvedValue(undefined);
     prismaMock.auditLog.findFirst.mockResolvedValue(null);
     prismaMock.quickBooksItemMap.findUnique.mockResolvedValue({
@@ -219,11 +225,32 @@ describe("quickbooks billing sync hardening", () => {
     prismaMock.serviceFeeRule.findMany.mockResolvedValue([]);
     prismaMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
     prismaMock.quoteLineItem.findMany.mockResolvedValue([]);
+    prismaMock.billingPayerAccount.findUnique.mockResolvedValue(null);
     prismaMock.billingPayerAccount.findFirst.mockResolvedValue(null);
     prismaMock.billingPayerAccount.update.mockResolvedValue(undefined);
     prismaMock.inspectionBillingSummary.findMany.mockResolvedValue([]);
     prismaMock.quickBooksItemMap.upsert.mockResolvedValue(undefined);
     prismaMock.quickBooksItemMap.deleteMany.mockResolvedValue({ count: 0 });
+    prismaMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      status: "invoiced",
+      completedAt: new Date("2026-04-01T14:00:00.000Z"),
+      archivedAt: null,
+      customerCompany: { name: "Pinecrest Property Management" },
+      site: {
+        name: "Pinecrest Tower",
+        addressLine1: "100 State St",
+        addressLine2: null,
+        city: "Chicago",
+        state: "IL",
+        postalCode: "60601"
+      },
+      assignedTechnician: null,
+      technicianAssignments: [],
+      tasks: [{ inspectionType: "fire_extinguisher" }],
+      reports: [{ id: "report_1" }],
+      deficiencies: []
+    });
     prismaMock.inspection.update.mockResolvedValue(undefined);
     prismaMock.$transaction.mockImplementation(async (input: unknown) => {
       if (Array.isArray(input)) {
@@ -257,8 +284,8 @@ describe("quickbooks billing sync hardening", () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1" } }))
-      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
-      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
       .mockResolvedValueOnce(jsonResponse({}));
 
     const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
@@ -272,7 +299,7 @@ describe("quickbooks billing sync hardening", () => {
       summaryId: "summary_1",
       inspectionId: "inspection_1",
       invoiceId: "invoice_1",
-      invoiceNumber: "TW-TION_1",
+      invoiceNumber: "TW2026-1000",
       quickbooksSendStatus: "sent",
       quickbooksSendError: null,
       quickbooksSentTo: "billing@pinecrest.example"
@@ -284,7 +311,7 @@ describe("quickbooks billing sync hardening", () => {
         quickbooksSyncStatus: "synced",
         quickbooksInvoiceId: "invoice_1",
         quickbooksConnectionMode: "live",
-        quickbooksInvoiceNumber: "TW-TION_1",
+        quickbooksInvoiceNumber: "TW2026-1000",
         quickbooksCustomerId: "qbo_customer_1",
         quickbooksSyncError: null
       })
@@ -333,8 +360,8 @@ describe("quickbooks billing sync hardening", () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1" } }))
-      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
-      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
       .mockResolvedValueOnce(jsonResponse({}));
 
     const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
@@ -344,13 +371,9 @@ describe("quickbooks billing sync hardening", () => {
       "inspection_1"
     );
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/invoice"),
-      expect.objectContaining({
-        method: "POST",
-        body: expect.stringContaining("\"UnitPrice\":33.5")
-      })
-    );
+    const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    expect(createInvoiceBody.DocNumber).toBe("TW2026-1000");
+    expect(createInvoiceBody.Line?.[0]?.SalesItemLineDetail?.UnitPrice).toBe(33.5);
   });
 
   it("keeps invoice synced and marks send skipped when billing email is missing", async () => {
@@ -366,8 +389,8 @@ describe("quickbooks billing sync hardening", () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1" } }))
-      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
-      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }));
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }));
 
     const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
 
@@ -377,7 +400,7 @@ describe("quickbooks billing sync hardening", () => {
     );
 
     expect(result.quickbooksSendStatus).toBe("send_skipped");
-    expect(result.quickbooksSendError).toMatch(/does not have a billing email/i);
+    expect(result.quickbooksSendError).toMatch(/does not have a delivery email/i);
     expect(fetchMock).toHaveBeenCalledTimes(4);
     expect(prismaMock.inspectionBillingSummary.update).toHaveBeenCalledWith({
       where: { id: "summary_1" },
@@ -427,8 +450,8 @@ describe("quickbooks billing sync hardening", () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qb_payer_1", DisplayName: "Academy Fire", SyncToken: "0" } }))
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qb_payer_1", DisplayName: "Academy Fire" } }))
-      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
-      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
       .mockResolvedValueOnce(jsonResponse({}));
 
     const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
@@ -460,8 +483,8 @@ describe("quickbooks billing sync hardening", () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1" } }))
-      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
-      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
       .mockResolvedValueOnce(new Response("Send failed", { status: 500 }));
 
     const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
@@ -532,7 +555,7 @@ describe("quickbooks billing sync hardening", () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management", SyncToken: "0" } }))
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management" } }))
-      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_missing", DocNumber: "TW-TION_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_missing", DocNumber: "TW2026-1000" } }))
       .mockResolvedValueOnce(new Response("Not found", { status: 404 }));
 
     const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
@@ -822,13 +845,13 @@ describe("quickbooks billing sync hardening", () => {
       .mockResolvedValueOnce(jsonResponse({
         Invoice: {
           Id: "invoice_direct_1",
-          DocNumber: "INV-401"
+          DocNumber: "TW2026-1000"
         }
       }))
       .mockResolvedValueOnce(jsonResponse({
         Invoice: {
           Id: "invoice_direct_1",
-          DocNumber: "INV-401"
+          DocNumber: "TW2026-1000"
         }
       }));
 
@@ -856,11 +879,19 @@ describe("quickbooks billing sync hardening", () => {
     );
 
     const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
-    expect(createInvoiceBody).not.toHaveProperty("DocNumber");
+    expect(createInvoiceBody).toHaveProperty("DocNumber", "TW2026-1000");
+    expect(prismaMock.tenantInvoiceSequence.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        tenantId_year: {
+          tenantId: "tenant_1",
+          year: 2026
+        }
+      }
+    }));
     expect(fetchMock.mock.calls[2]?.[1]?.body).toContain("\"TaxCodeRef\":{\"value\":\"TAX\"}");
     expect(result).toEqual(expect.objectContaining({
       invoiceId: "invoice_direct_1",
-      invoiceNumber: "INV-401"
+      invoiceNumber: "TW2026-1000"
     }));
   });
 
@@ -1003,13 +1034,13 @@ describe("quickbooks billing sync hardening", () => {
       .mockResolvedValueOnce(jsonResponse({
         Invoice: {
           Id: "invoice_direct_2",
-          DocNumber: "INV-402"
+          DocNumber: "TW2027-1000"
         }
       }))
       .mockResolvedValueOnce(jsonResponse({
         Invoice: {
           Id: "invoice_direct_2",
-          DocNumber: "INV-402"
+          DocNumber: "TW2027-1000"
         }
       }));
 
@@ -1021,8 +1052,8 @@ describe("quickbooks billing sync hardening", () => {
         customerCompanyId: "customer_1",
         walkInMode: false,
         proposalType: "kitchen_suppression",
-        issueDate: "2026-04-10",
-        dueDate: "2026-05-10",
+        issueDate: "2027-04-10",
+        dueDate: "2027-05-10",
         memo: "Kitchen system service",
         sendEmail: false,
         lineItems: [
@@ -1038,7 +1069,16 @@ describe("quickbooks billing sync hardening", () => {
     );
 
     const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    expect(createInvoiceBody.DocNumber).toBe("TW2027-1000");
     expect(createInvoiceBody.Line).toHaveLength(3);
+    expect(prismaMock.tenantInvoiceSequence.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        tenantId_year: {
+          tenantId: "tenant_1",
+          year: 2027
+        }
+      }
+    }));
     expect(createInvoiceBody.Line.map((line: { Description: string }) => line.Description)).toEqual([
       "Kitchen suppression inspection",
       "Service Fee",
@@ -1149,8 +1189,8 @@ describe("quickbooks billing sync hardening", () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management", SyncToken: "0" } }))
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management" } }))
-      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }))
-      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW-TION_1" } }));
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }));
 
     const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
 
