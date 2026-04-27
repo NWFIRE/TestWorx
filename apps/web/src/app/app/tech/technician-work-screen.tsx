@@ -3,8 +3,8 @@
 
 import Link from "next/link";
 import { format } from "date-fns";
-import { useMemo } from "react";
-import { useSearchParams } from "next/navigation";
+import { useMemo, type KeyboardEvent, type MouseEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { ClaimButton } from "./claim-button";
 import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
@@ -18,8 +18,17 @@ function firstOpenTask(inspection: any) {
   return inspection.tasks.find((task: any) => task.report?.status !== "finalized") ?? inspection.tasks[0] ?? null;
 }
 
+function inspectionHref(inspection: any) {
+  const task = firstOpenTask(inspection);
+  return task ? `/app/tech/reports/${inspection.id}/${task.id}` : null;
+}
+
 function hasAttachedPdfs(inspection: any) {
   return (inspection.documents?.length ?? 0) > 0 || (inspection.attachments?.length ?? 0) > 0;
+}
+
+function shouldIgnoreCardNavigation(target: EventTarget | null) {
+  return target instanceof HTMLElement && Boolean(target.closest("a, button, input, select, textarea, label"));
 }
 
 function matchesQuery(inspection: any, query: string) {
@@ -41,6 +50,7 @@ function matchesQuery(inspection: any, query: string) {
 export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
   const snapshot = useOfflineScreenSnapshot("technician-work", initialData);
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const filter = (searchParams.get("filter") as WorkFilter | null) ?? "today";
   const query = (searchParams.get("query") ?? "").trim().toLowerCase();
@@ -95,6 +105,23 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
     return <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 text-sm text-slate-500">Loading work queue…</div>;
   }
 
+  function openInspectionFromCard(href: string | null, event: MouseEvent<HTMLElement>) {
+    if (!href || shouldIgnoreCardNavigation(event.target)) {
+      return;
+    }
+
+    router.push(href);
+  }
+
+  function openInspectionFromKeyboard(href: string | null, event: KeyboardEvent<HTMLElement>) {
+    if (!href || (event.key !== "Enter" && event.key !== " ")) {
+      return;
+    }
+
+    event.preventDefault();
+    router.push(href);
+  }
+
   return (
     <div className="space-y-5 pb-4">
       <section className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_14px_35px_rgba(15,23,42,0.06)]">
@@ -132,24 +159,42 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
 
       {filter === "open" ? (
         <section className="space-y-3">
-          {filtered.assigned.length > 0 ? filtered.assigned.map((inspection: any) => (
-            <article className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" key={inspection.id}>
-              <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
-              {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
-              <p className="mt-3 text-sm text-slate-600">
-                Open {format(toDateValue(inspection.scheduledStart), "MMM d, h:mm a")}
-              </p>
-              {hasAttachedPdfs(inspection) ? (
-                <div className="mt-4">
-                  <MobileInspectionPdfAccessCard
-                    attachments={inspection.attachments}
-                    documents={inspection.documents}
-                    inspectionId={inspection.id}
-                  />
+          {filtered.assigned.length > 0 ? filtered.assigned.map((inspection: any) => {
+            const href = inspectionHref(inspection);
+            return (
+              <article
+                aria-label={`Open ${inspection.primaryTitle}`}
+                className="cursor-pointer rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)] transition hover:border-[color:var(--tenant-primary-border)] hover:shadow-[0_16px_36px_rgba(15,23,42,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--tenant-primary)]"
+                key={inspection.id}
+                onClick={(event) => openInspectionFromCard(href, event)}
+                onKeyDown={(event) => openInspectionFromKeyboard(href, event)}
+                role={href ? "link" : undefined}
+                tabIndex={href ? 0 : undefined}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
+                    {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
+                  </div>
+                  <span className="rounded-full border border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary-soft)] px-3 py-1 text-xs font-semibold text-[var(--tenant-primary)]">
+                    Open
+                  </span>
                 </div>
-              ) : null}
-            </article>
-          )) : (
+                <p className="mt-3 text-sm text-slate-600">
+                  Open {format(toDateValue(inspection.scheduledStart), "MMM d, h:mm a")}
+                </p>
+                {hasAttachedPdfs(inspection) ? (
+                  <div className="mt-4">
+                    <MobileInspectionPdfAccessCard
+                      attachments={inspection.attachments}
+                      documents={inspection.documents}
+                      inspectionId={inspection.id}
+                    />
+                  </div>
+                ) : null}
+              </article>
+            );
+          }) : (
             <div className="rounded-[1.75rem] border border-dashed border-slate-200 bg-white p-5 text-sm text-slate-500">
               No open assigned work matches this filter.
             </div>
@@ -189,8 +234,17 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
             </div>
             {filtered.assigned.length > 0 ? filtered.assigned.map((inspection: any) => {
               const action = firstOpenTask(inspection);
+              const href = inspectionHref(inspection);
               return (
-                <article className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" key={inspection.id}>
+                <article
+                  aria-label={`Open ${inspection.primaryTitle}`}
+                  className="cursor-pointer rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)] transition hover:border-[color:var(--tenant-primary-border)] hover:shadow-[0_16px_36px_rgba(15,23,42,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--tenant-primary)]"
+                  key={inspection.id}
+                  onClick={(event) => openInspectionFromCard(href, event)}
+                  onKeyDown={(event) => openInspectionFromKeyboard(href, event)}
+                  role={href ? "link" : undefined}
+                  tabIndex={href ? 0 : undefined}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
@@ -224,9 +278,11 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                         {action.report?.status === "draft" || action.report?.status === "submitted" ? "Resume inspection" : "Start inspection"}
                       </Link>
                     ) : null}
-                    <Link className="flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700" href="/app/tech/inspections">
-                      Inspection details
-                    </Link>
+                    {href ? (
+                      <Link className="flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700" href={href}>
+                        Open inspection
+                      </Link>
+                    ) : null}
                   </div>
                 </article>
               );
