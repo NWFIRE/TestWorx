@@ -1,4 +1,4 @@
-import { prisma } from "@testworx/db";
+import { prisma, type Prisma } from "@testworx/db";
 import { z } from "zod";
 
 import type { ActorContext } from "@testworx/types";
@@ -13,7 +13,17 @@ type DeficiencyDashboardSite = {
   name: string;
 };
 
-type DeficiencyDashboardDeficiency = Awaited<ReturnType<typeof prisma.deficiency.findMany>>[number];
+type DeficiencyDashboardDeficiency = Prisma.DeficiencyGetPayload<{
+  include: {
+    inspection: {
+      select: {
+        id: true;
+        scheduledStart: true;
+        customerCompany: { select: { name: true } };
+      };
+    };
+  };
+}>;
 
 function readTechnicianAssignments(value: unknown): Array<{ technicianId: string }> {
   const assignments = (value as { technicianAssignments?: Array<{ technicianId: string }> } | null | undefined)?.technicianAssignments;
@@ -82,7 +92,13 @@ export async function getAdminDeficiencyDashboardData(actor: ActorContext, filte
   const deficiencyQuery = prisma.deficiency.findMany({
     where,
     include: {
-      inspection: { select: { id: true, scheduledStart: true } }
+      inspection: {
+        select: {
+          id: true,
+          scheduledStart: true,
+          customerCompany: { select: { name: true } }
+        }
+      }
     },
     orderBy: [{ createdAt: "desc" }]
   });
@@ -105,6 +121,7 @@ export async function getAdminDeficiencyDashboardData(actor: ActorContext, filte
     },
     deficiencies: typedDeficiencies.map((deficiency: DeficiencyDashboardDeficiency) => ({
       ...deficiency,
+      customerName: deficiency.inspection.customerCompany.name,
       siteName: siteNames.get(deficiency.siteId) ?? "Unknown site"
     }))
   };

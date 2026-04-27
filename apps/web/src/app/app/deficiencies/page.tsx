@@ -30,9 +30,25 @@ type DeficiencyListItem = {
   section: string;
   notes: string | null;
   photoStorageKey: string | null;
+  customerName: string;
   siteName: string;
   inspection: { scheduledStart: Date };
 };
+
+const genericSiteName = "General / No Fixed Site";
+
+function isGenericSiteName(siteName: string) {
+  return siteName.trim().toLowerCase() === genericSiteName.toLowerCase();
+}
+
+function buildDeficiencyContext(deficiency: DeficiencyListItem) {
+  const parts = [deficiency.customerName];
+  if (deficiency.siteName && !isGenericSiteName(deficiency.siteName)) {
+    parts.push(deficiency.siteName);
+  }
+  parts.push(format(deficiency.inspection.scheduledStart, "MMM d, yyyy h:mm a"));
+  return parts.join(" | ");
+}
 
 const statusOptions = [
   { value: "all", label: "All statuses" },
@@ -243,7 +259,7 @@ export default async function DeficienciesPage({
                       />
                     </div>
                     <p className="text-sm text-slate-500">
-                      {deficiency.siteName} • {format(deficiency.inspection.scheduledStart, "MMM d, yyyy h:mm a")}
+                      {buildDeficiencyContext(deficiency)}
                     </p>
                     <p className="text-sm text-slate-700">{deficiency.description}</p>
                     <div className="grid gap-3 md:grid-cols-2">
