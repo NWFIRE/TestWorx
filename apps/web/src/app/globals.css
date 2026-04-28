@@ -41,7 +41,8 @@
 
 @media (min-width: 1024px) {
   :root {
-    --mobile-report-bottom-clearance: 2rem;
+    --mobile-tab-bar-offset: env(safe-area-inset-bottom);
+    --mobile-report-bottom-clearance: calc(var(--mobile-report-action-bar-height) + env(safe-area-inset-bottom) + var(--keyboard-offset, 0px) + 2rem);
   }
 }
 
