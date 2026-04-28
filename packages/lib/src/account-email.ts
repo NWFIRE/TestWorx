@@ -112,6 +112,11 @@ function textToHtmlParagraphs(input: string) {
     .map((paragraph) => escapeHtml(paragraph).replaceAll("\n", "<br />"));
 }
 
+function getFirstName(value: string | null | undefined) {
+  const [firstName] = (value ?? "").trim().split(/\s+/);
+  return firstName || null;
+}
+
 function buildBrandedShell({
   eyebrow,
   title,
@@ -371,6 +376,9 @@ export async function sendQuoteReminderEmail(payload: QuoteReminderEmailPayload)
 export async function sendCustomerIntakeRequestEmail(payload: CustomerIntakeRequestEmailPayload) {
   const env = getOptionalEmailEnv();
   const companyName = payload.branding.companyName || payload.tenantName;
+  const firstName = getFirstName(payload.recipientName);
+  const greeting = firstName ? `Hi ${escapeHtml(firstName)},` : "Hello,";
+  const expirationDate = payload.expiresAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   return sendWithResend({
     from: env.RESEND_FROM_EMAIL ?? NO_REPLY_FROM_EMAIL,
     to: payload.recipientEmail,
@@ -379,14 +387,18 @@ export async function sendCustomerIntakeRequestEmail(payload: CustomerIntakeRequ
       eyebrow: "Customer setup",
       title: "Complete your customer setup",
       body: [
-        `Hi ${payload.recipientName || "there"},`,
-        `${companyName} sent this secure form so we can set up your customer profile, billing information, and service location correctly before scheduling work.`,
-        payload.optionalMessage?.trim() ? `Message from ${payload.senderName}: ${escapeHtml(payload.optionalMessage.trim())}` : "",
-        `This secure link expires on ${payload.expiresAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}.`
+        greeting,
+        "To get your service scheduled, we just need a few details to set up your account.",
+        "Please complete your secure customer setup form below.",
+        "This form allows us to:<br />&bull; Create your customer profile<br />&bull; Set up billing correctly<br />&bull; Confirm your service location",
+        "Takes about 2-3 minutes to complete.",
+        `This secure link expires on ${expirationDate}.`,
+        payload.optionalMessage?.trim() ? `Message from ${payload.senderName}: ${escapeHtml(payload.optionalMessage.trim())}` : ""
       ].filter(Boolean),
       actionHref: payload.intakeUrl,
       actionLabel: "Complete Customer Setup",
-      footer: "If you were not expecting this request, you can ignore this email.",
+      footer:
+        "<strong>Northwest Fire &amp; Safety</strong><br />Fire Protection &amp; Life Safety Services<br /><br />Phone: 580-540-3119<br />Email: <a href=\"mailto:accounting@nwireandsafety.com\" style=\"color:#2563eb;text-decoration:none;\">accounting@nwireandsafety.com</a><br />Web: <a href=\"http://www.nwfireandsafety.com\" style=\"color:#2563eb;text-decoration:none;\">www.nwfireandsafety.com</a><br /><br />If you were not expecting this request, you can safely ignore this email.",
       branding: payload.branding
     })
   });
