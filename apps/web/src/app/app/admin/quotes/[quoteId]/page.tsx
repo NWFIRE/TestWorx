@@ -127,6 +127,7 @@ export default async function QuoteDetailPage({
               contactName: detail.contactName ?? "",
               recipientEmail: detail.recipientEmail ?? "",
               proposalType: detail.proposalType ?? "",
+              includeDepositRequirement: detail.includeDepositRequirement,
               issuedAt: detail.issuedAt.toISOString().slice(0, 10),
               expiresAt: detail.expiresAt ? detail.expiresAt.toISOString().slice(0, 10) : "",
               internalNotes: detail.internalNotes ?? "",

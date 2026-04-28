@@ -87,7 +87,14 @@ vi.mock("../quickbooks", () => ({
 }));
 
 vi.mock("../scheduling", () => ({
-  createInspection: createInspectionMock
+  createInspection: createInspectionMock,
+  getCustomerFacingSiteLabel: vi.fn((siteName: string | null | undefined) => {
+    if (!siteName || siteName === "General / No Fixed Site" || siteName === "No fixed service address") {
+      return null;
+    }
+
+    return siteName;
+  })
 }));
 
 vi.mock("../quote-pdf", () => ({
@@ -195,6 +202,7 @@ describe("quotes", () => {
         contactName: "Alyssa Reed",
         recipientEmail: "alyssa@example.com",
         proposalType: "kitchen_suppression",
+        includeDepositRequirement: true,
         issuedAt: new Date("2026-04-06T12:00:00.000Z"),
         expiresAt: new Date("2026-04-30T12:00:00.000Z"),
         internalNotes: "Internal note",
@@ -223,6 +231,7 @@ describe("quotes", () => {
         syncStatus: QuoteSyncStatus.not_synced,
         deliveryStatus: QuoteDeliveryStatus.not_sent,
         proposalType: "kitchen_suppression",
+        includeDepositRequirement: true,
         subtotal: 105,
         total: 115,
         lineItems: {

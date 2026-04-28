@@ -96,6 +96,7 @@ function parseQuoteFormData(formData: FormData) {
     contactName: String(formData.get("contactName") ?? "").trim() || null,
     recipientEmail: String(formData.get("recipientEmail") ?? "").trim() || null,
     proposalType: String(formData.get("proposalType") ?? "").trim() || null,
+    includeDepositRequirement: formData.get("includeDepositRequirement") === "on",
     issuedAt: String(formData.get("issuedAt") ?? ""),
     expiresAt: String(formData.get("expiresAt") ?? "").trim() ? String(formData.get("expiresAt")) : null,
     internalNotes: String(formData.get("internalNotes") ?? "").trim() || null,

@@ -171,7 +171,9 @@ export default async function HostedQuotePage({
   const groupedLineItems = groupQuotePresentationLineItems(customerFacingLineItems);
   const summaryLine = buildQuoteProjectSummary(quote.lineItems, quote.proposalType);
   const actionMessage = quote.canRespond
-    ? "Please review the proposal details below before approving. A 30% deposit is required before planning, engineering, or design submittals begin."
+    ? quote.includeDepositRequirement
+      ? "Please review the proposal details below before approving. A 30% deposit is required before planning, engineering, or design submittals begin."
+      : "Please review the proposal details below before approving."
     : result.accessState === "approved"
       ? "This proposal has already been approved."
       : result.accessState === "expired"
@@ -354,17 +356,19 @@ export default async function HostedQuotePage({
                     </div>
                   ))}
 
-                  <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
-                    <div className="rounded-[24px] border border-slate-200 bg-slate-50/60 p-5">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Deposit Requirement</p>
-                      <p className="mt-3 text-sm leading-7 text-slate-700">A 30% deposit is required before planning, engineering, or design submittals begin.</p>
-                    </div>
+                  <div className={`grid gap-5 ${quote.includeDepositRequirement ? "xl:grid-cols-[1fr_320px]" : "xl:justify-end"}`}>
+                    {quote.includeDepositRequirement ? (
+                      <div className="rounded-[24px] border border-slate-200 bg-slate-50/60 p-5">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Deposit Requirement</p>
+                        <p className="mt-3 text-sm leading-7 text-slate-700">A 30% deposit is required before planning, engineering, or design submittals begin.</p>
+                      </div>
+                    ) : null}
                     <TotalSummaryCard primaryColor={primaryColor} subtotal={quote.subtotal} tax={quote.taxAmount} total={quote.total} />
                   </div>
                 </div>
               </section>
 
-              <QuoteProjectTermsCard customerNotes={quote.customerNotes} primaryColor={primaryColor} />
+              <QuoteProjectTermsCard customerNotes={quote.customerNotes} includeDepositRequirement={quote.includeDepositRequirement} primaryColor={primaryColor} />
 
               <section className="rounded-[30px] border border-slate-200/80 bg-white p-6 shadow-[0_18px_48px_rgba(15,23,42,0.05)] lg:p-8" id="approval-section">
                 <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">

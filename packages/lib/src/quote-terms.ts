@@ -11,17 +11,18 @@ export type QuoteTermsSection = {
 export type QuoteTermsContent = {
   title: string;
   intro?: string;
-  emphasisTitle: string;
-  emphasisBody: string;
+  emphasisTitle?: string;
+  emphasisBody?: string;
   sections: QuoteTermsSection[];
 };
+
+export const quoteDepositRequirementTitle = "Deposit Requirement";
+export const quoteDepositRequirementBody =
+  "To begin planning, engineering, or design submittals, a 30% deposit is required. Work will not begin and materials will not be ordered until the required deposit has been received.";
 
 const defaultQuoteTerms: QuoteTermsContent = {
   title: "Project Terms",
   intro: "This proposal outlines the included work, scope boundaries, and coordination expectations for the fire alarm, fire sprinkler, and/or kitchen suppression work described in this quote.",
-  emphasisTitle: "Deposit Requirement",
-  emphasisBody:
-    "To begin planning, engineering, or design submittals, a 30% deposit is required. Work will not begin and materials will not be ordered until the required deposit has been received.",
   sections: [
     {
       title: "Scope of Work",
@@ -64,6 +65,14 @@ export function getDefaultQuoteExpirationDate(issuedAt: Date) {
   return addDays(issuedAt, DEFAULT_QUOTE_EXPIRATION_DAYS);
 }
 
-export function getQuoteTermsContent() {
-  return defaultQuoteTerms;
+export function getQuoteTermsContent(input?: { includeDepositRequirement?: boolean }) {
+  if (!input?.includeDepositRequirement) {
+    return defaultQuoteTerms;
+  }
+
+  return {
+    ...defaultQuoteTerms,
+    emphasisTitle: quoteDepositRequirementTitle,
+    emphasisBody: quoteDepositRequirementBody
+  };
 }

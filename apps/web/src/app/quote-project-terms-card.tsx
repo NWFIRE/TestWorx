@@ -3,13 +3,15 @@ import { getQuoteTermsContent } from "@testworx/lib/server/index";
 export function QuoteProjectTermsCard({
   className = "",
   customerNotes,
+  includeDepositRequirement = false,
   primaryColor
 }: {
   className?: string;
   customerNotes?: string | null;
+  includeDepositRequirement?: boolean;
   primaryColor?: string;
 }) {
-  const terms = getQuoteTermsContent();
+  const terms = getQuoteTermsContent({ includeDepositRequirement });
 
   return (
     <section className={`rounded-[24px] border border-slate-200 bg-white p-5 sm:p-6 ${className}`}>
@@ -19,18 +21,20 @@ export function QuoteProjectTermsCard({
           {terms.intro ? <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">{terms.intro}</p> : null}
         </div>
 
-        <div
-          className="rounded-[22px] border p-5"
-          style={{
-            borderColor: primaryColor ? `${primaryColor}22` : undefined,
-            background: primaryColor ? `linear-gradient(180deg, ${primaryColor}0d, rgba(255,255,255,0.98))` : undefined
-          }}
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: primaryColor ?? "var(--tenant-primary)" }}>
-            {terms.emphasisTitle}
-          </p>
-          <p className="mt-3 text-sm leading-7 text-slate-700">{terms.emphasisBody}</p>
-        </div>
+        {terms.emphasisTitle && terms.emphasisBody ? (
+          <div
+            className="rounded-[22px] border p-5"
+            style={{
+              borderColor: primaryColor ? `${primaryColor}22` : undefined,
+              background: primaryColor ? `linear-gradient(180deg, ${primaryColor}0d, rgba(255,255,255,0.98))` : undefined
+            }}
+          >
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: primaryColor ?? "var(--tenant-primary)" }}>
+              {terms.emphasisTitle}
+            </p>
+            <p className="mt-3 text-sm leading-7 text-slate-700">{terms.emphasisBody}</p>
+          </div>
+        ) : null}
 
         <div className="grid gap-4 xl:grid-cols-2">
           {terms.sections.map((section) => (

@@ -20,6 +20,7 @@ export type QuotePdfInput = {
     quoteNumber: string;
     recipientEmail: string | null;
     proposalType?: string | null;
+    includeDepositRequirement?: boolean;
     issuedAt: Date;
     expiresAt: Date | null;
     status: string;
@@ -984,7 +985,7 @@ function renderTerms(
   branding: QuoteBranding,
   logo: PDFImage | null
 ) {
-  const terms = getQuoteTermsContent();
+  const terms = getQuoteTermsContent({ includeDepositRequirement: input.quote.includeDepositRequirement ?? false });
   drawSectionHeader(
     state,
     terms.title,
@@ -1011,28 +1012,30 @@ function renderTerms(
     state.cursorY -= introHeight + BLOCK_GAP;
   }
 
-  const emphasisHeight =
-    40 + measureTextHeight(regularFont, terms.emphasisBody, CONTENT_WIDTH - CARD_PADDING * 2, 9.5, 4);
-  state = ensureSpace(state, emphasisHeight + BLOCK_GAP, pdfDoc, theme, branding, input.quote, boldFont, regularFont, logo);
-  drawPanel(state.page, PAGE_MARGIN, state.cursorY, CONTENT_WIDTH, emphasisHeight, theme.accentPanel, theme.line);
-  state.page.drawText(terms.emphasisTitle.toUpperCase(), {
-    x: PAGE_MARGIN + CARD_PADDING,
-    y: state.cursorY - 18,
-    size: 7.5,
-    font: boldFont,
-    color: theme.accentText
-  });
-  drawTextBlock(
-    state.page,
-    regularFont,
-    terms.emphasisBody,
-    PAGE_MARGIN + CARD_PADDING,
-    state.cursorY - 36,
-    CONTENT_WIDTH - CARD_PADDING * 2,
-    9.5,
-    theme.heading
-  );
-  state.cursorY -= emphasisHeight + BLOCK_GAP;
+  if (terms.emphasisTitle && terms.emphasisBody) {
+    const emphasisHeight =
+      40 + measureTextHeight(regularFont, terms.emphasisBody, CONTENT_WIDTH - CARD_PADDING * 2, 9.5, 4);
+    state = ensureSpace(state, emphasisHeight + BLOCK_GAP, pdfDoc, theme, branding, input.quote, boldFont, regularFont, logo);
+    drawPanel(state.page, PAGE_MARGIN, state.cursorY, CONTENT_WIDTH, emphasisHeight, theme.accentPanel, theme.line);
+    state.page.drawText(terms.emphasisTitle.toUpperCase(), {
+      x: PAGE_MARGIN + CARD_PADDING,
+      y: state.cursorY - 18,
+      size: 7.5,
+      font: boldFont,
+      color: theme.accentText
+    });
+    drawTextBlock(
+      state.page,
+      regularFont,
+      terms.emphasisBody,
+      PAGE_MARGIN + CARD_PADDING,
+      state.cursorY - 36,
+      CONTENT_WIDTH - CARD_PADDING * 2,
+      9.5,
+      theme.heading
+    );
+    state.cursorY -= emphasisHeight + BLOCK_GAP;
+  }
 
   for (const section of terms.sections) {
     const bodyHeight = (section.body ?? []).reduce(

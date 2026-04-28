@@ -110,7 +110,7 @@ export default async function CustomerQuoteDetailPage({
             </div>
           </SectionCard>
 
-          <QuoteProjectTermsCard customerNotes={quote.customerNotes} />
+          <QuoteProjectTermsCard customerNotes={quote.customerNotes} includeDepositRequirement={quote.includeDepositRequirement} />
 
           <SectionCard>
             <h2 className="text-xl font-semibold text-slate-950">Response activity</h2>

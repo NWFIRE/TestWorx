@@ -60,6 +60,7 @@ export default async function NewQuotePage({
           contactName: selectedCustomer?.contactName ?? "",
           recipientEmail: selectedCustomer?.billingEmail ?? "",
           proposalType: "",
+          includeDepositRequirement: false,
           issuedAt: new Date().toISOString().slice(0, 10),
           expiresAt: addDays(new Date(), DEFAULT_QUOTE_EXPIRATION_DAYS).toISOString().slice(0, 10),
           internalNotes: "",

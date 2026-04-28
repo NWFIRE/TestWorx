@@ -59,6 +59,7 @@ type QuoteFormValue = {
   contactName: string;
   recipientEmail: string;
   proposalType: string;
+  includeDepositRequirement: boolean;
   issuedAt: string;
   expiresAt: string;
   internalNotes: string;
@@ -346,6 +347,22 @@ export function QuoteEditorForm({
                   </option>
                 ))}
               </select>
+            </label>
+
+            <label className="flex min-h-12 items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 md:col-span-2">
+              <input
+                checked={value.includeDepositRequirement}
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-slateblue focus:ring-slateblue"
+                name="includeDepositRequirement"
+                onChange={(event) => setValue((current) => ({ ...current, includeDepositRequirement: event.target.checked }))}
+                type="checkbox"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-slate-900">Include 30% deposit requirement</span>
+                <span className="mt-1 block text-xs leading-5 text-slate-500">
+                  Use this for system installs and major repairs only. When selected, the deposit note appears on the hosted quote and PDF terms.
+                </span>
+              </span>
             </label>
 
             <label className="block">

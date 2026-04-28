@@ -860,6 +860,7 @@ model Quote {
   contactName             String?
   recipientEmail          String?
   proposalType            String?
+  includeDepositRequirement Boolean             @default(false)
   status                  QuoteStatus         @default(draft)
   syncStatus              QuoteSyncStatus     @default(not_synced)
   deliveryStatus          QuoteDeliveryStatus @default(not_sent)
