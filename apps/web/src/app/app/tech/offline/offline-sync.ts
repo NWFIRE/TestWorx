@@ -13,10 +13,13 @@ import {
 import type { LocalReportDraftRecord, SyncQueueEntry, SyncSummary } from "./offline-types";
 
 const LAST_SYNC_META_KEY = "last-sync-at";
+const STALE_SYNCING_ENTRY_MS = 30_000;
 
 let syncStarted = false;
 let syncInFlight: Promise<void> | null = null;
 let intervalHandle: number | null = null;
+let visibilityHandler: (() => void) | null = null;
+let focusHandler: (() => void) | null = null;
 
 function nowIso() {
   return new Date().toISOString();
@@ -32,6 +35,23 @@ function toConflictStatus(message: string | null | undefined) {
 
 function hasNewerQueueVersion(entry: SyncQueueEntry | null, syncMarker: string) {
   return Boolean(entry && entry.updatedAt > syncMarker);
+}
+
+function isStaleSyncingEntry(entry: SyncQueueEntry, now = Date.now()) {
+  if (entry.status !== "syncing") {
+    return false;
+  }
+
+  const marker = Date.parse(entry.lastAttemptAt ?? entry.updatedAt);
+  if (!Number.isFinite(marker)) {
+    return true;
+  }
+
+  return now - marker > STALE_SYNCING_ENTRY_MS;
+}
+
+function isProcessableQueueEntry(entry: SyncQueueEntry) {
+  return entry.status === "pending" || entry.status === "failed" || isStaleSyncingEntry(entry);
 }
 
 function isFinalizationPendingOrComplete(record: LocalReportDraftRecord | null) {
@@ -140,11 +160,11 @@ export async function processSyncQueue() {
   }
 
   syncInFlight = (async () => {
-    const entries = (await listSyncQueueEntries(["pending", "failed"])).sort((left, right) => left.updatedAt.localeCompare(right.updatedAt));
+    const entries = (await listSyncQueueEntries()).filter(isProcessableQueueEntry).sort((left, right) => left.updatedAt.localeCompare(right.updatedAt));
 
     for (const entry of entries) {
       const current = await getSyncQueueEntry(entry.id);
-      if (!current || (current.status !== "pending" && current.status !== "failed")) {
+      if (!current || !isProcessableQueueEntry(current)) {
         continue;
       }
 
@@ -247,6 +267,18 @@ export function startTechnicianSyncEngine() {
     void processSyncQueue();
   });
 
+  visibilityHandler = () => {
+    if (document.visibilityState === "visible") {
+      void processSyncQueue();
+    }
+  };
+  focusHandler = () => {
+    void processSyncQueue();
+  };
+
+  document.addEventListener("visibilitychange", visibilityHandler);
+  window.addEventListener("focus", focusHandler);
+
   intervalHandle = window.setInterval(() => {
     void processSyncQueue();
   }, 15000);
@@ -256,6 +288,14 @@ export function stopTechnicianSyncEngine() {
   if (intervalHandle) {
     window.clearInterval(intervalHandle);
     intervalHandle = null;
+  }
+  if (visibilityHandler) {
+    document.removeEventListener("visibilitychange", visibilityHandler);
+    visibilityHandler = null;
+  }
+  if (focusHandler) {
+    window.removeEventListener("focus", focusHandler);
+    focusHandler = null;
   }
   syncStarted = false;
 }
@@ -339,9 +379,11 @@ export async function buildSyncSummary(): Promise<SyncSummary> {
     getOfflineMeta(LAST_SYNC_META_KEY)
   ]);
 
+  const staleSyncingEntries = entries.filter(isStaleSyncingEntry);
+
   return {
-    pending: entries.filter((entry) => entry.status === "pending").length,
-    syncing: entries.filter((entry) => entry.status === "syncing").length,
+    pending: entries.filter((entry) => entry.status === "pending").length + staleSyncingEntries.length,
+    syncing: entries.filter((entry) => entry.status === "syncing" && !isStaleSyncingEntry(entry)).length,
     failed: entries.filter((entry) => entry.status === "failed").length,
     conflict: entries.filter((entry) => entry.status === "conflict").length,
     lastSyncAt: lastSync?.value ?? null,
