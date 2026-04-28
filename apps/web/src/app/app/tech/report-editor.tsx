@@ -8,7 +8,7 @@ import type { ReportDraft } from "@testworx/lib";
 import type { ReportFieldDefinition, ReportPrimitiveValue, ReportTemplateDefinition } from "@testworx/lib";
 
 import { getLocalReportDraft, putLocalReportDraft, subscribeToOfflineChanges } from "./offline/offline-db";
-import { initializeLocalReportRecord, processSyncQueue, queueReportDraftSync, queueReportFinalizeSync, startTechnicianSyncEngine } from "./offline/offline-sync";
+import { initializeLocalReportRecord, queueReportDraftSync, queueReportFinalizeSync, startTechnicianSyncEngine } from "./offline/offline-sync";
 import type { LocalReportDraftRecord } from "./offline/offline-types";
 import { buildSafeTaskProgressSummary } from "./mobile-inspection-workspace";
 import type { TechnicianMobileTaskWorkspaceSummary } from "./mobile-inspection-workspace";
@@ -598,6 +598,15 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
         ? nextDraft(current)
         : nextDraft;
       latestDraftRef.current = resolvedDraft;
+      void persistDraftLocally(resolvedDraft, {
+        reportStatus: "draft",
+        pendingFinalize: false,
+        syncStatus: "pending",
+        lastError: null
+      }).catch((error) => {
+        setSaveState("Error");
+        setErrorMessage(toTechnicianFacingSaveMessage(error instanceof Error ? error.message : null, "save"));
+      });
       return resolvedDraft;
     });
     setDirty(true);
@@ -986,22 +995,8 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
         contentJson: latestDraftRef.current,
         taskDisplayLabel: taskDisplayLabel.trim() || null
       });
-      setSaveState(window.navigator.onLine ? "Finalizing" : "Finalize queued");
+      setSaveState("Finalize queued");
       setDirty(false);
-
-      if (window.navigator.onLine) {
-        await processSyncQueue();
-        await processSyncQueue();
-        const syncedRecord = await getLocalReportDraft(data.reportId);
-        if (syncedRecord) {
-          localRecordRef.current = syncedRecord;
-          setSaveState(buildReportSaveState(syncedRecord, data.reportStatus));
-          if (syncedRecord.lastError) {
-            setFinalizeErrorMessage(toTechnicianFacingStoredSyncMessage(syncedRecord.lastError, "finalize"));
-            return;
-          }
-        }
-      }
 
       window.location.assign("/app/tech/inspections?finalize=queued");
     } catch (error) {

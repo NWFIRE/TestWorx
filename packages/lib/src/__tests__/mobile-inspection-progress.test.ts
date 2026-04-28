@@ -19,7 +19,9 @@ describe("mobile inspection progress", () => {
     });
 
     const initial = buildMobileInspectionProgressSummary(template, draft);
+    const initialControlPanelSection = initial.sections.find((section) => section.sectionId === "control-panel");
     expect(initial.reportStatus).toBe("Not Started");
+    expect(initialControlPanelSection?.status).toBe("not_started");
     expect(initial.completedCount).toBeGreaterThan(0);
     expect(initial.totalCount).toBeGreaterThan(initial.completedCount ?? 0);
 

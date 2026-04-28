@@ -37,12 +37,36 @@ function isEmptyValue(value: ReportPrimitiveValue | undefined) {
   return value === null || value === undefined || value === "";
 }
 
+function isMeaningfulValue(field: Exclude<ReportFieldDefinition, { type: "repeater" }>, value: ReportPrimitiveValue | undefined) {
+  if (isEmptyValue(value)) {
+    return false;
+  }
+
+  if (field.type === "boolean" && value === false) {
+    return false;
+  }
+
+  return !isOnlyConfiguredDefault(field, value);
+}
+
 function isProgressCountedScalarField(field: Exclude<ReportFieldDefinition, { type: "repeater" }>) {
   return !field.hidden && !field.readOnly && field.type === "select";
 }
 
 function isMeaningfulScalarField(field: Exclude<ReportFieldDefinition, { type: "repeater" }>) {
   return !field.hidden && !field.readOnly && field.type !== "photo";
+}
+
+function getReportDefaultValue(field: Exclude<ReportFieldDefinition, { type: "repeater" }>) {
+  return field.prefill?.find((prefill) => prefill.source === "reportDefault")?.value;
+}
+
+function isOnlyConfiguredDefault(
+  field: Exclude<ReportFieldDefinition, { type: "repeater" }>,
+  value: ReportPrimitiveValue | undefined
+) {
+  const defaultValue = getReportDefaultValue(field);
+  return !isEmptyValue(defaultValue) && value === defaultValue;
 }
 
 function getRepeaterRows(
@@ -107,7 +131,7 @@ function buildSectionProgress(
       continue;
     }
 
-    if (isMeaningfulScalarField(field) && !isEmptyValue(sectionFields?.[field.id])) {
+    if (isMeaningfulScalarField(field) && isMeaningfulValue(field, sectionFields?.[field.id])) {
       hasMeaningfulInput = true;
     }
 
@@ -135,7 +159,7 @@ function buildSectionProgress(
     status = "needs_review";
   } else if (safeTotalCount !== null && safeCompletedCount === safeTotalCount) {
     status = "complete";
-  } else if (hasMeaningfulInput || (safeCompletedCount ?? 0) > 0) {
+  } else if (hasMeaningfulInput) {
     status = "in_progress";
   }
 
@@ -172,7 +196,7 @@ export function buildMobileInspectionProgressSummary(
   const percent = totalCount && completedCount !== null
     ? Math.round((completedCount / totalCount) * 100)
     : null;
-  const hasMeaningfulProgress = sections.some((section) => section.hasMeaningfulInput || (section.completedCount ?? 0) > 0);
+  const hasMeaningfulProgress = sections.some((section) => section.hasMeaningfulInput);
 
   const nextReportStatus = reportStatus === "finalized"
     ? "Finalized"

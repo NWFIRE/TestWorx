@@ -24,7 +24,7 @@ import {
 
 import type { TechnicianReportEditorData } from "./report-editor";
 import { getLocalReportDraft, putLocalReportDraft, subscribeToOfflineChanges } from "./offline/offline-db";
-import { initializeLocalReportRecord, processSyncQueue, queueReportDraftSync, queueReportFinalizeSync, startTechnicianSyncEngine } from "./offline/offline-sync";
+import { initializeLocalReportRecord, queueReportDraftSync, queueReportFinalizeSync, startTechnicianSyncEngine } from "./offline/offline-sync";
 import type { LocalReportDraftRecord } from "./offline/offline-types";
 import { buildSafeTaskProgressSummary } from "./mobile-inspection-workspace";
 import { MobileInspectionWorkspaceShell } from "./mobile-inspection-workspace-shell";
@@ -978,21 +978,7 @@ export function MobileChecklistReportScreen({
         taskDisplayLabel: data.customInspectionTypeLabel ?? null
       });
       trackChecklistEvent("finalize_queued_offline", { reportId: data.reportId });
-      setSaveState(window.navigator.onLine ? "Finalizing" : "Finalize queued");
-      if (window.navigator.onLine) {
-        await processSyncQueue();
-        await processSyncQueue();
-        const syncedRecord = await getLocalReportDraft(data.reportId);
-        if (syncedRecord) {
-          localRecordRef.current = syncedRecord;
-          setSaveState(buildReportSaveState(syncedRecord, data.reportStatus));
-          if (syncedRecord.lastError) {
-            setFinalizeErrorMessage(toTechnicianFacingStoredSyncMessage(syncedRecord.lastError, "finalize"));
-            trackChecklistEvent("finalize_sync_failed", { reportId: data.reportId, reason: syncedRecord.lastError });
-            return;
-          }
-        }
-      }
+      setSaveState("Finalize queued");
 
       router.replace("/app/tech/inspections?finalize=queued");
     } catch (error) {

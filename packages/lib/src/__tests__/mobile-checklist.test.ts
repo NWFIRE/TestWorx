@@ -34,17 +34,25 @@ describe("mobile checklist", () => {
       fields: {
         ...draft.sections["control-panel"]?.fields,
         acPowerIndicator: "yes",
-        batteryLoadTest: "fail"
+        controlPanels: [
+          {
+            __rowId: "panel_1",
+            panelName: "Main panel",
+            location: "Electrical room",
+            batteryLoadTest: "fail"
+          }
+        ]
       }
     };
 
     const model = buildMobileChecklistViewModel(template, draft);
     const acPower = model.items.find((item) => item.id === "control-panel:acPowerIndicator");
-    const batteryLoad = model.items.find((item) => item.id === "control-panel:batteryLoadTest");
+    const batteryLoad = model.items.find((item) => item.id === "control-panel:controlPanels:panel_1:batteryLoadTest");
 
     expect(acPower?.status).toBe("positive");
     expect(acPower?.supportsNotApplicable).toBe(true);
     expect(batteryLoad?.status).toBe("negative");
+    expect(batteryLoad?.groupLabel).toBe("Electrical room");
   });
 
   it("maps repeater checklist rows and carries row companion fields", () => {

@@ -16,7 +16,7 @@ import {
 
 import type { TechnicianReportEditorData } from "./report-editor";
 import { getLocalReportDraft, putLocalReportDraft, subscribeToOfflineChanges } from "./offline/offline-db";
-import { initializeLocalReportRecord, processSyncQueue, queueReportDraftSync, queueReportFinalizeSync, startTechnicianSyncEngine } from "./offline/offline-sync";
+import { initializeLocalReportRecord, queueReportDraftSync, queueReportFinalizeSync, startTechnicianSyncEngine } from "./offline/offline-sync";
 import type { LocalReportDraftRecord } from "./offline/offline-types";
 
 function buildReportSaveState(record: LocalReportDraftRecord | null, reportStatus: TechnicianReportEditorData["reportStatus"]) {
@@ -544,20 +544,7 @@ export function useMobileReportDraftController({
         taskDisplayLabel: data.customInspectionTypeLabel ?? null
       });
 
-      setSaveState(window.navigator.onLine ? "Finalizing" : "Finalize queued");
-      if (window.navigator.onLine) {
-        await processSyncQueue();
-        await processSyncQueue();
-        const syncedRecord = await getLocalReportDraft(data.reportId);
-        if (syncedRecord) {
-          localRecordRef.current = syncedRecord;
-          setSaveState(buildReportSaveState(syncedRecord, data.reportStatus));
-          if (syncedRecord.lastError) {
-            setFinalizeErrorMessage(toTechnicianFacingStoredSyncMessage(syncedRecord.lastError, "finalize"));
-            return { ok: false as const };
-          }
-        }
-      }
+      setSaveState("Finalize queued");
 
       return { ok: true as const };
     } catch (error) {
