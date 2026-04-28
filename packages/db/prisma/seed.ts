@@ -177,7 +177,18 @@ async function main() {
   const passwordHash = await hash(password, 12);
 
   await prisma.stripeWebhookEvent.deleteMany();
+  await prisma.customerIntakeAttachment.deleteMany();
+  await prisma.customerIntakeRequest.deleteMany();
+  await prisma.quoteReminderDispatch.deleteMany();
+  await prisma.quoteLineItem.deleteMany();
+  await prisma.quote.deleteMany();
+  await prisma.emailReminderSendLog.deleteMany();
+  await prisma.accountInvitation.deleteMany();
+  await prisma.passwordResetToken.deleteMany();
+  await prisma.technicianDeviceRegistration.deleteMany();
+  await prisma.technicianNotification.deleteMany();
   await prisma.inspectionTechnicianAssignment.deleteMany();
+  await prisma.inspectionCloseoutRequest.deleteMany();
   await prisma.inspectionAmendment.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.deficiency.deleteMany();
@@ -185,18 +196,33 @@ async function main() {
   await prisma.manualApplicability.deleteMany();
   await prisma.manual.deleteMany();
   await prisma.inspectionBillingSummary.deleteMany();
+  await prisma.billingResolutionSnapshot.deleteMany();
+  await prisma.billingItemCatalogMatch.deleteMany();
+  await prisma.quickBooksCatalogItemAlias.deleteMany();
+  await prisma.quickBooksItemMap.deleteMany();
+  await prisma.quickBooksItemCache.deleteMany();
+  await prisma.quickBooksCatalogItem.deleteMany();
   await prisma.complianceReportingFeeRule.deleteMany();
+  await prisma.serviceFeeRule.deleteMany();
   await prisma.inspectionDocument.deleteMany();
   await prisma.signature.deleteMany();
   await prisma.attachment.deleteMany();
+  await prisma.workOrderProviderContext.deleteMany();
   await prisma.inspectionReport.deleteMany();
   await prisma.inspectionRecurrence.deleteMany();
   await prisma.inspectionTask.deleteMany();
   await prisma.inspection.deleteMany();
+  await prisma.serviceSiteProviderAssignment.deleteMany();
+  await prisma.providerContractRate.deleteMany();
+  await prisma.providerContractProfile.deleteMany();
+  await prisma.contractProviderAccount.deleteMany();
   await prisma.asset.deleteMany();
   await prisma.site.deleteMany();
   await prisma.user.deleteMany();
   await prisma.customerCompany.deleteMany();
+  await prisma.billingContractProfile.deleteMany();
+  await prisma.billingPayerAccount.deleteMany();
+  await prisma.tenantInvoiceSequence.deleteMany();
   await prisma.tenant.deleteMany();
   await prisma.subscriptionPlan.deleteMany();
 
@@ -578,7 +604,13 @@ async function main() {
       await prisma.deficiency.create({
         data: {
           tenantId: tenant.id,
+          siteId: inspection.siteId,
+          inspectionId: created.id,
           inspectionReportId: firstReport.id,
+          reportType: created.tasks[0]?.inspectionType ?? "fire_extinguisher",
+          section: "inventory",
+          source: "seed",
+          sourceRowKey: `seed-${created.id}`,
           title: "Expired extinguisher service tag",
           description: "Unit EXT-100 requires six-year maintenance and updated tag.",
           severity: "medium",
