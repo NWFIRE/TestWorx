@@ -343,9 +343,6 @@ export function MobileFireAlarmReportScreen({
 
   const blockingIssues = useMemo(() => {
     const issues: string[] = [];
-    if (progress.sections.some((section) => section.status === "not_started" || section.status === "in_progress")) {
-      issues.push("Complete each report section before finalizing.");
-    }
     if (!(controller.draft.signatures.technician?.signerName && controller.draft.signatures.technician?.imageDataUrl)) {
       issues.push("Technician signature is required before finalizing.");
     }
@@ -363,7 +360,7 @@ export function MobileFireAlarmReportScreen({
     }
 
     return issues;
-  }, [controller.draft, progress.sections]);
+  }, [controller.draft]);
 
   const warnings = useMemo(() => {
     const items: string[] = [];

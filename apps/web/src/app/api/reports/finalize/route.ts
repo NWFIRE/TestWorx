@@ -16,7 +16,7 @@ function getStatusCode(error: unknown) {
     return 403;
   }
 
-  if (/not found|required|must be|supported|smaller|all report sections/i.test(error.message)) {
+  if (/not found|required|must be|supported|smaller|items need attention/i.test(error.message)) {
     return 422;
   }
 

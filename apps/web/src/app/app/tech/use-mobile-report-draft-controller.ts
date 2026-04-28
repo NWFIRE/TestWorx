@@ -75,7 +75,7 @@ function toTechnicianFacingSaveMessage(message: string | null | undefined, actio
     return normalized;
   }
 
-  if (/signatures are required|all report sections must be marked|add at least one/i.test(normalized)) {
+  if (/signatures are required|items need attention|add at least one/i.test(normalized)) {
     return normalized;
   }
 

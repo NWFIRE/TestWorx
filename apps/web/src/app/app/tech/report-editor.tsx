@@ -217,7 +217,7 @@ function toTechnicianFacingSaveMessage(message: string | null | undefined, actio
     return normalized;
   }
 
-  if (/signatures are required|all report sections must be marked/i.test(normalized)) {
+  if (/signatures are required|items need attention/i.test(normalized)) {
     return normalized;
   }
 
@@ -1014,22 +1014,18 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
     return null;
   }
 
-  const completedSectionCount = preview.sectionSummaries.filter((summary) => summary.status !== "pending").length;
   const activeSectionIndex = Math.max(0, data.template.sections.findIndex((section) => section.id === activeSection.id));
   const previousSectionId = activeSectionIndex > 0 ? data.template.sections[activeSectionIndex - 1]?.id : null;
   const nextSectionId = activeSectionIndex < data.template.sections.length - 1 ? data.template.sections[activeSectionIndex + 1]?.id : null;
   const signatureCount = countCapturedSignatures(draft);
   const activeSectionSummary = preview.sectionSummaries.find((summary) => summary.sectionId === activeSection.id);
   const visibleErrorMessage = errorMessage ?? finalizeErrorMessage;
-  const pendingSectionCount = preview.sectionSummaries.filter((summary) => summary.status === "pending").length;
   const hasRequiredSignatures = signatureCount === 2;
   const safeProgress = buildSafeTaskProgressSummary({
     completedCount: preview.sectionSummaries.reduce((sum, summary) => sum + summary.completedRows, 0),
     totalCount: preview.sectionSummaries.reduce((sum, summary) => sum + summary.totalRows, 0)
   });
-  const finalizeReadinessMessage = pendingSectionCount > 0
-    ? "Complete and mark every section before finalizing."
-    : !hasRequiredSignatures
+  const finalizeReadinessMessage = !hasRequiredSignatures
       ? "Technician and customer signatures are required before finalizing."
       : null;
   const finalizeQueued = saveState === "Finalizing" || saveState === "Finalize queued";
@@ -1099,7 +1095,6 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
           {[
-            ["Sections complete", `${completedSectionCount}/${data.template.sections.length}`],
             ...(safeProgress ? [["Report progress", `${safeProgress.percent}% complete`]] : []),
             ["Detected deficiencies", String(preview.deficiencyCount)],
             ["Manual deficiencies", String(draft.deficiencies.length)],
