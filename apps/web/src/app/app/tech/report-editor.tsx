@@ -8,7 +8,7 @@ import type { ReportDraft } from "@testworx/lib";
 import type { ReportFieldDefinition, ReportPrimitiveValue, ReportTemplateDefinition } from "@testworx/lib";
 
 import { getLocalReportDraft, putLocalReportDraft, subscribeToOfflineChanges } from "./offline/offline-db";
-import { initializeLocalReportRecord, queueReportDraftSync, queueReportFinalizeSync, startTechnicianSyncEngine } from "./offline/offline-sync";
+import { initializeLocalReportRecord, processSyncQueue, queueReportDraftSync, queueReportFinalizeSync, startTechnicianSyncEngine } from "./offline/offline-sync";
 import type { LocalReportDraftRecord } from "./offline/offline-types";
 import { buildSafeTaskProgressSummary } from "./mobile-inspection-workspace";
 import type { TechnicianMobileTaskWorkspaceSummary } from "./mobile-inspection-workspace";
@@ -61,6 +61,8 @@ const saveStateTone: Record<string, string> = {
   "Saved offline": "text-blue-700",
   "Pending sync": "text-blue-700",
   Syncing: "text-blue-700",
+  Finalizing: "text-blue-700",
+  "Finalize queued": "text-blue-700",
   "Saved on device": "text-amber-700",
   "Needs review": "text-rose-700"
 };
@@ -75,6 +77,22 @@ const sectionStatusOptions = [
 function buildReportSaveState(record: LocalReportDraftRecord | null, reportStatus: TechnicianReportEditorData["reportStatus"]) {
   if (!record) {
     return reportStatus === "finalized" ? "Finalized" : "Saved";
+  }
+
+  if (record.pendingFinalize) {
+    if (record.syncStatus === "conflict") {
+      return "Needs review";
+    }
+
+    if (record.syncStatus === "failed") {
+      return "Finalize queued";
+    }
+
+    if (record.syncStatus === "syncing" || record.syncStatus === "pending") {
+      return window.navigator.onLine ? "Finalizing" : "Finalize queued";
+    }
+
+    return "Finalize queued";
   }
 
   if (record.reportStatus === "finalized" && !record.pendingFinalize) {
@@ -347,6 +365,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
   const [backupWarning, setBackupWarning] = useState<string | null>(null);
   const lastSavedAtRef = useRef(Date.now());
   const saveInFlightRef = useRef(false);
+  const finalizeInFlightRef = useRef(false);
   const autosaveBlockedRef = useRef(false);
   const latestDraftRef = useRef(draft);
   const saveDraftRef = useRef<((nextDraft: ReportDraft, reason: "timer" | "section" | "manual") => Promise<boolean>) | null>(null);
@@ -927,6 +946,16 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
   }
 
   async function finalizeReport() {
+    if (finalizeInFlightRef.current) {
+      return;
+    }
+
+    if (localRecordRef.current?.pendingFinalize) {
+      setSaveState(buildReportSaveState(localRecordRef.current, data.reportStatus));
+      window.location.assign("/app/tech/inspections?finalize=queued");
+      return;
+    }
+
     if (saveInFlightRef.current) {
       setErrorMessage("Please wait for the current save to finish before finalizing.");
       return;
@@ -940,23 +969,46 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
     }
 
     setFinalizeErrorMessage(null);
+    finalizeInFlightRef.current = true;
     const finalizedAt = new Date().toISOString();
-    await persistDraftLocally(latestDraftRef.current, {
-      reportStatus: "submitted",
-      pendingFinalize: true,
-      finalizedAt,
-      syncStatus: "pending",
-      lastError: null
-    });
-    await queueReportFinalizeSync({
-      reportId: data.reportId,
-      inspectionReportId: data.reportId,
-      contentJson: latestDraftRef.current,
-      taskDisplayLabel: taskDisplayLabel.trim() || null
-    });
-    setSaveState(window.navigator.onLine ? "Pending sync" : "Saved offline");
-    setDirty(false);
-    window.location.assign("/app/tech/inspections?finalize=queued");
+
+    try {
+      await persistDraftLocally(latestDraftRef.current, {
+        reportStatus: "submitted",
+        pendingFinalize: true,
+        finalizedAt,
+        syncStatus: "pending",
+        lastError: null
+      });
+      await queueReportFinalizeSync({
+        reportId: data.reportId,
+        inspectionReportId: data.reportId,
+        contentJson: latestDraftRef.current,
+        taskDisplayLabel: taskDisplayLabel.trim() || null
+      });
+      setSaveState(window.navigator.onLine ? "Finalizing" : "Finalize queued");
+      setDirty(false);
+
+      if (window.navigator.onLine) {
+        await processSyncQueue();
+        await processSyncQueue();
+        const syncedRecord = await getLocalReportDraft(data.reportId);
+        if (syncedRecord) {
+          localRecordRef.current = syncedRecord;
+          setSaveState(buildReportSaveState(syncedRecord, data.reportStatus));
+          if (syncedRecord.lastError) {
+            setFinalizeErrorMessage(toTechnicianFacingStoredSyncMessage(syncedRecord.lastError, "finalize"));
+            return;
+          }
+        }
+      }
+
+      window.location.assign("/app/tech/inspections?finalize=queued");
+    } catch (error) {
+      setFinalizeErrorMessage(toTechnicianFacingSaveMessage(error instanceof Error ? error.message : null, "finalize"));
+    } finally {
+      finalizeInFlightRef.current = false;
+    }
   }
 
   const activeSection = data.template.sections.find((section) => section.id === activeSectionId) ?? data.template.sections[0];
@@ -985,7 +1037,8 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
     : !hasRequiredSignatures
       ? "Technician and customer signatures are required before finalizing."
       : null;
-  const canFinalizeNow = data.canFinalize && data.reportStatus !== "finalized" && !saveInFlightRef.current && !finalizeReadinessMessage;
+  const finalizeQueued = saveState === "Finalizing" || saveState === "Finalize queued";
+  const canFinalizeNow = data.canFinalize && data.reportStatus !== "finalized" && !saveInFlightRef.current && !finalizeInFlightRef.current && !finalizeQueued && !finalizeReadinessMessage;
   const footerStatus = safeProgress ? `${saveState} | ${safeProgress.percent}% complete` : saveState;
 
   return (

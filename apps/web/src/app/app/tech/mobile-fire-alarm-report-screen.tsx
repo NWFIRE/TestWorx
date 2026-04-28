@@ -443,7 +443,13 @@ export function MobileFireAlarmReportScreen({
                 </button>
                 <button
                   className="min-h-12 rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)] disabled:opacity-50"
-                  disabled={!data.canFinalize || blockingIssues.length > 0 || controller.finalizeInFlight}
+                  disabled={
+                    !data.canFinalize ||
+                    blockingIssues.length > 0 ||
+                    controller.finalizeInFlight ||
+                    controller.saveState === "Finalizing" ||
+                    controller.saveState === "Finalize queued"
+                  }
                   onClick={() => { void handleFinalize(); }}
                   type="button"
                 >

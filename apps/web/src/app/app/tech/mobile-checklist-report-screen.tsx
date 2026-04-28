@@ -24,7 +24,7 @@ import {
 
 import type { TechnicianReportEditorData } from "./report-editor";
 import { getLocalReportDraft, putLocalReportDraft, subscribeToOfflineChanges } from "./offline/offline-db";
-import { initializeLocalReportRecord, queueReportDraftSync, queueReportFinalizeSync, startTechnicianSyncEngine } from "./offline/offline-sync";
+import { initializeLocalReportRecord, processSyncQueue, queueReportDraftSync, queueReportFinalizeSync, startTechnicianSyncEngine } from "./offline/offline-sync";
 import type { LocalReportDraftRecord } from "./offline/offline-types";
 import { buildSafeTaskProgressSummary } from "./mobile-inspection-workspace";
 import { MobileInspectionWorkspaceShell } from "./mobile-inspection-workspace-shell";
@@ -37,6 +37,8 @@ const saveStateTone: Record<string, string> = {
   "Saved offline": "text-blue-700",
   "Pending sync": "text-blue-700",
   Syncing: "text-blue-700",
+  Finalizing: "text-blue-700",
+  "Finalize queued": "text-blue-700",
   "Saved on device": "text-amber-700",
   "Needs review": "text-rose-700",
   Finalized: "text-slate-700"
@@ -45,6 +47,22 @@ const saveStateTone: Record<string, string> = {
 function buildReportSaveState(record: LocalReportDraftRecord | null, reportStatus: TechnicianReportEditorData["reportStatus"]) {
   if (!record) {
     return reportStatus === "finalized" ? "Finalized" : "Saved";
+  }
+
+  if (record.pendingFinalize) {
+    if (record.syncStatus === "conflict") {
+      return "Needs review";
+    }
+
+    if (record.syncStatus === "failed") {
+      return "Finalize queued";
+    }
+
+    if (record.syncStatus === "syncing" || record.syncStatus === "pending") {
+      return window.navigator.onLine ? "Finalizing" : "Finalize queued";
+    }
+
+    return "Finalize queued";
   }
 
   if (record.reportStatus === "finalized" && !record.pendingFinalize) {
@@ -332,6 +350,16 @@ export function MobileChecklistReportScreen({
   const queueTimerRef = useRef<number | null>(null);
   const fieldTimerRef = useRef<Map<string, number>>(new Map());
   const finalizeInFlightRef = useRef(false);
+
+  function clearPendingDraftSyncTimers() {
+    if (queueTimerRef.current) {
+      window.clearTimeout(queueTimerRef.current);
+      queueTimerRef.current = null;
+    }
+
+    fieldTimerRef.current.forEach((timerId) => window.clearTimeout(timerId));
+    fieldTimerRef.current.clear();
+  }
 
   const preview = useMemo(() => buildReportPreview(draft), [draft]);
   const checklist = useMemo(() => buildMobileChecklistViewModel(data.template, draft), [data.template, draft]);
@@ -903,7 +931,13 @@ export function MobileChecklistReportScreen({
   }
 
   async function finalizeInspection() {
-    if (finalizeInFlightRef.current || localRecordRef.current?.pendingFinalize) {
+    if (finalizeInFlightRef.current) {
+      return;
+    }
+
+    if (localRecordRef.current?.pendingFinalize) {
+      setSaveState(buildReportSaveState(localRecordRef.current, data.reportStatus));
+      router.replace("/app/tech/inspections?finalize=queued");
       return;
     }
 
@@ -929,6 +963,7 @@ export function MobileChecklistReportScreen({
     trackChecklistEvent("finalize_tapped", { reportId: data.reportId });
 
     try {
+      clearPendingDraftSyncTimers();
       await persistDraftLocally(nextDraft, {
         reportStatus: "submitted",
         pendingFinalize: true,
@@ -943,6 +978,22 @@ export function MobileChecklistReportScreen({
         taskDisplayLabel: data.customInspectionTypeLabel ?? null
       });
       trackChecklistEvent("finalize_queued_offline", { reportId: data.reportId });
+      setSaveState(window.navigator.onLine ? "Finalizing" : "Finalize queued");
+      if (window.navigator.onLine) {
+        await processSyncQueue();
+        await processSyncQueue();
+        const syncedRecord = await getLocalReportDraft(data.reportId);
+        if (syncedRecord) {
+          localRecordRef.current = syncedRecord;
+          setSaveState(buildReportSaveState(syncedRecord, data.reportStatus));
+          if (syncedRecord.lastError) {
+            setFinalizeErrorMessage(toTechnicianFacingStoredSyncMessage(syncedRecord.lastError, "finalize"));
+            trackChecklistEvent("finalize_sync_failed", { reportId: data.reportId, reason: syncedRecord.lastError });
+            return;
+          }
+        }
+      }
+
       router.replace("/app/tech/inspections?finalize=queued");
     } catch (error) {
       const message = error instanceof Error ? error.message : null;
@@ -1204,7 +1255,7 @@ export function MobileChecklistReportScreen({
               </button>
               <button
                 className="min-h-12 rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)] disabled:opacity-50"
-                disabled={blockingIssues.length > 0 || finalizeInFlightRef.current}
+                disabled={blockingIssues.length > 0 || finalizeInFlightRef.current || saveState === "Finalizing" || saveState === "Finalize queued"}
                 onClick={() => { void finalizeInspection(); }}
                 type="button"
               >

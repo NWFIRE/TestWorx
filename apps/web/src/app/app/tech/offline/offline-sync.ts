@@ -34,6 +34,13 @@ function hasNewerQueueVersion(entry: SyncQueueEntry | null, syncMarker: string) 
   return Boolean(entry && entry.updatedAt > syncMarker);
 }
 
+function isFinalizationPendingOrComplete(record: LocalReportDraftRecord | null) {
+  return Boolean(
+    record &&
+    (record.pendingFinalize || record.reportStatus === "submitted" || record.reportStatus === "finalized")
+  );
+}
+
 async function upsertPendingQueueEntry(
   input: Omit<SyncQueueEntry, "status" | "retryCount" | "lastError" | "createdAt" | "updatedAt" | "lastAttemptAt">
 ) {
@@ -54,6 +61,12 @@ async function upsertPendingQueueEntry(
 }
 
 async function syncReportAutosave(entry: SyncQueueEntry) {
+  const reportId = String(entry.entityId);
+  const existingLocal = await getLocalReportDraft(reportId);
+  if (isFinalizationPendingOrComplete(existingLocal)) {
+    return;
+  }
+
   const response = await fetch("/api/reports/autosave", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -67,9 +80,8 @@ async function syncReportAutosave(entry: SyncQueueEntry) {
     });
   }
 
-  const reportId = String(entry.entityId);
   const local = await getLocalReportDraft(reportId);
-  if (local) {
+  if (local && !isFinalizationPendingOrComplete(local)) {
     await putLocalReportDraft({
       ...local,
       serverUpdatedAt: typeof payload.updatedAt === "string" ? payload.updatedAt : local.serverUpdatedAt,
@@ -134,6 +146,14 @@ export async function processSyncQueue() {
       const current = await getSyncQueueEntry(entry.id);
       if (!current || (current.status !== "pending" && current.status !== "failed")) {
         continue;
+      }
+
+      if (current.operation === "report_autosave") {
+        const local = await getLocalReportDraft(current.entityId);
+        if (isFinalizationPendingOrComplete(local)) {
+          await deleteSyncQueueEntry(current.id);
+          continue;
+        }
       }
 
       const syncMarker = nowIso();
@@ -246,6 +266,11 @@ export async function queueReportDraftSync(input: {
   contentJson: unknown;
   taskDisplayLabel: string | null;
 }) {
+  const local = await getLocalReportDraft(input.reportId);
+  if (isFinalizationPendingOrComplete(local)) {
+    return;
+  }
+
   await upsertPendingQueueEntry({
     id: buildQueueId(input.reportId, "report_autosave"),
     entityType: "inspection_report",
@@ -266,6 +291,7 @@ export async function queueReportFinalizeSync(input: {
   contentJson: unknown;
   taskDisplayLabel: string | null;
 }) {
+  await deleteSyncQueueEntry(buildQueueId(input.reportId, "report_autosave"));
   await upsertPendingQueueEntry({
     id: buildQueueId(input.reportId, "report_finalize"),
     entityType: "inspection_report",
