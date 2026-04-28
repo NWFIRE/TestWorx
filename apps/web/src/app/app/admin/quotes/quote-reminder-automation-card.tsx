@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { format } from "date-fns";
-import { formatQuoteReminderStage, quoteReminderTypeLabels } from "@testworx/lib";
+import { formatQuoteReminderStage, formatTenantDateTime, quoteReminderTypeLabels } from "@testworx/lib";
 
 import { ActionButton } from "@/app/action-button";
 import { useToast } from "@/app/toast-provider";
@@ -19,8 +18,8 @@ type QuoteReminderDispatchRecord = {
   error: string | null;
 };
 
-function formatDateTime(value: Date | null | undefined) {
-  return value ? format(value, "MMM d, yyyy h:mm a") : "—";
+function formatDateTime(value: Date | null | undefined, timezone?: string | null) {
+  return formatTenantDateTime(value, timezone);
 }
 
 export function QuoteReminderAutomationCard({
@@ -30,7 +29,8 @@ export function QuoteReminderAutomationCard({
   nextReminderAt,
   reminderStage,
   lastReminderAt,
-  reminderDispatches
+  reminderDispatches,
+  timezone
 }: {
   quoteId: string;
   remindersPausedAt: Date | null;
@@ -39,6 +39,7 @@ export function QuoteReminderAutomationCard({
   reminderStage: string | null;
   lastReminderAt: Date | null;
   reminderDispatches: QuoteReminderDispatchRecord[];
+  timezone?: string | null;
 }) {
   const [pending, startTransition] = useTransition();
   const [activeAction, setActiveAction] = useState<string | null>(null);
@@ -89,9 +90,9 @@ export function QuoteReminderAutomationCard({
       <p className="mt-2 text-sm text-slate-500">Control quote follow-up without interrupting the hosted approval workflow. Automatic reminders stop when quotes are approved, declined, cancelled, expired, or converted.</p>
       <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-600">
         <p><span className="font-semibold text-slate-950">Automation:</span> {state.remindersPausedAt ? "Paused" : state.remindersEnabled ? "Enabled" : "Disabled"}</p>
-        <p><span className="font-semibold text-slate-950">Next reminder:</span> {formatDateTime(state.nextReminderAt)}</p>
+        <p><span className="font-semibold text-slate-950">Next reminder:</span> {formatDateTime(state.nextReminderAt, timezone)}</p>
         <p><span className="font-semibold text-slate-950">Reminder stage:</span> {formatQuoteReminderStage(state.reminderStage)}</p>
-        <p><span className="font-semibold text-slate-950">Last reminder:</span> {formatDateTime(state.lastReminderAt)}</p>
+        <p><span className="font-semibold text-slate-950">Last reminder:</span> {formatDateTime(state.lastReminderAt, timezone)}</p>
       </div>
       <div className="mt-4 grid gap-3">
         <ActionButton className="w-full" onClick={() => runAction("send")} pending={pending && activeAction === "send"} pendingLabel="Sending..." tone="primary">
@@ -117,7 +118,7 @@ export function QuoteReminderAutomationCard({
               <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{dispatch.status}</p>
             </div>
             <p className="mt-1 text-sm text-slate-500">Recipient: {dispatch.recipientEmail ?? "—"}</p>
-            <p className="mt-1 text-sm text-slate-500">Sent: {dispatch.sentAt ? formatDateTime(dispatch.sentAt) : dispatch.attemptedAt ? formatDateTime(dispatch.attemptedAt) : "—"}</p>
+            <p className="mt-1 text-sm text-slate-500">Sent: {dispatch.sentAt ? formatDateTime(dispatch.sentAt, timezone) : dispatch.attemptedAt ? formatDateTime(dispatch.attemptedAt, timezone) : "—"}</p>
             {dispatch.error ? <p className="mt-1 text-sm text-rose-600">{dispatch.error}</p> : null}
           </div>
         ))}

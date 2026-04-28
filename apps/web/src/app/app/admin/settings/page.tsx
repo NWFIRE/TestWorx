@@ -376,7 +376,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
         variant="balanced"
       >
         <div className="space-y-6">
-          <TenantBrandingForm values={{ ...brandingSettings.branding, billingEmail: brandingSettings.billingEmail }} />
+          <TenantBrandingForm values={{ ...brandingSettings.branding, billingEmail: brandingSettings.billingEmail, timezone: brandingSettings.timezone }} />
           <SidebarOrderForm
             items={sidebarItems}
             savedOrder={brandingSettings.branding.sidebarOrder}

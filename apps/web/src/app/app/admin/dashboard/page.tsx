@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { format } from "date-fns";
 import { redirect } from "next/navigation";
 import {
   Bell,
@@ -17,6 +16,8 @@ import { auth } from "@/auth";
 import {
   formatInspectionTaskSummary,
   formatInspectionStatusLabel,
+  formatTenantDate,
+  formatTenantDateTime,
   getAdminDashboardData,
   getAdminDeficiencyDashboardData,
   getAdminReportReviewQueueData,
@@ -100,18 +101,19 @@ function formatScheduleDetail(inspection: DashboardInspection) {
   return `${taskSummary} • ${technicianSummary}`;
 }
 
-function formatInspectionMetaLine(inspection: DashboardInspection, dateFormat = "MMM d, yyyy h:mm a") {
-  return [inspection.secondaryTitle, format(inspection.scheduledStart, dateFormat)]
+function formatInspectionMetaLine(inspection: DashboardInspection, timezone?: string | null) {
+  return [inspection.secondaryTitle, formatTenantDateTime(inspection.scheduledStart, timezone)]
     .filter(Boolean)
     .join(" - ");
 }
 
 function buildActivityItems(
-  inspections: CompletedDashboardInspection[]
+  inspections: CompletedDashboardInspection[],
+  timezone?: string | null
 ): Array<{ title: string; meta: string; tag: string; href: string }> {
   return inspections.slice(0, 3).map((inspection) => ({
     title: `${inspection.primaryTitle ?? inspection.site.name} finalized`,
-    meta: formatInspectionMetaLine(inspection),
+    meta: formatInspectionMetaLine(inspection, timezone),
     tag: inspection.billingStatus ? inspection.billingStatus.replaceAll("_", " ") : "Completed",
     href: `/app/admin/inspections/${inspection.id}?from=${encodeURIComponent("/app/admin/dashboard")}`
   }));
@@ -199,6 +201,7 @@ function InspectionListCard({
   emptyText,
   ctaLabel,
   detailHrefBase,
+  timezone,
   emptyTitle = "Nothing is queued here"
 }: {
   title: string;
@@ -207,6 +210,7 @@ function InspectionListCard({
   emptyText: string;
   ctaLabel: string;
   detailHrefBase: string;
+  timezone?: string | null;
   emptyTitle?: string;
 }) {
   return (
@@ -238,14 +242,14 @@ function InspectionListCard({
                       {inspection.primaryTitle ?? inspection.site.name}
                     </div>
                     <div className="mt-1 text-sm leading-6 text-[color:var(--text-secondary)]">
-                      {formatInspectionMetaLine(inspection)}
+                      {formatInspectionMetaLine(inspection, timezone)}
                     </div>
                     <div className="mt-1 text-sm leading-6 text-[color:var(--text-muted)]">
                       {formatInspectionTaskSummary(inspection.tasks) ||
                         "Inspection workflow"}
                     </div>
                     <div className="mt-1 text-sm leading-6 text-[color:var(--text-muted)]">
-                      Next due: {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}
+                      Next due: {nextDue ? formatTenantDate(new Date(nextDue), timezone) : "One-time"}
                   </div>
                     </div>
                   <Link
@@ -311,7 +315,7 @@ export default async function AdminDashboardPage({
     (deficiency) => deficiency.severity === "high" || deficiency.severity === "critical"
   ).length;
   const todayItems = data.activeInspections.slice(0, 3);
-  const activityItems = buildActivityItems(data.completedInspections);
+  const activityItems = buildActivityItems(data.completedInspections, data.timezone);
   const billingPipeline = calculateBillingPipeline(data.completedInspections);
   const archivedInspectionItems = data.completedInspections.filter(
     (inspection) => inspection.status === "invoiced" || inspection.billingStatus === "invoiced"
@@ -524,7 +528,11 @@ export default async function AdminDashboardPage({
                               </div>
                             </div>
                             <div className="text-xs font-medium text-slate-700">
-                              {format(item.scheduledStart, "h:mm a")}
+                              {new Intl.DateTimeFormat("en-US", {
+                                hour: "numeric",
+                                minute: "2-digit",
+                                timeZone: data.timezone
+                              }).format(item.scheduledStart)}
                             </div>
                           </div>
                           <div className="mt-3">
@@ -588,6 +596,7 @@ export default async function AdminDashboardPage({
                   emptyText="No active inspections are on the board right now."
                   emptyTitle="No active inspections"
                   ctaLabel="Open inspection"
+                  timezone={data.timezone}
                 />
                 <InspectionListCard
                   title="Completed archive"
@@ -595,6 +604,7 @@ export default async function AdminDashboardPage({
                   detailHrefBase="/app/admin/dashboard"
                   inspections={archivedInspectionItems.slice(0, 6)}
                   emptyText="No fully completed and invoiced inspections are archived yet."
+                  timezone={data.timezone}
                   emptyTitle="No completed archive items"
                   ctaLabel="View inspection"
                 />

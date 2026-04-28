@@ -267,7 +267,8 @@ export async function updateTenantBrandingAction(_: { error: string | null; succ
         city: String(formData.get("city") ?? ""),
         state: String(formData.get("state") ?? ""),
         postalCode: String(formData.get("postalCode") ?? ""),
-        billingEmail: String(formData.get("billingEmail") ?? "")
+        billingEmail: String(formData.get("billingEmail") ?? ""),
+        timezone: String(formData.get("timezone") ?? "")
       }
     );
 

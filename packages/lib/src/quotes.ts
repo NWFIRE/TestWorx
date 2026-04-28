@@ -1108,7 +1108,8 @@ async function getQuoteByIdForTenant(tenantId: string, quoteId: string) {
         select: {
           name: true,
           branding: true,
-          billingEmail: true
+          billingEmail: true,
+          timezone: true
         }
       },
       createdBy: { select: { id: true, name: true } },

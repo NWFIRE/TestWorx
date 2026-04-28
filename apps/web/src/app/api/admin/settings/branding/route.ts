@@ -72,7 +72,8 @@ export async function POST(request: Request) {
         city: String(formData.get("city") ?? ""),
         state: String(formData.get("state") ?? ""),
         postalCode: String(formData.get("postalCode") ?? ""),
-        billingEmail: String(formData.get("billingEmail") ?? "")
+        billingEmail: String(formData.get("billingEmail") ?? ""),
+        timezone: String(formData.get("timezone") ?? "")
       }
     );
 

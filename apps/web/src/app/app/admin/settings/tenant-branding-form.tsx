@@ -4,6 +4,8 @@ import Image from "next/image";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { tenantTimezoneOptions } from "@testworx/lib";
+
 const initialState = { error: null as string | null, success: null as string | null };
 
 type BrandingValues = {
@@ -20,6 +22,7 @@ type BrandingValues = {
   state: string;
   postalCode: string;
   billingEmail: string;
+  timezone: string;
 };
 
 export function TenantBrandingForm({
@@ -94,6 +97,19 @@ export function TenantBrandingForm({
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="billingEmail">Billing email</label>
           <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={values.billingEmail} id="billingEmail" name="billingEmail" type="email" />
         </div>
+      </div>
+      <div>
+        <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="timezone">Timezone</label>
+        <select className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" defaultValue={values.timezone} id="timezone" name="timezone">
+          {tenantTimezoneOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label} ({option.value})
+            </option>
+          ))}
+        </select>
+        <p className="mt-2 text-xs leading-5 text-slate-500">
+          Used for scheduled work, quotes, reminders, customer activity, reports, and all operational timestamps.
+        </p>
       </div>
       <div className="grid gap-4 md:grid-cols-3">
         <div>

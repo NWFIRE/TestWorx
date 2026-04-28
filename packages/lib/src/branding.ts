@@ -5,6 +5,7 @@ import type { ActorContext } from "@testworx/types";
 import { actorContextSchema } from "@testworx/types";
 
 import { assertTenantContext } from "./permissions";
+import { DEFAULT_TENANT_TIMEZONE, normalizeTenantTimezone } from "./timezone";
 
 const hexColorSchema = z.string().regex(/^#(?:[0-9a-fA-F]{3}){1,2}$/i, "Enter a valid hex color.");
 const imageDataUrlSchema = z.string().refine((value) => value === "" || /^data:image\/.+;base64,/i.test(value), "Logos must be stored as image data URLs.");
@@ -138,7 +139,8 @@ function hexToRgbChannels(value: string) {
 }
 
 export const updateTenantBrandingSchema = tenantBrandingSchema.extend({
-  billingEmail: z.string().email().or(z.literal("")).default("")
+  billingEmail: z.string().email().or(z.literal("")).default(""),
+  timezone: z.string().trim().optional().default(DEFAULT_TENANT_TIMEZONE).transform((value) => normalizeTenantTimezone(value))
 });
 
 export const updateTenantSidebarOrderSchema = z.object({
@@ -160,6 +162,7 @@ export async function getTenantBrandingSettings(actor: ActorContext) {
     tenantId: tenant.id,
     tenantName: tenant.name,
     billingEmail: tenant.billingEmail ?? "",
+    timezone: normalizeTenantTimezone(tenant.timezone),
     branding: resolveTenantBranding({ tenantName: tenant.name, branding: tenant.branding, billingEmail: tenant.billingEmail }),
     subscriptionPlan: tenant.subscriptionPlan
   };
@@ -173,7 +176,7 @@ export async function updateTenantBranding(actor: ActorContext, input: z.input<t
 
   const parsedInput = updateTenantBrandingSchema.parse(input);
   const inputIncludesSidebarOrder = Object.prototype.hasOwnProperty.call(input, "sidebarOrder");
-  const { sidebarOrder, ...brandingInput } = parsedInput;
+  const { billingEmail, sidebarOrder, timezone, ...brandingInput } = parsedInput;
   const tenant = await prisma.tenant.findFirst({ where: { id: parsedActor.tenantId as string } });
   if (!tenant) {
     throw new Error("Tenant not found.");
@@ -181,7 +184,7 @@ export async function updateTenantBranding(actor: ActorContext, input: z.input<t
 
   const mergedBranding = resolveTenantBranding({
     tenantName: tenant.name,
-    billingEmail: parsedInput.billingEmail,
+    billingEmail,
     branding: {
       ...(tenant.branding && typeof tenant.branding === "object" ? tenant.branding as Record<string, unknown> : {}),
       ...brandingInput,
@@ -192,7 +195,8 @@ export async function updateTenantBranding(actor: ActorContext, input: z.input<t
   const updated = await prisma.tenant.update({
     where: { id: tenant.id },
     data: {
-      billingEmail: parsedInput.billingEmail || null,
+      billingEmail: billingEmail || null,
+      timezone,
       branding: mergedBranding
     }
   });
@@ -204,9 +208,9 @@ export async function updateTenantBranding(actor: ActorContext, input: z.input<t
       action: "tenant.branding_updated",
       entityType: "Tenant",
       entityId: tenant.id,
-      metadata: { primaryColor: mergedBranding.primaryColor, billingEmail: updated.billingEmail }
-    }
-  });
+        metadata: { primaryColor: mergedBranding.primaryColor, billingEmail: updated.billingEmail, timezone: updated.timezone }
+      }
+    });
 
   return updated;
 }

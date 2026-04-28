@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import {
   formatQuoteReminderStage,
+  formatTenantDate,
+  formatTenantDateTime,
   getQuoteDetail,
   getQuoteStatusTone,
   getQuoteSyncTone,
@@ -64,6 +65,7 @@ export default async function QuoteDetailPage({
     branding: detail.tenant.branding,
     billingEmail: detail.tenant.billingEmail
   }).legalBusinessName;
+  const tenantTimezone = detail.tenant.timezone;
 
   const returnHref = paramsData.from?.startsWith("/app/") ? paramsData.from : "/app/admin/quotes";
 
@@ -94,7 +96,7 @@ export default async function QuoteDetailPage({
             <div className="flex flex-wrap items-center gap-3">
               <StatusBadge label={quoteStatusLabels[detail.effectiveStatus]} tone={getQuoteStatusTone(detail.effectiveStatus)} />
               <StatusBadge label={quoteSyncStatusLabels[detail.syncStatus]} tone={getQuoteSyncTone(detail.syncStatus)} />
-              <p className="text-sm text-slate-500">Issued {format(detail.issuedAt, "MMM d, yyyy")}</p>
+              <p className="text-sm text-slate-500">Issued {formatTenantDate(detail.issuedAt, tenantTimezone)}</p>
               <p className="text-sm text-slate-500">Total ${detail.total.toFixed(2)}</p>
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -164,17 +166,17 @@ export default async function QuoteDetailPage({
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Sent</p>
-                <p className="mt-2 text-base font-semibold text-slate-950">{detail.lastSentAt ? format(detail.lastSentAt, "MMM d, yyyy h:mm a") : "Not sent yet"}</p>
+                <p className="mt-2 text-base font-semibold text-slate-950">{detail.lastSentAt ? formatTenantDateTime(detail.lastSentAt, tenantTimezone) : "Not sent yet"}</p>
                 <p className="mt-1 text-sm text-slate-500">Resends {detail.resendCount}</p>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Customer viewed</p>
-                <p className="mt-2 text-base font-semibold text-slate-950">{detail.firstViewedAt ? format(detail.firstViewedAt, "MMM d, yyyy h:mm a") : "Not viewed yet"}</p>
-                <p className="mt-1 text-sm text-slate-500">Last activity {detail.lastViewedAt ? format(detail.lastViewedAt, "MMM d, yyyy h:mm a") : "—"} • {detail.viewCount} views</p>
+                <p className="mt-2 text-base font-semibold text-slate-950">{detail.firstViewedAt ? formatTenantDateTime(detail.firstViewedAt, tenantTimezone) : "Not viewed yet"}</p>
+                <p className="mt-1 text-sm text-slate-500">Last activity {detail.lastViewedAt ? formatTenantDateTime(detail.lastViewedAt, tenantTimezone) : "—"} • {detail.viewCount} views</p>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Response</p>
-                <p className="mt-2 text-base font-semibold text-slate-950">{detail.approvedAt ? `Approved ${format(detail.approvedAt, "MMM d, yyyy h:mm a")}` : detail.declinedAt ? `Declined ${format(detail.declinedAt, "MMM d, yyyy h:mm a")}` : "Awaiting customer response"}</p>
+                <p className="mt-2 text-base font-semibold text-slate-950">{detail.approvedAt ? `Approved ${formatTenantDateTime(detail.approvedAt, tenantTimezone)}` : detail.declinedAt ? `Declined ${formatTenantDateTime(detail.declinedAt, tenantTimezone)}` : "Awaiting customer response"}</p>
                 <p className="mt-1 text-sm text-slate-500">{detail.customerResponseNote ?? "No customer response note yet."}</p>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
@@ -185,10 +187,10 @@ export default async function QuoteDetailPage({
               <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Reminders</p>
                 <p className="mt-2 text-base font-semibold text-slate-950">
-                  {detail.remindersPausedAt ? "Paused" : !detail.remindersEnabled ? "Disabled" : detail.nextReminderAt ? `Next ${format(detail.nextReminderAt, "MMM d, yyyy h:mm a")}` : "No reminder scheduled"}
+                  {detail.remindersPausedAt ? "Paused" : !detail.remindersEnabled ? "Disabled" : detail.nextReminderAt ? `Next ${formatTenantDateTime(detail.nextReminderAt, tenantTimezone)}` : "No reminder scheduled"}
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
-                  Stage {formatQuoteReminderStage(detail.reminderStage)} • Last sent {detail.lastReminderAt ? format(detail.lastReminderAt, "MMM d, yyyy h:mm a") : "—"} • {detail.reminderCount} reminder{detail.reminderCount === 1 ? "" : "s"}
+                  Stage {formatQuoteReminderStage(detail.reminderStage)} • Last sent {detail.lastReminderAt ? formatTenantDateTime(detail.lastReminderAt, tenantTimezone) : "—"} • {detail.reminderCount} reminder{detail.reminderCount === 1 ? "" : "s"}
                 </p>
               </div>
             </div>
@@ -203,7 +205,7 @@ export default async function QuoteDetailPage({
                 <div key={event.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-semibold text-slate-950">{event.action.replaceAll("_", " ")}</p>
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{format(event.createdAt, "MMM d, yyyy h:mm a")}</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{formatTenantDateTime(event.createdAt, tenantTimezone)}</p>
                   </div>
                   <p className="mt-1 text-sm text-slate-500">Actor: {event.actor?.name ?? "System"}</p>
                 </div>
@@ -291,6 +293,7 @@ export default async function QuoteDetailPage({
             reminderStage={detail.reminderStage}
             remindersEnabled={detail.remindersEnabled}
             remindersPausedAt={detail.remindersPausedAt}
+            timezone={tenantTimezone}
           />
 
           <QuoteSendCard
