@@ -59,6 +59,7 @@ export default async function CustomerIntakesPage({
 
   const params = searchParams ? await searchParams : {};
   const notice = readParam(params, "notice");
+  const error = readParam(params, "error");
   const data = await getCustomerIntakeWorkspace({
     userId: session.user.id,
     role: session.user.role,
@@ -85,6 +86,11 @@ export default async function CustomerIntakesPage({
       {notice ? (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
           {notice}
+        </div>
+      ) : null}
+      {error ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
+          {error}
         </div>
       ) : null}
 

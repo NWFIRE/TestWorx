@@ -41,10 +41,13 @@ function requireOfficeSession(rawSession: unknown): OfficeSession {
   return session as OfficeSession;
 }
 
-function intakeHref(message?: string) {
+function intakeHref(values?: { notice?: string; error?: string }) {
   const params = new URLSearchParams();
-  if (message) {
-    params.set("notice", message);
+  if (values?.notice) {
+    params.set("notice", values.notice);
+  }
+  if (values?.error) {
+    params.set("error", values.error);
   }
   const query = params.toString();
   return query ? `/app/admin/customer-intakes?${query}` : "/app/admin/customer-intakes";
@@ -73,7 +76,7 @@ export async function sendCustomerIntakeFormAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirect(intakeHref(parsed.error.issues[0]?.message ?? "Invalid intake request."));
+    redirect(intakeHref({ error: parsed.error.issues[0]?.message ?? "Invalid intake request." }));
   }
 
   try {
@@ -82,12 +85,12 @@ export async function sendCustomerIntakeFormAction(formData: FormData) {
     const deliverySuffix = result.delivery.sent
       ? " Email sent."
       : ` Request created, but email needs attention: ${result.delivery.error ?? "email is not configured."}`;
-    redirect(intakeHref(`Customer intake request created.${deliverySuffix}`));
+    redirect(intakeHref({ notice: `Customer intake request created.${deliverySuffix}` }));
   } catch (error) {
     if (isRedirectError(error)) {
       throw error;
     }
-    redirect(intakeHref(error instanceof Error ? error.message : "Unable to send intake form."));
+    redirect(intakeHref({ error: error instanceof Error ? error.message : "Unable to send intake form." }));
   }
 }
 

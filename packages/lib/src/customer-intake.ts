@@ -44,10 +44,9 @@ const serviceSystemTypeLabels: Record<(typeof serviceSystemTypes)[number], strin
 
 function nullableTrimmed(max: number) {
   return z
-    .string()
-    .trim()
-    .max(max)
-    .optional()
+    .union([z.string(), z.null(), z.undefined()])
+    .transform((value) => (typeof value === "string" ? value.trim() : ""))
+    .pipe(z.string().max(max))
     .transform((value) => value || null);
 }
 
