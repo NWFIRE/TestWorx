@@ -28,6 +28,8 @@ const serviceSystemTypes = [
   "fire_alarm",
   "kitchen_suppression",
   "fire_extinguishers",
+  "fire_sprinkler",
+  "emergency_exit_light",
   "emergency_service",
   "repair",
   "other"
@@ -37,6 +39,8 @@ const serviceSystemTypeLabels: Record<(typeof serviceSystemTypes)[number], strin
   fire_alarm: "Fire alarm",
   kitchen_suppression: "Kitchen suppression",
   fire_extinguishers: "Fire extinguishers",
+  fire_sprinkler: "Fire sprinkler",
+  emergency_exit_light: "Emergency/Exit Light",
   emergency_service: "Emergency service",
   repair: "Repair",
   other: "Other"

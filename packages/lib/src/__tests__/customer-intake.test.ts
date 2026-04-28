@@ -20,13 +20,13 @@ describe("customer intake validation", () => {
       siteState: "OK",
       sitePostalCode: "73103",
       requestedServiceType: "Fire extinguisher inspection",
-      systemTypes: ["fire_extinguishers"],
+      systemTypes: ["fire_extinguishers", "fire_sprinkler", "emergency_exit_light"],
       preferredServiceWindow: "Next week",
       serviceNotes: "Please call before arrival."
     });
 
     expect(parsed.companyName).toBe("Axis Energy");
-    expect(parsed.systemTypes).toEqual(["fire_extinguishers"]);
+    expect(parsed.systemTypes).toEqual(["fire_extinguishers", "fire_sprinkler", "emergency_exit_light"]);
   });
 
   it("requires at least one actionable system type", () => {
