@@ -29,22 +29,38 @@ const serviceSystemTypes = [
   "kitchen_suppression",
   "fire_extinguishers",
   "fire_sprinkler",
+  "wet_chemical_system",
+  "industrial_dry_chemical_system",
   "emergency_exit_light",
+  "emergency_exit_lights",
   "emergency_service",
   "repair",
   "other"
 ] as const;
 
 const serviceSystemTypeLabels: Record<(typeof serviceSystemTypes)[number], string> = {
-  fire_alarm: "Fire alarm",
-  kitchen_suppression: "Kitchen suppression",
-  fire_extinguishers: "Fire extinguishers",
-  fire_sprinkler: "Fire sprinkler",
-  emergency_exit_light: "Emergency/Exit Light",
-  emergency_service: "Emergency service",
+  fire_alarm: "Fire Alarm",
+  kitchen_suppression: "Kitchen Suppression",
+  fire_extinguishers: "Fire Extinguishers",
+  fire_sprinkler: "Fire Sprinkler",
+  wet_chemical_system: "Wet Chemical System",
+  industrial_dry_chemical_system: "Industrial Dry Chemical System",
+  emergency_exit_light: "Emergency / Exit Lights",
+  emergency_exit_lights: "Emergency / Exit Lights",
+  emergency_service: "Emergency Service",
   repair: "Repair",
   other: "Other"
 };
+
+const customerIntakeFormSystemTypes = [
+  "fire_alarm",
+  "kitchen_suppression",
+  "fire_extinguishers",
+  "wet_chemical_system",
+  "industrial_dry_chemical_system",
+  "emergency_exit_lights",
+  "other"
+] as const;
 
 function nullableTrimmed(max: number) {
   return z
@@ -62,9 +78,11 @@ export const customerIntakeSendSchema = z.object({
 
 export const customerIntakeSubmissionSchema = z.object({
   companyName: z.string().trim().min(1, "Company name is required.").max(160),
+  companyWebsite: nullableTrimmed(240),
   primaryContactName: z.string().trim().min(1, "Primary contact name is required.").max(160),
   primaryContactEmail: z.string().trim().email("Enter a valid primary contact email."),
   primaryContactPhone: z.string().trim().min(1, "Primary contact phone is required.").max(60),
+  billingContactName: nullableTrimmed(160),
   billingEmail: z.string().trim().email("Enter a valid billing email."),
   billingPhone: nullableTrimmed(60),
   billingAddressLine1: z.string().trim().min(1, "Billing address is required.").max(160),
@@ -83,6 +101,8 @@ export const customerIntakeSubmissionSchema = z.object({
   siteContactEmail: z.string().trim().email("Enter a valid site contact email.").or(z.literal("")).optional().transform((value) => value || null),
   requestedServiceType: z.string().trim().min(1, "Requested service type is required.").max(160),
   systemTypes: z.array(z.enum(serviceSystemTypes)).min(1, "Select at least one system type."),
+  preferredServiceDate: nullableTrimmed(80),
+  preferredTimeWindow: nullableTrimmed(120),
   preferredServiceWindow: nullableTrimmed(160),
   serviceNotes: nullableTrimmed(3000)
 });
@@ -214,6 +234,8 @@ function buildSiteNotes(data: CustomerIntakeSubmission) {
     `Requested service: ${data.requestedServiceType}`,
     `Systems: ${formatSystemTypes(data.systemTypes)}`,
     data.preferredServiceWindow ? `Preferred service window: ${data.preferredServiceWindow}` : null,
+    data.preferredServiceDate ? `Preferred service date: ${data.preferredServiceDate}` : null,
+    data.preferredTimeWindow ? `Preferred time window: ${data.preferredTimeWindow}` : null,
     data.serviceNotes ? `Notes: ${data.serviceNotes}` : null
   ].filter(Boolean);
 
@@ -223,10 +245,14 @@ function buildSiteNotes(data: CustomerIntakeSubmission) {
 function buildCustomerNotes(data: CustomerIntakeSubmission) {
   return [
     "Created from customer intake request.",
+    data.companyWebsite ? `Company website: ${data.companyWebsite}` : null,
+    data.billingContactName ? `Billing contact: ${data.billingContactName}` : null,
     data.billingPhone ? `Billing phone: ${data.billingPhone}` : null,
     `Requested service: ${data.requestedServiceType}`,
     `Systems: ${formatSystemTypes(data.systemTypes)}`,
     data.preferredServiceWindow ? `Preferred service window: ${data.preferredServiceWindow}` : null,
+    data.preferredServiceDate ? `Preferred service date: ${data.preferredServiceDate}` : null,
+    data.preferredTimeWindow ? `Preferred time window: ${data.preferredTimeWindow}` : null,
     data.serviceNotes ? `Service notes: ${data.serviceNotes}` : null
   ].filter(Boolean).join("\n");
 }
@@ -505,6 +531,7 @@ export async function getPublicCustomerIntakeRequest(token: string) {
     expiresAt: request.expiresAt,
     recipientEmail: request.recipientEmail,
     recipientName: request.recipientName,
+    submittedData: request.submittedDataJson ? toSubmittedData(request.submittedDataJson) : null,
     branding: resolveTenantBranding({
       tenantName: request.organization.name,
       branding: request.organization.branding,
@@ -704,4 +731,4 @@ export async function getCustomerIntakeAttachmentDownload(actor: ActorContext, a
   });
 }
 
-export { serviceSystemTypes, serviceSystemTypeLabels };
+export { customerIntakeFormSystemTypes, serviceSystemTypes, serviceSystemTypeLabels };

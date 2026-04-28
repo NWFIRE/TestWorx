@@ -24,9 +24,11 @@ export async function submitCustomerIntakeAction(formData: FormData) {
       token,
       submission: {
         companyName: readText(formData, "companyName"),
+        companyWebsite: readText(formData, "companyWebsite"),
         primaryContactName: readText(formData, "primaryContactName"),
         primaryContactEmail: readText(formData, "primaryContactEmail"),
         primaryContactPhone: readText(formData, "primaryContactPhone"),
+        billingContactName: readText(formData, "billingContactName"),
         billingEmail: readText(formData, "billingEmail"),
         billingPhone: readText(formData, "billingPhone"),
         billingAddressLine1: readText(formData, "billingAddressLine1"),
@@ -45,6 +47,8 @@ export async function submitCustomerIntakeAction(formData: FormData) {
         siteContactEmail: readText(formData, "siteContactEmail"),
         requestedServiceType: readText(formData, "requestedServiceType"),
         systemTypes: formData.getAll("systemTypes").map((value) => String(value)),
+        preferredServiceDate: readText(formData, "preferredServiceDate"),
+        preferredTimeWindow: readText(formData, "preferredTimeWindow"),
         preferredServiceWindow: readText(formData, "preferredServiceWindow"),
         serviceNotes: readText(formData, "serviceNotes")
       },
