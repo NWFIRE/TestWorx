@@ -94,6 +94,8 @@ type BrandedCustomerEmailPayload = BaseEmailPayload & {
 };
 
 const NO_REPLY_FROM_EMAIL = "noreply@tradeworx.net";
+const QUOTE_FROM_EMAIL = "quotes@tradeworx.net";
+const CUSTOMER_FROM_EMAIL = "hello@tradeworx.net";
 
 function escapeHtml(value: string) {
   return value
@@ -318,7 +320,6 @@ export async function sendWorkspacePasswordResetEmail(payload: PasswordResetEmai
 }
 
 export async function sendQuoteEmail(payload: QuoteEmailPayload) {
-  const env = getOptionalEmailEnv();
   const greeting = buildQuoteEmailGreeting(payload.recipientName);
   const proposalMessage = payload.messageBody.trim() || buildQuoteEmailDefaultMessage();
   const proposalWindow = payload.expiresAt
@@ -327,7 +328,7 @@ export async function sendQuoteEmail(payload: QuoteEmailPayload) {
   const companySignoff = payload.tenantName.trim();
 
   return sendWithResend({
-    from: env.RESEND_FROM_EMAIL,
+    from: QUOTE_FROM_EMAIL,
     to: payload.recipientEmail,
     cc: payload.ccEmails,
     subject: payload.subjectLine,
@@ -351,9 +352,8 @@ export async function sendQuoteEmail(payload: QuoteEmailPayload) {
 }
 
 export async function sendQuoteReminderEmail(payload: QuoteReminderEmailPayload) {
-  const env = getOptionalEmailEnv();
   return sendWithResend({
-    from: env.RESEND_FROM_EMAIL,
+    from: QUOTE_FROM_EMAIL,
     to: payload.recipientEmail,
     subject: payload.subjectLine,
     html: buildShell({
@@ -374,13 +374,12 @@ export async function sendQuoteReminderEmail(payload: QuoteReminderEmailPayload)
 }
 
 export async function sendCustomerIntakeRequestEmail(payload: CustomerIntakeRequestEmailPayload) {
-  const env = getOptionalEmailEnv();
   const companyName = payload.branding.companyName || payload.tenantName;
   const firstName = getFirstName(payload.recipientName);
   const greeting = firstName ? `Hi ${escapeHtml(firstName)},` : "Hello,";
   const expirationDate = payload.expiresAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   return sendWithResend({
-    from: env.RESEND_FROM_EMAIL ?? NO_REPLY_FROM_EMAIL,
+    from: CUSTOMER_FROM_EMAIL,
     to: payload.recipientEmail,
     subject: `Customer setup request from ${companyName}`,
     html: buildBrandedShell({
@@ -405,9 +404,8 @@ export async function sendCustomerIntakeRequestEmail(payload: CustomerIntakeRequ
 }
 
 export async function sendCustomerIntakeSubmittedEmail(payload: CustomerIntakeSubmittedEmailPayload) {
-  const env = getOptionalEmailEnv();
   return sendWithResend({
-    from: env.RESEND_FROM_EMAIL ?? NO_REPLY_FROM_EMAIL,
+    from: CUSTOMER_FROM_EMAIL,
     to: payload.recipientEmail,
     subject: `Customer intake submitted: ${payload.companyName}`,
     html: buildBrandedShell({
@@ -441,7 +439,7 @@ export async function sendInspectionReminderEmail(payload: BaseEmailPayload & {
 
 export async function sendCustomerBrandedEmail(payload: BrandedCustomerEmailPayload) {
   return sendWithResend({
-    from: NO_REPLY_FROM_EMAIL,
+    from: CUSTOMER_FROM_EMAIL,
     to: payload.recipientEmail,
     subject: payload.subjectLine,
     html: buildBrandedShell({
