@@ -195,6 +195,28 @@ export type ReportRepeaterBulkActionDefinition = {
   }>;
 };
 
+export type MobileReportDisplayType =
+  | "checklist_card"
+  | "quantity_summary"
+  | "grouped_check"
+  | "info_card"
+  | "issue_list"
+  | "photo_gallery"
+  | "signature";
+
+export type MobileReportBillableBehavior =
+  | "not_billable"
+  | "billable_if_new"
+  | "billable_if_serviced"
+  | "billable_if_replaced"
+  | "billable_if_explicit";
+
+export type MobileReportCarryForwardBehavior =
+  | "none"
+  | "copy_as_reference"
+  | "copy_as_confirmable"
+  | "copy_unresolved_only";
+
 type BaseFieldDefinition = {
   id: string;
   label: string;
@@ -225,6 +247,18 @@ type BaseFieldDefinition = {
   rowIdentityField?: string;
   allowDuplicate?: boolean;
   validation?: ReportFieldValidationDefinition[];
+  mobileDisplayType?: MobileReportDisplayType;
+  requiredForFinalization?: boolean;
+  billableBehavior?: MobileReportBillableBehavior;
+  carryForwardBehavior?: MobileReportCarryForwardBehavior;
+  groupKey?: string;
+  itemLabel?: string;
+  itemDescription?: string;
+  allowPhoto?: boolean;
+  requirePhotoOnFail?: boolean;
+  requireNoteOnFail?: boolean;
+  allowQuantity?: boolean;
+  allowBulkAllPass?: boolean;
 };
 
 export type ReportFieldDefinition =
@@ -249,6 +283,8 @@ export type ReportSectionDefinition = {
   label: string;
   description: string;
   fields: ReportFieldDefinition[];
+  mobileDisplayType?: MobileReportDisplayType;
+  groupKey?: string;
 };
 
 export type ReportTemplateDefinition = {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canEditReport, canFinalizeReport, normalizeSignaturePayload, validateDraftForTemplate, validateFinalizationDraft } from "../report-engine";
+import { canEditReport, canFinalizeReport, collectFinalizationValidationIssues, normalizeSignaturePayload, validateDraftForTemplate, validateFinalizationDraft } from "../report-engine";
 
 describe("finalization and authorization", () => {
   const completeDraft = {
@@ -48,9 +48,9 @@ describe("finalization and authorization", () => {
     }
   };
 
-  it("requires both signatures and completed section statuses to finalize", () => {
+  it("requires signatures but does not block finalization on generic section status", () => {
     expect(() => validateFinalizationDraft({ ...completeDraft, signatures: { technician: completeDraft.signatures.technician } })).toThrow(/signatures are required/i);
-    expect(() => validateFinalizationDraft({ ...completeDraft, sections: { inventory: { ...completeDraft.sections.inventory, status: "pending" } } })).toThrow(/all report sections must be marked/i);
+    expect(collectFinalizationValidationIssues({ ...completeDraft, sections: { inventory: { ...completeDraft.sections.inventory, status: "pending" } } })).toEqual([]);
     expect(validateFinalizationDraft(completeDraft)).toBe(true);
   });
 

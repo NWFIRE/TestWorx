@@ -284,6 +284,16 @@ type SmartBuildContext = {
   priorDraft: z.infer<typeof carryForwardDraftSchema> | null;
 };
 
+export type ReportValidationIssue = {
+  reportId?: string;
+  sectionId?: string;
+  itemId?: string;
+  label: string;
+  message: string;
+  severity: "blocking" | "warning";
+  actionLabel: string;
+};
+
 const carryForwardDraftSchema = z.object({
   overallNotes: z.string().max(MAX_OVERALL_NOTES_LENGTH).optional(),
   sectionOrder: z.array(z.string()).optional(),
@@ -1264,8 +1274,92 @@ export function describeRepeaterValueLines(
   });
 }
 
-export function validateFinalizationDraft(draft: ReportDraft, assets: ReportAssetRecord[] = []) {
+const finalizationNegativeValues = new Set(["fail", "deficiency", "damaged", "attention", "poor", "low", "high", "needs_repair", "no"]);
+
+function buildValidationIssue(input: Omit<ReportValidationIssue, "severity" | "actionLabel"> & Partial<Pick<ReportValidationIssue, "severity" | "actionLabel">>): ReportValidationIssue {
+  return {
+    severity: "blocking",
+    actionLabel: "Fix item",
+    ...input
+  };
+}
+
+function fieldLabelWithRow(fieldLabel: string, rowIndex?: number) {
+  return typeof rowIndex === "number" ? `${fieldLabel} #${rowIndex + 1}` : fieldLabel;
+}
+
+function collectFieldValidationIssues({
+  sectionId,
+  sectionLabel,
+  field,
+  value,
+  rowIndex,
+  row
+}: {
+  sectionId: string;
+  sectionLabel: string;
+  field: Exclude<ReportFieldDefinition, { type: "repeater" }>;
+  value: ReportPrimitiveValue | undefined;
+  rowIndex?: number;
+  row?: Record<string, ReportPrimitiveValue>;
+}) {
+  const issues: ReportValidationIssue[] = [];
+  const label = fieldLabelWithRow(field.itemLabel ?? field.label, rowIndex);
+  const itemId = typeof rowIndex === "number" ? `${sectionId}:${field.id}:${rowIndex}` : `${sectionId}:${field.id}`;
+
+  if (!isFieldVisible(field, row ?? {})) {
+    return issues;
+  }
+
+  if (field.requiredForFinalization && isEmptyValue(value)) {
+    issues.push(buildValidationIssue({
+      sectionId,
+      itemId,
+      label,
+      message: `${label} is required before finalizing.`,
+      actionLabel: `Open ${sectionLabel}`
+    }));
+  }
+
+  for (const validation of field.validation ?? []) {
+    if (validation.type === "required" && isEmptyValue(value)) {
+      issues.push(buildValidationIssue({
+        sectionId,
+        itemId,
+        label,
+        message: validation.message,
+        actionLabel: `Open ${sectionLabel}`
+      }));
+    }
+  }
+
+  const isFailingValue = finalizationNegativeValues.has(String(value ?? "").trim().toLowerCase());
+  if (isFailingValue && field.requireNoteOnFail && !row?.deficiencyNotes && !row?.notes) {
+    issues.push(buildValidationIssue({
+      sectionId,
+      itemId,
+      label,
+      message: `${label} needs a note because it was marked as an issue.`,
+      actionLabel: `Add note`
+    }));
+  }
+
+  if (isFailingValue && field.requirePhotoOnFail && !row?.deficiencyPhoto) {
+    issues.push(buildValidationIssue({
+      sectionId,
+      itemId,
+      label,
+      message: `${label} needs a photo because it was marked as an issue.`,
+      actionLabel: `Add photo`
+    }));
+  }
+
+  return issues;
+}
+
+export function collectFinalizationValidationIssues(draft: ReportDraft, assets: ReportAssetRecord[] = []): ReportValidationIssue[] {
   const template = resolveReportTemplate({ inspectionType: draft.inspectionType as InspectionType, assets });
+  const issues: ReportValidationIssue[] = [];
 
   for (const section of template.sections) {
     const sectionState = draft.sections[section.id];
@@ -1273,16 +1367,74 @@ export function validateFinalizationDraft(draft: ReportDraft, assets: ReportAsse
       continue;
     }
 
-    runFieldValidations(section.fields, sectionState.fields, "finalize");
+    for (const field of section.fields) {
+      const fieldValue = sectionState.fields[field.id];
+
+      if (field.type === "repeater") {
+        const rows = Array.isArray(fieldValue) ? fieldValue as ReportRepeaterRow[] : [];
+
+        for (const validation of field.validation ?? []) {
+          if (validation.type !== "minRows") {
+            continue;
+          }
+
+          if (rows.length < validation.value) {
+            issues.push(buildValidationIssue({
+              sectionId: section.id,
+              itemId: `${section.id}:${field.id}`,
+              label: field.label,
+              message: validation.message,
+              actionLabel: `Open ${section.label}`
+            }));
+          }
+        }
+
+        rows.forEach((row, rowIndex) => {
+          for (const rowField of field.rowFields) {
+            issues.push(...collectFieldValidationIssues({
+              sectionId: section.id,
+              sectionLabel: section.label,
+              field: rowField,
+              value: row[rowField.id],
+              rowIndex,
+              row
+            }));
+          }
+        });
+        continue;
+      }
+
+      issues.push(...collectFieldValidationIssues({
+        sectionId: section.id,
+        sectionLabel: section.label,
+        field,
+        value: fieldValue as ReportPrimitiveValue | undefined,
+        row: sectionState.fields as Record<string, ReportPrimitiveValue>
+      }));
+    }
   }
 
   if (!draft.signatures.technician?.signerName || !draft.signatures.technician?.imageDataUrl || !draft.signatures.customer?.signerName || !draft.signatures.customer?.imageDataUrl) {
-    throw new Error("Technician and customer signatures are required before finalization.");
+    issues.push(buildValidationIssue({
+      itemId: "signatures",
+      label: "Required signatures",
+      message: "Technician and customer signatures are required before finalization.",
+      actionLabel: "Open Review"
+    }));
   }
 
-  const incompleteSections = draft.sectionOrder.filter((sectionId) => (draft.sections[sectionId]?.status ?? "pending") === "pending");
-  if (incompleteSections.length > 0) {
-    throw new Error("All report sections must be marked before finalization.");
+  return issues;
+}
+
+export function validateFinalizationDraft(draft: ReportDraft, assets: ReportAssetRecord[] = []) {
+  const issues = collectFinalizationValidationIssues(draft, assets);
+  if (issues.length > 0) {
+    const blockingIssues = issues.filter((issue) => issue.severity === "blocking");
+    const issueCount = blockingIssues.length || issues.length;
+    const firstIssue = (blockingIssues[0] ?? issues[0])?.message;
+    throw new Error(issueCount === 1 && firstIssue
+      ? firstIssue
+      : `${issueCount} items need attention before finalizing.`);
   }
 
   return true;
