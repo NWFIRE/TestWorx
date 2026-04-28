@@ -15,15 +15,21 @@ CREATE INDEX "TenantInvoiceSequence_tenantId_idx" ON "TenantInvoiceSequence"("te
 
 ALTER TABLE "TenantInvoiceSequence" ADD CONSTRAINT "TenantInvoiceSequence_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-WITH existing_sequences AS (
+WITH invoice_matches AS (
     SELECT
         "tenantId",
-        (invoice_match[1])::INTEGER AS "year",
-        GREATEST(MAX((invoice_match[2])::INTEGER) + 1, 1000) AS "nextNumber"
+        (substring("quickbooksInvoiceNumber" FROM '^TW([0-9]{4})-[0-9]{4,}$'))::INTEGER AS "year",
+        (substring("quickbooksInvoiceNumber" FROM '^TW[0-9]{4}-([0-9]{4,})$'))::INTEGER AS "invoiceNumber"
     FROM "InspectionBillingSummary"
-    CROSS JOIN LATERAL regexp_match("quickbooksInvoiceNumber", '^TW([0-9]{4})-([0-9]{4,})$') AS invoice_match
-    WHERE "quickbooksInvoiceNumber" IS NOT NULL
-    GROUP BY "tenantId", (invoice_match[1])::INTEGER
+    WHERE "quickbooksInvoiceNumber" ~ '^TW[0-9]{4}-[0-9]{4,}$'
+),
+existing_sequences AS (
+    SELECT
+        "tenantId",
+        "year",
+        GREATEST(MAX("invoiceNumber") + 1, 1000) AS "nextNumber"
+    FROM invoice_matches
+    GROUP BY "tenantId", "year"
 )
 INSERT INTO "TenantInvoiceSequence" ("id", "tenantId", "year", "nextNumber", "createdAt", "updatedAt")
 SELECT
