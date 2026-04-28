@@ -655,6 +655,12 @@ export function CustomerManagementCard({
             {createState.success && createState.customerCompanyId ? (
               <div className="flex flex-wrap gap-3">
                 <Link
+                  className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white transition hover:bg-slateblue/90"
+                  href={`/app/admin/inspections?create=1&customerCompanyId=${encodeURIComponent(createState.customerCompanyId)}`}
+                >
+                  Create inspection
+                </Link>
+                <Link
                   className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue transition hover:border-slate-300 hover:bg-slate-50"
                   href={`/app/admin/email-reminders?customerCompanyId=${encodeURIComponent(createState.customerCompanyId)}&templateKey=customer_welcome`}
                 >

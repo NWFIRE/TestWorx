@@ -403,7 +403,7 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
               />
               <QuickActionLink
                 href={`/app/admin/inspections?create=1&customerCompanyId=${encodeURIComponent(data.customer.id)}`}
-                label="Schedule inspection"
+                label="Create inspection"
               />
               <QuickActionLink
                 href={`/app/admin/email-reminders?query=${encodeURIComponent(data.customer.name)}&customerCompanyId=${encodeURIComponent(data.customer.id)}&templateKey=customer_welcome`}
