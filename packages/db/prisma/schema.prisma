@@ -281,6 +281,15 @@ enum MobileDevicePlatform {
   android
 }
 
+enum CustomerIntakeStatus {
+  draft
+  sent
+  submitted
+  approved
+  rejected
+  expired
+}
+
 enum QuoteReminderType {
   sent_not_viewed_first
   sent_not_viewed_second
@@ -339,6 +348,7 @@ model Tenant {
   quickbooksTokenExpiresAt   DateTime?
   quickbooksConnectedAt      DateTime?
   quoteReminderSettings      Json?
+  customerIntakeAutoCreateEnabled Boolean                 @default(false)
   createdAt                 DateTime               @default(now())
   updatedAt                 DateTime               @updatedAt
   subscriptionPlan          SubscriptionPlan?      @relation(fields: [subscriptionPlanId], references: [id])
@@ -384,6 +394,7 @@ model Tenant {
   emailReminderSendLogs     EmailReminderSendLog[]
   technicianNotifications   TechnicianNotification[]
   technicianDeviceRegistrations TechnicianDeviceRegistration[]
+  customerIntakeRequests    CustomerIntakeRequest[]
 }
 
 model User {
@@ -428,6 +439,51 @@ model User {
   manualStates         UserManualState[]
   technicianNotifications TechnicianNotification[]
   technicianDeviceRegistrations TechnicianDeviceRegistration[]
+  createdCustomerIntakeRequests CustomerIntakeRequest[] @relation("CustomerIntakeCreatedBy")
+  approvedCustomerIntakeRequests CustomerIntakeRequest[] @relation("CustomerIntakeApprovedBy")
+}
+
+model CustomerIntakeRequest {
+  id               String               @id @default(cuid())
+  organizationId   String
+  tokenHash        String               @unique
+  recipientEmail   String
+  recipientName    String?
+  status           CustomerIntakeStatus @default(draft)
+  sentAt           DateTime?
+  submittedAt      DateTime?
+  approvedAt       DateTime?
+  expiresAt        DateTime
+  createdByUserId  String
+  approvedByUserId String?
+  optionalMessage  String?
+  submittedDataJson Json?
+  createdCustomerId String?
+  createdSiteId    String?
+  createdWorkOrderId String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  organization     Tenant               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy        User                 @relation("CustomerIntakeCreatedBy", fields: [createdByUserId], references: [id])
+  approvedBy       User?                @relation("CustomerIntakeApprovedBy", fields: [approvedByUserId], references: [id])
+  attachments      CustomerIntakeAttachment[]
+
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, recipientEmail])
+  @@index([organizationId, expiresAt])
+}
+
+model CustomerIntakeAttachment {
+  id              String                @id @default(cuid())
+  intakeRequestId String
+  fileName        String
+  mimeType        String
+  storageKey      String
+  fileSizeBytes   Int?
+  createdAt       DateTime              @default(now())
+  intakeRequest   CustomerIntakeRequest @relation(fields: [intakeRequestId], references: [id], onDelete: Cascade)
+
+  @@index([intakeRequestId])
 }
 
 model TechnicianNotification {

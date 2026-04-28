@@ -23,6 +23,7 @@ export * from "../client-profile";
 export * from "../contract-provider-billing";
 export * from "../compliance-reporting-fees";
 export * from "../customer-companies";
+export * from "../customer-intake";
 export * from "../customer-import";
 export * from "../deficiency-service";
 export * from "../email-reminders";

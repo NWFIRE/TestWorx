@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { auth } from "@/auth";
 import { getPaginatedTenantCustomerCompanyDirectory, getTenantBillingContractProfiles, getTenantBillingPayerAccounts } from "@testworx/lib/server/index";
@@ -62,6 +63,14 @@ export default async function ClientsPage({
         eyebrow="Clients"
         title="Customer companies"
         description="Manage client records, billing profiles, service addresses, and QuickBooks-linked customer accounts from one dedicated workspace."
+        actions={
+          <Link
+            className="btn-brand-primary inline-flex min-h-11 items-center rounded-2xl px-4 py-3 text-sm font-semibold"
+            href="/app/admin/customer-intakes"
+          >
+            Send Intake Form
+          </Link>
+        }
         contentWidth="full"
       />
 

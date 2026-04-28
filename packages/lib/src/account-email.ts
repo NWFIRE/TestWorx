@@ -69,6 +69,21 @@ type QuoteReminderEmailPayload = BaseEmailPayload & {
   expiresAt?: Date | null;
 };
 
+type CustomerIntakeRequestEmailPayload = BaseEmailPayload & {
+  intakeUrl: string;
+  senderName: string;
+  optionalMessage?: string | null;
+  expiresAt: Date;
+  branding: EmailShellBranding;
+};
+
+type CustomerIntakeSubmittedEmailPayload = BaseEmailPayload & {
+  companyName: string;
+  contactName: string;
+  reviewUrl: string;
+  branding: EmailShellBranding;
+};
+
 type BrandedCustomerEmailPayload = BaseEmailPayload & {
   subjectLine: string;
   bodyText: string;
@@ -349,6 +364,52 @@ export async function sendQuoteReminderEmail(payload: QuoteReminderEmailPayload)
       actionHref: payload.quoteUrl,
       actionLabel: payload.actionLabel ?? "View quote",
       footer: "Use the secure online quote page to review details, download the PDF, and approve or decline when you're ready."
+    })
+  });
+}
+
+export async function sendCustomerIntakeRequestEmail(payload: CustomerIntakeRequestEmailPayload) {
+  const env = getOptionalEmailEnv();
+  const companyName = payload.branding.companyName || payload.tenantName;
+  return sendWithResend({
+    from: env.RESEND_FROM_EMAIL ?? NO_REPLY_FROM_EMAIL,
+    to: payload.recipientEmail,
+    subject: `Customer setup request from ${companyName}`,
+    html: buildBrandedShell({
+      eyebrow: "Customer setup",
+      title: "Complete your customer setup",
+      body: [
+        `Hi ${payload.recipientName || "there"},`,
+        `${companyName} sent this secure form so we can set up your customer profile, billing information, and service location correctly before scheduling work.`,
+        payload.optionalMessage?.trim() ? `Message from ${payload.senderName}: ${escapeHtml(payload.optionalMessage.trim())}` : "",
+        `This secure link expires on ${payload.expiresAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}.`
+      ].filter(Boolean),
+      actionHref: payload.intakeUrl,
+      actionLabel: "Complete Customer Setup",
+      footer: "If you were not expecting this request, you can ignore this email.",
+      branding: payload.branding
+    })
+  });
+}
+
+export async function sendCustomerIntakeSubmittedEmail(payload: CustomerIntakeSubmittedEmailPayload) {
+  const env = getOptionalEmailEnv();
+  return sendWithResend({
+    from: env.RESEND_FROM_EMAIL ?? NO_REPLY_FROM_EMAIL,
+    to: payload.recipientEmail,
+    subject: `Customer intake submitted: ${payload.companyName}`,
+    html: buildBrandedShell({
+      eyebrow: "Customer intake submitted",
+      title: "A customer setup form is ready for review",
+      body: [
+        `${payload.companyName} submitted a customer intake request.`,
+        `Primary contact: ${payload.contactName}.`,
+        "Review the intake in TradeWorx before creating the customer record."
+      ],
+      actionHref: payload.reviewUrl,
+      actionLabel: "Review Intake",
+      footer: "This message was sent because your workspace is listed as the customer intake review contact.",
+      branding: payload.branding
     })
   });
 }
