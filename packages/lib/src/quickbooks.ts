@@ -4375,7 +4375,7 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
       ? deliverySnapshot.recipientEmail.trim()
       : payerAccount?.billingEmail ?? summary.customerCompany.billingEmail;
 
-    const itemRefCache = new Map<string, { qbItemId: string; qbItemName: string }>();
+    const itemRefCache = new Map<string, { qbItemId: string; qbItemName: string; taxable: boolean }>();
     const invoiceLines = [] as QuickBooksInvoiceLinePayload[];
 
     for (const item of normalizedSummary.items) {
@@ -4413,7 +4413,11 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
 
         resolvedItem = {
           qbItemId: resolved.qbItemId,
-          qbItemName: resolved.qbItemName
+          qbItemName: resolved.qbItemName,
+          taxable: await resolveMappedCatalogTaxable({
+            tenantId: parsedActor.tenantId as string,
+            quickbooksItemId: resolved.qbItemId
+          })
         };
         itemRefCache.set(cacheKey, resolvedItem);
       }
@@ -4424,7 +4428,8 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
         quantity: item.quantity,
         unitPrice,
         qbItemId: resolvedItem.qbItemId,
-        qbItemName: resolvedItem.qbItemName
+        qbItemName: resolvedItem.qbItemName,
+        taxable: resolvedItem.taxable
       }));
     }
 

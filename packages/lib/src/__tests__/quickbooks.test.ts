@@ -479,6 +479,48 @@ describe("quickbooks billing sync hardening", () => {
     }));
   });
 
+  it("applies catalog taxability to inspection billing invoice lines", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: null });
+    prismaMock.customerCompany.update.mockResolvedValue(undefined);
+    prismaMock.site.findFirst.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
+    prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue({ taxable: true });
+    prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue({
+      ...buildBillingSummary(),
+      items: [
+        {
+          id: "item_1",
+          description: "Recharge (5 lb ABC)",
+          quantity: 1,
+          unitPrice: 33.5,
+          amount: 33.5,
+          unit: "ea",
+          category: "material",
+          code: "RECHARGE_5LB_ABC"
+        }
+      ]
+    });
+    prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({}));
+
+    const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
+
+    await syncBillingSummaryToQuickBooks(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    expect(createInvoiceBody.Line?.[0]?.SalesItemLineDetail?.TaxCodeRef).toEqual({ value: "TAX" });
+  }, 10000);
+
   it("keeps invoice synced and marks send skipped when billing email is missing", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
     prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: null });
