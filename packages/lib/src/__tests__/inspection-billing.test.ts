@@ -408,6 +408,64 @@ describe("inspection billing extraction", () => {
     ].sort());
   });
 
+  it("excludes non-billable carried-forward extinguisher rows and bills only visit activity", () => {
+    const draft = buildFireExtinguisherDraft();
+    draft.sections["inventory"]!.fields.extinguishers = [
+      {
+        assetTag: "EXT-100",
+        location: "Lobby",
+        extinguisherType: "5 lb ABC",
+        servicePerformed: "Annual Inspection",
+        sourceReportId: "report_prior_1",
+        sourceReportItemId: "prior-row-1",
+        carryForwardStatus: "carried_forward",
+        visitStatus: "not_reviewed",
+        billableStatus: "not_billable"
+      },
+      {
+        assetTag: "EXT-101",
+        location: "Warehouse",
+        extinguisherType: "10 lb ABC",
+        servicePerformed: "Recharge",
+        sourceReportId: "report_prior_1",
+        sourceReportItemId: "prior-row-2",
+        carryForwardStatus: "carried_forward",
+        visitStatus: "serviced",
+        billableStatus: "billable_service"
+      },
+      {
+        assetTag: "EXT-102",
+        location: "Kitchen",
+        extinguisherType: "2.5 lb ABC",
+        servicePerformed: "New",
+        visitStatus: "new",
+        billableStatus: "billable_new"
+      }
+    ];
+
+    const items = extractBillableItemsFromFinalizedReport({
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1",
+      reportId: "report_1",
+      reportType: "fire_extinguisher",
+      contentJson: draft as unknown as object
+    });
+
+    expect(items.map((item) => [item.description, item.code, item.quantity]).sort()).toEqual([
+      ["Annual Inspection", "FE-ANNUAL", 1],
+      ["New (2.5 lb ABC)", "FE-NEW-2_5_LB_ABC", 1],
+      ["Recharge (10 lb ABC)", "FE-RECHARGE-10_LB_ABC", 1]
+    ].sort());
+    const recharge = items.find((item) => item.description.startsWith("Recharge"));
+    expect(recharge?.metadata).toMatchObject({
+      sourceReportId: "report_prior_1",
+      sourceReportItemId: "prior-row-2",
+      visitStatus: "serviced",
+      billableStatus: "billable_service",
+      billingSourceLabel: "Service performed"
+    });
+  });
+
   it("groups billables by category and preserves edited pricing during refresh", () => {
     const extracted = extractBillableItemsFromDraft({
       tenantId: "tenant_1",

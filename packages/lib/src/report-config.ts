@@ -396,6 +396,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
             repeatableSource: "siteAssets",
             rowIdentityField: "assetId",
             allowDuplicate: true,
+            carryForwardPriorRows: true,
             validation: [{ type: "minRows", value: 1, message: "Add at least one extinguisher row before finalizing." }],
             rowFields: [
               {

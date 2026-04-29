@@ -24,6 +24,32 @@ const MAX_DEFICIENCY_NOTES_LENGTH = 2000;
 const INTERNAL_REPEATER_ROW_ID = "__rowId";
 const DEFICIENCY_RESULT_VALUES = new Set(["fail", "deficiency", "needs_repair"]);
 
+export type ReportVisitStatus =
+  | "not_reviewed"
+  | "confirmed"
+  | "updated"
+  | "new"
+  | "removed"
+  | "serviced"
+  | "replaced";
+
+export type ReportBillableStatus =
+  | "not_billable"
+  | "billable_new"
+  | "billable_service"
+  | "billable_replacement"
+  | "billable_labor"
+  | "billable_parts";
+
+const CARRY_FORWARD_REPEATER_METADATA_FIELDS = [
+  "sourceReportId",
+  "sourceReportItemId",
+  "carriedForwardFromDate",
+  "carryForwardStatus",
+  "visitStatus",
+  "billableStatus"
+] as const;
+
 function isDataUrl(value: string) {
   const trimmed = value.trim();
   if (!trimmed.startsWith("data:")) {
@@ -282,6 +308,10 @@ type SmartBuildContext = {
   tenantBrandingDefaults: Record<string, ReportPrimitiveValue>;
   assets: ReportAssetRecord[];
   priorDraft: z.infer<typeof carryForwardDraftSchema> | null;
+  priorReportContext?: {
+    reportId: string;
+    finalizedAt?: string | null;
+  };
 };
 
 export type ReportValidationIssue = {
@@ -368,6 +398,49 @@ function normalizeRepeaterRowId(row: Record<string, unknown>) {
     : createRepeaterRowId();
 }
 
+function copyRepeaterMetadata(normalizedRow: ReportRepeaterRow, sourceRow: Record<string, unknown>) {
+  for (const fieldId of CARRY_FORWARD_REPEATER_METADATA_FIELDS) {
+    const value = asPrimitiveValue(sourceRow[fieldId]);
+    if (value !== undefined) {
+      normalizedRow[fieldId] = value;
+    }
+  }
+
+  return normalizedRow;
+}
+
+function resolveSourceReportItemId(row: Record<string, unknown>, fallbackIndex: number) {
+  for (const fieldId of [INTERNAL_REPEATER_ROW_ID, "assetId", "assetTag", "serialNumber", "location", "identifier"]) {
+    const value = asPrimitiveValue(row[fieldId]);
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+
+  return `prior-row-${fallbackIndex + 1}`;
+}
+
+function withCarryForwardMetadata(
+  row: ReportRepeaterRow,
+  context: SmartBuildContext,
+  sourceRow: Record<string, unknown> | null,
+  fallbackIndex: number
+) {
+  if (!context.priorReportContext?.reportId) {
+    return row;
+  }
+
+  return {
+    ...row,
+    sourceReportId: asPrimitiveValue(row.sourceReportId) ?? context.priorReportContext.reportId,
+    sourceReportItemId: asPrimitiveValue(row.sourceReportItemId) ?? resolveSourceReportItemId(sourceRow ?? row, fallbackIndex),
+    carriedForwardFromDate: asPrimitiveValue(row.carriedForwardFromDate) ?? context.priorReportContext.finalizedAt ?? "",
+    carryForwardStatus: asPrimitiveValue(row.carryForwardStatus) ?? "carried_forward",
+    visitStatus: asPrimitiveValue(row.visitStatus) ?? "not_reviewed",
+    billableStatus: asPrimitiveValue(row.billableStatus) ?? "not_billable"
+  };
+}
+
 function normalizeRepeaterRows(field: Extract<ReportFieldDefinition, { type: "repeater" }>, value: unknown) {
   const rows = Array.isArray(value) ? value : [];
   return rows
@@ -378,6 +451,7 @@ function normalizeRepeaterRows(field: Extract<ReportFieldDefinition, { type: "re
         normalizedRow[rowField.id] = normalizePrimitiveField(rowField, row[rowField.id]);
       }
       normalizedRow[INTERNAL_REPEATER_ROW_ID] = normalizeRepeaterRowId(row);
+      copyRepeaterMetadata(normalizedRow, row);
       return applyRepeaterRowEnhancements(
         field.rowFields,
         applyFieldMappings(field.rowFields, normalizedRow, field.rowFields.map((rowField) => rowField.id))
@@ -555,10 +629,13 @@ function createRepeaterSeedRows(field: Extract<ReportFieldDefinition, { type: "r
       }
 
       const withIdentity = isEmptyValue(row.assetId) ? { ...row, assetId: asset.id } : row;
-      return applyRepeaterRowEnhancements(
+      const enhancedRow = applyRepeaterRowEnhancements(
         field.rowFields,
         applyFieldMappings(field.rowFields, withIdentity, field.rowFields.map((rowField) => rowField.id))
       );
+      return field.carryForwardPriorRows && priorRow
+        ? withCarryForwardMetadata(enhancedRow, context, priorRow, 0)
+        : enhancedRow;
     });
   }
 
@@ -568,7 +645,7 @@ function createRepeaterSeedRows(field: Extract<ReportFieldDefinition, { type: "r
     : [];
 
   if (field.carryForwardPriorRows && (field.seedRows?.length ?? 0) === 0 && priorRows.length > 0) {
-    return normalizeRepeaterRows(field, priorRows);
+    return normalizeRepeaterRows(field, priorRows).map((row, index) => withCarryForwardMetadata(row, context, priorRows[index] ?? null, index));
   }
 
   return normalizeRepeaterRows(
@@ -815,6 +892,8 @@ export function buildRepeaterRowDefaults(
   ) as Record<string, ReportPrimitiveValue>;
 
   defaults[INTERNAL_REPEATER_ROW_ID] = createRepeaterRowId();
+  defaults.visitStatus = "new";
+  defaults.billableStatus = "billable_new";
 
   return applyRepeaterRowEnhancements(repeaterField.rowFields, defaults) as Record<string, ReportPrimitiveValue>;
 }
@@ -1026,6 +1105,10 @@ export function buildInitialReportDraft(input: {
   assetCount: number;
   previousDraft?: unknown;
   priorCompletedDraft?: unknown;
+  priorReportContext?: {
+    reportId: string;
+    finalizedAt?: string | null;
+  };
   priorReportSummary?: string;
   assets?: ReportAssetRecord[];
   siteDefaults?: Record<string, ReportPrimitiveValue>;
@@ -1050,7 +1133,8 @@ export function buildInitialReportDraft(input: {
       ...(input.tenantBrandingDefaults ?? {})
     },
     assets: input.assets ?? [],
-    priorDraft: priorCompletedDraft
+    priorDraft: priorCompletedDraft,
+    priorReportContext: input.priorReportContext
   };
 
   const mergedSections = Object.fromEntries(

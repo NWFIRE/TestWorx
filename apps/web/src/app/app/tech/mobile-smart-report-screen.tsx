@@ -127,6 +127,36 @@ function countRowIssues(row: Record<string, ReportPrimitiveValue>) {
   return Object.values(row).filter(isNegative).length;
 }
 
+function visitStatusLabel(row: Record<string, ReportPrimitiveValue>) {
+  switch (row.visitStatus) {
+    case "not_reviewed":
+      return "Previous";
+    case "confirmed":
+      return "Confirmed";
+    case "updated":
+      return "Updated";
+    case "new":
+      return "New";
+    case "removed":
+      return "Removed";
+    case "serviced":
+      return "Serviced";
+    case "replaced":
+      return "Replaced";
+    default:
+      return null;
+  }
+}
+
+function rowStatusLabel(row: Record<string, ReportPrimitiveValue>) {
+  const visitLabel = visitStatusLabel(row);
+  if (visitLabel) {
+    return visitLabel;
+  }
+
+  return countRowIssues(row) > 0 ? "Issue" : "Ready";
+}
+
 function firstPhotoValue(values: Record<string, ReportPrimitiveValue>, fields: Array<Exclude<ReportFieldDefinition, { type: "repeater" }>>) {
   const photoField = fields.find((field) => field.type === "photo" && displayValue(values[field.id]));
   return photoField ? displayValue(values[photoField.id]) : "";
@@ -409,6 +439,11 @@ function ChecklistTab({
                         }
                         return (
                           <div className="space-y-4">
+                            {typeof row.sourceReportId === "string" && row.sourceReportId ? (
+                              <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-950">
+                                <span className="font-semibold">Carried forward.</span> Confirm it, update details, mark service performed, or remove it for this visit.
+                              </div>
+                            ) : null}
                             {field.rowFields
                               .filter((rowField) => isFieldVisible(rowField, row))
                               .map((rowField) => (
@@ -429,7 +464,7 @@ function ChecklistTab({
                         key: rowKey(row, index),
                         title: rowTitle(row, index),
                         subtitle: rowSubtitle(row),
-                        status: countRowIssues(row) > 0 ? "Issue" : "Ready",
+                        status: rowStatusLabel(row),
                         issueCount: countRowIssues(row)
                       }))}
                       title={field.label}

@@ -1063,6 +1063,12 @@ export async function getInspectionReportDraft(actor: ActorContext, inspectionId
     assets,
     previousDraft: hydrateDraftFromReport(report),
     priorCompletedDraft: priorReport?.contentJson ?? undefined,
+    priorReportContext: priorReport
+      ? {
+          reportId: priorReport.id,
+          finalizedAt: priorReport.finalizedAt?.toISOString() ?? priorReport.updatedAt.toISOString()
+        }
+      : undefined,
     siteDefaults: {
       siteName: userFacingSiteName,
       customerName: report.inspection.customerCompany.name,

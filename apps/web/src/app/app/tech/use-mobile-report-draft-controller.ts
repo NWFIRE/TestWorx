@@ -63,6 +63,56 @@ function buildReportSaveState(record: LocalReportDraftRecord | null, reportStatu
   return "Saved";
 }
 
+const VISIT_ACTIVITY_METADATA_FIELDS = new Set([
+  "sourceReportId",
+  "sourceReportItemId",
+  "carriedForwardFromDate",
+  "carryForwardStatus",
+  "visitStatus",
+  "billableStatus"
+]);
+
+function applyVisitActivityMetadata(
+  row: Record<string, ReportPrimitiveValue>,
+  changedFieldId: string,
+  value: ReportPrimitiveValue
+) {
+  if (VISIT_ACTIVITY_METADATA_FIELDS.has(changedFieldId)) {
+    return row;
+  }
+
+  const nextRow = { ...row };
+  const hasPriorSource = typeof nextRow.sourceReportId === "string" && nextRow.sourceReportId.trim().length > 0;
+
+  if (changedFieldId === "servicePerformed") {
+    const selectedService = typeof value === "string" ? value : "";
+    if (selectedService === "New") {
+      nextRow.visitStatus = "new";
+      nextRow.billableStatus = "billable_new";
+      return nextRow;
+    }
+
+    if (selectedService === "Removed from Service") {
+      nextRow.visitStatus = "removed";
+      nextRow.billableStatus = "not_billable";
+      return nextRow;
+    }
+
+    if (selectedService && selectedService !== "Annual Inspection") {
+      const isReplacement = selectedService.toLowerCase().includes("replac");
+      nextRow.visitStatus = isReplacement ? "replaced" : "serviced";
+      nextRow.billableStatus = isReplacement ? "billable_replacement" : "billable_service";
+      return nextRow;
+    }
+  }
+
+  if (hasPriorSource && (nextRow.visitStatus === "not_reviewed" || nextRow.visitStatus === "confirmed")) {
+    nextRow.visitStatus = "updated";
+  }
+
+  return nextRow;
+}
+
 function toTechnicianFacingSaveMessage(message: string | null | undefined, action: "save" | "finalize") {
   const normalized = (message ?? "").trim();
   if (!normalized) {
@@ -338,7 +388,11 @@ export function useMobileReportDraftController({
         ? currentSection.fields[field.id] as unknown as Array<Record<string, ReportPrimitiveValue>>
         : [];
       const nextRows = currentRows.map((row, index) => index === rowIndex
-        ? applyRepeaterRowSmartUpdate(data.template, sectionId, field.id, { ...row, [rowFieldId]: value }, rowFieldId)
+        ? applyVisitActivityMetadata(
+            applyRepeaterRowSmartUpdate(data.template, sectionId, field.id, { ...row, [rowFieldId]: value }, rowFieldId),
+            rowFieldId,
+            value
+          )
         : row
       );
 

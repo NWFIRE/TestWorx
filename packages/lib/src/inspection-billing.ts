@@ -725,6 +725,84 @@ function normalizeBillableSelectionValues(value: unknown) {
   return [];
 }
 
+function isCarriedForwardRow(row: Record<string, ReportPrimitiveValue>) {
+  return typeof row.sourceReportId === "string" && row.sourceReportId.trim().length > 0;
+}
+
+function isExplicitBillableStatus(value: unknown) {
+  return typeof value === "string" && value.startsWith("billable_") && value !== "not_billable";
+}
+
+function hasExplicitVisitBillingActivity(
+  row: Record<string, ReportPrimitiveValue>,
+  mapping: BillableRepeaterMapping,
+  sourceValue: unknown
+) {
+  if (isExplicitBillableStatus(row.billableStatus)) {
+    return true;
+  }
+
+  if (row.visitStatus === "new" || row.visitStatus === "serviced" || row.visitStatus === "replaced") {
+    return true;
+  }
+
+  if (!mapping.expandValues) {
+    return false;
+  }
+
+  const selectedValues = normalizeBillableSelectionValues(sourceValue)
+    .filter((entry) => !mapping.includeValues || mapping.includeValues.includes(entry))
+    .filter((entry) => !mapping.excludeValues || !mapping.excludeValues.includes(entry));
+
+  return selectedValues.length > 0;
+}
+
+function shouldSkipNonBillableCarriedForwardRow(
+  row: Record<string, ReportPrimitiveValue>,
+  mapping: BillableRepeaterMapping,
+  sourceValue: unknown
+) {
+  if (!isCarriedForwardRow(row)) {
+    return false;
+  }
+
+  if (hasExplicitVisitBillingActivity(row, mapping, sourceValue)) {
+    return false;
+  }
+
+  return row.billableStatus === "not_billable" ||
+    row.visitStatus === "not_reviewed" ||
+    row.visitStatus === "confirmed" ||
+    row.carryForwardStatus === "carried_forward";
+}
+
+function buildRepeaterBillableMetadata(
+  baseMetadata: Record<string, unknown>,
+  row: Record<string, ReportPrimitiveValue>,
+  metadataFields?: string[]
+) {
+  const billingSourceLabel = row.visitStatus === "new"
+    ? "New item"
+    : row.visitStatus === "serviced"
+      ? "Service performed"
+      : row.visitStatus === "replaced"
+        ? "Replacement"
+        : isCarriedForwardRow(row)
+          ? "Carried forward"
+          : null;
+
+  return buildBillableMetadata({
+    ...baseMetadata,
+    sourceReportId: row.sourceReportId ?? null,
+    sourceReportItemId: row.sourceReportItemId ?? null,
+    carriedForwardFromDate: row.carriedForwardFromDate ?? null,
+    carryForwardStatus: row.carryForwardStatus ?? null,
+    visitStatus: row.visitStatus ?? null,
+    billableStatus: row.billableStatus ?? null,
+    billingSourceLabel
+  }, row, metadataFields);
+}
+
 function resolveBillableExtinguisherType(row: Record<string, ReportPrimitiveValue>) {
   return row.billingExtinguisherType ?? row.extinguisherTypeOther ?? row.extinguisherType ?? null;
 }
@@ -899,6 +977,14 @@ export function extractBillableItemsFromDraft(input: {
           : crypto.randomUUID();
 
       if (mapping.includePerRow) {
+        if (shouldSkipNonBillableCarriedForwardRow(typedRow, mapping, value)) {
+          continue;
+        }
+
+        if (isCarriedForwardRow(typedRow) && typedRow.billableStatus !== "billable_new") {
+          continue;
+        }
+
         if (!shouldIncludeBillableEntry(value, mapping, typedRow)) {
           continue;
         }
@@ -932,7 +1018,7 @@ export function extractBillableItemsFromDraft(input: {
           unit: mapping.unit,
           unitPrice: mapping.unitPrice ?? null,
           amount: calculateAmount(quantity, mapping.unitPrice ?? null),
-          metadata: buildBillableMetadata({
+          metadata: buildRepeaterBillableMetadata({
             displayGroup: mapping.displayGroup ?? mapping.category,
             repeater: mapping.repeater,
             assetId: typedRow.assetId ?? null,
@@ -945,6 +1031,10 @@ export function extractBillableItemsFromDraft(input: {
       }
 
       if (mapping.expandValues) {
+        if (shouldSkipNonBillableCarriedForwardRow(typedRow, mapping, value)) {
+          continue;
+        }
+
         const selectedValues = normalizeBillableSelectionValues(value)
           .filter((entry) => !mapping.includeValues || mapping.includeValues.includes(entry))
           .filter((entry) => !mapping.excludeValues || !mapping.excludeValues.includes(entry));
@@ -988,7 +1078,7 @@ export function extractBillableItemsFromDraft(input: {
             unit: mapping.unit,
             unitPrice: mapping.unitPrice ?? null,
             amount: calculateAmount(quantity, mapping.unitPrice ?? null),
-            metadata: buildBillableMetadata({
+            metadata: buildRepeaterBillableMetadata({
               displayGroup: mapping.displayGroup ?? mapping.category,
               repeater: mapping.repeater,
               assetId: typedRow.assetId ?? null,
@@ -1000,6 +1090,10 @@ export function extractBillableItemsFromDraft(input: {
           });
         }
 
+        continue;
+      }
+
+      if (shouldSkipNonBillableCarriedForwardRow(typedRow, mapping, value)) {
         continue;
       }
 
@@ -1033,7 +1127,7 @@ export function extractBillableItemsFromDraft(input: {
         unit: mapping.unit,
         unitPrice: mapping.unitPrice ?? null,
         amount: calculateAmount(quantity, mapping.unitPrice ?? null),
-        metadata: buildBillableMetadata({
+        metadata: buildRepeaterBillableMetadata({
           displayGroup: mapping.displayGroup ?? mapping.category,
           repeater: mapping.repeater,
           assetId: typedRow.assetId ?? null,
