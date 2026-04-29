@@ -488,6 +488,16 @@ export function MobileRepeatableRows({
           </div>
         );
       })}
+      {rows.length > 0 ? (
+        <button
+          className="min-h-12 w-full rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-[color:var(--tenant-primary-border)] hover:text-[var(--tenant-primary)] disabled:opacity-50"
+          disabled={disabled}
+          onClick={onAddRow}
+          type="button"
+        >
+          {addLabel}
+        </button>
+      ) : null}
     </div>
   );
 }

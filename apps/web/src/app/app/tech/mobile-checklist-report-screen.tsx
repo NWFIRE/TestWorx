@@ -922,8 +922,8 @@ export function MobileChecklistReportScreen({
       signatures: {
         ...currentDraft.signatures,
         [kind]: currentDraft.signatures[kind]
-          ? { ...currentDraft.signatures[kind], signerName: signerName.trim() }
-          : { signerName: signerName.trim(), imageDataUrl: "", signedAt: new Date().toISOString() }
+          ? { ...currentDraft.signatures[kind], signerName }
+          : { signerName, imageDataUrl: "", signedAt: new Date().toISOString() }
       }
     }), {
       debounceKey: `signature:${kind}`
@@ -1113,6 +1113,15 @@ export function MobileChecklistReportScreen({
                       </div>
                     );
                   })}
+                  {rows.length > 0 ? (
+                    <button
+                      className="min-h-12 w-full rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-[color:var(--tenant-primary-border)] hover:text-[var(--tenant-primary)]"
+                      onClick={() => addRepeaterRow(section.id, field)}
+                      type="button"
+                    >
+                      {field.addLabel ?? "Add row"}
+                    </button>
+                  ) : null}
                 </div>
               );
             })}

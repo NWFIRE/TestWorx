@@ -538,8 +538,8 @@ export function useMobileReportDraftController({
       signatures: {
         ...currentDraft.signatures,
         [kind]: currentDraft.signatures[kind]
-          ? { ...currentDraft.signatures[kind], signerName: signerName.trim() }
-          : { signerName: signerName.trim(), imageDataUrl: "", signedAt: new Date().toISOString() }
+          ? { ...currentDraft.signatures[kind], signerName }
+          : { signerName, imageDataUrl: "", signedAt: new Date().toISOString() }
       }
     }), {
       debounceKey: `signature:${kind}`
