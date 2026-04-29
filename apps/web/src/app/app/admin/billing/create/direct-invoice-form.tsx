@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 
 import { ActionButton } from "@/app/action-button";
+import { SearchSelect, type SearchSelectOption } from "@/app/search-select";
 import { useToast } from "@/app/toast-provider";
 
 type CustomerOption = {
@@ -19,6 +20,7 @@ type CatalogOption = {
   name: string;
   sku: string | null;
   itemType: string;
+  description: string | null;
   taxable: boolean;
   unitPrice: number | null;
 };
@@ -78,6 +80,21 @@ function parseQuantityInputValue(value: string) {
   return Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : 0;
 }
 
+function formatItemType(value: string) {
+  return value.replaceAll("_", " ").replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function buildCatalogSecondaryLabel(item: CatalogOption) {
+  return [
+    formatItemType(item.itemType),
+    item.description,
+    item.sku ? `SKU ${item.sku}` : null,
+    item.unitPrice !== null ? `$${item.unitPrice.toFixed(2)}` : null,
+    item.quickbooksItemId ? `QB ${item.quickbooksItemId}` : null,
+    item.quickbooksItemId ? "QuickBooks mapped" : "No QuickBooks mapping"
+  ].filter(Boolean).join(" | ");
+}
+
 function buildEmptyLine(): InvoiceLineValue {
   return {
     id: crypto.randomUUID(),
@@ -115,6 +132,15 @@ export function DirectInvoiceForm({
   const subtotal = useMemo(
     () => value.lineItems.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0),
     [value.lineItems]
+  );
+  const catalogOptions = useMemo<SearchSelectOption[]>(
+    () => catalogItems.map((item) => ({
+      value: item.id,
+      label: item.name,
+      secondaryLabel: buildCatalogSecondaryLabel(item),
+      badge: item.quickbooksItemId ? "QB mapped" : "Unmapped"
+    })),
+    [catalogItems]
   );
 
   function updateLine(index: number, patch: Partial<InvoiceLineValue>) {
@@ -348,20 +374,13 @@ export function DirectInvoiceForm({
                 <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr_0.7fr_0.7fr_auto]">
                   <label className="block">
                     <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Part or service</span>
-                    <select
-                      className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
-                      onChange={(event) => applyCatalogSelection(index, event.target.value)}
+                    <SearchSelect
+                      emptyText="No active parts or services matched that search."
+                      onChange={(selectedCatalogItemId) => applyCatalogSelection(index, selectedCatalogItemId)}
+                      options={catalogOptions}
+                      placeholder="Search by item, SKU, category, or QuickBooks id"
                       value={line.catalogItemId}
-                    >
-                      <option value="">Select item</option>
-                      {catalogItems.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                          {item.sku ? ` (${item.sku})` : ""}
-                          {item.unitPrice !== null ? ` • $${item.unitPrice.toFixed(2)}` : ""}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </label>
 
                   <label className="block">

@@ -2397,6 +2397,64 @@ describe("inspection billing persistence and admin review", () => {
     );
   });
 
+  it("matches manual catalog searches by description and QuickBooks item id", async () => {
+    const summaryRow = [
+      {
+        id: "summary_1",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        status: "draft",
+        subtotal: 0,
+        notes: null,
+        quickbooksSyncStatus: "not_synced",
+        quickbooksInvoiceId: null,
+        items: [
+          {
+            id: "line_1",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "fire_alarm",
+            category: "service",
+            description: "Miscellaneous service",
+            quantity: 1,
+            unitPrice: null
+          }
+        ]
+      }
+    ];
+    prismaMock.$queryRaw.mockImplementation(async () => summaryRow);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([
+      {
+        id: "catalog_monitoring",
+        quickbooksItemId: "QBO-SVC-42",
+        name: "Central Station Signal Test",
+        sku: "FA-SIGNAL",
+        itemType: "Service",
+        rawJson: {
+          Description: "Fire alarm monitoring verification and dispatch signal confirmation"
+        },
+        unitPrice: 85
+      }
+    ]);
+    prismaMock.quickBooksCatalogItemAlias.findMany.mockResolvedValue([]);
+
+    const byDescription = await searchBillingSummaryItemCatalogMatches(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { summaryId: "summary_1", itemId: "line_1", query: "dispatch signal" }
+    );
+    const byQuickBooksId = await searchBillingSummaryItemCatalogMatches(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { summaryId: "summary_1", itemId: "line_1", query: "QBO-SVC-42" }
+    );
+
+    expect(byDescription.results[0]).toEqual(expect.objectContaining({
+      catalogItemId: "catalog_monitoring",
+      description: "Fire alarm monitoring verification and dispatch signal confirmation"
+    }));
+    expect(byQuickBooksId.results[0]?.catalogItemId).toBe("catalog_monitoring");
+  });
+
   it("blocks manual catalog searching for service fee lines", async () => {
     prismaMock.$queryRaw.mockResolvedValueOnce([
       {

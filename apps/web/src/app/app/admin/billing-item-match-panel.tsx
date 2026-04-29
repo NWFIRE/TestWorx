@@ -10,6 +10,7 @@ type MatchCandidate = {
   name: string;
   sku: string | null;
   itemType: string;
+  description: string | null;
   unitPrice: number | null;
   alias: string | null;
   confidence: number;
@@ -31,7 +32,7 @@ const initialSearchState: SearchState = {
   error: null,
   query: "",
   results: [],
-  pagination: { page: 1, totalPages: 1, totalCount: 0, limit: 8 },
+  pagination: { page: 1, totalPages: 1, totalCount: 0, limit: 20 },
   hasSearched: false
 };
 
@@ -48,6 +49,31 @@ function confidenceLabel(confidence: number) {
   }
 
   return "Possible match";
+}
+
+function formatItemType(value: string) {
+  return value.replaceAll("_", " ").replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function formatMatchMethod(value: string) {
+  if (value === "source_mapping") {
+    return "saved mapping";
+  }
+  if (value === "catalog_search") {
+    return "catalog search";
+  }
+  return value.replaceAll("_", " ");
+}
+
+function buildCatalogOptionSecondaryLabel(candidate: MatchCandidate) {
+  return [
+    formatItemType(candidate.itemType),
+    candidate.description,
+    candidate.sku ? `SKU ${candidate.sku}` : null,
+    candidate.unitPrice !== null ? `$${candidate.unitPrice.toFixed(2)}` : null,
+    candidate.quickbooksItemId ? `QB ${candidate.quickbooksItemId}` : null,
+    candidate.quickbooksItemId ? "QuickBooks mapped" : "No QuickBooks mapping"
+  ].filter(Boolean).join(" | ");
 }
 
 export function BillingItemMatchPanel({
@@ -121,13 +147,8 @@ export function BillingItemMatchPanel({
     () => results.map((candidate) => ({
       value: candidate.catalogItemId,
       label: candidate.name,
-      secondaryLabel: [
-        candidate.itemType,
-        candidate.sku ? `SKU ${candidate.sku}` : null,
-        candidate.unitPrice !== null ? `$${candidate.unitPrice.toFixed(2)}` : null,
-        confidenceLabel(candidate.confidence)
-      ].filter(Boolean).join(" | "),
-      badge: candidate.autoMatchEligible ? "Recommended" : "Match"
+      secondaryLabel: buildCatalogOptionSecondaryLabel(candidate),
+      badge: candidate.autoMatchEligible ? "Recommended" : candidate.quickbooksItemId ? "QB mapped" : "Unmapped"
     })),
     [results]
   );
@@ -165,7 +186,10 @@ export function BillingItemMatchPanel({
         )}
         {activeMatch ? (
           <span className="min-w-0 break-words text-xs text-slate-500">
-            {confidenceLabel(activeMatch.confidence)} via {activeMatch.matchMethod.replaceAll("_", " ")}
+            {formatItemType(activeMatch.itemType)}
+            {activeMatch.unitPrice !== null ? ` | $${activeMatch.unitPrice.toFixed(2)}` : ""}
+            {` | ${activeMatch.quickbooksItemId ? "QuickBooks mapped" : "No QuickBooks mapping"}`}
+            {` | ${confidenceLabel(activeMatch.confidence)} via ${formatMatchMethod(activeMatch.matchMethod)}`}
           </span>
         ) : suggestedMatches[0] ? (
           <span className="min-w-0 break-words text-xs text-slate-500">
@@ -186,16 +210,19 @@ export function BillingItemMatchPanel({
           <SearchSelect
             customValue={activeMatch?.name ?? ""}
             emptyText={searchState.hasSearched
-              ? "No products or services matched that search."
-              : "No suggested matches yet. Search products and services."}
-            label="QuickBooks product or service"
+              ? "No active parts or services matched that search."
+              : "Start typing to search the full active parts and services catalog."}
+            label="Parts / services catalog item"
             loading={searchPending}
             onChange={(catalogItemId) => linkCandidate(catalogItemId)}
             onQueryChange={setSearchQuery}
             options={matchOptions}
-            placeholder="Search products and services"
+            placeholder="Search by item, description, SKU, category, or QuickBooks id"
             value={activeMatch?.catalogItemId ?? ""}
           />
+          <p className="text-xs leading-5 text-slate-500">
+            Search covers the active TradeWorx parts/services catalog. Unmatched lines are allowed, but QuickBooks sync works best when every billable line is mapped.
+          </p>
 
           {searchState.error ? <p className="text-sm text-rose-600">{searchState.error}</p> : null}
           {linkState.error ? <p className="text-sm text-rose-600">{linkState.error}</p> : null}

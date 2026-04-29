@@ -51,7 +51,7 @@ export type BillingReviewGroup<T extends BillableItem = BillableItem> = T & {
   subtotal: number;
 };
 
-export type BillingCatalogMatchMethod = "exact" | "normalized" | "alias" | "fuzzy" | "source_mapping" | "manual";
+export type BillingCatalogMatchMethod = "exact" | "normalized" | "alias" | "fuzzy" | "source_mapping" | "catalog_search" | "manual";
 
 export type BillingCatalogMatchSuggestion = {
   catalogItemId: string;
@@ -59,6 +59,7 @@ export type BillingCatalogMatchSuggestion = {
   name: string;
   sku: string | null;
   itemType: string;
+  description: string | null;
   unitPrice: number | null;
   alias: string | null;
   confidence: number;
@@ -77,8 +78,19 @@ type BillingItemCatalogMatchRecord = {
     name: string;
     sku: string | null;
     itemType: string;
+    rawJson?: Prisma.JsonValue | null;
     unitPrice: number | null;
   };
+};
+
+type CatalogCandidateRecord = {
+  id: string;
+  quickbooksItemId: string;
+  name: string;
+  sku: string | null;
+  itemType: string;
+  rawJson: Prisma.JsonValue | null;
+  unitPrice: number | null;
 };
 
 const AUTO_MATCH_CONFIDENCE_THRESHOLD = 0.96;
@@ -514,6 +526,56 @@ function buildBillingReviewGroupKey(item: Pick<
 
 function buildBillingItemSearchQuery(item: Pick<BillableItem, "code" | "description">) {
   return item.code?.trim() || item.description.trim();
+}
+
+function readCatalogRawString(rawJson: Prisma.JsonValue | null | undefined, keys: string[]) {
+  if (!rawJson || typeof rawJson !== "object" || Array.isArray(rawJson)) {
+    return null;
+  }
+
+  const record = rawJson as Record<string, unknown>;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
+function readCatalogDescription(rawJson: Prisma.JsonValue | null | undefined) {
+  return readCatalogRawString(rawJson, ["Description", "SalesDesc", "PurchaseDesc", "FullyQualifiedName"]);
+}
+
+function buildCatalogSearchText(catalogItem: Pick<CatalogCandidateRecord, "name" | "sku" | "itemType" | "quickbooksItemId" | "rawJson">, alias?: string | null) {
+  return [
+    catalogItem.name,
+    catalogItem.sku,
+    catalogItem.itemType,
+    catalogItem.quickbooksItemId,
+    alias,
+    readCatalogDescription(catalogItem.rawJson)
+  ].filter((value): value is string => typeof value === "string" && value.trim().length > 0).join(" ");
+}
+
+function matchesManualCatalogSearch(catalogItem: CatalogCandidateRecord, query: string, alias?: string | null) {
+  const normalizedQuery = normalizeMatchText(query);
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  const searchText = normalizeMatchText(buildCatalogSearchText(catalogItem, alias));
+  if (searchText.includes(normalizedQuery)) {
+    return true;
+  }
+
+  const queryTokens = tokenizeMatchText(query);
+  if (queryTokens.length === 0) {
+    return true;
+  }
+
+  return queryTokens.every((token) => searchText.includes(token));
 }
 
 function calculateTokenOverlapScore(left: string[], right: string[]) {
@@ -1324,6 +1386,7 @@ async function findStoredBillingItemCatalogMatch(tenantId: string, item: Billabl
           name: true,
           sku: true,
           itemType: true,
+          rawJson: true,
           unitPrice: true
         }
       }
@@ -1376,6 +1439,7 @@ async function findStoredQuickBooksCodeMapping(tenantId: string, item: BillableI
       name: true,
       sku: true,
       itemType: true,
+      rawJson: true,
       unitPrice: true
     }
   });
@@ -1397,35 +1461,23 @@ async function searchCatalogCandidates(
   options?: { page?: number; limit?: number; mode?: "manual" | "suggestion" }
 ) {
   const rawQuery = query.trim();
-  const normalizedQuery = normalizeMatchText(rawQuery);
   const tokenizedQuery = tokenizeMatchText(rawQuery);
   const searchTarget = {
     code: rawQuery || item.code,
     description: rawQuery || item.description
   };
   const page = Math.max(options?.page ?? 1, 1);
-  const limit = Math.min(Math.max(options?.limit ?? 8, 1), 20);
+  const limit = Math.min(Math.max(options?.limit ?? 8, 1), 50);
+  const isManualSearch = options?.mode === "manual";
   const confidenceThreshold =
-    options?.mode === "manual" ? MANUAL_SEARCH_CONFIDENCE_THRESHOLD : SUGGESTED_MATCH_CONFIDENCE_THRESHOLD;
-
-  if (!rawQuery) {
-    return {
-      results: [] as BillingCatalogMatchSuggestion[],
-      pagination: {
-        page: 1,
-        totalPages: 1,
-        totalCount: 0,
-        limit
-      }
-    };
-  }
+    isManualSearch ? MANUAL_SEARCH_CONFIDENCE_THRESHOLD : SUGGESTED_MATCH_CONFIDENCE_THRESHOLD;
 
   const [catalogItems, aliases] = await Promise.all([
     prisma.quickBooksCatalogItem.findMany({
       where: {
         tenantId,
         active: true,
-        ...(options?.mode === "manual"
+        ...(isManualSearch
           ? {}
           : {
               OR: [
@@ -1439,23 +1491,32 @@ async function searchCatalogCandidates(
               ]
             })
       },
+      orderBy: [{ name: "asc" }],
       select: {
         id: true,
         quickbooksItemId: true,
         name: true,
         sku: true,
         itemType: true,
+        rawJson: true,
         unitPrice: true
       },
-      take: 30
+      ...(isManualSearch ? {} : { take: 60 })
     }),
     prisma.quickBooksCatalogItemAlias.findMany({
       where: {
         tenantId,
-        OR: [
-          { alias: { contains: rawQuery, mode: "insensitive" } },
-          ...(normalizedQuery ? [{ normalizedAlias: { contains: normalizedQuery } }] : [])
-        ]
+        ...(rawQuery
+          ? {
+              OR: [
+                { alias: { contains: rawQuery, mode: "insensitive" } },
+                ...tokenizedQuery.map((token) => ({
+                  normalizedAlias: { contains: token }
+                }))
+              ]
+            }
+          : {}),
+        catalogItem: { is: { active: true } }
       },
       select: {
         alias: true,
@@ -1466,67 +1527,84 @@ async function searchCatalogCandidates(
             name: true,
             sku: true,
             itemType: true,
+            rawJson: true,
             unitPrice: true
           }
         }
       },
-      take: 30
+      ...(isManualSearch ? {} : { take: 60 })
     })
   ]);
 
   const candidates = new Map<string, BillingCatalogMatchSuggestion>();
 
   for (const catalogItem of catalogItems) {
+    if (isManualSearch && !matchesManualCatalogSearch(catalogItem, rawQuery)) {
+      continue;
+    }
+
     const scored = scoreCatalogMatch({
       item: searchTarget,
       catalogName: catalogItem.name,
       sku: catalogItem.sku
     });
-    if (scored.confidence < confidenceThreshold) {
+    const manualSearchConfidence = isManualSearch && rawQuery
+      ? Math.max(scored.confidence, 0.2)
+      : scored.confidence;
+    if (manualSearchConfidence < confidenceThreshold && rawQuery) {
       continue;
     }
 
     const existing = candidates.get(catalogItem.id);
-    if (!existing || scored.confidence > existing.confidence) {
+    if (!existing || manualSearchConfidence > existing.confidence) {
       candidates.set(catalogItem.id, {
         catalogItemId: catalogItem.id,
         quickbooksItemId: catalogItem.quickbooksItemId,
         name: catalogItem.name,
         sku: catalogItem.sku,
         itemType: catalogItem.itemType,
+        description: readCatalogDescription(catalogItem.rawJson),
         unitPrice: catalogItem.unitPrice,
         alias: null,
-        confidence: scored.confidence,
-        matchMethod: scored.matchMethod,
-        autoMatchEligible: scored.confidence >= AUTO_MATCH_CONFIDENCE_THRESHOLD
+        confidence: manualSearchConfidence,
+        matchMethod: isManualSearch && manualSearchConfidence === 0.2 ? "catalog_search" : scored.matchMethod,
+        autoMatchEligible: !isManualSearch && scored.confidence >= AUTO_MATCH_CONFIDENCE_THRESHOLD
       });
     }
   }
 
   for (const alias of aliases) {
+    if (isManualSearch && !matchesManualCatalogSearch(alias.catalogItem, rawQuery, alias.alias)) {
+      continue;
+    }
+
     const scored = scoreCatalogMatch({
       item: searchTarget,
       catalogName: alias.catalogItem.name,
       alias: alias.alias,
       sku: alias.catalogItem.sku
     });
-    if (scored.confidence < confidenceThreshold) {
+    const manualSearchConfidence = isManualSearch && rawQuery
+      ? Math.max(scored.confidence, 0.2)
+      : scored.confidence;
+    if (manualSearchConfidence < confidenceThreshold && rawQuery) {
       continue;
     }
 
     const existing = candidates.get(alias.catalogItem.id);
-    if (!existing || scored.confidence > existing.confidence) {
+    if (!existing || manualSearchConfidence > existing.confidence) {
       candidates.set(alias.catalogItem.id, {
         catalogItemId: alias.catalogItem.id,
         quickbooksItemId: alias.catalogItem.quickbooksItemId,
         name: alias.catalogItem.name,
         sku: alias.catalogItem.sku,
         itemType: alias.catalogItem.itemType,
+        description: readCatalogDescription(alias.catalogItem.rawJson),
         unitPrice: alias.catalogItem.unitPrice,
         alias: alias.alias,
-        confidence: scored.confidence,
-        matchMethod: scored.matchMethod,
-        autoMatchEligible: scored.confidence >= AUTO_MATCH_CONFIDENCE_THRESHOLD
+        confidence: manualSearchConfidence,
+        matchMethod: isManualSearch && manualSearchConfidence === 0.2 ? "catalog_search" : scored.matchMethod,
+        autoMatchEligible: !isManualSearch && scored.confidence >= AUTO_MATCH_CONFIDENCE_THRESHOLD
       });
     }
   }
@@ -1577,6 +1655,7 @@ async function buildBillingItemCatalogState(tenantId: string, item: BillableItem
         name: true,
         sku: true,
         itemType: true,
+        rawJson: true,
         unitPrice: true
       }
     });
@@ -1589,6 +1668,7 @@ async function buildBillingItemCatalogState(tenantId: string, item: BillableItem
           name: linkedItem.name,
           sku: linkedItem.sku,
           itemType: linkedItem.itemType,
+          description: readCatalogDescription(linkedItem.rawJson),
           unitPrice: linkedItem.unitPrice,
           alias: null,
           confidence: item.linkedMatchConfidence ?? 1,
@@ -1609,6 +1689,7 @@ async function buildBillingItemCatalogState(tenantId: string, item: BillableItem
         name: storedMatch.catalogItem.name,
         sku: storedMatch.catalogItem.sku,
         itemType: storedMatch.catalogItem.itemType,
+        description: readCatalogDescription(storedMatch.catalogItem.rawJson),
         unitPrice: storedMatch.catalogItem.unitPrice,
         alias: null,
         confidence: storedMatch.confidence,
@@ -1628,6 +1709,7 @@ async function buildBillingItemCatalogState(tenantId: string, item: BillableItem
         name: storedCodeMapping.catalogItem.name,
         sku: storedCodeMapping.catalogItem.sku,
         itemType: storedCodeMapping.catalogItem.itemType,
+        description: readCatalogDescription(storedCodeMapping.catalogItem.rawJson),
         unitPrice: storedCodeMapping.catalogItem.unitPrice,
         alias: null,
         confidence: 1,

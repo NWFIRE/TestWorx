@@ -3762,6 +3762,7 @@ export async function getQuickBooksDirectInvoiceFormOptions(actor: ActorContext)
         name: true,
         sku: true,
         itemType: true,
+        rawJson: true,
         taxable: true,
         unitPrice: true
       }
@@ -3771,7 +3772,19 @@ export async function getQuickBooksDirectInvoiceFormOptions(actor: ActorContext)
   return {
     connection,
     customers,
-    catalogItems
+    catalogItems: catalogItems.map((item) => ({
+      id: item.id,
+      quickbooksItemId: item.quickbooksItemId,
+      name: item.name,
+      sku: item.sku,
+      itemType: item.itemType,
+      description: readQuickBooksStringField(item.rawJson, "Description")
+        ?? readQuickBooksStringField(item.rawJson, "SalesDesc")
+        ?? readQuickBooksStringField(item.rawJson, "PurchaseDesc")
+        ?? readQuickBooksStringField(item.rawJson, "FullyQualifiedName"),
+      taxable: item.taxable,
+      unitPrice: item.unitPrice
+    }))
   };
 }
 

@@ -735,6 +735,7 @@ export async function searchBillingSummaryItemCatalogMatchesAction(
       name: string;
       sku: string | null;
       itemType: string;
+      description: string | null;
       unitPrice: number | null;
       alias: string | null;
       confidence: number;
@@ -757,7 +758,7 @@ export async function searchBillingSummaryItemCatalogMatchesAction(
       error: "Unauthorized",
       query,
       results: [],
-      pagination: { page: 1, totalPages: 1, totalCount: 0, limit: 8 },
+      pagination: { page: 1, totalPages: 1, totalCount: 0, limit: 20 },
       hasSearched: true
     };
   }
@@ -765,7 +766,7 @@ export async function searchBillingSummaryItemCatalogMatchesAction(
   try {
     const result = await searchBillingSummaryItemCatalogMatches(
       { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-      { summaryId, itemId, query, page: Number.isFinite(page) ? page : 1, limit: 8 }
+      { summaryId, itemId, query, page: Number.isFinite(page) ? page : 1, limit: 20 }
     );
 
     return {
@@ -780,7 +781,7 @@ export async function searchBillingSummaryItemCatalogMatchesAction(
       error: error instanceof Error ? error.message : "Unable to search products and services.",
       query,
       results: [],
-      pagination: { page: 1, totalPages: 1, totalCount: 0, limit: 8 },
+      pagination: { page: 1, totalPages: 1, totalCount: 0, limit: 20 },
       hasSearched: true
     };
   }

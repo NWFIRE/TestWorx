@@ -24,6 +24,7 @@ type BillingSummaryLineItem = BillingSummaryDetail["reviewGroupedItems"][keyof B
     name: string;
     sku: string | null;
     itemType: string;
+    description: string | null;
     unitPrice: number | null;
     alias: string | null;
     confidence: number;
@@ -36,6 +37,7 @@ type BillingSummaryLineItem = BillingSummaryDetail["reviewGroupedItems"][keyof B
     name: string;
     sku: string | null;
     itemType: string;
+    description: string | null;
     unitPrice: number | null;
     alias: string | null;
     confidence: number;
