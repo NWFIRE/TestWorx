@@ -27,6 +27,38 @@ function hasAttachedPdfs(inspection: any) {
   return (inspection.documents?.length ?? 0) > 0 || (inspection.attachments?.length ?? 0) > 0;
 }
 
+function isPlaceholderMonthAnchor(task: any, dueDate: Date) {
+  return typeof task.dueMonth === "string" && dueDate.toISOString().slice(0, 10) === `${task.dueMonth}-01`;
+}
+
+function getHardDueDate(inspection: any) {
+  const dates = (inspection.tasks ?? [])
+    .map((task: any) => {
+      if (!task.dueDate) {
+        return null;
+      }
+      const dueDate = toDateValue(task.dueDate);
+      return isPlaceholderMonthAnchor(task, dueDate) ? null : dueDate;
+    })
+    .filter(Boolean) as Date[];
+
+  return dates.sort((left, right) => left.getTime() - right.getTime())[0] ?? null;
+}
+
+function formatTechnicianWorkTiming(inspection: any) {
+  const hardDueDate = getHardDueDate(inspection);
+  if (hardDueDate) {
+    return `Hard date ${format(hardDueDate, "MMM d")}`;
+  }
+
+  const dueMonth = (inspection.tasks ?? []).find((task: any) => typeof task.dueMonth === "string" && task.dueMonth)?.dueMonth;
+  if (dueMonth) {
+    return `Due ${format(toDateValue(`${dueMonth}-01T00:00:00`), "MMMM yyyy")}`;
+  }
+
+  return `Due ${format(toDateValue(inspection.scheduledStart), "MMMM yyyy")}`;
+}
+
 function shouldIgnoreCardNavigation(target: EventTarget | null) {
   return target instanceof HTMLElement && Boolean(target.closest("a, button, input, select, textarea, label"));
 }
@@ -197,7 +229,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                   </span>
                 </div>
                 <p className="mt-3 text-sm text-slate-600">
-                  Open {format(toDateValue(inspection.scheduledStart), "MMM d, h:mm a")}
+                  {formatTechnicianWorkTiming(inspection)}
                 </p>
                 {hasAttachedPdfs(inspection) ? (
                   <div className="mt-4">
@@ -267,7 +299,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                       {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
                     </div>
                     <span className="inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                      {format(toDateValue(inspection.scheduledStart), "MMM d")}
+                      {formatTechnicianWorkTiming(inspection)}
                     </span>
                   </div>
                   <p className="mt-3 text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>

@@ -372,12 +372,53 @@ describe("month defaults and past-due status", () => {
     expect(defaultScheduledStartForMonth("2026-03", "2026-03-19T14:45")).toBe("2026-03-01T14:45");
   });
 
-  it("marks incomplete inspections as past due after month end", () => {
+  it("keeps due-month inspections out of past due after month end", () => {
     expect(
       isInspectionPastDue({
         status: InspectionStatus.scheduled,
         scheduledStart: new Date("2026-03-01T09:00:00.000Z"),
+        tasks: [
+          {
+            dueMonth: "2026-03",
+            dueDate: null,
+            schedulingStatus: "scheduled_now"
+          }
+        ],
         now: new Date("2026-04-01T06:00:00.000Z")
+      })
+    ).toBe(false);
+  });
+
+  it("does not treat old first-of-month due-date placeholders as hard scheduled dates", () => {
+    expect(
+      isInspectionPastDue({
+        status: InspectionStatus.scheduled,
+        scheduledStart: new Date("2026-03-01T09:00:00.000Z"),
+        tasks: [
+          {
+            dueMonth: "2026-03",
+            dueDate: new Date("2026-03-01T00:00:00.000Z"),
+            schedulingStatus: "scheduled_now"
+          }
+        ],
+        now: new Date("2026-04-01T06:00:00.000Z")
+      })
+    ).toBe(false);
+  });
+
+  it("marks incomplete inspections as past due only after a hard scheduled date passes", () => {
+    expect(
+      isInspectionPastDue({
+        status: InspectionStatus.scheduled,
+        scheduledStart: new Date("2026-03-01T09:00:00.000Z"),
+        tasks: [
+          {
+            dueMonth: "2026-03",
+            dueDate: new Date("2026-03-15T00:00:00.000Z"),
+            schedulingStatus: "scheduled_now"
+          }
+        ],
+        now: new Date("2026-03-16T06:00:00.000Z")
       })
     ).toBe(true);
   });
@@ -387,6 +428,13 @@ describe("month defaults and past-due status", () => {
       isInspectionPastDue({
         status: InspectionStatus.completed,
         scheduledStart: new Date("2026-03-01T09:00:00.000Z"),
+        tasks: [
+          {
+            dueMonth: "2026-03",
+            dueDate: new Date("2026-03-15T00:00:00.000Z"),
+            schedulingStatus: "scheduled_now"
+          }
+        ],
         now: new Date("2026-04-01T00:00:00.000Z")
       })
     ).toBe(false);

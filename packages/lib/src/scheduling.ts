@@ -1,4 +1,4 @@
-import { addMonths, endOfMonth, endOfWeek, format, isAfter, isSameDay, startOfDay, startOfMonth, subDays, subMonths } from "date-fns";
+import { addMonths, endOfDay, endOfMonth, endOfWeek, format, isAfter, isSameDay, startOfDay, startOfMonth, subDays, subMonths } from "date-fns";
 import {
   AttachmentKind,
   InspectionClassification,
@@ -313,6 +313,35 @@ export function getInspectionCloseoutRequestTone(status: InspectionCloseoutReque
 
 export function isCurrentVisitTaskSchedulingStatus(status?: string | null) {
   return Boolean(status && currentVisitTaskSchedulingStatuses.has(status as InspectionTaskSchedulingStatus));
+}
+
+function formatDueMonthDateAnchor(dueMonth: string | null | undefined) {
+  const normalized = dueMonth?.trim();
+  return normalized && /^\d{4}-\d{2}$/.test(normalized) ? `${normalized}-01` : null;
+}
+
+function isPlaceholderMonthAnchorDueDate(input: { dueDate?: Date | null; dueMonth?: string | null }) {
+  if (!(input.dueDate instanceof Date) || Number.isNaN(input.dueDate.getTime())) {
+    return false;
+  }
+
+  const monthAnchor = formatDueMonthDateAnchor(input.dueMonth);
+  return Boolean(monthAnchor && input.dueDate.toISOString().slice(0, 10) === monthAnchor);
+}
+
+function getHardScheduledDueDate(tasks?: Array<{ dueDate?: Date | null; dueMonth?: string | null; schedulingStatus?: string | null }> | null) {
+  const hardDates = (tasks ?? [])
+    .filter((task) => isCurrentVisitTaskSchedulingStatus(task.schedulingStatus ?? "scheduled_now"))
+    .map((task) => task.dueDate instanceof Date && !Number.isNaN(task.dueDate.getTime()) && !isPlaceholderMonthAnchorDueDate(task)
+      ? task.dueDate
+      : null)
+    .filter((date): date is Date => Boolean(date));
+
+  if (!hardDates.length) {
+    return null;
+  }
+
+  return hardDates.reduce((earliest, current) => current.getTime() < earliest.getTime() ? current : earliest);
 }
 
 function normalizeTaskDueMonth(input: { dueMonth?: string | null; dueDate?: Date | null; fallbackMonth?: string | null }) {
@@ -742,18 +771,25 @@ export function formatAssignedTechnicianNames(input: {
 export function isInspectionPastDue(input: {
   status: InspectionStatus;
   scheduledStart: Date;
+  tasks?: Array<{ dueDate?: Date | null; dueMonth?: string | null; schedulingStatus?: string | null }> | null;
   now?: Date;
 }) {
   if (isTerminalInspectionStatus(input.status)) {
     return false;
   }
 
-  return isAfter(input.now ?? new Date(), endOfMonth(input.scheduledStart));
+  const hardScheduledDueDate = getHardScheduledDueDate(input.tasks);
+  if (!hardScheduledDueDate) {
+    return false;
+  }
+
+  return isAfter(input.now ?? new Date(), endOfDay(hardScheduledDueDate));
 }
 
 export function getInspectionDisplayStatus(input: {
   status: InspectionStatus;
   scheduledStart: Date;
+  tasks?: Array<{ dueDate?: Date | null; dueMonth?: string | null; schedulingStatus?: string | null }> | null;
   now?: Date;
 }) {
   return isInspectionPastDue(input) ? "past_due" : input.status;
@@ -1021,7 +1057,7 @@ function parseInspectionFormData(formData: FormData) {
           frequency: String(formData.get(`frequency:${inspectionType}`) ?? getDefaultInspectionRecurrenceFrequency(inspectionType)),
           assignedTechnicianId: assignedTechnicianIds[0] ?? null,
           dueMonth: inspectionMonth || scheduledStart.slice(0, 7),
-          dueDate: parseDateTimeInput(scheduledStart),
+          dueDate: null,
           schedulingStatus: "scheduled_now",
           notes: undefined
         }));
@@ -3465,7 +3501,7 @@ export async function getInspectionForEdit(actor: ActorContext, inspectionId: st
       customerBillingPostalCode: inspection.customerCompany.billingPostalCode
     }),
     lifecycle,
-    displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
+    displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart, tasks: inspection.tasks }),
     assignedTechnicianNames: formatAssignedTechnicianNames({
       assignedTechnician: inspection.assignedTechnician,
       technicianAssignments: readTechnicianNameAssignments(inspection)
@@ -3587,7 +3623,7 @@ export async function getAdminDashboardData(actor: ActorContext) {
       ...inspection,
       tasks: withInspectionTaskDisplayLabels(inspection.tasks),
       ...displayLabels,
-      displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
+      displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart, tasks: inspection.tasks }),
       billingStatus: inspectionWithOptionalBillingSummary.billingSummary?.status ?? null,
       assignedTechnicianNames: formatAssignedTechnicianNames({
         assignedTechnician: inspection.assignedTechnician,
@@ -3694,7 +3730,7 @@ export async function getAdminUpcomingInspectionsData(
       customerBillingState: inspection.customerCompany.billingState,
       customerBillingPostalCode: inspection.customerCompany.billingPostalCode
     }),
-    displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
+    displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart, tasks: inspection.tasks }),
     assignedTechnicianNames: formatAssignedTechnicianNames({
       assignedTechnician: inspection.assignedTechnician,
       technicianAssignments: readTechnicianNameAssignments(inspection)
@@ -3839,7 +3875,8 @@ export async function getAdminSchedulingQueueData(
       }),
       displayStatus: getInspectionDisplayStatus({
         status: inspection.status,
-        scheduledStart: inspection.scheduledStart
+        scheduledStart: inspection.scheduledStart,
+        tasks: currentTasks
       }),
       assignedTechnicianNames: formatAssignedTechnicianNames({
         assignedTechnician: inspection.assignedTechnician,
@@ -4239,7 +4276,7 @@ export async function getAdminAmendmentManagementData(
         customerBillingState: inspection.customerCompany.billingState,
         customerBillingPostalCode: inspection.customerCompany.billingPostalCode
       }),
-      displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
+      displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart, tasks: inspection.tasks }),
       assignedTechnicianNames: formatAssignedTechnicianNames({
         assignedTechnician: inspection.assignedTechnician,
         technicianAssignments: readTechnicianNameAssignments(inspection)
@@ -4289,6 +4326,7 @@ function buildMonthCalendar(inspections: Array<{
   status: InspectionStatus;
   inspectionClassification: InspectionClassification;
   isPriority: boolean;
+  tasks?: Array<{ dueDate?: Date | null; dueMonth?: string | null; schedulingStatus?: string | null }>;
   site: {
     name: string;
     addressLine1: string | null;
@@ -4334,7 +4372,7 @@ function buildMonthCalendar(inspections: Array<{
     dayKey: format(inspection.scheduledStart, "yyyy-MM-dd"),
     label: format(inspection.scheduledStart, "MMM d"),
     siteName: getCustomerFacingSiteLabel(inspection.site.name) ?? inspection.customerCompany.name,
-    status: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
+    status: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart, tasks: inspection.tasks }),
     inspectionClassification: inspection.inspectionClassification,
     isPriority: inspection.isPriority
   }));
@@ -4469,7 +4507,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
       customerBillingPostalCode: inspection.customerCompany.billingPostalCode
     }),
     closeoutRequest: inspection.closeoutRequest,
-    displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
+    displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart, tasks: inspection.tasks }),
     assignedTechnicianNames: formatAssignedTechnicianNames({
       assignedTechnician: inspection.assignedTechnician,
       technicianAssignments: readTechnicianNameAssignments(inspection)
@@ -4507,7 +4545,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
           customerBillingState: inspection.customerCompany.billingState,
           customerBillingPostalCode: inspection.customerCompany.billingPostalCode
         }),
-        displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
+        displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart, tasks: inspection.tasks }),
         assignedTechnicianNames: formatAssignedTechnicianNames({
           assignedTechnician: inspection.assignedTechnician,
           technicianAssignments: readTechnicianNameAssignments(inspection)
@@ -4536,7 +4574,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
         customerBillingState: inspection.customerCompany.billingState,
         customerBillingPostalCode: inspection.customerCompany.billingPostalCode
       }),
-      displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart }),
+      displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart, tasks: inspection.tasks }),
       assignedTechnicianNames: formatAssignedTechnicianNames({
         assignedTechnician: inspection.assignedTechnician,
         technicianAssignments: readTechnicianNameAssignments(inspection)

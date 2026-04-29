@@ -94,7 +94,6 @@ export type InspectionSchedulerFormInitialValues = {
 
 function createServiceLineDraft(
   inspectionMonth: string,
-  scheduledStart?: string,
   initialValue?: InspectionTaskValue
 ): ServiceLineDraft {
   const inspectionType = initialValue?.inspectionType ?? inspectionTypeOptions[0] ?? "fire_extinguisher";
@@ -104,7 +103,7 @@ function createServiceLineDraft(
     frequency: initialValue?.frequency ?? getDefaultInspectionRecurrenceFrequency(inspectionType),
     assignedTechnicianId: initialValue?.assignedTechnicianId ?? "",
     dueMonth: initialValue?.dueMonth ?? inspectionMonth,
-    dueDate: initialValue?.dueDate ?? scheduledStart?.slice(0, 10) ?? "",
+    dueDate: initialValue?.dueDate ?? "",
     schedulingStatus: initialValue?.schedulingStatus ?? "scheduled_now",
     notes: initialValue?.notes ?? ""
   };
@@ -114,16 +113,13 @@ function buildInitialServiceLines(initialValues?: InspectionSchedulerFormInitial
   const inspectionMonth =
     initialValues?.inspectionMonth ??
     (initialValues?.scheduledStart ? initialValues.scheduledStart.slice(0, 7) : new Date().toISOString().slice(0, 7));
-  const scheduledStart =
-    initialValues?.scheduledStart ?? defaultScheduledStartForMonth(inspectionMonth);
-
   if (initialValues?.tasks?.length) {
     return initialValues.tasks.map((task) =>
-      createServiceLineDraft(inspectionMonth, scheduledStart, task)
+      createServiceLineDraft(inspectionMonth, task)
     );
   }
 
-  return [createServiceLineDraft(inspectionMonth, scheduledStart)];
+  return [createServiceLineDraft(inspectionMonth)];
 }
 
 function serializeInitialValues(initialValues?: InspectionSchedulerFormInitialValues) {
@@ -335,7 +331,7 @@ export function InspectionSchedulerForm({
   };
 
   const addServiceLine = () => {
-    const nextLine = createServiceLineDraft(inspectionMonth, scheduledStart);
+    const nextLine = createServiceLineDraft(inspectionMonth);
     setServiceLines((current) => [...current, nextLine]);
     setNewestServiceLineId(nextLine.id);
   };
@@ -358,7 +354,7 @@ export function InspectionSchedulerForm({
     setStatus("to_be_completed");
     setNotes("");
     setStartManuallyEdited(false);
-    setServiceLines([createServiceLineDraft(defaultMonth, defaultStart)]);
+    setServiceLines([createServiceLineDraft(defaultMonth)]);
     setExternalDocumentFiles([]);
     setExternalDocumentLabel("");
     setExternalDocumentsRequireSignature(true);
@@ -674,10 +670,10 @@ export function InspectionSchedulerForm({
             type="month"
             value={inspectionMonth}
           />
-          <p className="mt-2 text-sm leading-5 text-slate-500">This is the visit month. Each service line below can still carry its own due month or exact due date.</p>
+          <p className="mt-2 text-sm leading-5 text-slate-500">This is the normal due period technicians use for planning. Use a hard date only when the visit truly has to happen on a specific day.</p>
         </div>
         <div className="min-w-0">
-          <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="scheduledStart">Visit start</label>
+          <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="scheduledStart">Dispatch anchor</label>
           <PickerField
             id="scheduledStart"
             icon={
@@ -695,6 +691,7 @@ export function InspectionSchedulerForm({
             type="datetime-local"
             value={scheduledStart}
           />
+          <p className="mt-2 text-sm leading-5 text-slate-500">Defaults to the first day of the visit month for calendar grouping. This is not shown as a hard due date unless a service line hard date is set.</p>
         </div>
       </div>
       <div className="grid min-w-0 gap-4 md:grid-cols-2">
@@ -733,7 +730,7 @@ export function InspectionSchedulerForm({
           <div>
             <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 sm:text-sm sm:tracking-[0.2em]">Services on this visit</p>
             <h4 className="mt-1 text-lg font-semibold text-ink">Schedule for this visit and track future due work</h4>
-            <p className="mt-2 text-sm leading-5 text-slate-500">Each service line can have its own technician, due month, due date, and scheduling status.</p>
+            <p className="mt-2 text-sm leading-5 text-slate-500">Each service line can have its own technician, due month, optional hard date, and scheduling status.</p>
           </div>
         </div>
         <div className="space-y-4">
@@ -864,7 +861,7 @@ export function InspectionSchedulerForm({
                     />
                   </div>
                   <div className="min-w-0">
-                    <label className="mb-2 block text-sm font-medium text-slate-600">Due date</label>
+                    <label className="mb-2 block text-sm font-medium text-slate-600">Hard scheduled date</label>
                     <PickerField
                       id={`serviceLineDueDate-${line.id}`}
                       icon={
@@ -878,6 +875,7 @@ export function InspectionSchedulerForm({
                       type="date"
                       value={line.dueDate}
                     />
+                    <p className="mt-2 text-sm leading-5 text-slate-500">Optional. Leave blank for normal due-month scheduling.</p>
                   </div>
                 </div>
 
