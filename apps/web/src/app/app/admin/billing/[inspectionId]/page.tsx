@@ -135,6 +135,41 @@ function buildBillingItemContext(item: {
   return context;
 }
 
+function isComplianceReportingFeeItem(item: {
+  code?: string | null;
+  description?: string | null;
+  metadata?: Record<string, unknown> | null;
+  reportType?: string | null;
+}) {
+  const feeType = typeof item.metadata?.feeType === "string" ? item.metadata.feeType : "";
+
+  return feeType === "compliance_reporting"
+    || item.reportType === "compliance_reporting"
+    || item.code?.startsWith("COMPLIANCE_REPORTING_FEE")
+    || item.description === "Compliance Reporting Fee";
+}
+
+function getFeeDisplayRank(item: BillingSummaryLineItem) {
+  if (isComplianceReportingFeeItem(item)) {
+    return 1;
+  }
+
+  const feeType = typeof item.metadata?.feeType === "string" ? item.metadata.feeType : "";
+  if (feeType === "service_fee" || item.sourceField === "serviceFee" || item.sourceSection === "service-fee") {
+    return 0;
+  }
+
+  return 2;
+}
+
+function sortBillingItemsForDisplay(category: keyof typeof categoryLabels, items: BillingSummaryLineItem[]) {
+  if (category !== "fee") {
+    return items;
+  }
+
+  return [...items].sort((left, right) => getFeeDisplayRank(left) - getFeeDisplayRank(right));
+}
+
 function describeAutomaticFeeSource(item: {
   metadata?: Record<string, unknown> | null;
 }) {
@@ -205,7 +240,8 @@ export default async function BillingSummaryDetailPage({
     notFound();
   }
 
-  const groupedEntries = Object.entries(summary.reviewGroupedItems) as Array<[keyof typeof categoryLabels, typeof summary.reviewGroupedItems[keyof typeof summary.reviewGroupedItems]]>;
+  const groupedEntries = (Object.entries(summary.reviewGroupedItems) as Array<[keyof typeof categoryLabels, BillingSummaryLineItem[]]>)
+    .map(([category, items]) => [category, sortBillingItemsForDisplay(category, items)] as const);
   const isInvoiced = summary.status === "invoiced";
   const canUseQuickBooksActions = quickBooksConnection.connection.connected;
   const summaryQuickBooksMode = summary.quickbooksConnectionMode === "sandbox" || summary.quickbooksConnectionMode === "live"
@@ -316,8 +352,16 @@ export default async function BillingSummaryDetailPage({
                         {item.unitPrice === null || item.unitPrice === undefined ? <p className="text-sm font-semibold text-amber-700">Missing unit price. Review recommended.</p> : null}
                         {item.category === "fee" ? (
                           <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50/70 px-4 py-4 text-sm text-amber-900">
-                            <p className="font-semibold text-amber-950">Automatic fee line</p>
+                            <p className="font-semibold text-amber-950">{isComplianceReportingFeeItem(item) ? "Compliance reporting fee assessed" : "Automatic fee line"}</p>
+                            {isComplianceReportingFeeItem(item) ? (
+                              <p className="mt-2 font-medium text-amber-950">
+                                This fee will be included on the invoice. Confirm it here before syncing or sending.
+                              </p>
+                            ) : null}
                             <p className="mt-2">{describeAutomaticFeeSource(item)}</p>
+                            {isComplianceReportingFeeItem(item) && item.unitPrice !== null && item.unitPrice !== undefined ? (
+                              <p className="mt-2 text-amber-800">Assessed fee: ${(item.quantity * item.unitPrice).toFixed(2)}</p>
+                            ) : null}
                             {typeof item.metadata?.serviceFeePriority === "number" ? (
                               <p className="mt-2 text-amber-800">Rule priority: {item.metadata.serviceFeePriority}</p>
                             ) : null}
