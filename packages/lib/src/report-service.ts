@@ -840,7 +840,21 @@ async function persistDraftMedia(input: { tenantId: string; draft: ReportDraft; 
   return { draft, staleStorageKeys };
 }
 
-async function getAuthorizedEditableReport(actor: ActorContext, inspectionReportId: string) {
+function canFinalizeReportOnCompletedInspection(input: {
+  actorRole: string;
+  inspectionStatus: InspectionStatus;
+  reportStatus: ReportStatus;
+}) {
+  return input.actorRole === "technician" &&
+    input.inspectionStatus === InspectionStatus.completed &&
+    input.reportStatus !== reportStatuses.finalized;
+}
+
+async function getAuthorizedEditableReport(
+  actor: ActorContext,
+  inspectionReportId: string,
+  options: { allowCompletedInspectionFinalize?: boolean } = {}
+) {
   const parsedActor = parseActor(actor);
 
   const report = await prisma.inspectionReport.findFirst({
@@ -876,7 +890,15 @@ async function getAuthorizedEditableReport(actor: ActorContext, inspectionReport
   if (
     parsedActor.role === "technician" &&
     !isActiveOperationalInspectionStatus(report.inspection.status) &&
-    !hasActiveCorrectionState(report.correctionState)
+    !hasActiveCorrectionState(report.correctionState) &&
+    !(
+      options.allowCompletedInspectionFinalize &&
+      canFinalizeReportOnCompletedInspection({
+        actorRole: parsedActor.role,
+        inspectionStatus: report.inspection.status,
+        reportStatus: report.status
+      })
+    )
   ) {
     throw new Error("Closed inspections are no longer editable in the technician app.");
   }
@@ -1462,12 +1484,106 @@ async function replaceGeneratedReportPdfTx(
   };
 }
 
-export async function finalizeInspectionReport(actor: ActorContext, input: {
-  inspectionReportId: string;
-  contentJson: unknown;
+type FinalizeInspectionReportInput = {
+  inspectionReportId?: string;
+  inspectionId?: string;
+  taskId?: string;
+  contentJson?: unknown;
+  draft?: unknown;
   taskDisplayLabel?: string | null;
+};
+
+function normalizeFinalizeInspectionReportInput(input: FinalizeInspectionReportInput) {
+  if (!input || typeof input !== "object") {
+    throw new Error("Report finalization request must include report content.");
+  }
+
+  const inspectionReportId = typeof input.inspectionReportId === "string" && input.inspectionReportId.trim()
+    ? input.inspectionReportId.trim()
+    : null;
+  const inspectionId = typeof input.inspectionId === "string" && input.inspectionId.trim()
+    ? input.inspectionId.trim()
+    : null;
+  const taskId = typeof input.taskId === "string" && input.taskId.trim()
+    ? input.taskId.trim()
+    : null;
+
+  if (!inspectionReportId && (!inspectionId || !taskId)) {
+    throw new Error("Report finalization request must include a report id or inspection and task id.");
+  }
+
+  const contentJson = input.contentJson ?? input.draft;
+  return {
+    inspectionReportId,
+    inspectionId,
+    taskId,
+    contentJson,
+    taskDisplayLabel: typeof input.taskDisplayLabel === "string" ? input.taskDisplayLabel : null
+  };
+}
+
+function isZodLikeError(error: unknown): error is { issues: Array<{ message?: string }> } {
+  return Boolean(
+    error &&
+    typeof error === "object" &&
+    "issues" in error &&
+    Array.isArray((error as { issues?: unknown }).issues)
+  );
+}
+
+function toFinalizeDraftValidationError(error: unknown) {
+  if (error instanceof Error && error.message.trim()) {
+    return error;
+  }
+
+  if (isZodLikeError(error)) {
+    const firstMessage = error.issues.find((issue) => issue.message)?.message;
+    return new Error(firstMessage
+      ? `Report draft is incomplete or out of date: ${firstMessage}`
+      : "Report draft is incomplete or out of date. Reopen the report, review required items, and finalize again.");
+  }
+
+  return new Error("Report draft is incomplete or out of date. Reopen the report, review required items, and finalize again.");
+}
+
+async function resolveFinalizeInspectionReportId(input: {
+  tenantId: string;
+  inspectionReportId: string | null;
+  inspectionId: string | null;
+  taskId: string | null;
 }) {
-  const { parsedActor, report } = await getAuthorizedEditableReport(actor, input.inspectionReportId);
+  if (input.inspectionReportId) {
+    return input.inspectionReportId;
+  }
+
+  const report = await prisma.inspectionReport.findFirst({
+    where: {
+      tenantId: input.tenantId,
+      inspectionId: input.inspectionId as string,
+      inspectionTaskId: input.taskId as string
+    },
+    select: { id: true }
+  });
+
+  if (!report) {
+    throw new Error("Report not found.");
+  }
+
+  return report.id;
+}
+
+export async function finalizeInspectionReport(actor: ActorContext, input: FinalizeInspectionReportInput) {
+  const normalizedInput = normalizeFinalizeInspectionReportInput(input);
+  const parsedActorForLookup = parseActor(actor);
+  const inspectionReportId = await resolveFinalizeInspectionReportId({
+    tenantId: parsedActorForLookup.tenantId as string,
+    inspectionReportId: normalizedInput.inspectionReportId,
+    inspectionId: normalizedInput.inspectionId,
+    taskId: normalizedInput.taskId
+  });
+  const { parsedActor, report } = await getAuthorizedEditableReport(actor, inspectionReportId, {
+    allowCompletedInspectionFinalize: true
+  });
 
   if (!canFinalizeReport(parsedActor.role, report.status)) {
     throw new Error("This report cannot be finalized.");
@@ -1487,9 +1603,19 @@ export async function finalizeInspectionReport(actor: ActorContext, input: {
     }
   }) as ReportAssetRecord[];
 
-  const validatedDraft = validateDraftForTemplate(input.contentJson, report.task.inspectionType, assets);
-  validateFinalizationDraft(validatedDraft, assets);
-  const nextTaskDisplayLabel = input.taskDisplayLabel?.trim() || null;
+  const submittedContentJson = normalizedInput.contentJson ?? report.contentJson;
+  if (!submittedContentJson) {
+    throw new Error("Report content is required before finalizing.");
+  }
+
+  let validatedDraft: ReportDraft;
+  try {
+    validatedDraft = validateDraftForTemplate(submittedContentJson, report.task.inspectionType, assets);
+    validateFinalizationDraft(validatedDraft, assets);
+  } catch (error) {
+    throw toFinalizeDraftValidationError(error);
+  }
+  const nextTaskDisplayLabel = normalizedInput.taskDisplayLabel?.trim() || null;
   const staleStorageKeys = new Set<string>();
   let priorGeneratedKeys: string[] = [];
 

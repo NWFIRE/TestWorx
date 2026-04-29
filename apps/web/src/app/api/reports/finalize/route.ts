@@ -12,11 +12,11 @@ function getStatusCode(error: unknown) {
     return 401;
   }
 
-  if (/does not have access|locked|cannot be finalized/i.test(error.message)) {
+  if (/does not have access|locked|cannot be finalized|closed inspections/i.test(error.message)) {
     return 403;
   }
 
-  if (/not found|required|must be|supported|smaller|items need attention/i.test(error.message)) {
+  if (/not found|required|must be|supported|smaller|items need attention|incomplete|out of date|draft inspection type/i.test(error.message)) {
     return 422;
   }
 
@@ -49,6 +49,12 @@ export async function POST(request: Request) {
         { status: 503 }
       );
     }
+
+    console.error("Report finalization failed", {
+      message: error instanceof Error ? error.message : String(error),
+      name: error instanceof Error ? error.name : "UnknownError",
+      stack: error instanceof Error ? error.stack : undefined
+    });
 
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to finalize report." }, { status: getStatusCode(error) });
   }
