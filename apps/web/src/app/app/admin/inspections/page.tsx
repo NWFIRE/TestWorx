@@ -242,7 +242,6 @@ export default async function AdminInspectionsPage({
             + Create Inspection
           </Link>
         }
-        backNavigation={{ label: "Back to dashboard", fallbackHref: "/app/admin/dashboard" }}
         description="Create new inspections, filter active work fast, and open each visit into a focused operational command center."
         eyebrow="Inspections"
         title="Inspections"

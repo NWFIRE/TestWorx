@@ -272,11 +272,10 @@ function DesktopBackButton({ fallbackHref }: { fallbackHref: string }) {
   return (
     <button
       aria-label="Go back"
-      className="pressable hidden h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-500 shadow-[0_4px_12px_rgba(15,23,42,0.04)] transition hover:border-slate-300 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.28)] lg:inline-flex"
+      className="pressable hidden h-8 items-center rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-500 shadow-[0_4px_12px_rgba(15,23,42,0.04)] transition hover:border-slate-300 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.28)] lg:inline-flex"
       onClick={handleBack}
       type="button"
     >
-      <span aria-hidden="true" className="text-[13px] leading-none">&larr;</span>
       Back
     </button>
   );

@@ -3,7 +3,6 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { PageBackControl } from "@/app/page-back-control";
 import {
   buildInspectionPacketDocuments,
   editableInspectionStatuses,
@@ -124,26 +123,6 @@ function resolveInspectionMode(value: string | undefined) {
 
 function sanitizePathSegment(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "file";
-}
-
-function resolveInspectionBackLabel(originPath: string) {
-  if (originPath.startsWith("/app/admin/billing")) {
-    return "Back to billing";
-  }
-
-  if (originPath.startsWith("/app/admin/reports")) {
-    return "Back to review";
-  }
-
-  if (originPath.startsWith("/app/admin/amendments")) {
-    return "Back to inspections";
-  }
-
-  if (originPath.startsWith("/app/admin/inspections") || originPath.startsWith("/app/admin/scheduling")) {
-    return "Back to inspections";
-  }
-
-  return "Back to dashboard";
 }
 
 export default async function EditInspectionPage({
@@ -363,11 +342,9 @@ export default async function EditInspectionPage({
     : null;
   const providerContext = inspectionView.providerContextRecord ?? inspectionView.providerContextSnapshot ?? null;
   const billingResolutionMetadata = inspectionView.billingSummary?.billingResolutionMetadata ?? null;
-  const backLabel = resolveInspectionBackLabel(originPath);
   return (
     <section className="space-y-6">
       <div className="rounded-[2rem] border border-[color:rgb(203_215_230_/_0.92)] bg-white p-6 shadow-panel">
-        <PageBackControl className="mb-2" fallbackHref={originPath} label={backLabel} />
         <p className="text-sm uppercase tracking-[0.25em] text-[color:var(--text-secondary)]">
           {isReviewMode ? "Inspection action command center" : "Inspection command center"}
         </p>

@@ -3,7 +3,6 @@ import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { PageBackControl } from "@/app/page-back-control";
 import {
   formatBillingPricingSourceLabel,
   formatBillingResolutionModeLabel,
@@ -232,7 +231,6 @@ export default async function BillingSummaryDetailPage({
       <div className="rounded-[2rem] bg-white p-6 shadow-panel">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <PageBackControl className="mb-2" fallbackHref="/app/admin/billing" label="Back to billing" />
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing detail</p>
             <h2 className="mt-2 text-3xl font-semibold text-ink">{summary.customerName}</h2>
             <p className="mt-3 text-slate-500">{summary.siteName} | {format(summary.inspectionDate, "MMM d, yyyy h:mm a")} | Technician: {summary.technicianName ?? "Unassigned"}</p>

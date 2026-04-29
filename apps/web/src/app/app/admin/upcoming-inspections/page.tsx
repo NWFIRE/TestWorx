@@ -67,7 +67,6 @@ export default async function UpcomingInspectionsPage({
   return (
     <AppPageShell density="wide">
       <PageHeader
-        backNavigation={{ label: "Back to dashboard", fallbackHref: "/app/admin/dashboard" }}
         eyebrow="Forward planning"
         title="Upcoming inspections"
         description="Plan the next several months of inspections with a month-by-month view of what is already scheduled, what still needs assignment, and where new work should be added."

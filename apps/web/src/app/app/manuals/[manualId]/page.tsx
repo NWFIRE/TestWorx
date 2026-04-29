@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
@@ -30,11 +29,6 @@ export default async function ManualDetailPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link className="text-sm font-semibold text-[var(--tenant-primary)]" href="/app/manuals">
-          ← Back to manuals
-        </Link>
-      </div>
       <ManualDetailHeader manual={manual as never} />
       <ManualActionBar manual={manual as never} />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
