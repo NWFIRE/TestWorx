@@ -182,9 +182,9 @@ function DetailField({
   value: string;
 }) {
   return (
-    <div className="space-y-1">
+    <div className="min-w-0 space-y-1">
       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">{label}</p>
-      <p className="text-sm leading-6 text-[color:var(--text-secondary)]">{value}</p>
+      <p className="min-w-0 text-sm leading-6 text-[color:var(--text-secondary)] [overflow-wrap:anywhere]">{value}</p>
     </div>
   );
 }
@@ -366,7 +366,7 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
     <div className="space-y-6">
       <SectionCard>
         <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-          <div className="max-w-3xl">
+          <div className="min-w-0 max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge label={data.customer.isActive ? "Active account" : "Inactive account"} tone={data.customer.isActive ? "emerald" : "slate"} />
               <StatusBadge label={data.customer.quickbooksCustomerId ? "QuickBooks linked" : "QuickBooks not linked"} tone={data.customer.quickbooksCustomerId ? "violet" : "slate"} />
