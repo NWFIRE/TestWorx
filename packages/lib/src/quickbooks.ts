@@ -743,6 +743,64 @@ function normalizeQuickBooksError(input: {
   });
 }
 
+function readQuickBooksFault(rawBody: string | null | undefined) {
+  if (!rawBody) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawBody) as {
+      Fault?: {
+        type?: unknown;
+        Error?: Array<{
+          code?: unknown;
+          Message?: unknown;
+          Detail?: unknown;
+          element?: unknown;
+        }>;
+      };
+    };
+    const entry = parsed.Fault?.Error?.[0];
+    if (!entry) {
+      return null;
+    }
+
+    return {
+      type: typeof parsed.Fault?.type === "string" ? parsed.Fault.type : null,
+      code: String(entry.code ?? ""),
+      message: typeof entry.Message === "string" ? entry.Message : null,
+      detail: typeof entry.Detail === "string" ? entry.Detail : null,
+      element: typeof entry.element === "string" ? entry.element : null
+    };
+  } catch {
+    return null;
+  }
+}
+
+function buildQuickBooksRequestErrorMessage(input: {
+  rawBody: string | null;
+  statusText: string;
+  operation: string;
+}) {
+  const fault = readQuickBooksFault(input.rawBody);
+  if (!fault) {
+    const fallback = input.rawBody?.trim() || input.statusText;
+    return `QuickBooks request failed: ${fallback}`;
+  }
+
+  const isSystemFault = fault.type === "SystemFault" || fault.code === "10000" || /System Failure|NullPointerException/i.test(`${fault.message ?? ""} ${fault.detail ?? ""}`);
+  if (isSystemFault && input.operation.includes("/send")) {
+    return "QuickBooks created the invoice, but QuickBooks could not email it right now because Intuit returned a temporary system error. Retry the send later, or open the invoice in QuickBooks and send it manually.";
+  }
+
+  if (isSystemFault) {
+    return "QuickBooks returned a temporary system error. Retry the action later, or complete it in QuickBooks if it is urgent.";
+  }
+
+  const readable = [fault.message, fault.detail].filter(Boolean).join(": ");
+  return readable ? `QuickBooks request failed: ${readable}` : "QuickBooks request failed.";
+}
+
 function isQuickBooksDuplicateCustomerNameError(error: unknown) {
   if (!(error instanceof QuickBooksRequestError)) {
     return false;
@@ -1022,9 +1080,14 @@ async function quickBooksApiRequest<T>(connection: QuickBooksTenantConnection, i
 
   if (!response.ok) {
     const errorText = await response.text();
+    const operation = `${input.method ?? "GET"} ${input.path}`;
     throw new QuickBooksRequestError({
-      message: `QuickBooks request failed: ${errorText || response.statusText}`,
-      operation: `${input.method ?? "GET"} ${input.path}`,
+      message: buildQuickBooksRequestErrorMessage({
+        rawBody: errorText || null,
+        statusText: response.statusText,
+        operation
+      }),
+      operation,
       httpStatus: response.status,
       intuitTid: readIntuitTid(response.headers),
       rawBody: errorText || null,

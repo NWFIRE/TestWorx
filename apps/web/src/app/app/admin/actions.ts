@@ -1004,7 +1004,8 @@ export async function sendQuickBooksInvoiceAction(formData: FormData) {
 
     const result = await sendQuickBooksInvoice(
       { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-      inspectionId
+      inspectionId,
+      { suppressThrowOnSendFailure: true }
     );
 
     revalidatePath("/app/admin");
@@ -1019,7 +1020,9 @@ export async function sendQuickBooksInvoiceAction(formData: FormData) {
     return {
       ok: true,
       error: null,
-      message: result.sendStatus === "sent" ? "Invoice sent from QuickBooks." : result.error ?? "QuickBooks email send was skipped.",
+      message: result.sendStatus === "sent"
+        ? "Invoice sent from QuickBooks."
+        : result.error ?? "QuickBooks email send was skipped.",
       detail
     };
   } catch (error) {

@@ -52,6 +52,20 @@ function formatDateTime(value: Date | null) {
   return value ? value.toLocaleString() : "Not synced";
 }
 
+function formatQuickBooksSendStatus(status: string | null) {
+  switch (status) {
+    case "sent":
+      return "sent";
+    case "send_failed":
+      return "send failed";
+    case "send_skipped":
+      return "send skipped";
+    case "not_sent":
+    default:
+      return "not sent";
+  }
+}
+
 export function BillingSummaryStatusActions({
   summaryId,
   inspectionId,
@@ -116,7 +130,12 @@ export function BillingSummaryStatusActions({
       const result = await action(buildFormData());
       if (result?.ok) {
         applyDetail(result.detail);
-        showToast({ title: result.message ?? "Billing updated", tone: "success" });
+        const sendFailed = result.detail?.quickbooksSendStatus === "send_failed";
+        showToast({
+          title: result.message ?? "Billing updated",
+          tone: sendFailed ? "error" : "success",
+          durationMs: sendFailed ? 8500 : undefined
+        });
       } else if (result?.error) {
         showToast({ title: result.error, tone: "error" });
       }
@@ -140,10 +159,10 @@ export function BillingSummaryStatusActions({
         <p className="mt-2">Invoice id: <span className="font-semibold text-ink">{state.quickbooksInvoiceId ?? "Not synced"}</span></p>
         <p className="mt-2">Invoice mode: <span className="font-semibold text-ink">{state.quickbooksMode ? (state.quickbooksMode === "sandbox" ? "Sandbox" : "Live") : "Not recorded"}</span></p>
         <p className="mt-2">Synced at: <span className="font-semibold text-ink">{formatDateTime(state.quickbooksSyncedAt)}</span></p>
-        <p className="mt-2">QuickBooks send: <span className="font-semibold text-ink">{state.quickbooksSendStatus}</span></p>
+        <p className="mt-2">QuickBooks send: <span className="font-semibold text-ink">{formatQuickBooksSendStatus(state.quickbooksSendStatus)}</span></p>
         <p className="mt-2">Sent at: <span className="font-semibold text-ink">{state.quickbooksSentAt ? state.quickbooksSentAt.toLocaleString() : "Not sent"}</span></p>
-        {state.quickbooksSyncError ? <p className="mt-2 text-rose-700">Last sync error: {state.quickbooksSyncError}</p> : null}
-        {state.quickbooksSendError ? <p className="mt-2 text-amber-700">Last send note: {state.quickbooksSendError}</p> : null}
+        {state.quickbooksSyncError ? <p className="mt-2 break-words text-rose-700">Last sync error: {state.quickbooksSyncError}</p> : null}
+        {state.quickbooksSendError ? <p className="mt-2 break-words text-amber-700">Last send note: {state.quickbooksSendError}</p> : null}
       </div>
 
       <div className="mt-4 grid gap-3">
@@ -159,7 +178,13 @@ export function BillingSummaryStatusActions({
           pendingLabel="Syncing invoice..."
           tone="primary"
         >
-          {hasVerifiedQuickBooksInvoice ? "Already synced to QuickBooks" : "Sync invoice to QuickBooks"}
+          {hasVerifiedQuickBooksInvoice
+            ? state.quickbooksSendStatus === "sent"
+              ? "Synced and sent from QuickBooks"
+              : state.quickbooksSendStatus === "send_failed"
+                ? "Synced - send failed"
+                : "Synced - ready to send"
+            : "Sync invoice to QuickBooks"}
         </ActionButton>
 
         {hasVerifiedQuickBooksInvoice && !summaryModeMismatch && canUseQuickBooksActions && state.quickbooksSendStatus !== "sent" ? (
