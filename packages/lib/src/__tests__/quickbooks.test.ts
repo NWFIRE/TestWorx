@@ -1121,8 +1121,12 @@ describe("quickbooks billing sync hardening", () => {
   it("advances to the next TradeWorx invoice number when QuickBooks reports a duplicate document number", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
     prismaMock.tenantInvoiceSequence.upsert
-      .mockResolvedValueOnce({ nextNumber: 1003 })
-      .mockResolvedValueOnce({ nextNumber: 1004 });
+      .mockResolvedValueOnce({ nextNumber: 1004 })
+      .mockResolvedValueOnce({ nextNumber: 1005 })
+      .mockResolvedValueOnce({ nextNumber: 1006 })
+      .mockResolvedValueOnce({ nextNumber: 1007 })
+      .mockResolvedValueOnce({ nextNumber: 1008 })
+      .mockResolvedValueOnce({ nextNumber: 1009 });
     prismaMock.customerCompany.findFirst.mockResolvedValue({
       id: "customer_1",
       name: "Orr Energy Services",
@@ -1172,17 +1176,21 @@ describe("quickbooks billing sync hardening", () => {
           PrimaryEmailAddr: { Address: "ap@orr.example" }
         }
       }))
-      .mockResolvedValueOnce(quickBooksDuplicateDocNumberResponse("TW2026-1002"))
+      .mockResolvedValueOnce(quickBooksDuplicateDocNumberResponse("TW2026-1003"))
+      .mockResolvedValueOnce(quickBooksDuplicateDocNumberResponse("TW2026-1004"))
+      .mockResolvedValueOnce(quickBooksDuplicateDocNumberResponse("TW2026-1005"))
+      .mockResolvedValueOnce(quickBooksDuplicateDocNumberResponse("TW2026-1006"))
+      .mockResolvedValueOnce(quickBooksDuplicateDocNumberResponse("TW2026-1007"))
       .mockResolvedValueOnce(jsonResponse({
         Invoice: {
           Id: "invoice_direct_4",
-          DocNumber: "TW2026-1003"
+          DocNumber: "TW2026-1008"
         }
       }))
       .mockResolvedValueOnce(jsonResponse({
         Invoice: {
           Id: "invoice_direct_4",
-          DocNumber: "TW2026-1003"
+          DocNumber: "TW2026-1008"
         }
       }));
 
@@ -1209,12 +1217,19 @@ describe("quickbooks billing sync hardening", () => {
       }
     );
 
-    const firstCreateBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
-    const secondCreateBody = JSON.parse(String(fetchMock.mock.calls[3]?.[1]?.body ?? "{}"));
-    expect(firstCreateBody.DocNumber).toBe("TW2026-1002");
-    expect(secondCreateBody.DocNumber).toBe("TW2026-1003");
-    expect(prismaMock.tenantInvoiceSequence.upsert).toHaveBeenCalledTimes(2);
-    expect(result.invoiceNumber).toBe("TW2026-1003");
+    const attemptedDocNumbers = fetchMock.mock.calls
+      .slice(2, 8)
+      .map((call) => JSON.parse(String(call[1]?.body ?? "{}")).DocNumber);
+    expect(attemptedDocNumbers).toEqual([
+      "TW2026-1003",
+      "TW2026-1004",
+      "TW2026-1005",
+      "TW2026-1006",
+      "TW2026-1007",
+      "TW2026-1008"
+    ]);
+    expect(prismaMock.tenantInvoiceSequence.upsert).toHaveBeenCalledTimes(6);
+    expect(result.invoiceNumber).toBe("TW2026-1008");
   });
 
   it("applies service and compliance fee rules for customer invoices", async () => {

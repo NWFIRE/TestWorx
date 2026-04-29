@@ -303,6 +303,7 @@ export const directQuickBooksInvoiceInputSchema = z.object({
 });
 
 const TRADEWORX_INVOICE_SEQUENCE_START = 1000;
+const TRADEWORX_INVOICE_DUPLICATE_RETRY_LIMIT = 100;
 
 function getTradeWorxInvoiceYear(dateInput?: Date | string | null) {
   if (dateInput instanceof Date && !Number.isNaN(dateInput.getTime())) {
@@ -501,7 +502,7 @@ async function createQuickBooksInvoiceWithTradeWorxNumber(input: {
     ? input.preferredDocNumber.trim()
     : null;
 
-  for (let attempt = 0; attempt < 5; attempt += 1) {
+  for (let attempt = 0; attempt < TRADEWORX_INVOICE_DUPLICATE_RETRY_LIMIT; attempt += 1) {
     const docNumber = preferredDocNumber
       ?? await reserveTradeWorxInvoiceNumber({
         tenantId: input.tenantId,
