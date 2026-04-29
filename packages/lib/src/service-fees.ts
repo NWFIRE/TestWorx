@@ -27,6 +27,15 @@ function normalizeZip(value: string | null | undefined) {
   return value?.trim() ?? "";
 }
 
+function isUsableLocationValue(value: string | null | undefined) {
+  const normalized = normalizeText(value);
+  return normalized.length > 0 && normalized !== "UNKNOWN" && normalized !== "N/A" && normalized !== "NA";
+}
+
+function firstUsableLocationValue(...values: Array<string | null | undefined>) {
+  return values.find(isUsableLocationValue) ?? "";
+}
+
 export const updateDefaultServiceFeeSchema = z.object({
   defaultServiceFeeCode: z.string().trim().max(80).default("SERVICE_FEE"),
   defaultServiceFeeUnitPrice: z.number().finite().nonnegative().nullable()
@@ -123,6 +132,16 @@ async function getInspectionServiceFeeMatchContextTx(tx: Prisma.TransactionClien
           state: true,
           postalCode: true
         }
+      },
+      customerCompany: {
+        select: {
+          serviceCity: true,
+          serviceState: true,
+          servicePostalCode: true,
+          billingCity: true,
+          billingState: true,
+          billingPostalCode: true
+        }
       }
     }
   });
@@ -135,9 +154,21 @@ async function getInspectionServiceFeeMatchContextTx(tx: Prisma.TransactionClien
     tenantId: input.tenantId,
     customerCompanyId: inspection.customerCompanyId,
     siteId: inspection.siteId,
-    city: normalizeText(inspection.site.city),
-    state: normalizeText(inspection.site.state),
-    postalCode: normalizeZip(inspection.site.postalCode)
+    city: normalizeText(firstUsableLocationValue(
+      inspection.site?.city,
+      inspection.customerCompany?.serviceCity,
+      inspection.customerCompany?.billingCity
+    )),
+    state: normalizeText(firstUsableLocationValue(
+      inspection.site?.state,
+      inspection.customerCompany?.serviceState,
+      inspection.customerCompany?.billingState
+    )),
+    postalCode: normalizeZip(firstUsableLocationValue(
+      inspection.site?.postalCode,
+      inspection.customerCompany?.servicePostalCode,
+      inspection.customerCompany?.billingPostalCode
+    ))
   } satisfies ServiceFeeMatchContext;
 }
 
@@ -212,13 +243,44 @@ export async function resolveServiceFeeForLocationTx(
     };
   }
 ) {
+  const inputCity = firstUsableLocationValue(input.location.city);
+  const inputState = firstUsableLocationValue(input.location.state);
+  const inputPostalCode = firstUsableLocationValue(input.location.postalCode);
+  const customerCompanyId = input.customerCompanyId ?? null;
+  const shouldLoadCustomerLocation = Boolean(customerCompanyId) && (!inputCity || !inputState || !inputPostalCode);
+  const customerCompany = shouldLoadCustomerLocation
+    ? await tx.customerCompany.findFirst({
+        where: { id: customerCompanyId as string, tenantId: input.tenantId },
+        select: {
+          serviceCity: true,
+          serviceState: true,
+          servicePostalCode: true,
+          billingCity: true,
+          billingState: true,
+          billingPostalCode: true
+        }
+      })
+    : null;
+
   return resolveServiceFeeForMatchContextTx(tx, {
     tenantId: input.tenantId,
-    customerCompanyId: input.customerCompanyId ?? null,
+    customerCompanyId,
     siteId: input.siteId ?? null,
-    city: normalizeText(input.location.city),
-    state: normalizeText(input.location.state),
-    postalCode: normalizeZip(input.location.postalCode)
+    city: normalizeText(firstUsableLocationValue(
+      inputCity,
+      customerCompany?.serviceCity,
+      customerCompany?.billingCity
+    )),
+    state: normalizeText(firstUsableLocationValue(
+      inputState,
+      customerCompany?.serviceState,
+      customerCompany?.billingState
+    )),
+    postalCode: normalizeZip(firstUsableLocationValue(
+      inputPostalCode,
+      customerCompany?.servicePostalCode,
+      customerCompany?.billingPostalCode
+    ))
   });
 }
 
