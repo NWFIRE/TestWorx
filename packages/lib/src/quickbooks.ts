@@ -2381,7 +2381,8 @@ async function buildDirectInvoiceAutomaticFeeLines(input: {
     division: complianceDivision,
     location: {
       city: input.location.city,
-      state: input.location.state
+      state: input.location.state,
+      zipCode: input.location.postalCode
     }
   });
 

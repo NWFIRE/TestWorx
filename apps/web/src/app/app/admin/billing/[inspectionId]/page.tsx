@@ -187,7 +187,8 @@ function describeAutomaticFeeSource(item: {
     const jurisdiction = [
       typeof item.metadata?.complianceJurisdictionCity === "string" ? item.metadata.complianceJurisdictionCity : null,
       typeof item.metadata?.complianceJurisdictionCounty === "string" ? item.metadata.complianceJurisdictionCounty : null,
-      typeof item.metadata?.complianceJurisdictionState === "string" ? item.metadata.complianceJurisdictionState : null
+      typeof item.metadata?.complianceJurisdictionState === "string" ? item.metadata.complianceJurisdictionState : null,
+      typeof item.metadata?.complianceJurisdictionZipCode === "string" ? item.metadata.complianceJurisdictionZipCode : null
     ].filter(Boolean).join(", ");
 
     return jurisdiction

@@ -1425,12 +1425,14 @@ model ComplianceReportingFeeRule {
   id             String                      @id @default(cuid())
   tenantId       String
   division       ComplianceReportingDivision
-  city           String
-  normalizedCity String
+  city           String?
+  normalizedCity String                    @default("")
   county         String?
   normalizedCounty String                    @default("")
   state          String?
   normalizedState String                     @default("")
+  zipCode        String?
+  normalizedZipCode String                   @default("")
   feeAmount      Float
   active         Boolean                     @default(true)
   createdAt      DateTime                    @default(now())
@@ -1439,6 +1441,8 @@ model ComplianceReportingFeeRule {
 
   @@index([tenantId, active, division])
   @@index([tenantId, normalizedCity])
+  @@index([tenantId, normalizedZipCode])
+  @@index([tenantId, active, division, normalizedZipCode])
 }
 
 model QuickBooksCatalogItem {

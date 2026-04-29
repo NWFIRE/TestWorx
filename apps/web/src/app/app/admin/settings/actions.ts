@@ -1024,6 +1024,7 @@ export async function createComplianceReportingFeeRuleAction(_: { error: string 
     city: String(formData.get("city") ?? ""),
     county: String(formData.get("county") ?? ""),
     state: String(formData.get("state") ?? ""),
+    zipCode: String(formData.get("zipCode") ?? ""),
     feeAmount: Number(formData.get("feeAmount") ?? "0"),
     active: formData.get("active") === "on"
   });
@@ -1058,6 +1059,7 @@ export async function updateComplianceReportingFeeRuleAction(formData: FormData)
     city: String(formData.get("city") ?? ""),
     county: String(formData.get("county") ?? ""),
     state: String(formData.get("state") ?? ""),
+    zipCode: String(formData.get("zipCode") ?? ""),
     feeAmount: Number(formData.get("feeAmount") ?? "0"),
     active: formData.get("active") === "on"
   });

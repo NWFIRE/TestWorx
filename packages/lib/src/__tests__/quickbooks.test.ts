@@ -30,7 +30,8 @@ const prismaMock = {
     findMany: vi.fn()
   },
   complianceReportingFeeRule: {
-    findFirst: vi.fn()
+    findFirst: vi.fn(),
+    findMany: vi.fn()
   },
   quickBooksCatalogItem: {
     findMany: vi.fn(),
@@ -242,7 +243,7 @@ describe("quickbooks billing sync hardening", () => {
     prismaMock.quickBooksItemCache.createMany.mockResolvedValue({ count: 0 });
     prismaMock.quickBooksItemCache.deleteMany.mockResolvedValue({ count: 0 });
     prismaMock.serviceFeeRule.findMany.mockResolvedValue([]);
-    prismaMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
+    prismaMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
     prismaMock.quoteLineItem.findMany.mockResolvedValue([]);
     prismaMock.billingPayerAccount.findUnique.mockResolvedValue(null);
     prismaMock.billingPayerAccount.findFirst.mockResolvedValue(null);
@@ -1274,13 +1275,18 @@ describe("quickbooks billing sync hardening", () => {
         priority: 100
       }
     ]);
-    prismaMock.complianceReportingFeeRule.findFirst.mockResolvedValue({
+    prismaMock.complianceReportingFeeRule.findMany.mockResolvedValue([{
       id: "compliance_rule_1",
       city: "Tulsa",
       county: null,
       state: "OK",
+      zipCode: null,
+      normalizedCity: "TULSA",
+      normalizedCounty: "",
+      normalizedState: "OK",
+      normalizedZipCode: "",
       feeAmount: 18
-    });
+    }]);
     prismaMock.quickBooksItemMap.findUnique.mockImplementation(async (input: {
       where: { tenantId_integrationId_internalCode: { internalCode: string } };
     }) => {

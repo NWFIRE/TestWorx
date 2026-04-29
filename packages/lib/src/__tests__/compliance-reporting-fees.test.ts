@@ -4,8 +4,8 @@ const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     complianceReportingFeeRule: {
       findFirst: vi.fn(),
-      count: vi.fn(),
       findMany: vi.fn(),
+      count: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn()
@@ -30,13 +30,18 @@ describe("compliance reporting fee resolution", () => {
   });
 
   it("returns the matching active fee by city and division", async () => {
-    prismaMock.complianceReportingFeeRule.findFirst.mockResolvedValue({
+    prismaMock.complianceReportingFeeRule.findMany.mockResolvedValue([{
       id: "rule_1",
       city: "Chicago",
       county: "Cook",
       state: "IL",
+      zipCode: null,
+      normalizedCity: "CHICAGO",
+      normalizedCounty: "",
+      normalizedState: "IL",
+      normalizedZipCode: "",
       feeAmount: 25
-    });
+    }]);
 
     const resolved = await resolveComplianceReportingFeeTx(prismaMock as never, {
       tenantId: "tenant_1",
@@ -51,16 +56,17 @@ describe("compliance reporting fee resolution", () => {
       division: "fire_alarm",
       feeAmount: 25,
       matched: true,
-      source: "city",
+      source: "city_state",
       ruleId: "rule_1",
       city: "Chicago",
       county: "Cook",
-      state: "IL"
+      state: "IL",
+      zipCode: null
     });
   });
 
   it("returns zero when no matching fee exists", async () => {
-    prismaMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
+    prismaMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
 
     const resolved = await resolveComplianceReportingFeeTx(prismaMock as never, {
       tenantId: "tenant_1",
@@ -79,14 +85,33 @@ describe("compliance reporting fee resolution", () => {
     });
   });
 
-  it("ignores a city match when the stored state does not match", async () => {
-    prismaMock.complianceReportingFeeRule.findFirst.mockResolvedValue({
-      id: "rule_1",
-      city: "Springfield",
-      county: null,
-      state: "MO",
-      feeAmount: 19
-    });
+  it("skips mismatched city rules and applies the matching state-specific rule", async () => {
+    prismaMock.complianceReportingFeeRule.findMany.mockResolvedValue([
+      {
+        id: "rule_mo",
+        city: "Springfield",
+        county: null,
+        state: "MO",
+        zipCode: null,
+        normalizedCity: "SPRINGFIELD",
+        normalizedCounty: "",
+        normalizedState: "MO",
+        normalizedZipCode: "",
+        feeAmount: 19
+      },
+      {
+        id: "rule_il",
+        city: "Springfield",
+        county: null,
+        state: "IL",
+        zipCode: null,
+        normalizedCity: "SPRINGFIELD",
+        normalizedCounty: "",
+        normalizedState: "IL",
+        normalizedZipCode: "",
+        feeAmount: 27
+      }
+    ]);
 
     const resolved = await resolveComplianceReportingFeeTx(prismaMock as never, {
       tenantId: "tenant_1",
@@ -97,8 +122,56 @@ describe("compliance reporting fee resolution", () => {
       }
     });
 
-    expect(resolved.feeAmount).toBe(0);
-    expect(resolved.matched).toBe(false);
+    expect(resolved.feeAmount).toBe(27);
+    expect(resolved.matched).toBe(true);
+    expect(resolved.source).toBe("city_state");
+  });
+
+  it("prefers ZIP-specific rules over broader city rules", async () => {
+    prismaMock.complianceReportingFeeRule.findMany.mockResolvedValue([
+      {
+        id: "rule_city",
+        city: "Enid",
+        county: null,
+        state: "OK",
+        zipCode: null,
+        normalizedCity: "ENID",
+        normalizedCounty: "",
+        normalizedState: "OK",
+        normalizedZipCode: "",
+        feeAmount: 20
+      },
+      {
+        id: "rule_zip",
+        city: "Enid",
+        county: null,
+        state: "OK",
+        zipCode: "73701",
+        normalizedCity: "ENID",
+        normalizedCounty: "",
+        normalizedState: "OK",
+        normalizedZipCode: "73701",
+        feeAmount: 35
+      }
+    ]);
+
+    const resolved = await resolveComplianceReportingFeeTx(prismaMock as never, {
+      tenantId: "tenant_1",
+      division: "fire_alarm",
+      location: {
+        city: "Enid",
+        state: "OK",
+        zipCode: "73701"
+      }
+    });
+
+    expect(resolved).toEqual(expect.objectContaining({
+      feeAmount: 35,
+      matched: true,
+      source: "zip",
+      ruleId: "rule_zip",
+      zipCode: "73701"
+    }));
   });
 });
 
@@ -119,6 +192,7 @@ describe("compliance reporting fee rule validation", () => {
           city: "Chicago",
           county: "Cook",
           state: "IL",
+          zipCode: "",
           feeAmount: 18,
           active: true
         }
@@ -134,6 +208,7 @@ describe("compliance reporting fee rule validation", () => {
       city: "Chicago",
       county: "Cook",
       state: "IL",
+      zipCode: null,
       feeAmount: 18,
       active: false
     });
@@ -145,6 +220,7 @@ describe("compliance reporting fee rule validation", () => {
         city: "Chicago",
         county: "Cook",
         state: "IL",
+        zipCode: "",
         feeAmount: 18,
         active: false
       }
@@ -165,6 +241,8 @@ describe("compliance reporting fee rule validation", () => {
         normalizedCounty: "COOK",
         state: "IL",
         normalizedState: "IL",
+        zipCode: null,
+        normalizedZipCode: "",
         feeAmount: 18,
         active: true
       })
@@ -179,6 +257,7 @@ describe("compliance reporting fee rule validation", () => {
           city: "Chicago",
           county: "",
           state: "IL",
+          zipCode: "",
           feeAmount: 25,
           active: true
         }

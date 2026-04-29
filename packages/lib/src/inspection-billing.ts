@@ -1675,28 +1675,70 @@ async function buildInspectionServiceFeeItemTx(tx: TransactionClient, input: {
   } satisfies BillableItem;
 }
 
+function normalizeJurisdictionValue(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const normalized = trimmed.toUpperCase();
+  if (normalized === "UNKNOWN" || normalized === "N/A" || normalized === "NA") {
+    return null;
+  }
+
+  return trimmed;
+}
+
+function firstJurisdictionValue(...values: Array<string | null | undefined>) {
+  return values.map(normalizeJurisdictionValue).find(Boolean) ?? null;
+}
+
 async function buildComplianceReportingFeeItemsTx(tx: TransactionClient, input: {
   tenantId: string;
   inspectionId: string;
   siteId: string;
+  customerCompanyId: string;
   reportTypes: InspectionType[];
 }) {
   const feeItems: BillableItem[] = [];
   const processedDivisions = new Set<string>();
-  const site = await tx.site.findFirst({
-    where: {
-      id: input.siteId,
-      tenantId: input.tenantId
-    },
-    select: {
-      city: true,
-      state: true
-    }
-  });
+  const [site, customerCompany] = await Promise.all([
+    tx.site.findFirst({
+      where: {
+        id: input.siteId,
+        tenantId: input.tenantId
+      },
+      select: {
+        city: true,
+        state: true,
+        postalCode: true
+      }
+    }),
+    tx.customerCompany.findFirst({
+      where: {
+        id: input.customerCompanyId,
+        tenantId: input.tenantId
+      },
+      select: {
+        serviceCity: true,
+        serviceState: true,
+        servicePostalCode: true,
+        billingCity: true,
+        billingState: true,
+        billingPostalCode: true
+      }
+    })
+  ]);
 
   if (!site) {
     throw new Error("Site not found for compliance reporting fee resolution.");
   }
+
+  const location = {
+    city: firstJurisdictionValue(site.city, customerCompany?.serviceCity, customerCompany?.billingCity),
+    state: firstJurisdictionValue(site.state, customerCompany?.serviceState, customerCompany?.billingState),
+    zipCode: firstJurisdictionValue(site.postalCode, customerCompany?.servicePostalCode, customerCompany?.billingPostalCode)
+  };
 
   for (const reportType of input.reportTypes) {
     const division = mapInspectionTypeToComplianceReportingDivision(reportType);
@@ -1708,10 +1750,7 @@ async function buildComplianceReportingFeeItemsTx(tx: TransactionClient, input: 
     const resolvedFee = await resolveComplianceReportingFeeTx(tx, {
       tenantId: input.tenantId,
       division,
-      location: {
-        city: site.city,
-        state: site.state
-      }
+      location
     });
 
     if (!resolvedFee.matched || resolvedFee.feeAmount <= 0) {
@@ -1741,6 +1780,7 @@ async function buildComplianceReportingFeeItemsTx(tx: TransactionClient, input: 
         complianceJurisdictionCity: resolvedFee.city ?? null,
         complianceJurisdictionCounty: resolvedFee.county ?? null,
         complianceJurisdictionState: resolvedFee.state ?? null,
+        complianceJurisdictionZipCode: resolvedFee.zipCode ?? null,
         complianceResolutionSource: resolvedFee.source
       }
     } satisfies BillableItem);
@@ -2568,6 +2608,7 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
     tenantId: input.tenantId,
     inspectionId: input.inspectionId,
     siteId: inspection.siteId,
+    customerCompanyId: inspection.customerCompanyId,
     reportTypes: reports.map((report) => report.inspectionType)
   }));
 

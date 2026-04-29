@@ -23,9 +23,10 @@ type ComplianceReportingFeeSettingsCardProps = {
   rules: Array<{
     id: string;
     division: string;
-    city: string;
+    city: string | null;
     county: string | null;
     state: string | null;
+    zipCode: string | null;
     feeAmount: number;
     active: boolean;
   }>;
@@ -76,7 +77,7 @@ export function ComplianceReportingFeeSettingsCard({
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Compliance reporting fees</p>
         <h3 className="mt-2 text-2xl font-semibold text-ink">Jurisdiction-based reporting fees</h3>
-        <p className="mt-2 text-sm text-slate-500">TradeWorx applies these fees automatically by service-location city and report division. Each division resolves independently and shows as its own Compliance Reporting Fee line.</p>
+        <p className="mt-2 text-sm text-slate-500">TradeWorx applies these fees automatically by service-location city, state, ZIP code, and report division. Each division resolves independently and shows as its own Compliance Reporting Fee line.</p>
       </div>
 
       {activeEditor === "create" ? (
@@ -102,10 +103,10 @@ export function ComplianceReportingFeeSettingsCard({
               <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="feeAmount" min="0" name="feeAmount" placeholder="25.00" required step="0.01" type="number" />
             </div>
           </div>
-          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+          <div className="mt-4 grid gap-4 lg:grid-cols-4">
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="city">City</label>
-              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="city" name="city" required />
+              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="city" name="city" />
             </div>
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="county">County</label>
@@ -114,6 +115,10 @@ export function ComplianceReportingFeeSettingsCard({
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="state">State</label>
               <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="state" name="state" />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="zipCode">ZIP code</label>
+              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="zipCode" name="zipCode" />
             </div>
           </div>
           <label className="mt-4 flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
@@ -132,7 +137,7 @@ export function ComplianceReportingFeeSettingsCard({
             <div>
               <p className="text-sm uppercase tracking-[0.18em] text-slate-500">New rule</p>
               <h4 className="mt-1 text-lg font-semibold text-ink">Add a compliance reporting fee</h4>
-              <p className="mt-2 text-sm text-slate-500">Use one rule per division and jurisdiction. TradeWorx applies it automatically whenever the site city matches.</p>
+              <p className="mt-2 text-sm text-slate-500">Use one rule per division and jurisdiction. TradeWorx applies the most specific matching city/state/ZIP fee automatically.</p>
             </div>
             <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={openCreateHref}>
               Open new rule
@@ -157,9 +162,9 @@ export function ComplianceReportingFeeSettingsCard({
           <div key={rule.id} className="rounded-[1.5rem] border border-slate-200 p-5">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="text-lg font-semibold text-ink">{formatDivisionLabel(rule.division)} / {rule.city}</p>
+                <p className="text-lg font-semibold text-ink">{formatDivisionLabel(rule.division)} / {rule.city ?? rule.zipCode ?? "Jurisdiction rule"}</p>
                 <p className="text-sm text-slate-500">
-                  {[rule.county, rule.state].filter(Boolean).join(" | ") || "City-level rule"}
+                  {[rule.county, rule.state, rule.zipCode].filter(Boolean).join(" | ") || "Location rule"}
                 </p>
               </div>
               <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${rule.active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
@@ -181,10 +186,10 @@ export function ComplianceReportingFeeSettingsCard({
                     <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.feeAmount} min="0" name="feeAmount" step="0.01" type="number" />
                   </div>
                 </div>
-                <div className="grid gap-4 lg:grid-cols-3">
+                <div className="grid gap-4 lg:grid-cols-4">
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-600">City</label>
-                    <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.city} name="city" />
+                    <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.city ?? ""} name="city" />
                   </div>
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-600">County</label>
@@ -193,6 +198,10 @@ export function ComplianceReportingFeeSettingsCard({
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-600">State</label>
                     <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.state ?? ""} name="state" />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-600">ZIP code</label>
+                    <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.zipCode ?? ""} name="zipCode" />
                   </div>
                 </div>
                 <div className="grid gap-4 lg:grid-cols-[auto_auto]">
@@ -213,7 +222,7 @@ export function ComplianceReportingFeeSettingsCard({
                 <div className="space-y-1">
                   <p>Division: <span className="font-semibold text-ink">{formatDivisionLabel(rule.division)}</span></p>
                   <p>Compliance Reporting Fee: <span className="font-semibold text-ink">${rule.feeAmount.toFixed(2)}</span></p>
-                  <p>Jurisdiction: <span className="font-semibold text-ink">{[rule.city, rule.county, rule.state].filter(Boolean).join(", ")}</span></p>
+                  <p>Jurisdiction: <span className="font-semibold text-ink">{[rule.city, rule.county, rule.state, rule.zipCode].filter(Boolean).join(", ")}</span></p>
                 </div>
                 <Link
                   className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"

@@ -23,27 +23,59 @@ function normalizeJurisdictionValue(value: string | null | undefined) {
   return value?.trim().toUpperCase() ?? "";
 }
 
+function normalizeZipCode(value: string | null | undefined) {
+  return value?.trim().toUpperCase().replace(/\s+/g, "") ?? "";
+}
+
+function usableJurisdictionValue(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const normalized = trimmed.toUpperCase();
+  if (normalized === "UNKNOWN" || normalized === "N/A" || normalized === "NA") {
+    return null;
+  }
+
+  return trimmed;
+}
+
+function firstJurisdictionValue(...values: Array<string | null | undefined>) {
+  return values.map(usableJurisdictionValue).find(Boolean) ?? null;
+}
+
 export const complianceReportingDivisionSchema = z.nativeEnum(ComplianceReportingDivision);
 
 export const complianceReportingFeeRuleInputSchema = z.object({
   ruleId: z.string().trim().optional(),
   division: complianceReportingDivisionSchema,
-  city: z.string().trim().min(1, "City is required.").max(80),
+  city: z.string().trim().max(80).optional().transform((value) => value || undefined),
   county: z.string().trim().max(80).optional().transform((value) => value || undefined),
   state: z.string().trim().max(40).optional().transform((value) => value || undefined),
+  zipCode: z.string().trim().max(20).optional().transform((value) => value || undefined),
   feeAmount: z.number().finite().nonnegative(),
   active: z.boolean().default(true)
+}).superRefine((value, context) => {
+  if (!value.city && !value.zipCode) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Enter a city and/or ZIP code for this compliance reporting fee rule.",
+      path: ["city"]
+    });
+  }
 });
 
 export type ComplianceReportingFeeResolution = {
   division: ComplianceReportingDivision;
   feeAmount: number;
   matched: boolean;
-  source: "city" | "none";
+  source: "zip" | "city_state" | "city" | "none";
   ruleId?: string;
-  city?: string;
+  city?: string | null;
   county?: string | null;
   state?: string | null;
+  zipCode?: string | null;
 };
 
 export function mapInspectionTypeToComplianceReportingDivision(inspectionType: InspectionType) {
@@ -69,6 +101,9 @@ function findDuplicateActiveRuleTx(
     tenantId: string;
     division: ComplianceReportingDivision;
     normalizedCity: string;
+    normalizedCounty: string;
+    normalizedState: string;
+    normalizedZipCode: string;
     excludeRuleId?: string;
   }
 ) {
@@ -77,11 +112,28 @@ function findDuplicateActiveRuleTx(
       tenantId: input.tenantId,
       division: input.division,
       normalizedCity: input.normalizedCity,
+      normalizedCounty: input.normalizedCounty,
+      normalizedState: input.normalizedState,
+      normalizedZipCode: input.normalizedZipCode,
       active: true,
       ...(input.excludeRuleId ? { id: { not: input.excludeRuleId } } : {})
     },
     select: { id: true }
   });
+}
+
+function getComplianceRuleSpecificity(rule: {
+  normalizedZipCode: string;
+  normalizedCity: string;
+  normalizedCounty: string;
+  normalizedState: string;
+}) {
+  return [
+    rule.normalizedZipCode ? 8 : 0,
+    rule.normalizedCity ? 4 : 0,
+    rule.normalizedState ? 2 : 0,
+    rule.normalizedCounty ? 1 : 0
+  ].reduce((sum, value) => sum + value, 0);
 }
 
 export async function resolveComplianceReportingFeeTx(
@@ -93,14 +145,16 @@ export async function resolveComplianceReportingFeeTx(
       city: string | null | undefined;
       county?: string | null | undefined;
       state?: string | null | undefined;
+      zipCode?: string | null | undefined;
     };
   }
 ) {
   const normalizedCity = normalizeJurisdictionValue(input.location.city);
   const normalizedCounty = normalizeJurisdictionValue(input.location.county);
   const normalizedState = normalizeJurisdictionValue(input.location.state);
+  const normalizedZipCode = normalizeZipCode(input.location.zipCode);
 
-  if (!normalizedCity) {
+  if (!normalizedCity && !normalizedZipCode) {
     return {
       division: input.division,
       feeAmount: 0,
@@ -109,16 +163,21 @@ export async function resolveComplianceReportingFeeTx(
     } satisfies ComplianceReportingFeeResolution;
   }
 
-  const rule = await tx.complianceReportingFeeRule.findFirst({
+  const rules = await tx.complianceReportingFeeRule.findMany({
     where: {
       tenantId: input.tenantId,
       division: input.division,
-      normalizedCity,
-      active: true
+      active: true,
+      OR: [
+        ...(normalizedZipCode ? [{ normalizedZipCode }] : []),
+        ...(normalizedCity ? [{ normalizedCity }] : [])
+      ]
     },
     orderBy: [
-      { normalizedCounty: "desc" },
+      { normalizedZipCode: "desc" },
       { normalizedState: "desc" },
+      { normalizedCounty: "desc" },
+      { normalizedCity: "desc" },
       { updatedAt: "desc" }
     ],
     select: {
@@ -126,29 +185,32 @@ export async function resolveComplianceReportingFeeTx(
       city: true,
       county: true,
       state: true,
+      zipCode: true,
+      normalizedCity: true,
+      normalizedCounty: true,
+      normalizedState: true,
+      normalizedZipCode: true,
       feeAmount: true
     }
   });
 
+  const rule = [...rules].sort((left, right) => getComplianceRuleSpecificity(right) - getComplianceRuleSpecificity(left)).find((candidate) => {
+    if (candidate.normalizedZipCode && candidate.normalizedZipCode !== normalizedZipCode) {
+      return false;
+    }
+    if (candidate.normalizedCity && candidate.normalizedCity !== normalizedCity) {
+      return false;
+    }
+    if (candidate.normalizedCounty && candidate.normalizedCounty !== normalizedCounty) {
+      return false;
+    }
+    if (candidate.normalizedState && candidate.normalizedState !== normalizedState) {
+      return false;
+    }
+    return true;
+  });
+
   if (!rule) {
-    return {
-      division: input.division,
-      feeAmount: 0,
-      matched: false,
-      source: "none"
-    } satisfies ComplianceReportingFeeResolution;
-  }
-
-  if (rule.county && normalizedCounty && normalizeJurisdictionValue(rule.county) !== normalizedCounty) {
-    return {
-      division: input.division,
-      feeAmount: 0,
-      matched: false,
-      source: "none"
-    } satisfies ComplianceReportingFeeResolution;
-  }
-
-  if (rule.state && normalizedState && normalizeJurisdictionValue(rule.state) !== normalizedState) {
     return {
       division: input.division,
       feeAmount: 0,
@@ -161,11 +223,12 @@ export async function resolveComplianceReportingFeeTx(
     division: input.division,
     feeAmount: rule.feeAmount,
     matched: true,
-    source: "city",
+    source: rule.normalizedZipCode ? "zip" : rule.normalizedState ? "city_state" : "city",
     ruleId: rule.id,
     city: rule.city,
     county: rule.county,
-    state: rule.state
+    state: rule.state,
+    zipCode: rule.zipCode
   } satisfies ComplianceReportingFeeResolution;
 }
 
@@ -189,7 +252,18 @@ export async function resolveInspectionComplianceReportingFeeTx(
     },
     select: {
       city: true,
-      state: true
+      state: true,
+      postalCode: true,
+      customerCompany: {
+        select: {
+          serviceCity: true,
+          serviceState: true,
+          servicePostalCode: true,
+          billingCity: true,
+          billingState: true,
+          billingPostalCode: true
+        }
+      }
     }
   });
 
@@ -201,8 +275,9 @@ export async function resolveInspectionComplianceReportingFeeTx(
     tenantId: input.tenantId,
     division,
     location: {
-      city: site.city,
-      state: site.state
+      city: firstJurisdictionValue(site.city, site.customerCompany.serviceCity, site.customerCompany.billingCity),
+      state: firstJurisdictionValue(site.state, site.customerCompany.serviceState, site.customerCompany.billingState),
+      zipCode: firstJurisdictionValue(site.postalCode, site.customerCompany.servicePostalCode, site.customerCompany.billingPostalCode)
     }
   });
 }
@@ -256,12 +331,16 @@ export async function createComplianceReportingFeeRule(
   const normalizedCity = normalizeJurisdictionValue(parsedInput.city);
   const normalizedCounty = normalizeJurisdictionValue(parsedInput.county);
   const normalizedState = normalizeJurisdictionValue(parsedInput.state);
+  const normalizedZipCode = normalizeZipCode(parsedInput.zipCode);
 
   if (parsedInput.active) {
     const duplicate = await findDuplicateActiveRuleTx(prisma, {
       tenantId: parsedActor.tenantId as string,
       division: parsedInput.division,
-      normalizedCity
+      normalizedCity,
+      normalizedCounty,
+      normalizedState,
+      normalizedZipCode
     });
     if (duplicate) {
       throw new Error("An active compliance reporting fee already exists for this division and jurisdiction.");
@@ -272,12 +351,14 @@ export async function createComplianceReportingFeeRule(
     data: {
       tenantId: parsedActor.tenantId as string,
       division: parsedInput.division,
-      city: parsedInput.city.trim(),
+      city: parsedInput.city ?? null,
       normalizedCity,
       county: parsedInput.county ?? null,
       normalizedCounty,
       state: parsedInput.state ?? null,
       normalizedState,
+      zipCode: parsedInput.zipCode ?? null,
+      normalizedZipCode,
       feeAmount: parsedInput.feeAmount,
       active: parsedInput.active
     }
@@ -295,6 +376,7 @@ export async function createComplianceReportingFeeRule(
         city: rule.city,
         county: rule.county,
         state: rule.state,
+        zipCode: rule.zipCode,
         feeAmount: rule.feeAmount,
         active: rule.active
       }
@@ -329,12 +411,16 @@ export async function updateComplianceReportingFeeRule(
   const normalizedCity = normalizeJurisdictionValue(parsedInput.city);
   const normalizedCounty = normalizeJurisdictionValue(parsedInput.county);
   const normalizedState = normalizeJurisdictionValue(parsedInput.state);
+  const normalizedZipCode = normalizeZipCode(parsedInput.zipCode);
 
   if (parsedInput.active) {
     const duplicate = await findDuplicateActiveRuleTx(prisma, {
       tenantId: parsedActor.tenantId as string,
       division: parsedInput.division,
       normalizedCity,
+      normalizedCounty,
+      normalizedState,
+      normalizedZipCode,
       excludeRuleId: parsedInput.ruleId
     });
     if (duplicate) {
@@ -346,12 +432,14 @@ export async function updateComplianceReportingFeeRule(
     where: { id: parsedInput.ruleId },
     data: {
       division: parsedInput.division,
-      city: parsedInput.city.trim(),
+      city: parsedInput.city ?? null,
       normalizedCity,
       county: parsedInput.county ?? null,
       normalizedCounty,
       state: parsedInput.state ?? null,
       normalizedState,
+      zipCode: parsedInput.zipCode ?? null,
+      normalizedZipCode,
       feeAmount: parsedInput.feeAmount,
       active: parsedInput.active
     }
@@ -369,6 +457,7 @@ export async function updateComplianceReportingFeeRule(
         city: rule.city,
         county: rule.county,
         state: rule.state,
+        zipCode: rule.zipCode,
         feeAmount: rule.feeAmount,
         active: rule.active
       }
@@ -408,6 +497,7 @@ export async function deleteComplianceReportingFeeRule(actor: ActorContext, rule
         city: existing.city,
         county: existing.county,
         state: existing.state,
+        zipCode: existing.zipCode,
         feeAmount: existing.feeAmount,
         active: existing.active
       }

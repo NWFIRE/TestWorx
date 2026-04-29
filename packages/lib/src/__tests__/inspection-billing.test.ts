@@ -11,16 +11,17 @@ const { prismaMock, txMock } = vi.hoisted(() => ({
     billingPayerAccount: { findFirst: vi.fn() },
     billingContractProfile: { findFirst: vi.fn() },
     providerContractProfile: { findFirst: vi.fn() },
+    workOrderProviderContext: { findFirst: vi.fn() },
     providerContractRate: { findMany: vi.fn() },
     billingResolutionSnapshot: { findFirst: vi.fn(), create: vi.fn() },
     site: { findFirst: vi.fn() },
     tenant: { findUnique: vi.fn() },
     serviceFeeRule: { findMany: vi.fn() },
-    complianceReportingFeeRule: { findFirst: vi.fn() },
+    complianceReportingFeeRule: { findFirst: vi.fn(), findMany: vi.fn() },
     billingItemCatalogMatch: { findUnique: vi.fn(), upsert: vi.fn() },
     quickBooksCatalogItem: { findFirst: vi.fn(), findMany: vi.fn() },
     quickBooksCatalogItemAlias: { findMany: vi.fn(), upsert: vi.fn() },
-    inspectionBillingSummary: { update: vi.fn() },
+    inspectionBillingSummary: { findFirst: vi.fn(), update: vi.fn() },
     auditLog: { create: vi.fn() }
   },
   txMock: {
@@ -36,7 +37,7 @@ const { prismaMock, txMock } = vi.hoisted(() => ({
     site: { findFirst: vi.fn() },
     tenant: { findUnique: vi.fn() },
     serviceFeeRule: { findMany: vi.fn() },
-    complianceReportingFeeRule: { findFirst: vi.fn() }
+    complianceReportingFeeRule: { findFirst: vi.fn(), findMany: vi.fn() }
   }
 }));
 
@@ -215,6 +216,7 @@ describe("inspection billing extraction", () => {
     txMock.customerCompany.findFirst.mockReset();
     txMock.billingPayerAccount.findFirst.mockReset();
     txMock.billingContractProfile.findFirst.mockReset();
+    prismaMock.workOrderProviderContext.findFirst.mockReset();
     txMock.providerContractProfile.findFirst.mockReset();
     txMock.providerContractRate.findMany.mockReset();
     txMock.billingResolutionSnapshot.findFirst.mockReset();
@@ -223,6 +225,7 @@ describe("inspection billing extraction", () => {
     txMock.tenant.findUnique.mockReset();
     txMock.serviceFeeRule.findMany.mockReset();
     txMock.complianceReportingFeeRule.findFirst.mockReset();
+    txMock.complianceReportingFeeRule.findMany.mockReset();
     prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
@@ -275,7 +278,7 @@ describe("inspection billing extraction", () => {
       city: "Chicago",
       state: "IL"
     });
-    prismaMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
+    prismaMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
   });
 
   it("extracts kitchen suppression material items from structured fields", () => {
@@ -581,10 +584,13 @@ describe("inspection billing persistence and admin review", () => {
     txMock.customerCompany.findFirst.mockReset();
     txMock.billingPayerAccount.findFirst.mockReset();
     txMock.billingContractProfile.findFirst.mockReset();
+    txMock.providerContractProfile.findFirst.mockReset();
+    txMock.providerContractRate.findMany.mockReset();
     txMock.site.findFirst.mockReset();
     txMock.tenant.findUnique.mockReset();
     txMock.serviceFeeRule.findMany.mockReset();
     txMock.complianceReportingFeeRule.findFirst.mockReset();
+    txMock.complianceReportingFeeRule.findMany.mockReset();
     prismaMock.inspection.findFirst.mockResolvedValue({
       id: "inspection_1",
       customerCompanyId: "customer_1",
@@ -606,8 +612,26 @@ describe("inspection billing persistence and admin review", () => {
       autoBillingEnabled: false,
       requiredBillingReferences: {}
     });
+    txMock.customerCompany.findFirst.mockResolvedValue({
+      id: "customer_1",
+      name: "Pinecrest Property Management",
+      quickbooksCustomerId: "qb_customer_1",
+      billingType: "standard",
+      billToAccountId: null,
+      contractProfileId: null,
+      invoiceDeliverySettings: { method: "payer_email" },
+      autoBillingEnabled: false,
+      requiredBillingReferences: {}
+    });
     prismaMock.billingPayerAccount.findFirst.mockResolvedValue(null);
     prismaMock.billingContractProfile.findFirst.mockResolvedValue(null);
+    prismaMock.workOrderProviderContext.findFirst.mockResolvedValue(null);
+    txMock.billingPayerAccount.findFirst.mockResolvedValue(null);
+    txMock.billingContractProfile.findFirst.mockResolvedValue(null);
+    txMock.providerContractProfile.findFirst.mockResolvedValue(null);
+    txMock.providerContractRate.findMany.mockResolvedValue([]);
+    txMock.billingResolutionSnapshot.findFirst.mockResolvedValue(null);
+    txMock.billingResolutionSnapshot.create.mockResolvedValue({ id: "billing_resolution_1" });
     prismaMock.tenant.findUnique.mockResolvedValue({
       defaultServiceFeeCode: "SERVICE_FEE",
       defaultServiceFeeUnitPrice: 95
@@ -617,7 +641,7 @@ describe("inspection billing persistence and admin review", () => {
       city: "Chicago",
       state: "IL"
     });
-    prismaMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
+    prismaMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
     prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
@@ -859,13 +883,18 @@ describe("inspection billing persistence and admin review", () => {
       city: "Chicago",
       state: "IL"
     });
-    txMock.complianceReportingFeeRule.findFirst.mockResolvedValue({
+    txMock.complianceReportingFeeRule.findMany.mockResolvedValue([{
       id: "compliance_rule_1",
       city: "Chicago",
       county: "Cook",
       state: "IL",
+      zipCode: null,
+      normalizedCity: "CHICAGO",
+      normalizedCounty: "",
+      normalizedState: "IL",
+      normalizedZipCode: "",
       feeAmount: 22.5
-    });
+    }]);
 
     txMock.$queryRaw
       .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }])
@@ -968,7 +997,7 @@ describe("inspection billing persistence and admin review", () => {
       city: "Chicago",
       state: "IL"
     });
-    txMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
+    txMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
     txMock.$queryRaw
       .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }])
       .mockResolvedValueOnce([
@@ -1083,7 +1112,7 @@ describe("inspection billing persistence and admin review", () => {
       city: "Chicago",
       state: "IL"
     });
-    txMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
+    txMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
     txMock.$queryRaw
       .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }])
       .mockResolvedValueOnce([
@@ -1150,7 +1179,16 @@ describe("inspection billing persistence and admin review", () => {
       },
       providerContextSnapshot: null
     });
-    txMock.providerContractProfile.findFirst.mockResolvedValue(null);
+    txMock.providerContractProfile.findFirst.mockResolvedValue({
+      id: "provider_contract_1",
+      name: "Commercial Fire Annual",
+      status: "expired",
+      invoiceGroupingMode: "per_work_order",
+      requireProviderWorkOrderNumber: true,
+      requireSiteReferenceNumber: true,
+      effectiveStartDate: new Date("2025-01-01T00:00:00.000Z"),
+      effectiveEndDate: new Date("2025-12-31T00:00:00.000Z")
+    });
     txMock.tenant.findUnique.mockResolvedValue({
       defaultServiceFeeCode: "SERVICE_FEE",
       defaultServiceFeeUnitPrice: 95
@@ -1160,7 +1198,7 @@ describe("inspection billing persistence and admin review", () => {
       city: "Chicago",
       state: "IL"
     });
-    txMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
+    txMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
     txMock.$queryRaw
       .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }])
       .mockResolvedValueOnce([
@@ -1246,7 +1284,7 @@ describe("inspection billing persistence and admin review", () => {
       city: "Chicago",
       state: "IL"
     });
-    txMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
+    txMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
     txMock.$queryRaw
       .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }])
       .mockResolvedValueOnce([
@@ -1294,13 +1332,18 @@ describe("inspection billing persistence and admin review", () => {
       city: "Chicago",
       state: "IL"
     });
-    txMock.complianceReportingFeeRule.findFirst.mockResolvedValue({
+    txMock.complianceReportingFeeRule.findMany.mockResolvedValue([{
       id: "compliance_rule_sprinkler",
       city: "Chicago",
       county: "Cook",
       state: "IL",
+      zipCode: null,
+      normalizedCity: "CHICAGO",
+      normalizedCounty: "",
+      normalizedState: "IL",
+      normalizedZipCode: "",
       feeAmount: 30
-    });
+    }]);
 
     txMock.$queryRaw
       .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }])
@@ -1330,6 +1373,94 @@ describe("inspection billing persistence and admin review", () => {
     const complianceFees = summary?.items.filter((item) => item.description === "Compliance Reporting Fee") ?? [];
     expect(complianceFees).toHaveLength(1);
     expect(complianceFees[0]?.code).toBe("COMPLIANCE_REPORTING_FEE_FIRE_SPRINKLER");
+  });
+
+  it("uses the customer service address for compliance fees when the site is a generic placeholder", async () => {
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      site: {
+        city: "Unknown",
+        state: "Unknown",
+        postalCode: ""
+      },
+      customerCompany: {
+        serviceCity: "Enid",
+        serviceState: "OK",
+        servicePostalCode: "73701",
+        billingCity: null,
+        billingState: null,
+        billingPostalCode: null
+      }
+    });
+    txMock.customerCompany.findFirst.mockResolvedValue({
+      id: "customer_1",
+      name: "Enid Customer",
+      quickbooksCustomerId: "qb_customer_1",
+      billingType: "standard",
+      billToAccountId: null,
+      contractProfileId: null,
+      invoiceDeliverySettings: { method: "payer_email" },
+      autoBillingEnabled: false,
+      requiredBillingReferences: {},
+      serviceCity: "Enid",
+      serviceState: "OK",
+      servicePostalCode: "73701",
+      billingCity: null,
+      billingState: null,
+      billingPostalCode: null
+    });
+    txMock.tenant.findUnique.mockResolvedValue({
+      defaultServiceFeeCode: "SERVICE_FEE",
+      defaultServiceFeeUnitPrice: 95
+    });
+    txMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    txMock.site.findFirst.mockResolvedValue({
+      city: "Unknown",
+      state: "Unknown",
+      postalCode: ""
+    });
+    txMock.complianceReportingFeeRule.findMany.mockResolvedValue([{
+      id: "compliance_rule_enid",
+      city: "Enid",
+      county: null,
+      state: "OK",
+      zipCode: "73701",
+      normalizedCity: "ENID",
+      normalizedCounty: "",
+      normalizedState: "OK",
+      normalizedZipCode: "73701",
+      feeAmount: 35
+    }]);
+
+    txMock.$queryRaw
+      .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }])
+      .mockResolvedValueOnce([{
+        id: "report_1",
+        inspectionId: "inspection_1",
+        tenantId: "tenant_1",
+        contentJson: {},
+        inspectionType: "fire_alarm"
+      }])
+      .mockResolvedValueOnce([]);
+
+    const summary = await syncInspectionBillingSummaryTx(txMock as never, {
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1"
+    });
+
+    const complianceFee = summary?.items.find((item) => item.description === "Compliance Reporting Fee");
+    expect(complianceFee).toEqual(expect.objectContaining({
+      unitPrice: 35,
+      amount: 35
+    }));
+    expect(complianceFee?.metadata).toEqual(expect.objectContaining({
+      complianceJurisdictionCity: "Enid",
+      complianceJurisdictionState: "OK",
+      complianceJurisdictionZipCode: "73701",
+      complianceResolutionSource: "zip"
+    }));
   });
 
   it("maps only supported inspection types into compliance reporting divisions", () => {
@@ -1363,7 +1494,7 @@ describe("inspection billing persistence and admin review", () => {
       city: "Chicago",
       state: "IL"
     });
-    txMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
+    txMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
     prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue({
       sourceKey: "service|fire_extinguisher|inventory|servicePerformed||annual inspection",
       catalogItemId: "catalog_annual",
@@ -1657,7 +1788,7 @@ describe("inspection billing persistence and admin review", () => {
       city: "Chicago",
       state: "IL"
     });
-    prismaMock.complianceReportingFeeRule.findFirst.mockResolvedValue(null);
+    prismaMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
 
     const detail = await getAdminBillingSummaryDetail(
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
@@ -1781,13 +1912,18 @@ describe("inspection billing persistence and admin review", () => {
       city: "Chicago",
       state: "IL"
     });
-    prismaMock.complianceReportingFeeRule.findFirst.mockResolvedValue({
+    prismaMock.complianceReportingFeeRule.findMany.mockResolvedValue([{
       id: "compliance_rule_1",
       city: "Chicago",
       county: "Cook",
       state: "IL",
+      zipCode: null,
+      normalizedCity: "CHICAGO",
+      normalizedCounty: "",
+      normalizedState: "IL",
+      normalizedZipCode: "",
       feeAmount: 22.5
-    });
+    }]);
 
     const detail = await getAdminBillingSummaryDetail(
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
@@ -2483,10 +2619,10 @@ describe("inspection billing persistence and admin review", () => {
     );
 
     const updateCall = prismaMock.$executeRaw.mock.calls.at(-1)?.[0];
-    const executeRawText = String(updateCall);
-    expect(executeRawText).toContain("\"unitPrice\":32.5");
-    expect(executeRawText).toContain("\"amount\":65");
-    expect(executeRawText).toContain("\"amount\":162.5");
+    const executeRawValues = JSON.stringify((updateCall as { values?: unknown[] } | undefined)?.values ?? []);
+    expect(executeRawValues).toContain("\"unitPrice\":32.5");
+    expect(executeRawValues).toContain("\"amount\":65");
+    expect(executeRawValues).toContain("\"amount\":162.5");
   });
 
   it("clears a manual billing item link without breaking pricing", async () => {
