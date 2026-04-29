@@ -704,6 +704,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
           field: "laborHours",
           category: "labor",
           description: "On-site labor",
+          code: "ON_SITE_LABOR",
           unit: "hours",
           quantitySource: "fieldValue",
           includeWhenGreaterThanZero: true

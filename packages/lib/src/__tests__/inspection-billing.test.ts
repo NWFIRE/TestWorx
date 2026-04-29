@@ -310,8 +310,8 @@ describe("inspection billing extraction", () => {
       draft: buildFireAlarmDraft()
     });
 
-    expect(items.map((item) => [item.category, item.description, item.quantity])).toEqual([
-      ["labor", "On-site labor", 3.5]
+    expect(items.map((item) => [item.category, item.description, item.quantity, item.code])).toEqual([
+      ["labor", "On-site labor", 3.5, "ON_SITE_LABOR"]
     ]);
   });
 

@@ -3064,6 +3064,25 @@ function requirePrice(item: QuickBooksBillingSummary["items"][number]) {
   return item.unitPrice;
 }
 
+function resolveBillingItemCodeForQuickBooks(item: QuickBooksBillingSummary["items"][number]) {
+  const explicitCode = item.code?.trim();
+  if (explicitCode) {
+    return explicitCode;
+  }
+
+  const normalizedDescription = item.description
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+  if (item.category.toLowerCase() === "labor" && normalizedDescription === "on site labor") {
+    return "ON_SITE_LABOR";
+  }
+
+  return null;
+}
+
 async function resolveBillingItemUnitPriceForQuickBooks(input: {
   tenantId: string;
   integrationId: string;
@@ -4387,7 +4406,7 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
           item
         })
       });
-      const billingCode = item.code?.trim();
+      const billingCode = resolveBillingItemCodeForQuickBooks(item);
       if (!billingCode) {
         throw new Error(`Billing item "${item.description}" is missing a stable billing code. Add a billing code before syncing to QuickBooks.`);
       }
