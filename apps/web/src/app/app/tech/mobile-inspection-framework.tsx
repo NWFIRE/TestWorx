@@ -188,8 +188,19 @@ export function MobileReportNavigator({
           const status = task.isCurrent
             ? currentMode === "review" && task.reportStatus !== "finalized"
               ? "Ready for Completion"
-              : getTechnicianMobileTaskStatusLabel({ reportStatus: task.reportStatus, hasMeaningfulProgress: task.hasMeaningfulProgress })
-            : getTechnicianMobileTaskStatusLabel({ reportStatus: task.reportStatus, hasMeaningfulProgress: task.hasMeaningfulProgress });
+              : getTechnicianMobileTaskStatusLabel({
+                  reportStatus: task.reportStatus,
+                  hasMeaningfulProgress: task.hasMeaningfulProgress,
+                  schedulingStatus: task.schedulingStatus,
+                  isAvailableInTechnicianApp: task.isAvailableInTechnicianApp
+                })
+            : getTechnicianMobileTaskStatusLabel({
+                reportStatus: task.reportStatus,
+                hasMeaningfulProgress: task.hasMeaningfulProgress,
+                schedulingStatus: task.schedulingStatus,
+                isAvailableInTechnicianApp: task.isAvailableInTechnicianApp
+              });
+          const isUnavailable = task.isAvailableInTechnicianApp === false;
 
           return (
             <button
@@ -197,9 +208,16 @@ export function MobileReportNavigator({
               className={`min-w-[14rem] rounded-[1.35rem] border px-4 py-4 text-left transition ${
                 task.isCurrent
                   ? "border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary-soft)] shadow-[0_16px_34px_rgb(var(--tenant-primary-rgb)/0.12)]"
-                  : "border-slate-200 bg-slate-50"
+                  : isUnavailable
+                    ? "cursor-not-allowed border-slate-200 bg-slate-100 opacity-75"
+                    : "border-slate-200 bg-slate-50"
               }`}
-              onClick={() => onSelectReport(task.id, currentMode)}
+              disabled={isUnavailable}
+              onClick={() => {
+                if (!isUnavailable) {
+                  onSelectReport(task.id, currentMode);
+                }
+              }}
               type="button"
             >
               <div className="flex items-start justify-between gap-3">
@@ -210,6 +228,7 @@ export function MobileReportNavigator({
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700">{status}</span>
               </div>
               {progress ? <p className="mt-3 text-sm text-slate-500">{progress.label}</p> : null}
+              {isUnavailable && task.unavailableReason ? <p className="mt-3 text-sm text-slate-500">{task.unavailableReason}</p> : null}
             </button>
           );
         })}

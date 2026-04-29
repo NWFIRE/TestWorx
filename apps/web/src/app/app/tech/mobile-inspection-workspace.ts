@@ -2,12 +2,16 @@ export type TechnicianMobileTaskStatusLabel =
   | "Not Started"
   | "In Progress"
   | "Ready for Completion"
-  | "Finalized";
+  | "Finalized"
+  | "Future Visit";
 
 export type TechnicianMobileTaskWorkspaceSummary = {
   id: string;
   displayLabel: string;
   reportStatus: "draft" | "submitted" | "finalized" | null;
+  schedulingStatus?: string | null;
+  isAvailableInTechnicianApp?: boolean;
+  unavailableReason?: string | null;
   hasMeaningfulProgress?: boolean;
   progressCompletedCount?: number | null;
   progressTotalCount?: number | null;
@@ -16,15 +20,28 @@ export type TechnicianMobileTaskWorkspaceSummary = {
 };
 
 type TaskLike = {
+  schedulingStatus?: string | null;
   report?: {
     status?: "draft" | "submitted" | "finalized" | null;
   } | null;
 };
 
+const technicianActionableSchedulingStatuses = new Set(["due_now", "scheduled_now", "completed", "deferred"]);
+
+export function isTechnicianActionableSchedulingStatus(status: string | null | undefined) {
+  return !status || technicianActionableSchedulingStatuses.has(status);
+}
+
 export function getTechnicianMobileTaskStatusLabel(input: {
   reportStatus: "draft" | "submitted" | "finalized" | null | undefined;
   hasMeaningfulProgress?: boolean;
+  schedulingStatus?: string | null;
+  isAvailableInTechnicianApp?: boolean;
 }): TechnicianMobileTaskStatusLabel {
+  if (input.isAvailableInTechnicianApp === false || !isTechnicianActionableSchedulingStatus(input.schedulingStatus)) {
+    return "Future Visit";
+  }
+
   if (input.reportStatus === "finalized") {
     return "Finalized";
   }
@@ -80,7 +97,8 @@ export function summarizeTechnicianTaskStatuses(tasks: TaskLike[]) {
 
   for (const task of tasks) {
     const status = getTechnicianMobileTaskStatusLabel({
-      reportStatus: task.report?.status ?? null
+      reportStatus: task.report?.status ?? null,
+      schedulingStatus: task.schedulingStatus
     });
 
     if (status === "Not Started") {

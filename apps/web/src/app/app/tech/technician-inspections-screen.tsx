@@ -5,18 +5,18 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { useSearchParams } from "next/navigation";
 
-import { buildInspectionTaskSummaryLine } from "./mobile-inspection-workspace";
+import { buildInspectionTaskSummaryLine, isTechnicianActionableSchedulingStatus } from "./mobile-inspection-workspace";
 import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
 import { MobileInspectionPdfAccessCard } from "./mobile-inspection-pdf-access-card";
 import { useOfflineScreenSnapshot } from "./offline/use-offline-screen-snapshot";
 import { toDateValue } from "./date-value";
 
 function activeTasks(inspection: any) {
-  return inspection.tasks.filter((task: any) => task.report?.status !== "finalized");
+  return inspection.tasks.filter((task: any) => task.report?.status !== "finalized" && isTechnicianActionableSchedulingStatus(task.schedulingStatus));
 }
 
 function openTaskLink(inspection: any) {
-  const task = activeTasks(inspection)[0] ?? inspection.tasks[0] ?? null;
+  const task = activeTasks(inspection)[0] ?? inspection.tasks.find((candidate: any) => isTechnicianActionableSchedulingStatus(candidate.schedulingStatus)) ?? null;
   return task ? `/app/tech/reports/${inspection.id}/${task.id}` : "/app/tech";
 }
 
@@ -35,8 +35,15 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
   const dashboard = snapshot.dashboard;
   const active = dashboard.assigned.filter((inspection: any) => activeTasks(inspection).length > 0);
   const filter = searchParams.get("filter") ?? "all";
+  const unavailableReportNotice = searchParams.get("report") === "unavailable";
   return (
     <div className="space-y-5 pb-4">
+      {unavailableReportNotice ? (
+        <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+          That report is scheduled for a future visit and is not available for technician entry yet.
+        </div>
+      ) : null}
+
       <section
         className="rounded-[1.85rem] p-5 text-[var(--tenant-primary-contrast)] shadow-[0_24px_60px_rgb(var(--tenant-primary-rgb)/0.2)]"
         style={{

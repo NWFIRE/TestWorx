@@ -37,7 +37,9 @@ function resolveWorkspaceTaskStatusLabel({
 
   return getTechnicianMobileTaskStatusLabel({
     reportStatus: task.reportStatus,
-    hasMeaningfulProgress: task.hasMeaningfulProgress
+    hasMeaningfulProgress: task.hasMeaningfulProgress,
+    schedulingStatus: task.schedulingStatus,
+    isAvailableInTechnicianApp: task.isAvailableInTechnicianApp
   });
 }
 
@@ -125,13 +127,16 @@ export function MobileInspectionWorkspaceShell({
                 ? `/app/tech/reports/${encodeURIComponent(workspace.inspectionId)}/${encodeURIComponent(task.id)}/review`
                 : `/app/tech/reports/${encodeURIComponent(workspace.inspectionId)}/${encodeURIComponent(task.id)}`;
               const isCurrent = Boolean(task.isCurrent);
+              const isUnavailable = task.isAvailableInTechnicianApp === false;
 
               const content = (
                 <div
                   className={`rounded-[1.45rem] border px-4 py-4 transition ${
                     isCurrent
                       ? "border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary-soft)] shadow-[0_18px_40px_rgb(var(--tenant-primary-rgb)/0.12)]"
-                      : "border-slate-200 bg-white"
+                      : isUnavailable
+                        ? "border-slate-200 bg-slate-100 opacity-75"
+                        : "border-slate-200 bg-white"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -163,10 +168,11 @@ export function MobileInspectionWorkspaceShell({
                       </div>
                     </div>
                   ) : null}
+                  {isUnavailable && task.unavailableReason ? <p className="mt-3 text-sm text-slate-500">{task.unavailableReason}</p> : null}
                 </div>
               );
 
-              if (isCurrent) {
+              if (isCurrent || isUnavailable) {
                 return <div key={task.id}>{content}</div>;
               }
 

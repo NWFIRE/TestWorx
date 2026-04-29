@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { ClaimButton } from "./claim-button";
 import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
+import { isTechnicianActionableSchedulingStatus } from "./mobile-inspection-workspace";
 import { MobileInspectionPdfAccessCard } from "./mobile-inspection-pdf-access-card";
 import { useOfflineScreenSnapshot } from "./offline/use-offline-screen-snapshot";
 import { toDateValue } from "./date-value";
@@ -15,7 +16,9 @@ import { toDateValue } from "./date-value";
 type WorkFilter = "today" | "upcoming" | "overdue" | "open" | "claimable";
 
 function firstOpenTask(inspection: any) {
-  return inspection.tasks.find((task: any) => task.report?.status !== "finalized") ?? inspection.tasks[0] ?? null;
+  return inspection.tasks.find((task: any) => task.report?.status !== "finalized" && isTechnicianActionableSchedulingStatus(task.schedulingStatus))
+    ?? inspection.tasks.find((task: any) => isTechnicianActionableSchedulingStatus(task.schedulingStatus))
+    ?? null;
 }
 
 function inspectionHref(inspection: any) {
@@ -97,7 +100,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
     if (filter === "open") {
       return {
         assigned: dashboard.assigned
-          .filter((inspection: any) => inspection.tasks.some((task: any) => task.report?.status !== "finalized"))
+          .filter((inspection: any) => inspection.tasks.some((task: any) => task.report?.status !== "finalized" && isTechnicianActionableSchedulingStatus(task.schedulingStatus)))
           .filter((inspection: any) => matchesQuery(inspection, query)),
         claimable: [],
         open: []

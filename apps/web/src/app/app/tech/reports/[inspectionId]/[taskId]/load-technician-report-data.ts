@@ -37,9 +37,9 @@ export async function loadTechnicianReportData(inspectionId: string, taskId: str
     if (
       error instanceof Error &&
       session.user.role === "technician" &&
-      /completed inspections are no longer available in the technician app/i.test(error.message)
+      /(completed|closed) inspections are no longer available in the technician app|future visit.*not available in the technician app yet/i.test(error.message)
     ) {
-      redirect("/app/tech?report=finalized");
+      redirect("/app/tech/inspections?report=unavailable");
     }
 
     throw error;
@@ -79,6 +79,9 @@ export async function loadTechnicianReportData(inspectionId: string, taskId: str
         id: task.id,
         displayLabel: task.displayLabel,
         reportStatus: task.reportStatus,
+        schedulingStatus: task.schedulingStatus,
+        isAvailableInTechnicianApp: task.isAvailableInTechnicianApp,
+        unavailableReason: task.unavailableReason,
         hasMeaningfulProgress: task.hasMeaningfulProgress,
         progressCompletedCount: task.progressCompletedCount,
         progressTotalCount: task.progressTotalCount,

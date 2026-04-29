@@ -1014,6 +1014,11 @@ export async function getInspectionReportDraft(actor: ActorContext, inspectionId
     return {
       id: task.id,
       inspectionType: task.inspectionType,
+      schedulingStatus: task.schedulingStatus ?? null,
+      isAvailableInTechnicianApp: !task.schedulingStatus || ["due_now", "scheduled_now", "completed", "deferred"].includes(task.schedulingStatus),
+      unavailableReason: task.schedulingStatus && !["due_now", "scheduled_now", "completed", "deferred"].includes(task.schedulingStatus)
+        ? "Tracked for a future visit"
+        : null,
       customDisplayLabel: task.customDisplayLabel ?? null,
       displayLabel: task.displayLabel,
       reportStatus: task.report?.status ?? null,
