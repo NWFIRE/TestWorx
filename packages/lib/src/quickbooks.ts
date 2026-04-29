@@ -463,6 +463,79 @@ class QuickBooksRequestError extends Error {
   }
 }
 
+function readDuplicateQuickBooksDocNumber(error: unknown) {
+  if (!(error instanceof QuickBooksRequestError) || !error.rawBody) {
+    return null;
+  }
+
+  let isDuplicateDocumentNumber = /Duplicate Document Number Error/i.test(error.rawBody);
+  try {
+    const parsed = JSON.parse(error.rawBody) as { Fault?: { Error?: Array<{ code?: unknown; Message?: unknown; Detail?: unknown }> } };
+    const errors = parsed.Fault?.Error ?? [];
+    isDuplicateDocumentNumber = errors.some((entry) => (
+      String(entry.code ?? "") === "6140"
+      || /Duplicate Document Number Error/i.test(String(entry.Message ?? ""))
+      || /Duplicate Document Number Error/i.test(String(entry.Detail ?? ""))
+    ));
+  } catch {
+    // QuickBooks sometimes returns non-JSON error text; the regex fallback above handles that.
+  }
+
+  if (!isDuplicateDocumentNumber) {
+    return null;
+  }
+
+  const match = error.rawBody.match(/DocNumber=([A-Za-z0-9-]+)/);
+  return match?.[1] ?? "unknown";
+}
+
+async function createQuickBooksInvoiceWithTradeWorxNumber(input: {
+  connection: QuickBooksTenantConnection;
+  tenantId: string;
+  issueDate?: Date | string | null;
+  preferredDocNumber?: string | null;
+  body: Record<string, unknown>;
+}) {
+  const attemptedDuplicates: string[] = [];
+  let preferredDocNumber = typeof input.preferredDocNumber === "string" && input.preferredDocNumber.trim().length > 0
+    ? input.preferredDocNumber.trim()
+    : null;
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const docNumber = preferredDocNumber
+      ?? await reserveTradeWorxInvoiceNumber({
+        tenantId: input.tenantId,
+        issueDate: input.issueDate
+      });
+    preferredDocNumber = null;
+
+    try {
+      const invoiceResponse = await quickBooksApiRequest<{ Invoice?: unknown }>(input.connection, {
+        path: "/invoice",
+        method: "POST",
+        body: {
+          ...input.body,
+          DocNumber: docNumber
+        }
+      });
+
+      return {
+        docNumber,
+        invoiceResponse
+      };
+    } catch (error) {
+      const duplicateDocNumber = readDuplicateQuickBooksDocNumber(error);
+      if (!duplicateDocNumber) {
+        throw error;
+      }
+
+      attemptedDuplicates.push(duplicateDocNumber);
+    }
+  }
+
+  throw new Error(`QuickBooks already has invoice number${attemptedDuplicates.length === 1 ? "" : "s"} ${attemptedDuplicates.join(", ")}. TradeWorx advanced the invoice sequence but could not find an unused number after multiple attempts. Retry invoice sync.`);
+}
+
 function parseActor(actor: ActorContext) {
   const parsed = actorContextSchema.parse(actor);
   assertTenantContext(parsed.role, parsed.tenantId);
@@ -4252,15 +4325,11 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
       }));
     }
 
-    const docNumber = normalizedSummary.quickbooksInvoiceNumber
-      ?? await reserveTradeWorxInvoiceNumber({
-        tenantId: parsedActor.tenantId as string
-      });
-    const invoiceResponse = await quickBooksApiRequest<{ Invoice?: unknown }>(tenant, {
-      path: "/invoice",
-      method: "POST",
+    const { docNumber, invoiceResponse } = await createQuickBooksInvoiceWithTradeWorxNumber({
+      connection: tenant,
+      tenantId: parsedActor.tenantId as string,
+      preferredDocNumber: normalizedSummary.quickbooksInvoiceNumber,
       body: {
-        DocNumber: docNumber,
         CustomerRef: { value: customerId },
         ...(sendToEmail ? { BillEmail: { Address: sendToEmail } } : {}),
         PrivateNote: summary.notes ?? `Synced from TradeWorx inspection ${summary.inspectionId}`,
@@ -4784,16 +4853,11 @@ export async function createDirectQuickBooksInvoice(
       invoiceLines.push(...automaticFeeLines);
     }
 
-    const docNumber = await reserveTradeWorxInvoiceNumber({
+    const { docNumber, invoiceResponse } = await createQuickBooksInvoiceWithTradeWorxNumber({
+      connection: tenant,
       tenantId: parsedActor.tenantId as string,
-      issueDate
-    });
-
-    const invoiceResponse = await quickBooksApiRequest<{ Invoice?: unknown }>(tenant, {
-      path: "/invoice",
-      method: "POST",
+      issueDate,
       body: {
-        DocNumber: docNumber,
         CustomerRef: { value: customerId },
         TxnDate: issueDate.toISOString().slice(0, 10),
         ...(dueDate ? { DueDate: dueDate.toISOString().slice(0, 10) } : {}),
