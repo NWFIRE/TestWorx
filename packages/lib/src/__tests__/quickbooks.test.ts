@@ -640,6 +640,8 @@ describe("quickbooks billing sync hardening", () => {
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1" } }))
       .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
       .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse(systemFault, { status: 500 }))
+      .mockResolvedValueOnce(jsonResponse(systemFault, { status: 500 }))
       .mockResolvedValueOnce(jsonResponse(systemFault, { status: 500 }));
 
     const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
@@ -653,6 +655,10 @@ describe("quickbooks billing sync hardening", () => {
     expect(result.quickbooksSendError).toMatch(/QuickBooks created the invoice/i);
     expect(result.quickbooksSendError).toMatch(/Retry the send later/i);
     expect(result.quickbooksSendError).not.toMatch(/NullPointerException|Fault|SystemFailureError/i);
+    expect(fetchMock).toHaveBeenCalledTimes(7);
+    const firstSendRequest = fetchMock.mock.calls[4]?.[1] as RequestInit | undefined;
+    expect((firstSendRequest?.headers as Record<string, string>)["Content-Type"]).toBeUndefined();
+    expect(firstSendRequest?.body).toBeUndefined();
     expect(prismaMock.inspectionBillingSummary.update).toHaveBeenCalledWith({
       where: { id: "summary_1" },
       data: expect.objectContaining({
@@ -665,6 +671,55 @@ describe("quickbooks billing sync hardening", () => {
       data: expect.objectContaining({
         quickbooksSendStatus: "send_failed",
         quickbooksSendError: result.quickbooksSendError
+      })
+    });
+  });
+
+  it("automatically retries a transient QuickBooks send SystemFault before marking the invoice sent", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: null });
+    prismaMock.customerCompany.update.mockResolvedValue(undefined);
+    prismaMock.site.findFirst.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
+    prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue(buildBillingSummary());
+    prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
+    prismaMock.auditLog.create.mockResolvedValue(undefined);
+
+    const systemFault = {
+      Fault: {
+        Error: [{
+          Message: "An application error has occurred while processing your request",
+          Detail: "System Failure Error: java.lang.NullPointerException",
+          code: "10000",
+          element: "SystemFailureError"
+        }],
+        type: "SystemFault"
+      }
+    };
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse(systemFault, { status: 500 }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1" } }));
+
+    const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
+
+    const result = await syncBillingSummaryToQuickBooks(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    expect(result.quickbooksSendStatus).toBe("sent");
+    expect(result.quickbooksSendError).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+    expect(prismaMock.inspectionBillingSummary.update).toHaveBeenCalledWith({
+      where: { id: "summary_1" },
+      data: expect.objectContaining({
+        quickbooksSendStatus: "sent",
+        quickbooksSendError: null
       })
     });
   });

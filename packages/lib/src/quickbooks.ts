@@ -304,6 +304,7 @@ export const directQuickBooksInvoiceInputSchema = z.object({
 
 const TRADEWORX_INVOICE_SEQUENCE_START = 1000;
 const TRADEWORX_INVOICE_DUPLICATE_RETRY_LIMIT = 100;
+const QUICKBOOKS_SEND_RETRY_DELAYS_MS = [0, 750, 1500];
 
 function getTradeWorxInvoiceYear(dateInput?: Date | string | null) {
   if (dateInput instanceof Date && !Number.isNaN(dateInput.getTime())) {
@@ -777,6 +778,22 @@ function readQuickBooksFault(rawBody: string | null | undefined) {
   }
 }
 
+function isQuickBooksSendSystemFault(error: QuickBooksRequestError) {
+  if (!error.operation.includes("/send")) {
+    return false;
+  }
+
+  const fault = readQuickBooksFault(error.rawBody);
+  return Boolean(
+    fault
+    && (
+      fault.type === "SystemFault"
+      || fault.code === "10000"
+      || /System Failure|NullPointerException/i.test(`${fault.message ?? ""} ${fault.detail ?? ""}`)
+    )
+  );
+}
+
 function buildQuickBooksRequestErrorMessage(input: {
   rawBody: string | null;
   statusText: string;
@@ -799,6 +816,10 @@ function buildQuickBooksRequestErrorMessage(input: {
 
   const readable = [fault.message, fault.detail].filter(Boolean).join(": ");
   return readable ? `QuickBooks request failed: ${readable}` : "QuickBooks request failed.";
+}
+
+function delay(ms: number) {
+  return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
 }
 
 function isQuickBooksDuplicateCustomerNameError(error: unknown) {
@@ -1068,13 +1089,17 @@ async function quickBooksApiRequest<T>(connection: QuickBooksTenantConnection, i
     url.search = input.searchParams.toString();
   }
 
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${refreshed.quickbooksAccessToken}`,
+    Accept: "application/json"
+  };
+  if (input.body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+
   const response = await fetch(url, {
     method: input.method ?? "GET",
-    headers: {
-      Authorization: `Bearer ${refreshed.quickbooksAccessToken}`,
-      Accept: "application/json",
-      "Content-Type": "application/json"
-    },
+    headers,
     body: input.body === undefined ? undefined : JSON.stringify(input.body)
   });
 
@@ -5090,13 +5115,36 @@ async function sendQuickBooksInvoiceForSummary(input: {
 
   const sendParams = new URLSearchParams();
   sendParams.set("sendTo", summary.billingEmail);
+  let lastSendError: QuickBooksRequestError | null = null;
 
   try {
-    await quickBooksApiRequest<Record<string, unknown>>(tenant, {
-      path: `/invoice/${summary.quickbooksInvoiceId}/send`,
-      method: "POST",
-      searchParams: sendParams
-    });
+    for (let attempt = 0; attempt < QUICKBOOKS_SEND_RETRY_DELAYS_MS.length; attempt += 1) {
+      await delay(QUICKBOOKS_SEND_RETRY_DELAYS_MS[attempt] ?? 0);
+      try {
+        await quickBooksApiRequest<Record<string, unknown>>(tenant, {
+          path: `/invoice/${summary.quickbooksInvoiceId}/send`,
+          method: "POST",
+          searchParams: sendParams
+        });
+        lastSendError = null;
+        break;
+      } catch (error) {
+        const normalizedError = normalizeQuickBooksError({
+          error,
+          fallbackOperation: "billing.send",
+          connectionMode: tenant.quickbooksConnectionMode
+        });
+        lastSendError = normalizedError;
+        const canRetry = attempt < QUICKBOOKS_SEND_RETRY_DELAYS_MS.length - 1 && isQuickBooksSendSystemFault(normalizedError);
+        if (!canRetry) {
+          throw normalizedError;
+        }
+      }
+    }
+
+    if (lastSendError) {
+      throw lastSendError;
+    }
 
     await prisma.inspectionBillingSummary.update({
       where: { id: summary.id },
