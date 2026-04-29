@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { LiveUrlSelectFilter } from "@/app/live-url-select-filter";
+import { LiveUrlSearchSelect } from "@/app/live-url-search-select";
 import { getAdminReportReviewQueueData } from "@testworx/lib/server/index";
 
 import {
@@ -21,10 +22,35 @@ function taskDisplayLabel(task: { inspectionType: string; displayLabel?: string 
   return task.displayLabel ?? task.inspectionType.replaceAll("_", " ");
 }
 
+function buildReadyToBillHref(input: { month?: string; query?: string }) {
+  const search = new URLSearchParams();
+  if (input.month) {
+    search.set("month", input.month);
+  }
+  if (input.query?.trim()) {
+    search.set("q", input.query.trim());
+  }
+
+  const query = search.toString();
+  return query ? `/app/admin/reports?${query}` : "/app/admin/reports";
+}
+
+function uniqueSearchOptions<T extends { value: string }>(options: T[]) {
+  const seen = new Set<string>();
+  return options.filter((option) => {
+    const key = option.value.trim().toLowerCase();
+    if (!key || seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
 export default async function AdminReportsQueuePage({
   searchParams
 }: {
-  searchParams?: Promise<{ month?: string }>;
+  searchParams?: Promise<{ month?: string; q?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -36,7 +62,8 @@ export default async function AdminReportsQueuePage({
 
   const params = searchParams ? await searchParams : {};
   const month = typeof params.month === "string" ? params.month : undefined;
-  const currentPath = month ? `/app/admin/reports?month=${encodeURIComponent(month)}` : "/app/admin/reports";
+  const query = typeof params.q === "string" ? params.q.trim() : "";
+  const currentPath = buildReadyToBillHref({ month, query });
 
   const data = await getAdminReportReviewQueueData(
     {
@@ -44,8 +71,36 @@ export default async function AdminReportsQueuePage({
       role: session.user.role,
       tenantId: session.user.tenantId
     },
-    { month }
+    { month, query }
   );
+  const readyToBillSearchOptions = uniqueSearchOptions([
+    ...data.inspections.map((inspection) => ({
+      value: inspection.customerCompany.name,
+      label: inspection.customerCompany.name,
+      secondaryLabel: "Customer",
+      badge: "Customer"
+    })),
+    ...data.inspections.map((inspection) => ({
+      value: inspection.primaryTitle ?? inspection.site.name,
+      label: inspection.primaryTitle ?? inspection.site.name,
+      secondaryLabel: [inspection.secondaryTitle, inspection.site.city].filter(Boolean).join(" | ") || "Inspection location",
+      badge: "Location"
+    })),
+    ...data.inspections.map((inspection) => ({
+      value: inspection.id,
+      label: `Inspection ${inspection.id.slice(0, 8)}`,
+      secondaryLabel: [inspection.customerCompany.name, inspection.primaryTitle, format(inspection.completedAt ?? inspection.scheduledStart, "MMM d, yyyy")].filter(Boolean).join(" | "),
+      badge: "Inspection"
+    })),
+    ...data.inspections.flatMap((inspection) =>
+      inspection.reviewTasks.map((task) => ({
+        value: taskDisplayLabel(task),
+        label: taskDisplayLabel(task),
+        secondaryLabel: inspection.customerCompany.name,
+        badge: "Report"
+      }))
+    )
+  ]);
 
   return (
     <AppPageShell>
@@ -80,10 +135,28 @@ export default async function AdminReportsQueuePage({
       </section>
 
       <FilterBar
-        description="The ready-to-bill queue defaults to the current month. Switch months to find older finalized, non-invoiced work."
+        description="Search for a customer or inspection, then switch months only when you need older finalized, non-invoiced work."
         title="Queue filters"
       >
-        <LiveUrlSelectFilter options={data.options.months} paramKey="month" value={data.filters.month} />
+        <div className="grid w-full gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,0.32fr)_auto]">
+          <LiveUrlSearchSelect
+            className="min-w-0"
+            emptyText="No matching ready-to-bill inspections found"
+            initialValue={data.filters.query}
+            options={readyToBillSearchOptions}
+            paramKey="q"
+            placeholder="Search customer, inspection, site, technician, or report type"
+          />
+          <LiveUrlSelectFilter options={data.options.months} paramKey="month" value={data.filters.month} />
+          {data.filters.query ? (
+            <Link
+              className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 py-3 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-subtle)]"
+              href={buildReadyToBillHref({ month: data.filters.month })}
+            >
+              Clear search
+            </Link>
+          ) : null}
+        </div>
       </FilterBar>
 
       <SectionCard>

@@ -5,6 +5,7 @@ import {
   InspectionCloseoutRequestStatus,
   InspectionCloseoutRequestType,
   InspectionStatus,
+  InspectionType,
   Prisma,
   RecurrenceFrequency
 } from "@prisma/client";
@@ -3927,7 +3928,7 @@ export async function getAdminSchedulingQueueData(
 
 export async function getAdminReportReviewQueueData(
   actor: ActorContext,
-  input?: { month?: string }
+  input?: { month?: string; query?: string }
 ) {
   const parsedActor = parseActor(actor);
   if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
@@ -3941,33 +3942,60 @@ export async function getAdminReportReviewQueueData(
     ? startOfMonth(new Date(`${requestedMonth}-01T00:00:00.000Z`))
     : currentMonthStart;
   const monthEnd = endOfMonth(monthStart);
+  const requestedQuery = (input?.query ?? "").trim();
+  const normalizedQuery = requestedQuery.toLowerCase();
+  const matchingInspectionTypes = requestedQuery
+    ? Object.keys(inspectionTypeRegistry).filter((type) =>
+        type.toLowerCase().includes(normalizedQuery) ||
+        type.replaceAll("_", " ").toLowerCase().includes(normalizedQuery)
+      )
+    : [];
+  const monthScope: Prisma.InspectionWhereInput[] = [
+    {
+      completedAt: {
+        gte: monthStart,
+        lte: monthEnd
+      }
+    },
+    {
+      completedAt: null,
+      tasks: {
+        some: {
+          report: {
+            status: reportStatuses.finalized,
+            finalizedAt: {
+              gte: monthStart,
+              lte: monthEnd
+            }
+          }
+        }
+      }
+    }
+  ];
+  const queryScope: Prisma.InspectionWhereInput | null = requestedQuery
+    ? {
+        OR: [
+          { id: { contains: requestedQuery, mode: "insensitive" } },
+          { customerCompany: { name: { contains: requestedQuery, mode: "insensitive" } } },
+          { site: { name: { contains: requestedQuery, mode: "insensitive" } } },
+          { site: { addressLine1: { contains: requestedQuery, mode: "insensitive" } } },
+          { site: { city: { contains: requestedQuery, mode: "insensitive" } } },
+          { site: { state: { contains: requestedQuery, mode: "insensitive" } } },
+          { site: { postalCode: { contains: requestedQuery, mode: "insensitive" } } },
+          { assignedTechnician: { name: { contains: requestedQuery, mode: "insensitive" } } },
+          { technicianAssignments: { some: { technician: { name: { contains: requestedQuery, mode: "insensitive" } } } } },
+          ...(matchingInspectionTypes.length > 0 ? [{ tasks: { some: { inspectionType: { in: matchingInspectionTypes as InspectionType[] } } } }] : []),
+          { tasks: { some: { customDisplayLabel: { contains: requestedQuery, mode: "insensitive" } } } }
+        ]
+      }
+    : null;
 
   const inspections = await prisma.inspection.findMany({
     where: {
       tenantId,
       status: InspectionStatus.completed,
-      OR: [
-        {
-          completedAt: {
-            gte: monthStart,
-            lte: monthEnd
-          }
-        },
-        {
-          completedAt: null,
-          tasks: {
-            some: {
-              report: {
-                status: reportStatuses.finalized,
-                finalizedAt: {
-                  gte: monthStart,
-                  lte: monthEnd
-                }
-              }
-            }
-          }
-        }
-      ]
+      OR: monthScope,
+      ...(queryScope ? { AND: [queryScope] } : {})
     },
     include: {
       site: true,
@@ -3990,7 +4018,7 @@ export async function getAdminReportReviewQueueData(
       }
     },
     orderBy: [{ scheduledStart: "desc" }],
-    take: 40
+    take: requestedQuery ? 100 : 40
   });
 
   const mapped = inspections
@@ -4040,6 +4068,32 @@ export async function getAdminReportReviewQueueData(
 
   const readyToBillInspections = mapped.filter((inspection) => inspection.lifecycleSummary.actionState === "ready_to_bill");
   const syncIssueInspections = mapped.filter((inspection) => inspection.lifecycleSummary.actionState === "sync_issue");
+  const queryMatchedReadyToBillInspections = readyToBillInspections.filter((inspection) => {
+    if (!requestedQuery) {
+      return true;
+    }
+
+    const values = [
+      inspection.id,
+      inspection.primaryTitle,
+      inspection.secondaryTitle,
+      inspection.site.name,
+      inspection.site.addressLine1,
+      inspection.site.city,
+      inspection.site.state,
+      inspection.site.postalCode,
+      inspection.customerCompany.name,
+      inspection.billingStatus,
+      ...inspection.assignedTechnicianNames,
+      ...inspection.reviewTasks.flatMap((task) => [
+        task.id,
+        task.inspectionType,
+        task.displayLabel
+      ])
+    ];
+
+    return values.some((value) => value?.toLowerCase().includes(normalizedQuery));
+  });
 
   const monthOptions = Array.from({ length: 12 }, (_, index) => {
     const monthDate = subMonths(currentMonthStart, index);
@@ -4051,18 +4105,19 @@ export async function getAdminReportReviewQueueData(
 
   return {
     filters: {
-      month: format(monthStart, "yyyy-MM")
+      month: format(monthStart, "yyyy-MM"),
+      query: requestedQuery
     },
     counts: {
-      awaitingReview: readyToBillInspections.length,
-      readyToBill: readyToBillInspections.length,
+      awaitingReview: queryMatchedReadyToBillInspections.length,
+      readyToBill: queryMatchedReadyToBillInspections.length,
       syncIssues: syncIssueInspections.length,
       completed: mapped.length
     },
     options: {
       months: monthOptions
     },
-    inspections: readyToBillInspections
+    inspections: queryMatchedReadyToBillInspections
   };
 }
 
