@@ -258,6 +258,21 @@ type InspectionRow = {
   inspectionClassification: string | null;
 };
 
+type ComplianceFeeBackfillCandidateRow = {
+  inspectionId: string;
+};
+
+export type CompletedInspectionComplianceFeeRefreshResult = {
+  inspectedCount: number;
+  refreshedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  failures: Array<{
+    inspectionId: string;
+    message: string;
+  }>;
+};
+
 type InspectionBillingResolutionContext = {
   inspectionId: string;
   customerCompanyId: string;
@@ -365,6 +380,14 @@ type ProviderContractProfileResolution = {
 
 const INSPECTION_LEVEL_REPORT_TYPE = "inspection";
 const COMPLIANCE_FEE_REPORT_TYPE = "compliance_reporting";
+const COMPLIANCE_REPORTING_INSPECTION_TYPES: InspectionType[] = [
+  "fire_extinguisher",
+  "fire_alarm",
+  "wet_fire_sprinkler",
+  "dry_fire_sprinkler",
+  "joint_commission_fire_sprinkler",
+  "kitchen_suppression"
+];
 
 const defaultBillingResolutionSnapshotMetadata: BillingResolutionSnapshotMetadata = {
   warningCodes: [],
@@ -2815,6 +2838,84 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
     createdAt: existing?.createdAt ?? new Date(),
     updatedAt: new Date()
   } satisfies PersistedBillingSummary;
+}
+
+export async function refreshCompletedInspectionComplianceFees(
+  actor: ActorContext
+): Promise<CompletedInspectionComplianceFeeRefreshResult> {
+  const parsedActor = parseActor(actor);
+  ensureAdmin(parsedActor);
+  const tenantId = parsedActor.tenantId as string;
+
+  const candidates = (await prisma.$queryRaw`
+    SELECT i."id" AS "inspectionId"
+    FROM "Inspection" i
+    INNER JOIN "InspectionReport" r
+      ON r."inspectionId" = i."id"
+      AND r."tenantId" = i."tenantId"
+    INNER JOIN "InspectionTask" t
+      ON t."id" = r."inspectionTaskId"
+      AND t."tenantId" = i."tenantId"
+    LEFT JOIN "InspectionBillingSummary" s
+      ON s."inspectionId" = i."id"
+      AND s."tenantId" = i."tenantId"
+    WHERE i."tenantId" = ${tenantId}
+      AND i."status"::text = ${InspectionStatus.completed}
+      AND r."status"::text = ${reportStatuses.finalized}
+      AND t."inspectionType"::text IN (${Prisma.join(COMPLIANCE_REPORTING_INSPECTION_TYPES)})
+      AND COALESCE(s."status"::text, 'draft') <> 'invoiced'
+    GROUP BY i."id"
+    ORDER BY MAX(COALESCE(r."finalizedAt", r."updatedAt", r."createdAt")) DESC
+  `) as ComplianceFeeBackfillCandidateRow[];
+
+  let refreshedCount = 0;
+  let skippedCount = 0;
+  const failures: CompletedInspectionComplianceFeeRefreshResult["failures"] = [];
+
+  for (const candidate of candidates) {
+    try {
+      const summary = await syncInspectionBillingSummaryTx(prisma as unknown as TransactionClient, {
+        tenantId,
+        inspectionId: candidate.inspectionId
+      });
+
+      if (summary) {
+        refreshedCount += 1;
+      } else {
+        skippedCount += 1;
+      }
+    } catch (error) {
+      failures.push({
+        inspectionId: candidate.inspectionId,
+        message: error instanceof Error ? error.message : "Unable to refresh billing summary."
+      });
+    }
+  }
+
+  const result = {
+    inspectedCount: candidates.length,
+    refreshedCount,
+    skippedCount,
+    failedCount: failures.length,
+    failures
+  } satisfies CompletedInspectionComplianceFeeRefreshResult;
+
+  try {
+    await prisma.auditLog.create({
+      data: {
+        tenantId,
+        actorUserId: parsedActor.userId,
+        action: "billing.compliance_fees_refreshed",
+        entityType: "InspectionBillingSummary",
+        entityId: tenantId,
+        metadata: result
+      }
+    });
+  } catch {
+    // Refreshing eligible billing summaries matters more than audit logging this maintenance sweep.
+  }
+
+  return result;
 }
 
 function ensureAdmin(parsedActor: ReturnType<typeof parseActor>) {

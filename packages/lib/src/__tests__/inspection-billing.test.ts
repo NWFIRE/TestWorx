@@ -60,6 +60,7 @@ import {
   linkBillingSummaryItemCatalog,
   linkBillingSummaryItemGroupCatalog,
   mergeBillingItems,
+  refreshCompletedInspectionComplianceFees,
   searchBillingSummaryItemCatalogMatches,
   syncInspectionBillingSummaryTx,
   updateBillingSummaryItem,
@@ -578,6 +579,11 @@ describe("inspection billing persistence and admin review", () => {
     prismaMock.quickBooksCatalogItem.findFirst.mockReset();
     prismaMock.quickBooksCatalogItem.findMany.mockReset();
     prismaMock.quickBooksCatalogItemAlias.findMany.mockReset();
+    prismaMock.providerContractProfile.findFirst.mockReset();
+    prismaMock.providerContractRate.findMany.mockReset();
+    prismaMock.billingResolutionSnapshot.findFirst.mockReset();
+    prismaMock.billingResolutionSnapshot.create.mockReset();
+    prismaMock.auditLog.create.mockReset();
     txMock.$queryRaw.mockReset();
     txMock.$executeRaw.mockReset();
     txMock.inspection.findFirst.mockReset();
@@ -626,6 +632,11 @@ describe("inspection billing persistence and admin review", () => {
     prismaMock.billingPayerAccount.findFirst.mockResolvedValue(null);
     prismaMock.billingContractProfile.findFirst.mockResolvedValue(null);
     prismaMock.workOrderProviderContext.findFirst.mockResolvedValue(null);
+    prismaMock.providerContractProfile.findFirst.mockResolvedValue(null);
+    prismaMock.providerContractRate.findMany.mockResolvedValue([]);
+    prismaMock.billingResolutionSnapshot.findFirst.mockResolvedValue(null);
+    prismaMock.billingResolutionSnapshot.create.mockResolvedValue({ id: "billing_resolution_1" });
+    prismaMock.auditLog.create.mockResolvedValue({ id: "audit_1" });
     txMock.billingPayerAccount.findFirst.mockResolvedValue(null);
     txMock.billingContractProfile.findFirst.mockResolvedValue(null);
     txMock.providerContractProfile.findFirst.mockResolvedValue(null);
@@ -1937,6 +1948,92 @@ describe("inspection billing persistence and admin review", () => {
         unitPrice: 22.5
       })
     );
+  });
+
+  it("refreshes historical completed non-invoiced inspections for current compliance fee rules", async () => {
+    const kitchenDraft = buildKitchenDraft();
+
+    prismaMock.$queryRaw
+      .mockResolvedValueOnce([{ inspectionId: "inspection_1" }])
+      .mockResolvedValueOnce([
+        {
+          inspectionId: "inspection_1",
+          customerCompanyId: "customer_1",
+          siteId: "site_1",
+          inspectionClassification: null
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "report_1",
+          inspectionId: "inspection_1",
+          tenantId: "tenant_1",
+          contentJson: kitchenDraft,
+          inspectionType: "kitchen_suppression"
+        }
+      ])
+      .mockResolvedValueOnce([]);
+
+    prismaMock.billingResolutionSnapshot.findFirst.mockResolvedValue(null);
+    prismaMock.billingResolutionSnapshot.create.mockResolvedValue({ id: "billing_resolution_1" });
+    prismaMock.site.findFirst.mockResolvedValue({
+      city: "Chicago",
+      state: "IL",
+      postalCode: "60601"
+    });
+    prismaMock.customerCompany.findFirst.mockResolvedValue({
+      id: "customer_1",
+      name: "Pinecrest Property Management",
+      quickbooksCustomerId: "qb_customer_1",
+      billingType: "standard",
+      billToAccountId: null,
+      contractProfileId: null,
+      invoiceDeliverySettings: { method: "payer_email" },
+      autoBillingEnabled: false,
+      requiredBillingReferences: {},
+      serviceCity: null,
+      serviceState: null,
+      servicePostalCode: null,
+      billingCity: null,
+      billingState: null,
+      billingPostalCode: null
+    });
+    prismaMock.complianceReportingFeeRule.findMany.mockResolvedValue([{
+      id: "compliance_rule_1",
+      city: "Chicago",
+      county: "Cook",
+      state: "IL",
+      zipCode: null,
+      normalizedCity: "CHICAGO",
+      normalizedCounty: "",
+      normalizedState: "IL",
+      normalizedZipCode: "",
+      feeAmount: 22.5
+    }]);
+    prismaMock.auditLog.create.mockResolvedValue({ id: "audit_1" });
+
+    const result = await refreshCompletedInspectionComplianceFees({
+      userId: "office_1",
+      role: "office_admin",
+      tenantId: "tenant_1"
+    });
+
+    expect(result).toEqual({
+      inspectedCount: 1,
+      refreshedCount: 1,
+      skippedCount: 0,
+      failedCount: 0,
+      failures: []
+    });
+    expect(prismaMock.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        action: "billing.compliance_fees_refreshed",
+        metadata: expect.objectContaining({
+          refreshedCount: 1
+        })
+      })
+    }));
   });
 
   it("updates grouped billing rows while preserving underlying items", async () => {

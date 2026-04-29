@@ -29,6 +29,7 @@ import {
   disconnectQuickBooksAction,
   importQuickBooksCustomersAction,
   importQuickBooksCatalogItemsAction,
+  refreshCompletedInspectionComplianceFeesAction,
   saveQuickBooksItemMappingAction,
   clearQuickBooksItemMappingAction,
   syncQuickBooksCustomersActionState,
@@ -238,6 +239,7 @@ async function ComplianceReportingFeesSection({
       createRuleAction={createComplianceReportingFeeRuleAction}
       deleteRuleAction={deleteComplianceReportingFeeRuleAction}
       pagination={data.pagination}
+      refreshCompletedInspectionsAction={refreshCompletedInspectionComplianceFeesAction}
       rules={data.rules}
       updateRuleAction={updateComplianceReportingFeeRuleAction}
     />

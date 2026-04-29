@@ -40,6 +40,7 @@ type ComplianceReportingFeeSettingsCardProps = {
   createRuleAction: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
   updateRuleAction: (formData: FormData) => Promise<void>;
   deleteRuleAction: (formData: FormData) => Promise<void>;
+  refreshCompletedInspectionsAction: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
 };
 
 export function ComplianceReportingFeeSettingsCard({
@@ -48,9 +49,11 @@ export function ComplianceReportingFeeSettingsCard({
   activeEditor,
   createRuleAction,
   updateRuleAction,
-  deleteRuleAction
+  deleteRuleAction,
+  refreshCompletedInspectionsAction
 }: ComplianceReportingFeeSettingsCardProps) {
   const [createState, createFormAction, createPending] = useActionState(createRuleAction, initialState);
+  const [refreshState, refreshFormAction, refreshPending] = useActionState(refreshCompletedInspectionsAction, initialState);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const previousPageHref = buildSettingsHref(pathname, searchParams, {
@@ -79,6 +82,27 @@ export function ComplianceReportingFeeSettingsCard({
         <h3 className="mt-2 text-2xl font-semibold text-ink">Jurisdiction-based reporting fees</h3>
         <p className="mt-2 text-sm text-slate-500">TradeWorx applies these fees automatically by service-location city, state, ZIP code, and report division. Each division resolves independently and shows as its own Compliance Reporting Fee line.</p>
       </div>
+
+      <form action={refreshFormAction} className="rounded-[1.5rem] border border-blue-100 bg-blue-50/60 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-sm uppercase tracking-[0.18em] text-blue-700">Historical billing refresh</p>
+            <h4 className="mt-1 text-lg font-semibold text-ink">Apply current rules to completed inspections</h4>
+            <p className="mt-2 text-sm text-slate-600">
+              Refreshes completed, non-invoiced billing summaries so prior matching inspections receive the correct compliance fees.
+            </p>
+          </div>
+          <button
+            className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+            disabled={refreshPending}
+            type="submit"
+          >
+            {refreshPending ? "Refreshing..." : "Refresh historical inspections"}
+          </button>
+        </div>
+        {refreshState.error ? <p className="mt-3 text-sm text-rose-600">{refreshState.error}</p> : null}
+        {refreshState.success ? <p className="mt-3 text-sm text-emerald-700">{refreshState.success}</p> : null}
+      </form>
 
       {activeEditor === "create" ? (
         <form action={createFormAction} className="rounded-[1.5rem] border border-slate-200 p-5">

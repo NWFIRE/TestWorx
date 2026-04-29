@@ -24,6 +24,7 @@ import {
   customerCompanyInputSchema,
   importQuickBooksCatalogItems,
   quickBooksCatalogItemInputSchema,
+  refreshCompletedInspectionComplianceFees,
   saveQuickBooksItemMappingForCode,
   clearQuickBooksItemMappingForCode,
   billingContractProfileInputSchema,
@@ -46,6 +47,19 @@ import {
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 const BRAND_PRIMARY_COOKIE = "tradeworx_brand_primary";
 const BRAND_ACCENT_COOKIE = "tradeworx_brand_accent";
+
+function formatComplianceFeeRefreshResult(result: Awaited<ReturnType<typeof refreshCompletedInspectionComplianceFees>>) {
+  if (result.inspectedCount === 0) {
+    return "No eligible completed inspections needed a billing refresh.";
+  }
+
+  const base = `Refreshed ${result.refreshedCount} completed inspection${result.refreshedCount === 1 ? "" : "s"}.`;
+  if (result.failedCount === 0) {
+    return base;
+  }
+
+  return `${base} ${result.failedCount} inspection${result.failedCount === 1 ? "" : "s"} could not be refreshed and should be reviewed manually.`;
+}
 
 function getAppUrl() {
   return process.env.APP_URL || process.env.NEXTAUTH_URL || "http://localhost:3000";
@@ -1038,10 +1052,19 @@ export async function createComplianceReportingFeeRuleAction(_: { error: string 
       { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
       parsed.data
     );
+    let refreshMessage = "Historical billing refresh did not run.";
+    try {
+      const refreshResult = await refreshCompletedInspectionComplianceFees(
+        { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }
+      );
+      refreshMessage = formatComplianceFeeRefreshResult(refreshResult);
+    } catch {
+      refreshMessage = "Rule saved, but historical billing refresh failed. Use Refresh historical inspections to retry.";
+    }
 
     revalidatePath("/app/admin/settings");
     revalidatePath("/app/admin/billing");
-    return { error: null, success: "Compliance reporting fee rule created." };
+    return { error: null, success: `Compliance reporting fee rule created. ${refreshMessage}` };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unable to create compliance reporting fee rule.", success: null };
   }
@@ -1068,9 +1091,44 @@ export async function updateComplianceReportingFeeRuleAction(formData: FormData)
     { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
     parsed
   );
+  try {
+    await refreshCompletedInspectionComplianceFees(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }
+    );
+  } catch {
+    // The rule update should remain saved even if a historical billing refresh needs to be retried.
+  }
 
   revalidatePath("/app/admin/settings");
   revalidatePath("/app/admin/billing");
+}
+
+export async function refreshCompletedInspectionComplianceFeesAction(
+  previousState: { error: string | null; success: string | null },
+  formData: FormData
+) {
+  void previousState;
+  void formData;
+
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { error: "Unauthorized", success: null };
+  }
+
+  try {
+    const result = await refreshCompletedInspectionComplianceFees(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }
+    );
+
+    revalidatePath("/app/admin/settings");
+    revalidatePath("/app/admin/billing");
+    return { error: null, success: formatComplianceFeeRefreshResult(result) };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Unable to refresh historical compliance fees.",
+      success: null
+    };
+  }
 }
 
 export async function deleteComplianceReportingFeeRuleAction(formData: FormData) {
