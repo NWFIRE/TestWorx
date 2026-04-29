@@ -87,10 +87,10 @@ function scoreRule(rule: {
   if (rule.customerCompanyId) {
     specificity += 400;
   }
-  if (rule.zipCode) {
+  if (rule.city && rule.state) {
     specificity += 300;
   }
-  if (rule.city && rule.state) {
+  if (rule.zipCode) {
     specificity += 200;
   } else if (rule.city || rule.state) {
     specificity += 100;

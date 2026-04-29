@@ -468,7 +468,7 @@ export default async function BillingSummaryDetailPage({
                 <p className="mt-3 text-sm text-slate-600">Required attachment labels</p>
                 <p className="text-base font-semibold text-ink">{requiredAttachmentLabels.length > 0 ? requiredAttachmentLabels.join(", ") : "No attachment labels"}</p>
                 <p className="mt-3 text-sm text-slate-600">Resolved recipient</p>
-                <p className="text-base font-semibold text-ink">{typeof deliverySnapshot?.recipientEmail === "string" && deliverySnapshot.recipientEmail ? deliverySnapshot.recipientEmail : "Resolved at send time"}</p>
+                <p className="text-base font-semibold text-ink [overflow-wrap:anywhere]">{typeof deliverySnapshot?.recipientEmail === "string" && deliverySnapshot.recipientEmail ? deliverySnapshot.recipientEmail : "Resolved at send time"}</p>
               </div>
             </div>
           </div>
