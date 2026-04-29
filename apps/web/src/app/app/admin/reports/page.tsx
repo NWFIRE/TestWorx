@@ -3,8 +3,6 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { LiveUrlSelectFilter } from "@/app/live-url-select-filter";
-import { LiveUrlSearchSelect } from "@/app/live-url-search-select";
 import { getAdminReportReviewQueueData } from "@testworx/lib/server/index";
 
 import {
@@ -17,6 +15,7 @@ import {
   StatusBadge,
   WorkQueueNav
 } from "../operations-ui";
+import { ReadyToBillFilters } from "./ready-to-bill-filters";
 
 function taskDisplayLabel(task: { inspectionType: string; displayLabel?: string }) {
   return task.displayLabel ?? task.inspectionType.replaceAll("_", " ");
@@ -138,25 +137,12 @@ export default async function AdminReportsQueuePage({
         description="Search for a customer or inspection, then switch months only when you need older finalized, non-invoiced work."
         title="Queue filters"
       >
-        <div className="grid w-full gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,0.32fr)_auto]">
-          <LiveUrlSearchSelect
-            className="min-w-0"
-            emptyText="No matching ready-to-bill inspections found"
-            initialValue={data.filters.query}
-            options={readyToBillSearchOptions}
-            paramKey="q"
-            placeholder="Search customer, inspection, site, technician, or report type"
-          />
-          <LiveUrlSelectFilter options={data.options.months} paramKey="month" value={data.filters.month} />
-          {data.filters.query ? (
-            <Link
-              className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 py-3 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-subtle)]"
-              href={buildReadyToBillHref({ month: data.filters.month })}
-            >
-              Clear search
-            </Link>
-          ) : null}
-        </div>
+        <ReadyToBillFilters
+          initialMonth={data.filters.month}
+          initialQuery={data.filters.query}
+          monthOptions={data.options.months}
+          searchOptions={readyToBillSearchOptions}
+        />
       </FilterBar>
 
       <SectionCard>
