@@ -15,6 +15,11 @@ import {
   resolveComplianceReportingFeeTx
 } from "./compliance-reporting-fees";
 import { resolveInspectionServiceFeeTx } from "./service-fees";
+import {
+  resolveMinimumTicketRuleTx,
+  type MinimumTicketResolution,
+  type MinimumTicketServiceContext
+} from "./minimum-ticket-pricing";
 import { saveQuickBooksItemMappingForCode } from "./quickbooks";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
 import { getCustomerFacingSiteLabel } from "./scheduling";
@@ -96,6 +101,7 @@ type CatalogCandidateRecord = {
 const AUTO_MATCH_CONFIDENCE_THRESHOLD = 0.96;
 const SUGGESTED_MATCH_CONFIDENCE_THRESHOLD = 0.72;
 const MANUAL_SEARCH_CONFIDENCE_THRESHOLD = 0.15;
+const MINIMUM_TICKET_ADJUSTMENT_CODE = "MINIMUM_TICKET_ADJUSTMENT";
 
 function isRuleControlledFeeItem(item: BillableItem) {
   return item.category === "fee";
@@ -235,6 +241,8 @@ type AuthorizedBillingSummaryRow = {
   id: string;
   tenantId: string;
   inspectionId: string;
+  customerCompanyId: string;
+  siteId: string;
   status: string;
   billingType: string;
   billToAccountId: string | null;
@@ -311,6 +319,7 @@ type InspectionBillingResolutionContext = {
           name: string;
           status: "draft" | "active" | "inactive" | "expired";
           invoiceGroupingMode: "per_work_order" | "per_site" | "monthly_rollup";
+          minimumTicketRuleMode: "organization_default" | "provider_specific" | "none";
           requireProviderWorkOrderNumber: boolean;
           requireSiteReferenceNumber: boolean;
           effectiveStartDate: Date | null;
@@ -379,6 +388,7 @@ type ProviderContractProfileResolution = {
     name: string;
     status: "draft" | "active" | "inactive" | "expired";
     invoiceGroupingMode: "per_work_order" | "per_site" | "monthly_rollup";
+    minimumTicketRuleMode: "organization_default" | "provider_specific" | "none";
     requireProviderWorkOrderNumber: boolean;
     requireSiteReferenceNumber: boolean;
     effectiveStartDate: Date | null;
@@ -1898,6 +1908,167 @@ function subtotalForItems(items: BillableItem[]) {
   return Number(items.reduce((sum, item) => sum + (item.amount ?? 0), 0).toFixed(2));
 }
 
+function isMinimumTicketAdjustmentItem(item: BillableItem) {
+  return item.code === MINIMUM_TICKET_ADJUSTMENT_CODE
+    || item.sourceSection === "minimum-ticket"
+    || item.metadata?.feeType === "minimum_ticket";
+}
+
+function minimumTicketDescription(resolution: MinimumTicketResolution) {
+  const ruleType = resolution.rule?.ruleType;
+  if (ruleType === "walk_in") {
+    return "Minimum Service Ticket Adjustment - Walk-In Minimum";
+  }
+  if (ruleType === "local_service") {
+    return "Minimum Service Ticket Adjustment - Local Service Minimum";
+  }
+  return "Minimum Service Ticket Adjustment - Standard Service Minimum";
+}
+
+function buildMinimumTicketAdjustmentItem(input: {
+  tenantId: string;
+  inspectionId: string;
+  resolution: MinimumTicketResolution;
+}): BillableItem | null {
+  if (!input.resolution.applies || input.resolution.adjustmentAmount <= 0) {
+    return null;
+  }
+
+  return {
+    id: `${input.inspectionId}:minimum-ticket-adjustment`,
+    tenantId: input.tenantId,
+    inspectionId: input.inspectionId,
+    reportId: input.inspectionId,
+    reportType: INSPECTION_LEVEL_REPORT_TYPE,
+    sourceSection: "minimum-ticket",
+    sourceField: input.resolution.rule?.ruleType ?? "minimum",
+    category: "fee",
+    code: MINIMUM_TICKET_ADJUSTMENT_CODE,
+    description: minimumTicketDescription(input.resolution),
+    quantity: 1,
+    unit: "ticket",
+    unitPrice: input.resolution.adjustmentAmount,
+    amount: input.resolution.adjustmentAmount,
+    metadata: {
+      displayGroup: "fee",
+      feeType: "minimum_ticket",
+      minimumTicketRuleId: input.resolution.rule?.id ?? null,
+      minimumTicketRuleName: input.resolution.rule?.name ?? null,
+      minimumTicketRuleType: input.resolution.rule?.ruleType ?? null,
+      minimumTicketRuleSource: input.resolution.rule?.source ?? null,
+      minimumTicketAmount: input.resolution.minimumAmount,
+      subtotalBeforeMinimum: input.resolution.subtotalBeforeMinimum,
+      minimumTicketAdjustmentAmount: input.resolution.adjustmentAmount,
+      minimumTicketReason: input.resolution.reason,
+      minimumTicketServiceContext: input.resolution.serviceContext,
+      minimumTicketLocationCity: input.resolution.location.city,
+      minimumTicketLocationState: input.resolution.location.state,
+      minimumTicketLocationPostalCode: input.resolution.location.postalCode,
+      providerMinimumTicketRuleMode: input.resolution.providerMode
+    }
+  } satisfies BillableItem;
+}
+
+function deriveMinimumTicketServiceContext(input: {
+  inspectionClassification: string | null;
+  items: BillableItem[];
+}): MinimumTicketServiceContext {
+  const classification = input.inspectionClassification?.trim().toLowerCase();
+  if (classification === "walk_in" || classification === "drop_off" || classification === "dropoff") {
+    return "walk_in";
+  }
+  if (classification === "emergency") {
+    return "emergency";
+  }
+  if (input.items.some((item) => item.category === "labor" || item.category === "service")) {
+    return "service";
+  }
+  return "inspection";
+}
+
+function withMinimumTicketSnapshot(
+  pricingSnapshot: JsonValue | null,
+  resolution: MinimumTicketResolution
+): JsonValue {
+  const base = pricingSnapshot && typeof pricingSnapshot === "object" && !Array.isArray(pricingSnapshot)
+    ? pricingSnapshot as Record<string, unknown>
+    : {};
+
+  return {
+    ...base,
+    minimumTicket: {
+      applied: resolution.applies,
+      ruleId: resolution.rule?.id ?? null,
+      ruleName: resolution.rule?.name ?? null,
+      ruleType: resolution.rule?.ruleType ?? null,
+      ruleSource: resolution.rule?.source ?? null,
+      minimumAmount: resolution.minimumAmount,
+      subtotalBeforeMinimum: resolution.subtotalBeforeMinimum,
+      adjustmentAmount: resolution.adjustmentAmount,
+      reason: resolution.reason,
+      serviceContext: resolution.serviceContext,
+      location: resolution.location,
+      providerMode: resolution.providerMode
+    }
+  } satisfies JsonValue;
+}
+
+function readProviderMinimumTicketRuleMode(pricingSnapshot: JsonValue | null) {
+  if (!pricingSnapshot || typeof pricingSnapshot !== "object" || Array.isArray(pricingSnapshot)) {
+    return null;
+  }
+
+  const value = (pricingSnapshot as Record<string, unknown>).providerMinimumTicketRuleMode;
+  return value === "organization_default" || value === "provider_specific" || value === "none"
+    ? value
+    : null;
+}
+
+async function applyMinimumTicketPricingToSummaryItemsTx(
+  tx: TransactionClient | typeof prisma,
+  input: {
+    tenantId: string;
+    inspectionId: string;
+    customerCompanyId: string;
+    siteId: string;
+    billingType: "standard" | "third_party";
+    pricingSnapshot: JsonValue | null;
+    inspectionClassification: string | null;
+    items: BillableItem[];
+  }
+) {
+  const itemsBeforeMinimum = input.items.filter((item) => !isMinimumTicketAdjustmentItem(item));
+  const subtotalBeforeMinimum = subtotalForItems(itemsBeforeMinimum);
+  const minimumTicketResolution = await resolveMinimumTicketRuleTx(tx, {
+    tenantId: input.tenantId,
+    customerCompanyId: input.customerCompanyId,
+    siteId: input.siteId,
+    serviceContext: deriveMinimumTicketServiceContext({
+      inspectionClassification: input.inspectionClassification,
+      items: itemsBeforeMinimum
+    }),
+    subtotalBeforeMinimum,
+    billingType: input.billingType,
+    providerMinimumTicketRuleMode: input.billingType === "third_party"
+      ? readProviderMinimumTicketRuleMode(input.pricingSnapshot)
+      : null
+  });
+  const minimumTicketAdjustmentItem = buildMinimumTicketAdjustmentItem({
+    tenantId: input.tenantId,
+    inspectionId: input.inspectionId,
+    resolution: minimumTicketResolution
+  });
+  const items = minimumTicketAdjustmentItem
+    ? [...itemsBeforeMinimum, minimumTicketAdjustmentItem]
+    : itemsBeforeMinimum;
+
+  return {
+    items,
+    subtotal: subtotalForItems(items),
+    pricingSnapshot: withMinimumTicketSnapshot(input.pricingSnapshot, minimumTicketResolution)
+  };
+}
+
 function normalizeBillingType(value: string | null | undefined): "standard" | "third_party" {
   return value === "third_party" ? "third_party" : "standard";
 }
@@ -2108,6 +2279,7 @@ async function getInspectionBillingResolutionContextTx(
               name: true,
               status: true,
               invoiceGroupingMode: true,
+              minimumTicketRuleMode: true,
               requireProviderWorkOrderNumber: true,
               requireSiteReferenceNumber: true,
               effectiveStartDate: true,
@@ -2147,6 +2319,7 @@ async function getInspectionBillingResolutionContextTx(
               name: true,
               status: true,
               invoiceGroupingMode: true,
+              minimumTicketRuleMode: true,
               requireProviderWorkOrderNumber: true,
               requireSiteReferenceNumber: true,
               effectiveStartDate: true,
@@ -2210,19 +2383,30 @@ async function resolveProviderContractProfileTx(
   }
 ): Promise<ProviderContractProfileResolution> {
   const directProfile = input.providerContext.providerContractProfile;
-  if (
-    directProfile
-    && directProfile.status === "active"
-    && (!directProfile.effectiveStartDate || directProfile.effectiveStartDate.getTime() <= input.billingDate.getTime())
-    && (!directProfile.effectiveEndDate || directProfile.effectiveEndDate.getTime() >= input.billingDate.getTime())
-  ) {
-    return {
-      profile: directProfile,
-      contractResolutionStatus: "active",
-      warningCode: null,
-      warning: null,
-      blockingIssueCode: null
-    };
+  if (directProfile) {
+    const startsOnTime = !directProfile.effectiveStartDate || directProfile.effectiveStartDate.getTime() <= input.billingDate.getTime();
+    const endsOnTime = !directProfile.effectiveEndDate || directProfile.effectiveEndDate.getTime() >= input.billingDate.getTime();
+    const isExpired = directProfile.status === "expired" || Boolean(directProfile.effectiveEndDate && directProfile.effectiveEndDate.getTime() < input.billingDate.getTime());
+
+    if (directProfile.status === "active" && startsOnTime && endsOnTime) {
+      return {
+        profile: directProfile,
+        contractResolutionStatus: "active",
+        warningCode: null,
+        warning: null,
+        blockingIssueCode: null
+      };
+    }
+
+    if (isExpired) {
+      return {
+        profile: directProfile,
+        contractResolutionStatus: "expired",
+        warningCode: "provider_contract_expired",
+        warning: `Provider contract ${directProfile.name} is expired for this billing date.`,
+        blockingIssueCode: "provider_contract_expired"
+      };
+    }
   }
 
   const profileId = input.providerContext.providerContractProfileId
@@ -2240,6 +2424,7 @@ async function resolveProviderContractProfileTx(
         name: true,
         status: true,
         invoiceGroupingMode: true,
+        minimumTicketRuleMode: true,
         requireProviderWorkOrderNumber: true,
         requireSiteReferenceNumber: true,
         effectiveStartDate: true,
@@ -2302,6 +2487,7 @@ async function resolveProviderContractProfileTx(
       name: true,
       status: true,
       invoiceGroupingMode: true,
+      minimumTicketRuleMode: true,
       requireProviderWorkOrderNumber: true,
       requireSiteReferenceNumber: true,
       effectiveStartDate: true,
@@ -2310,6 +2496,19 @@ async function resolveProviderContractProfileTx(
   });
 
   if (!fallbackProfile) {
+    return {
+      profile: null,
+      contractResolutionStatus: "missing",
+      warningCode: "provider_contract_missing",
+      warning: "Provider billing has no active contract profile. Pricing fell back to the next available pricing source.",
+      blockingIssueCode: null
+    };
+  }
+
+  const fallbackStartsOnTime = !fallbackProfile.effectiveStartDate || fallbackProfile.effectiveStartDate.getTime() <= input.billingDate.getTime();
+  const fallbackEndsOnTime = !fallbackProfile.effectiveEndDate || fallbackProfile.effectiveEndDate.getTime() >= input.billingDate.getTime();
+
+  if (fallbackProfile.status !== "active" || !fallbackStartsOnTime || !fallbackEndsOnTime) {
     return {
       profile: null,
       contractResolutionStatus: "missing",
@@ -2468,6 +2667,7 @@ async function resolveBillingOutcomeTx(
       serviceType,
       pricingMethod: providerRate?.pricingMethod ?? null,
       providerRateId: providerRate?.id ?? null,
+      providerMinimumTicketRuleMode: contractProfile?.minimumTicketRuleMode ?? "organization_default",
       contractResolutionStatus: contractResolution.contractResolutionStatus,
       warningCodes,
       warnings
@@ -2811,8 +3011,19 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
         reportTypes: reports.map((report) => report.inspectionType),
         items: linkedItems
       });
-  const pricedItems = billingResolution.items;
-  const subtotal = subtotalForItems(pricedItems);
+  const minimumPricedSummary = await applyMinimumTicketPricingToSummaryItemsTx(db, {
+    tenantId: input.tenantId,
+    inspectionId: input.inspectionId,
+    customerCompanyId: inspection.customerCompanyId,
+    siteId: inspection.siteId,
+    billingType: billingResolution.billingType,
+    pricingSnapshot: billingResolution.pricingSnapshot,
+    inspectionClassification: inspection.inspectionClassification,
+    items: billingResolution.items
+  });
+  const pricedItems = minimumPricedSummary.items;
+  const subtotal = minimumPricedSummary.subtotal;
+  const pricingSnapshot = minimumPricedSummary.pricingSnapshot;
   const billingResolutionSnapshotId = existingResolutionSnapshot?.id
     ?? (
       await db.billingResolutionSnapshot.create({
@@ -2855,7 +3066,7 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
       ${billingResolution.contractProfileId},
       ${billingResolution.contractProfileName},
       ${JSON.stringify(billingResolution.routingSnapshot)}::jsonb,
-      ${JSON.stringify(billingResolution.pricingSnapshot)}::jsonb,
+      ${JSON.stringify(pricingSnapshot)}::jsonb,
       ${JSON.stringify(billingResolution.groupingSnapshot)}::jsonb,
       ${JSON.stringify(billingResolution.attachmentSnapshot)}::jsonb,
       ${JSON.stringify(billingResolution.deliverySnapshot)}::jsonb,
@@ -2909,7 +3120,7 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
     contractProfileId: billingResolution.contractProfileId,
     contractProfileName: billingResolution.contractProfileName,
     routingSnapshot: billingResolution.routingSnapshot,
-    pricingSnapshot: billingResolution.pricingSnapshot,
+    pricingSnapshot,
     groupingSnapshot: billingResolution.groupingSnapshot,
     attachmentSnapshot: billingResolution.attachmentSnapshot,
     deliverySnapshot: billingResolution.deliverySnapshot,
@@ -3235,7 +3446,7 @@ async function getAuthorizedBillingSummary(actor: ActorContext, summaryId: strin
   ensureAdmin(parsedActor);
 
   const rows = (await prisma.$queryRaw`
-    SELECT "id", "tenantId", "inspectionId", "status", "billingType", "billToAccountId", "billToName", "contractProfileId", "contractProfileName", "routingSnapshot", "pricingSnapshot", "groupingSnapshot", "attachmentSnapshot", "deliverySnapshot", "referenceSnapshot", "subtotal", "notes", "items", "quickbooksSyncStatus", "quickbooksInvoiceId", "quickbooksSendStatus"
+    SELECT "id", "tenantId", "inspectionId", "customerCompanyId", "siteId", "status", "billingType", "billToAccountId", "billToName", "contractProfileId", "contractProfileName", "routingSnapshot", "pricingSnapshot", "groupingSnapshot", "attachmentSnapshot", "deliverySnapshot", "referenceSnapshot", "subtotal", "notes", "items", "quickbooksSyncStatus", "quickbooksInvoiceId", "quickbooksSendStatus"
     FROM "InspectionBillingSummary"
     WHERE "id" = ${summaryId} AND "tenantId" = ${parsedActor.tenantId as string}
     LIMIT 1
@@ -3364,12 +3575,22 @@ export async function updateBillingSummaryItem(actor: ActorContext, summaryId: s
       };
     })
   );
-  const subtotal = subtotalForItems(items);
+  const minimumPricedSummary = await applyMinimumTicketPricingToSummaryItemsTx(prisma, {
+    tenantId: parsedActor.tenantId as string,
+    inspectionId: summary.inspectionId,
+    customerCompanyId: summary.customerCompanyId,
+    siteId: summary.siteId,
+    billingType: normalizeBillingType(summary.billingType),
+    pricingSnapshot: summary.pricingSnapshot,
+    inspectionClassification: null,
+    items
+  });
 
   await prisma.$executeRaw`
     UPDATE "InspectionBillingSummary"
-    SET "items" = ${JSON.stringify(items)}::jsonb,
-        "subtotal" = ${subtotal},
+    SET "items" = ${JSON.stringify(minimumPricedSummary.items)}::jsonb,
+        "subtotal" = ${minimumPricedSummary.subtotal},
+        "pricingSnapshot" = ${JSON.stringify(minimumPricedSummary.pricingSnapshot)}::jsonb,
         "quickbooksSyncStatus" = CASE WHEN "quickbooksInvoiceId" IS NULL THEN COALESCE("quickbooksSyncStatus", 'not_synced') ELSE 'not_synced' END,
         "quickbooksInvoiceId" = CASE WHEN "quickbooksInvoiceId" IS NULL THEN "quickbooksInvoiceId" ELSE NULL END,
         "quickbooksInvoiceNumber" = CASE WHEN "quickbooksInvoiceNumber" IS NULL THEN "quickbooksInvoiceNumber" ELSE NULL END,
@@ -3430,12 +3651,22 @@ export async function updateBillingSummaryItemGroup(
       };
     })
   );
-  const subtotal = subtotalForItems(updatedItems);
+  const minimumPricedSummary = await applyMinimumTicketPricingToSummaryItemsTx(prisma, {
+    tenantId: parsedActor.tenantId as string,
+    inspectionId: summary.inspectionId,
+    customerCompanyId: summary.customerCompanyId,
+    siteId: summary.siteId,
+    billingType: normalizeBillingType(summary.billingType),
+    pricingSnapshot: summary.pricingSnapshot,
+    inspectionClassification: null,
+    items: updatedItems
+  });
 
   await prisma.$executeRaw`
     UPDATE "InspectionBillingSummary"
-    SET "items" = ${JSON.stringify(updatedItems)}::jsonb,
-        "subtotal" = ${subtotal},
+    SET "items" = ${JSON.stringify(minimumPricedSummary.items)}::jsonb,
+        "subtotal" = ${minimumPricedSummary.subtotal},
+        "pricingSnapshot" = ${JSON.stringify(minimumPricedSummary.pricingSnapshot)}::jsonb,
         "quickbooksSyncStatus" = CASE WHEN "quickbooksInvoiceId" IS NULL THEN COALESCE("quickbooksSyncStatus", 'not_synced') ELSE 'not_synced' END,
         "quickbooksInvoiceId" = CASE WHEN "quickbooksInvoiceId" IS NULL THEN "quickbooksInvoiceId" ELSE NULL END,
         "quickbooksInvoiceNumber" = CASE WHEN "quickbooksInvoiceNumber" IS NULL THEN "quickbooksInvoiceNumber" ELSE NULL END,

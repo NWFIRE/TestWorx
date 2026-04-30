@@ -257,6 +257,7 @@ export default async function BillingSummaryDetailPage({
   const attachmentSnapshot = asRecord(summary.attachmentSnapshot);
   const deliverySnapshot = asRecord(summary.deliverySnapshot);
   const referenceSnapshot = asRecord(summary.referenceSnapshot);
+  const minimumTicketSnapshot = asRecord(pricingSnapshot?.minimumTicket);
   const billingResolutionMetadata = summary.billingResolutionMetadata;
   const requiredAttachmentLabels = Array.isArray(attachmentSnapshot?.requiredDocumentLabels)
     ? attachmentSnapshot.requiredDocumentLabels.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
@@ -303,6 +304,14 @@ export default async function BillingSummaryDetailPage({
       {summaryModeMismatch ? (
         <div className="rounded-[2rem] border border-amber-200 bg-amber-50 px-6 py-4 text-sm text-amber-800 shadow-panel">
           This billing summary was synced in QuickBooks {summaryQuickBooksMode === "sandbox" ? "Sandbox" : "Live"}. Re-sync it in {quickBooksConnection.connection.appModeLabel} mode before opening or sending it.
+        </div>
+      ) : null}
+      {minimumTicketSnapshot?.applied === true ? (
+        <div className="rounded-[2rem] border border-blue-200 bg-blue-50 px-6 py-4 text-sm text-blue-900 shadow-panel">
+          <p className="font-semibold">Minimum ticket applied</p>
+          <p className="mt-1">
+            Subtotal was ${Number(minimumTicketSnapshot.subtotalBeforeMinimum ?? 0).toFixed(2)}. {String(minimumTicketSnapshot.ruleName ?? "Minimum ticket")} is ${Number(minimumTicketSnapshot.minimumAmount ?? 0).toFixed(2)}, so a ${Number(minimumTicketSnapshot.adjustmentAmount ?? 0).toFixed(2)} minimum adjustment was added.
+          </p>
         </div>
       ) : null}
 

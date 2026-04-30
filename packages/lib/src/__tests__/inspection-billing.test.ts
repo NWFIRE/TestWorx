@@ -17,6 +17,7 @@ const { prismaMock, txMock } = vi.hoisted(() => ({
     site: { findFirst: vi.fn() },
     tenant: { findUnique: vi.fn() },
     serviceFeeRule: { findMany: vi.fn() },
+    minimumTicketRule: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     complianceReportingFeeRule: { findFirst: vi.fn(), findMany: vi.fn() },
     billingItemCatalogMatch: { findUnique: vi.fn(), upsert: vi.fn() },
     quickBooksCatalogItem: { findFirst: vi.fn(), findMany: vi.fn() },
@@ -37,6 +38,7 @@ const { prismaMock, txMock } = vi.hoisted(() => ({
     site: { findFirst: vi.fn() },
     tenant: { findUnique: vi.fn() },
     serviceFeeRule: { findMany: vi.fn() },
+    minimumTicketRule: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     complianceReportingFeeRule: { findFirst: vi.fn(), findMany: vi.fn() }
   }
 }));
@@ -69,6 +71,7 @@ import {
 } from "../inspection-billing";
 import { buildInitialReportDraft } from "../report-engine";
 import { mapInspectionTypeToComplianceReportingDivision } from "../compliance-reporting-fees";
+import { buildMinimumTicketResolution, selectMinimumTicketRule } from "../minimum-ticket-pricing";
 import { resolveInspectionServiceFeeTx, resolveServiceFeeForLocationTx } from "../service-fees";
 
 function buildKitchenDraftForManufacturer(manufacturer: string) {
@@ -210,6 +213,121 @@ function buildEmergencyLightingDraft() {
   return draft;
 }
 
+describe("minimum ticket pricing", () => {
+  const rules = [
+    {
+      id: "minimum_walk_in",
+      name: "Walk-In Minimum",
+      ruleType: "walk_in" as const,
+      amount: 25,
+      currency: "USD",
+      appliesTo: "walk_in" as const,
+      locationMode: "manual" as const,
+      city: null,
+      state: null,
+      priority: 100,
+      source: "database" as const
+    },
+    {
+      id: "minimum_enid",
+      name: "Enid Local Minimum",
+      ruleType: "local_service" as const,
+      amount: 59,
+      currency: "USD",
+      appliesTo: "all" as const,
+      locationMode: "city" as const,
+      city: "Enid",
+      state: "OK",
+      priority: 50,
+      source: "database" as const
+    },
+    {
+      id: "minimum_standard",
+      name: "Standard Service Minimum",
+      ruleType: "standard_service" as const,
+      amount: 79,
+      currency: "USD",
+      appliesTo: "all" as const,
+      locationMode: "manual" as const,
+      city: null,
+      state: null,
+      priority: 0,
+      source: "database" as const
+    }
+  ];
+
+  it("applies the Enid local minimum when subtotal is below 59", () => {
+    const rule = selectMinimumTicketRule({
+      rules,
+      serviceContext: "inspection",
+      location: { city: "Enid", state: "OK", postalCode: "73701" }
+    });
+    const resolution = buildMinimumTicketResolution({
+      rule,
+      subtotalBeforeMinimum: 42,
+      serviceContext: "inspection",
+      location: { city: "Enid", state: "OK", postalCode: "73701" }
+    });
+
+    expect(resolution.applies).toBe(true);
+    expect(resolution.minimumAmount).toBe(59);
+    expect(resolution.adjustmentAmount).toBe(17);
+  });
+
+  it("does not add an Enid minimum adjustment when subtotal already meets the minimum", () => {
+    const rule = selectMinimumTicketRule({
+      rules,
+      serviceContext: "inspection",
+      location: { city: "Enid", state: "OK", postalCode: "73701" }
+    });
+    const resolution = buildMinimumTicketResolution({
+      rule,
+      subtotalBeforeMinimum: 85,
+      serviceContext: "inspection",
+      location: { city: "Enid", state: "OK", postalCode: "73701" }
+    });
+
+    expect(resolution.applies).toBe(false);
+    expect(resolution.adjustmentAmount).toBe(0);
+  });
+
+  it("uses the standard minimum outside Enid", () => {
+    const rule = selectMinimumTicketRule({
+      rules,
+      serviceContext: "inspection",
+      location: { city: "Ringwood", state: "OK", postalCode: "73768" }
+    });
+    const resolution = buildMinimumTicketResolution({
+      rule,
+      subtotalBeforeMinimum: 50,
+      serviceContext: "inspection",
+      location: { city: "Ringwood", state: "OK", postalCode: "73768" }
+    });
+
+    expect(rule?.name).toBe("Standard Service Minimum");
+    expect(resolution.minimumAmount).toBe(79);
+    expect(resolution.adjustmentAmount).toBe(29);
+  });
+
+  it("uses the walk-in minimum before location rules", () => {
+    const rule = selectMinimumTicketRule({
+      rules,
+      serviceContext: "walk_in",
+      location: { city: "Ringwood", state: "OK", postalCode: "73768" }
+    });
+    const resolution = buildMinimumTicketResolution({
+      rule,
+      subtotalBeforeMinimum: 10,
+      serviceContext: "walk_in",
+      location: { city: "Ringwood", state: "OK", postalCode: "73768" }
+    });
+
+    expect(rule?.name).toBe("Walk-In Minimum");
+    expect(resolution.minimumAmount).toBe(25);
+    expect(resolution.adjustmentAmount).toBe(15);
+  });
+});
+
 describe("inspection billing extraction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -225,6 +343,7 @@ describe("inspection billing extraction", () => {
     txMock.site.findFirst.mockReset();
     txMock.tenant.findUnique.mockReset();
     txMock.serviceFeeRule.findMany.mockReset();
+    txMock.minimumTicketRule.findMany.mockReset();
     txMock.complianceReportingFeeRule.findFirst.mockReset();
     txMock.complianceReportingFeeRule.findMany.mockReset();
     prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue(null);
@@ -583,6 +702,7 @@ describe("inspection billing persistence and admin review", () => {
     prismaMock.providerContractRate.findMany.mockReset();
     prismaMock.billingResolutionSnapshot.findFirst.mockReset();
     prismaMock.billingResolutionSnapshot.create.mockReset();
+    prismaMock.minimumTicketRule.findMany.mockReset();
     prismaMock.auditLog.create.mockReset();
     txMock.$queryRaw.mockReset();
     txMock.$executeRaw.mockReset();
@@ -595,6 +715,7 @@ describe("inspection billing persistence and admin review", () => {
     txMock.site.findFirst.mockReset();
     txMock.tenant.findUnique.mockReset();
     txMock.serviceFeeRule.findMany.mockReset();
+    txMock.minimumTicketRule.findMany.mockReset();
     txMock.complianceReportingFeeRule.findFirst.mockReset();
     txMock.complianceReportingFeeRule.findMany.mockReset();
     prismaMock.inspection.findFirst.mockResolvedValue({
@@ -648,11 +769,13 @@ describe("inspection billing persistence and admin review", () => {
       defaultServiceFeeUnitPrice: 95
     });
     prismaMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    prismaMock.minimumTicketRule.findMany.mockResolvedValue([]);
     prismaMock.site.findFirst.mockResolvedValue({
       city: "Chicago",
       state: "IL"
     });
     prismaMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
+    txMock.minimumTicketRule.findMany.mockResolvedValue([]);
     prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
@@ -1427,6 +1550,7 @@ describe("inspection billing persistence and admin review", () => {
       defaultServiceFeeUnitPrice: 95
     });
     txMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    txMock.minimumTicketRule.findMany.mockResolvedValue([]);
     txMock.site.findFirst.mockResolvedValue({
       city: "Unknown",
       state: "Unknown",
@@ -2756,7 +2880,7 @@ describe("inspection billing persistence and admin review", () => {
         ]
       }
     ]);
-    prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValueOnce({
+    prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue({
       id: "catalog_1",
       quickbooksItemId: "qb_1",
       name: "New 2.5 ABC Fire Extinguisher",
@@ -2773,11 +2897,10 @@ describe("inspection billing persistence and admin review", () => {
       null
     );
 
-    const updateCall = prismaMock.$executeRaw.mock.calls.at(-1)?.[0];
-    const executeRawValues = JSON.stringify((updateCall as { values?: unknown[] } | undefined)?.values ?? []);
-    expect(executeRawValues).toContain("\"unitPrice\":32.5");
-    expect(executeRawValues).toContain("\"amount\":65");
-    expect(executeRawValues).toContain("\"amount\":162.5");
+    const updateCall = prismaMock.$executeRaw.mock.calls.at(-1);
+    const persistedItems = JSON.parse(String(updateCall?.[1] ?? "[]"));
+    expect(persistedItems[0]).toEqual(expect.objectContaining({ unitPrice: 32.5, amount: 65 }));
+    expect(persistedItems[1]).toEqual(expect.objectContaining({ unitPrice: 32.5, amount: 162.5 }));
   });
 
   it("clears a manual billing item link without breaking pricing", async () => {

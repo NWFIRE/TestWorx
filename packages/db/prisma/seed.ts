@@ -203,6 +203,7 @@ async function main() {
   await prisma.quickBooksItemCache.deleteMany();
   await prisma.quickBooksCatalogItem.deleteMany();
   await prisma.complianceReportingFeeRule.deleteMany();
+  await prisma.minimumTicketRule.deleteMany();
   await prisma.serviceFeeRule.deleteMany();
   await prisma.inspectionDocument.deleteMany();
   await prisma.signature.deleteMany();
@@ -364,6 +365,48 @@ async function main() {
     prisma.site.create({ data: { tenantId: tenant.id, customerCompanyId: harbor.id, name: "Harbor Main Campus", addressLine1: "800 Harbor Dr", city: "Chicago", state: "IL", postalCode: "60611" } }),
     prisma.site.create({ data: { tenantId: tenant.id, customerCompanyId: summit.id, name: "Summit Distribution Hub", addressLine1: "4250 Commerce Way", city: "Joliet", state: "IL", postalCode: "60431" } })
   ]);
+
+  await prisma.minimumTicketRule.createMany({
+    data: [
+      {
+        organizationId: tenant.id,
+        name: "Enid Local Minimum",
+        ruleType: "local_service",
+        amount: 59,
+        currency: "USD",
+        appliesTo: "all",
+        locationMode: "city",
+        city: "Enid",
+        normalizedCity: "ENID",
+        state: "OK",
+        normalizedState: "OK",
+        priority: 50,
+        isActive: true
+      },
+      {
+        organizationId: tenant.id,
+        name: "Standard Service Minimum",
+        ruleType: "standard_service",
+        amount: 79,
+        currency: "USD",
+        appliesTo: "all",
+        locationMode: "manual",
+        priority: 0,
+        isActive: true
+      },
+      {
+        organizationId: tenant.id,
+        name: "Walk-In Minimum",
+        ruleType: "walk_in",
+        amount: 25,
+        currency: "USD",
+        appliesTo: "walk_in",
+        locationMode: "manual",
+        priority: 100,
+        isActive: true
+      }
+    ]
+  });
 
   await prisma.complianceReportingFeeRule.createMany({
     data: [

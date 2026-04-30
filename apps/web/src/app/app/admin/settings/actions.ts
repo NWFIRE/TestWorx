@@ -17,6 +17,7 @@ import {
   createServiceFeeRule,
   buildQuickBooksConnectUrl,
   deleteComplianceReportingFeeRule,
+  deleteMinimumTicketRule,
   disconnectQuickBooks,
   importQuickBooksCustomers,
   deleteServiceFeeRule,
@@ -25,6 +26,7 @@ import {
   importQuickBooksCatalogItems,
   quickBooksCatalogItemInputSchema,
   refreshCompletedInspectionComplianceFees,
+  minimumTicketRuleInputSchema,
   saveQuickBooksItemMappingForCode,
   clearQuickBooksItemMappingForCode,
   billingContractProfileInputSchema,
@@ -41,7 +43,8 @@ import {
   updateServiceFeeRule,
   updateTenantBranding,
   updateTenantDefaultServiceFee,
-  updateTenantSidebarOrder
+  updateTenantSidebarOrder,
+  upsertMinimumTicketRule
 } from "@testworx/lib/server/index";
 
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
@@ -1019,6 +1022,64 @@ export async function deleteServiceFeeRuleAction(formData: FormData) {
   }
 
   await deleteServiceFeeRule(
+    { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+    ruleId
+  );
+
+  revalidatePath("/app/admin/settings");
+  revalidatePath("/app/admin/billing");
+}
+
+export async function upsertMinimumTicketRuleAction(_: { error: string | null; success: string | null }, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { error: "Unauthorized", success: null };
+  }
+
+  const parsed = minimumTicketRuleInputSchema.safeParse({
+    ruleId: String(formData.get("ruleId") ?? "").trim() || undefined,
+    name: String(formData.get("name") ?? ""),
+    ruleType: String(formData.get("ruleType") ?? "local_service"),
+    amount: Number(formData.get("amount") ?? "0"),
+    currency: String(formData.get("currency") ?? "USD") || "USD",
+    appliesTo: String(formData.get("appliesTo") ?? "all"),
+    locationMode: String(formData.get("locationMode") ?? "city"),
+    city: String(formData.get("city") ?? ""),
+    state: String(formData.get("state") ?? ""),
+    priority: Number(formData.get("priority") ?? "0"),
+    isActive: formData.get("isActive") === "on"
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid minimum ticket rule.", success: null };
+  }
+
+  try {
+    const rule = await upsertMinimumTicketRule(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      parsed.data
+    );
+
+    revalidatePath("/app/admin/settings");
+    revalidatePath("/app/admin/billing");
+    return { error: null, success: `${rule.name} saved.` };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Unable to save minimum ticket rule.", success: null };
+  }
+}
+
+export async function deleteMinimumTicketRuleAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return;
+  }
+
+  const ruleId = String(formData.get("ruleId") ?? "");
+  if (!ruleId) {
+    return;
+  }
+
+  await deleteMinimumTicketRule(
     { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
     ruleId
   );

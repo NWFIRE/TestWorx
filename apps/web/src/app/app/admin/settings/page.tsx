@@ -8,6 +8,7 @@ import {
   getPaginatedTenantComplianceReportingFeeSettings,
   getTenantBillingContractProfiles,
   getQuickBooksItemMappingSettings,
+  getTenantMinimumTicketPricingSettings,
   getTenantBillingPayerAccounts,
   getPaginatedTenantServiceFeeSettings,
   getTenantBillingSettings,
@@ -25,6 +26,7 @@ import {
   createComplianceReportingFeeRuleAction,
   createServiceFeeRuleAction,
   deleteComplianceReportingFeeRuleAction,
+  deleteMinimumTicketRuleAction,
   deleteServiceFeeRuleAction,
   disconnectQuickBooksAction,
   importQuickBooksCustomersAction,
@@ -40,6 +42,7 @@ import {
   startBillingCheckoutAction,
   updateComplianceReportingFeeRuleAction,
   updateDefaultServiceFeeAction,
+  upsertMinimumTicketRuleAction,
   updateServiceFeeRuleAction,
   updateTenantSidebarOrderAction
 } from "./actions";
@@ -47,6 +50,7 @@ import { BillingPlansSection } from "./billing-plans-section";
 import { BillingContractProfileSettingsCard } from "./billing-contract-profile-settings-card";
 import { BillingPayerSettingsCard } from "./billing-payer-settings-card";
 import { ComplianceReportingFeeSettingsCard } from "./compliance-reporting-fee-settings-card";
+import { MinimumTicketPricingSettingsCard } from "./minimum-ticket-pricing-settings-card";
 import { QuickBooksItemMappingCard } from "./quickbooks-item-mapping-card";
 import { ServiceFeeSettingsCard } from "./service-fee-settings-card";
 import { QuickBooksSettingsCard } from "./quickbooks-settings-card";
@@ -246,6 +250,37 @@ async function ComplianceReportingFeesSection({
   );
 }
 
+async function MinimumTicketPricingSection({
+  actor
+}: {
+  actor: { userId: string; role: string; tenantId: string };
+}) {
+  let data: Awaited<ReturnType<typeof getTenantMinimumTicketPricingSettings>>;
+
+  try {
+    data = await getTenantMinimumTicketPricingSettings(actor);
+  } catch (error) {
+    return (
+      <LazySectionCard
+        actionHref={buildSettingsHref({ minimumTicketOpen: "1" }, { minimumTicketOpen: 1 })}
+        actionLabel="Try again"
+        description={error instanceof Error ? error.message : "Unable to load minimum ticket pricing right now."}
+        eyebrow="Minimum ticket pricing"
+        title="Location-based minimums"
+        tone="error"
+      />
+    );
+  }
+
+  return (
+    <MinimumTicketPricingSettingsCard
+      deleteRuleAction={deleteMinimumTicketRuleAction}
+      rules={data.rules}
+      upsertRuleAction={upsertMinimumTicketRuleAction}
+    />
+  );
+}
+
 async function QuickBooksMappingsSection({
   actor,
   notice
@@ -318,6 +353,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
       : null;
   const feesOpen = isSectionOpen(params, "feesOpen");
   const complianceFeesOpen = isSectionOpen(params, "complianceFeesOpen");
+  const minimumTicketOpen = isSectionOpen(params, "minimumTicketOpen");
   const mappingsOpen = isSectionOpen(params, "mappingsOpen", quickBooksNotice);
   const payerAccountsNotice = Array.isArray(params.billingPayers)
     ? params.billingPayers[0]
@@ -486,6 +522,30 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
               }
             >
               <ComplianceReportingFeesSection activeEditor={complianceFeeEditor} actor={actor} page={complianceFeePage} />
+            </Suspense>
+          </SettingsDisclosureCard>
+          <SettingsDisclosureCard
+            description="Enforce one ticket-level minimum after service fees, compliance fees, labor, parts, and report lines are calculated."
+            eyebrow="Minimum ticket pricing"
+            initialOpen={minimumTicketOpen}
+            openLabel="Open minimum pricing"
+            queryKey="minimumTicketOpen"
+            title="Location-based minimums"
+          >
+            <Suspense
+              key="minimum-ticket-pricing"
+              fallback={
+                <LazySectionCard
+                  actionHref={buildSettingsHref(params, { minimumTicketOpen: 1 })}
+                  actionLabel="Reload section"
+                  description="Loading minimum ticket pricing rules..."
+                  eyebrow="Minimum ticket pricing"
+                  title="Location-based minimums"
+                  tone="loading"
+                />
+              }
+            >
+              <MinimumTicketPricingSection actor={actor} />
             </Suspense>
           </SettingsDisclosureCard>
           <SettingsDisclosureCard

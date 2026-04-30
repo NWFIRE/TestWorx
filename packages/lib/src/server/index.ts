@@ -33,6 +33,7 @@ export * from "../inspection-archive";
 export * from "../inspection-documents";
 export * from "../inspection-lifecycle";
 export * from "../manuals";
+export * from "../minimum-ticket-pricing";
 export * from "../permissions";
 export * from "../pilot-readiness";
 export * from "../quickbooks";

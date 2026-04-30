@@ -183,6 +183,12 @@ enum ProviderInvoiceGroupingMode {
   monthly_rollup
 }
 
+enum ProviderMinimumTicketRuleMode {
+  organization_default
+  provider_specific
+  none
+}
+
 enum ProviderContractRatePricingMethod {
   flat_rate
   per_unit
@@ -227,6 +233,25 @@ enum ComplianceReportingDivision {
   fire_alarm
   fire_sprinkler
   kitchen_suppression
+}
+
+enum MinimumTicketRuleType {
+  local_service
+  standard_service
+  walk_in
+}
+
+enum MinimumTicketRuleAppliesTo {
+  inspection
+  service
+  walk_in
+  all
+}
+
+enum MinimumTicketRuleLocationMode {
+  city
+  service_zone
+  manual
 }
 
 enum QuoteStatus {
@@ -374,6 +399,7 @@ model Tenant {
   inspectionTechnicianAssignments InspectionTechnicianAssignment[]
   stripeWebhookEvents       StripeWebhookEvent[]
   serviceFeeRules           ServiceFeeRule[]
+  minimumTicketRules        MinimumTicketRule[]
   billingPayerAccounts      BillingPayerAccount[]
   billingContractProfiles   BillingContractProfile[]
   contractProviderAccounts  ContractProviderAccount[]
@@ -683,6 +709,7 @@ model ProviderContractProfile {
   effectiveEndDate               DateTime?
   pricingStrategy                ProviderContractPricingStrategy
   invoiceGroupingMode            ProviderInvoiceGroupingMode
+  minimumTicketRuleMode          ProviderMinimumTicketRuleMode  @default(organization_default)
   requireProviderWorkOrderNumber Boolean                       @default(false)
   requireSiteReferenceNumber     Boolean                       @default(false)
   notes                          String?
@@ -1496,6 +1523,33 @@ model ComplianceReportingFeeRule {
   @@index([tenantId, normalizedCity])
   @@index([tenantId, normalizedZipCode])
   @@index([tenantId, active, division, normalizedZipCode])
+}
+
+model MinimumTicketRule {
+  id                 String                        @id @default(cuid())
+  organizationId     String
+  name               String
+  ruleType           MinimumTicketRuleType
+  amount             Float
+  currency           String                        @default("USD")
+  appliesTo          MinimumTicketRuleAppliesTo    @default(all)
+  locationMode       MinimumTicketRuleLocationMode @default(city)
+  city               String?
+  normalizedCity     String                        @default("")
+  state              String?
+  normalizedState    String                        @default("")
+  serviceZoneId      String?
+  priority           Int                           @default(0)
+  isActive           Boolean                       @default(true)
+  effectiveStartDate DateTime?
+  effectiveEndDate   DateTime?
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+  organization       Tenant                        @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, isActive, priority])
+  @@index([organizationId, ruleType])
+  @@index([organizationId, normalizedCity, normalizedState])
 }
 
 model QuickBooksCatalogItem {
