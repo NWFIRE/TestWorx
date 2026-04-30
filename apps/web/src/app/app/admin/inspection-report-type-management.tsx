@@ -12,6 +12,7 @@ import {
 type AddInspectionTaskType = Parameters<typeof addInspectionTaskAdminAction>[1];
 
 type ReportTypeOption = {
+  canAddMultiple: boolean;
   label: string;
   value: string;
 };
@@ -48,6 +49,13 @@ export function InspectionReportTypeManagement(input: {
     () => new Set(input.tasks.map((task) => task.inspectionType)),
     [input.tasks]
   );
+  const activeReportTypeCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const task of input.tasks) {
+      counts.set(task.inspectionType, (counts.get(task.inspectionType) ?? 0) + 1);
+    }
+    return counts;
+  }, [input.tasks]);
   const filteredReportTypes = useMemo(() => {
     const query = reportTypeQuery.trim().toLowerCase();
     if (!query) {
@@ -81,17 +89,23 @@ export function InspectionReportTypeManagement(input: {
           <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
             {filteredReportTypes.length ? filteredReportTypes.map((reportType) => {
               const alreadyAdded = activeReportTypes.has(reportType.value);
+              const existingCount = activeReportTypeCounts.get(reportType.value) ?? 0;
+              const canAdd = !alreadyAdded || reportType.canAddMultiple;
               return (
                 <button
                   className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl border px-3 py-2 text-left text-sm font-semibold transition ${
-                    alreadyAdded
+                    !canAdd
                       ? "border-slate-200 bg-white text-slate-400"
                       : "border-blue-100 bg-white text-ink hover:border-blue-300 hover:bg-blue-50"
                   }`}
-                  disabled={isPending || alreadyAdded}
+                  disabled={isPending || !canAdd}
                   key={reportType.value}
                   onClick={() => {
-                    const confirmed = window.confirm(`Add ${reportType.label} to this inspection?`);
+                    const confirmed = window.confirm(
+                      existingCount > 0
+                        ? `Add another ${reportType.label} report to this inspection?`
+                        : `Add ${reportType.label} to this inspection?`
+                    );
                     if (!confirmed) {
                       return;
                     }
@@ -111,9 +125,9 @@ export function InspectionReportTypeManagement(input: {
                 >
                   <span>{reportType.label}</span>
                   <span className={`rounded-full px-2 py-1 text-[0.65rem] uppercase tracking-[0.14em] ${
-                    alreadyAdded ? "bg-slate-100 text-slate-500" : "bg-blue-50 text-blue-700"
+                    !canAdd ? "bg-slate-100 text-slate-500" : "bg-blue-50 text-blue-700"
                   }`}>
-                    {alreadyAdded ? "Already added" : "Add"}
+                    {!canAdd ? "Already added" : existingCount > 0 ? `Add another (${existingCount})` : "Add"}
                   </span>
                 </button>
               );

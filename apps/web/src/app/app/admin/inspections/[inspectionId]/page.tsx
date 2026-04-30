@@ -11,6 +11,7 @@ import {
   formatInspectionClassificationLabel,
   formatInspectionStatusLabel,
   formatInspectionTaskTypeLabel,
+  allowsMultipleInspectionTasks,
   formatBillingPricingSourceLabel,
   formatBillingResolutionModeLabel,
   formatWorkOrderProviderSourceLabel,
@@ -106,7 +107,7 @@ function formatStatusFromAuditValue(value: unknown) {
 }
 
 function inspectionTaskLabel(task: { inspectionType: string; customDisplayLabel?: string | null }) {
-  return task.customDisplayLabel?.trim() || formatInspectionTaskTypeLabel(task.inspectionType as InspectionType);
+  return task.customDisplayLabel?.trim() || (task as { displayLabel?: string | null }).displayLabel?.trim() || formatInspectionTaskTypeLabel(task.inspectionType as InspectionType);
 }
 
 function resolveInspectionOrigin(value: string | undefined) {
@@ -166,6 +167,7 @@ export default async function EditInspectionPage({
       id: string;
       inspectionType: InspectionType;
       customDisplayLabel?: string | null;
+      displayLabel?: string | null;
       addedByUserId: string | null;
       assignedTechnicianId?: string | null;
       dueMonth?: string | null;
@@ -793,6 +795,7 @@ export default async function EditInspectionPage({
             <InspectionReportTypeManagement
               inspectionId={inspection.id}
               reportTypes={Object.entries(inspectionTypeRegistry).map(([value, definition]) => ({
+                canAddMultiple: allowsMultipleInspectionTasks(value as InspectionType),
                 value,
                 label: definition.label
               }))}
