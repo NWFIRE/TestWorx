@@ -20,6 +20,7 @@ type MinimumTicketRule = {
 
 type MinimumTicketPricingSettingsCardProps = {
   rules: MinimumTicketRule[];
+  storageReady?: boolean;
   upsertRuleAction: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
   deleteRuleAction: (formData: FormData) => Promise<void>;
 };
@@ -42,6 +43,7 @@ function ruleDescription(rule: MinimumTicketRule) {
 
 export function MinimumTicketPricingSettingsCard({
   rules,
+  storageReady = true,
   upsertRuleAction,
   deleteRuleAction
 }: MinimumTicketPricingSettingsCardProps) {
@@ -55,13 +57,18 @@ export function MinimumTicketPricingSettingsCard({
         <p className="mt-2 text-sm text-slate-500">
           TradeWorx checks the full ticket subtotal after service fees, compliance fees, labor, parts, and report lines. If the total is below the matching minimum, it adds one clear adjustment line.
         </p>
+        {!storageReady ? (
+          <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            The default minimums are active while the database migration finishes. Editing will be available after the minimum ticket pricing table is present.
+          </p>
+        ) : null}
       </div>
 
       <form action={formAction} className="rounded-[1.5rem] border border-slate-200 p-5">
         <div className="grid gap-4 lg:grid-cols-3">
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="ruleType">Minimum type</label>
-            <select className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue="local_service" id="ruleType" name="ruleType">
+            <select className="w-full rounded-2xl border border-slate-200 px-4 py-3 disabled:bg-slate-50 disabled:text-slate-400" defaultValue="local_service" disabled={!storageReady} id="ruleType" name="ruleType">
               <option value="local_service">Enid local minimum</option>
               <option value="standard_service">Standard service minimum</option>
               <option value="walk_in">Walk-in minimum</option>
@@ -69,17 +76,17 @@ export function MinimumTicketPricingSettingsCard({
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="name">Rule name</label>
-            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue="Enid Local Minimum" id="name" name="name" required />
+            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3 disabled:bg-slate-50 disabled:text-slate-400" defaultValue="Enid Local Minimum" disabled={!storageReady} id="name" name="name" required />
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="amount">Minimum amount</label>
-            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={59} id="amount" min="0" name="amount" required step="0.01" type="number" />
+            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3 disabled:bg-slate-50 disabled:text-slate-400" defaultValue={59} disabled={!storageReady} id="amount" min="0" name="amount" required step="0.01" type="number" />
           </div>
         </div>
         <div className="mt-4 grid gap-4 lg:grid-cols-5">
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="appliesTo">Applies to</label>
-            <select className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue="all" id="appliesTo" name="appliesTo">
+            <select className="w-full rounded-2xl border border-slate-200 px-4 py-3 disabled:bg-slate-50 disabled:text-slate-400" defaultValue="all" disabled={!storageReady} id="appliesTo" name="appliesTo">
               <option value="all">All tickets</option>
               <option value="inspection">Inspection</option>
               <option value="service">Service/repair</option>
@@ -88,32 +95,32 @@ export function MinimumTicketPricingSettingsCard({
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="locationMode">Location mode</label>
-            <select className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue="city" id="locationMode" name="locationMode">
+            <select className="w-full rounded-2xl border border-slate-200 px-4 py-3 disabled:bg-slate-50 disabled:text-slate-400" defaultValue="city" disabled={!storageReady} id="locationMode" name="locationMode">
               <option value="city">City</option>
               <option value="manual">Manual / catch-all</option>
             </select>
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="city">City</label>
-            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue="Enid" id="city" name="city" />
+            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3 disabled:bg-slate-50 disabled:text-slate-400" defaultValue="Enid" disabled={!storageReady} id="city" name="city" />
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="state">State</label>
-            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue="OK" id="state" name="state" />
+            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3 disabled:bg-slate-50 disabled:text-slate-400" defaultValue="OK" disabled={!storageReady} id="state" name="state" />
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="priority">Priority</label>
-            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={50} id="priority" min="0" name="priority" type="number" />
+            <input className="w-full rounded-2xl border border-slate-200 px-4 py-3 disabled:bg-slate-50 disabled:text-slate-400" defaultValue={50} disabled={!storageReady} id="priority" min="0" name="priority" type="number" />
           </div>
         </div>
         <label className="mt-4 flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          <input className="h-5 w-5 rounded border-slate-300" defaultChecked name="isActive" type="checkbox" />
+          <input className="h-5 w-5 rounded border-slate-300" defaultChecked disabled={!storageReady} name="isActive" type="checkbox" />
           Rule is active
         </label>
         {state.error ? <p className="mt-3 text-sm text-rose-600">{state.error}</p> : null}
         {state.success ? <p className="mt-3 text-sm text-emerald-700">{state.success}</p> : null}
-        <button className="mt-4 inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={pending} type="submit">
-          {pending ? "Saving minimum..." : "Save minimum rule"}
+        <button className="mt-4 inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={pending || !storageReady} type="submit">
+          {!storageReady ? "Migration pending" : pending ? "Saving minimum..." : "Save minimum rule"}
         </button>
       </form>
 
@@ -132,7 +139,7 @@ export function MinimumTicketPricingSettingsCard({
             </div>
             <p className="mt-5 text-3xl font-semibold text-ink">${rule.amount.toFixed(2)}</p>
             <p className="mt-1 text-sm text-slate-500">Priority {rule.priority} · {rule.currency}</p>
-            {rule.id ? (
+            {rule.id && storageReady ? (
               <form action={deleteRuleAction} className="mt-4">
                 <input name="ruleId" type="hidden" value={rule.id} />
                 <button className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600" type="submit">

@@ -276,6 +276,7 @@ async function MinimumTicketPricingSection({
     <MinimumTicketPricingSettingsCard
       deleteRuleAction={deleteMinimumTicketRuleAction}
       rules={data.rules}
+      storageReady={data.storageReady}
       upsertRuleAction={upsertMinimumTicketRuleAction}
     />
   );

@@ -319,7 +319,7 @@ type InspectionBillingResolutionContext = {
           name: string;
           status: "draft" | "active" | "inactive" | "expired";
           invoiceGroupingMode: "per_work_order" | "per_site" | "monthly_rollup";
-          minimumTicketRuleMode: "organization_default" | "provider_specific" | "none";
+          minimumTicketRuleMode?: "organization_default" | "provider_specific" | "none";
           requireProviderWorkOrderNumber: boolean;
           requireSiteReferenceNumber: boolean;
           effectiveStartDate: Date | null;
@@ -388,7 +388,7 @@ type ProviderContractProfileResolution = {
     name: string;
     status: "draft" | "active" | "inactive" | "expired";
     invoiceGroupingMode: "per_work_order" | "per_site" | "monthly_rollup";
-    minimumTicketRuleMode: "organization_default" | "provider_specific" | "none";
+    minimumTicketRuleMode?: "organization_default" | "provider_specific" | "none";
     requireProviderWorkOrderNumber: boolean;
     requireSiteReferenceNumber: boolean;
     effectiveStartDate: Date | null;
@@ -2279,7 +2279,6 @@ async function getInspectionBillingResolutionContextTx(
               name: true,
               status: true,
               invoiceGroupingMode: true,
-              minimumTicketRuleMode: true,
               requireProviderWorkOrderNumber: true,
               requireSiteReferenceNumber: true,
               effectiveStartDate: true,
@@ -2319,7 +2318,6 @@ async function getInspectionBillingResolutionContextTx(
               name: true,
               status: true,
               invoiceGroupingMode: true,
-              minimumTicketRuleMode: true,
               requireProviderWorkOrderNumber: true,
               requireSiteReferenceNumber: true,
               effectiveStartDate: true,
@@ -2424,7 +2422,6 @@ async function resolveProviderContractProfileTx(
         name: true,
         status: true,
         invoiceGroupingMode: true,
-        minimumTicketRuleMode: true,
         requireProviderWorkOrderNumber: true,
         requireSiteReferenceNumber: true,
         effectiveStartDate: true,
@@ -2487,7 +2484,6 @@ async function resolveProviderContractProfileTx(
       name: true,
       status: true,
       invoiceGroupingMode: true,
-      minimumTicketRuleMode: true,
       requireProviderWorkOrderNumber: true,
       requireSiteReferenceNumber: true,
       effectiveStartDate: true,

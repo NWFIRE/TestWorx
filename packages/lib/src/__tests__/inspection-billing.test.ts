@@ -71,7 +71,7 @@ import {
 } from "../inspection-billing";
 import { buildInitialReportDraft } from "../report-engine";
 import { mapInspectionTypeToComplianceReportingDivision } from "../compliance-reporting-fees";
-import { buildMinimumTicketResolution, selectMinimumTicketRule } from "../minimum-ticket-pricing";
+import { buildMinimumTicketResolution, resolveMinimumTicketRuleTx, selectMinimumTicketRule } from "../minimum-ticket-pricing";
 import { resolveInspectionServiceFeeTx, resolveServiceFeeForLocationTx } from "../service-fees";
 
 function buildKitchenDraftForManufacturer(manufacturer: string) {
@@ -325,6 +325,28 @@ describe("minimum ticket pricing", () => {
     expect(rule?.name).toBe("Walk-In Minimum");
     expect(resolution.minimumAmount).toBe(25);
     expect(resolution.adjustmentAmount).toBe(15);
+  });
+
+  it("falls back to built-in minimums while the minimum ticket table is missing", async () => {
+    txMock.site.findFirst.mockResolvedValue({ city: "Enid", state: "OK", postalCode: "73701" });
+    txMock.customerCompany.findFirst.mockResolvedValue(null);
+    txMock.minimumTicketRule.findMany.mockRejectedValue(
+      Object.assign(new Error("The table `public.MinimumTicketRule` does not exist in the current database."), {
+        code: "P2021"
+      })
+    );
+
+    const resolution = await resolveMinimumTicketRuleTx(txMock as never, {
+      tenantId: "tenant_1",
+      customerCompanyId: null,
+      siteId: "site_1",
+      serviceContext: "inspection",
+      subtotalBeforeMinimum: 42
+    });
+
+    expect(resolution.rule?.name).toBe("Enid Local Minimum");
+    expect(resolution.applies).toBe(true);
+    expect(resolution.adjustmentAmount).toBe(17);
   });
 });
 

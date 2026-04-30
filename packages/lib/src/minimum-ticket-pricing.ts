@@ -82,6 +82,20 @@ function roundMoney(value: number) {
   return Number(value.toFixed(2));
 }
 
+function isMissingMinimumTicketRuleStorageError(error: unknown) {
+  const code = typeof error === "object" && error !== null && "code" in error
+    ? String((error as { code?: unknown }).code)
+    : "";
+  const message = error instanceof Error ? error.message : String(error ?? "");
+
+  if (code === "P2021" || code === "P2022") {
+    return message.includes("MinimumTicketRule") || message.includes("minimumTicketRule");
+  }
+
+  return message.includes("MinimumTicketRule")
+    && (message.includes("does not exist") || message.includes("current database"));
+}
+
 const DEFAULT_MINIMUM_RULES: MinimumTicketRuleRecord[] = [
   {
     id: null,
@@ -123,6 +137,22 @@ const DEFAULT_MINIMUM_RULES: MinimumTicketRuleRecord[] = [
     source: "default"
   }
 ];
+
+function defaultMinimumTicketSettingsRules() {
+  return DEFAULT_MINIMUM_RULES.map((rule) => ({
+    id: "",
+    name: rule.name,
+    ruleType: rule.ruleType,
+    amount: rule.amount,
+    currency: rule.currency,
+    appliesTo: rule.appliesTo,
+    locationMode: rule.locationMode,
+    city: rule.city,
+    state: rule.state,
+    priority: rule.priority,
+    isActive: true
+  }));
+}
 
 export const minimumTicketRuleInputSchema = z.object({
   ruleId: z.string().trim().optional(),
@@ -366,36 +396,44 @@ export async function resolveMinimumTicketRuleTx(
 
   const location = await getMinimumTicketLocationTx(tx, input);
   const now = new Date();
-  const databaseRules = await tx.minimumTicketRule.findMany({
-    where: {
-      organizationId: input.tenantId,
-      isActive: true,
-      OR: [
-        { effectiveStartDate: null },
-        { effectiveStartDate: { lte: now } }
-      ],
-      AND: [
-        {
-          OR: [
-            { effectiveEndDate: null },
-            { effectiveEndDate: { gte: now } }
-          ]
-        }
-      ]
-    },
-    select: {
-      id: true,
-      name: true,
-      ruleType: true,
-      amount: true,
-      currency: true,
-      appliesTo: true,
-      locationMode: true,
-      city: true,
-      state: true,
-      priority: true
+  let databaseRules: Array<Parameters<typeof mapDatabaseRule>[0]> = [];
+  try {
+    databaseRules = await tx.minimumTicketRule.findMany({
+      where: {
+        organizationId: input.tenantId,
+        isActive: true,
+        OR: [
+          { effectiveStartDate: null },
+          { effectiveStartDate: { lte: now } }
+        ],
+        AND: [
+          {
+            OR: [
+              { effectiveEndDate: null },
+              { effectiveEndDate: { gte: now } }
+            ]
+          }
+        ]
+      },
+      select: {
+        id: true,
+        name: true,
+        ruleType: true,
+        amount: true,
+        currency: true,
+        appliesTo: true,
+        locationMode: true,
+        city: true,
+        state: true,
+        priority: true
+      }
+    });
+  } catch (error) {
+    if (!isMissingMinimumTicketRuleStorageError(error)) {
+      throw error;
     }
-  });
+  }
+
   const rules = databaseRules.length > 0
     ? databaseRules.map(mapDatabaseRule)
     : DEFAULT_MINIMUM_RULES;
@@ -419,43 +457,54 @@ export async function getTenantMinimumTicketPricingSettings(actor: ActorContext)
   ensureTenantAdmin(parsedActor);
   const tenantId = parsedActor.tenantId as string;
 
-  const rules = await prisma.minimumTicketRule.findMany({
-    where: { organizationId: tenantId },
-    orderBy: [
-      { isActive: "desc" },
-      { ruleType: "asc" },
-      { priority: "desc" },
-      { updatedAt: "desc" }
-    ],
-    select: {
-      id: true,
-      name: true,
-      ruleType: true,
-      amount: true,
-      currency: true,
-      appliesTo: true,
-      locationMode: true,
-      city: true,
-      state: true,
-      priority: true,
-      isActive: true
+  let rules: Array<{
+    id: string;
+    name: string;
+    ruleType: MinimumTicketRuleType;
+    amount: number;
+    currency: string;
+    appliesTo: MinimumTicketRuleAppliesTo;
+    locationMode: MinimumTicketRuleLocationMode;
+    city: string | null;
+    state: string | null;
+    priority: number;
+    isActive: boolean;
+  }> = [];
+  let storageReady = true;
+
+  try {
+    rules = await prisma.minimumTicketRule.findMany({
+      where: { organizationId: tenantId },
+      orderBy: [
+        { isActive: "desc" },
+        { ruleType: "asc" },
+        { priority: "desc" },
+        { updatedAt: "desc" }
+      ],
+      select: {
+        id: true,
+        name: true,
+        ruleType: true,
+        amount: true,
+        currency: true,
+        appliesTo: true,
+        locationMode: true,
+        city: true,
+        state: true,
+        priority: true,
+        isActive: true
+      }
+    });
+  } catch (error) {
+    if (!isMissingMinimumTicketRuleStorageError(error)) {
+      throw error;
     }
-  });
+    storageReady = false;
+  }
 
   return {
-    rules: rules.length > 0 ? rules : DEFAULT_MINIMUM_RULES.map((rule) => ({
-      id: "",
-      name: rule.name,
-      ruleType: rule.ruleType,
-      amount: rule.amount,
-      currency: rule.currency,
-      appliesTo: rule.appliesTo,
-      locationMode: rule.locationMode,
-      city: rule.city,
-      state: rule.state,
-      priority: rule.priority,
-      isActive: true
-    }))
+    rules: rules.length > 0 ? rules : defaultMinimumTicketSettingsRules(),
+    storageReady
   };
 }
 
