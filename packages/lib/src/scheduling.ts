@@ -2861,13 +2861,21 @@ export async function addInspectionTask(actor: ActorContext, input: {
 }) {
   const parsedActor = parseActor(actor);
   const tenantId = parsedActor.tenantId as string;
+  const inspectionType = inspectionTypeEnum.parse(input.inspectionType);
 
   return prisma.$transaction(async (tx) => {
     const inspection = await tx.inspection.findFirst({
       where: { id: input.inspectionId, tenantId },
       include: {
         technicianAssignments: { select: { technicianId: true } },
-        tasks: { select: { sortOrder: true } }
+        tasks: {
+          select: {
+            inspectionType: true,
+            schedulingStatus: true,
+            sortOrder: true,
+            status: true
+          }
+        }
       }
     });
 
@@ -2892,6 +2900,15 @@ export async function addInspectionTask(actor: ActorContext, input: {
       throw new Error("Report types can only be added to active inspections.");
     }
 
+    const existingActiveTask = inspection.tasks.find((task) =>
+      task.inspectionType === inspectionType &&
+      task.status !== InspectionStatus.cancelled &&
+      isCurrentVisitTaskSchedulingStatus(task.schedulingStatus ?? "scheduled_now")
+    );
+    if (existingActiveTask) {
+      throw new Error(`${formatInspectionTaskTypeLabel(inspectionType)} is already added to this inspection.`);
+    }
+
     const nextSortOrder = inspection.tasks.length > 0
       ? Math.max(...inspection.tasks.map((task) => task.sortOrder)) + 1
       : 0;
@@ -2902,15 +2919,30 @@ export async function addInspectionTask(actor: ActorContext, input: {
     const defaultTechnicianId = parsedActor.role === "technician"
       ? parsedActor.userId
       : inspection.assignedTechnicianId ?? assignedTechnicianIds[0] ?? null;
+    const technicianIdsToValidate = defaultTechnicianId
+      ? [...new Set([...assignedTechnicianIds, defaultTechnicianId])]
+      : assignedTechnicianIds;
+
+    await Promise.all(
+      technicianIdsToValidate.map((technicianUserId) =>
+        assertTechnicianEligibilityForReportTypes({
+          tx,
+          tenantId,
+          technicianUserId,
+          reportTypes: [inspectionType],
+          mode: "assign"
+        })
+      )
+    );
 
     const createdTask = await createInspectionTaskWithReport({
       tx,
       tenantId,
       inspectionId: inspection.id,
-      inspectionType: input.inspectionType,
-      frequency: getDefaultInspectionRecurrenceFrequency(input.inspectionType),
+      inspectionType,
+      frequency: getDefaultInspectionRecurrenceFrequency(inspectionType),
       scheduledStart: inspection.scheduledStart,
-      taskStatus: inspection.status === InspectionStatus.in_progress ? InspectionStatus.in_progress : InspectionStatus.to_be_completed,
+      taskStatus: InspectionStatus.to_be_completed,
       technicianId: defaultTechnicianId,
       addedByUserId: parsedActor.userId,
       sortOrder: nextSortOrder,
@@ -2923,11 +2955,11 @@ export async function addInspectionTask(actor: ActorContext, input: {
     await createAuditLog(tx, {
       tenantId,
       actorUserId: parsedActor.userId,
-      action: "inspection.task_added",
+      action: "report_type_added",
       entityId: inspection.id,
       metadata: {
         inspectionTaskId: createdTask.id,
-        inspectionType: input.inspectionType
+        inspectionType
       }
     });
 
@@ -2939,6 +2971,7 @@ export async function removeInspectionTask(actor: ActorContext, input: {
   inspectionId: string;
   inspectionTaskId: string;
   force?: boolean;
+  reason?: string;
 }) {
   const parsedActor = parseActor(actor);
   const tenantId = parsedActor.tenantId as string;
@@ -2968,9 +3001,7 @@ export async function removeInspectionTask(actor: ActorContext, input: {
       throw new Error("You do not have access to remove report types from this inspection.");
     }
 
-    const forceRemoval = Boolean(input.force && ["tenant_admin", "office_admin", "platform_admin"].includes(parsedActor.role));
-
-    if (!forceRemoval && isTerminalInspectionStatus(inspection.status)) {
+    if (isTerminalInspectionStatus(inspection.status)) {
       throw new Error("Report types can only be removed from active inspections.");
     }
 
@@ -3027,8 +3058,8 @@ export async function removeInspectionTask(actor: ActorContext, input: {
         })
       : 0;
 
-    if (!forceRemoval && reportActivityCount > 0) {
-      throw new Error("This report type already has report activity and cannot be removed.");
+    if (reportActivityCount > 0) {
+      throw new Error("This report type already has report activity. Mark it Not Needed instead so the work history is preserved.");
     }
 
     const storageKeys = task.report
@@ -3110,13 +3141,13 @@ export async function removeInspectionTask(actor: ActorContext, input: {
     await createAuditLog(tx, {
       tenantId,
       actorUserId: parsedActor.userId,
-      action: "inspection.task_removed",
+      action: "report_type_removed",
       entityId: inspection.id,
       metadata: {
         inspectionTaskId: task.id,
         inspectionType: task.inspectionType,
         removedByUserId: parsedActor.userId,
-        forceRemoval
+        reason: input.reason?.trim() || null
       }
     });
 
@@ -3140,6 +3171,108 @@ export async function removeInspectionTask(actor: ActorContext, input: {
         }
       });
     }
+
+    return { id: task.id };
+  });
+}
+
+export async function markInspectionTaskNotNeeded(actor: ActorContext, input: {
+  inspectionId: string;
+  inspectionTaskId: string;
+  reason: string;
+}) {
+  const parsedActor = parseActor(actor);
+  const tenantId = parsedActor.tenantId as string;
+
+  if (!["tenant_admin", "office_admin", "platform_admin"].includes(parsedActor.role)) {
+    throw new Error("Only administrators can mark report types not needed.");
+  }
+
+  const reason = input.reason.trim();
+  if (reason.length < 4) {
+    throw new Error("Add a short reason before marking this report type not needed.");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const inspection = await tx.inspection.findFirst({
+      where: { id: input.inspectionId, tenantId }
+    });
+
+    if (!inspection) {
+      throw new Error("Inspection not found.");
+    }
+
+    if (isTerminalInspectionStatus(inspection.status)) {
+      throw new Error("Report types can only be marked not needed on active inspections.");
+    }
+
+    const task = await tx.inspectionTask.findFirst({
+      where: {
+        id: input.inspectionTaskId,
+        tenantId,
+        inspectionId: inspection.id
+      },
+      include: {
+        report: {
+          select: {
+            id: true,
+            status: true,
+            correctionReason: true
+          }
+        }
+      }
+    });
+
+    if (!task) {
+      throw new Error("Report type not found.");
+    }
+
+    const previousStatus = task.status;
+    const previousSchedulingStatus = task.schedulingStatus;
+    const nextNotes = [
+      task.notes?.trim(),
+      `Marked not needed by admin: ${reason}`
+    ].filter(Boolean).join("\n");
+
+    await tx.inspectionTask.update({
+      where: { id: task.id },
+      data: {
+        status: InspectionStatus.cancelled,
+        schedulingStatus: "not_scheduled",
+        notes: nextNotes
+      }
+    });
+
+    if (task.report) {
+      await tx.inspectionReport.update({
+        where: { id: task.report.id },
+        data: {
+          correctionReason: [
+            task.report.correctionReason?.trim(),
+            `Admin marked report not needed: ${reason}`
+          ].filter(Boolean).join("\n") || null
+        }
+      });
+    }
+
+    await createAuditLog(tx, {
+      tenantId,
+      actorUserId: parsedActor.userId,
+      action: task.report?.status === reportStatuses.finalized
+        ? "report_type_voided"
+        : "report_type_marked_not_needed",
+      entityId: inspection.id,
+      metadata: {
+        inspectionTaskId: task.id,
+        inspectionReportId: task.report?.id ?? null,
+        inspectionType: task.inspectionType,
+        previousStatus,
+        nextStatus: InspectionStatus.cancelled,
+        previousSchedulingStatus,
+        nextSchedulingStatus: "not_scheduled",
+        reason
+      }
+    });
 
     return { id: task.id };
   });

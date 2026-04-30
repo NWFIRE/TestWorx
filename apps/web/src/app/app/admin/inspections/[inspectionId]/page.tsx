@@ -22,6 +22,7 @@ import {
   getInspectionDocuments,
   getInspectionForEdit,
   getInspectionStatusTone,
+  inspectionTypeRegistry,
   isDueAtTimeOfServiceCustomer
 } from "@testworx/lib/server/index";
 
@@ -32,10 +33,10 @@ import { InspectionExternalDocumentsCard } from "../../inspection-external-docum
 import { InspectionCloseoutRequestActions } from "../../inspection-closeout-request-actions";
 import { InspectionPdfUploadCard } from "../../inspection-pdf-upload-card";
 import { InspectionReportCorrectionsCard } from "../../inspection-report-corrections-card";
+import { InspectionReportTypeManagement } from "../../inspection-report-type-management";
 import { InspectionSchedulerForm } from "../../inspection-scheduler-form";
 import { InspectionStatusUpdateCard } from "../../inspection-status-update-card";
 import { PriorityBadge, StatusBadge, WorkspaceSplit } from "../../operations-ui";
-import { RemoveReportTypeButton } from "../../../tech/remove-report-type-button";
 import { InspectionPacketCard } from "../../../inspection-packet-card";
 
 type InspectionType = Parameters<typeof getDefaultInspectionRecurrenceFrequency>[0];
@@ -175,6 +176,7 @@ export default async function EditInspectionPage({
       report: {
         id: string;
         status: string;
+        autosaveVersion?: number;
         finalizedAt: Date | null;
         updatedAt: Date;
         correctionState: string;
@@ -788,13 +790,16 @@ export default async function EditInspectionPage({
           />
           ) : null}
           {!isReviewMode ? (
-          <div className="rounded-[2rem] bg-white p-6 shadow-panel">
-            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Report type management</p>
-            <div className="mt-4 space-y-3">
-              {inspectionView.tasks.length ? inspectionView.tasks.map((task: InspectionTask) => {
-                const isAddedTask = Boolean(task.addedByUserId);
+            <InspectionReportTypeManagement
+              inspectionId={inspection.id}
+              reportTypes={Object.entries(inspectionTypeRegistry).map(([value, definition]) => ({
+                value,
+                label: definition.label
+              }))}
+              tasks={inspectionView.tasks.map((task: InspectionTask) => {
                 const hasReportActivity = Boolean(
                   task.report && (
+                    (task.report.autosaveVersion ?? 1) > 1 ||
                     task.report.status === "finalized" ||
                     task.report.correctionEvents.length > 0 ||
                     task.report.finalizedAt ||
@@ -802,41 +807,22 @@ export default async function EditInspectionPage({
                     task.report.correctionResolvedAt
                   )
                 );
-
-                return (
-                  <div key={task.id} className="rounded-2xl border border-slate-200 p-4">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-ink">{inspectionTaskLabel(task)}</p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {isAddedTask
-                            ? "Added after the original inspection was scheduled."
-                            : "Original scheduled report type."}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          Assigned technician: {task.assignedTechnicianId ? dashboardData.technicians.find((technician) => technician.id === task.assignedTechnicianId)?.name ?? "Assigned" : "Unassigned"}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          Due: {task.dueDate ? format(task.dueDate, "MMM d, yyyy") : task.dueMonth ?? "Not recorded"} | Status: {String(task.schedulingStatus ?? "scheduled_now").replaceAll("_", " ")}
-                        </p>
-                        {hasReportActivity ? <p className="mt-1 text-sm text-amber-700">This report type already has report activity and cannot be removed.</p> : null}
-                      </div>
-                      <RemoveReportTypeButton
-                        inspectionId={inspection.id}
-                        inspectionTaskId={task.id}
-                        taskLabel={inspectionTaskLabel(task)}
-                      />
-                    </div>
-                  </div>
-                );
-              }) : (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-medium text-slate-700">No report types on this inspection.</p>
-                  <p className="mt-1 text-sm text-slate-500">Report types will appear here when they are attached to the visit.</p>
-                </div>
-              )}
-            </div>
-          </div>
+                return {
+                  id: task.id,
+                  inspectionType: task.inspectionType,
+                  label: inspectionTaskLabel(task),
+                  assignedTechnicianName: task.assignedTechnicianId
+                    ? dashboardData.technicians.find((technician) => technician.id === task.assignedTechnicianId)?.name ?? "Assigned"
+                    : "Unassigned",
+                  dueLabel: task.dueDate ? format(task.dueDate, "MMM d, yyyy") : task.dueMonth ?? "Not recorded",
+                  reportStatus: task.report?.status === "finalized" ? "Finalized" : task.report?.status === "submitted" ? "Ready for Review" : "Draft",
+                  schedulingStatus: task.schedulingStatus ?? "scheduled_now",
+                  isAddedTask: Boolean(task.addedByUserId),
+                  hasReportActivity,
+                  isFinalized: task.report?.status === "finalized"
+                };
+              })}
+            />
           ) : null}
           {!isReviewMode ? <InspectionPdfUploadCard attachments={attachmentView} inspectionId={inspection.id} tenantStoragePrefix={sanitizePathSegment(session.user.tenantId)} /> : null}
           {!isReviewMode ? <DeleteInspectionCard action={deleteInspectionAction} inspectionId={inspection.id} redirectTo={originPath} /> : null}

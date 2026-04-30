@@ -21,7 +21,7 @@ export function AdminReportDeleteButton(input: {
         disabled={pending}
         onClick={() => {
           const confirmed = window.confirm(
-            `Delete ${input.taskLabel} from this inspection? This permanently deletes the report, signatures, photos, deficiencies, and generated PDFs tied to it.`
+            `Remove ${input.taskLabel} from this inspection? This is only allowed when no technician work has been recorded.`
           );
           if (!confirmed) {
             return;
@@ -30,7 +30,7 @@ export function AdminReportDeleteButton(input: {
           startTransition(async () => {
             setMessage(null);
             const result = await removeInspectionTaskAdminAction(input.inspectionId, input.inspectionTaskId);
-            setMessage(result.ok ? "Report deleted." : result.error ?? "Unable to delete this report.");
+            setMessage(result.ok ? "Report removed." : result.error ?? "Unable to remove this report.");
             if (result.ok) {
               router.refresh();
             }
@@ -38,9 +38,9 @@ export function AdminReportDeleteButton(input: {
         }}
         type="button"
       >
-        {pending ? "Deleting..." : "Delete report"}
+        {pending ? "Removing..." : "Remove report"}
       </button>
-      {message ? <p className={`text-xs ${message === "Report deleted." ? "text-emerald-600" : "text-rose-600"}`}>{message}</p> : null}
+      {message ? <p className={`text-xs ${message === "Report removed." ? "text-emerald-600" : "text-rose-600"}`}>{message}</p> : null}
     </div>
   );
 }

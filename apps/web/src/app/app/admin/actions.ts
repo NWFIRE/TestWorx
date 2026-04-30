@@ -5,6 +5,7 @@ import { isRedirectError } from "next/dist/client/components/redirect-error";
 
 import { auth } from "@/auth";
 import {
+  addInspectionTask,
   approveInspectionCloseoutRequest,
   dismissInspectionCloseoutRequest,
   createInspection,
@@ -39,11 +40,15 @@ import {
   updateInspectionStatus,
   reopenCompletedReportForCorrection,
   regenerateFinalizedReportPdf,
+  inspectionTypeRegistry,
+  markInspectionTaskNotNeeded,
   removeInspectionTask,
   uploadInspectionPdfAttachment
 } from "@testworx/lib/server/index";
 
 export { getCustomerSiteImportTemplateCsv };
+
+type InspectionType = keyof typeof inspectionTypeRegistry;
 
 function asRecord(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -380,7 +385,7 @@ export async function removeInspectionTaskAdminAction(inspectionId: string, insp
   try {
     await removeInspectionTask(
       { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-      { inspectionId, inspectionTaskId, force: true }
+      { inspectionId, inspectionTaskId }
     );
 
     revalidatePath("/app/admin");
@@ -393,7 +398,65 @@ export async function removeInspectionTaskAdminAction(inspectionId: string, insp
 
     return { ok: true, error: null };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Unable to delete this report." };
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to remove this report type." };
+  }
+}
+
+export async function addInspectionTaskAdminAction(inspectionId: string, inspectionType: InspectionType) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  if (!(inspectionType in inspectionTypeRegistry)) {
+    return { ok: false, error: "Choose a valid report type." };
+  }
+
+  try {
+    const task = await addInspectionTask(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      { inspectionId, inspectionType }
+    );
+
+    revalidatePath("/app/admin");
+    revalidatePath("/app/admin/amendments");
+    revalidatePath("/app/admin/reports");
+    revalidatePath(`/app/admin/inspections/${inspectionId}`);
+    revalidatePath(`/app/admin/reports/${inspectionId}/${task.id}`);
+    revalidatePath("/app/tech");
+    revalidatePath(`/app/tech/reports/${inspectionId}/${task.id}`);
+    revalidatePath("/app/customer");
+
+    return { ok: true, error: null, taskId: task.id };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to add this report type.", taskId: null };
+  }
+}
+
+export async function markInspectionTaskNotNeededAdminAction(inspectionId: string, inspectionTaskId: string, reason: string) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  try {
+    await markInspectionTaskNotNeeded(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      { inspectionId, inspectionTaskId, reason }
+    );
+
+    revalidatePath("/app/admin");
+    revalidatePath("/app/admin/amendments");
+    revalidatePath("/app/admin/reports");
+    revalidatePath(`/app/admin/inspections/${inspectionId}`);
+    revalidatePath(`/app/admin/reports/${inspectionId}/${inspectionTaskId}`);
+    revalidatePath("/app/tech");
+    revalidatePath(`/app/tech/reports/${inspectionId}/${inspectionTaskId}`);
+    revalidatePath("/app/customer");
+
+    return { ok: true, error: null };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to mark this report type not needed." };
   }
 }
 
