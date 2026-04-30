@@ -355,7 +355,12 @@ describe("quickbooks billing sync hardening", () => {
       .mockResolvedValueOnce({
         unitPrice: 33.5
       })
-      .mockResolvedValueOnce(null);
+      .mockResolvedValueOnce({
+        quickbooksItemId: "mapped_item_1",
+        name: "Recharge - 5# ABC",
+        active: true,
+        taxable: false
+      });
     prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue({
       ...buildBillingSummary(),
       items: [
@@ -394,6 +399,72 @@ describe("quickbooks billing sync hardening", () => {
     const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
     expect(createInvoiceBody.DocNumber).toBe("TW2026-1000");
     expect(createInvoiceBody.Line?.[0]?.SalesItemLineDetail?.UnitPrice).toBe(33.5);
+  });
+
+  it("uses a manually linked catalog item before falling back to legacy billing code mapping", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: null });
+    prismaMock.customerCompany.update.mockResolvedValue(undefined);
+    prismaMock.site.findFirst.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
+    prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValueOnce({
+      quickbooksItemId: "qb_fire_alarm_annual",
+      name: "Fire Alarm - Annual Inspection",
+      active: true,
+      taxable: false
+    });
+    prismaMock.quickBooksItemMap.findUnique.mockResolvedValue(null);
+    prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue({
+      ...buildBillingSummary(),
+      subtotal: 230,
+      items: [
+        {
+          id: "item_1",
+          description: "On-site labor",
+          quantity: 2,
+          unitPrice: 115,
+          amount: 230,
+          unit: "hours",
+          category: "labor",
+          linkedCatalogItemId: "catalog_fire_alarm_annual",
+          linkedQuickBooksItemId: "qb_fire_alarm_annual",
+          linkedCatalogItemName: "Fire Alarm - Annual Inspection"
+        }
+      ]
+    });
+    prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({}));
+
+    const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
+
+    await syncBillingSummaryToQuickBooks(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    expect(prismaMock.quickBooksItemMap.findUnique).not.toHaveBeenCalledWith({
+      where: {
+        tenantId_integrationId_internalCode: {
+          tenantId: "tenant_1",
+          integrationId: "realm_1",
+          internalCode: "ON_SITE_LABOR"
+        }
+      }
+    });
+
+    const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    expect(createInvoiceBody.Line?.[0]?.SalesItemLineDetail?.ItemRef).toEqual({
+      value: "qb_fire_alarm_annual",
+      name: "Fire Alarm - Annual Inspection"
+    });
+    expect(createInvoiceBody.Line?.[0]?.SalesItemLineDetail?.Qty).toBe(2);
+    expect(createInvoiceBody.Line?.[0]?.SalesItemLineDetail?.UnitPrice).toBe(115);
   });
 
   it("groups identical inspection billing items into one QuickBooks invoice line with summed quantity", async () => {

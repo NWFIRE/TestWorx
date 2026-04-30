@@ -3083,6 +3083,45 @@ function resolveBillingItemCodeForQuickBooks(item: QuickBooksBillingSummary["ite
   return null;
 }
 
+async function resolveLinkedBillingItemForQuickBooks(input: {
+  tenantId: string;
+  item: QuickBooksBillingSummary["items"][number];
+}) {
+  if (!input.item.linkedCatalogItemId && !input.item.linkedQuickBooksItemId) {
+    return null;
+  }
+
+  const linkedCatalogItem = await prisma.quickBooksCatalogItem.findFirst({
+    where: {
+      tenantId: input.tenantId,
+      OR: [
+        ...(input.item.linkedCatalogItemId ? [{ id: input.item.linkedCatalogItemId }] : []),
+        ...(input.item.linkedQuickBooksItemId ? [{ quickbooksItemId: input.item.linkedQuickBooksItemId }] : [])
+      ]
+    },
+    select: {
+      quickbooksItemId: true,
+      name: true,
+      active: true,
+      taxable: true
+    }
+  });
+
+  if (!linkedCatalogItem) {
+    throw new Error(`Billing item "${input.item.description}" is linked to a QuickBooks catalog item that is no longer available. Change the match before syncing.`);
+  }
+
+  if (!linkedCatalogItem.active) {
+    throw new Error(`Billing item "${input.item.description}" is linked to inactive QuickBooks item "${linkedCatalogItem.name}". Change the match before syncing.`);
+  }
+
+  return {
+    qbItemId: linkedCatalogItem.quickbooksItemId,
+    qbItemName: linkedCatalogItem.name,
+    taxable: linkedCatalogItem.taxable
+  };
+}
+
 async function resolveBillingItemUnitPriceForQuickBooks(input: {
   tenantId: string;
   integrationId: string;
@@ -4406,38 +4445,51 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
           item
         })
       });
-      const billingCode = resolveBillingItemCodeForQuickBooks(item);
-      if (!billingCode) {
-        throw new Error(`Billing item "${item.description}" is missing a stable billing code. Add a billing code before syncing to QuickBooks.`);
-      }
-
-      const cacheKey = billingCode;
+      const cacheKey = item.linkedCatalogItemId
+        ? `catalog:${item.linkedCatalogItemId}`
+        : item.linkedQuickBooksItemId
+          ? `qb:${item.linkedQuickBooksItemId}`
+          : `code:${resolveBillingItemCodeForQuickBooks(item) ?? ""}`;
       let resolvedItem = itemRefCache.get(cacheKey);
       if (!resolvedItem) {
-        const resolved = await resolveQuickBooksItemForBilling({
+        const linkedItem = await resolveLinkedBillingItemForQuickBooks({
           tenantId: parsedActor.tenantId as string,
-          integrationId,
-          billingCode,
-          displayName: item.description
+          item
         });
 
-        if (resolved.status !== "mapped") {
-          throw new Error(buildQuickBooksBillingCodeMappingError({
-            billingCode,
-            description: item.description,
-            resolvedReason: resolved.reason,
-            suggestions: resolved.suggestions
-          }));
-        }
+        if (linkedItem) {
+          resolvedItem = linkedItem;
+        } else {
+          const billingCode = resolveBillingItemCodeForQuickBooks(item);
+          if (!billingCode) {
+            throw new Error(`Billing item "${item.description}" is missing a stable billing code. Add a billing code before syncing to QuickBooks.`);
+          }
 
-        resolvedItem = {
-          qbItemId: resolved.qbItemId,
-          qbItemName: resolved.qbItemName,
-          taxable: await resolveMappedCatalogTaxable({
+          const resolved = await resolveQuickBooksItemForBilling({
             tenantId: parsedActor.tenantId as string,
-            quickbooksItemId: resolved.qbItemId
-          })
-        };
+            integrationId,
+            billingCode,
+            displayName: item.description
+          });
+
+          if (resolved.status !== "mapped") {
+            throw new Error(buildQuickBooksBillingCodeMappingError({
+              billingCode,
+              description: item.description,
+              resolvedReason: resolved.reason,
+              suggestions: resolved.suggestions
+            }));
+          }
+
+          resolvedItem = {
+            qbItemId: resolved.qbItemId,
+            qbItemName: resolved.qbItemName,
+            taxable: await resolveMappedCatalogTaxable({
+              tenantId: parsedActor.tenantId as string,
+              quickbooksItemId: resolved.qbItemId
+            })
+          };
+        }
         itemRefCache.set(cacheKey, resolvedItem);
       }
 
