@@ -1561,8 +1561,6 @@ export function buildReportPreview(draft: ReportDraft): ReportPreview {
     let completionState: ReportSectionCompletionState = "not_started";
     if (totalRows > 0) {
       completionState = completedRows >= totalRows ? "complete" : completedRows > 0 ? "partial" : "not_started";
-    } else if ((sectionState?.status ?? "pending") !== "pending") {
-      completionState = "complete";
     }
 
     return {
@@ -1590,28 +1588,18 @@ export function buildReportPreview(draft: ReportDraft): ReportPreview {
     });
   });
 
-  const failingSections = Object.entries(draft.sections)
-    .filter(([, section]) => section.status === "fail")
-    .map(([sectionId]) => sectionId);
-
   const totalRows = sectionSummaries.reduce((sum, section) => sum + section.totalRows, 0);
   const completedRows = sectionSummaries.reduce((sum, section) => sum + section.completedRows, 0);
   const deficiencyCount = detectedDeficiencies.length;
-  const completedSectionCount = sectionSummaries.filter((section) => section.status !== "pending").length;
-  const sectionCompletion = sectionSummaries.length > 0 ? completedSectionCount / sectionSummaries.length : 0;
   const rowCompletion = totalRows > 0 ? completedRows / totalRows : 0;
-  const reportCompletion = totalRows > 0
-    ? rowCompletion >= 1 && completedSectionCount < sectionSummaries.length
-      ? sectionCompletion
-      : rowCompletion
-    : sectionCompletion;
+  const reportCompletion = totalRows > 0 ? rowCompletion : 0;
 
   return {
     sectionSummaries,
     deficiencyCount,
     manualDeficiencyCount: draft.deficiencies.length,
     attachmentCount: draft.attachments.length,
-    failingSections,
+    failingSections: [],
     inspectionStatus: deficiencyCount > 0 || draft.deficiencies.length > 0 ? "deficiencies_found" : "pass",
     reportCompletion,
     completedRows,

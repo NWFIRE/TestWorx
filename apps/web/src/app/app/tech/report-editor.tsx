@@ -67,13 +67,6 @@ const saveStateTone: Record<string, string> = {
   "Needs review": "text-rose-700"
 };
 
-const sectionStatusOptions = [
-  { value: "pending", label: "Pending", activeClassName: "border-slate-300 bg-slate-100 text-slate-700" },
-  { value: "pass", label: "Pass", activeClassName: "border-emerald-200 bg-emerald-50 text-emerald-800" },
-  { value: "attention", label: "Attention", activeClassName: "border-amber-200 bg-amber-50 text-amber-800" },
-  { value: "fail", label: "Fail", activeClassName: "border-rose-200 bg-rose-50 text-rose-800" }
-] as const;
-
 function buildReportSaveState(record: LocalReportDraftRecord | null, reportStatus: TechnicianReportEditorData["reportStatus"]) {
   if (!record) {
     return reportStatus === "finalized" ? "Finalized" : "Saved";
@@ -189,20 +182,14 @@ function sectionStatusLabel(summary: ReturnType<typeof buildReportPreview>["sect
   return `○ ${summary.sectionLabel}`;
 }
 
-function formatSectionStatusText(value: string | null | undefined) {
-  return (value ?? "pending").replaceAll("_", " ");
-}
-
 function formatSectionNavMeta(
-  summary: ReturnType<typeof buildReportPreview>["sectionSummaries"][number] | undefined,
-  status: string | null | undefined
+  summary: ReturnType<typeof buildReportPreview>["sectionSummaries"][number] | undefined
 ) {
-  const statusText = formatSectionStatusText(status);
   if (!summary?.totalRows) {
-    return statusText;
+    return "Open section";
   }
 
-  return `${summary.completedRows}/${summary.totalRows} rows • ${statusText}`;
+  return `${summary.completedRows}/${summary.totalRows} rows`;
 }
 
 function toTechnicianFacingSaveMessage(message: string | null | undefined, action: "save" | "finalize") {
@@ -830,7 +817,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
     }
   }
 
-  function updateSectionMeta(sectionId: string, key: "status" | "notes", value: string) {
+  function updateSectionNotes(sectionId: string, value: string) {
     updateDraft((currentDraft) => {
       const currentSection = sectionState(sectionId, currentDraft);
       return {
@@ -839,7 +826,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
           ...currentDraft.sections,
           [sectionId]: {
             ...currentSection,
-            [key]: key === "notes" ? normalizeEditorText(value) : value
+            notes: normalizeEditorText(value)
           }
         }
       };
@@ -1125,7 +1112,6 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
           <div className="mt-4 -mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 pr-5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden md:hidden">
             {data.template.sections.map((section) => {
               const summary = preview.sectionSummaries.find((entry) => entry.sectionId === section.id);
-              const status = draft.sections[section.id]?.status ?? "pending";
               const summaryLabel = sectionStatusLabel(summary ?? {
                 sectionId: section.id,
                 sectionLabel: section.label,
@@ -1146,7 +1132,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
                 >
                   <p className="text-sm font-semibold leading-5 break-words">{section.label}</p>
                   <p className={`mt-2 text-xs ${activeSectionId === section.id ? "text-white/80" : "text-slate-500"}`}>
-                    {formatSectionNavMeta(summary, status)}
+                    {formatSectionNavMeta(summary)}
                   </p>
                 </button>
               );
@@ -1155,7 +1141,6 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
           <div className="mt-4 hidden gap-3 md:grid md:grid-cols-2 xl:grid-cols-4">
             {data.template.sections.map((section) => {
               const summary = preview.sectionSummaries.find((entry) => entry.sectionId === section.id);
-              const status = draft.sections[section.id]?.status ?? "pending";
               const summaryLabel = sectionStatusLabel(summary ?? {
                 sectionId: section.id,
                 sectionLabel: section.label,
@@ -1176,7 +1161,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
                 >
                   <p className="text-sm font-semibold leading-5">{section.label}</p>
                   <p className={`mt-2 text-xs ${activeSectionId === section.id ? "text-white/80" : "text-slate-500"}`}>
-                    {formatSectionNavMeta(summary, status)}
+                    {formatSectionNavMeta(summary)}
                   </p>
                 </button>
               );
@@ -1228,29 +1213,6 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
                     Prev
                   </button>
                 ) : null}
-              </div>
-              <div className="w-full md:w-auto md:min-w-[13rem]">
-                <label className="mb-2 block text-sm font-medium text-slate-600">Section Status</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {sectionStatusOptions.map((option) => {
-                    const isActive = (draft.sections[activeSection.id]?.status ?? "pending") === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        className={`min-h-12 rounded-2xl border px-4 py-3 text-sm font-semibold uppercase tracking-[0.12em] transition ${
-                          isActive
-                            ? option.activeClassName
-                            : "border-slate-200 bg-white text-slate-600"
-                        } disabled:opacity-50`}
-                        disabled={!data.canEdit || data.reportStatus === "finalized"}
-                        onClick={() => updateSectionMeta(activeSection.id, "status", option.value)}
-                        type="button"
-                      >
-                        {normalizeOptionLabel(option.label)}
-                      </button>
-                    );
-                  })}
-                </div>
               </div>
             </div>
             <div className="mt-5 grid gap-4">
@@ -1425,7 +1387,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
               ))}
               <div>
                 <label className="block text-sm font-medium text-slate-600">Section notes</label>
-                <textarea className="mt-2 min-h-32 w-full resize-none overflow-hidden rounded-[1.5rem] border border-slate-200 px-4 py-4 text-base uppercase" data-auto-grow="on" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateSectionMeta(activeSection.id, "notes", event.target.value)} value={draft.sections[activeSection.id]?.notes ?? ""} />
+                <textarea className="mt-2 min-h-32 w-full resize-none overflow-hidden rounded-[1.5rem] border border-slate-200 px-4 py-4 text-base uppercase" data-auto-grow="on" disabled={!data.canEdit || data.reportStatus === "finalized"} onChange={(event) => updateSectionNotes(activeSection.id, event.target.value)} value={draft.sections[activeSection.id]?.notes ?? ""} />
               </div>
             </div>
           </div>

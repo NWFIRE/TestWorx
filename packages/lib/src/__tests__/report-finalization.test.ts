@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canEditReport, canFinalizeReport, collectFinalizationValidationIssues, normalizeSignaturePayload, validateDraftForTemplate, validateFinalizationDraft } from "../report-engine";
+import { buildReportPreview, canEditReport, canFinalizeReport, collectFinalizationValidationIssues, normalizeSignaturePayload, validateDraftForTemplate, validateFinalizationDraft } from "../report-engine";
 
 describe("finalization and authorization", () => {
   const completeDraft = {
@@ -52,6 +52,25 @@ describe("finalization and authorization", () => {
     expect(() => validateFinalizationDraft({ ...completeDraft, signatures: { technician: completeDraft.signatures.technician } })).toThrow(/signatures are required/i);
     expect(collectFinalizationValidationIssues({ ...completeDraft, sections: { inventory: { ...completeDraft.sections.inventory, status: "pending" } } })).toEqual([]);
     expect(validateFinalizationDraft(completeDraft)).toBe(true);
+  });
+
+  it("ignores legacy section status when deriving preview completion", () => {
+    const preview = buildReportPreview({
+      ...completeDraft,
+      sections: {
+        inventory: {
+          ...completeDraft.sections.inventory,
+          status: "fail",
+          fields: {
+            extinguishers: []
+          }
+        }
+      }
+    });
+
+    expect(preview.reportCompletion).toBe(0);
+    expect(preview.failingSections).toEqual([]);
+    expect(preview.sectionSummaries[0]?.completionState).toBe("not_started");
   });
 
   it("normalizes signature payloads", () => {
