@@ -666,7 +666,167 @@ type ScheduledInspectionTaskInput = z.infer<typeof scheduleInspectionSchema>["ta
   recurrenceSeriesId?: string | null;
   recurrenceAnchorScheduledStart?: Date | null;
   recurrenceNextDueAt?: Date | null;
+  serviceScheduleId?: string | null;
 };
+
+type ServiceScheduleInspectionPlanTask = ScheduledInspectionTaskInput & {
+  sourceTaskIndex: number;
+  duePeriod: string;
+  isGeneratedFutureOccurrence: boolean;
+};
+
+type ServiceScheduleInspectionPlanGroup = {
+  duePeriod: string;
+  scheduledStart: Date;
+  isCurrentPeriod: boolean;
+  tasks: ServiceScheduleInspectionPlanTask[];
+};
+
+function getTaskDuePeriod(input: {
+  task: Pick<ScheduledInspectionTaskInput, "dueMonth" | "dueDate">;
+  fallbackScheduledStart: Date;
+}) {
+  return normalizeTaskDueMonth({
+    dueMonth: input.task.dueMonth,
+    dueDate: input.task.dueDate ?? null,
+    fallbackMonth: format(input.fallbackScheduledStart, "yyyy-MM")
+  }) ?? format(input.fallbackScheduledStart, "yyyy-MM");
+}
+
+function getScheduledStartForDuePeriod(input: {
+  duePeriod: string;
+  baseScheduledStart: Date;
+  dueDate?: Date | null;
+}) {
+  if (
+    input.dueDate instanceof Date &&
+    !Number.isNaN(input.dueDate.getTime()) &&
+    !isPlaceholderMonthAnchorDueDate({ dueDate: input.dueDate, dueMonth: input.duePeriod })
+  ) {
+    return input.dueDate;
+  }
+
+  const [yearText, monthText] = input.duePeriod.split("-");
+  const year = Number(yearText);
+  const month = Number(monthText);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    return input.baseScheduledStart;
+  }
+
+  const scheduledStart = new Date(input.baseScheduledStart);
+  scheduledStart.setFullYear(year, month - 1, 1);
+  return scheduledStart;
+}
+
+export function buildServiceScheduleInspectionPlan(input: {
+  tasks: ScheduledInspectionTaskInput[];
+  scheduledStart: Date;
+  inspectionMonth?: string | null;
+}): ServiceScheduleInspectionPlanGroup[] {
+  const currentPeriod = input.inspectionMonth ?? format(input.scheduledStart, "yyyy-MM");
+  const taskOccurrences: ServiceScheduleInspectionPlanTask[] = [];
+
+  input.tasks.forEach((task, sourceTaskIndex) => {
+    const duePeriod = getTaskDuePeriod({ task, fallbackScheduledStart: input.scheduledStart });
+    taskOccurrences.push({
+      ...task,
+      assignedTechnicianId: duePeriod === currentPeriod ? task.assignedTechnicianId ?? null : null,
+      dueMonth: duePeriod,
+      schedulingStatus: "scheduled_now",
+      sourceTaskIndex,
+      duePeriod,
+      isGeneratedFutureOccurrence: false
+    });
+
+    const dueAnchor = getScheduledStartForDuePeriod({
+      duePeriod,
+      baseScheduledStart: input.scheduledStart,
+      dueDate: task.dueDate ?? null
+    });
+    const nextDueDate = nextDueFrom(dueAnchor, task.frequency);
+    if (nextDueDate && duePeriod === currentPeriod) {
+      const nextDuePeriod = format(nextDueDate, "yyyy-MM");
+      taskOccurrences.push({
+        ...task,
+        assignedTechnicianId: null,
+        dueMonth: nextDuePeriod,
+        dueDate: nextDueDate,
+        schedulingStatus: "scheduled_now",
+        recurrenceAnchorScheduledStart: dueAnchor,
+        recurrenceNextDueAt: nextDueFrom(nextDueDate, task.frequency),
+        sourceTaskIndex,
+        duePeriod: nextDuePeriod,
+        isGeneratedFutureOccurrence: true
+      });
+    }
+  });
+
+  const grouped = new Map<string, ServiceScheduleInspectionPlanGroup>();
+  for (const task of taskOccurrences) {
+    const existing = grouped.get(task.duePeriod);
+    if (existing) {
+      existing.tasks.push(task);
+      continue;
+    }
+
+    grouped.set(task.duePeriod, {
+      duePeriod: task.duePeriod,
+      scheduledStart: getScheduledStartForDuePeriod({
+        duePeriod: task.duePeriod,
+        baseScheduledStart: input.scheduledStart,
+        dueDate: task.dueDate ?? null
+      }),
+      isCurrentPeriod: task.duePeriod === currentPeriod,
+      tasks: [task]
+    });
+  }
+
+  return [...grouped.values()].sort((left, right) => {
+    if (left.isCurrentPeriod !== right.isCurrentPeriod) {
+      return left.isCurrentPeriod ? -1 : 1;
+    }
+    return left.scheduledStart.getTime() - right.scheduledStart.getTime();
+  });
+}
+
+type TechnicianEligibilityMode = "assign" | "claim";
+
+type TechnicianEligibilityRow = {
+  technicianUserId?: string | null;
+  reportType: InspectionType;
+  canBeAssigned: boolean;
+  canClaim: boolean;
+  expiresAt?: Date | null;
+};
+
+export function isTechnicianEligibleForReportTypesFromRows(input: {
+  rows: TechnicianEligibilityRow[];
+  reportTypes: InspectionType[];
+  mode: TechnicianEligibilityMode;
+  now?: Date;
+}) {
+  const distinctReportTypes = [...new Set(input.reportTypes)];
+  if (!distinctReportTypes.length) {
+    return false;
+  }
+
+  if (input.rows.length === 0) {
+    return true;
+  }
+
+  const now = input.now ?? new Date();
+  const byReportType = new Map(input.rows.map((row) => [row.reportType, row]));
+  return distinctReportTypes.every((reportType) => {
+    const row = byReportType.get(reportType);
+    if (!row) {
+      return false;
+    }
+    if (row.expiresAt instanceof Date && !Number.isNaN(row.expiresAt.getTime()) && row.expiresAt < now) {
+      return false;
+    }
+    return input.mode === "claim" ? row.canClaim : row.canBeAssigned;
+  });
+}
 
 function mapRecurringTaskDefinitions(input: {
   existingTasks: Array<{
@@ -741,6 +901,53 @@ function readTechnicianAssignments(value: unknown): Array<{ technicianId: string
 function readTechnicianNameAssignments(value: unknown): Array<{ technician: { name: string } }> {
   const assignments = (value as { technicianAssignments?: Array<{ technician: { name: string } }> } | null | undefined)?.technicianAssignments;
   return Array.isArray(assignments) ? assignments : [];
+}
+
+function getCurrentVisitReportTypes(tasks: Array<{ inspectionType: keyof typeof inspectionTypeRegistry; schedulingStatus?: string | null }>) {
+  return tasks
+    .filter((task) => isCurrentVisitTaskSchedulingStatus(task.schedulingStatus ?? "scheduled_now"))
+    .map((task) => task.inspectionType as InspectionType);
+}
+
+async function getTechnicianEligibilityRows(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  technicianUserId: string
+): Promise<TechnicianEligibilityRow[]> {
+  if (!("technicianReportTypeEligibility" in tx) || !tx.technicianReportTypeEligibility) {
+    return [];
+  }
+
+  return tx.technicianReportTypeEligibility.findMany({
+    where: { tenantId, technicianUserId },
+    select: {
+      technicianUserId: true,
+      reportType: true,
+      canBeAssigned: true,
+      canClaim: true,
+      expiresAt: true
+    }
+  });
+}
+
+async function assertTechnicianEligibilityForReportTypes(input: {
+  tx: Prisma.TransactionClient;
+  tenantId: string;
+  technicianUserId: string;
+  reportTypes: InspectionType[];
+  mode: TechnicianEligibilityMode;
+}) {
+  const rows = await getTechnicianEligibilityRows(input.tx, input.tenantId, input.technicianUserId);
+  if (!isTechnicianEligibleForReportTypesFromRows({
+    rows,
+    reportTypes: input.reportTypes,
+    mode: input.mode
+  })) {
+    const reportTypeLabels = [...new Set(input.reportTypes)]
+      .map((reportType) => formatInspectionTaskTypeLabel(reportType as keyof typeof inspectionTypeRegistry))
+      .join(", ");
+    throw new Error(`Technician is not eligible for every report type on this inspection${reportTypeLabels ? ` (${reportTypeLabels})` : ""}.`);
+  }
 }
 
 export function isTechnicianAssignedToInspection(input: {
@@ -1394,7 +1601,10 @@ async function validateSchedulingReferences(tx: Prisma.TransactionClient, tenant
   const uniqueAssignedTechnicianIds = normalizeAssignedTechnicianIds({
     assignedTechnicianIds: [
       ...(input.assignedTechnicianIds ?? []),
-      ...input.tasks.map((task) => task.assignedTechnicianId).filter((value): value is string => Boolean(value))
+      ...input.tasks
+        .filter((task) => isCurrentVisitTaskSchedulingStatus(task.schedulingStatus))
+        .map((task) => task.assignedTechnicianId)
+        .filter((value): value is string => Boolean(value))
     ]
   });
   const assignedTechnicianQuery = uniqueAssignedTechnicianIds.length
@@ -1421,6 +1631,20 @@ async function validateSchedulingReferences(tx: Prisma.TransactionClient, tenant
   }
 
   const assignedTechnicianIds = uniqueAssignedTechnicianIds.filter((technicianId) => assignedTechnicians.some((technician) => technician.id === technicianId));
+  const currentVisitReportTypes = getCurrentVisitReportTypes(input.tasks);
+  if (currentVisitReportTypes.length > 0) {
+    await Promise.all(
+      assignedTechnicianIds.map((technicianUserId) =>
+        assertTechnicianEligibilityForReportTypes({
+          tx,
+          tenantId,
+          technicianUserId,
+          reportTypes: currentVisitReportTypes,
+          mode: "assign"
+        })
+      )
+    );
+  }
 
   return {
     customerCompany,
@@ -1460,6 +1684,50 @@ async function syncInspectionTechnicianAssignments(
   });
 }
 
+async function createServiceSchedulesForInspectionInput(input: {
+  tx: Prisma.TransactionClient;
+  tenantId: string;
+  customerCompanyId: string;
+  siteId: string;
+  tasks: ScheduledInspectionTaskInput[];
+  scheduledStart: Date;
+}) {
+  if (!("serviceSchedule" in input.tx) || !input.tx.serviceSchedule) {
+    return new Map<number, string>();
+  }
+
+  const scheduleIdsByTaskIndex = new Map<number, string>();
+  await Promise.all(
+    input.tasks.map(async (task, index) => {
+      const dueMonth = getTaskDuePeriod({ task, fallbackScheduledStart: input.scheduledStart });
+      const dueDate = getScheduledStartForDuePeriod({
+        duePeriod: dueMonth,
+        baseScheduledStart: input.scheduledStart,
+        dueDate: task.dueDate ?? null
+      });
+      const serviceSchedule = await input.tx.serviceSchedule.create({
+        data: {
+          tenantId: input.tenantId,
+          customerCompanyId: input.customerCompanyId,
+          siteId: input.siteId,
+          serviceType: task.inspectionType,
+          reportType: task.inspectionType,
+          cadence: task.frequency,
+          nextDueDate: nextDueFrom(dueDate, task.frequency),
+          dueMonth,
+          dueDayOrWindow: task.dueDate && !isPlaceholderMonthAnchorDueDate({ dueDate: task.dueDate, dueMonth })
+            ? format(task.dueDate, "yyyy-MM-dd")
+            : null,
+          isActive: true
+        }
+      });
+      scheduleIdsByTaskIndex.set(index, serviceSchedule.id);
+    })
+  );
+
+  return scheduleIdsByTaskIndex;
+}
+
 async function writeInspectionTasks(
   tx: Prisma.TransactionClient,
   inspectionId: string,
@@ -1475,6 +1743,7 @@ async function writeInspectionTasks(
         tenantId,
         inspectionId,
         inspectionType: task.inspectionType,
+        serviceScheduleId: task.serviceScheduleId ?? null,
         frequency: task.frequency,
         scheduledStart,
         taskStatus: InspectionStatus.to_be_completed,
@@ -1502,6 +1771,7 @@ async function createInspectionTaskWithReport(input: {
   tenantId: string;
   inspectionId: string;
   inspectionType: keyof typeof inspectionTypeRegistry;
+  serviceScheduleId?: string | null;
   frequency: RecurrenceFrequency;
   scheduledStart: Date;
   taskStatus: InspectionStatus;
@@ -1520,6 +1790,7 @@ async function createInspectionTaskWithReport(input: {
     data: {
       tenantId: input.tenantId,
       inspectionId: input.inspectionId,
+      serviceScheduleId: input.serviceScheduleId ?? null,
       inspectionType: input.inspectionType,
       status: input.taskStatus,
       addedByUserId: input.addedByUserId ?? null,
@@ -1706,6 +1977,7 @@ async function createRecurringFollowUpInspectionsTx(tx: Prisma.TransactionClient
     technicianAssignments?: Array<{ technicianId: string }>;
     tasks: Array<{
       id: string;
+      serviceScheduleId?: string | null;
       inspectionType: keyof typeof inspectionTypeRegistry;
       assignedTechnicianId?: string | null;
       dueMonth?: string | null;
@@ -1777,11 +2049,6 @@ async function createRecurringFollowUpInspectionsTx(tx: Prisma.TransactionClient
   const durationMs = input.inspection.scheduledEnd
     ? Math.max(input.inspection.scheduledEnd.getTime() - input.inspection.scheduledStart.getTime(), 0)
     : null;
-  const assignedTechnicianIds = getInspectionAssignedTechnicianIds({
-    assignedTechnicianId: input.inspection.assignedTechnicianId,
-    technicianAssignments: input.inspection.technicianAssignments
-  });
-
   const groupedTasks = new Map<string, { scheduledStart: Date; tasks: ScheduledInspectionTaskInput[] }>();
   for (const task of tasksToRollForward) {
     const nextScheduledStart = task.recurrence?.nextDueAt;
@@ -1795,8 +2062,9 @@ async function createRecurringFollowUpInspectionsTx(tx: Prisma.TransactionClient
     };
     group.tasks.push({
       inspectionType: task.inspectionType,
+      serviceScheduleId: task.serviceScheduleId ?? null,
       frequency: task.recurrence?.frequency ?? getDefaultInspectionRecurrenceFrequency(task.inspectionType),
-      assignedTechnicianId: task.assignedTechnicianId ?? null,
+      assignedTechnicianId: null,
       dueMonth: normalizeTaskDueMonth({
         dueMonth: task.dueMonth ?? null,
         dueDate: task.recurrence?.nextDueAt ?? task.dueDate ?? null,
@@ -1819,13 +2087,13 @@ async function createRecurringFollowUpInspectionsTx(tx: Prisma.TransactionClient
         tenantId: input.tenantId,
         customerCompanyId: input.inspection.customerCompanyId,
         siteId: input.inspection.siteId,
-        assignedTechnicianId: input.inspection.assignedTechnicianId,
+        assignedTechnicianId: null,
         createdByUserId: input.actorUserId,
         scheduledStart: group.scheduledStart,
         scheduledEnd: durationMs === null ? null : new Date(group.scheduledStart.getTime() + durationMs),
         status: InspectionStatus.to_be_completed,
         notes: input.inspection.notes,
-        claimable: assignedTechnicianIds.length === 0
+        claimable: true
       }
     });
 
@@ -1836,7 +2104,7 @@ async function createRecurringFollowUpInspectionsTx(tx: Prisma.TransactionClient
       scheduledStart: group.scheduledStart
     });
 
-    await syncInspectionTechnicianAssignments(tx, createdInspection.id, input.tenantId, assignedTechnicianIds);
+    await syncInspectionTechnicianAssignments(tx, createdInspection.id, input.tenantId, []);
     await writeInspectionTasks(
       tx,
       createdInspection.id,
@@ -1996,47 +2264,86 @@ export async function createInspection(actor: ActorContext, input: z.infer<typeo
       nextIsPriority: input.isPriority,
       nextStatus: input.status
     });
-
-    const inspection = await tx.inspection.create({
-      data: {
-        tenantId,
-        customerCompanyId: customerCompany.id,
-        siteId: site.id,
-        assignedTechnicianId: primaryAssignedTechnicianId,
-        createdByUserId: parsedActor.userId,
-        inspectionClassification: input.inspectionClassification,
-        isPriority: priorityState.isPriority,
-        priorityAssignedAt: priorityState.priorityAssignedAt,
-        priorityClearedAt: priorityState.priorityClearedAt,
-        scheduledStart: input.scheduledStart,
-        scheduledEnd: input.scheduledEnd ?? null,
-        status: input.status,
-        notes: input.notes,
-        claimable: assignedTechnicianIds.length === 0
-      }
-    });
-
-    await snapshotProviderAssignmentForInspectionTx(tx, {
+    const serviceScheduleIdsByTaskIndex = await createServiceSchedulesForInspectionInput({
+      tx,
       tenantId,
-      inspectionId: inspection.id,
+      customerCompanyId: customerCompany.id,
       siteId: site.id,
+      tasks: input.tasks,
       scheduledStart: input.scheduledStart
     });
+    const plannedInspectionGroups = buildServiceScheduleInspectionPlan({
+      tasks: input.tasks.map((task, index) => ({
+        ...task,
+        serviceScheduleId: serviceScheduleIdsByTaskIndex.get(index) ?? null
+      })),
+      scheduledStart: input.scheduledStart,
+      inspectionMonth: input.inspectionMonth
+    });
+    if (!plannedInspectionGroups.length) {
+      throw new Error("Select at least one due service before creating the inspection.");
+    }
 
-    await syncInspectionTechnicianAssignments(tx, inspection.id, tenantId, assignedTechnicianIds);
-    await writeInspectionTasks(tx, inspection.id, tenantId, input.scheduledStart, input.scheduledStart, input.tasks);
-    await createAuditLog(tx, {
-      tenantId,
-      actorUserId: parsedActor.userId,
-      action: "inspection.created",
-      entityId: inspection.id,
+    const createdInspections: Array<{ id: string; isCurrentPeriod: boolean }> = [];
+    for (const group of plannedInspectionGroups) {
+      const groupAssignedTechnicianIds = group.isCurrentPeriod ? assignedTechnicianIds : [];
+      const groupPrimaryTechnicianId = group.isCurrentPeriod ? primaryAssignedTechnicianId : null;
+      const groupPriorityState = group.isCurrentPeriod
+        ? priorityState
+        : { isPriority: false, priorityAssignedAt: null, priorityClearedAt: null };
+      const inspection = await tx.inspection.create({
+        data: {
+          tenantId,
+          customerCompanyId: customerCompany.id,
+          siteId: site.id,
+          assignedTechnicianId: groupPrimaryTechnicianId,
+          createdByUserId: parsedActor.userId,
+          inspectionClassification: input.inspectionClassification,
+          isPriority: groupPriorityState.isPriority,
+          priorityAssignedAt: groupPriorityState.priorityAssignedAt,
+          priorityClearedAt: groupPriorityState.priorityClearedAt,
+          scheduledStart: group.scheduledStart,
+          scheduledEnd: group.isCurrentPeriod ? input.scheduledEnd ?? null : null,
+          status: group.isCurrentPeriod ? input.status : InspectionStatus.to_be_completed,
+          notes: input.notes,
+          claimable: groupAssignedTechnicianIds.length === 0
+        }
+      });
+      createdInspections.push({ id: inspection.id, isCurrentPeriod: group.isCurrentPeriod });
+
+      await snapshotProviderAssignmentForInspectionTx(tx, {
+        tenantId,
+        inspectionId: inspection.id,
+        siteId: site.id,
+        scheduledStart: group.scheduledStart
+      });
+
+      await syncInspectionTechnicianAssignments(tx, inspection.id, tenantId, groupAssignedTechnicianIds);
+      await writeInspectionTasks(
+        tx,
+        inspection.id,
+        tenantId,
+        group.scheduledStart,
+        group.scheduledStart,
+        group.tasks.map((task) => ({
+          ...task,
+          assignedTechnicianId: group.isCurrentPeriod ? task.assignedTechnicianId ?? groupPrimaryTechnicianId : null
+        }))
+      );
+      await createAuditLog(tx, {
+        tenantId,
+        actorUserId: parsedActor.userId,
+        action: group.isCurrentPeriod ? "inspection.created" : "inspection.future_created_from_service_schedule",
+        entityId: inspection.id,
         metadata: {
           customerCompanyId: customerCompany.id,
           siteId: site.id,
           inspectionClassification: input.inspectionClassification,
-          isPriority: priorityState.isPriority,
-          status: input.status,
-          taskCount: input.tasks.length
+          isPriority: groupPriorityState.isPriority,
+          status: group.isCurrentPeriod ? input.status : InspectionStatus.to_be_completed,
+          duePeriod: group.duePeriod,
+          taskCount: group.tasks.length,
+          sourceServiceTaskIndexes: [...new Set(group.tasks.map((task) => task.sourceTaskIndex))]
         }
       });
 
@@ -2050,7 +2357,7 @@ export async function createInspection(actor: ActorContext, input: z.infer<typeo
         }
       });
 
-      if (priorityState.isPriority) {
+      if (groupPriorityState.isPriority) {
         await createAuditLog(tx, {
           tenantId,
           actorUserId: parsedActor.userId,
@@ -2062,36 +2369,41 @@ export async function createInspection(actor: ActorContext, input: z.infer<typeo
         });
       }
 
-    if (assignedTechnicianIds.length > 0) {
+      if (groupAssignedTechnicianIds.length > 0) {
         await createAuditLog(tx, {
           tenantId,
           actorUserId: parsedActor.userId,
           action: "inspection.assigned",
           entityId: inspection.id,
           metadata: {
-            assignedTechnicianIds
+            assignedTechnicianIds: groupAssignedTechnicianIds
           }
         });
       }
 
-      if (priorityState.isPriority && assignedTechnicianIds.length > 0) {
+      if (groupPriorityState.isPriority && groupAssignedTechnicianIds.length > 0) {
         await createPriorityInspectionAssignedNotificationsTx(tx, {
           tenantId,
           inspectionId: inspection.id,
-          technicianIds: assignedTechnicianIds
+          technicianIds: groupAssignedTechnicianIds
         });
       }
+    }
 
-      return tx.inspection.findUniqueOrThrow({
-        where: { id: inspection.id },
-        include: {
-          site: true,
-          customerCompany: true,
-          assignedTechnician: true,
-          technicianAssignments: { include: { technician: true } },
-          tasks: { include: { recurrence: true } }
-        }
-      });
+    const primaryInspection = createdInspections.find((inspection) => inspection.isCurrentPeriod) ?? createdInspections[0];
+    if (!primaryInspection) {
+      throw new Error("No inspection visits were created.");
+    }
+    return tx.inspection.findUniqueOrThrow({
+      where: { id: primaryInspection.id },
+      include: {
+        site: true,
+        customerCompany: true,
+        assignedTechnician: true,
+        technicianAssignments: { include: { technician: true } },
+        tasks: { include: { recurrence: true } }
+      }
+    });
     });
 }
 
@@ -4456,7 +4768,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(now);
 
-  const [assignedInspections, unassignedInspections, recentCompletedInspections] = await Promise.all([
+  const [assignedInspections, unassignedInspections, recentCompletedInspections, technicianEligibilityRows] = await Promise.all([
     prisma.inspection.findMany({
       where: {
         tenantId,
@@ -4530,6 +4842,16 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
         tasks: { include: { recurrence: true, report: true, assignedTechnician: true } }
       },
       orderBy: [{ scheduledStart: "desc" }]
+    }),
+    prisma.technicianReportTypeEligibility.findMany({
+      where: { tenantId, technicianUserId: parsedActor.userId },
+      select: {
+        technicianUserId: true,
+        reportType: true,
+        canBeAssigned: true,
+        canClaim: true,
+        expiresAt: true
+      }
     })
   ]);
 
@@ -4576,6 +4898,13 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
     thisMonth: monthAssignedWithDisplay,
     assigned: assignedWithDisplay,
     unassigned: unassignedInspections
+      .filter((inspection) =>
+        isTechnicianEligibleForReportTypesFromRows({
+          rows: technicianEligibilityRows,
+          reportTypes: getCurrentVisitReportTypes(inspection.tasks),
+          mode: "claim"
+        })
+      )
       .map((inspection) => ({
         ...inspection,
         tasks: withInspectionTaskDisplayLabels(
@@ -4665,6 +4994,14 @@ export async function claimInspection(actor: ActorContext, inspectionId: string)
     })) {
       throw new Error("Inspection is not claimable.");
     }
+
+    await assertTechnicianEligibilityForReportTypes({
+      tx,
+      tenantId,
+      technicianUserId: parsedActor.userId,
+      reportTypes: getCurrentVisitReportTypes(inspection.tasks),
+      mode: "claim"
+    });
 
     const claimed = await tx.inspection.updateMany({
       where: {

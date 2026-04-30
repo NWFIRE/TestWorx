@@ -5,7 +5,7 @@ import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { BrandLoader } from "@/app/brand-loader";
 import { LiveUrlSearchInput } from "@/app/live-url-search-input";
 import { SearchInput } from "@/app/search-input";
-import { customerAllowanceKeys, internalAllowanceKeys, type TeamAllowanceMap } from "@testworx/lib";
+import { customerAllowanceKeys, inspectionTypeRegistry, internalAllowanceKeys, type TeamAllowanceMap } from "@testworx/lib";
 
 import {
   AppPageShell,
@@ -25,6 +25,7 @@ import {
   resendInviteAction,
   revokeInviteAction,
   setUserActiveStateAction,
+  updateTechnicianEligibilityAction,
   updateInviteAllowancesAction,
   updateUserAllowancesAction
 } from "./actions";
@@ -43,6 +44,16 @@ type WorkspaceUser = {
   customerCompany?: { id: string; name: string } | null;
   allowances: TeamAllowanceMap;
   allowanceLabels: AllowanceLabel[];
+  reportTypeEligibilities?: TechnicianEligibility[];
+};
+type TechnicianEligibility = {
+  reportType: string;
+  canBeAssigned: boolean;
+  canClaim: boolean;
+  licenseRequired: boolean;
+  licenseNumber?: string | null;
+  expiresAt?: string | Date | null;
+  notes?: string | null;
 };
 type WorkspaceInvite = {
   id: string;
@@ -200,6 +211,79 @@ function AllowanceFieldset({
   );
 }
 
+function formatDateInputValue(value: string | Date | null | undefined) {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+}
+
+function TechnicianEligibilityForm({ user }: { user: WorkspaceUser }) {
+  const [state, formAction, pending] = useActionState(updateTechnicianEligibilityAction, initialTeamActionState);
+  const existing = new Map((user.reportTypeEligibilities ?? []).map((eligibility) => [eligibility.reportType, eligibility]));
+  const reportTypes = Object.entries(inspectionTypeRegistry).filter(([reportType]) => reportType !== "work_order");
+
+  return (
+    <form action={formAction} className="mt-5 space-y-4 rounded-[1.5rem] border border-blue-100 bg-blue-50/50 p-4">
+      <input name="userId" type="hidden" value={user.id} />
+      <div>
+        <p className="text-sm font-semibold text-slate-800">Inspection type eligibility</p>
+        <p className="mt-1 text-xs text-slate-500">Controls which report types this technician can be assigned or claim from the shared queue.</p>
+      </div>
+      <div className="space-y-3">
+        {reportTypes.map(([reportType, config]) => {
+          const eligibility = existing.get(reportType);
+          const canBeAssigned = eligibility ? eligibility.canBeAssigned : true;
+          const canClaim = eligibility ? eligibility.canClaim : true;
+          return (
+            <div key={reportType} className="rounded-2xl border border-slate-200 bg-white p-3">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-ink">{config.label}</p>
+                  <p className="text-xs text-slate-500">{config.description}</p>
+                </div>
+                <label className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-3 text-sm text-slate-700">
+                  <input defaultChecked={canBeAssigned} name={`${reportType}:canBeAssigned`} type="checkbox" />
+                  Can be assigned
+                </label>
+                <label className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-3 text-sm text-slate-700">
+                  <input defaultChecked={canClaim} name={`${reportType}:canClaim`} type="checkbox" />
+                  Can claim
+                </label>
+              </div>
+              <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_12rem_1.2fr]">
+                <input
+                  className="field-contrast w-full rounded-xl border px-3 py-2.5 text-sm outline-none"
+                  defaultValue={eligibility?.licenseNumber ?? ""}
+                  name={`${reportType}:licenseNumber`}
+                  placeholder="License number"
+                />
+                <input
+                  className="field-contrast w-full rounded-xl border px-3 py-2.5 text-sm outline-none"
+                  defaultValue={formatDateInputValue(eligibility?.expiresAt)}
+                  name={`${reportType}:expiresAt`}
+                  type="date"
+                />
+                <input
+                  className="field-contrast w-full rounded-xl border px-3 py-2.5 text-sm outline-none"
+                  defaultValue={eligibility?.notes ?? ""}
+                  name={`${reportType}:notes`}
+                  placeholder="Notes"
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <button className="inline-flex min-h-11 items-center justify-center rounded-xl bg-slateblue px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60" disabled={pending} type="submit">
+        {pending ? "Saving eligibility..." : "Save eligibility"}
+      </button>
+      <ResultCallout error={state.error} success={state.success} />
+    </form>
+  );
+}
+
 function InviteFormCard({
   title,
   description,
@@ -349,6 +433,8 @@ function UserRow({ user, customerMode = false }: { user: WorkspaceUser; customer
           Save allowances
         </button>
       </form>
+
+      {!customerMode && user.role === "technician" ? <TechnicianEligibilityForm user={user} /> : null}
 
       <div className="mt-4 space-y-3">
         <ResultCallout error={allowanceState.error} success={allowanceState.success} />

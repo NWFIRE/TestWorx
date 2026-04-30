@@ -93,6 +93,13 @@ export async function updateInviteAllowances(
   return mod.updateInviteAllowances(...args);
 }
 
+export async function updateTechnicianReportTypeEligibility(
+  ...args: Parameters<TeamManagementModule["updateTechnicianReportTypeEligibility"]>
+): ReturnType<TeamManagementModule["updateTechnicianReportTypeEligibility"]> {
+  const mod = await import("../team-management");
+  return mod.updateTechnicianReportTypeEligibility(...args);
+}
+
 export async function setUserActiveState(
   ...args: Parameters<TeamManagementModule["setUserActiveState"]>
 ): ReturnType<TeamManagementModule["setUserActiveState"]> {

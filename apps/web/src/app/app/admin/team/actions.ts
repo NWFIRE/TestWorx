@@ -14,8 +14,10 @@ import {
   revokeAccountInvitation,
   setUserActiveState,
   updateInviteAllowances,
+  updateTechnicianReportTypeEligibility,
   updateUserAllowances
 } from "@testworx/lib/server/index";
+import { inspectionTypeRegistry, type BrowserInspectionType } from "@testworx/lib";
 import { initialTeamActionState, type TeamActionState } from "./action-state";
 
 function readAllowanceValues(formData: FormData) {
@@ -136,6 +138,32 @@ export async function updateInviteAllowancesAction(_: TeamActionState, formData:
     return { ...initialTeamActionState, success: "Invite allowances updated." };
   } catch (error) {
     return { ...initialTeamActionState, error: error instanceof Error ? error.message : "Unable to update invite allowances." };
+  }
+}
+
+export async function updateTechnicianEligibilityAction(_: TeamActionState, formData: FormData): Promise<TeamActionState> {
+  try {
+    const actor = await requireActor();
+    const reportTypes = Object.keys(inspectionTypeRegistry).filter((reportType) => reportType !== "work_order") as BrowserInspectionType[];
+    const readOptionalDate = (key: string) => {
+      const value = String(formData.get(key) ?? "").trim();
+      return value ? new Date(`${value}T00:00:00.000Z`) : null;
+    };
+    await updateTechnicianReportTypeEligibility(actor, {
+      technicianUserId: String(formData.get("userId") ?? ""),
+      eligibilities: reportTypes.map((reportType) => ({
+        reportType,
+        canBeAssigned: formData.get(`${reportType}:canBeAssigned`) === "on",
+        canClaim: formData.get(`${reportType}:canClaim`) === "on",
+        licenseNumber: String(formData.get(`${reportType}:licenseNumber`) ?? "").trim() || null,
+        expiresAt: readOptionalDate(`${reportType}:expiresAt`),
+        notes: String(formData.get(`${reportType}:notes`) ?? "").trim() || null
+      }))
+    });
+    revalidatePath("/app/admin/team");
+    return { ...initialTeamActionState, success: "Technician eligibility updated." };
+  } catch (error) {
+    return { ...initialTeamActionState, error: error instanceof Error ? error.message : "Unable to update eligibility." };
   }
 }
 

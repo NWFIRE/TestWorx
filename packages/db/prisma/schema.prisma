@@ -395,6 +395,8 @@ model Tenant {
   technicianNotifications   TechnicianNotification[]
   technicianDeviceRegistrations TechnicianDeviceRegistration[]
   customerIntakeRequests    CustomerIntakeRequest[]
+  serviceSchedules          ServiceSchedule[]
+  technicianReportTypeEligibilities TechnicianReportTypeEligibility[]
 }
 
 model User {
@@ -441,6 +443,7 @@ model User {
   technicianDeviceRegistrations TechnicianDeviceRegistration[]
   createdCustomerIntakeRequests CustomerIntakeRequest[] @relation("CustomerIntakeCreatedBy")
   approvedCustomerIntakeRequests CustomerIntakeRequest[] @relation("CustomerIntakeApprovedBy")
+  reportTypeEligibilities TechnicianReportTypeEligibility[]
 }
 
 model CustomerIntakeRequest {
@@ -578,6 +581,7 @@ model CustomerCompany {
   accountInvitations        AccountInvitation[]
   quotes                    Quote[]
   emailReminderSendLogs     EmailReminderSendLog[]
+  serviceSchedules          ServiceSchedule[]
 
   @@index([tenantId, billingType])
   @@index([tenantId, billToAccountId])
@@ -743,6 +747,7 @@ model Site {
   serviceFeeRules   ServiceFeeRule[]
   quotes            Quote[]
   providerAssignments ServiceSiteProviderAssignment[]
+  serviceSchedules ServiceSchedule[]
 }
 
 model ServiceSiteProviderAssignment {
@@ -1084,10 +1089,56 @@ model InspectionTechnicianAssignment {
   @@index([tenantId, technicianId])
 }
 
+model ServiceSchedule {
+  id                String              @id @default(cuid())
+  tenantId          String
+  customerCompanyId String
+  siteId            String
+  serviceType       InspectionType
+  reportType        InspectionType
+  cadence           RecurrenceFrequency
+  nextDueDate       DateTime?
+  dueMonth          String?
+  dueDayOrWindow    String?
+  isActive          Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerCompany   CustomerCompany     @relation(fields: [customerCompanyId], references: [id], onDelete: Cascade)
+  site              Site                @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  tasks             InspectionTask[]
+
+  @@index([tenantId, customerCompanyId, siteId])
+  @@index([tenantId, siteId, dueMonth])
+  @@index([tenantId, reportType, isActive])
+}
+
+model TechnicianReportTypeEligibility {
+  id               String         @id @default(cuid())
+  tenantId         String
+  technicianUserId String
+  reportType       InspectionType
+  canBeAssigned    Boolean        @default(true)
+  canClaim         Boolean        @default(true)
+  licenseRequired  Boolean        @default(false)
+  licenseNumber    String?
+  expiresAt        DateTime?
+  notes            String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  technician       User           @relation(fields: [technicianUserId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, technicianUserId, reportType])
+  @@index([tenantId, reportType])
+  @@index([tenantId, technicianUserId])
+}
+
 model InspectionTask {
   id             String           @id @default(cuid())
   tenantId       String
   inspectionId   String
+  serviceScheduleId String?
   inspectionType InspectionType
   customDisplayLabel String?
   addedByUserId  String?
@@ -1102,6 +1153,7 @@ model InspectionTask {
   updatedAt      DateTime         @updatedAt
   tenant         Tenant           @relation(fields: [tenantId], references: [id])
   inspection     Inspection       @relation(fields: [inspectionId], references: [id])
+  serviceSchedule ServiceSchedule? @relation(fields: [serviceScheduleId], references: [id], onDelete: SetNull)
   addedBy        User?            @relation("InspectionTaskAddedBy", fields: [addedByUserId], references: [id])
   assignedTechnician User?        @relation("InspectionTaskAssignedTechnician", fields: [assignedTechnicianId], references: [id])
   recurrence     InspectionRecurrence?
@@ -1109,6 +1161,7 @@ model InspectionTask {
   
   @@index([inspectionId, inspectionType])
   @@index([tenantId, assignedTechnicianId])
+  @@index([tenantId, serviceScheduleId])
   @@index([tenantId, dueMonth])
   @@index([tenantId, schedulingStatus])
 }

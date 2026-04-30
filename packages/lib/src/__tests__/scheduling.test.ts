@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { InspectionClassification, InspectionStatus } from "@prisma/client";
+import { InspectionClassification, InspectionStatus, InspectionType } from "@prisma/client";
 
 import {
+  buildServiceScheduleInspectionPlan,
   defaultScheduledStartForMonth,
   formatCustomerFacingInspectionAddress,
   genericInspectionSiteOptionValue,
@@ -13,6 +14,7 @@ import {
   getInspectionDisplayStatus,
   getInspectionStatusTone,
   isInspectionPastDue,
+  isTechnicianEligibleForReportTypesFromRows,
   nextDueFrom,
   parseCreateInspectionFormData,
   pickEarliestNextDueAt,
@@ -364,6 +366,116 @@ describe("recurrence logic", () => {
     ]);
 
     expect(earliest?.toISOString()).toBe("2026-05-01T09:00:00.000Z");
+  });
+
+  it("separates mixed due services into current and future inspection groups", () => {
+    const plan = buildServiceScheduleInspectionPlan({
+      scheduledStart: new Date("2026-04-01T09:00:00.000Z"),
+      inspectionMonth: "2026-04",
+      tasks: [
+        {
+          inspectionType: "kitchen_suppression",
+          frequency: "SEMI_ANNUAL",
+          assignedTechnicianId: "tech_1",
+          dueMonth: "2026-04",
+          dueDate: new Date("2026-04-01T00:00:00.000Z"),
+          schedulingStatus: "scheduled_now"
+        },
+        {
+          inspectionType: "fire_extinguisher",
+          frequency: "ANNUAL",
+          assignedTechnicianId: null,
+          dueMonth: "2026-10",
+          dueDate: new Date("2026-10-01T00:00:00.000Z"),
+          schedulingStatus: "scheduled_future"
+        },
+        {
+          inspectionType: "fire_alarm",
+          frequency: "ANNUAL",
+          assignedTechnicianId: null,
+          dueMonth: "2026-10",
+          dueDate: new Date("2026-10-01T00:00:00.000Z"),
+          schedulingStatus: "scheduled_future"
+        }
+      ]
+    });
+
+    expect(plan).toHaveLength(2);
+    expect(plan[0]?.duePeriod).toBe("2026-04");
+    expect(plan[0]?.isCurrentPeriod).toBe(true);
+    expect(plan[0]?.tasks.map((task) => task.inspectionType)).toEqual(["kitchen_suppression"]);
+    expect(plan[1]?.duePeriod).toBe("2026-10");
+    expect(plan[1]?.tasks.map((task) => task.inspectionType).sort()).toEqual([
+      "fire_alarm",
+      "fire_extinguisher",
+      "kitchen_suppression"
+    ]);
+    expect(plan[1]?.tasks.every((task) => task.assignedTechnicianId === null)).toBe(true);
+  });
+
+  it("does not create current inspection tasks for services due in a later month", () => {
+    const plan = buildServiceScheduleInspectionPlan({
+      scheduledStart: new Date("2026-04-01T09:00:00.000Z"),
+      inspectionMonth: "2026-04",
+      tasks: [
+        {
+          inspectionType: "fire_alarm",
+          frequency: "ANNUAL",
+          assignedTechnicianId: "tech_1",
+          dueMonth: "2026-10",
+          dueDate: new Date("2026-10-01T00:00:00.000Z"),
+          schedulingStatus: "scheduled_future"
+        }
+      ]
+    });
+
+    expect(plan).toHaveLength(1);
+    expect(plan[0]?.duePeriod).toBe("2026-10");
+    expect(plan[0]?.isCurrentPeriod).toBe(false);
+    expect(plan[0]?.tasks).toHaveLength(1);
+  });
+
+  it("requires explicit eligibility rows for every claimed report type once eligibility is configured", () => {
+    expect(
+      isTechnicianEligibleForReportTypesFromRows({
+        rows: [],
+        reportTypes: [InspectionType.fire_alarm],
+        mode: "claim"
+      })
+    ).toBe(true);
+
+    expect(
+      isTechnicianEligibleForReportTypesFromRows({
+        rows: [
+          {
+            reportType: InspectionType.fire_alarm,
+            canBeAssigned: true,
+            canClaim: true
+          }
+        ],
+        reportTypes: [InspectionType.fire_alarm, InspectionType.kitchen_suppression],
+        mode: "claim"
+      })
+    ).toBe(false);
+
+    expect(
+      isTechnicianEligibleForReportTypesFromRows({
+        rows: [
+          {
+            reportType: InspectionType.fire_alarm,
+            canBeAssigned: true,
+            canClaim: true
+          },
+          {
+            reportType: InspectionType.kitchen_suppression,
+            canBeAssigned: true,
+            canClaim: false
+          }
+        ],
+        reportTypes: [InspectionType.fire_alarm, InspectionType.kitchen_suppression],
+        mode: "assign"
+      })
+    ).toBe(true);
   });
 });
 

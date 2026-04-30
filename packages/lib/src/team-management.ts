@@ -21,6 +21,7 @@ import {
   type TeamAllowanceKey,
   type TeamAllowanceMap
 } from "./team-management-shared";
+import { inspectionTypeRegistry, type BrowserInspectionType } from "./inspection-types-shared";
 
 const userRoleOptions = ["tenant_admin", "office_admin", "technician", "customer_user"] as const;
 const inviteStatusOptions = ["pending", "accepted", "revoked"] as const;
@@ -53,6 +54,18 @@ const allowanceUpdateSchema = z.object({
 const inviteAllowanceUpdateSchema = z.object({
   inviteId: z.string().trim().min(1),
   allowances: allowanceMapSchema
+});
+
+const technicianEligibilityUpdateSchema = z.object({
+  technicianUserId: z.string().trim().min(1),
+  eligibilities: z.array(z.object({
+    reportType: z.enum(Object.keys(inspectionTypeRegistry) as [BrowserInspectionType, ...BrowserInspectionType[]]),
+    canBeAssigned: z.boolean().default(false),
+    canClaim: z.boolean().default(false),
+    licenseNumber: z.string().trim().max(120).optional().nullable(),
+    expiresAt: z.union([z.coerce.date(), z.null()]).optional(),
+    notes: z.string().trim().max(500).optional().nullable()
+  }))
 });
 
 const acceptInviteSchema = z.object({
@@ -463,7 +476,19 @@ export async function searchTeamWorkspaceUsers(
       allowances: true,
       lastLoginAt: true,
       createdAt: true,
-      customerCompany: { select: { id: true, name: true } }
+      customerCompany: { select: { id: true, name: true } },
+      reportTypeEligibilities: {
+        select: {
+          reportType: true,
+          canBeAssigned: true,
+          canClaim: true,
+          licenseRequired: true,
+          licenseNumber: true,
+          expiresAt: true,
+          notes: true
+        },
+        orderBy: { reportType: "asc" }
+      }
     }
   });
 
@@ -478,7 +503,8 @@ export async function searchTeamWorkspaceUsers(
     return {
       ...user,
       allowances,
-      allowanceLabels: getAllowanceLabels(typedRole, allowances)
+      allowanceLabels: getAllowanceLabels(typedRole, allowances),
+      reportTypeEligibilities: user.role === "technician" ? user.reportTypeEligibilities : []
     };
   });
 
@@ -487,6 +513,76 @@ export async function searchTeamWorkspaceUsers(
     page: input.page,
     hasMore
   };
+}
+
+export async function updateTechnicianReportTypeEligibility(
+  actor: ActorContext,
+  rawInput: z.input<typeof technicianEligibilityUpdateSchema>
+) {
+  const parsedActor = parseActor(actor);
+  const tenantId = requireTenantId(parsedActor);
+  const actorUser = await getActorWithAllowances(parsedActor);
+  ensureTeamManagementAccess(actorUser);
+  const input = technicianEligibilityUpdateSchema.parse(rawInput);
+
+  const technician = await prisma.user.findFirst({
+    where: {
+      id: input.technicianUserId,
+      tenantId,
+      role: "technician"
+    },
+    select: { id: true }
+  });
+
+  if (!technician) {
+    throw new Error("Technician not found.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await Promise.all(
+      input.eligibilities.map((eligibility) =>
+        tx.technicianReportTypeEligibility.upsert({
+          where: {
+            tenantId_technicianUserId_reportType: {
+              tenantId,
+              technicianUserId: technician.id,
+              reportType: eligibility.reportType
+            }
+          },
+          update: {
+            canBeAssigned: eligibility.canBeAssigned,
+            canClaim: eligibility.canClaim,
+            licenseRequired: Boolean(eligibility.licenseNumber || eligibility.expiresAt),
+            licenseNumber: eligibility.licenseNumber || null,
+            expiresAt: eligibility.expiresAt ?? null,
+            notes: eligibility.notes || null
+          },
+          create: {
+            tenantId,
+            technicianUserId: technician.id,
+            reportType: eligibility.reportType,
+            canBeAssigned: eligibility.canBeAssigned,
+            canClaim: eligibility.canClaim,
+            licenseRequired: Boolean(eligibility.licenseNumber || eligibility.expiresAt),
+            licenseNumber: eligibility.licenseNumber || null,
+            expiresAt: eligibility.expiresAt ?? null,
+            notes: eligibility.notes || null
+          }
+        })
+      )
+    );
+
+    await createAuditLog(tx, {
+      tenantId,
+      actorUserId: parsedActor.userId,
+      action: "technician.report_type_eligibility_updated",
+      entityType: "User",
+      entityId: technician.id,
+      metadata: {
+        reportTypes: input.eligibilities.map((eligibility) => eligibility.reportType)
+      }
+    });
+  });
 }
 
 export async function createAccountInvitation(
