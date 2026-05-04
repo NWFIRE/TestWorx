@@ -27,7 +27,7 @@ describe("inspection lifecycle resolver", () => {
     });
   });
 
-  it("routes completed finalized non-invoiced work to Ready to Bill", () => {
+  it("routes completed finalized non-invoiced work to Ready To Bill", () => {
     const summary = resolveInspectionLifecycleSummary({
       inspectionStatus: "completed",
       reports: [finalizedReport],
@@ -36,12 +36,12 @@ describe("inspection lifecycle resolver", () => {
 
     expect(summary).toMatchObject({
       actionState: "ready_to_bill",
-      primaryLabel: "Ready to Bill",
+      primaryLabel: "Ready To Bill",
       nextAction: "Create Invoice"
     });
   });
 
-  it("keeps draft reports out of Ready to Bill", () => {
+  it("keeps draft reports out of Ready To Bill", () => {
     const summary = resolveInspectionLifecycleSummary({
       inspectionStatus: "in_progress",
       hasStartedWork: true,

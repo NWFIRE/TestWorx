@@ -203,14 +203,14 @@ const workQueueItems = [
   },
   {
     key: "review",
-    label: "Ready to bill",
+    label: "Ready To Bill",
     href: "/app/admin/reports",
     tone: "emerald" as const
   },
   {
     key: "billing",
     label: "Billing work",
-    href: "/app/admin/billing?status=ready",
+    href: "/app/admin/billing",
     tone: "emerald" as const
   },
   {

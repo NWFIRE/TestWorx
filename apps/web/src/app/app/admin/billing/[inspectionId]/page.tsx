@@ -93,6 +93,16 @@ function formatDeliveryMethod(value: unknown) {
   return "Payer billing email";
 }
 
+function formatBillingSummaryStatusLabel(status: string) {
+  if (status === "draft" || status === "reviewed") {
+    return "Ready To Bill";
+  }
+  if (status === "invoiced") {
+    return "Invoiced";
+  }
+  return status.replaceAll("_", " ");
+}
+
 function formatEditableQuantity(quantity: number) {
   return quantity > 0 ? String(Math.round(quantity)) : "";
 }
@@ -531,7 +541,7 @@ export default async function BillingSummaryDetailPage({
 
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Summary status</p>
-            <h3 className="mt-1 text-2xl font-semibold text-ink">{summary.status}</h3>
+            <h3 className="mt-1 text-2xl font-semibold text-ink">{formatBillingSummaryStatusLabel(summary.status)}</h3>
             <BillingSummaryStatusActions
               canUseQuickBooksActions={canUseQuickBooksActions}
               connectedCompany={quickBooksConnection.tenant.quickbooksCompanyName}

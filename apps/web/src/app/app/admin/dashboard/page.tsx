@@ -146,7 +146,7 @@ function buildAlertItems(data: AdminDashboardData, inspectionNotice?: string) {
   ).length;
   if (reviewedBillingCount > 0) {
     alerts.push(
-      `${reviewedBillingCount} completed report${reviewedBillingCount === 1 ? "" : "s"} are ready to bill.`
+      `${reviewedBillingCount} completed report${reviewedBillingCount === 1 ? "" : "s"} are Ready To Bill.`
     );
   }
 
@@ -177,20 +177,19 @@ function calculateBillingPipeline(
   ).length;
 
   return [
-    { label: "Draft billing", value: Math.round((draft / total) * 100), tone: "bg-slate-900" },
-    { label: "Ready to Bill", value: Math.round((reviewed / total) * 100), tone: "bg-slateblue" },
+    { label: "Ready To Bill", value: Math.round(((draft + reviewed) / total) * 100), tone: "bg-slateblue" },
     { label: "Invoiced", value: Math.round((invoiced / total) * 100), tone: "bg-violet-500" }
   ];
 }
 
 function formatBillingReady(inspections: CompletedDashboardInspection[]) {
-  const reviewedCount = inspections.filter(
-    (inspection) => inspection.billingStatus === "reviewed"
+  const readyToBillCount = inspections.filter(
+    (inspection) => !inspection.billingStatus || inspection.billingStatus === "draft" || inspection.billingStatus === "reviewed"
   ).length;
 
   return {
-    value: reviewedCount.toString(),
-    change: reviewedCount ? "Ready to Bill" : "No billing items queued"
+    value: readyToBillCount.toString(),
+    change: readyToBillCount ? "Ready To Bill" : "No billing items queued"
   };
 }
 
@@ -333,11 +332,11 @@ export default async function AdminDashboardPage({
       tone: "blue" as const
     },
     {
-      label: "Ready to bill",
+      label: "Ready To Bill",
       value: readyToBillReportCount.toString(),
       change: readyToBillReportCount
         ? "Finalized work still needs invoice action"
-        : "Ready-to-bill queue is clear",
+        : "Ready To Bill queue is clear",
       icon: FileText,
       href: "/app/admin/reports",
       tone: "emerald" as const
@@ -347,7 +346,7 @@ export default async function AdminDashboardPage({
       value: billingReady.value,
       change: billingReady.change,
       icon: CreditCard,
-      href: "/app/admin/billing?status=ready",
+      href: "/app/admin/billing",
       tone: "emerald" as const
     },
     {
@@ -649,7 +648,7 @@ export default async function AdminDashboardPage({
                 <div className="mt-5 space-y-3">
                   {[
                     { label: "Create invoices for ready work", href: "/app/admin/reports" },
-                    { label: "Resolve billing drafts", href: "/app/admin/billing?status=draft" },
+                    { label: "Review Ready To Bill", href: "/app/admin/billing" },
                     { label: "Follow up on open deficiencies", href: "/app/deficiencies?status=open" }
                   ].map((item) => (
                     <Link

@@ -106,15 +106,15 @@ export default async function AdminReportsQueuePage({
       <PageHeader
         backNavigation={{ label: "Back to admin", fallbackHref: "/app/admin" }}
         description="Completed inspections with finalized reports that still require invoice action. Invoiced and closed work stays out of this queue."
-        eyebrow="Ready to bill"
-        title="Ready to bill"
+        eyebrow="Ready To Bill"
+        title="Ready To Bill"
       />
 
       <WorkQueueNav activeKey="review" />
 
       <section className="grid gap-3 md:grid-cols-2">
         <KPIStatCard
-          label="Ready to bill"
+          label="Ready To Bill"
           note="Finalized, non-invoiced work requiring invoice follow-through."
           tone="emerald"
           value={data.counts.readyToBill}

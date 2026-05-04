@@ -144,9 +144,9 @@ function labelForBillingStatus(status: LifecycleBillingStatus) {
     case "not_billed":
       return "Not Billed";
     case "ready_to_bill":
-      return "Ready to Bill";
+      return "Ready To Bill";
     case "invoice_draft":
-      return "Invoice Draft";
+      return "Ready To Bill";
     case "invoiced":
       return "Invoiced";
     case "paid":
@@ -248,7 +248,7 @@ export function resolveInspectionLifecycleSummary(input: {
       reportStatus,
       billingStatus,
       actionState: "ready_to_bill",
-      primaryLabel: "Ready to Bill",
+      primaryLabel: "Ready To Bill",
       secondaryLabel: "Finalized and ready for invoice.",
       nextAction: "Create Invoice"
     };

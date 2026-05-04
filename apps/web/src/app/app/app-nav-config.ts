@@ -112,7 +112,7 @@ const adminNavItems: AppNavItem[] = [
     shortLabel: "Billing",
     abbreviation: "BL",
     icon: "invoice",
-    description: "Invoice drafts, ready-to-bill work, and invoiced history",
+    description: "Ready To Bill work and invoiced history",
     tone: "emerald"
   },
   {

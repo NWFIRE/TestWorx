@@ -204,6 +204,7 @@ export function BillingSummaryStatusActions({
 
         <ActionButton
           className="w-full"
+          disabled={state.summaryStatus !== "invoiced"}
           onClick={() => runAction("draft", () => {
             const formData = new FormData();
             formData.set("summaryId", summaryId);
@@ -212,13 +213,14 @@ export function BillingSummaryStatusActions({
             return formData;
           }, updateBillingSummaryStatusAction)}
           pending={pending && activeAction === "draft"}
-          pendingLabel="Moving to draft..."
+          pendingLabel="Moving back to Ready To Bill..."
         >
-          {state.summaryStatus === "draft" ? "Currently draft" : "Move to draft"}
+          {state.summaryStatus === "invoiced" ? "Move back to Ready To Bill" : "Currently Ready To Bill"}
         </ActionButton>
 
         <ActionButton
           className="w-full"
+          disabled={state.summaryStatus === "reviewed" || state.summaryStatus === "invoiced"}
           onClick={() => runAction("reviewed", () => {
             const formData = new FormData();
             formData.set("summaryId", summaryId);
@@ -227,24 +229,9 @@ export function BillingSummaryStatusActions({
             return formData;
           }, updateBillingSummaryStatusAction)}
           pending={pending && activeAction === "reviewed"}
-          pendingLabel="Marking reviewed..."
+          pendingLabel="Confirming Ready To Bill..."
         >
-          {state.summaryStatus === "reviewed" ? "Currently reviewed" : "Mark reviewed"}
-        </ActionButton>
-
-        <ActionButton
-          className="w-full"
-          onClick={() => runAction("invoice-draft", () => {
-            const formData = new FormData();
-            formData.set("summaryId", summaryId);
-            formData.set("inspectionId", inspectionId);
-            formData.set("status", "reviewed");
-            return formData;
-          }, updateBillingSummaryStatusAction)}
-          pending={pending && activeAction === "invoice-draft"}
-          pendingLabel="Creating invoice draft..."
-        >
-          Create invoice draft
+          {state.summaryStatus === "reviewed" ? "Ready To Bill confirmed" : "Confirm Ready To Bill"}
         </ActionButton>
 
         <ActionButton

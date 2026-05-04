@@ -19,15 +19,13 @@ import {
 type AdminBillingSummary = Awaited<ReturnType<typeof getAdminBillingSummaries>>[number];
 
 const statusTones = {
-  draft: "amber",
+  draft: "blue",
   reviewed: "blue",
   invoiced: "violet"
 } as const;
 
 const statusOptions = [
-  { value: "all", label: "Open work" },
-  { value: "draft", label: "Invoice Draft" },
-  { value: "reviewed", label: "Ready to Bill" },
+  { value: "all", label: "Ready To Bill" },
   { value: "invoiced", label: "Invoiced" }
 ] as const;
 
@@ -43,11 +41,8 @@ function buildBillingHref(status?: string) {
 }
 
 function formatBillingSummaryStatus(status: string) {
-  if (status === "reviewed") {
-    return "Ready to Bill";
-  }
-  if (status === "draft") {
-    return "Invoice Draft";
+  if (status === "reviewed" || status === "draft") {
+    return "Ready To Bill";
   }
   if (status === "invoiced") {
     return "Invoiced";
@@ -203,18 +198,18 @@ export default async function AdminBillingPage({
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KPIStatCard
-          href={buildBillingHref("draft")}
-          label="Invoice Draft"
-          note="Summaries still missing final pricing or review decisions."
-          tone="amber"
-          value={summaries.filter((summary) => summary.status === "draft").length}
+          href={buildBillingHref()}
+          label="Ready To Bill"
+          note="Completed, finalized work ready for billing follow-through."
+          tone="blue"
+          value={openSummaries.length}
         />
         <KPIStatCard
-          href={buildBillingHref("reviewed")}
-          label="Ready to Bill"
-          note="Completed, finalized work ready for invoice follow-through."
-          tone="blue"
-          value={summaries.filter((summary) => summary.status === "reviewed").length}
+          href={buildBillingHref()}
+          label="Needs pricing"
+          note="Ready-to-bill summaries with missing pricing decisions."
+          tone="amber"
+          value={openSummaries.filter((summary) => summary.metrics.missingPriceCount > 0).length}
         />
         <KPIStatCard
           href={buildBillingHref("invoiced")}
@@ -224,15 +219,15 @@ export default async function AdminBillingPage({
           value={invoicedSummaries.length}
         />
         <KPIStatCard
-          label="Open queue"
-          note="All summaries that still need billing work or confirmation."
+          label="Total summaries"
+          note="All billing summaries, including archived invoiced work."
           tone="slate"
-          value={openSummaries.length}
+          value={summaries.length}
         />
       </section>
 
       <FilterBar
-        description="Open work shows only summaries that still need billing action. Use Invoiced for completed invoice history."
+        description="Ready To Bill shows summaries that still need billing action. Use Invoiced for completed invoice history."
         title="Queue filters"
       >
         {statusOptions.map((option) => (
@@ -248,11 +243,11 @@ export default async function AdminBillingPage({
 
       <SummaryQueueSection
         ctaLabel={selectedStatus === "invoiced" ? "View invoice detail" : "Review billing"}
-        description={selectedStatus === "all" ? "Operational billing work that still needs review, pricing, or invoice completion. Invoiced work is archived below." : "Billing summaries matching the selected queue."}
+        description={selectedStatus === "all" ? "Completed, finalized work that is ready for pricing, invoice creation, or QuickBooks follow-through. Invoiced work is archived below." : "Billing summaries matching the selected queue."}
         emptyText="No billing summaries match the current queue filter."
         emptyTitle="No billing summaries in this queue"
         summaries={filteredSummaries}
-        title={selectedStatus === "all" ? "Billing work queue" : `${statusOptions.find((option) => option.value === selectedStatus)?.label ?? selectedStatus} queue`}
+        title={selectedStatus === "all" ? "Ready To Bill queue" : `${statusOptions.find((option) => option.value === selectedStatus)?.label ?? selectedStatus} queue`}
       />
 
       {selectedStatus === "all" ? (
