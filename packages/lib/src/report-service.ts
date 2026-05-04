@@ -1577,6 +1577,54 @@ async function resolveFinalizeInspectionReportId(input: {
   return report.id;
 }
 
+async function getIdempotentFinalizedReport(actor: ActorContext, inspectionReportId: string) {
+  const parsedActor = parseActor(actor);
+  if (!["technician", "tenant_admin", "office_admin", "platform_admin"].includes(parsedActor.role)) {
+    throw new Error("This report cannot be finalized.");
+  }
+
+  const report = await prisma.inspectionReport.findFirst({
+    where: {
+      id: inspectionReportId,
+      tenantId: parsedActor.tenantId as string,
+      status: reportStatuses.finalized,
+      finalizedAt: { not: null }
+    },
+    include: {
+      tenant: true,
+      inspection: {
+        include: {
+          site: true,
+          customerCompany: true,
+          technicianAssignments: { select: { technicianId: true } }
+        }
+      },
+      task: true,
+      technician: true,
+      attachments: true,
+      signatures: true,
+      deficiencies: true
+    }
+  });
+
+  if (!report) {
+    return null;
+  }
+
+  if (
+    parsedActor.role === "technician" &&
+    !isTechnicianAssignedToInspection({
+      userId: parsedActor.userId,
+      assignedTechnicianId: report.inspection.assignedTechnicianId,
+      technicianAssignments: readTechnicianAssignments(report.inspection)
+    })
+  ) {
+    throw new Error("Technician does not have access to this report.");
+  }
+
+  return report;
+}
+
 export async function finalizeInspectionReport(actor: ActorContext, input: FinalizeInspectionReportInput) {
   const normalizedInput = normalizeFinalizeInspectionReportInput(input);
   const parsedActorForLookup = parseActor(actor);
@@ -1586,6 +1634,12 @@ export async function finalizeInspectionReport(actor: ActorContext, input: Final
     inspectionId: normalizedInput.inspectionId,
     taskId: normalizedInput.taskId
   });
+
+  const alreadyFinalized = await getIdempotentFinalizedReport(actor, inspectionReportId);
+  if (alreadyFinalized) {
+    return alreadyFinalized;
+  }
+
   const { parsedActor, report } = await getAuthorizedEditableReport(actor, inspectionReportId, {
     allowCompletedInspectionFinalize: true
   });

@@ -30,7 +30,7 @@ function buildQueueId(reportId: string, operation: SyncQueueEntry["operation"]) 
 }
 
 function toConflictStatus(message: string | null | undefined) {
-  return /locked|cannot edit|cannot be finalized|already finalized|already completed|does not have access/i.test(message ?? "");
+  return /locked|cannot edit|cannot be finalized|already finalized|already completed|closed inspections|does not have access/i.test(message ?? "");
 }
 
 function hasNewerQueueVersion(entry: SyncQueueEntry | null, syncMarker: string) {
@@ -51,7 +51,10 @@ function isStaleSyncingEntry(entry: SyncQueueEntry, now = Date.now()) {
 }
 
 function isProcessableQueueEntry(entry: SyncQueueEntry) {
-  return entry.status === "pending" || entry.status === "failed" || isStaleSyncingEntry(entry);
+  return entry.status === "pending" ||
+    entry.status === "failed" ||
+    isStaleSyncingEntry(entry) ||
+    (entry.operation === "report_finalize" && entry.status === "conflict" && /already finalized|already completed|closed inspections/i.test(entry.lastError ?? ""));
 }
 
 function isFinalizationPendingOrComplete(record: LocalReportDraftRecord | null) {
