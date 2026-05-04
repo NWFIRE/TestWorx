@@ -35,7 +35,7 @@ export default async function QuoteDetailPage({
   searchParams
 }: {
   params: Promise<{ quoteId: string }>;
-  searchParams?: Promise<{ from?: string }>;
+  searchParams?: Promise<{ error?: string; from?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -47,6 +47,7 @@ export default async function QuoteDetailPage({
 
   const { quoteId } = await params;
   const paramsData = searchParams ? await searchParams : {};
+  const actionError = typeof paramsData.error === "string" ? paramsData.error : "";
   const detail = await getQuoteDetail(
     {
       userId: session.user.id,
@@ -89,6 +90,12 @@ export default async function QuoteDetailPage({
           </>
         }
       />
+
+      {actionError ? (
+        <div className="rounded-[24px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-semibold text-rose-800">
+          {actionError}
+        </div>
+      ) : null}
 
       <WorkspaceSplit variant="content-heavy">
         <div className="space-y-6">

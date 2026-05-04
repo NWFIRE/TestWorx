@@ -29,7 +29,7 @@ import {
   syncQuoteToQuickBooksEstimate,
   validateMappedQbItem
 } from "./quickbooks";
-import { createInspection, getCustomerFacingSiteLabel } from "./scheduling";
+import { createInspection, ensureGenericInspectionSite, getCustomerFacingSiteLabel } from "./scheduling";
 import { assertTenantContext, canAccessQuoteWorkspace } from "./permissions";
 
 const quoteStatusValues = Object.values(QuoteStatus);
@@ -2567,14 +2567,15 @@ export async function convertQuoteToInspection(actor: ActorContext, quoteId: str
     throw new Error("Quote not found.");
   }
   if (quote.convertedInspectionId) {
-    throw new Error("This quote has already been converted.");
+    return { id: quote.convertedInspectionId };
   }
   if (getEffectiveQuoteStatus(quote.status, quote.expiresAt) !== QuoteStatus.approved) {
     throw new Error("Approve this quote before converting it into work.");
   }
-  if (!quote.siteId) {
-    throw new Error("Assign a site before converting this quote into work.");
-  }
+  const conversionSiteId = quote.siteId ?? (await ensureGenericInspectionSite(
+    { userId: parsedActor.userId, role: parsedActor.role, tenantId: parsedActor.tenantId },
+    quote.customerCompanyId
+  )).id;
 
   const convertibleLines = quote.lineItems.filter((line) => Boolean(line.inspectionType));
   if (convertibleLines.length === 0) {
@@ -2586,7 +2587,7 @@ export async function convertQuoteToInspection(actor: ActorContext, quoteId: str
     { userId: parsedActor.userId, role: parsedActor.role, tenantId: parsedActor.tenantId },
     {
       customerCompanyId: quote.customerCompanyId,
-      siteId: quote.siteId,
+      siteId: conversionSiteId,
       inspectionClassification: "standard",
       isPriority: false,
       scheduledStart,

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QuoteDeliveryStatus, QuoteStatus, QuoteSyncStatus } from "@prisma/client";
 import { addDays } from "date-fns";
 
-const { prismaMock, sendQuoteEmailMock, sendQuoteReminderEmailMock, syncQuoteToQuickBooksEstimateMock, createInspectionMock, saveQuickBooksItemMappingForCodeMock, clearQuickBooksItemMappingForCodeMock, generateQuotePdfMock } = vi.hoisted(() => ({
+const { prismaMock, sendQuoteEmailMock, sendQuoteReminderEmailMock, syncQuoteToQuickBooksEstimateMock, createInspectionMock, ensureGenericInspectionSiteMock, saveQuickBooksItemMappingForCodeMock, clearQuickBooksItemMappingForCodeMock, generateQuotePdfMock } = vi.hoisted(() => ({
   prismaMock: {
     quote: {
       count: vi.fn(),
@@ -54,6 +54,7 @@ const { prismaMock, sendQuoteEmailMock, sendQuoteReminderEmailMock, syncQuoteToQ
   sendQuoteReminderEmailMock: vi.fn(),
   syncQuoteToQuickBooksEstimateMock: vi.fn(),
   createInspectionMock: vi.fn(),
+  ensureGenericInspectionSiteMock: vi.fn(),
   saveQuickBooksItemMappingForCodeMock: vi.fn(),
   clearQuickBooksItemMappingForCodeMock: vi.fn(),
   generateQuotePdfMock: vi.fn()
@@ -88,6 +89,7 @@ vi.mock("../quickbooks", () => ({
 
 vi.mock("../scheduling", () => ({
   createInspection: createInspectionMock,
+  ensureGenericInspectionSite: ensureGenericInspectionSiteMock,
   getCustomerFacingSiteLabel: vi.fn((siteName: string | null | undefined) => {
     if (!siteName || siteName === "General / No Fixed Site" || siteName === "No fixed service address") {
       return null;
@@ -135,6 +137,7 @@ describe("quotes", () => {
     prismaMock.auditLog.create.mockResolvedValue(undefined);
     prismaMock.auditLog.findMany.mockResolvedValue([]);
     prismaMock.quoteLineItem.findMany.mockResolvedValue([]);
+    ensureGenericInspectionSiteMock.mockResolvedValue({ id: "generic_site_1" });
     prismaMock.quote.findUnique.mockResolvedValue({
       id: "quote_1",
       tenantId: "tenant_1",
@@ -925,6 +928,70 @@ describe("quotes", () => {
         convertedInspectionId: "inspection_1"
       })
     }));
+  });
+
+  it("uses a generic customer site when converting an approved quote without a linked site", async () => {
+    createInspectionMock.mockResolvedValue({ id: "inspection_2" });
+    ensureGenericInspectionSiteMock.mockResolvedValue({ id: "generic_site_1" });
+    prismaMock.quote.findFirst.mockResolvedValue({
+      id: "quote_1",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      siteId: null,
+      quoteNumber: "Q-2026-0012",
+      status: QuoteStatus.approved,
+      expiresAt: null,
+      convertedInspectionId: null,
+      customerNotes: null,
+      lineItems: [
+        {
+          id: "line_1",
+          inspectionType: "kitchen_suppression",
+          description: "Kitchen suppression inspection",
+          title: "Kitchen suppression inspection"
+        }
+      ]
+    });
+
+    const inspection = await convertQuoteToInspection(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      "quote_1"
+    );
+
+    expect(inspection.id).toBe("inspection_2");
+    expect(ensureGenericInspectionSiteMock).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId: "tenant_1", userId: "admin_1" }),
+      "customer_1"
+    );
+    expect(createInspectionMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        siteId: "generic_site_1"
+      })
+    );
+  });
+
+  it("returns the existing converted inspection instead of failing repeated conversion clicks", async () => {
+    prismaMock.quote.findFirst.mockResolvedValue({
+      id: "quote_1",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      siteId: null,
+      quoteNumber: "Q-2026-0013",
+      status: QuoteStatus.converted,
+      expiresAt: null,
+      convertedInspectionId: "inspection_existing",
+      customerNotes: null,
+      lineItems: []
+    });
+
+    const inspection = await convertQuoteToInspection(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      "quote_1"
+    );
+
+    expect(inspection.id).toBe("inspection_existing");
+    expect(createInspectionMock).not.toHaveBeenCalled();
   });
 
   it("deletes an unsynced quote and records the deletion audit event", async () => {
