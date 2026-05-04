@@ -136,7 +136,7 @@ function toTechnicianFacingSaveMessage(message: string | null | undefined, actio
 
 function toTechnicianFacingStoredSyncMessage(message: string | null | undefined, action: "save" | "finalize") {
   const normalized = (message ?? "").trim();
-  if (/locked|cannot edit|cannot be finalized|already finalized|already completed/i.test(normalized)) {
+  if (/locked|cannot edit|cannot be finalized|already finalized|already completed|closed inspections/i.test(normalized)) {
     return "Your work is saved on this iPad, but the office copy changed. Open Profile or contact the office before continuing.";
   }
 

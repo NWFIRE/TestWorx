@@ -18,6 +18,7 @@ const STALE_SYNCING_ENTRY_MS = 30_000;
 let syncStarted = false;
 let syncInFlight: Promise<void> | null = null;
 let intervalHandle: number | null = null;
+let onlineHandler: (() => void) | null = null;
 let visibilityHandler: (() => void) | null = null;
 let focusHandler: (() => void) | null = null;
 
@@ -54,7 +55,7 @@ function isProcessableQueueEntry(entry: SyncQueueEntry) {
   return entry.status === "pending" ||
     entry.status === "failed" ||
     isStaleSyncingEntry(entry) ||
-    (entry.operation === "report_finalize" && entry.status === "conflict" && /already finalized|already completed|closed inspections/i.test(entry.lastError ?? ""));
+    (entry.operation === "report_finalize" && entry.status === "conflict" && /already finalized|already completed/i.test(entry.lastError ?? ""));
 }
 
 function isFinalizationPendingOrComplete(record: LocalReportDraftRecord | null) {
@@ -266,9 +267,10 @@ export function startTechnicianSyncEngine() {
   syncStarted = true;
   void processSyncQueue();
 
-  window.addEventListener("online", () => {
+  onlineHandler = () => {
     void processSyncQueue();
-  });
+  };
+  window.addEventListener("online", onlineHandler);
 
   visibilityHandler = () => {
     if (document.visibilityState === "visible") {
@@ -299,6 +301,10 @@ export function stopTechnicianSyncEngine() {
   if (focusHandler) {
     window.removeEventListener("focus", focusHandler);
     focusHandler = null;
+  }
+  if (onlineHandler) {
+    window.removeEventListener("online", onlineHandler);
+    onlineHandler = null;
   }
   syncStarted = false;
 }
