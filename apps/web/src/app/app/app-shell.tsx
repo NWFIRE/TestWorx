@@ -386,14 +386,11 @@ export function AppShell({
     window.requestAnimationFrame(() => {
       const header = container.previousElementSibling instanceof HTMLElement ? container.previousElementSibling : null;
       const headerHeight = header?.getBoundingClientRect().height ?? 0;
-      const keyboardOffset = Number.parseFloat(
-        getComputedStyle(document.documentElement).getPropertyValue("--keyboard-offset") || "0"
-      );
       const { viewportBottom } = getVisibleViewportMetrics();
       const containerRect = container.getBoundingClientRect();
       const targetRect = target.getBoundingClientRect();
       const visibleTop = containerRect.top + headerHeight + 12;
-      const visibleBottom = Math.min(containerRect.bottom, viewportBottom - keyboardOffset) - 20;
+      const visibleBottom = Math.min(containerRect.bottom, viewportBottom) - 20;
 
       if (targetRect.top >= visibleTop && targetRect.bottom <= visibleBottom) {
         return;
@@ -408,7 +405,7 @@ export function AppShell({
       window.setTimeout(() => {
         const refreshedContainerRect = container.getBoundingClientRect();
         const refreshedTargetRect = target.getBoundingClientRect();
-        const refreshedBottom = Math.min(refreshedContainerRect.bottom, getVisibleViewportMetrics().viewportBottom - keyboardOffset) - 20;
+        const refreshedBottom = Math.min(refreshedContainerRect.bottom, getVisibleViewportMetrics().viewportBottom) - 20;
         const refreshedTop = refreshedContainerRect.top + headerHeight + 12;
 
         if (refreshedTargetRect.top >= refreshedTop && refreshedTargetRect.bottom <= refreshedBottom) {
