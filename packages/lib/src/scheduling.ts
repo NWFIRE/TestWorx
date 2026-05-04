@@ -329,6 +329,24 @@ export function isCurrentVisitTaskSchedulingStatus(status?: string | null) {
   return Boolean(status && currentVisitTaskSchedulingStatuses.has(status as InspectionTaskSchedulingStatus));
 }
 
+function isCurrentVisitTaskForInspection<T extends {
+  schedulingStatus?: string | null;
+  status?: InspectionStatus | string | null;
+}>(
+  task: T,
+  inspection: { convertedFromQuotes?: unknown[] | null }
+) {
+  if (isCurrentVisitTaskSchedulingStatus(task.schedulingStatus ?? "scheduled_now")) {
+    return true;
+  }
+
+  return Boolean(
+    inspection.convertedFromQuotes?.length &&
+    task.schedulingStatus === "not_scheduled" &&
+    task.status !== InspectionStatus.cancelled
+  );
+}
+
 function formatDueMonthDateAnchor(dueMonth: string | null | undefined) {
   const normalized = dueMonth?.trim();
   return normalized && /^\d{4}-\d{2}$/.test(normalized) ? `${normalized}-01` : null;
@@ -4299,6 +4317,7 @@ export async function getAdminSchedulingQueueData(
       customerCompany: true,
       assignedTechnician: true,
       technicianAssignments: { include: { technician: true } },
+      convertedFromQuotes: { select: { id: true }, take: 1 },
       tasks: { include: { recurrence: true, report: true, assignedTechnician: true } }
     },
     orderBy: [{ scheduledStart: "asc" }],
@@ -4307,7 +4326,7 @@ export async function getAdminSchedulingQueueData(
 
   const mapped = inspections.map((inspection) => {
     const currentTasks = withInspectionTaskDisplayLabels(
-      inspection.tasks.filter((task) => isCurrentVisitTaskSchedulingStatus(task.schedulingStatus ?? "scheduled_now"))
+      inspection.tasks.filter((task) => isCurrentVisitTaskForInspection(task, inspection))
     );
 
     return {
@@ -4894,10 +4913,18 @@ function buildMonthCalendar(inspections: Array<{
 function filterTasksForTechnician<T extends {
   assignedTechnicianId?: string | null;
   schedulingStatus?: string | null;
-}>(tasks: T[], technicianId: string) {
+  status?: InspectionStatus | string | null;
+}>(
+  tasks: T[],
+  technicianId: string,
+  inspection?: { convertedFromQuotes?: unknown[] | null }
+) {
   return tasks.filter((task) => {
     const matchesAssignment = !task.assignedTechnicianId || task.assignedTechnicianId === technicianId;
-    return matchesAssignment && isCurrentVisitTaskSchedulingStatus(task.schedulingStatus ?? "scheduled_now");
+    const isCurrentTask = inspection
+      ? isCurrentVisitTaskForInspection(task, inspection)
+      : isCurrentVisitTaskSchedulingStatus(task.schedulingStatus ?? "scheduled_now");
+    return matchesAssignment && isCurrentTask;
   });
 }
 
@@ -4934,6 +4961,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
             requestedBy: { select: { id: true, name: true } }
           }
         },
+        convertedFromQuotes: { select: { id: true }, take: 1 },
         tasks: { include: { recurrence: true, report: true, assignedTechnician: true } },
         attachments: {
           where: { kind: AttachmentKind.pdf },
@@ -4967,7 +4995,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
     }),
     prisma.inspection.findMany({
       where: { tenantId, assignedTechnicianId: null, technicianAssignments: { none: {} }, claimable: true, status: { in: [...claimableInspectionStatuses] } },
-      include: { site: true, customerCompany: true, assignedTechnician: true, technicianAssignments: { include: { technician: true } }, tasks: { include: { recurrence: true, report: true, assignedTechnician: true } } },
+      include: { site: true, customerCompany: true, assignedTechnician: true, technicianAssignments: { include: { technician: true } }, convertedFromQuotes: { select: { id: true }, take: 1 }, tasks: { include: { recurrence: true, report: true, assignedTechnician: true } } },
       orderBy: [{ scheduledStart: "asc" }]
     }),
     prisma.inspection.findMany({
@@ -5004,7 +5032,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
   const assignedQueue = assignedInspections
     .map((inspection) => ({
       ...inspection,
-      tasks: withInspectionTaskDisplayLabels(filterTasksForTechnician(inspection.tasks, parsedActor.userId))
+      tasks: withInspectionTaskDisplayLabels(filterTasksForTechnician(inspection.tasks, parsedActor.userId, inspection))
     }))
     .filter((inspection) => inspection.tasks.length > 0);
   const monthAssigned = assignedQueue.filter((inspection) => inspection.scheduledStart >= monthStart && inspection.scheduledStart <= monthEnd);
@@ -5044,18 +5072,20 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
     thisMonth: monthAssignedWithDisplay,
     assigned: assignedWithDisplay,
     unassigned: unassignedInspections
-      .filter((inspection) =>
+      .map((inspection) => ({
+        inspection,
+        currentTasks: inspection.tasks.filter((task) => isCurrentVisitTaskForInspection(task, inspection))
+      }))
+      .filter(({ currentTasks }) =>
         isTechnicianEligibleForReportTypesFromRows({
           rows: technicianEligibilityRows,
-          reportTypes: getCurrentVisitReportTypes(inspection.tasks),
+          reportTypes: currentTasks.map((task) => task.inspectionType as InspectionType),
           mode: "claim"
         })
       )
-      .map((inspection) => ({
+      .map(({ inspection, currentTasks }) => ({
         ...inspection,
-        tasks: withInspectionTaskDisplayLabels(
-          inspection.tasks.filter((task) => isCurrentVisitTaskSchedulingStatus(task.schedulingStatus ?? "scheduled_now"))
-        ),
+        tasks: withInspectionTaskDisplayLabels(currentTasks),
         ...getInspectionDisplayLabels({
           siteName: inspection.site.name,
           customerName: inspection.customerCompany.name,
@@ -5125,7 +5155,11 @@ export async function claimInspection(actor: ActorContext, inspectionId: string)
   return prisma.$transaction(async (tx) => {
     const inspection = await tx.inspection.findFirst({
       where: { id: inspectionId, tenantId },
-      include: { tasks: true, technicianAssignments: { select: { technicianId: true } } }
+      include: {
+        convertedFromQuotes: { select: { id: true }, take: 1 },
+        tasks: true,
+        technicianAssignments: { select: { technicianId: true } }
+      }
     });
 
     if (!inspection || !canTechnicianClaimInspection({
@@ -5145,7 +5179,9 @@ export async function claimInspection(actor: ActorContext, inspectionId: string)
       tx,
       tenantId,
       technicianUserId: parsedActor.userId,
-      reportTypes: getCurrentVisitReportTypes(inspection.tasks),
+      reportTypes: inspection.tasks
+        .filter((task) => isCurrentVisitTaskForInspection(task, inspection))
+        .map((task) => task.inspectionType as InspectionType),
       mode: "claim"
     });
 

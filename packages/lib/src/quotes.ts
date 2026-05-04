@@ -2600,7 +2600,7 @@ export async function convertQuoteToInspection(actor: ActorContext, quoteId: str
         assignedTechnicianId: null,
         dueMonth: `${scheduledStart.getFullYear()}-${String(scheduledStart.getMonth() + 1).padStart(2, "0")}`,
         dueDate: scheduledStart,
-        schedulingStatus: "not_scheduled" as const,
+        schedulingStatus: "scheduled_now" as const,
         notes: line.description ?? line.title
       }))
     }

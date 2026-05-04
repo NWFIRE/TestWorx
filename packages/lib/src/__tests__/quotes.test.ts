@@ -878,6 +878,55 @@ describe("quotes", () => {
     )).rejects.toThrow("Approve this quote before converting it into work.");
   });
 
+  it("converts approved quote lines into current-visit inspection tasks", async () => {
+    createInspectionMock.mockResolvedValue({ id: "inspection_1" });
+    prismaMock.quote.findFirst.mockResolvedValue({
+      id: "quote_1",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      quoteNumber: "Q-2026-0011",
+      status: QuoteStatus.approved,
+      expiresAt: null,
+      convertedInspectionId: null,
+      customerNotes: null,
+      lineItems: [
+        {
+          id: "line_1",
+          inspectionType: "fire_extinguisher",
+          description: "Annual inspection",
+          title: "Fire extinguisher annual inspection"
+        }
+      ]
+    });
+
+    const inspection = await convertQuoteToInspection(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      "quote_1"
+    );
+
+    expect(inspection.id).toBe("inspection_1");
+    expect(createInspectionMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        status: "to_be_completed",
+        tasks: [
+          expect.objectContaining({
+            inspectionType: "fire_extinguisher",
+            schedulingStatus: "scheduled_now"
+          })
+        ]
+      })
+    );
+    expect(prismaMock.quote.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "quote_1" },
+      data: expect.objectContaining({
+        status: QuoteStatus.converted,
+        convertedInspectionId: "inspection_1"
+      })
+    }));
+  });
+
   it("deletes an unsynced quote and records the deletion audit event", async () => {
     prismaMock.quote.findFirst.mockResolvedValue({
       id: "quote_1",
