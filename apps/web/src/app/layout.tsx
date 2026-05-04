@@ -4,6 +4,7 @@ import { buildTenantBrandingCss, getTenantBrandingSettings } from "@testworx/lib
 import { cookies } from "next/headers";
 import "./globals.css";
 import { GlobalBackButton } from "./global-back-button";
+import { PwaServiceWorkerRegistration } from "./pwa-service-worker-registration";
 import { ToastProvider } from "./toast-provider";
 
 const BRAND_PRIMARY_COOKIE = "tradeworx_brand_primary";
@@ -63,6 +64,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     <html lang="en">
       <body style={theme}>
         <ToastProvider>
+          <PwaServiceWorkerRegistration />
           <GlobalBackButton />
           {children}
         </ToastProvider>
