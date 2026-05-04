@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { format } from "date-fns";
+import { addDays, endOfDay, format, startOfDay } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
@@ -55,6 +55,25 @@ const priorityOptions = [
   { value: "priority", label: "Priority only" },
   { value: "non_priority", label: "Non-priority only" }
 ];
+
+const FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS = 60;
+
+type AdminSchedulingInspection = Awaited<ReturnType<typeof getAdminSchedulingQueueData>>["inspections"][number];
+
+function getFastManagementDueDate(inspection: AdminSchedulingInspection) {
+  const nextDue = pickEarliestNextDueAt(
+    inspection.tasks.map((task) => task.recurrence?.nextDueAt)
+  );
+  const dueDate = new Date(nextDue ?? inspection.scheduledStart);
+
+  return Number.isNaN(dueDate.getTime()) ? null : dueDate;
+}
+
+function isInFastManagementWindow(inspection: AdminSchedulingInspection, windowEnd: Date) {
+  const dueDate = getFastManagementDueDate(inspection);
+
+  return dueDate ? dueDate <= windowEnd : false;
+}
 
 function buildInspectionsHref(input: {
   statuses?: string[];
@@ -223,6 +242,10 @@ export default async function AdminInspectionsPage({
       };
     })
   ]);
+  const fastManagementWindowEnd = endOfDay(addDays(startOfDay(new Date()), FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS));
+  const fastManagementInspections = queueData.inspections.filter((inspection) =>
+    isInFastManagementWindow(inspection, fastManagementWindowEnd)
+  );
 
   return (
     <AppPageShell density="wide">
@@ -345,15 +368,15 @@ export default async function AdminInspectionsPage({
             </h2>
           </div>
           <p className="text-sm text-[color:var(--text-muted)]">
-            {queueData.inspections.length} inspection{queueData.inspections.length === 1 ? "" : "s"}
+            {fastManagementInspections.length} inspection{fastManagementInspections.length === 1 ? "" : "s"}
           </p>
         </div>
 
-        {queueData.inspections.length === 0 ? (
+        {fastManagementInspections.length === 0 ? (
           <div className="mt-5">
             <EmptyState
-              description="Try broadening the filters or clearing the search to bring more inspection work back into view."
-              title="No inspections match this view"
+              description="This list only shows past due work and inspections due in the next 60 days. Clear filters or use Upcoming for later inspections."
+              title="No past due or near-term inspections match this view"
             />
           </div>
         ) : (
@@ -370,7 +393,7 @@ export default async function AdminInspectionsPage({
             </div>
 
             <div className="divide-y divide-[color:rgb(220_229_240_/_0.9)]">
-              {queueData.inspections.map((inspection) => {
+              {fastManagementInspections.map((inspection) => {
                 const nextDue = pickEarliestNextDueAt(
                   inspection.tasks.map((task) => task.recurrence?.nextDueAt)
                 );
