@@ -971,6 +971,100 @@ describe("quotes", () => {
     );
   });
 
+  it("converts QuickBooks catalog service lines by inferring the inspection type", async () => {
+    createInspectionMock.mockResolvedValue({ id: "inspection_qb" });
+    prismaMock.quote.findFirst.mockResolvedValue({
+      id: "quote_qb",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      proposalType: null,
+      quoteNumber: "Q-2026-0014",
+      status: QuoteStatus.approved,
+      expiresAt: null,
+      convertedInspectionId: null,
+      customerNotes: null,
+      lineItems: [
+        {
+          id: "line_1",
+          internalCode: "QBO_ITEM:qb_catalog_9",
+          title: "Kitchen System Recharge",
+          description: "QuickBooks Service - SKU KS-RECHARGE",
+          category: "service",
+          inspectionType: null
+        }
+      ]
+    });
+
+    await convertQuoteToInspection(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      "quote_qb"
+    );
+
+    expect(createInspectionMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        tasks: [
+          expect.objectContaining({
+            inspectionType: "kitchen_suppression",
+            notes: "QuickBooks Service - SKU KS-RECHARGE"
+          })
+        ]
+      })
+    );
+  });
+
+  it("uses the proposal type as a fallback for service quote lines without report metadata", async () => {
+    createInspectionMock.mockResolvedValue({ id: "inspection_proposal" });
+    prismaMock.quote.findFirst.mockResolvedValue({
+      id: "quote_proposal",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      proposalType: "fire_alarm",
+      quoteNumber: "Q-2026-0015",
+      status: QuoteStatus.approved,
+      expiresAt: null,
+      convertedInspectionId: null,
+      customerNotes: null,
+      lineItems: [
+        {
+          id: "line_1",
+          internalCode: "QBO_ITEM:service_fee",
+          title: "Service Fee",
+          description: "Travel/service fee",
+          category: "service_fee",
+          inspectionType: null
+        },
+        {
+          id: "line_2",
+          internalCode: "QBO_ITEM:annual_service",
+          title: "Annual Service",
+          description: "Annual inspection service",
+          category: "service",
+          inspectionType: null
+        }
+      ]
+    });
+
+    await convertQuoteToInspection(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      "quote_proposal"
+    );
+
+    expect(createInspectionMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        tasks: [
+          expect.objectContaining({
+            inspectionType: "fire_alarm",
+            notes: "Annual inspection service"
+          })
+        ]
+      })
+    );
+  });
+
   it("returns the existing converted inspection instead of failing repeated conversion clicks", async () => {
     prismaMock.quote.findFirst.mockResolvedValue({
       id: "quote_1",

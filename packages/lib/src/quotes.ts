@@ -207,6 +207,15 @@ export const quoteProposalTypes = quoteProposalTypeValues.map((value) => ({
   label: quoteProposalTypeLabels[value]
 }));
 
+const quoteProposalInspectionTypeMap: Partial<Record<QuoteProposalType, keyof typeof inspectionTypeRegistry>> = {
+  fire_alarm: "fire_alarm",
+  fire_sprinkler: "wet_fire_sprinkler",
+  kitchen_suppression: "kitchen_suppression",
+  fire_extinguisher: "fire_extinguisher",
+  industrial_suppression: "industrial_suppression",
+  emergency_exit_lighting: "emergency_exit_lighting"
+};
+
 export const quoteLineItemInputSchema = z.object({
   id: z.string().trim().optional(),
   sortOrder: z.number().int().nonnegative().optional(),
@@ -675,6 +684,99 @@ function calculateQuoteTotals(lineItems: Array<{ quantity: number; unitPrice: nu
 
 function getQuoteCatalogItem(code: string) {
   return quoteCatalog.find((item) => item.code === code) ?? null;
+}
+
+function isKnownInspectionType(value: string | null | undefined): value is keyof typeof inspectionTypeRegistry {
+  return Boolean(value && value in inspectionTypeRegistry);
+}
+
+function inferInspectionTypeFromQuoteLine(
+  line: Pick<NormalizedQuoteLineItem, "category" | "description" | "inspectionType" | "internalCode" | "title">,
+  proposalType?: string | null
+): { inspectionType: keyof typeof inspectionTypeRegistry; source: "explicit" | "catalog" | "text" | "proposal" } | null {
+  if (isKnownInspectionType(line.inspectionType)) {
+    return { inspectionType: line.inspectionType, source: "explicit" };
+  }
+
+  const catalogItem = getQuoteCatalogItem(line.internalCode);
+  const catalogInspectionType = catalogItem?.inspectionType ?? null;
+  if (isKnownInspectionType(catalogInspectionType)) {
+    return { inspectionType: catalogInspectionType, source: "catalog" };
+  }
+
+  if (normalizeNullableString(line.category) === autoQuoteServiceFeeCategory) {
+    return null;
+  }
+
+  const haystack = [
+    line.internalCode,
+    line.title,
+    line.description ?? "",
+    line.category ?? ""
+  ].join(" ").toLowerCase();
+  const textMatches: Array<[RegExp, keyof typeof inspectionTypeRegistry]> = [
+    [/joint\s+commission/, "joint_commission_fire_sprinkler"],
+    [/\bdry\b.*sprinkler|sprinkler.*\bdry\b/, "dry_fire_sprinkler"],
+    [/\bwet\b.*sprinkler|sprinkler/, "wet_fire_sprinkler"],
+    [/backflow/, "backflow"],
+    [/fire\s+pump|\bpump\b/, "fire_pump"],
+    [/industrial|dry\s+chemical/, "industrial_suppression"],
+    [/kitchen|hood|wet\s+chemical|ansul/, "kitchen_suppression"],
+    [/extinguisher|\babc\b|recharge/, "fire_extinguisher"],
+    [/fire\s+alarm|alarm\s+panel|control\s+panel/, "fire_alarm"],
+    [/emergency\s*(\/|and)?\s*exit|exit\s+light|emergency\s+light/, "emergency_exit_lighting"]
+  ];
+
+  const textMatch = textMatches.find(([pattern]) => pattern.test(haystack));
+  if (textMatch) {
+    return { inspectionType: textMatch[1], source: "text" };
+  }
+
+  const proposalInspectionType = quoteProposalInspectionTypeMap[proposalType as QuoteProposalType];
+  if (
+    proposalInspectionType &&
+    ["inspection", "service", "repair", "labor"].includes((line.category ?? "").trim().toLowerCase())
+  ) {
+    return { inspectionType: proposalInspectionType, source: "proposal" };
+  }
+
+  return null;
+}
+
+function buildConvertibleQuoteLines(input: {
+  lineItems: Array<Pick<NormalizedQuoteLineItem, "category" | "description" | "inspectionType" | "internalCode" | "title">>;
+  proposalType?: string | null;
+}) {
+  const directLines: Array<{
+    line: Pick<NormalizedQuoteLineItem, "description" | "inspectionType" | "internalCode" | "title">;
+    inspectionType: keyof typeof inspectionTypeRegistry;
+  }> = [];
+  const inferredLinesByType = new Map<keyof typeof inspectionTypeRegistry, {
+    line: Pick<NormalizedQuoteLineItem, "description" | "inspectionType" | "internalCode" | "title">;
+    inspectionType: keyof typeof inspectionTypeRegistry;
+  }>();
+
+  for (const line of input.lineItems) {
+    const resolved = inferInspectionTypeFromQuoteLine(line, input.proposalType);
+    if (!resolved) {
+      continue;
+    }
+
+    const convertibleLine = {
+      line,
+      inspectionType: resolved.inspectionType
+    };
+    if (resolved.source === "explicit" || resolved.source === "catalog") {
+      directLines.push(convertibleLine);
+      continue;
+    }
+
+    if (!inferredLinesByType.has(resolved.inspectionType)) {
+      inferredLinesByType.set(resolved.inspectionType, convertibleLine);
+    }
+  }
+
+  return [...directLines, ...inferredLinesByType.values()];
 }
 
 function buildQuickBooksQuoteCatalogCode(qbItemId: string) {
@@ -2577,9 +2679,12 @@ export async function convertQuoteToInspection(actor: ActorContext, quoteId: str
     quote.customerCompanyId
   )).id;
 
-  const convertibleLines = quote.lineItems.filter((line) => Boolean(line.inspectionType));
+  const convertibleLines = buildConvertibleQuoteLines({
+    lineItems: quote.lineItems,
+    proposalType: quote.proposalType
+  });
   if (convertibleLines.length === 0) {
-    throw new Error("Add at least one inspection-linked line item before converting this quote into work.");
+    throw new Error("Add at least one inspection service line, or set the quote proposal type, before converting this quote into work.");
   }
 
   const scheduledStart = defaultConversionStart();
@@ -2595,8 +2700,8 @@ export async function convertQuoteToInspection(actor: ActorContext, quoteId: str
       assignedTechnicianIds: [],
       status: InspectionStatus.to_be_completed,
       notes: [`Converted from quote ${quote.quoteNumber}.`, quote.customerNotes ?? ""].filter(Boolean).join("\n"),
-      tasks: convertibleLines.map((line) => ({
-        inspectionType: line.inspectionType!,
+      tasks: convertibleLines.map(({ line, inspectionType }) => ({
+        inspectionType,
         frequency: RecurrenceFrequency.ONCE,
         assignedTechnicianId: null,
         dueMonth: `${scheduledStart.getFullYear()}-${String(scheduledStart.getMonth() + 1).padStart(2, "0")}`,
