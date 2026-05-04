@@ -57,19 +57,49 @@ const priorityOptions = [
 ];
 
 const FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS = 60;
+const terminalInspectionStatusesForFastManagement = new Set(["completed", "invoiced", "cancelled"]);
 
 type AdminSchedulingInspection = Awaited<ReturnType<typeof getAdminSchedulingQueueData>>["inspections"][number];
 
-function getFastManagementDueDate(inspection: AdminSchedulingInspection) {
-  const nextDue = pickEarliestNextDueAt(
-    inspection.tasks.map((task) => task.recurrence?.nextDueAt)
-  );
-  const dueDate = new Date(nextDue ?? inspection.scheduledStart);
+function earliestDate(dates: Date[]) {
+  return dates.reduce((earliest, current) => current.getTime() < earliest.getTime() ? current : earliest);
+}
 
-  return Number.isNaN(dueDate.getTime()) ? null : dueDate;
+function readValidDate(value: unknown) {
+  const date = value instanceof Date ? value : typeof value === "string" ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime()) ? date : null;
+}
+
+function readDueMonthAnchor(value: unknown) {
+  const dueMonth = typeof value === "string" ? value.trim() : "";
+  if (!/^\d{4}-\d{2}$/.test(dueMonth)) {
+    return null;
+  }
+
+  const date = new Date(`${dueMonth}-01T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getFastManagementDueDate(inspection: AdminSchedulingInspection) {
+  const currentTaskDueDates = inspection.tasks
+    .flatMap((task) => [
+      readValidDate(task.dueDate),
+      readDueMonthAnchor(task.dueMonth)
+    ])
+    .filter((date): date is Date => Boolean(date));
+
+  if (currentTaskDueDates.length) {
+    return earliestDate(currentTaskDueDates);
+  }
+
+  return readValidDate(inspection.scheduledStart);
 }
 
 function isInFastManagementWindow(inspection: AdminSchedulingInspection, windowEnd: Date) {
+  if (terminalInspectionStatusesForFastManagement.has(inspection.status)) {
+    return true;
+  }
+
   const dueDate = getFastManagementDueDate(inspection);
 
   return dueDate ? dueDate <= windowEnd : false;
