@@ -20,20 +20,57 @@ function ensureTenantAdmin(parsedActor: ReturnType<typeof parseActor>) {
 }
 
 function normalizeText(value: string | null | undefined) {
-  return value?.trim().toUpperCase() ?? "";
+  return value?.trim().replace(/\s+/g, " ").toUpperCase() ?? "";
 }
 
 function normalizeZip(value: string | null | undefined) {
-  return value?.trim() ?? "";
+  return value?.trim().replace(/\s+/g, "") ?? "";
 }
 
 function isUsableLocationValue(value: string | null | undefined) {
   const normalized = normalizeText(value);
-  return normalized.length > 0 && normalized !== "UNKNOWN" && normalized !== "N/A" && normalized !== "NA";
+  return normalized.length > 0 &&
+    ![
+      "UNKNOWN",
+      "UNKNOWN UNKNOWN",
+      "UNKNOWN UNKNOWN UNKNOWN",
+      "N/A",
+      "NA",
+      "NONE",
+      "NULL",
+      "GENERAL",
+      "GENERAL / NO FIXED SITE",
+      "NO FIXED SITE",
+      "NO FIXED SERVICE ADDRESS",
+      "NO SERVICE ADDRESS",
+      "NOT RECORDED"
+    ].includes(normalized);
 }
 
 function firstUsableLocationValue(...values: Array<string | null | undefined>) {
   return values.find(isUsableLocationValue) ?? "";
+}
+
+function normalizeCityForMatch(value: string | null | undefined) {
+  return normalizeText(value)
+    .replace(/,\s*(OK|OKLAHOMA)\b.*$/i, "")
+    .replace(/\s+(OK|OKLAHOMA)\b.*$/i, "")
+    .trim();
+}
+
+function normalizeStateForMatch(value: string | null | undefined, cityValue?: string | null) {
+  const explicitState = normalizeText(value);
+  if (explicitState) {
+    return explicitState === "OKLAHOMA" ? "OK" : explicitState;
+  }
+
+  const normalizedCity = normalizeText(cityValue);
+  const embeddedState = normalizedCity.match(/(?:,\s*|\s+)(OK|OKLAHOMA)\b/);
+  if (embeddedState?.[1]) {
+    return embeddedState[1] === "OKLAHOMA" ? "OK" : embeddedState[1];
+  }
+
+  return "";
 }
 
 export const updateDefaultServiceFeeSchema = z.object({
@@ -154,16 +191,23 @@ async function getInspectionServiceFeeMatchContextTx(tx: Prisma.TransactionClien
     tenantId: input.tenantId,
     customerCompanyId: inspection.customerCompanyId,
     siteId: inspection.siteId,
-    city: normalizeText(firstUsableLocationValue(
+    city: normalizeCityForMatch(firstUsableLocationValue(
       inspection.site?.city,
       inspection.customerCompany?.serviceCity,
       inspection.customerCompany?.billingCity
     )),
-    state: normalizeText(firstUsableLocationValue(
-      inspection.site?.state,
-      inspection.customerCompany?.serviceState,
-      inspection.customerCompany?.billingState
-    )),
+    state: normalizeStateForMatch(
+      firstUsableLocationValue(
+        inspection.site?.state,
+        inspection.customerCompany?.serviceState,
+        inspection.customerCompany?.billingState
+      ),
+      firstUsableLocationValue(
+        inspection.site?.city,
+        inspection.customerCompany?.serviceCity,
+        inspection.customerCompany?.billingCity
+      )
+    ),
     postalCode: normalizeZip(firstUsableLocationValue(
       inspection.site?.postalCode,
       inspection.customerCompany?.servicePostalCode,
@@ -201,8 +245,8 @@ async function resolveServiceFeeForMatchContextTx(
     .filter((rule) => !rule.siteId || rule.siteId === context.siteId)
     .filter((rule) => !rule.customerCompanyId || rule.customerCompanyId === context.customerCompanyId)
     .filter((rule) => !rule.zipCode || normalizeZip(rule.zipCode) === context.postalCode)
-    .filter((rule) => !rule.city || normalizeText(rule.city) === context.city)
-    .filter((rule) => !rule.state || normalizeText(rule.state) === context.state)
+    .filter((rule) => !rule.city || normalizeCityForMatch(rule.city) === context.city)
+    .filter((rule) => !rule.state || normalizeStateForMatch(rule.state) === context.state)
     .sort((left, right) => scoreRule(right) - scoreRule(left))[0];
 
   if (matchingRule) {
@@ -266,16 +310,23 @@ export async function resolveServiceFeeForLocationTx(
     tenantId: input.tenantId,
     customerCompanyId,
     siteId: input.siteId ?? null,
-    city: normalizeText(firstUsableLocationValue(
+    city: normalizeCityForMatch(firstUsableLocationValue(
       inputCity,
       customerCompany?.serviceCity,
       customerCompany?.billingCity
     )),
-    state: normalizeText(firstUsableLocationValue(
-      inputState,
-      customerCompany?.serviceState,
-      customerCompany?.billingState
-    )),
+    state: normalizeStateForMatch(
+      firstUsableLocationValue(
+        inputState,
+        customerCompany?.serviceState,
+        customerCompany?.billingState
+      ),
+      firstUsableLocationValue(
+        inputCity,
+        customerCompany?.serviceCity,
+        customerCompany?.billingCity
+      )
+    ),
     postalCode: normalizeZip(firstUsableLocationValue(
       inputPostalCode,
       customerCompany?.servicePostalCode,

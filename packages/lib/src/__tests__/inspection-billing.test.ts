@@ -909,6 +909,106 @@ describe("inspection billing persistence and admin review", () => {
     });
   });
 
+  it("ignores no-fixed-site placeholders before matching Enid customer service fee rules", async () => {
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      site: {
+        city: "Unknown Unknown Unknown",
+        state: "No fixed service address",
+        postalCode: "Not recorded"
+      },
+      customerCompany: {
+        serviceCity: "Enid",
+        serviceState: "OK",
+        servicePostalCode: "73701",
+        billingCity: null,
+        billingState: null,
+        billingPostalCode: null
+      }
+    });
+    txMock.tenant.findUnique.mockResolvedValue({
+      defaultServiceFeeCode: "SERVICE_FEE",
+      defaultServiceFeeUnitPrice: 65
+    });
+    txMock.serviceFeeRule.findMany.mockResolvedValue([
+      {
+        id: "enid_rule",
+        customerCompanyId: null,
+        siteId: null,
+        city: "Enid",
+        state: "OK",
+        zipCode: null,
+        feeCode: "SERVICE_FEE",
+        unitPrice: 35,
+        priority: 1
+      }
+    ]);
+
+    const resolved = await resolveInspectionServiceFeeTx(txMock as never, {
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1"
+    });
+
+    expect(resolved).toEqual({
+      code: "SERVICE_FEE",
+      unitPrice: 35,
+      source: "city_state_rule",
+      ruleId: "enid_rule",
+      priority: 1
+    });
+  });
+
+  it("matches Enid service fee rules when location city is stored as Enid, OK", async () => {
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      site: {
+        city: "Enid, OK",
+        state: "",
+        postalCode: "73701"
+      },
+      customerCompany: {
+        serviceCity: null,
+        serviceState: null,
+        servicePostalCode: null,
+        billingCity: null,
+        billingState: null,
+        billingPostalCode: null
+      }
+    });
+    txMock.tenant.findUnique.mockResolvedValue({
+      defaultServiceFeeCode: "SERVICE_FEE",
+      defaultServiceFeeUnitPrice: 65
+    });
+    txMock.serviceFeeRule.findMany.mockResolvedValue([
+      {
+        id: "enid_rule",
+        customerCompanyId: null,
+        siteId: null,
+        city: "Enid",
+        state: "OK",
+        zipCode: null,
+        feeCode: "SERVICE_FEE",
+        unitPrice: 35,
+        priority: 1
+      }
+    ]);
+
+    const resolved = await resolveInspectionServiceFeeTx(txMock as never, {
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1"
+    });
+
+    expect(resolved).toMatchObject({
+      unitPrice: 35,
+      source: "city_state_rule",
+      ruleId: "enid_rule"
+    });
+  });
+
   it("uses a matching city and state service fee rule ahead of a ZIP-only rule for market pricing", async () => {
     txMock.inspection.findFirst.mockResolvedValue({
       id: "inspection_1",
