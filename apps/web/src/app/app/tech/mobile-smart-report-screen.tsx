@@ -176,6 +176,7 @@ export function MobileSmartReportScreen({
   const router = useRouter();
   const controller = useMobileReportDraftController({ data, inspectionId, taskId });
   const [activeTab, setActiveTab] = useState<SmartTab>(mode === "review" ? "review" : "overview");
+  const [finalizeQueued, setFinalizeQueued] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, string | null>>({});
 
@@ -209,7 +210,7 @@ export function MobileSmartReportScreen({
   async function handleFinalize() {
     const result = await controller.finalizeReport();
     if (result.ok) {
-      router.replace("/app/tech/inspections?finalize=queued");
+      setFinalizeQueued(true);
     }
   }
 
@@ -281,6 +282,11 @@ export function MobileSmartReportScreen({
       ) : null}
       {controller.finalizeErrorMessage ? (
         <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{controller.finalizeErrorMessage}</p>
+      ) : null}
+      {finalizeQueued ? (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          Finalization is saved on this device. TradeWorx will upload it automatically when service is available.
+        </div>
       ) : null}
 
       {activeTab === "overview" ? (

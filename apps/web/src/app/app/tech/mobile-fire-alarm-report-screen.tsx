@@ -294,6 +294,7 @@ export function MobileFireAlarmReportScreen({
 }) {
   const router = useRouter();
   const controller = useMobileReportDraftController({ data, inspectionId, taskId });
+  const [finalizeQueued, setFinalizeQueued] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, string | null>>({});
 
@@ -394,7 +395,7 @@ export function MobileFireAlarmReportScreen({
   async function handleFinalize() {
     const result = await controller.finalizeReport();
     if (result.ok) {
-      router.replace("/app/tech/inspections?finalize=queued");
+      setFinalizeQueued(true);
     }
   }
 
@@ -469,6 +470,11 @@ export function MobileFireAlarmReportScreen({
         warnings={warnings}
       >
         <MobileReportSummaryBanner data={data} mode="review" onSelectReport={handleReportSelect} progress={progress} saveState={controller.saveState} />
+        {finalizeQueued ? (
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 shadow-panel">
+            Finalization is saved on this device. TradeWorx will upload it automatically when service is available.
+          </div>
+        ) : null}
         <div className="grid gap-4 lg:grid-cols-2">
           <SignaturePad
             disabled={isReadOnly}

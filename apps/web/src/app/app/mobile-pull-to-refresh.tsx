@@ -316,6 +316,8 @@ export function MobilePullToRefresh({
     try {
       if (registeredRefresh) {
         await registeredRefresh();
+      } else if (!window.navigator.onLine) {
+        return;
       } else {
         startTransition(() => {
           router.refresh();

@@ -344,6 +344,7 @@ export function MobileChecklistReportScreen({
   const [saveState, setSaveState] = useState(data.reportStatus === "finalized" ? "Finalized" : "Saved");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [finalizeErrorMessage, setFinalizeErrorMessage] = useState<string | null>(null);
+  const [finalizeQueued, setFinalizeQueued] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const draftRef = useRef<ReportDraft>(initialDraft);
   const localRecordRef = useRef<LocalReportDraftRecord | null>(null);
@@ -937,7 +938,7 @@ export function MobileChecklistReportScreen({
 
     if (localRecordRef.current?.pendingFinalize) {
       setSaveState(buildReportSaveState(localRecordRef.current, data.reportStatus));
-      router.replace("/app/tech/inspections?finalize=queued");
+      setFinalizeQueued(true);
       return;
     }
 
@@ -979,8 +980,7 @@ export function MobileChecklistReportScreen({
       });
       trackChecklistEvent("finalize_queued_offline", { reportId: data.reportId });
       setSaveState("Finalize queued");
-
-      router.replace("/app/tech/inspections?finalize=queued");
+      setFinalizeQueued(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : null;
       setFinalizeErrorMessage(toTechnicianFacingSaveMessage(message, "finalize"));
@@ -1229,6 +1229,11 @@ export function MobileChecklistReportScreen({
           <p className="rounded-2xl border border-rose-200 bg-white px-4 py-3 text-sm text-rose-700 shadow-panel">
             {finalizeErrorMessage ?? errorMessage}
           </p>
+        ) : null}
+        {finalizeQueued ? (
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 shadow-panel">
+            Finalization is saved on this device. TradeWorx will upload it automatically when service is available.
+          </div>
         ) : null}
 
         <div
