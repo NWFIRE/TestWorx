@@ -8,6 +8,7 @@ import { sendManualEmailReminders } from "@testworx/lib/server/index";
 export async function sendEmailRemindersAction(input: {
   dueMonth: string;
   customerCompanyIds: string[];
+  recipientEmailOverrides?: Record<string, string>;
   templateKey: string;
   subject: string;
   body: string;
@@ -20,7 +21,10 @@ export async function sendEmailRemindersAction(input: {
   try {
     const result = await sendManualEmailReminders(
       { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-      input
+      {
+        ...input,
+        recipientEmailOverrides: input.recipientEmailOverrides ?? {}
+      }
     );
 
     revalidatePath("/app/admin/email-reminders");

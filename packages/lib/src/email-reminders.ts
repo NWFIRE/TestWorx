@@ -115,6 +115,7 @@ function getEmailTemplateDefinition(templateKey: string) {
 const sendManualEmailRemindersInputSchema = z.object({
   dueMonth: z.string().regex(/^\d{4}-\d{2}$/),
   customerCompanyIds: z.array(z.string().trim().min(1)).min(1, "Select at least one customer."),
+  recipientEmailOverrides: z.record(z.string().trim().min(1), z.string().trim().email()).optional().default({}),
   templateKey: z.string().trim().min(1),
   subject: z.string().trim().min(1, "Add a subject before sending."),
   body: z.string().trim().min(1, "Add message content before sending.")
@@ -757,7 +758,10 @@ export async function sendManualEmailReminders(
   let failedCount = 0;
 
   for (const recipient of recipients) {
-    if (!recipient.recipientEmail) {
+    const overrideEmail = parsedInput.recipientEmailOverrides[recipient.customerCompanyId]?.trim();
+    const recipientEmail = overrideEmail || recipient.recipientEmail;
+
+    if (!recipientEmail) {
       failedCount += 1;
       continue;
     }
@@ -771,7 +775,7 @@ export async function sendManualEmailReminders(
     const mergedSubject = mergeEmailReminderTemplate(parsedInput.subject, mergeFields);
     const mergedBody = mergeEmailReminderTemplate(parsedInput.body, mergeFields);
     const delivery = await sendCustomerBrandedEmail({
-      recipientEmail: recipient.recipientEmail,
+      recipientEmail,
       recipientName: recipient.customerName || "Customer",
       tenantName: tenant.name,
       subjectLine: mergedSubject,
@@ -801,7 +805,7 @@ export async function sendManualEmailReminders(
       customerCompanyId: recipient.customerCompanyId,
       sentByUserId: parsedActor.userId,
       templateKey: parsedInput.templateKey,
-      recipientEmail: recipient.recipientEmail,
+      recipientEmail,
       dueMonth: template.category === "reminder" ? parsedInput.dueMonth : null,
       siteSummary: template.category === "reminder" ? recipient.siteSummary : null,
       subjectSnapshot: mergedSubject,
@@ -834,7 +838,8 @@ export async function sendManualEmailReminders(
         dueMonth: parsedInput.dueMonth,
         sentCount,
         failedCount,
-        customerCompanyIds: parsedInput.customerCompanyIds
+        customerCompanyIds: parsedInput.customerCompanyIds,
+        recipientEmailOverrideCustomerIds: Object.keys(parsedInput.recipientEmailOverrides)
       }
     }
   });

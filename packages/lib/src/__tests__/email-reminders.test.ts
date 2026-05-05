@@ -321,6 +321,74 @@ describe("email reminders", () => {
     expect(prismaMock.auditLog.create).toHaveBeenCalled();
   });
 
+  it("uses a one-off recipient email override without changing the customer file", async () => {
+    prismaMock.customerCompany.findMany.mockResolvedValue([
+      {
+        id: "customer_1",
+        name: "Klemme Construction",
+        contactName: "Brett Klemme",
+        billingEmail: "office@klemme.com",
+        phone: "555-1111",
+        serviceAddressLine1: "123 Main St",
+        serviceCity: "Tulsa",
+        serviceState: "OK",
+        servicePostalCode: "74101",
+        billingAddressLine1: "123 Main St",
+        billingCity: "Tulsa",
+        billingState: "OK",
+        billingPostalCode: "74101",
+        sites: []
+      }
+    ]);
+    prismaMock.tenant.findFirst.mockResolvedValue({
+      id: "tenant_1",
+      name: "Northwest Fire & Safety",
+      billingEmail: "billing@nwfireandsafety.com",
+      branding: {
+        legalBusinessName: "Northwest Fire & Safety",
+        phone: "580-540-3119",
+        email: "accounting@nwfireandsafety.com"
+      }
+    });
+    prismaMock.inspectionTask.findMany.mockResolvedValue([]);
+    sendCustomerBrandedEmailMock.mockResolvedValue({
+      sent: true,
+      provider: "resend",
+      messageId: "msg_override",
+      error: null,
+      reason: "sent"
+    });
+
+    const { sendManualEmailReminders } = await import("../email-reminders");
+    const result = await sendManualEmailReminders(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        dueMonth: "2026-04",
+        customerCompanyIds: ["customer_1"],
+        recipientEmailOverrides: { customer_1: "alternate@example.com" },
+        templateKey: "inspection_due_this_month",
+        subject: "Your Fire Inspection Is Due This Month",
+        body: "Hello {{customerName}},\n\nPlease contact {{companyName}}."
+      }
+    );
+
+    expect(result.sentCount).toBe(1);
+    expect(sendCustomerBrandedEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({ recipientEmail: "alternate@example.com" })
+    );
+    expect(prismaMock.emailReminderSendLog.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({
+            customerCompanyId: "customer_1",
+            recipientEmail: "alternate@example.com"
+          })
+        ]
+      })
+    );
+    expect(prismaMock.customerCompany.findMany).toHaveBeenCalled();
+  });
+
   it("allows manual sends for customers without due task matches", async () => {
     prismaMock.customerCompany.findMany.mockResolvedValue([
       {

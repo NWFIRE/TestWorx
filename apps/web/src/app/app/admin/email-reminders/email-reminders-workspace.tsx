@@ -140,6 +140,7 @@ export function EmailRemindersWorkspace({
   sendAction: (input: {
     dueMonth: string;
     customerCompanyIds: string[];
+    recipientEmailOverrides?: Record<string, string>;
     templateKey: string;
     subject: string;
     body: string;
@@ -159,6 +160,7 @@ export function EmailRemindersWorkspace({
   const [templateKey, setTemplateKey] = useState(defaultTemplate?.key ?? "");
   const [subject, setSubject] = useState(defaultTemplate?.subject ?? "");
   const [body, setBody] = useState(defaultTemplate?.body ?? "");
+  const [recipientEmailOverrides, setRecipientEmailOverrides] = useState<Record<string, string>>({});
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>(
     initialCustomerCompanyIds.filter((customerCompanyId) =>
       data.recipients.some((recipient) => recipient.customerCompanyId === customerCompanyId)
@@ -195,6 +197,22 @@ export function EmailRemindersWorkspace({
     const nextSearch = new URLSearchParams(searchParams.toString());
     nextSearch.set("page", String(nextPage));
     router.replace(`${pathname}?${nextSearch.toString()}`, { scroll: false });
+  }
+
+  function getSendRecipientEmail(recipient: WorkspaceData["recipients"][number]) {
+    return recipientEmailOverrides[recipient.customerCompanyId]?.trim() || recipient.recipientEmail || "";
+  }
+
+  function isValidEmail(value: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+  }
+
+  function buildRecipientEmailOverridePayload() {
+    return Object.fromEntries(
+      Object.entries(recipientEmailOverrides)
+        .map(([customerCompanyId, email]) => [customerCompanyId, email.trim()] as const)
+        .filter(([customerCompanyId, email]) => selectedCustomerIds.includes(customerCompanyId) && email.length > 0)
+    );
   }
 
   return (
@@ -439,6 +457,63 @@ export function EmailRemindersWorkspace({
               </p>
             </div>
 
+            {selectedRecipients.length > 0 ? (
+              <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+                <div>
+                  <p className="text-sm font-semibold text-slate-950">One-off recipient emails</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Optional. Enter a different email here for this send only. The customer file will not be changed.
+                  </p>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {selectedRecipients.map((recipient) => {
+                    const overrideValue = recipientEmailOverrides[recipient.customerCompanyId] ?? "";
+                    const resolvedEmail = getSendRecipientEmail(recipient);
+
+                    return (
+                      <label className="block" key={recipient.customerCompanyId}>
+                        <span className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm font-medium text-slate-700">
+                          <span>{recipient.customerName}</span>
+                          <span className="text-xs font-normal text-slate-500">
+                            Sending to: {resolvedEmail || "No email selected"}
+                          </span>
+                        </span>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <input
+                            className="h-12 min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
+                            onChange={(event) =>
+                              setRecipientEmailOverrides((current) => ({
+                                ...current,
+                                [recipient.customerCompanyId]: event.target.value
+                              }))
+                            }
+                            placeholder={recipient.recipientEmail ? `Default: ${recipient.recipientEmail}` : "Enter recipient email"}
+                            type="email"
+                            value={overrideValue}
+                          />
+                          {overrideValue ? (
+                            <button
+                              className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+                              onClick={() =>
+                                setRecipientEmailOverrides((current) => {
+                                  const next = { ...current };
+                                  delete next[recipient.customerCompanyId];
+                                  return next;
+                                })
+                              }
+                              type="button"
+                            >
+                              Use file email
+                            </button>
+                          ) : null}
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
             <ActionButton
               className="w-full"
               pending={pending}
@@ -450,10 +525,23 @@ export function EmailRemindersWorkspace({
                   return;
                 }
 
+                const invalidRecipient = selectedRecipients.find((recipient) => {
+                  const resolvedEmail = getSendRecipientEmail(recipient);
+                  return !resolvedEmail || !isValidEmail(resolvedEmail);
+                });
+                if (invalidRecipient) {
+                  showToast({
+                    title: `Add a valid email for ${invalidRecipient.customerName}.`,
+                    tone: "error"
+                  });
+                  return;
+                }
+
                 startTransition(async () => {
                   const result = await sendAction({
                     dueMonth: data.filters.dueMonth,
                     customerCompanyIds: selectedRecipients.map((recipient) => recipient.customerCompanyId),
+                    recipientEmailOverrides: buildRecipientEmailOverridePayload(),
                     templateKey,
                     subject,
                     body
@@ -462,6 +550,7 @@ export function EmailRemindersWorkspace({
                   if (result.ok) {
                     showToast({ title: result.message ?? "Customer emails sent", tone: "success" });
                     setSelectedCustomerIds([]);
+                    setRecipientEmailOverrides({});
                     router.refresh();
                     return;
                   }
