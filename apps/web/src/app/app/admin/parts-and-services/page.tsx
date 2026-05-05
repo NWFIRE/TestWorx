@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { canAccessProductsServicesWorkspace } from "@testworx/lib";
 import {
   getPaginatedTenantQuickBooksCatalogSettings,
   getTenantQuickBooksConnectionSettings
@@ -36,15 +37,18 @@ export default async function PartsAndServicesPage({
   if (!session?.user?.tenantId) {
     redirect("/login");
   }
-  if (!["tenant_admin", "office_admin", "platform_admin"].includes(session.user.role)) {
-    redirect("/app/admin");
+  const canAccessCatalog = canAccessProductsServicesWorkspace(session.user.role, session.user.allowances ?? null);
+  if (!canAccessCatalog) {
+    redirect("/app");
   }
+  const canManageCatalog = ["tenant_admin", "office_admin", "platform_admin"].includes(session.user.role);
 
   const params = searchParams ? await searchParams : {};
   const actor = {
     userId: session.user.id,
     role: session.user.role,
-    tenantId: session.user.tenantId
+    tenantId: session.user.tenantId,
+    allowances: session.user.allowances ?? null
   };
   const catalogSearch = readSearchParam(params, "qboSearch");
   const catalogItemType = readSearchParam(params, "qboType");
@@ -67,6 +71,7 @@ export default async function PartsAndServicesPage({
       <PageHeader
         backNavigation={{ label: "Back to admin", fallbackHref: "/app/admin" }}
         actions={
+          canManageCatalog ? (
           <div className="flex flex-wrap gap-3">
             <Link
               className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
@@ -75,6 +80,7 @@ export default async function PartsAndServicesPage({
               Create invoice
             </Link>
           </div>
+          ) : null
         }
         description="Manage the synced QuickBooks catalog used across quotes, billing, and direct invoice creation."
         eyebrow="Parts and services"
@@ -111,6 +117,7 @@ export default async function PartsAndServicesPage({
 
       <QuickBooksCatalogManagementCard
         activeItemCount={catalog.activeCount}
+        readOnly={!canManageCatalog}
         configured={connection.config.enabled}
         connected={connection.tenant.connected}
         createCatalogItemAction={createQuickBooksCatalogItemInlineAction}

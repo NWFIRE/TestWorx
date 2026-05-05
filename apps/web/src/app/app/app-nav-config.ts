@@ -1,4 +1,4 @@
-import { canAccessQuoteWorkspace } from "@testworx/lib";
+import { canAccessProductsServicesWorkspace, canAccessQuoteWorkspace } from "@testworx/lib";
 
 export type AppNavItem = {
   href: string;
@@ -24,6 +24,16 @@ const quotesNavItem: AppNavItem = {
   tone: "blue",
   matchMode: "exact",
   matchPrefixes: ["/app/admin/quotes"]
+};
+
+const partsAndServicesNavItem: AppNavItem = {
+  href: "/app/admin/parts-and-services",
+  label: "Parts and Services",
+  shortLabel: "Parts/Services",
+  abbreviation: "PS",
+  icon: "grid",
+  description: "QuickBooks products, services, and invoice items",
+  tone: "blue"
 };
 
 const adminNavItems: AppNavItem[] = [
@@ -77,15 +87,7 @@ const adminNavItems: AppNavItem[] = [
     description: "Month-by-month planning and future inspection scheduling",
     tone: "blue"
   },
-  {
-    href: "/app/admin/parts-and-services",
-    label: "Parts and Services",
-    shortLabel: "Parts/Services",
-    abbreviation: "PS",
-    icon: "grid",
-    description: "QuickBooks products, services, and invoice items",
-    tone: "blue"
-  },
+  partsAndServicesNavItem,
   {
     href: "/app/manuals",
     label: "Manuals",
@@ -307,8 +309,28 @@ export function getAppNavItemsForRole(role: string, allowances?: InternalAllowan
     baseItems = profileItem ? [...itemsWithoutProfile, quotesNavItem, profileItem] : [...itemsWithoutProfile, quotesNavItem];
   }
 
-  if (!canAccessQuoteWorkspace(role, allowances)) {
-    return applyAdminSidebarOrder(role, baseItems.filter((item) => item.href !== "/app/admin/quotes"), sidebarOrder);
+  if (role === "technician" && canAccessProductsServicesWorkspace(role, allowances)) {
+    const profileItem = baseItems.find((item) => item.href === "/app/tech/profile");
+    const itemsWithoutProfile = baseItems.filter((item) => item.href !== "/app/tech/profile");
+    baseItems = profileItem
+      ? [...itemsWithoutProfile, partsAndServicesNavItem, profileItem]
+      : [...itemsWithoutProfile, partsAndServicesNavItem];
+  }
+
+  if (!canAccessQuoteWorkspace(role, allowances) || !canAccessProductsServicesWorkspace(role, allowances)) {
+    return applyAdminSidebarOrder(
+      role,
+      baseItems.filter((item) => {
+        if (item.href === "/app/admin/quotes") {
+          return canAccessQuoteWorkspace(role, allowances);
+        }
+        if (item.href === "/app/admin/parts-and-services") {
+          return canAccessProductsServicesWorkspace(role, allowances);
+        }
+        return true;
+      }),
+      sidebarOrder
+    );
   }
 
   return applyAdminSidebarOrder(role, baseItems, sidebarOrder);

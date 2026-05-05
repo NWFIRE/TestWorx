@@ -47,6 +47,7 @@ type QuickBooksCatalogManagementCardProps = {
   updateCatalogItemAction: (formData: FormData) => Promise<{ ok: boolean; error: string | null; success: string | null }>;
   importCatalogAction?: (_: { error: string | null; success: string | null }, formData: FormData) => Promise<{ error: string | null; success: string | null }>;
   notice?: string | null;
+  readOnly?: boolean;
 };
 
 export function QuickBooksCatalogManagementCard({
@@ -64,14 +65,15 @@ export function QuickBooksCatalogManagementCard({
   createCatalogItemAction,
   updateCatalogItemAction,
   importCatalogAction,
-  notice
+  notice,
+  readOnly = false
 }: QuickBooksCatalogManagementCardProps) {
   const [createState, createFormAction, createPending] = useActionState(createCatalogItemAction, initialState);
   const [importState, importFormAction, importPending] = useActionState(importCatalogAction ?? (async () => initialState), initialState);
   const [pendingItemId, setPendingItemId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const { showToast } = useToast();
-  const canManageCatalog = configured && connected && !reconnectRequired && !modeMismatch;
+  const canManageCatalog = !readOnly && configured && connected && !reconnectRequired && !modeMismatch;
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const previousPageHref = buildSettingsHref(pathname, searchParams, {
@@ -94,14 +96,16 @@ export function QuickBooksCatalogManagementCard({
     <div className="space-y-6 rounded-[2rem] bg-white p-6 shadow-panel">
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">QuickBooks products and services</p>
-        <h3 className="mt-2 text-2xl font-semibold text-ink">Create and edit billing catalog items</h3>
-        <p className="mt-2 text-sm text-slate-500">Manage the synced QuickBooks products and services catalog TradeWorx uses for quotes, billing, and direct invoice creation.</p>
+        <h3 className="mt-2 text-2xl font-semibold text-ink">{readOnly ? "View billing catalog pricing" : "Create and edit billing catalog items"}</h3>
+        <p className="mt-2 text-sm text-slate-500">{readOnly ? "Review the synced products and services catalog TradeWorx uses for pricing." : "Manage the synced QuickBooks products and services catalog TradeWorx uses for quotes, billing, and direct invoice creation."}</p>
       </div>
 
       <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
         <p className="font-semibold text-ink">Connection requirement</p>
         <p className="mt-2">
-          {canManageCatalog
+          {readOnly
+            ? "This user has pricing visibility only. Catalog changes stay limited to office administrators."
+            : canManageCatalog
             ? "QuickBooks is connected and ready. New items created here will be saved in QuickBooks and then cached in TradeWorx."
             : "Reconnect QuickBooks in the correct mode before creating or editing products and services here."}
         </p>
@@ -112,7 +116,7 @@ export function QuickBooksCatalogManagementCard({
         <h4 className="mt-1 text-lg font-semibold text-ink">{importedItemCount} item{importedItemCount === 1 ? "" : "s"} imported</h4>
         <p className="mt-2 text-sm text-slate-500">TradeWorx keeps the current view paginated so the page stays responsive as your QuickBooks company grows.</p>
         <p className="mt-2 text-sm text-slate-500">Showing {filteredItemCount} item{filteredItemCount === 1 ? "" : "s"} in the current view.</p>
-        {importCatalogAction ? (
+        {importCatalogAction && !readOnly ? (
           <form action={importFormAction} className="mt-4">
             <ActionButton pending={importPending} pendingLabel="Refreshing catalog..." tone="secondary" type="submit">
               Refresh from QuickBooks
@@ -182,6 +186,7 @@ export function QuickBooksCatalogManagementCard({
         </form>
       </div>
 
+      {!readOnly ? (
       <form action={createFormAction} className="rounded-[1.5rem] border border-slate-200 p-5">
         <div className="mb-4">
           <p className="text-sm uppercase tracking-[0.18em] text-slate-500">New item</p>
@@ -225,6 +230,7 @@ export function QuickBooksCatalogManagementCard({
           Add product or service
         </ActionButton>
       </form>
+      ) : null}
 
       <div className="space-y-4">
         <div>
@@ -249,7 +255,13 @@ export function QuickBooksCatalogManagementCard({
                   {item.active ? "Active" : "Inactive"}
                 </span>
               </div>
-              {!editable ? (
+              {readOnly ? (
+                <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 sm:grid-cols-3">
+                  <p><span className="font-semibold text-ink">SKU:</span> {item.sku ?? "Not recorded"}</p>
+                  <p><span className="font-semibold text-ink">Unit price:</span> {item.unitPrice !== null ? `$${item.unitPrice.toFixed(2)}` : "Not recorded"}</p>
+                  <p><span className="font-semibold text-ink">Taxable:</span> {item.taxable ? "Yes" : "No"}</p>
+                </div>
+              ) : !editable ? (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                   TradeWorx leaves this QuickBooks item type read-only for safety. Service and NonInventory items can be edited here.
                 </div>

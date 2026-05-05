@@ -9,7 +9,7 @@ import { resolveComplianceReportingFeeTx } from "./compliance-reporting-fees";
 import { assertEnvForFeature, getOptionalQuickBooksEnv, getServerEnv } from "./env";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
 import type { JsonObject } from "./json-types";
-import { assertTenantContext } from "./permissions";
+import { assertTenantContext, canAccessProductsServicesWorkspace } from "./permissions";
 import { resolveServiceFeeForLocationTx } from "./service-fees";
 import { getCustomerFacingSiteLabel } from "./scheduling";
 
@@ -550,6 +550,10 @@ function canManageQuickBooksConnection(role: string) {
 
 function canManageQuickBooksSync(role: string) {
   return ["tenant_admin", "platform_admin", "office_admin"].includes(role);
+}
+
+function canViewQuickBooksCatalog(actor: ActorContext) {
+  return canAccessProductsServicesWorkspace(actor.role, actor.allowances ?? null);
 }
 
 export function getQuickBooksConfiguration(): QuickBooksConfig {
@@ -3267,8 +3271,8 @@ export async function getTenantQuickBooksSettings(actor: ActorContext, filters?:
 
 export async function getTenantQuickBooksConnectionSettings(actor: ActorContext) {
   const parsedActor = parseActor(actor);
-  if (!canManageQuickBooksSync(parsedActor.role)) {
-    throw new Error("Only administrators can access QuickBooks settings.");
+  if (!canManageQuickBooksSync(parsedActor.role) && !canViewQuickBooksCatalog(parsedActor)) {
+    throw new Error("Products and services access is required.");
   }
 
   const config = getQuickBooksConfiguration();
@@ -3302,8 +3306,8 @@ export async function getTenantQuickBooksConnectionSettings(actor: ActorContext)
 
 export async function getPaginatedTenantQuickBooksCatalogSettings(actor: ActorContext, filters?: QuickBooksCatalogFilterInput) {
   const parsedActor = parseActor(actor);
-  if (!canManageQuickBooksSync(parsedActor.role)) {
-    throw new Error("Only administrators can access QuickBooks catalog settings.");
+  if (!canManageQuickBooksSync(parsedActor.role) && !canViewQuickBooksCatalog(parsedActor)) {
+    throw new Error("Products and services access is required.");
   }
 
   const tenant = await getTenantQuickBooksConnection(parsedActor.tenantId as string);

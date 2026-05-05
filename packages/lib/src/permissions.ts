@@ -34,3 +34,15 @@ export function canAccessQuoteWorkspace(role: string, allowances?: InternalAllow
   return allowances?.quoteAccess ?? false;
 }
 
+export function canAccessProductsServicesWorkspace(role: string, allowances?: InternalAllowances) {
+  if (role === "platform_admin" || role === "tenant_admin") {
+    return true;
+  }
+
+  if (role === "office_admin") {
+    return allowances?.productsServicesAccess ?? true;
+  }
+
+  return allowances?.productsServicesAccess ?? false;
+}
+
