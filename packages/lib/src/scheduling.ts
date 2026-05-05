@@ -93,7 +93,12 @@ export const inspectionReviewFilters = ["needs_review", "pending_follow_up_reque
 export type InspectionReviewFilterValue = (typeof inspectionReviewFilters)[number];
 const inspectionReviewFilterSchema = z.enum(["all", ...inspectionReviewFilters]);
 export const unstartedInspectionStatuses = [InspectionStatus.to_be_completed, InspectionStatus.scheduled] as const;
-export const claimableInspectionStatuses = [InspectionStatus.to_be_completed, InspectionStatus.scheduled] as const;
+export const claimableInspectionStatuses = [
+  InspectionStatus.to_be_completed,
+  InspectionStatus.scheduled,
+  InspectionStatus.in_progress,
+  InspectionStatus.follow_up_required
+] as const;
 export const activeOperationalInspectionStatuses = [
   InspectionStatus.to_be_completed,
   InspectionStatus.scheduled,
@@ -1261,7 +1266,7 @@ export function canTechnicianClaimInspection(input: {
       input.actorTenantId === input.inspectionTenantId &&
       input.assignedTechnicianIds.length === 0 &&
       input.claimable &&
-      (input.status === InspectionStatus.to_be_completed || input.status === InspectionStatus.scheduled)
+      claimableInspectionStatuses.includes(input.status as (typeof claimableInspectionStatuses)[number])
   );
 }
 

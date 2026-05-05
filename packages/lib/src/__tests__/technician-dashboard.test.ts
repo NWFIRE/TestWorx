@@ -149,7 +149,14 @@ describe("technician dashboard inspection access", () => {
         assignedTechnicianId: null,
         technicianAssignments: { none: {} },
         claimable: true,
-        status: { in: [InspectionStatus.to_be_completed, InspectionStatus.scheduled] }
+        status: {
+          in: [
+            InspectionStatus.to_be_completed,
+            InspectionStatus.scheduled,
+            InspectionStatus.in_progress,
+            InspectionStatus.follow_up_required
+          ]
+        }
       }
     }));
     expect(result.unassigned).toHaveLength(1);

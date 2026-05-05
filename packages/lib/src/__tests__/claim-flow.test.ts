@@ -28,6 +28,28 @@ describe("unassigned claim flow", () => {
     ).toBe(true);
   });
 
+  it("allows claim when an unassigned inspection is already open but still claimable", () => {
+    expect(
+      canTechnicianClaimInspection({
+        actorTenantId: "tenant_1",
+        inspectionTenantId: "tenant_1",
+        assignedTechnicianIds: [],
+        claimable: true,
+        status: InspectionStatus.in_progress
+      })
+    ).toBe(true);
+
+    expect(
+      canTechnicianClaimInspection({
+        actorTenantId: "tenant_1",
+        inspectionTenantId: "tenant_1",
+        assignedTechnicianIds: [],
+        claimable: true,
+        status: InspectionStatus.follow_up_required
+      })
+    ).toBe(true);
+  });
+
   it("blocks claim when tenant isolation would be violated", () => {
     expect(
       canTechnicianClaimInspection({

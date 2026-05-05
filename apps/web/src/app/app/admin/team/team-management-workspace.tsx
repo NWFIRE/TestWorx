@@ -228,6 +228,12 @@ function TechnicianEligibilityForm({ user }: { user: WorkspaceUser }) {
   const existing = new Map((user.reportTypeEligibilities ?? []).map((eligibility) => [eligibility.reportType, eligibility]));
   const reportTypes = Object.entries(inspectionTypeRegistry).filter(([reportType]) => reportType !== "work_order");
 
+  useEffect(() => {
+    if (state.success) {
+      notifyTeamUserAccessChanged(user.id);
+    }
+  }, [state.success, user.id]);
+
   return (
     <form action={formAction} className="mt-5 space-y-4 rounded-[1.5rem] border border-blue-100 bg-blue-50/50 p-4">
       <input name="userId" type="hidden" value={user.id} />
@@ -379,6 +385,12 @@ function UserRow({ user, customerMode = false }: { user: WorkspaceUser; customer
   const [resetState, resetFormAction, resetPending] = useActionState(issuePasswordResetAction, initialTeamActionState);
   const [removeState, removeFormAction, removePending] = useActionState(removeUserAction, initialTeamActionState);
 
+  useEffect(() => {
+    if (allowanceState.success) {
+      notifyTeamUserAccessChanged(user.id);
+    }
+  }, [allowanceState.success, user.id]);
+
   return (
     <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-panel">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -524,9 +536,34 @@ function EmptyState({ title, description }: { title: string; description: string
 }
 
 const userLookupCache = new Map<string, UserLookupResponse>();
+const teamUserAccessChangedEvent = "tradeworx:team-user-access-changed";
 
 function buildUserLookupCacheKey(kind: "internal" | "customer", query: string, page: number, status: "all" | "active" | "inactive") {
   return `team-user-lookup:${kind}:${status}:${page}:${query.trim().toLowerCase()}`;
+}
+
+function clearUserLookupCache() {
+  userLookupCache.clear();
+
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {
+    const key = window.sessionStorage.key(index);
+    if (key?.startsWith("team-user-lookup:")) {
+      window.sessionStorage.removeItem(key);
+    }
+  }
+}
+
+function notifyTeamUserAccessChanged(userId: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  clearUserLookupCache();
+  window.dispatchEvent(new CustomEvent(teamUserAccessChangedEvent, { detail: { userId } }));
 }
 
 function AsyncUserLookupSection({
@@ -586,6 +623,13 @@ function AsyncUserLookupSection({
 
     const applyPayload = (payload: UserLookupResponse) => {
       setItems((current) => (replace ? payload.items : [...current, ...payload.items]));
+      setSelectedUser((current) => {
+        if (!current) {
+          return current;
+        }
+
+        return payload.items.find((user) => user.id === current.id) ?? current;
+      });
       setHasMore(payload.hasMore);
       setError(null);
       setHasLoaded(true);
@@ -652,6 +696,24 @@ function AsyncUserLookupSection({
     void loadUsers(0, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, debouncedQuery, statusFilter]);
+
+  useEffect(() => {
+    const handleAccessChange = (event: Event) => {
+      const detail = event instanceof CustomEvent ? event.detail as { userId?: string } | undefined : undefined;
+      if (detail?.userId && selectedUser?.id && detail.userId !== selectedUser.id) {
+        return;
+      }
+
+      clearUserLookupCache();
+      setHasLoaded(false);
+      setPage(0);
+      void loadUsers(0, true);
+    };
+
+    window.addEventListener(teamUserAccessChangedEvent, handleAccessChange);
+    return () => window.removeEventListener(teamUserAccessChangedEvent, handleAccessChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQuery, kind, selectedUser?.id, statusFilter]);
 
   return (
     <div className="space-y-4">

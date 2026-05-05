@@ -33,6 +33,9 @@ const prismaMock = {
   auditLog: {
     create: vi.fn()
   },
+  technicianReportTypeEligibility: {
+    upsert: vi.fn()
+  },
   $transaction: vi.fn()
 };
 
@@ -86,6 +89,7 @@ describe("team management", () => {
     vi.stubEnv("RESEND_API_KEY", "re_test_key");
     vi.stubEnv("RESEND_FROM_EMAIL", "noreply@tradeworx.net");
     prismaMock.auditLog.create.mockResolvedValue(undefined);
+    prismaMock.technicianReportTypeEligibility.upsert.mockResolvedValue(undefined);
     prismaMock.passwordResetToken.updateMany.mockResolvedValue({ count: 0 });
     prismaMock.passwordResetToken.deleteMany.mockResolvedValue({ count: 0 });
     prismaMock.accountInvitation.count.mockResolvedValue(0);
@@ -472,6 +476,75 @@ describe("team management", () => {
     });
     expect(result.items).toHaveLength(1);
     expect(result.items[0]?.customerCompany?.name).toBe("North Campus");
+  });
+
+  it("updates technician report type assignment and claim eligibility", async () => {
+    prismaMock.user.findFirst
+      .mockResolvedValueOnce(makeAdminUser())
+      .mockResolvedValueOnce({
+        id: "tech_1",
+        role: "technician"
+      });
+
+    const { updateTechnicianReportTypeEligibility } = await import("../team-management");
+
+    await updateTechnicianReportTypeEligibility(makeActor(), {
+      technicianUserId: "tech_1",
+      eligibilities: [
+        {
+          reportType: "fire_alarm",
+          canBeAssigned: true,
+          canClaim: true,
+          licenseNumber: "FA-123",
+          expiresAt: new Date("2027-01-01T00:00:00.000Z"),
+          notes: "Licensed fire alarm tech"
+        },
+        {
+          reportType: "fire_extinguisher",
+          canBeAssigned: true,
+          canClaim: false,
+          licenseNumber: null,
+          expiresAt: null,
+          notes: null
+        }
+      ]
+    });
+
+    expect(prismaMock.technicianReportTypeEligibility.upsert).toHaveBeenCalledTimes(2);
+    expect(prismaMock.technicianReportTypeEligibility.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        tenantId_technicianUserId_reportType: {
+          tenantId: "tenant_1",
+          technicianUserId: "tech_1",
+          reportType: "fire_alarm"
+        }
+      },
+      update: expect.objectContaining({
+        canBeAssigned: true,
+        canClaim: true,
+        licenseNumber: "FA-123"
+      }),
+      create: expect.objectContaining({
+        tenantId: "tenant_1",
+        technicianUserId: "tech_1",
+        reportType: "fire_alarm",
+        canBeAssigned: true,
+        canClaim: true
+      })
+    }));
+    expect(prismaMock.technicianReportTypeEligibility.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        tenantId_technicianUserId_reportType: {
+          tenantId: "tenant_1",
+          technicianUserId: "tech_1",
+          reportType: "fire_extinguisher"
+        }
+      },
+      update: expect.objectContaining({
+        canBeAssigned: true,
+        canClaim: false
+      })
+    }));
   });
 
   it("keeps pending invites visible when the workspace is filtered to active users", async () => {
