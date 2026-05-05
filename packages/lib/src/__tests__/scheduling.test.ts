@@ -552,6 +552,11 @@ describe("recurrence logic", () => {
       isTechnicianEligibleForReportTypesFromRows({
         rows: [
           {
+            reportType: InspectionType.kitchen_suppression,
+            canBeAssigned: true,
+            canClaim: true
+          },
+          {
             reportType: InspectionType.fire_alarm,
             canBeAssigned: true,
             canClaim: false
@@ -561,6 +566,25 @@ describe("recurrence logic", () => {
         mode: "claim"
       })
     ).toBe(false);
+
+    expect(
+      isTechnicianEligibleForReportTypesFromRows({
+        rows: [
+          {
+            reportType: InspectionType.fire_alarm,
+            canBeAssigned: false,
+            canClaim: false
+          },
+          {
+            reportType: InspectionType.kitchen_suppression,
+            canBeAssigned: false,
+            canClaim: false
+          }
+        ],
+        reportTypes: [InspectionType.fire_alarm, InspectionType.kitchen_suppression],
+        mode: "claim"
+      })
+    ).toBe(true);
   });
 
   it("does not require report-type eligibility rows for work orders", () => {

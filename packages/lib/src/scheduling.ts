@@ -908,6 +908,10 @@ export function isTechnicianEligibleForReportTypesFromRows(input: {
     return true;
   }
 
+  if (input.mode === "claim" && input.rows.every((row) => !row.canClaim)) {
+    return true;
+  }
+
   const now = input.now ?? new Date();
   const byReportType = new Map(input.rows.map((row) => [row.reportType, row]));
   return eligibilityReportTypes.every((reportType) => {
@@ -920,6 +924,22 @@ export function isTechnicianEligibleForReportTypesFromRows(input: {
     }
     return input.mode === "claim" ? row.canClaim : row.canBeAssigned;
   });
+}
+
+function getClaimableInspectionVisibleTasks<T extends {
+  dueDate?: Date | string | null;
+  dueMonth?: string | null;
+  schedulingStatus?: string | null;
+  status?: InspectionStatus | string | null;
+}>(
+  inspection: { tasks: T[]; convertedFromQuotes?: unknown[] | null; scheduledStart?: Date | string | null }
+) {
+  const currentTasks = inspection.tasks.filter((task) => isCurrentVisitTaskForInspection(task, inspection));
+  if (currentTasks.length > 0) {
+    return currentTasks;
+  }
+
+  return inspection.tasks.filter((task) => task.status !== InspectionStatus.cancelled);
 }
 
 function mapRecurringTaskDefinitions(input: {
@@ -5128,7 +5148,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
     unassigned: unassignedInspections
       .map((inspection) => ({
         inspection,
-        currentTasks: inspection.tasks.filter((task) => isCurrentVisitTaskForInspection(task, inspection))
+        currentTasks: getClaimableInspectionVisibleTasks(inspection)
       }))
       .filter(({ currentTasks }) =>
         isTechnicianEligibleForReportTypesFromRows({
@@ -5233,8 +5253,7 @@ export async function claimInspection(actor: ActorContext, inspectionId: string)
       tx,
       tenantId,
       technicianUserId: parsedActor.userId,
-      reportTypes: inspection.tasks
-        .filter((task) => isCurrentVisitTaskForInspection(task, inspection))
+      reportTypes: getClaimableInspectionVisibleTasks(inspection)
         .map((task) => task.inspectionType as InspectionType),
       mode: "claim"
     });
