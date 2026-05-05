@@ -146,8 +146,6 @@ describe("technician dashboard inspection access", () => {
     expect(prismaMock.inspection.findMany).toHaveBeenNthCalledWith(2, expect.objectContaining({
       where: {
         tenantId: "tenant_1",
-        assignedTechnicianId: null,
-        technicianAssignments: { none: {} },
         claimable: true,
         status: {
           in: [
@@ -161,6 +159,41 @@ describe("technician dashboard inspection access", () => {
     }));
     expect(result.unassigned).toHaveLength(1);
     expect(result.unassigned[0]?.id).toBe("inspection_shared");
+  });
+
+  it("keeps claimable inspections visible when stale assignment rows exist", async () => {
+    prismaMock.inspection.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "inspection_shared_stale_assignment",
+          tenantId: "tenant_1",
+          status: InspectionStatus.scheduled,
+          inspectionClassification: "standard",
+          isPriority: false,
+          scheduledStart: new Date("2026-03-17T09:00:00.000Z"),
+          site: { id: "site_1", name: "Pinecrest Tower" },
+          customerCompany: { id: "customer_1", name: "Pinecrest Property Management" },
+          assignedTechnician: { id: "tech_old", name: "Previous Tech" },
+          technicianAssignments: [{ technicianId: "tech_old", technician: { name: "Previous Tech" } }],
+          tasks: [
+            {
+              id: "task_shared_stale_assignment",
+              inspectionType: "fire_extinguisher",
+              assignedTechnicianId: "tech_old",
+              schedulingStatus: "scheduled_now",
+              recurrence: null,
+              report: null
+            }
+          ]
+        }
+      ])
+      .mockResolvedValueOnce([]);
+
+    const result = await getTechnicianDashboardData({ userId: "tech_2", role: "technician", tenantId: "tenant_1" });
+
+    expect(result.unassigned).toHaveLength(1);
+    expect(result.unassigned[0]?.id).toBe("inspection_shared_stale_assignment");
   });
 
   it("shows future claimable inspections when their future-scheduled tasks belong to that visit period", async () => {

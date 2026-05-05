@@ -62,13 +62,25 @@ describe("unassigned claim flow", () => {
     ).toBe(false);
   });
 
-  it("blocks claim when the inspection is already assigned", () => {
+  it("trusts claimable as the shared-queue source of truth even if stale assignment rows exist", () => {
     expect(
       canTechnicianClaimInspection({
         actorTenantId: "tenant_1",
         inspectionTenantId: "tenant_1",
         assignedTechnicianIds: ["tech_7"],
         claimable: true,
+        status: InspectionStatus.scheduled
+      })
+    ).toBe(true);
+  });
+
+  it("blocks claim when the inspection is no longer marked claimable", () => {
+    expect(
+      canTechnicianClaimInspection({
+        actorTenantId: "tenant_1",
+        inspectionTenantId: "tenant_1",
+        assignedTechnicianIds: [],
+        claimable: false,
         status: InspectionStatus.scheduled
       })
     ).toBe(false);

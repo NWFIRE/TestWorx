@@ -1284,7 +1284,6 @@ export function canTechnicianClaimInspection(input: {
   return Boolean(
     input.actorTenantId &&
       input.actorTenantId === input.inspectionTenantId &&
-      input.assignedTechnicianIds.length === 0 &&
       input.claimable &&
       claimableInspectionStatuses.includes(input.status as (typeof claimableInspectionStatuses)[number])
   );
@@ -4145,7 +4144,7 @@ export async function getAdminDashboardData(actor: ActorContext) {
       take: 20
     }),
     prisma.site.count({ where: { tenantId } }),
-    prisma.inspection.count({ where: { tenantId, assignedTechnicianId: null, technicianAssignments: { none: {} }, claimable: true, status: { in: [...claimableInspectionStatuses] } } }),
+    prisma.inspection.count({ where: { tenantId, claimable: true, status: { in: [...claimableInspectionStatuses] } } }),
     prisma.inspection.count({ where: { tenantId } }),
     prisma.inspection.count({ where: { tenantId, status: { in: [...completedOperationalInspectionStatuses] } } })
   ]);
@@ -5077,7 +5076,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
       orderBy: [{ scheduledStart: "asc" }]
     }),
     prisma.inspection.findMany({
-      where: { tenantId, assignedTechnicianId: null, technicianAssignments: { none: {} }, claimable: true, status: { in: [...claimableInspectionStatuses] } },
+      where: { tenantId, claimable: true, status: { in: [...claimableInspectionStatuses] } },
       include: { site: true, customerCompany: true, assignedTechnician: true, technicianAssignments: { include: { technician: true } }, convertedFromQuotes: { select: { id: true }, take: 1 }, tasks: { include: { recurrence: true, report: true, assignedTechnician: true } } },
       orderBy: [{ scheduledStart: "asc" }]
     }),
@@ -5262,8 +5261,6 @@ export async function claimInspection(actor: ActorContext, inspectionId: string)
       where: {
         id: inspectionId,
         tenantId,
-        assignedTechnicianId: null,
-        technicianAssignments: { none: {} },
         claimable: true,
         status: { in: [...claimableInspectionStatuses] }
       },
