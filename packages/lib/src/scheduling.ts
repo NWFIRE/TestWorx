@@ -841,13 +841,18 @@ export function isTechnicianEligibleForReportTypesFromRows(input: {
     return false;
   }
 
+  const eligibilityReportTypes = distinctReportTypes.filter((reportType) => reportType !== InspectionType.work_order);
+  if (!eligibilityReportTypes.length) {
+    return true;
+  }
+
   if (input.rows.length === 0) {
     return true;
   }
 
   const now = input.now ?? new Date();
   const byReportType = new Map(input.rows.map((row) => [row.reportType, row]));
-  return distinctReportTypes.every((reportType) => {
+  return eligibilityReportTypes.every((reportType) => {
     const row = byReportType.get(reportType);
     if (!row) {
       return false;

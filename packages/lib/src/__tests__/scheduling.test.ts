@@ -485,6 +485,36 @@ describe("recurrence logic", () => {
       })
     ).toBe(true);
   });
+
+  it("does not require report-type eligibility rows for work orders", () => {
+    expect(
+      isTechnicianEligibleForReportTypesFromRows({
+        rows: [
+          {
+            reportType: InspectionType.fire_alarm,
+            canBeAssigned: false,
+            canClaim: false
+          }
+        ],
+        reportTypes: [InspectionType.work_order],
+        mode: "assign"
+      })
+    ).toBe(true);
+
+    expect(
+      isTechnicianEligibleForReportTypesFromRows({
+        rows: [
+          {
+            reportType: InspectionType.fire_alarm,
+            canBeAssigned: true,
+            canClaim: true
+          }
+        ],
+        reportTypes: [InspectionType.work_order, InspectionType.fire_alarm],
+        mode: "assign"
+      })
+    ).toBe(true);
+  });
 });
 
 describe("month defaults and past-due status", () => {
