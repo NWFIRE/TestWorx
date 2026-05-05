@@ -343,24 +343,26 @@ export default async function AdminInspectionsPage({
         />
       </section>
 
-      <SectionCard className="sticky top-4 z-10">
-        <div className="flex flex-col gap-4">
+      <SectionCard className="2xl:sticky 2xl:top-4 2xl:z-10">
+        <div className="flex flex-col gap-3 lg:gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">
               Inspection Filters
             </p>
-            <p className="mt-2 text-sm text-[color:var(--text-muted)]">
+            <p className="mt-2 hidden text-sm text-[color:var(--text-muted)] lg:block">
               Search by customer, site, address, or inspection id and keep the queue tight for daily office work.
             </p>
           </div>
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,0.8fr))]">
-            <LiveUrlSearchSelect
-              emptyText="No matching customers, locations, or inspections found"
-              initialValue={queueData.filters.query}
-              options={inspectionSearchOptions}
-              paramKey="q"
-              placeholder="Search customer, location, address, or inspection reference"
-            />
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,0.8fr))]">
+            <div className="md:col-span-2 xl:col-span-3 2xl:col-span-1">
+              <LiveUrlSearchSelect
+                emptyText="No matching customers, locations, or inspections found"
+                initialValue={queueData.filters.query}
+                options={inspectionSearchOptions}
+                paramKey="q"
+                placeholder="Search customer, location, address, or inspection reference"
+              />
+            </div>
             <LiveUrlSelectFilter options={statusOptions} paramKey="status" value={resolveStatusSelectValue(queueData.filters.statuses)} />
             <LiveUrlSelectFilter options={typeOptions} paramKey="classification" value={resolveTypeSelectValue(queueData.filters.classifications)} />
             <LiveUrlSelectFilter options={priorityOptions} paramKey="priority" value={queueData.filters.priority} />
