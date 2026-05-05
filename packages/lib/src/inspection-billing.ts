@@ -210,6 +210,7 @@ type AdminBillingSummaryDetailRow = {
   siteId: string;
   siteName: string;
   inspectionDate: Date;
+  inspectionClassification: string | null;
   technicianName: string | null;
   status: string;
   billingType: string;
@@ -243,6 +244,7 @@ type AuthorizedBillingSummaryRow = {
   inspectionId: string;
   customerCompanyId: string;
   siteId: string;
+  inspectionClassification: string | null;
   status: string;
   billingType: string;
   billToAccountId: string | null;
@@ -3224,6 +3226,23 @@ function buildSummaryMetrics(items: BillableItem[]) {
   };
 }
 
+async function applyMinimumTicketPricingToPersistedSummaryItems(
+  tx: TransactionClient | typeof prisma,
+  summary: Pick<AuthorizedBillingSummaryRow, "tenantId" | "inspectionId" | "customerCompanyId" | "siteId" | "billingType" | "pricingSnapshot" | "inspectionClassification">,
+  items: BillableItem[]
+) {
+  return applyMinimumTicketPricingToSummaryItemsTx(tx, {
+    tenantId: summary.tenantId,
+    inspectionId: summary.inspectionId,
+    customerCompanyId: summary.customerCompanyId,
+    siteId: summary.siteId,
+    billingType: normalizeBillingType(summary.billingType),
+    pricingSnapshot: summary.pricingSnapshot,
+    inspectionClassification: summary.inspectionClassification,
+    items
+  });
+}
+
 export async function getAdminBillingSummaries(actor: ActorContext) {
   const parsedActor = parseActor(actor);
   ensureAdmin(parsedActor);
@@ -3238,6 +3257,7 @@ export async function getAdminBillingSummaries(actor: ActorContext) {
       s."siteId",
       site."name" AS "siteName",
       i."scheduledStart" AS "inspectionDate",
+      i."inspectionClassification",
       tech."name" AS "technicianName",
       s."status",
       s."billingType",
@@ -3410,8 +3430,39 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
       };
     })
   );
+  const displayMinimumPricedSummary = row.status === "invoiced"
+    ? {
+        items: itemsWithCatalogState,
+        subtotal: row.subtotal,
+        pricingSnapshot: row.pricingSnapshot
+      }
+    : await applyMinimumTicketPricingToSummaryItemsTx(prisma, {
+        tenantId,
+        inspectionId: row.inspectionId,
+        customerCompanyId: row.customerCompanyId,
+        siteId: row.siteId,
+        billingType: normalizeBillingType(row.billingType),
+        pricingSnapshot: row.pricingSnapshot,
+        inspectionClassification: row.inspectionClassification,
+        items: itemsWithCatalogState
+      });
+  const displayItems = displayMinimumPricedSummary.items as typeof itemsWithCatalogState;
+
+  if (row.subtotal !== displayMinimumPricedSummary.subtotal) {
+    await prisma.inspectionBillingSummary.update({
+      where: { id: row.id },
+      data: {
+        items: displayMinimumPricedSummary.items as unknown as Prisma.InputJsonValue,
+        subtotal: displayMinimumPricedSummary.subtotal,
+        pricingSnapshot: displayMinimumPricedSummary.pricingSnapshot as Prisma.InputJsonValue
+      }
+    });
+  }
+
   return {
     ...row,
+    subtotal: displayMinimumPricedSummary.subtotal,
+    pricingSnapshot: displayMinimumPricedSummary.pricingSnapshot,
     siteName: getCustomerFacingSiteLabel(row.siteName) ?? row.customerName,
     status: row.status as BillingSummaryStatus,
     billingType: normalizeBillingType(row.billingType),
@@ -3424,11 +3475,11 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
     quickbooksSentAt: row.quickbooksSentAt ?? (row.quickbooksSyncStatus === "sent" ? row.quickbooksSyncedAt ?? null : null),
     quickbooksSyncError: row.quickbooksSyncError ?? null,
     quickbooksSendError: row.quickbooksSendError ?? null,
-    items: itemsWithCatalogState,
-    groupedItems: groupBillableItems(itemsWithCatalogState),
-    reviewGroupedItems: groupBillingReviewItems(itemsWithCatalogState),
-    reportTypes: [...new Set(itemsWithCatalogState.map((item) => item.reportType).filter((reportType) => reportType !== INSPECTION_LEVEL_REPORT_TYPE))],
-    metrics: buildSummaryMetrics(itemsWithCatalogState),
+    items: displayItems,
+    groupedItems: groupBillableItems(displayItems),
+    reviewGroupedItems: groupBillingReviewItems(displayItems),
+    reportTypes: [...new Set(displayItems.map((item) => item.reportType).filter((reportType) => reportType !== INSPECTION_LEVEL_REPORT_TYPE))],
+    metrics: buildSummaryMetrics(displayItems),
     billingResolution: billingResolutionSnapshot?.billingResolutionSnapshot ?? null,
     billingResolutionMetadata: parseBillingResolutionSnapshotMetadata(
       billingResolutionSnapshot?.billingResolutionSnapshot?.snapshotData
@@ -3442,9 +3493,34 @@ async function getAuthorizedBillingSummary(actor: ActorContext, summaryId: strin
   ensureAdmin(parsedActor);
 
   const rows = (await prisma.$queryRaw`
-    SELECT "id", "tenantId", "inspectionId", "customerCompanyId", "siteId", "status", "billingType", "billToAccountId", "billToName", "contractProfileId", "contractProfileName", "routingSnapshot", "pricingSnapshot", "groupingSnapshot", "attachmentSnapshot", "deliverySnapshot", "referenceSnapshot", "subtotal", "notes", "items", "quickbooksSyncStatus", "quickbooksInvoiceId", "quickbooksSendStatus"
-    FROM "InspectionBillingSummary"
-    WHERE "id" = ${summaryId} AND "tenantId" = ${parsedActor.tenantId as string}
+    SELECT
+      s."id",
+      s."tenantId",
+      s."inspectionId",
+      s."customerCompanyId",
+      s."siteId",
+      i."inspectionClassification",
+      s."status",
+      s."billingType",
+      s."billToAccountId",
+      s."billToName",
+      s."contractProfileId",
+      s."contractProfileName",
+      s."routingSnapshot",
+      s."pricingSnapshot",
+      s."groupingSnapshot",
+      s."attachmentSnapshot",
+      s."deliverySnapshot",
+      s."referenceSnapshot",
+      s."subtotal",
+      s."notes",
+      s."items",
+      s."quickbooksSyncStatus",
+      s."quickbooksInvoiceId",
+      s."quickbooksSendStatus"
+    FROM "InspectionBillingSummary" s
+    INNER JOIN "Inspection" i ON i."id" = s."inspectionId" AND i."tenantId" = s."tenantId"
+    WHERE s."id" = ${summaryId} AND s."tenantId" = ${parsedActor.tenantId as string}
     LIMIT 1
   `) as AuthorizedBillingSummaryRow[];
 
@@ -3757,14 +3833,15 @@ export async function linkBillingSummaryItemCatalog(
       : candidate
   );
 
-  const subtotal = subtotalForItems(updatedItems);
+  const minimumPricedSummary = await applyMinimumTicketPricingToPersistedSummaryItems(prisma, summary, updatedItems);
 
   await prisma.$transaction(async (tx) => {
     await tx.inspectionBillingSummary.update({
       where: { id: summary.id },
       data: {
-        items: updatedItems as unknown as Prisma.InputJsonValue,
-        subtotal,
+        items: minimumPricedSummary.items as unknown as Prisma.InputJsonValue,
+        subtotal: minimumPricedSummary.subtotal,
+        pricingSnapshot: minimumPricedSummary.pricingSnapshot as Prisma.InputJsonValue,
         quickbooksSyncStatus: summary.quickbooksInvoiceId ? "not_synced" : summary.quickbooksSyncStatus ?? "not_synced",
         quickbooksInvoiceId: null,
         quickbooksInvoiceNumber: null,
@@ -3941,14 +4018,15 @@ export async function linkBillingSummaryItemGroupCatalog(
       : candidate
   );
 
-  const subtotal = subtotalForItems(updatedItems);
+  const minimumPricedSummary = await applyMinimumTicketPricingToPersistedSummaryItems(prisma, summary, updatedItems);
 
   await prisma.$transaction(async (tx) => {
     await tx.inspectionBillingSummary.update({
       where: { id: summary.id },
       data: {
-        items: updatedItems as unknown as Prisma.InputJsonValue,
-        subtotal,
+        items: minimumPricedSummary.items as unknown as Prisma.InputJsonValue,
+        subtotal: minimumPricedSummary.subtotal,
+        pricingSnapshot: minimumPricedSummary.pricingSnapshot as Prisma.InputJsonValue,
         quickbooksSyncStatus: summary.quickbooksInvoiceId ? "not_synced" : summary.quickbooksSyncStatus ?? "not_synced",
         quickbooksInvoiceId: null,
         quickbooksInvoiceNumber: null,
@@ -4094,11 +4172,14 @@ export async function clearBillingSummaryItemCatalogLink(
       : candidate
   );
 
+  const minimumPricedSummary = await applyMinimumTicketPricingToPersistedSummaryItems(prisma, summary, updatedItems);
+
   await prisma.inspectionBillingSummary.update({
     where: { id: summary.id },
     data: {
-      items: updatedItems as unknown as Prisma.InputJsonValue,
-      subtotal: subtotalForItems(updatedItems),
+      items: minimumPricedSummary.items as unknown as Prisma.InputJsonValue,
+      subtotal: minimumPricedSummary.subtotal,
+      pricingSnapshot: minimumPricedSummary.pricingSnapshot as Prisma.InputJsonValue,
       quickbooksSyncStatus: summary.quickbooksInvoiceId ? "not_synced" : summary.quickbooksSyncStatus ?? "not_synced",
       quickbooksInvoiceId: null,
       quickbooksInvoiceNumber: null,
@@ -4164,11 +4245,14 @@ export async function clearBillingSummaryItemGroupCatalogLink(
       : candidate
   );
 
+  const minimumPricedSummary = await applyMinimumTicketPricingToPersistedSummaryItems(prisma, summary, updatedItems);
+
   await prisma.inspectionBillingSummary.update({
     where: { id: summary.id },
     data: {
-      items: updatedItems as unknown as Prisma.InputJsonValue,
-      subtotal: subtotalForItems(updatedItems),
+      items: minimumPricedSummary.items as unknown as Prisma.InputJsonValue,
+      subtotal: minimumPricedSummary.subtotal,
+      pricingSnapshot: minimumPricedSummary.pricingSnapshot as Prisma.InputJsonValue,
       quickbooksSyncStatus: summary.quickbooksInvoiceId ? "not_synced" : summary.quickbooksSyncStatus ?? "not_synced",
       quickbooksInvoiceId: null,
       quickbooksInvoiceNumber: null,
