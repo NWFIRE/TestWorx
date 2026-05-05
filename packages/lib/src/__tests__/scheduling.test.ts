@@ -506,7 +506,7 @@ describe("recurrence logic", () => {
     expect(plan[0]?.tasks).toHaveLength(1);
   });
 
-  it("requires explicit eligibility rows for every claimed report type once eligibility is configured", () => {
+  it("uses explicit eligibility rows as restrictions while allowing report types without saved rows", () => {
     expect(
       isTechnicianEligibleForReportTypesFromRows({
         rows: [],
@@ -527,7 +527,7 @@ describe("recurrence logic", () => {
         reportTypes: [InspectionType.fire_alarm, InspectionType.kitchen_suppression],
         mode: "claim"
       })
-    ).toBe(false);
+    ).toBe(true);
 
     expect(
       isTechnicianEligibleForReportTypesFromRows({
@@ -547,6 +547,20 @@ describe("recurrence logic", () => {
         mode: "assign"
       })
     ).toBe(true);
+
+    expect(
+      isTechnicianEligibleForReportTypesFromRows({
+        rows: [
+          {
+            reportType: InspectionType.fire_alarm,
+            canBeAssigned: true,
+            canClaim: false
+          }
+        ],
+        reportTypes: [InspectionType.fire_alarm, InspectionType.kitchen_suppression],
+        mode: "claim"
+      })
+    ).toBe(false);
   });
 
   it("does not require report-type eligibility rows for work orders", () => {

@@ -913,7 +913,7 @@ export function isTechnicianEligibleForReportTypesFromRows(input: {
   return eligibilityReportTypes.every((reportType) => {
     const row = byReportType.get(reportType);
     if (!row) {
-      return false;
+      return true;
     }
     if (row.expiresAt instanceof Date && !Number.isNaN(row.expiresAt.getTime()) && row.expiresAt < now) {
       return false;
