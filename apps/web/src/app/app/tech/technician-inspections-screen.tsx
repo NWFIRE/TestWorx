@@ -63,6 +63,7 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
           <article className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" key={inspection.id}>
             <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
             {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
+            {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--tenant-primary)]">
                 {inspection.tasks.some((task: any) => task.report?.status === "draft" || task.report?.status === "submitted") ? "Draft" : "In Progress"}
@@ -78,6 +79,7 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
                 contactName={inspection.customerCompany?.contactName}
                 email={inspection.customerCompany?.billingEmail}
                 phone={inspection.customerCompany?.phone}
+                serviceAddress={inspection.locationLabel}
               />
             </div>
             {hasAttachedPdfs(inspection) ? (
@@ -115,6 +117,7 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
           <article className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" key={inspection.id}>
             <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
             {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
+            {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}
             <p className="mt-3 text-sm text-slate-600">Completed {format(toDateValue(inspection.scheduledStart), "MMM d, h:mm a")}</p>
           </article>
         )) : (

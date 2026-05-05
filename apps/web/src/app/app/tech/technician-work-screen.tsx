@@ -76,6 +76,7 @@ function matchesQuery(inspection: any, query: string) {
     inspection.customerCompany?.name,
     inspection.primaryTitle,
     inspection.secondaryTitle,
+    inspection.locationLabel,
     ...inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " "))
   ].filter(Boolean).join(" ").toLowerCase();
 
@@ -226,6 +227,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                   <div className="min-w-0">
                     <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
                     {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
+                    {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}
                   </div>
                   <span className="rounded-full border border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary-soft)] px-3 py-1 text-xs font-semibold text-[var(--tenant-primary)]">
                     Open
@@ -257,6 +259,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
             <article className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" key={inspection.id}>
               <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
               {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
+              {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}
               <p className="mt-3 text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
               <div className="mt-4">
                 <InspectionCustomerContactCard
@@ -264,6 +267,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                   contactName={inspection.customerCompany?.contactName}
                   email={inspection.customerCompany?.billingEmail}
                   phone={inspection.customerCompany?.phone}
+                  serviceAddress={inspection.locationLabel}
                 />
               </div>
               <div className="mt-4">
@@ -300,6 +304,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                     <div className="min-w-0">
                       <p className="truncate text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
                       {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
+                      {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}
                     </div>
                     <span className="inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
                       {formatTechnicianWorkTiming(inspection)}
@@ -312,6 +317,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                       contactName={inspection.customerCompany?.contactName}
                       email={inspection.customerCompany?.billingEmail}
                       phone={inspection.customerCompany?.phone}
+                      serviceAddress={inspection.locationLabel}
                     />
                   </div>
                   {hasAttachedPdfs(inspection) ? (
@@ -353,6 +359,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
               <article className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" key={inspection.id}>
                 <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
                 {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
+                {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}
                 <p className="mt-3 text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
                 <div className="mt-4">
                   <InspectionCustomerContactCard
@@ -360,6 +367,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                     contactName={inspection.customerCompany?.contactName}
                     email={inspection.customerCompany?.billingEmail}
                     phone={inspection.customerCompany?.phone}
+                    serviceAddress={inspection.locationLabel}
                   />
                 </div>
                 <div className="mt-4">

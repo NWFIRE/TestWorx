@@ -51,7 +51,22 @@ export async function loadTechnicianReportData(inspectionId: string, taskId: str
 
   const inspectionDisplay = getInspectionDisplayLabels({
     siteName: report.inspection.site.name,
-    customerName: report.inspection.customerCompany.name
+    customerName: report.inspection.customerCompany.name,
+    siteAddressLine1: report.inspection.site.addressLine1,
+    siteAddressLine2: report.inspection.site.addressLine2,
+    siteCity: report.inspection.site.city,
+    siteState: report.inspection.site.state,
+    sitePostalCode: report.inspection.site.postalCode,
+    customerServiceAddressLine1: report.inspection.customerCompany.serviceAddressLine1,
+    customerServiceAddressLine2: report.inspection.customerCompany.serviceAddressLine2,
+    customerServiceCity: report.inspection.customerCompany.serviceCity,
+    customerServiceState: report.inspection.customerCompany.serviceState,
+    customerServicePostalCode: report.inspection.customerCompany.servicePostalCode,
+    customerBillingAddressLine1: report.inspection.customerCompany.billingAddressLine1,
+    customerBillingAddressLine2: report.inspection.customerCompany.billingAddressLine2,
+    customerBillingCity: report.inspection.customerCompany.billingCity,
+    customerBillingState: report.inspection.customerCompany.billingState,
+    customerBillingPostalCode: report.inspection.customerCompany.billingPostalCode
   });
 
   const data: TechnicianReportEditorData = {
@@ -67,6 +82,7 @@ export async function loadTechnicianReportData(inspectionId: string, taskId: str
     customInspectionTypeLabel: report.task.customDisplayLabel ?? null,
     siteName: inspectionDisplay.primaryTitle,
     customerName: inspectionDisplay.secondaryTitle || report.inspection.customerCompany.name,
+    serviceAddress: inspectionDisplay.locationLabel,
     customerContactName: report.inspection.customerCompany.contactName ?? null,
     customerPhone: report.inspection.customerCompany.phone ?? null,
     customerEmail: report.inspection.customerCompany.billingEmail ?? null,

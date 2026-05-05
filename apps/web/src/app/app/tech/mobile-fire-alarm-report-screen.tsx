@@ -518,6 +518,7 @@ export function MobileFireAlarmReportScreen({
       customerContactName={data.customerContactName}
       customerEmail={data.customerEmail}
       customerPhone={data.customerPhone}
+      serviceAddress={data.serviceAddress}
       siteName={data.siteName}
       stickyFooter={(
         <div>
@@ -633,6 +634,7 @@ function MobileReportSummaryBanner({
       customerContactName={data.customerContactName}
       customerEmail={data.customerEmail}
       customerPhone={data.customerPhone}
+      serviceAddress={data.serviceAddress}
       siteName={data.siteName}
       title={data.inspectionTypeLabel}
       workspace={data.inspectionWorkspace}

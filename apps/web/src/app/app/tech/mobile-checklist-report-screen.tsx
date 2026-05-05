@@ -1145,6 +1145,7 @@ export function MobileChecklistReportScreen({
           customerPhone={data.customerPhone}
           saveState={saveState}
           scheduledDateLabel={data.scheduledDateLabel}
+          serviceAddress={data.serviceAddress}
           siteName={data.siteName}
           workspace={data.inspectionWorkspace}
         />
@@ -1281,6 +1282,7 @@ export function MobileChecklistReportScreen({
         customerPhone={data.customerPhone}
         saveState={saveState}
         scheduledDateLabel={formatChecklistTimestamp(data.scheduledDateLabel)}
+        serviceAddress={data.serviceAddress}
         siteName={data.siteName}
         workspace={data.inspectionWorkspace}
       />

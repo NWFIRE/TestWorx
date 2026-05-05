@@ -28,6 +28,7 @@ export type TechnicianReportEditorData = {
   customInspectionTypeLabel?: string | null;
   siteName: string;
   customerName: string;
+  serviceAddress?: string | null;
   customerContactName?: string | null;
   customerPhone?: string | null;
   customerEmail?: string | null;
@@ -1032,6 +1033,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
         customerPhone={data.customerPhone}
         saveState={saveState}
         scheduledDateLabel={data.scheduledDateLabel}
+        serviceAddress={data.serviceAddress}
         siteName={data.siteName}
         workspace={data.inspectionWorkspace}
       />

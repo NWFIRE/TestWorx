@@ -19,6 +19,7 @@ export function MobileInspectionShell({
   title,
   siteName,
   customerName,
+  serviceAddress,
   customerContactName,
   customerPhone,
   customerEmail,
@@ -39,6 +40,7 @@ export function MobileInspectionShell({
   title: string;
   siteName?: string | null;
   customerName?: string | null;
+  serviceAddress?: string | null;
   customerContactName?: string | null;
   customerPhone?: string | null;
   customerEmail?: string | null;
@@ -97,6 +99,7 @@ export function MobileInspectionShell({
             contactName={customerContactName}
             email={customerEmail}
             phone={customerPhone}
+            serviceAddress={serviceAddress}
           />
 
           {sections.length > 0 ? (

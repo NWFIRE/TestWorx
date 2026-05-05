@@ -47,6 +47,7 @@ export function MobileInspectionWorkspaceShell({
   workspace,
   siteName,
   customerName,
+  serviceAddress,
   customerContactName,
   customerPhone,
   customerEmail,
@@ -57,6 +58,7 @@ export function MobileInspectionWorkspaceShell({
   workspace: InspectionWorkspaceData;
   siteName: string;
   customerName: string;
+  serviceAddress?: string | null;
   customerContactName?: string | null;
   customerPhone?: string | null;
   customerEmail?: string | null;
@@ -67,7 +69,7 @@ export function MobileInspectionWorkspaceShell({
   const isMultiTaskInspection = workspace.totalTaskCount > 1;
   const currentTask = workspace.relatedTasks.find((task) => task.isCurrent) ?? workspace.relatedTasks[0] ?? null;
   const modeLabel = currentMode === "review" ? "Review mode" : "Inspection workspace";
-  const hasCustomerContact = Boolean(customerContactName?.trim() || customerPhone?.trim() || customerEmail?.trim());
+  const hasCustomerContact = Boolean(serviceAddress?.trim() || customerContactName?.trim() || customerPhone?.trim() || customerEmail?.trim());
 
   return (
     <section className="rounded-[1.85rem] border border-slate-200 bg-white p-5 shadow-panel">
@@ -108,6 +110,7 @@ export function MobileInspectionWorkspaceShell({
             contactName={customerContactName}
             email={customerEmail}
             phone={customerPhone}
+            serviceAddress={serviceAddress}
           />
         </div>
       ) : null}

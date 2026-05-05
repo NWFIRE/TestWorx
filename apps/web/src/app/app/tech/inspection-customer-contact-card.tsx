@@ -7,21 +7,24 @@ function normalizePhoneHref(phone: string) {
 
 export function InspectionCustomerContactCard({
   contactName,
+  serviceAddress,
   phone,
   email,
   compact = false
 }: {
   contactName?: string | null;
+  serviceAddress?: string | null;
   phone?: string | null;
   email?: string | null;
   compact?: boolean;
 }) {
   const trimmedName = contactName?.trim() || null;
+  const trimmedServiceAddress = serviceAddress?.trim() || null;
   const trimmedPhone = phone?.trim() || null;
   const trimmedEmail = email?.trim() || null;
   const phoneHref = trimmedPhone ? normalizePhoneHref(trimmedPhone) : null;
 
-  if (!trimmedName && !trimmedPhone && !trimmedEmail) {
+  if (!trimmedName && !trimmedServiceAddress && !trimmedPhone && !trimmedEmail) {
     return null;
   }
 
@@ -29,6 +32,7 @@ export function InspectionCustomerContactCard({
     <div className={`rounded-[1.25rem] border border-slate-200 bg-slate-50 ${compact ? "px-3.5 py-3" : "px-4 py-4"}`}>
       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Customer contact</p>
       {trimmedName ? <p className="mt-2 text-sm font-semibold text-slate-950">{trimmedName}</p> : null}
+      {trimmedServiceAddress ? <p className="mt-2 text-sm leading-5 text-slate-600">{trimmedServiceAddress}</p> : null}
       <div className={`mt-3 grid gap-2 ${trimmedPhone && trimmedEmail ? "sm:grid-cols-2" : "grid-cols-1"}`}>
         {trimmedPhone ? (
           phoneHref ? (

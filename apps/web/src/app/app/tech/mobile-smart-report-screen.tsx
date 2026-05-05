@@ -230,6 +230,7 @@ export function MobileSmartReportScreen({
       customerEmail={data.customerEmail}
       customerName={data.customerName}
       customerPhone={data.customerPhone}
+      serviceAddress={data.serviceAddress}
       onSelectReport={handleReportSelect}
       onSelectSection={handleSectionSelect}
       progressLabel={progressLabel}
