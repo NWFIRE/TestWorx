@@ -330,13 +330,26 @@ export function isCurrentVisitTaskSchedulingStatus(status?: string | null) {
 }
 
 function isCurrentVisitTaskForInspection<T extends {
+  dueDate?: Date | string | null;
+  dueMonth?: string | null;
   schedulingStatus?: string | null;
   status?: InspectionStatus | string | null;
 }>(
   task: T,
-  inspection: { convertedFromQuotes?: unknown[] | null }
+  inspection: { convertedFromQuotes?: unknown[] | null; scheduledStart?: Date | string | null }
 ) {
   if (isCurrentVisitTaskSchedulingStatus(task.schedulingStatus ?? "scheduled_now")) {
+    return true;
+  }
+
+  const inspectionDuePeriod = getDateDuePeriod(inspection.scheduledStart ?? null);
+  const taskDuePeriod = getTaskDuePeriodForVisibility(task);
+  if (
+    task.schedulingStatus === "scheduled_future" &&
+    inspectionDuePeriod &&
+    taskDuePeriod === inspectionDuePeriod &&
+    task.status !== InspectionStatus.cancelled
+  ) {
     return true;
   }
 
@@ -345,6 +358,24 @@ function isCurrentVisitTaskForInspection<T extends {
     task.schedulingStatus === "not_scheduled" &&
     task.status !== InspectionStatus.cancelled
   );
+}
+
+function getDateDuePeriod(value?: Date | string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : format(date, "yyyy-MM");
+}
+
+function getTaskDuePeriodForVisibility(input: { dueDate?: Date | string | null; dueMonth?: string | null }) {
+  const normalizedDueMonth = input.dueMonth?.trim();
+  if (normalizedDueMonth && /^\d{4}-\d{2}$/.test(normalizedDueMonth)) {
+    return normalizedDueMonth;
+  }
+
+  return getDateDuePeriod(input.dueDate ?? null);
 }
 
 function formatDueMonthDateAnchor(dueMonth: string | null | undefined) {
@@ -5044,16 +5075,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
       },
       orderBy: [{ scheduledStart: "desc" }]
     }),
-    prisma.technicianReportTypeEligibility.findMany({
-      where: { tenantId, technicianUserId: parsedActor.userId },
-      select: {
-        technicianUserId: true,
-        reportType: true,
-        canBeAssigned: true,
-        canClaim: true,
-        expiresAt: true
-      }
-    })
+    getTechnicianEligibilityRows(prisma as unknown as Prisma.TransactionClient, tenantId, parsedActor.userId)
   ]);
 
   const assignedQueue = assignedInspections

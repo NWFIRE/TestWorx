@@ -155,4 +155,80 @@ describe("technician dashboard inspection access", () => {
     expect(result.unassigned).toHaveLength(1);
     expect(result.unassigned[0]?.id).toBe("inspection_shared");
   });
+
+  it("shows future claimable inspections when their future-scheduled tasks belong to that visit period", async () => {
+    prismaMock.inspection.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "inspection_future_shared",
+          tenantId: "tenant_1",
+          status: InspectionStatus.to_be_completed,
+          inspectionClassification: "standard",
+          isPriority: false,
+          scheduledStart: new Date("2026-10-01T09:00:00.000Z"),
+          site: { id: "site_1", name: "Pinecrest Tower" },
+          customerCompany: { id: "customer_1", name: "Pinecrest Property Management" },
+          assignedTechnician: null,
+          technicianAssignments: [],
+          tasks: [
+            {
+              id: "task_future_shared",
+              inspectionType: "fire_alarm",
+              assignedTechnicianId: null,
+              dueMonth: "2026-10",
+              dueDate: new Date("2026-10-01T00:00:00.000Z"),
+              schedulingStatus: "scheduled_future",
+              status: InspectionStatus.to_be_completed,
+              recurrence: null,
+              report: null
+            }
+          ]
+        }
+      ])
+      .mockResolvedValueOnce([]);
+
+    const result = await getTechnicianDashboardData({ userId: "tech_2", role: "technician", tenantId: "tenant_1" });
+
+    expect(result.unassigned).toHaveLength(1);
+    expect(result.unassigned[0]?.id).toBe("inspection_future_shared");
+    expect(result.unassigned[0]?.tasks).toHaveLength(1);
+  });
+
+  it("does not show future-scheduled tasks parked outside the inspection visit period", async () => {
+    prismaMock.inspection.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "inspection_current_with_later_task",
+          tenantId: "tenant_1",
+          status: InspectionStatus.to_be_completed,
+          inspectionClassification: "standard",
+          isPriority: false,
+          scheduledStart: new Date("2026-04-01T09:00:00.000Z"),
+          site: { id: "site_1", name: "Pinecrest Tower" },
+          customerCompany: { id: "customer_1", name: "Pinecrest Property Management" },
+          assignedTechnician: null,
+          technicianAssignments: [],
+          tasks: [
+            {
+              id: "task_future_parked",
+              inspectionType: "fire_alarm",
+              assignedTechnicianId: null,
+              dueMonth: "2026-10",
+              dueDate: new Date("2026-10-01T00:00:00.000Z"),
+              schedulingStatus: "scheduled_future",
+              status: InspectionStatus.to_be_completed,
+              recurrence: null,
+              report: null
+            }
+          ]
+        }
+      ])
+      .mockResolvedValueOnce([]);
+
+    const result = await getTechnicianDashboardData({ userId: "tech_2", role: "technician", tenantId: "tenant_1" });
+
+    expect(result.unassigned).toHaveLength(0);
+  });
 });
