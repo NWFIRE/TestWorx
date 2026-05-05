@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { getDefaultDashboardPath } from "../auth";
-import { canAccessProductsServicesWorkspace, canAccessQuoteWorkspace } from "../permissions";
+import { canAccessProductsServicesWorkspace, canAccessQuoteWorkspace, canAccessWorkOrderWorkspace } from "../permissions";
 
 describe("dashboard routing", () => {
   it("routes technicians to the technician workspace", () => {
@@ -34,6 +34,18 @@ describe("products and services access", () => {
   it("keeps office admins enabled by default unless products/services access is turned off", () => {
     expect(canAccessProductsServicesWorkspace("office_admin")).toBe(true);
     expect(canAccessProductsServicesWorkspace("office_admin", { productsServicesAccess: false })).toBe(false);
+  });
+});
+
+describe("work order access", () => {
+  it("allows technicians only when work order access is granted", () => {
+    expect(canAccessWorkOrderWorkspace("technician")).toBe(false);
+    expect(canAccessWorkOrderWorkspace("technician", { workOrderAccess: true })).toBe(true);
+  });
+
+  it("keeps office admins enabled by default unless work order access is turned off", () => {
+    expect(canAccessWorkOrderWorkspace("office_admin")).toBe(true);
+    expect(canAccessWorkOrderWorkspace("office_admin", { workOrderAccess: false })).toBe(false);
   });
 });
 

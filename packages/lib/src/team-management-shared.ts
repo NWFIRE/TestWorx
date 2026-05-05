@@ -1,6 +1,7 @@
 export const internalAllowanceKeys = [
   "accountAdmin",
   "schedulingAccess",
+  "workOrderAccess",
   "quoteAccess",
   "billingAccess",
   "productsServicesAccess",
@@ -26,6 +27,7 @@ export type TeamAllowanceMap = Record<TeamAllowanceKey, boolean>;
 export const allowanceLabelMap: Record<TeamAllowanceKey, string> = {
   accountAdmin: "Team admin",
   schedulingAccess: "Scheduling",
+  workOrderAccess: "Work orders",
   quoteAccess: "Quotes",
   billingAccess: "Billing review",
   productsServicesAccess: "Products & services",

@@ -46,3 +46,15 @@ export function canAccessProductsServicesWorkspace(role: string, allowances?: In
   return allowances?.productsServicesAccess ?? false;
 }
 
+export function canAccessWorkOrderWorkspace(role: string, allowances?: InternalAllowances) {
+  if (role === "platform_admin" || role === "tenant_admin") {
+    return true;
+  }
+
+  if (role === "office_admin") {
+    return allowances?.workOrderAccess ?? true;
+  }
+
+  return allowances?.workOrderAccess ?? false;
+}
+

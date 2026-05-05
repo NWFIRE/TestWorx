@@ -85,6 +85,7 @@ const roleLabels: Record<string, string> = {
 const internalAllowanceLabelMap: Record<(typeof internalAllowanceKeys)[number], string> = {
   accountAdmin: "Team admin",
   schedulingAccess: "Scheduling",
+  workOrderAccess: "Work orders",
   quoteAccess: "Quotes",
   billingAccess: "Billing",
   productsServicesAccess: "Products/services pricing",
@@ -106,6 +107,7 @@ function getRoleDefaultAllowances(role: "tenant_admin" | "office_admin" | "techn
   return {
     accountAdmin: role === "tenant_admin" || role === "office_admin",
     schedulingAccess: role === "tenant_admin" || role === "office_admin",
+    workOrderAccess: role === "tenant_admin" || role === "office_admin",
     quoteAccess: role === "tenant_admin" || role === "office_admin",
     billingAccess: role === "tenant_admin" || role === "office_admin",
     productsServicesAccess: role === "tenant_admin" || role === "office_admin",
