@@ -421,6 +421,69 @@ describe("recurrence logic", () => {
     expect(plan[1]?.tasks.every((task) => task.assignedTechnicianId === null)).toBe(true);
   });
 
+  it("does not duplicate a single-system future task when recurrence and explicit future planning overlap", () => {
+    const plan = buildServiceScheduleInspectionPlan({
+      scheduledStart: new Date("2026-04-01T09:00:00.000Z"),
+      inspectionMonth: "2026-04",
+      tasks: [
+        {
+          inspectionType: "fire_extinguisher",
+          frequency: "SEMI_ANNUAL",
+          assignedTechnicianId: "tech_1",
+          dueMonth: "2026-04",
+          dueDate: new Date("2026-04-01T00:00:00.000Z"),
+          schedulingStatus: "scheduled_now"
+        },
+        {
+          inspectionType: "fire_extinguisher",
+          frequency: "SEMI_ANNUAL",
+          assignedTechnicianId: null,
+          dueMonth: "2026-10",
+          dueDate: new Date("2026-10-01T00:00:00.000Z"),
+          schedulingStatus: "scheduled_future",
+          notes: "Explicit October extinguisher visit"
+        }
+      ]
+    });
+
+    const october = plan.find((group) => group.duePeriod === "2026-10");
+
+    expect(october?.tasks.filter((task) => task.inspectionType === "fire_extinguisher")).toHaveLength(1);
+    expect(october?.tasks[0]?.notes).toBe("Explicit October extinguisher visit");
+  });
+
+  it("keeps intentional duplicate multi-system tasks in the same due period", () => {
+    const plan = buildServiceScheduleInspectionPlan({
+      scheduledStart: new Date("2026-04-01T09:00:00.000Z"),
+      inspectionMonth: "2026-04",
+      tasks: [
+        {
+          inspectionType: "kitchen_suppression",
+          frequency: "SEMI_ANNUAL",
+          assignedTechnicianId: "tech_1",
+          dueMonth: "2026-04",
+          dueDate: new Date("2026-04-01T00:00:00.000Z"),
+          schedulingStatus: "scheduled_now",
+          notes: "Main hood"
+        },
+        {
+          inspectionType: "kitchen_suppression",
+          frequency: "SEMI_ANNUAL",
+          assignedTechnicianId: "tech_1",
+          dueMonth: "2026-04",
+          dueDate: new Date("2026-04-01T00:00:00.000Z"),
+          schedulingStatus: "scheduled_now",
+          notes: "Secondary hood"
+        }
+      ]
+    });
+
+    const april = plan.find((group) => group.duePeriod === "2026-04");
+
+    expect(april?.tasks).toHaveLength(2);
+    expect(april?.tasks.map((task) => task.notes)).toEqual(["Main hood", "Secondary hood"]);
+  });
+
   it("does not create current inspection tasks for services due in a later month", () => {
     const plan = buildServiceScheduleInspectionPlan({
       scheduledStart: new Date("2026-04-01T09:00:00.000Z"),

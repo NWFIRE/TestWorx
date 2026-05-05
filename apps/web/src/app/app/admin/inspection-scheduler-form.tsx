@@ -301,6 +301,7 @@ export function InspectionSchedulerForm({
   const [externalDocumentsRequireSignature, setExternalDocumentsRequireSignature] = useState(true);
   const [externalDocumentsCustomerVisible, setExternalDocumentsCustomerVisible] = useState(false);
   const [isUploadingExternalDocuments, setIsUploadingExternalDocuments] = useState(false);
+  const [submitLocked, setSubmitLocked] = useState(false);
   const serviceLineRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const initialValuesSignature = serializeInitialValues(initialValues);
   const filteredSites = useMemo(
@@ -434,6 +435,12 @@ export function InspectionSchedulerForm({
   }, initialState);
 
   useEffect(() => {
+    if (state.error || state.success) {
+      setSubmitLocked(false);
+    }
+  }, [state.error, state.success]);
+
+  useEffect(() => {
     if (!newestServiceLineId) {
       return;
     }
@@ -541,7 +548,19 @@ export function InspectionSchedulerForm({
   }, [router, state.redirectTo]);
 
   return (
-    <form action={formAction} className="min-w-0 overflow-hidden space-y-5 rounded-[1.5rem] bg-white p-4 shadow-panel sm:space-y-6 sm:rounded-[2rem] sm:p-6" ref={formRef}>
+    <form
+      action={formAction}
+      className="min-w-0 overflow-hidden space-y-5 rounded-[1.5rem] bg-white p-4 shadow-panel sm:space-y-6 sm:rounded-[2rem] sm:p-6"
+      onSubmit={(event) => {
+        if (pending || submitLocked || isUploadingExternalDocuments) {
+          event.preventDefault();
+          return;
+        }
+
+        setSubmitLocked(true);
+      }}
+      ref={formRef}
+    >
       {initialValues?.inspectionId ? <input name="inspectionId" type="hidden" value={initialValues.inspectionId} /> : null}
       <input name="serviceLinesJson" type="hidden" value={serviceLinesJson} />
       <input name="inspectionClassification" type="hidden" value={inspectionClassification} />
@@ -1011,14 +1030,14 @@ export function InspectionSchedulerForm({
           <div className="flex flex-wrap gap-3">
             <button
               className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-ember px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
-              disabled={pending || isUploadingExternalDocuments}
+              disabled={pending || submitLocked || isUploadingExternalDocuments}
               type="submit"
             >
-              {pending || isUploadingExternalDocuments ? "Saving new visit..." : protectedSaveConfirmLabel}
+              {pending || submitLocked || isUploadingExternalDocuments ? "Saving new visit..." : protectedSaveConfirmLabel}
             </button>
             <button
               className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-              disabled={pending || isUploadingExternalDocuments}
+              disabled={pending || submitLocked || isUploadingExternalDocuments}
               onClick={() => setShowProtectedSaveConfirm(false)}
               type="button"
             >
@@ -1029,7 +1048,7 @@ export function InspectionSchedulerForm({
       ) : (
         <button
           className="w-full rounded-2xl bg-ember px-5 py-3 text-base font-semibold text-white disabled:opacity-60"
-          disabled={pending || isUploadingExternalDocuments}
+          disabled={pending || submitLocked || isUploadingExternalDocuments}
           onClick={(event) => {
             if (!protectedSaveMode) {
               return;
@@ -1040,7 +1059,7 @@ export function InspectionSchedulerForm({
           }}
           type="submit"
         >
-          {pending ? "Saving schedule..." : isUploadingExternalDocuments ? "Uploading PDFs..." : submitLabel}
+          {pending || submitLocked ? "Saving schedule..." : isUploadingExternalDocuments ? "Uploading PDFs..." : submitLabel}
         </button>
       )}
     </form>

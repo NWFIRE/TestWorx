@@ -792,8 +792,30 @@ export function buildServiceScheduleInspectionPlan(input: {
     }
   });
 
-  const grouped = new Map<string, ServiceScheduleInspectionPlanGroup>();
+  const dedupedOccurrences: ServiceScheduleInspectionPlanTask[] = [];
+  const singleInstanceTaskIndexes = new Map<string, number>();
   for (const task of taskOccurrences) {
+    if (allowsMultipleInspectionTasks(task.inspectionType)) {
+      dedupedOccurrences.push(task);
+      continue;
+    }
+
+    const key = `${task.duePeriod}:${task.inspectionType}`;
+    const existingIndex = singleInstanceTaskIndexes.get(key);
+    if (existingIndex === undefined) {
+      singleInstanceTaskIndexes.set(key, dedupedOccurrences.length);
+      dedupedOccurrences.push(task);
+      continue;
+    }
+
+    const existing = dedupedOccurrences[existingIndex];
+    if (existing?.isGeneratedFutureOccurrence && !task.isGeneratedFutureOccurrence) {
+      dedupedOccurrences[existingIndex] = task;
+    }
+  }
+
+  const grouped = new Map<string, ServiceScheduleInspectionPlanGroup>();
+  for (const task of dedupedOccurrences) {
     const existing = grouped.get(task.duePeriod);
     if (existing) {
       existing.tasks.push(task);
