@@ -7,6 +7,7 @@ import {
   getTechnicianMobileTaskStatusLabel,
   type TechnicianMobileTaskWorkspaceSummary
 } from "./mobile-inspection-workspace";
+import { DispatchNotesCard } from "./dispatch-notes-card";
 import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
 
 type InspectionWorkspaceData = {
@@ -51,6 +52,7 @@ export function MobileInspectionWorkspaceShell({
   customerContactName,
   customerPhone,
   customerEmail,
+  dispatchNotes,
   scheduledDateLabel,
   currentMode,
   saveState
@@ -62,6 +64,7 @@ export function MobileInspectionWorkspaceShell({
   customerContactName?: string | null;
   customerPhone?: string | null;
   customerEmail?: string | null;
+  dispatchNotes?: string | null;
   scheduledDateLabel: string;
   currentMode: "edit" | "review";
   saveState?: string | null;
@@ -102,6 +105,8 @@ export function MobileInspectionWorkspaceShell({
           </p>
         ) : null}
       </div>
+
+      <DispatchNotesCard className="mt-4" compact notes={dispatchNotes} />
 
       {hasCustomerContact ? (
         <div className="mt-4">

@@ -7,6 +7,7 @@ import { useMemo, type KeyboardEvent, type MouseEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { ClaimButton } from "./claim-button";
+import { DispatchNotesCard } from "./dispatch-notes-card";
 import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
 import { isTechnicianActionableSchedulingStatus } from "./mobile-inspection-workspace";
 import { MobileInspectionPdfAccessCard } from "./mobile-inspection-pdf-access-card";
@@ -236,6 +237,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                 <p className="mt-3 text-sm text-slate-600">
                   {formatTechnicianWorkTiming(inspection)}
                 </p>
+                <DispatchNotesCard className="mt-4" compact notes={inspection.notes} />
                 {hasAttachedPdfs(inspection) ? (
                   <div className="mt-4">
                     <MobileInspectionPdfAccessCard
@@ -261,6 +263,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
               {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
               {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}
               <p className="mt-3 text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
+              <DispatchNotesCard className="mt-4" compact notes={inspection.notes} />
               <div className="mt-4">
                 <InspectionCustomerContactCard
                   compact
@@ -311,6 +314,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                     </span>
                   </div>
                   <p className="mt-3 text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
+                  <DispatchNotesCard className="mt-4" compact notes={inspection.notes} />
                   <div className="mt-4">
                     <InspectionCustomerContactCard
                       compact
@@ -361,6 +365,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                 {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
                 {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}
                 <p className="mt-3 text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
+                <DispatchNotesCard className="mt-4" compact notes={inspection.notes} />
                 <div className="mt-4">
                   <InspectionCustomerContactCard
                     compact

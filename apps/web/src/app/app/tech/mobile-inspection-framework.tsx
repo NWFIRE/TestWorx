@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import type { MobileInspectionSectionProgress, MobileInspectionSectionStatus, ReportPrimitiveValue } from "@testworx/lib";
 
 import { buildSafeTaskProgressSummary, getTechnicianMobileTaskStatusLabel, type TechnicianMobileTaskWorkspaceSummary } from "./mobile-inspection-workspace";
+import { DispatchNotesCard } from "./dispatch-notes-card";
 import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
 
 type WorkspaceData = {
@@ -23,6 +24,7 @@ export function MobileInspectionShell({
   customerContactName,
   customerPhone,
   customerEmail,
+  dispatchNotes,
   reportStatus,
   saveState,
   workspace,
@@ -44,6 +46,7 @@ export function MobileInspectionShell({
   customerContactName?: string | null;
   customerPhone?: string | null;
   customerEmail?: string | null;
+  dispatchNotes?: string | null;
   reportStatus: string;
   saveState: string;
   workspace: WorkspaceData;
@@ -93,6 +96,8 @@ export function MobileInspectionShell({
           </div>
 
           <MobileReportNavigator currentMode={reportMode} onSelectReport={onSelectReport} workspace={workspace} />
+
+          <DispatchNotesCard compact notes={dispatchNotes} />
 
           <InspectionCustomerContactCard
             compact

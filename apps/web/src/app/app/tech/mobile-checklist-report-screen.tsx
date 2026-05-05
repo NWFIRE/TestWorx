@@ -219,20 +219,6 @@ function BooleanChips({
   );
 }
 
-function DispatchNotesBanner({ notes }: { notes: string | null | undefined }) {
-  const trimmedNotes = notes?.trim();
-  if (!trimmedNotes) {
-    return null;
-  }
-
-  return (
-    <div className="rounded-[1.25rem] border border-amber-200 bg-amber-50/85 px-4 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-900">Dispatch notes</p>
-      <p className="mt-1 text-sm leading-6 text-amber-950 whitespace-pre-wrap">{trimmedNotes}</p>
-    </div>
-  );
-}
-
 function buildDefaultSeverityOptions() {
   return [
     { label: "Low", value: "low" },
@@ -1143,6 +1129,7 @@ export function MobileChecklistReportScreen({
           customerEmail={data.customerEmail}
           customerName={data.customerName}
           customerPhone={data.customerPhone}
+          dispatchNotes={data.dispatchNotes}
           saveState={saveState}
           scheduledDateLabel={data.scheduledDateLabel}
           serviceAddress={data.serviceAddress}
@@ -1280,13 +1267,13 @@ export function MobileChecklistReportScreen({
         customerEmail={data.customerEmail}
         customerName={data.customerName}
         customerPhone={data.customerPhone}
+        dispatchNotes={data.dispatchNotes}
         saveState={saveState}
         scheduledDateLabel={formatChecklistTimestamp(data.scheduledDateLabel)}
         serviceAddress={data.serviceAddress}
         siteName={data.siteName}
         workspace={data.inspectionWorkspace}
       />
-      <DispatchNotesBanner notes={data.dispatchNotes} />
       {safeChecklistProgress ? (
         <div className="rounded-[1.75rem] bg-white p-5 shadow-panel">
           <div className="flex items-center justify-between text-sm text-slate-600">

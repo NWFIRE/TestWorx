@@ -225,20 +225,6 @@ function toTechnicianFacingStoredSyncMessage(message: string | null | undefined,
     : "Finalization is saved on this iPad. TradeWorx will keep trying to upload it.";
 }
 
-function DispatchNotesBanner({ notes }: { notes: string | null | undefined }) {
-  const trimmedNotes = notes?.trim();
-  if (!trimmedNotes) {
-    return null;
-  }
-
-  return (
-    <div className="mt-3 rounded-[1.25rem] border border-amber-200 bg-amber-50/80 px-4 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-900">Dispatch notes</p>
-      <p className="mt-1 text-sm leading-6 text-amber-950 whitespace-pre-wrap">{trimmedNotes}</p>
-    </div>
-  );
-}
-
 function ReportSelectControl({
   options,
   value,
@@ -1031,6 +1017,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
         customerEmail={data.customerEmail}
         customerName={data.customerName}
         customerPhone={data.customerPhone}
+        dispatchNotes={data.dispatchNotes}
         saveState={saveState}
         scheduledDateLabel={data.scheduledDateLabel}
         serviceAddress={data.serviceAddress}
@@ -1045,7 +1032,6 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
               {(taskDisplayLabel.trim() || data.defaultInspectionTypeLabel)}
             </h2>
           <p className="mt-2 text-sm text-slate-500">{data.defaultInspectionTypeLabel}</p>
-          <DispatchNotesBanner notes={data.dispatchNotes} />
           {data.canEdit && data.reportStatus !== "finalized" ? (
             <div className="mt-4 max-w-xl">
                 <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500" htmlFor={`report-name-${data.reportId}`}>

@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { useSearchParams } from "next/navigation";
 
 import { buildInspectionTaskSummaryLine, isTechnicianActionableSchedulingStatus } from "./mobile-inspection-workspace";
+import { DispatchNotesCard } from "./dispatch-notes-card";
 import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
 import { MobileInspectionPdfAccessCard } from "./mobile-inspection-pdf-access-card";
 import { useOfflineScreenSnapshot } from "./offline/use-offline-screen-snapshot";
@@ -73,6 +74,7 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
             {inspection.tasks.length > 1 ? (
               <p className="mt-3 text-sm text-slate-500">{buildInspectionTaskSummaryLine(inspection.tasks)}</p>
             ) : null}
+            <DispatchNotesCard className="mt-4" compact notes={inspection.notes} />
             <div className="mt-4">
               <InspectionCustomerContactCard
                 compact
@@ -119,6 +121,7 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
             {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
             {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}
             <p className="mt-3 text-sm text-slate-600">Completed {format(toDateValue(inspection.scheduledStart), "MMM d, h:mm a")}</p>
+            <DispatchNotesCard className="mt-4" compact notes={inspection.notes} />
           </article>
         )) : (
           <div className="rounded-[1.75rem] border border-dashed border-slate-200 bg-white p-5 text-sm text-slate-500">
