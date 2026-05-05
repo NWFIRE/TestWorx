@@ -150,6 +150,30 @@ function serializeInitialValues(initialValues?: InspectionSchedulerFormInitialVa
   });
 }
 
+function resolveSchedulerSiteSelection(input: {
+  siteId?: string | null;
+  customerCompanyId?: string | null;
+  sites: SiteOption[];
+  autoSelectGenericSiteOnCustomerChange?: boolean;
+}) {
+  if (input.siteId) {
+    const selectedSite = input.sites.find((site) => site.id === input.siteId);
+    if (
+      selectedSite &&
+      (!input.customerCompanyId || selectedSite.customerCompanyId === input.customerCompanyId) &&
+      !isUserFacingSiteLabel(selectedSite.name)
+    ) {
+      return genericInspectionSiteOptionValue;
+    }
+
+    return input.siteId;
+  }
+
+  return input.customerCompanyId && input.autoSelectGenericSiteOnCustomerChange
+    ? genericInspectionSiteOptionValue
+    : "";
+}
+
 function PickerField({
   id,
   name,
@@ -248,10 +272,12 @@ export function InspectionSchedulerForm({
   const { showToast } = useToast();
   const [selectedCustomerId, setSelectedCustomerId] = useState(initialValues?.customerCompanyId ?? "");
   const [selectedSiteId, setSelectedSiteId] = useState(
-    initialValues?.siteId ??
-      (initialValues?.customerCompanyId && autoSelectGenericSiteOnCustomerChange
-        ? genericInspectionSiteOptionValue
-        : "")
+    () => resolveSchedulerSiteSelection({
+      siteId: initialValues?.siteId,
+      customerCompanyId: initialValues?.customerCompanyId,
+      sites,
+      autoSelectGenericSiteOnCustomerChange
+    })
   );
   const [inspectionClassification, setInspectionClassification] = useState<InspectionClassification>(
     initialValues?.inspectionClassification ?? "standard"
@@ -371,12 +397,12 @@ export function InspectionSchedulerForm({
 
     lastAppliedInitialValuesRef.current = initialValuesSignature;
     setSelectedCustomerId(initialValues.customerCompanyId ?? "");
-    setSelectedSiteId(
-      initialValues.siteId ??
-        (initialValues.customerCompanyId && autoSelectGenericSiteOnCustomerChange
-          ? genericInspectionSiteOptionValue
-          : "")
-    );
+    setSelectedSiteId(resolveSchedulerSiteSelection({
+      siteId: initialValues.siteId,
+      customerCompanyId: initialValues.customerCompanyId,
+      sites,
+      autoSelectGenericSiteOnCustomerChange
+    }));
     setInspectionClassification(initialValues.inspectionClassification ?? "standard");
     setIsPriority(Boolean(initialValues.isPriority));
 
@@ -391,7 +417,7 @@ export function InspectionSchedulerForm({
     setStartManuallyEdited(Boolean(initialValues.scheduledStart));
     setServiceLines(buildInitialServiceLines(initialValues));
     setShowProtectedSaveConfirm(false);
-  }, [autoSelectGenericSiteOnCustomerChange, initialValues, initialValuesSignature]);
+  }, [autoSelectGenericSiteOnCustomerChange, initialValues, initialValuesSignature, sites]);
 
   const [state, formAction, pending] = useActionState(async (previousState: typeof initialState, formData: FormData) => {
     const result = await action(previousState, formData);
