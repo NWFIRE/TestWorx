@@ -1,8 +1,8 @@
 export type SyncQueueStatus = "pending" | "syncing" | "synced" | "failed" | "conflict";
 
-export type SyncQueueEntityType = "inspection_report";
+export type SyncQueueEntityType = "inspection_report" | "work_order_line_item";
 
-export type SyncQueueOperation = "report_autosave" | "report_finalize";
+export type SyncQueueOperation = "report_autosave" | "report_finalize" | "work_order_line_upsert" | "work_order_line_delete";
 
 export type LocalScreenSnapshotKey =
   | "technician-home"
@@ -28,6 +28,28 @@ export type LocalReportDraftRecord = {
   finalizedAt: string | null;
   syncStatus: SyncQueueStatus;
   pendingFinalize: boolean;
+  lastError: string | null;
+};
+
+export type LocalWorkOrderLineItemRecord = {
+  id: string;
+  inspectionId: string;
+  catalogItemId: string | null;
+  itemType: string;
+  name: string;
+  description: string | null;
+  quantity: number;
+  unitPrice: number | null;
+  totalPrice: number | null;
+  taxable: boolean;
+  billableStatus: string;
+  technicianNotes: string | null;
+  source: string;
+  quickBooksItemId: string | null;
+  synced: boolean;
+  invoiced: boolean;
+  localUpdatedAt: string;
+  syncStatus: SyncQueueStatus;
   lastError: string | null;
 };
 

@@ -2,6 +2,7 @@
 
 import type {
   LocalReportDraftRecord,
+  LocalWorkOrderLineItemRecord,
   LocalScreenSnapshotKey,
   OfflineMetaRecord,
   ScreenSnapshotRecord,
@@ -10,9 +11,10 @@ import type {
 } from "./offline-types";
 
 const DATABASE_NAME = "tradeworx-technician-offline";
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const SCREEN_SNAPSHOT_STORE = "screenSnapshots";
 const REPORT_DRAFT_STORE = "reportDrafts";
+const WORK_ORDER_LINE_ITEM_STORE = "workOrderLineItems";
 const SYNC_QUEUE_STORE = "syncQueue";
 const META_STORE = "meta";
 const OFFLINE_CHANGE_EVENT = "tradeworx-offline-change";
@@ -36,6 +38,12 @@ function openDatabase() {
 
       if (!database.objectStoreNames.contains(REPORT_DRAFT_STORE)) {
         database.createObjectStore(REPORT_DRAFT_STORE, { keyPath: "reportId" });
+      }
+
+      if (!database.objectStoreNames.contains(WORK_ORDER_LINE_ITEM_STORE)) {
+        const store = database.createObjectStore(WORK_ORDER_LINE_ITEM_STORE, { keyPath: "id" });
+        store.createIndex("inspectionId", "inspectionId", { unique: false });
+        store.createIndex("syncStatus", "syncStatus", { unique: false });
       }
 
       if (!database.objectStoreNames.contains(SYNC_QUEUE_STORE)) {
@@ -119,6 +127,41 @@ export async function listLocalReportDrafts() {
     request.onsuccess = () => resolve((request.result as LocalReportDraftRecord[] | undefined) ?? []);
     request.onerror = () => reject(request.error);
   });
+}
+
+export async function putLocalWorkOrderLineItem(record: LocalWorkOrderLineItemRecord) {
+  await runTransaction<void>(WORK_ORDER_LINE_ITEM_STORE, "readwrite", (store, resolve, reject) => {
+    const request = store.put(record);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+  notifyOfflineChange();
+}
+
+export async function listLocalWorkOrderLineItems(inspectionId: string) {
+  return runTransaction<LocalWorkOrderLineItemRecord[]>(WORK_ORDER_LINE_ITEM_STORE, "readonly", (store, resolve, reject) => {
+    const index = store.index("inspectionId");
+    const request = index.getAll(inspectionId);
+    request.onsuccess = () => resolve((request.result as LocalWorkOrderLineItemRecord[] | undefined) ?? []);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getLocalWorkOrderLineItem(id: string) {
+  return runTransaction<LocalWorkOrderLineItemRecord | null>(WORK_ORDER_LINE_ITEM_STORE, "readonly", (store, resolve, reject) => {
+    const request = store.get(id);
+    request.onsuccess = () => resolve((request.result as LocalWorkOrderLineItemRecord | undefined) ?? null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function deleteLocalWorkOrderLineItem(id: string) {
+  await runTransaction<void>(WORK_ORDER_LINE_ITEM_STORE, "readwrite", (store, resolve, reject) => {
+    const request = store.delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+  notifyOfflineChange();
 }
 
 export async function putSyncQueueEntry(entry: SyncQueueEntry) {

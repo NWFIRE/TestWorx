@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { SetStateAction } from "react";
 import { useRouter } from "next/navigation";
 
@@ -25,7 +25,11 @@ import {
   MobileSectionList
 } from "./mobile-inspection-framework";
 import type { TechnicianReportEditorData } from "./report-editor";
+import { SearchSelect, type SearchSelectOption } from "@/app/search-select";
 import { SignaturePad } from "./signature-pad";
+import { deleteLocalWorkOrderLineItem, listLocalWorkOrderLineItems, putLocalWorkOrderLineItem, subscribeToOfflineChanges } from "./offline/offline-db";
+import { queueWorkOrderLineItemDelete, queueWorkOrderLineItemUpsert } from "./offline/offline-sync";
+import type { LocalWorkOrderLineItemRecord } from "./offline/offline-types";
 import { useMobileReportDraftController } from "./use-mobile-report-draft-controller";
 
 type SmartTab = "overview" | "checklist" | "issues" | "photos" | "review";
@@ -366,7 +370,289 @@ function OverviewTab({
           <p className="mt-2 text-sm leading-6 text-blue-950">{data.draft.context.priorReportSummary}</p>
         </section>
       ) : null}
+      {data.template.label.toLowerCase().includes("work order") ? (
+        <WorkOrderProductsAndServicesCard data={data} disabled={!data.canEdit || data.reportStatus === "finalized"} />
+      ) : null}
     </div>
+  );
+}
+
+function formatCatalogType(value: string) {
+  return value.replaceAll("_", " ").replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function buildCatalogOptionLabel(item: NonNullable<TechnicianReportEditorData["workOrderCatalogItems"]>[number]) {
+  return [
+    formatCatalogType(item.itemType),
+    item.description,
+    item.sku ? `SKU ${item.sku}` : null,
+    item.unitPrice !== null ? `$${item.unitPrice.toFixed(2)}` : null,
+    item.taxable ? "Taxable" : "Non-taxable",
+    item.quickbooksItemId ? "QuickBooks mapped" : "No QuickBooks mapping"
+  ].filter(Boolean).join(" | ");
+}
+
+function buildLocalWorkOrderLineId() {
+  return `wol-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function toLocalWorkOrderLineRecord(
+  line: NonNullable<TechnicianReportEditorData["workOrderLineItems"]>[number]
+): LocalWorkOrderLineItemRecord {
+  return {
+    ...line,
+    localUpdatedAt: new Date().toISOString(),
+    syncStatus: line.synced ? "synced" : "pending",
+    lastError: null
+  };
+}
+
+function mergeWorkOrderLines(
+  serverLines: LocalWorkOrderLineItemRecord[],
+  localLines: LocalWorkOrderLineItemRecord[]
+) {
+  const merged = new Map(serverLines.map((line) => [line.id, line] as const));
+  for (const line of localLines) {
+    merged.set(line.id, line);
+  }
+  return [...merged.values()].sort((left, right) => left.localUpdatedAt.localeCompare(right.localUpdatedAt));
+}
+
+function WorkOrderProductsAndServicesCard({
+  data,
+  disabled
+}: {
+  data: TechnicianReportEditorData;
+  disabled: boolean;
+}) {
+  const catalogItems = useMemo(() => data.workOrderCatalogItems ?? [], [data.workOrderCatalogItems]);
+  const serverLines = useMemo(
+    () => (data.workOrderLineItems ?? []).map(toLocalWorkOrderLineRecord),
+    [data.workOrderLineItems]
+  );
+  const [lines, setLines] = useState<LocalWorkOrderLineItemRecord[]>(serverLines);
+  const [catalogItemId, setCatalogItemId] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [unitPrice, setUnitPrice] = useState("");
+  const [billableStatus, setBillableStatus] = useState("billable");
+  const [technicianNotes, setTechnicianNotes] = useState("");
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const selectedCatalogItem = catalogItems.find((item) => item.id === catalogItemId) ?? null;
+  const options = useMemo<SearchSelectOption[]>(() => catalogItems.map((item) => ({
+    value: item.id,
+    label: item.name,
+    secondaryLabel: buildCatalogOptionLabel(item),
+    badge: item.quickbooksItemId ? "QB mapped" : "Unmapped"
+  })), [catalogItems]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function hydrateLines() {
+      const localLines = await listLocalWorkOrderLineItems(data.inspectionWorkspace.inspectionId);
+      if (cancelled) {
+        return;
+      }
+      setLines(mergeWorkOrderLines(serverLines, localLines));
+    }
+
+    void hydrateLines();
+    const unsubscribe = subscribeToOfflineChanges(() => {
+      void hydrateLines();
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [data.inspectionWorkspace.inspectionId, serverLines]);
+
+  function applyCatalogSelection(nextCatalogItemId: string) {
+    const item = catalogItems.find((candidate) => candidate.id === nextCatalogItemId) ?? null;
+    setCatalogItemId(nextCatalogItemId);
+    setUnitPrice(typeof item?.unitPrice === "number" ? item.unitPrice.toFixed(2) : "");
+  }
+
+  async function addLine() {
+    if (disabled || !selectedCatalogItem) {
+      return;
+    }
+
+    const safeQuantity = Number.isFinite(quantity) ? Math.max(1, Math.trunc(quantity)) : 1;
+    const parsedUnitPrice = unitPrice.trim().length > 0 ? Number(unitPrice) : selectedCatalogItem.unitPrice ?? 0;
+    const safeUnitPrice = Number.isFinite(parsedUnitPrice) ? parsedUnitPrice : selectedCatalogItem.unitPrice ?? 0;
+    const record: LocalWorkOrderLineItemRecord = {
+      id: buildLocalWorkOrderLineId(),
+      inspectionId: data.inspectionWorkspace.inspectionId,
+      catalogItemId: selectedCatalogItem.id,
+      itemType: selectedCatalogItem.itemType,
+      name: selectedCatalogItem.name,
+      description: selectedCatalogItem.description,
+      quantity: safeQuantity,
+      unitPrice: safeUnitPrice,
+      totalPrice: Number((safeQuantity * safeUnitPrice).toFixed(2)),
+      taxable: selectedCatalogItem.taxable,
+      billableStatus,
+      technicianNotes: technicianNotes.trim() || null,
+      source: "technician_selected",
+      quickBooksItemId: selectedCatalogItem.quickbooksItemId,
+      synced: false,
+      invoiced: false,
+      localUpdatedAt: new Date().toISOString(),
+      syncStatus: "pending",
+      lastError: null
+    };
+
+    await putLocalWorkOrderLineItem(record);
+    await queueWorkOrderLineItemUpsert({
+      id: record.id,
+      inspectionId: record.inspectionId,
+      catalogItemId: selectedCatalogItem.id,
+      quantity: record.quantity,
+      unitPrice: record.unitPrice,
+      billableStatus: record.billableStatus,
+      technicianNotes: record.technicianNotes
+    });
+    setLines((current) => mergeWorkOrderLines(current, [record]));
+    setCatalogItemId("");
+    setQuantity(1);
+    setUnitPrice("");
+    setBillableStatus("billable");
+    setTechnicianNotes("");
+    setStatusMessage(window.navigator.onLine ? "Line item saved and queued for sync." : "Line item saved on this device. It will sync when service returns.");
+  }
+
+  async function removeLine(line: LocalWorkOrderLineItemRecord) {
+    if (line.invoiced) {
+      setStatusMessage("This item has already been invoiced and cannot be removed from mobile.");
+      return;
+    }
+    await deleteLocalWorkOrderLineItem(line.id);
+    await queueWorkOrderLineItemDelete({ id: line.id, inspectionId: line.inspectionId });
+    setLines((current) => current.filter((item) => item.id !== line.id));
+    setStatusMessage(window.navigator.onLine ? "Line item removal queued." : "Removal saved on this device and will sync later.");
+  }
+
+  const billableTotal = lines
+    .filter((line) => line.billableStatus === "billable")
+    .reduce((sum, line) => sum + Number(line.totalPrice ?? (line.quantity * (line.unitPrice ?? 0))), 0);
+
+  return (
+    <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-panel">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Products & services</p>
+          <h3 className="mt-2 text-xl font-semibold text-slate-950">Work performed for billing</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            Select actual parts, labor, services, or fees from the full catalog. These items save locally first and feed invoice billing after sync.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-right">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Billable</p>
+          <p className="text-lg font-semibold text-slate-950">${billableTotal.toFixed(2)}</p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3">
+        <SearchSelect
+          customValue={selectedCatalogItem?.name ?? ""}
+          disabled={disabled}
+          emptyText="No active products or services matched that search."
+          label="Product / service"
+          onChange={applyCatalogSelection}
+          options={options}
+          placeholder="Search full catalog"
+          value={catalogItemId}
+        />
+        <div className="grid gap-3 sm:grid-cols-[0.5fr_0.65fr_1fr]">
+          <label className="block text-sm text-slate-600">
+            Quantity
+            <input
+              className="mt-2 min-h-12 w-full rounded-2xl border border-slate-200 px-4 py-3 text-base disabled:bg-slate-50"
+              disabled={disabled}
+              inputMode="numeric"
+              min="1"
+              onChange={(event) => setQuantity(Math.max(1, Math.trunc(Number(event.target.value || 1))))}
+              step="1"
+              type="number"
+              value={quantity > 0 ? String(quantity) : ""}
+            />
+          </label>
+          <label className="block text-sm text-slate-600">
+            Unit price
+            <input
+              className="mt-2 min-h-12 w-full rounded-2xl border border-slate-200 px-4 py-3 text-base disabled:bg-slate-50"
+              disabled={disabled}
+              onChange={(event) => setUnitPrice(event.target.value)}
+              placeholder="0.00"
+              step="0.01"
+              type="number"
+              value={unitPrice}
+            />
+          </label>
+          <label className="block text-sm text-slate-600">
+            Billing status
+            <select
+              className="mt-2 min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base disabled:bg-slate-50"
+              disabled={disabled}
+              onChange={(event) => setBillableStatus(event.target.value)}
+              value={billableStatus}
+            >
+              <option value="billable">Billable</option>
+              <option value="no_charge">No charge</option>
+              <option value="included">Included</option>
+              <option value="warranty">Warranty</option>
+              <option value="not_billable">Not billable</option>
+            </select>
+          </label>
+        </div>
+        <label className="block text-sm text-slate-600">
+          Notes
+          <textarea
+            className="mt-2 min-h-20 w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-base disabled:bg-slate-50"
+            disabled={disabled}
+            onChange={(event) => setTechnicianNotes(event.target.value)}
+            placeholder="Optional note for office billing review"
+            value={technicianNotes}
+          />
+        </label>
+        <button
+          className="min-h-12 rounded-2xl bg-[var(--tenant-primary)] px-5 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)] disabled:opacity-50"
+          disabled={disabled || !catalogItemId}
+          onClick={addLine}
+          type="button"
+        >
+          Add product/service
+        </button>
+      </div>
+
+      {statusMessage ? <p className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">{statusMessage}</p> : null}
+
+      <div className="mt-5 space-y-3">
+        {lines.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No products or services added yet.</p>
+        ) : lines.map((line) => (
+          <div key={line.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold text-slate-950">{line.name}</p>
+                <p className="mt-1 text-sm text-slate-500">{formatCatalogType(line.itemType)} | Qty {line.quantity} | ${(line.totalPrice ?? line.quantity * (line.unitPrice ?? 0)).toFixed(2)}</p>
+                <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{line.billableStatus.replaceAll("_", " ")}</p>
+                {line.technicianNotes ? <p className="mt-2 text-sm leading-6 text-slate-600">{line.technicianNotes}</p> : null}
+                {line.syncStatus !== "synced" ? <p className="mt-2 text-xs font-semibold text-amber-700">Saved on device / {line.syncStatus}</p> : null}
+                {line.lastError ? <p className="mt-2 text-xs font-semibold text-rose-700">{line.lastError}</p> : null}
+              </div>
+              <button
+                className="rounded-2xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 disabled:opacity-50"
+                disabled={disabled || line.invoiced}
+                onClick={() => { void removeLine(line); }}
+                type="button"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

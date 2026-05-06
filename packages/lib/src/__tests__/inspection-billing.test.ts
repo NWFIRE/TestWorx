@@ -22,6 +22,7 @@ const { prismaMock, txMock } = vi.hoisted(() => ({
     billingItemCatalogMatch: { findUnique: vi.fn(), upsert: vi.fn() },
     quickBooksCatalogItem: { findFirst: vi.fn(), findMany: vi.fn() },
     quickBooksCatalogItemAlias: { findMany: vi.fn(), upsert: vi.fn() },
+    workOrderLineItem: { findMany: vi.fn(), updateMany: vi.fn() },
     inspectionBillingSummary: { findFirst: vi.fn(), update: vi.fn() },
     auditLog: { create: vi.fn() }
   },
@@ -39,7 +40,8 @@ const { prismaMock, txMock } = vi.hoisted(() => ({
     tenant: { findUnique: vi.fn() },
     serviceFeeRule: { findMany: vi.fn() },
     minimumTicketRule: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
-    complianceReportingFeeRule: { findFirst: vi.fn(), findMany: vi.fn() }
+    complianceReportingFeeRule: { findFirst: vi.fn(), findMany: vi.fn() },
+    workOrderLineItem: { findMany: vi.fn(), updateMany: vi.fn() }
   }
 }));
 
@@ -484,10 +486,12 @@ describe("inspection billing extraction", () => {
     txMock.minimumTicketRule.findMany.mockReset();
     txMock.complianceReportingFeeRule.findFirst.mockReset();
     txMock.complianceReportingFeeRule.findMany.mockReset();
+    txMock.workOrderLineItem.findMany.mockReset();
     prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
     prismaMock.quickBooksCatalogItemAlias.findMany.mockResolvedValue([]);
+    prismaMock.workOrderLineItem.findMany.mockResolvedValue([]);
     prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof prismaMock) => Promise<unknown>) => callback(prismaMock as never));
     prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
     prismaMock.inspectionBillingSummary.findFirst.mockResolvedValue(null);
@@ -784,6 +788,39 @@ describe("inspection billing extraction", () => {
     expect(grouped.labor[0]?.unitPrice).toBe(125);
   });
 
+  it("preserves admin manual billing lines during summary refresh", () => {
+    const extracted = extractBillableItemsFromDraft({
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1",
+      reportId: "report_1",
+      reportType: "fire_alarm",
+      draft: buildFireAlarmDraft()
+    });
+
+    const merged = mergeBillingItems(
+      [
+        {
+          id: "manual_line_1",
+          tenantId: "tenant_1",
+          inspectionId: "inspection_1",
+          reportId: "inspection_1",
+          reportType: "inspection",
+          sourceSection: "manual-billing",
+          sourceField: "admin-added",
+          category: "service",
+          description: "Extra diagnostic service",
+          quantity: 1,
+          unitPrice: 85,
+          amount: 85,
+          metadata: { manualBillingLine: true }
+        }
+      ],
+      extracted
+    );
+
+    expect(merged.some((item) => item.id === "manual_line_1")).toBe(true);
+  });
+
   it("groups identical review rows into one consolidated billing line", () => {
     const grouped = groupBillingReviewItems([
       {
@@ -903,6 +940,7 @@ describe("inspection billing persistence and admin review", () => {
     txMock.providerContractRate.findMany.mockResolvedValue([]);
     txMock.billingResolutionSnapshot.findFirst.mockResolvedValue(null);
     txMock.billingResolutionSnapshot.create.mockResolvedValue({ id: "billing_resolution_1" });
+    txMock.workOrderLineItem.findMany.mockResolvedValue([]);
     prismaMock.tenant.findUnique.mockResolvedValue({
       defaultServiceFeeCode: "SERVICE_FEE",
       defaultServiceFeeUnitPrice: 95
@@ -1297,6 +1335,76 @@ describe("inspection billing persistence and admin review", () => {
       })
     );
     expect(txMock.$executeRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it("includes billable work order line items in auto billing summaries", async () => {
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      inspectionClassification: "standard"
+    });
+    txMock.tenant.findUnique.mockResolvedValue({
+      defaultServiceFeeCode: "SERVICE_FEE",
+      defaultServiceFeeUnitPrice: 95
+    });
+    txMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    txMock.site.findFirst.mockResolvedValue({
+      city: "Chicago",
+      state: "IL"
+    });
+    txMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
+    txMock.workOrderLineItem.findMany.mockResolvedValue([
+      {
+        id: "work_line_1",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        catalogItemId: "catalog_part_1",
+        itemType: "part",
+        name: "2.5 lb ABC extinguisher",
+        description: "New 2.5 lb ABC extinguisher",
+        quantity: 2,
+        unitPrice: 51.95,
+        totalPrice: 103.9,
+        taxable: true,
+        billableStatus: "billable",
+        technicianNotes: "Customer requested replacement units.",
+        source: "technician_selected",
+        quickBooksItemId: "qb_part_1",
+        invoicedAt: null,
+        catalogItem: {
+          id: "catalog_part_1",
+          name: "2.5 lb ABC extinguisher",
+          quickbooksItemId: "qb_part_1",
+          taxable: true,
+          unitPrice: 51.95,
+          rawJson: { SalesTaxCodeRef: { value: "TAX" } }
+        }
+      }
+    ]);
+
+    txMock.$queryRaw
+      .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1", inspectionClassification: "standard" }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const summary = await syncInspectionBillingSummaryTx(txMock as never, {
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1"
+    });
+
+    const workOrderLine = summary?.items.find((item) => item.metadata?.workOrderLineItemId === "work_line_1");
+    expect(workOrderLine).toEqual(expect.objectContaining({
+      reportType: "work_order",
+      category: "material",
+      description: "New 2.5 lb ABC extinguisher",
+      quantity: 2,
+      unitPrice: 51.95,
+      amount: 103.9,
+      linkedCatalogItemId: "catalog_part_1",
+      linkedQuickBooksItemId: "qb_part_1",
+      taxable: true
+    }));
   });
 
   it("snapshots contract-provider billing resolution during summary sync", async () => {

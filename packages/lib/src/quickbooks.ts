@@ -4806,6 +4806,18 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
         where: { id: summary.inspectionId },
         data: { status: InspectionStatus.invoiced }
       });
+      await tx.workOrderLineItem.updateMany({
+        where: {
+          tenantId: parsedActor.tenantId as string,
+          inspectionId: summary.inspectionId,
+          billableStatus: "billable",
+          invoicedAt: null
+        },
+        data: {
+          invoicedBillingSummaryId: summary.id,
+          invoicedAt: new Date()
+        }
+      });
       await syncInspectionArchiveStateTx(tx, {
         tenantId: parsedActor.tenantId as string,
         inspectionId: summary.inspectionId

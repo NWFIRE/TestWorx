@@ -15,6 +15,36 @@ import type { TechnicianMobileTaskWorkspaceSummary } from "./mobile-inspection-w
 import { MobileInspectionWorkspaceShell } from "./mobile-inspection-workspace-shell";
 import { SignaturePad } from "./signature-pad";
 
+export type WorkOrderCatalogItemForMobile = {
+  id: string;
+  quickbooksItemId: string;
+  name: string;
+  sku: string | null;
+  itemType: string;
+  description: string | null;
+  unitPrice: number | null;
+  taxable: boolean;
+};
+
+export type WorkOrderLineItemForMobile = {
+  id: string;
+  inspectionId: string;
+  catalogItemId: string | null;
+  itemType: string;
+  name: string;
+  description: string | null;
+  quantity: number;
+  unitPrice: number | null;
+  totalPrice: number | null;
+  taxable: boolean;
+  billableStatus: string;
+  technicianNotes: string | null;
+  source: string;
+  quickBooksItemId: string | null;
+  synced: boolean;
+  invoiced: boolean;
+};
+
 export type TechnicianReportEditorData = {
   reportId: string;
   reportStatus: "draft" | "submitted" | "finalized";
@@ -41,6 +71,8 @@ export type TechnicianReportEditorData = {
   };
   dispatchNotes?: string | null;
   paymentCollectionNotice?: string | null;
+  workOrderCatalogItems?: WorkOrderCatalogItemForMobile[];
+  workOrderLineItems?: WorkOrderLineItemForMobile[];
   template: ReportTemplateDefinition;
   draft: ReportDraft;
 };

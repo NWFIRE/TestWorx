@@ -639,6 +639,20 @@ function clearCatalogTaxSnapshot() {
   };
 }
 
+function mapWorkOrderLineItemTypeToBillingCategory(itemType: string): BillableCategory {
+  const normalized = itemType.toLowerCase();
+  if (normalized.includes("labor")) {
+    return "labor";
+  }
+  if (normalized.includes("part") || normalized.includes("material") || normalized.includes("inventory") || normalized.includes("replacement")) {
+    return "material";
+  }
+  if (normalized.includes("fee")) {
+    return "fee";
+  }
+  return "service";
+}
+
 function generateManualBillingLineId() {
   return `manual-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -1376,10 +1390,76 @@ export function extractBillableItemsFromFinalizedReport(input: {
   });
 }
 
+async function extractBillableItemsFromWorkOrderLineItemsTx(tx: TransactionClient, input: {
+  tenantId: string;
+  inspectionId: string;
+}) {
+  const lines = await tx.workOrderLineItem.findMany({
+    where: {
+      tenantId: input.tenantId,
+      inspectionId: input.inspectionId,
+      billableStatus: "billable",
+      invoicedAt: null
+    },
+    include: {
+      catalogItem: {
+        select: {
+          id: true,
+          name: true,
+          quickbooksItemId: true,
+          taxable: true,
+          unitPrice: true,
+          rawJson: true
+        }
+      }
+    },
+    orderBy: [{ createdAt: "asc" }]
+  });
+
+  return lines.map((line) => {
+    const quantity = line.quantity > 0 ? line.quantity : 1;
+    const unitPrice = line.unitPrice ?? line.catalogItem?.unitPrice ?? 0;
+    return {
+      id: `work-order-line:${line.id}`,
+      tenantId: input.tenantId,
+      inspectionId: input.inspectionId,
+      reportId: input.inspectionId,
+      reportType: "work_order",
+      sourceSection: "work-order-line-items",
+      sourceField: line.source,
+      category: mapWorkOrderLineItemTypeToBillingCategory(line.itemType),
+      code: line.quickBooksItemId ? `CATALOG_${line.quickBooksItemId}` : undefined,
+      description: line.description?.trim() || line.name,
+      quantity,
+      unit: "each",
+      unitPrice,
+      amount: calculateAmount(quantity, unitPrice),
+      metadata: {
+        workOrderLineItemId: line.id,
+        catalogItemId: line.catalogItemId,
+        source: line.source,
+        billableStatus: line.billableStatus,
+        technicianNotes: line.technicianNotes,
+        sourceQuantity: quantity
+      },
+      linkedCatalogItemId: line.catalogItem?.id ?? line.catalogItemId,
+      linkedCatalogItemName: line.catalogItem?.name ?? line.name,
+      linkedQuickBooksItemId: line.catalogItem?.quickbooksItemId ?? line.quickBooksItemId,
+      linkedMatchMethod: "work_order_line_item",
+      linkedMatchConfidence: 1,
+      ...buildCatalogTaxSnapshot({
+        quickbooksItemId: line.catalogItem?.quickbooksItemId ?? line.quickBooksItemId,
+        taxable: line.taxable,
+        rawJson: line.catalogItem?.rawJson ?? null
+      })
+    } satisfies BillableItem;
+  });
+}
+
 export function mergeBillingItems(existingItems: BillableItem[], nextItems: BillableItem[]) {
   const existingById = new Map(existingItems.map((item) => [item.id, item] as const));
 
-  return nextItems.map((item) => {
+  const mergedItems = nextItems.map((item) => {
     const existing = existingById.get(item.id);
     const sourceQuantity = item.quantity;
     const existingSourceQuantity = typeof existing?.metadata?.sourceQuantity === "number" ? existing.metadata.sourceQuantity : undefined;
@@ -1399,6 +1479,13 @@ export function mergeBillingItems(existingItems: BillableItem[], nextItems: Bill
       }
     };
   });
+
+  const nextIds = new Set(nextItems.map((item) => item.id));
+  const preservedManualItems = existingItems.filter((item) =>
+    item.metadata?.manualBillingLine === true && !nextIds.has(item.id)
+  );
+
+  return [...mergedItems, ...preservedManualItems];
 }
 
 export function groupBillableItems(items: BillableItem[]) {
@@ -3249,6 +3336,7 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
       contentJson: report.contentJson
     })
   );
+  extracted.push(...await extractBillableItemsFromWorkOrderLineItemsTx(db, input));
 
   extracted.push(await buildInspectionServiceFeeItemTx(db, input));
   extracted.push(...await buildComplianceReportingFeeItemsTx(db, {

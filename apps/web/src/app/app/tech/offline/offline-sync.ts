@@ -3,14 +3,16 @@
 import {
   deleteSyncQueueEntry,
   getLocalReportDraft,
+  getLocalWorkOrderLineItem,
   getOfflineMeta,
   getSyncQueueEntry,
   listSyncQueueEntries,
+  putLocalWorkOrderLineItem,
   putLocalReportDraft,
   putOfflineMeta,
   putSyncQueueEntry
 } from "./offline-db";
-import type { LocalReportDraftRecord, SyncQueueEntry, SyncSummary } from "./offline-types";
+import type { LocalReportDraftRecord, LocalWorkOrderLineItemRecord, SyncQueueEntry, SyncSummary } from "./offline-types";
 
 const LAST_SYNC_META_KEY = "last-sync-at";
 const STALE_SYNCING_ENTRY_MS = 30_000;
@@ -28,6 +30,10 @@ function nowIso() {
 
 function buildQueueId(reportId: string, operation: SyncQueueEntry["operation"]) {
   return `inspection_report:${reportId}:${operation}`;
+}
+
+function buildWorkOrderLineQueueId(lineItemId: string, operation: SyncQueueEntry["operation"]) {
+  return `work_order_line_item:${lineItemId}:${operation}`;
 }
 
 function toConflictStatus(message: string | null | undefined) {
@@ -143,6 +149,47 @@ async function syncReportFinalize(entry: SyncQueueEntry) {
   }
 }
 
+async function syncWorkOrderLineUpsert(entry: SyncQueueEntry) {
+  const response = await fetch("/api/work-orders/line-items", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "upsert", ...entry.payload })
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw Object.assign(new Error(payload.error ?? "Unable to sync work order line item."), {
+      syncConflict: response.status === 409 || toConflictStatus(payload.error)
+    });
+  }
+
+  const lineItem = payload.lineItem as LocalWorkOrderLineItemRecord | undefined;
+  if (lineItem?.id) {
+    await putLocalWorkOrderLineItem({
+      ...lineItem,
+      synced: true,
+      syncStatus: "synced",
+      localUpdatedAt: nowIso(),
+      lastError: null
+    });
+  }
+}
+
+async function syncWorkOrderLineDelete(entry: SyncQueueEntry) {
+  const response = await fetch("/api/work-orders/line-items", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "delete", ...entry.payload })
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw Object.assign(new Error(payload.error ?? "Unable to remove work order line item."), {
+      syncConflict: response.status === 409 || toConflictStatus(payload.error)
+    });
+  }
+}
+
 async function markQueueEntryStatus(entry: SyncQueueEntry, status: SyncQueueEntry["status"], lastError: string | null) {
   await putSyncQueueEntry({
     ...entry,
@@ -194,6 +241,10 @@ export async function processSyncQueue() {
           await syncReportAutosave(current);
         } else if (current.operation === "report_finalize") {
           await syncReportFinalize(current);
+        } else if (current.operation === "work_order_line_upsert") {
+          await syncWorkOrderLineUpsert(current);
+        } else if (current.operation === "work_order_line_delete") {
+          await syncWorkOrderLineDelete(current);
         }
 
         const latest = await getSyncQueueEntry(current.id);
@@ -244,6 +295,17 @@ export async function processSyncQueue() {
               syncStatus: (error as { syncConflict?: boolean } | undefined)?.syncConflict ? "conflict" : "failed",
               lastError: message
             });
+          }
+          if (current.entityType === "work_order_line_item") {
+            const localLine = await getLocalWorkOrderLineItem(current.entityId);
+            if (localLine) {
+              await putLocalWorkOrderLineItem({
+                ...localLine,
+                syncStatus: (error as { syncConflict?: boolean } | undefined)?.syncConflict ? "conflict" : "failed",
+                lastError: message,
+                localUpdatedAt: nowIso()
+              });
+            }
           }
         }
       }
@@ -350,6 +412,45 @@ export async function queueReportFinalizeSync(input: {
       inspectionReportId: input.inspectionReportId,
       contentJson: input.contentJson,
       taskDisplayLabel: input.taskDisplayLabel
+    }
+  });
+  void processSyncQueue();
+}
+
+export async function queueWorkOrderLineItemUpsert(input: {
+  id: string;
+  inspectionId: string;
+  catalogItemId: string;
+  quantity: number;
+  unitPrice: number | null;
+  billableStatus: string;
+  technicianNotes: string | null;
+}) {
+  await deleteSyncQueueEntry(buildWorkOrderLineQueueId(input.id, "work_order_line_delete"));
+  await upsertPendingQueueEntry({
+    id: buildWorkOrderLineQueueId(input.id, "work_order_line_upsert"),
+    entityType: "work_order_line_item",
+    entityId: input.id,
+    operation: "work_order_line_upsert",
+    payload: input
+  });
+  void processSyncQueue();
+}
+
+export async function queueWorkOrderLineItemDelete(input: {
+  id: string;
+  inspectionId: string;
+}) {
+  await deleteSyncQueueEntry(buildWorkOrderLineQueueId(input.id, "work_order_line_upsert"));
+  await upsertPendingQueueEntry({
+    id: buildWorkOrderLineQueueId(input.id, "work_order_line_delete"),
+    entityType: "work_order_line_item",
+    entityId: input.id,
+    operation: "work_order_line_delete",
+    payload: {
+      id: input.id,
+      lineItemId: input.id,
+      inspectionId: input.inspectionId
     }
   });
   void processSyncQueue();
