@@ -5,7 +5,6 @@ import {
   CalendarDays,
   CircleAlert,
   ClipboardList,
-  CreditCard,
   FileText,
   Search,
   ShieldCheck,
@@ -19,11 +18,12 @@ import {
   formatTenantDate,
   formatTenantDateTime,
   getAdminDashboardData,
+  getAdminBillingSummaries,
   getAdminDeficiencyDashboardData,
-  getAdminReportReviewQueueData,
   getAdminSchedulingQueueData,
   getInspectionStatusTone,
   isDueAtTimeOfServiceCustomer,
+  isOpenBillingQueueStatus,
   pickEarliestNextDueAt
 } from "@testworx/lib/server/index";
 
@@ -39,6 +39,7 @@ import {
 } from "../operations-ui";
 
 type AdminDashboardData = Awaited<ReturnType<typeof getAdminDashboardData>>;
+type AdminBillingSummary = Awaited<ReturnType<typeof getAdminBillingSummaries>>[number];
 type CompletedDashboardInspection = AdminDashboardData["completedInspections"][number];
 type ActiveDashboardInspection = AdminDashboardData["activeInspections"][number];
 type DashboardInspection = CompletedDashboardInspection | ActiveDashboardInspection;
@@ -119,7 +120,7 @@ function buildActivityItems(
   }));
 }
 
-function buildAlertItems(data: AdminDashboardData, inspectionNotice?: string) {
+function buildAlertItems(data: AdminDashboardData, readyToBillCount: number, inspectionNotice?: string) {
   const alerts: string[] = [];
 
   if (inspectionNotice === "deleted") {
@@ -141,12 +142,9 @@ function buildAlertItems(data: AdminDashboardData, inspectionNotice?: string) {
     );
   }
 
-  const reviewedBillingCount = data.completedInspections.filter(
-    (inspection) => inspection.billingStatus === "reviewed"
-  ).length;
-  if (reviewedBillingCount > 0) {
+  if (readyToBillCount > 0) {
     alerts.push(
-      `${reviewedBillingCount} completed report${reviewedBillingCount === 1 ? "" : "s"} are Ready To Bill.`
+      `${readyToBillCount} billing summar${readyToBillCount === 1 ? "y is" : "ies are"} Ready To Bill.`
     );
   }
 
@@ -163,34 +161,16 @@ function buildAlertItems(data: AdminDashboardData, inspectionNotice?: string) {
 }
 
 function calculateBillingPipeline(
-  inspections: CompletedDashboardInspection[]
+  summaries: AdminBillingSummary[]
 ): Array<{ label: string; value: number; tone: string }> {
-  const total = inspections.length || 1;
-  const draft = inspections.filter(
-    (inspection) => !inspection.billingStatus || inspection.billingStatus === "draft"
-  ).length;
-  const reviewed = inspections.filter(
-    (inspection) => inspection.billingStatus === "reviewed"
-  ).length;
-  const invoiced = inspections.filter(
-    (inspection) => inspection.billingStatus === "invoiced"
-  ).length;
+  const total = summaries.length || 1;
+  const readyToBill = summaries.filter((summary) => isOpenBillingQueueStatus(summary.status)).length;
+  const invoiced = summaries.filter((summary) => summary.status === "invoiced").length;
 
   return [
-    { label: "Ready To Bill", value: Math.round(((draft + reviewed) / total) * 100), tone: "bg-slateblue" },
+    { label: "Ready To Bill", value: Math.round((readyToBill / total) * 100), tone: "bg-slateblue" },
     { label: "Invoiced", value: Math.round((invoiced / total) * 100), tone: "bg-violet-500" }
   ];
-}
-
-function formatBillingReady(inspections: CompletedDashboardInspection[]) {
-  const readyToBillCount = inspections.filter(
-    (inspection) => !inspection.billingStatus || inspection.billingStatus === "draft" || inspection.billingStatus === "reviewed"
-  ).length;
-
-  return {
-    value: readyToBillCount.toString(),
-    change: readyToBillCount ? "Ready To Bill" : "No billing items queued"
-  };
 }
 
 function InspectionListCard({
@@ -286,14 +266,14 @@ export default async function AdminDashboardPage({
     tenantId: session.user.tenantId
   };
 
-  const [data, schedulingQueueData, reportReviewData, deficiencyData] = await Promise.all([
+  const [data, schedulingQueueData, billingSummaries, deficiencyData] = await Promise.all([
     getAdminDashboardData({
       userId: session.user.id,
       role: session.user.role,
       tenantId: session.user.tenantId
     }),
     getAdminSchedulingQueueData(actor, { statuses: ["to_be_completed", "scheduled", "in_progress", "follow_up_required"] }),
-    getAdminReportReviewQueueData(actor),
+    getAdminBillingSummaries(actor),
     getAdminDeficiencyDashboardData(
       actor,
       { status: "open" }
@@ -307,15 +287,14 @@ export default async function AdminDashboardPage({
   const greeting = getGreetingByHour(new Date(), data.timezone);
   const firstName = getGreetingName(session.user.name);
   const openInspectionCount = schedulingQueueData.inspections.length;
-  const readyToBillReportCount = reportReviewData.counts.readyToBill;
-  const billingReady = formatBillingReady(data.completedInspections);
-  const alerts = buildAlertItems(data, inspectionNotice);
+  const readyToBillSummaryCount = billingSummaries.filter((summary) => isOpenBillingQueueStatus(summary.status)).length;
+  const alerts = buildAlertItems(data, readyToBillSummaryCount, inspectionNotice);
   const complianceFlags = deficiencyData.deficiencies.filter(
     (deficiency) => deficiency.severity === "high" || deficiency.severity === "critical"
   ).length;
   const todayItems = data.activeInspections.slice(0, 3);
   const activityItems = buildActivityItems(data.completedInspections, data.timezone);
-  const billingPipeline = calculateBillingPipeline(data.completedInspections);
+  const billingPipeline = calculateBillingPipeline(billingSummaries);
   const archivedInspectionItems = data.completedInspections.filter(
     (inspection) => inspection.status === "invoiced" || inspection.billingStatus === "invoiced"
   );
@@ -333,19 +312,11 @@ export default async function AdminDashboardPage({
     },
     {
       label: "Ready To Bill",
-      value: readyToBillReportCount.toString(),
-      change: readyToBillReportCount
+      value: readyToBillSummaryCount.toString(),
+      change: readyToBillSummaryCount
         ? "Finalized work still needs invoice action"
         : "Ready To Bill queue is clear",
       icon: FileText,
-      href: "/app/admin/reports",
-      tone: "emerald" as const
-    },
-    {
-      label: "Billing ready",
-      value: billingReady.value,
-      change: billingReady.change,
-      icon: CreditCard,
       href: "/app/admin/billing",
       tone: "emerald" as const
     },
@@ -439,7 +410,7 @@ export default async function AdminDashboardPage({
             </SectionCard>
           </div>
 
-          <section className="grid gap-3 lg:grid-cols-4 lg:gap-4">
+          <section className="grid gap-3 lg:grid-cols-3 lg:gap-4">
             {statCards.map(({ label, value, change, icon: Icon, href, tone }) => (
               <KPIStatCard
                 href={href}
@@ -674,9 +645,7 @@ export default async function AdminDashboardPage({
                     </p>
                   </div>
                   <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                    {data.completedInspections.some(
-                      (inspection) => inspection.billingStatus === "reviewed"
-                    )
+                    {readyToBillSummaryCount > 0
                       ? "Active"
                       : "Healthy"}
                   </div>

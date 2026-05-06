@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMock = {
+  tenant: {
+    findUnique: vi.fn()
+  },
   customerCompany: {
     findMany: vi.fn()
   },
@@ -31,6 +34,7 @@ describe("admin dashboard data", () => {
   });
 
   it("returns completed archive data while keeping active scheduling counts available", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue({ timezone: "America/Chicago" });
     prismaMock.customerCompany.findMany.mockResolvedValue([{ id: "customer_1", name: "Pinecrest" }]);
     prismaMock.site.findMany.mockResolvedValue([{ id: "site_1", name: "Tower", city: "Chicago", customerCompanyId: "customer_1" }]);
     prismaMock.user.findMany.mockResolvedValue([{ id: "tech_1", name: "Taylor Tech" }]);
