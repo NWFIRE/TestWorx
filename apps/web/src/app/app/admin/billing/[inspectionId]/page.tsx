@@ -12,9 +12,10 @@ import {
 } from "@testworx/lib/server/index";
 
 import { BillingSummaryStatusActions } from "../billing-summary-status-actions";
+import { BillingManualLineForm } from "../../billing-manual-line-form";
 import { BillingItemMatchPanel } from "../../billing-item-match-panel";
 import { AppPageShell, WorkspaceSplit } from "../../operations-ui";
-import { clearBillingSummaryItemCatalogLinkAction, linkBillingSummaryItemCatalogAction, searchBillingSummaryItemCatalogMatchesAction, sendQuickBooksInvoiceAction, syncBillingSummaryToQuickBooksAction, updateBillingSummaryItemGroupAction, updateBillingSummaryNotesAction, updateBillingSummaryStatusAction } from "../../actions";
+import { addBillingSummaryManualLineAction, clearBillingSummaryItemCatalogLinkAction, getBillingManualLineCatalogItems, linkBillingSummaryItemCatalogAction, searchBillingSummaryItemCatalogMatchesAction, sendQuickBooksInvoiceAction, syncBillingSummaryToQuickBooksAction, updateBillingSummaryItemGroupAction, updateBillingSummaryNotesAction, updateBillingSummaryStatusAction } from "../../actions";
 
 type BillingSummaryDetail = NonNullable<Awaited<ReturnType<typeof getAdminBillingSummaryDetail>>>;
 type BillingSummaryLineItem = BillingSummaryDetail["reviewGroupedItems"][keyof BillingSummaryDetail["reviewGroupedItems"]][number] & {
@@ -167,6 +168,12 @@ function isComplianceReportingFeeItem(item: {
     || item.description === "Compliance Reporting Fee";
 }
 
+function isManualBillingLine(item: {
+  metadata?: Record<string, unknown> | null;
+}) {
+  return item.metadata?.manualBillingLine === true;
+}
+
 function getFeeDisplayRank(item: BillingSummaryLineItem) {
   if (isComplianceReportingFeeItem(item)) {
     return 1;
@@ -242,13 +249,18 @@ export default async function BillingSummaryDetailPage({
   }
 
   const { inspectionId } = await params;
-  const [summary, quickBooksConnection] = await Promise.all([
+  const [summary, quickBooksConnection, manualLineCatalogItems] = await Promise.all([
     getAdminBillingSummaryDetail({
       userId: session.user.id,
       role: session.user.role,
       tenantId: session.user.tenantId
     }, inspectionId),
     getTenantQuickBooksConnectionStatus({
+      userId: session.user.id,
+      role: session.user.role,
+      tenantId: session.user.tenantId
+    }),
+    getBillingManualLineCatalogItems({
       userId: session.user.id,
       role: session.user.role,
       tenantId: session.user.tenantId
@@ -376,6 +388,14 @@ export default async function BillingSummaryDetailPage({
         </div>
       ) : null}
 
+      <BillingManualLineForm
+        action={addBillingSummaryManualLineAction}
+        catalogItems={manualLineCatalogItems}
+        disabled={isInvoiced}
+        inspectionId={summary.inspectionId}
+        summaryId={summary.id}
+      />
+
       <WorkspaceSplit variant="content-heavy">
         <div className="space-y-6">
           {groupedEntries.map(([category, items]) => (
@@ -437,7 +457,7 @@ export default async function BillingSummaryDetailPage({
                           </details>
                         ) : null}
                         {item.unitPrice === null || item.unitPrice === undefined ? <p className="text-sm font-semibold text-amber-700">Missing unit price. Review recommended.</p> : null}
-                        {item.category === "fee" ? (
+                        {item.category === "fee" && !isManualBillingLine(item) ? (
                           <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50/70 px-4 py-4 text-sm text-amber-900">
                             <p className="font-semibold text-amber-950">{isComplianceReportingFeeItem(item) ? "Compliance reporting fee assessed" : "Automatic fee line"}</p>
                             {isComplianceReportingFeeItem(item) ? (

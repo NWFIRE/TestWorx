@@ -52,6 +52,7 @@ vi.mock("../quickbooks", () => ({
 }));
 
 import {
+  addBillingSummaryManualLine,
   calculateInvoiceTotalsFromItems,
   clearBillingSummaryItemCatalogLink,
   extractBillableItemsFromDraft,
@@ -489,6 +490,7 @@ describe("inspection billing extraction", () => {
     prismaMock.quickBooksCatalogItemAlias.findMany.mockResolvedValue([]);
     prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof prismaMock) => Promise<unknown>) => callback(prismaMock as never));
     prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
+    prismaMock.inspectionBillingSummary.findFirst.mockResolvedValue(null);
     prismaMock.auditLog.create.mockResolvedValue(undefined);
     prismaMock.quickBooksCatalogItemAlias.upsert.mockResolvedValue(undefined);
     prismaMock.billingItemCatalogMatch.upsert.mockResolvedValue(undefined);
@@ -2911,6 +2913,98 @@ describe("inspection billing persistence and admin review", () => {
     );
     expect(prismaMock.billingItemCatalogMatch.upsert).toHaveBeenCalled();
     expect(prismaMock.quickBooksCatalogItemAlias.upsert).toHaveBeenCalled();
+  });
+
+  it("adds an admin manual billing line from the products and services catalog", async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      {
+        id: "summary_1",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        inspectionClassification: "standard",
+        status: "reviewed",
+        billingType: "standard",
+        billToAccountId: null,
+        billToName: null,
+        contractProfileId: null,
+        contractProfileName: null,
+        routingSnapshot: null,
+        pricingSnapshot: null,
+        groupingSnapshot: null,
+        attachmentSnapshot: null,
+        deliverySnapshot: null,
+        referenceSnapshot: null,
+        subtotal: 125,
+        notes: "Ready",
+        quickbooksSyncStatus: "not_synced",
+        quickbooksInvoiceId: null,
+        quickbooksSendStatus: "not_sent",
+        items: [
+          {
+            id: "line_1",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "fire_alarm",
+            category: "service",
+            description: "Annual inspection",
+            quantity: 1,
+            unitPrice: 125
+          }
+        ]
+      }
+    ]);
+    prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue({
+      id: "catalog_labor",
+      quickbooksItemId: "qb_labor",
+      name: "Additional fire alarm labor",
+      sku: "LAB-FA",
+      itemType: "Labor",
+      unitPrice: 115,
+      taxable: false,
+      rawJson: { Description: "Extra labor", SalesTaxCodeRef: { value: "NON" } }
+    });
+    prismaMock.minimumTicketRule.findMany.mockResolvedValue([]);
+
+    await addBillingSummaryManualLine(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        summaryId: "summary_1",
+        catalogItemId: "catalog_labor",
+        description: "After-hours troubleshooting",
+        quantity: 2,
+        unitPrice: 115
+      }
+    );
+
+    expect(prismaMock.inspectionBillingSummary.update).toHaveBeenCalled();
+    const updateInput = prismaMock.inspectionBillingSummary.update.mock.calls[0]?.[0];
+    const updatedItems = Array.isArray(updateInput?.data?.items) ? updateInput.data.items : [];
+    expect(updatedItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reportType: "inspection",
+          sourceSection: "manual-billing",
+          sourceField: "admin-added",
+          category: "labor",
+          description: "After-hours troubleshooting",
+          quantity: 2,
+          unitPrice: 115,
+          amount: 230,
+          linkedCatalogItemId: "catalog_labor",
+          linkedQuickBooksItemId: "qb_labor",
+          taxable: false
+        })
+      ])
+    );
+    expect(updateInput?.data?.subtotal).toBe(355);
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        action: "billing.manual_line_added"
+      })
+    }));
   });
 
   it("applies the linked catalog price to billing lines", async () => {

@@ -5,6 +5,7 @@ import { isRedirectError } from "next/dist/client/components/redirect-error";
 
 import { auth } from "@/auth";
 import {
+  addBillingSummaryManualLine,
   addInspectionTask,
   approveInspectionCloseoutRequest,
   dismissInspectionCloseoutRequest,
@@ -20,6 +21,7 @@ import {
   ensureGenericInspectionSite,
   genericInspectionSiteOptionValue,
   getAdminBillingSummaryDetail,
+  getBillingManualLineCatalogItems,
   getCustomerSiteImportTemplateCsv,
   uploadInspectionDocument,
   parseCreateInspectionFormData,
@@ -47,6 +49,7 @@ import {
 } from "@testworx/lib/server/index";
 
 export { getCustomerSiteImportTemplateCsv };
+export { getBillingManualLineCatalogItems };
 
 type InspectionType = keyof typeof inspectionTypeRegistry;
 
@@ -788,6 +791,43 @@ export async function updateBillingSummaryItemGroupAction(formData: FormData) {
 
   revalidatePath("/app/admin/billing");
   revalidatePath(`/app/admin/billing/${inspectionId}`);
+}
+
+export async function addBillingSummaryManualLineAction(formData: FormData) {
+  const session = await auth();
+  const summaryId = String(formData.get("summaryId") ?? "");
+  const inspectionId = String(formData.get("inspectionId") ?? "");
+  const catalogItemId = String(formData.get("catalogItemId") ?? "");
+  const description = String(formData.get("description") ?? "").trim();
+  const quantity = Number(formData.get("quantity") ?? "1");
+  const unitPriceRaw = String(formData.get("unitPrice") ?? "");
+  const unitPrice = unitPriceRaw.trim().length > 0 ? Number(unitPriceRaw) : null;
+
+  if (!session?.user?.tenantId || !summaryId || !inspectionId || !catalogItemId) {
+    return { ok: false, error: "Select a product or service before adding a line item." };
+  }
+
+  try {
+    await addBillingSummaryManualLine(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      {
+        summaryId,
+        catalogItemId,
+        description,
+        quantity: Number.isFinite(quantity) ? quantity : 1,
+        unitPrice: unitPrice !== null && Number.isFinite(unitPrice) ? unitPrice : null
+      }
+    );
+
+    revalidatePath("/app/admin/billing");
+    revalidatePath(`/app/admin/billing/${inspectionId}`);
+    return { ok: true, error: null };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Unable to add billing line item."
+    };
+  }
 }
 
 export async function searchBillingSummaryItemCatalogMatchesAction(

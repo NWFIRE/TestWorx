@@ -98,6 +98,17 @@ export type BillingCatalogMatchSuggestion = {
   autoMatchEligible: boolean;
 };
 
+export type BillingManualLineCatalogItem = {
+  id: string;
+  quickbooksItemId: string;
+  name: string;
+  sku: string | null;
+  itemType: string;
+  description: string | null;
+  unitPrice: number | null;
+  taxable: boolean;
+};
+
 type BillingItemCatalogMatchRecord = {
   sourceKey: string;
   catalogItemId: string;
@@ -132,7 +143,7 @@ const MANUAL_SEARCH_CONFIDENCE_THRESHOLD = 0.15;
 const MINIMUM_TICKET_ADJUSTMENT_CODE = "MINIMUM_TICKET_ADJUSTMENT";
 
 function isRuleControlledFeeItem(item: BillableItem) {
-  return item.category === "fee";
+  return item.category === "fee" && item.metadata?.manualBillingLine !== true;
 }
 
 export type BillingSummaryStatus = "draft" | "reviewed" | "invoiced";
@@ -626,6 +637,29 @@ function clearCatalogTaxSnapshot() {
     quickBooksTaxableStatus: null,
     quickBooksTaxCodeRef: null
   };
+}
+
+function generateManualBillingLineId() {
+  return `manual-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function mapCatalogItemTypeToBillingCategory(itemType: string): BillableCategory {
+  const normalized = itemType.toLowerCase();
+  if (normalized.includes("labor")) {
+    return "labor";
+  }
+  if (
+    normalized.includes("part") ||
+    normalized.includes("material") ||
+    normalized.includes("inventory") ||
+    normalized.includes("noninventory")
+  ) {
+    return "material";
+  }
+  if (normalized.includes("fee")) {
+    return "fee";
+  }
+  return "service";
 }
 
 function buildCatalogSearchText(catalogItem: Pick<CatalogCandidateRecord, "name" | "sku" | "itemType" | "quickbooksItemId" | "rawJson">, alias?: string | null) {
@@ -4088,6 +4122,163 @@ export async function updateBillingSummaryItemGroup(
         "updatedAt" = NOW()
     WHERE "id" = ${summary.id}
   `;
+}
+
+export async function getBillingManualLineCatalogItems(actor: ActorContext) {
+  const parsedActor = parseActor(actor);
+  ensureAdmin(parsedActor);
+
+  const items = await prisma.quickBooksCatalogItem.findMany({
+    where: {
+      tenantId: parsedActor.tenantId as string,
+      active: true
+    },
+    orderBy: [{ name: "asc" }],
+    select: {
+      id: true,
+      quickbooksItemId: true,
+      name: true,
+      sku: true,
+      itemType: true,
+      rawJson: true,
+      unitPrice: true,
+      taxable: true
+    }
+  });
+
+  return items.map((item) => ({
+    id: item.id,
+    quickbooksItemId: item.quickbooksItemId,
+    name: item.name,
+    sku: item.sku,
+    itemType: item.itemType,
+    description: readCatalogDescription(item.rawJson),
+    unitPrice: item.unitPrice,
+    taxable: item.taxable
+  })) satisfies BillingManualLineCatalogItem[];
+}
+
+export async function addBillingSummaryManualLine(actor: ActorContext, input: {
+  summaryId: string;
+  catalogItemId: string;
+  description?: string | null;
+  quantity: number;
+  unitPrice?: number | null;
+}) {
+  const { parsedActor, summary } = await getAuthorizedBillingSummary(actor, input.summaryId);
+  if (summary.status === "invoiced") {
+    throw new Error("Invoiced billing summaries must be moved back to review before adding line items.");
+  }
+
+  const catalogItem = await prisma.quickBooksCatalogItem.findFirst({
+    where: {
+      id: input.catalogItemId,
+      tenantId: parsedActor.tenantId as string,
+      active: true
+    },
+    select: {
+      id: true,
+      quickbooksItemId: true,
+      name: true,
+      sku: true,
+      itemType: true,
+      rawJson: true,
+      unitPrice: true,
+      taxable: true
+    }
+  });
+
+  if (!catalogItem) {
+    throw new Error("Select an active product or service before adding a manual billing line.");
+  }
+
+  const quantity = Number.isFinite(input.quantity) ? Math.max(1, Math.trunc(input.quantity)) : 1;
+  const unitPrice = typeof input.unitPrice === "number" && Number.isFinite(input.unitPrice)
+    ? input.unitPrice
+    : catalogItem.unitPrice ?? 0;
+  const description = input.description?.trim() || catalogItem.name;
+  const manualItem: BillableItem = {
+    id: generateManualBillingLineId(),
+    tenantId: summary.tenantId,
+    inspectionId: summary.inspectionId,
+    reportId: summary.inspectionId,
+    reportType: INSPECTION_LEVEL_REPORT_TYPE,
+    sourceSection: "manual-billing",
+    sourceField: "admin-added",
+    category: mapCatalogItemTypeToBillingCategory(catalogItem.itemType),
+    code: `CATALOG_${catalogItem.quickbooksItemId}`,
+    description,
+    quantity,
+    unitPrice,
+    amount: calculateAmount(quantity, unitPrice),
+    unit: "each",
+    metadata: {
+      manualBillingLine: true,
+      addedByUserId: parsedActor.userId,
+      addedAt: new Date().toISOString(),
+      catalogItemId: catalogItem.id,
+      catalogItemName: catalogItem.name,
+      quickbooksItemId: catalogItem.quickbooksItemId
+    },
+    linkedCatalogItemId: catalogItem.id,
+    linkedCatalogItemName: catalogItem.name,
+    linkedQuickBooksItemId: catalogItem.quickbooksItemId,
+    linkedMatchMethod: "manual",
+    linkedMatchConfidence: 1,
+    ...buildCatalogTaxSnapshot(catalogItem)
+  };
+
+  const minimumPricedSummary = await applyMinimumTicketPricingToSummaryItemsTx(prisma, {
+    tenantId: parsedActor.tenantId as string,
+    inspectionId: summary.inspectionId,
+    customerCompanyId: summary.customerCompanyId,
+    siteId: summary.siteId,
+    billingType: normalizeBillingType(summary.billingType),
+    pricingSnapshot: summary.pricingSnapshot,
+    inspectionClassification: null,
+    items: [...summary.items, manualItem]
+  });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.inspectionBillingSummary.update({
+      where: { id: summary.id },
+      data: {
+        items: minimumPricedSummary.items as unknown as Prisma.InputJsonValue,
+        subtotal: minimumPricedSummary.subtotal,
+        pricingSnapshot: minimumPricedSummary.pricingSnapshot as Prisma.InputJsonValue,
+        quickbooksSyncStatus: summary.quickbooksInvoiceId ? "not_synced" : summary.quickbooksSyncStatus ?? "not_synced",
+        quickbooksInvoiceId: null,
+        quickbooksInvoiceNumber: null,
+        quickbooksConnectionMode: null,
+        quickbooksCustomerId: null,
+        quickbooksSyncedAt: null,
+        quickbooksSyncError: null,
+        quickbooksSendStatus: "not_sent",
+        quickbooksSentAt: null,
+        quickbooksSendError: null
+      }
+    });
+
+    await tx.auditLog.create({
+      data: {
+        tenantId: summary.tenantId,
+        actorUserId: parsedActor.userId,
+        action: "billing.manual_line_added",
+        entityType: "InspectionBillingSummary",
+        entityId: summary.id,
+        metadata: {
+          itemId: manualItem.id,
+          catalogItemId: catalogItem.id,
+          catalogItemName: catalogItem.name,
+          description,
+          quantity,
+          unitPrice
+        }
+      }
+    });
+  });
+
+  return manualItem;
 }
 
 export async function searchBillingSummaryItemCatalogMatches(
