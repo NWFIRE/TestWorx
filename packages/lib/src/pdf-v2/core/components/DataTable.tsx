@@ -1,3 +1,5 @@
+import React from "react";
+
 import type { DataTableProps } from "../types/common";
 
 export function DataTable<T>({ columns, rows, density = "normal" }: DataTableProps<T>) {

@@ -1,3 +1,5 @@
+import React from "react";
+
 import { EmptyState } from "../../core/components/EmptyState";
 import { PhotoGrid } from "../../core/components/PhotoGrid";
 import { SectionHeader } from "../../core/components/SectionHeader";

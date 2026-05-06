@@ -25,7 +25,7 @@ export function contentWidth() {
 }
 
 export function contentTop() {
-  return PDF_V2_TOKENS.pageHeight - PDF_V2_TOKENS.margin - PDF_V2_TOKENS.headerHeight - 18;
+  return PDF_V2_TOKENS.pageHeight - PDF_V2_TOKENS.margin - PDF_V2_TOKENS.headerHeight - 12;
 }
 
 export function contentBottom() {
@@ -58,29 +58,49 @@ export async function embedImage(pdfDoc: PDFDocument, dataUrl: string) {
 }
 
 export function splitTextIntoLines(font: PDFFont, text: string, maxWidth: number, size: number, maxLines?: number) {
-  const normalized = String(text ?? "").replace(/\s+/g, " ").trim();
-  if (!normalized) {
+  const raw = String(text ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+  if (!raw) {
     return [];
   }
-  const words = normalized.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
-  let currentLine = "";
 
-  for (const word of words) {
-    const candidate = currentLine ? `${currentLine} ${word}` : word;
-    if (font.widthOfTextAtSize(candidate, size) > maxWidth && currentLine) {
-      lines.push(currentLine);
-      currentLine = word;
-      if (maxLines && lines.length >= maxLines) {
-        break;
+  for (const paragraph of raw.split("\n")) {
+    const normalized = paragraph.replace(/\s+/g, " ").trim();
+    if (!normalized) {
+      if (!maxLines || lines.length < maxLines) {
+        lines.push("");
       }
-    } else {
-      currentLine = candidate;
+      continue;
     }
-  }
 
-  if (currentLine && (!maxLines || lines.length < maxLines)) {
-    lines.push(currentLine);
+    const words = normalized.split(/\s+/).filter(Boolean);
+    let currentLine = "";
+
+    for (const word of words) {
+      const candidate = currentLine ? `${currentLine} ${word}` : word;
+      if (font.widthOfTextAtSize(candidate, size) > maxWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+        if (maxLines && lines.length >= maxLines) {
+          return lines.slice(0, maxLines);
+        }
+      } else if (font.widthOfTextAtSize(candidate, size) > maxWidth) {
+        lines.push(word);
+        currentLine = "";
+        if (maxLines && lines.length >= maxLines) {
+          return lines.slice(0, maxLines);
+        }
+      } else {
+        currentLine = candidate;
+      }
+    }
+
+    if (currentLine && (!maxLines || lines.length < maxLines)) {
+      lines.push(currentLine);
+    }
+    if (maxLines && lines.length >= maxLines) {
+      return lines.slice(0, maxLines);
+    }
   }
 
   return maxLines ? lines.slice(0, maxLines) : lines;
@@ -94,7 +114,17 @@ export function measureParagraphHeight(font: PDFFont, text: string, maxWidth: nu
 export function drawParagraph(page: PDFPage, font: PDFFont, text: string, x: number, y: number, maxWidth: number, size: number, color: PdfV2Theme["ink"], lineGap = 3, maxLines?: number) {
   const lines = splitTextIntoLines(font, text, maxWidth, size, maxLines);
   lines.forEach((line, index) => {
-    page.drawText(line, { x, y: y - index * (size + lineGap), size, font, color });
+    if (line) {
+      page.drawText(line, { x, y: y - index * (size + lineGap), size, font, color });
+    }
+  });
+}
+
+export function drawTextLines(page: PDFPage, font: PDFFont, lines: string[], x: number, y: number, size: number, color: PdfV2Theme["ink"], lineGap = 3) {
+  lines.forEach((line, index) => {
+    if (line) {
+      page.drawText(line, { x, y: y - index * (size + lineGap), size, font, color });
+    }
   });
 }
 
@@ -122,28 +152,28 @@ function drawHeader(runtime: PdfV2Runtime, page: PDFPage, pageNumber: number) {
 
   if (logoEmbedded) {
     const scaled = logoEmbedded.scale(1);
-    const ratio = Math.min(38 / scaled.width, 38 / scaled.height, 1);
+    const ratio = Math.min(32 / scaled.width, 32 / scaled.height, 1);
     page.drawImage(logoEmbedded, {
       x: leftX,
-      y: top - 40,
+      y: top - 34,
       width: scaled.width * ratio,
       height: scaled.height * ratio
     });
   } else {
-    drawRect(page, leftX, top - 2, 38, 38, theme.softSurface, theme.line, 1);
+    drawRect(page, leftX, top - 2, 32, 32, theme.softSurface, theme.line, 1);
   }
 
-  drawParagraph(page, boldFont, model.header.companyName, leftX + 50, top - 8, leftWidth - 50, 13, theme.ink, 3, 2);
-  drawParagraph(page, regularFont, model.header.contactLine, leftX, top - 52, leftWidth, 8, theme.softText, 3, 2);
-  drawParagraph(page, regularFont, model.header.addressLine, leftX, top - 64, leftWidth, 8, theme.softText, 3, 2);
+  drawParagraph(page, boldFont, model.header.companyName, leftX + 42, top - 7, leftWidth - 42, 12, theme.ink, 3, 2);
+  drawParagraph(page, regularFont, model.header.contactLine, leftX, top - 43, leftWidth, 7.5, theme.softText, 3, 2);
+  drawParagraph(page, regularFont, model.header.addressLine, leftX, top - 54, leftWidth, 7.5, theme.softText, 3, 2);
 
-  drawParagraph(page, boldFont, model.header.reportTitle, rightX, top - 8, rightWidth, PDF_V2_TYPOGRAPHY.reportTitle, theme.ink, 3, 2);
+  drawParagraph(page, boldFont, model.header.reportTitle, rightX, top - 7, rightWidth, PDF_V2_TYPOGRAPHY.reportTitle, theme.ink, 3, 2);
   const metaRows: Array<[string, string]> = [
     ["Report ID", model.header.reportId],
     ["Service Date", model.header.serviceDate],
     ["Page", String(pageNumber)]
   ];
-  let metaY = top - 48;
+  let metaY = top - 39;
   for (const [label, value] of metaRows) {
     page.drawText(label.toUpperCase(), {
       x: rightX,
@@ -159,7 +189,7 @@ function drawHeader(runtime: PdfV2Runtime, page: PDFPage, pageNumber: number) {
       font: regularFont,
       color: theme.ink
     });
-    metaY -= 14;
+    metaY -= 12;
   }
 
   page.drawLine({
@@ -214,6 +244,10 @@ export function ensureSpace(runtime: PdfV2Runtime, cursor: PageCursor, requiredH
     return cursor;
   }
   return addPage(runtime, cursor.pageNumber + 1);
+}
+
+export function remainingContentHeight(cursor: PageCursor) {
+  return Math.max(0, cursor.y - contentBottom());
 }
 
 export function drawSectionTitle(runtime: PdfV2Runtime, cursor: PageCursor, title: string, description?: string) {

@@ -1,3 +1,5 @@
+import React from "react";
+
 import type { IdentityBandProps } from "../types/common";
 
 import { MetadataGrid } from "./MetadataGrid";

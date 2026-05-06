@@ -1,3 +1,5 @@
+import React from "react";
+
 import type { PdfShellProps } from "../types/common";
 import { pageClassName } from "../layout/page";
 

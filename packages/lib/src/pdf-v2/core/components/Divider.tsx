@@ -1,3 +1,5 @@
+import React from "react";
+
 import type { DividerProps } from "../types/common";
 
 export function Divider({ subtle = false }: DividerProps) {

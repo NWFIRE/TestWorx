@@ -1,3 +1,5 @@
+import React from "react";
+
 import type { ReportHeaderProps } from "../types/common";
 import { joinNonEmpty } from "../formatting/text";
 

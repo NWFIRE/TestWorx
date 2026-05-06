@@ -45,10 +45,10 @@ export const pdfCss = `
   .pdf-shell {
     display: flex;
     flex-direction: column;
-    gap: var(--pdf-space-16);
-    min-height: calc(11in - 1in);
-    break-after: page;
-    page-break-after: always;
+    gap: var(--pdf-space-12);
+    margin-bottom: var(--pdf-space-16);
+    break-after: auto;
+    page-break-after: auto;
   }
   .pdf-shell:last-child {
     break-after: auto;
@@ -57,8 +57,7 @@ export const pdfCss = `
   .pdf-shell__body {
     display: flex;
     flex-direction: column;
-    gap: var(--pdf-space-16);
-    flex: 1;
+    gap: var(--pdf-space-12);
   }
 
   .pdf-header, .pdf-outcome-hero, .pdf-compliance-block, .pdf-identity-band, .pdf-section, .pdf-table-wrap, .pdf-photo-frame, .pdf-signature-card {
@@ -85,7 +84,7 @@ export const pdfCss = `
   .pdf-header__left { flex: 1.2; }
   .pdf-header__right { flex: 1; align-items: flex-end; text-align: right; }
   .pdf-header__brand { display: flex; align-items: center; gap: var(--pdf-space-12); }
-  .pdf-header__logo, .pdf-header__logo-fallback { width: 48px; height: 48px; border-radius: var(--pdf-radius-sm); }
+  .pdf-header__logo, .pdf-header__logo-fallback { width: 36px; height: 36px; border-radius: var(--pdf-radius-sm); }
   .pdf-header__logo { object-fit: contain; }
   .pdf-header__logo-fallback { background: var(--pdf-panel); border: 1px solid var(--pdf-border); }
 
@@ -97,7 +96,7 @@ export const pdfCss = `
     font-weight: 700;
   }
   .pdf-company-name { font-size: ${pdfTokens.fontSize.xl}; font-weight: 700; line-height: 1.1; }
-  .pdf-title { font-size: 28px; font-weight: 800; line-height: 1.1; }
+  .pdf-title { font-size: 23px; font-weight: 800; line-height: 1.1; }
   .pdf-header__meta, .pdf-text-sm, .pdf-muted, .pdf-section-subtitle, .pdf-empty-state { color: var(--pdf-muted); font-size: ${pdfTokens.fontSize.sm}; }
   .pdf-divider { border-top: 1px solid var(--pdf-border); }
 
@@ -126,8 +125,20 @@ export const pdfCss = `
   .pdf-metadata-value { font-size: ${pdfTokens.fontSize.md}; font-weight: 600; }
   .pdf-metric-value { font-size: ${pdfTokens.fontSize.lg}; font-weight: 800; line-height: 1.1; }
   .pdf-compliance-codes { font-size: ${pdfTokens.fontSize.lg}; font-weight: 700; }
-  .pdf-section { display: flex; flex-direction: column; gap: var(--pdf-space-12); }
+  .pdf-section { display: flex; flex-direction: column; gap: var(--pdf-space-8); break-inside: auto; page-break-inside: auto; }
   .pdf-section-title { margin: 0; font-size: ${pdfTokens.fontSize.xl}; line-height: 1.2; }
+
+  .pdf-header,
+  .pdf-section-title,
+  .pdf-summary-strip__item,
+  .pdf-metadata-item,
+  .pdf-metric-item,
+  .pdf-photo-frame,
+  .pdf-signature-card,
+  .pdf-empty-state {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 
   .pdf-summary-strip { flex-wrap: wrap; gap: var(--pdf-space-12); }
   .pdf-summary-strip__item {
@@ -177,11 +188,11 @@ export const pdfCss = `
   }
   .pdf-table--compact th, .pdf-table--compact td { padding-top: 8px; padding-bottom: 8px; }
   .pdf-cell-lines { display: flex; flex-direction: column; gap: 4px; }
-  .pdf-photo-grid { display: grid; gap: var(--pdf-space-16); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pdf-photo-grid { display: grid; gap: var(--pdf-space-12); grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pdf-photo-grid--single { grid-template-columns: 1fr; }
-  .pdf-photo-image { width: 100%; max-height: 300px; object-fit: contain; border-radius: var(--pdf-radius-sm); background: var(--pdf-panel); }
-  .pdf-signature-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--pdf-space-16); }
+  .pdf-photo-image { width: 100%; height: auto; max-height: 260px; object-fit: contain; border-radius: var(--pdf-radius-sm); background: var(--pdf-panel); }
+  .pdf-signature-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--pdf-space-12); }
   .pdf-signature-grid--single { grid-template-columns: 1fr; }
-  .pdf-signature-image { width: 100%; max-height: 96px; object-fit: contain; margin-top: var(--pdf-space-12); border-top: 1px solid var(--pdf-border); padding-top: var(--pdf-space-12); }
-  .pdf-footer { margin-top: auto; padding-top: var(--pdf-space-8); border-top: 1px solid var(--pdf-border); font-size: ${pdfTokens.fontSize.xs}; color: var(--pdf-muted); }
+  .pdf-signature-image { width: 100%; max-height: 78px; object-fit: contain; margin-top: var(--pdf-space-8); border-top: 1px solid var(--pdf-border); padding-top: var(--pdf-space-8); }
+  .pdf-footer { padding-top: var(--pdf-space-8); border-top: 1px solid var(--pdf-border); font-size: ${pdfTokens.fontSize.xs}; color: var(--pdf-muted); break-inside: avoid; page-break-inside: avoid; }
 `;

@@ -254,6 +254,33 @@ enum MinimumTicketRuleLocationMode {
   manual
 }
 
+enum WorkOrderLineItemType {
+  service
+  labor
+  part
+  material
+  inspection
+  fee
+  replacement
+  other
+}
+
+enum WorkOrderLineBillableStatus {
+  billable
+  not_billable
+  included
+  warranty
+  no_charge
+}
+
+enum WorkOrderLineSource {
+  technician_selected
+  admin_added
+  report_generated
+  minimum_rule
+  contract_rule
+}
+
 enum QuoteStatus {
   draft
   ready_to_send
@@ -390,6 +417,7 @@ model Tenant {
   signatures                Signature[]
   deficiencies              Deficiency[]
   billingSummaries          InspectionBillingSummary[]
+  workOrderLineItems        WorkOrderLineItem[]
   invoiceSequences          TenantInvoiceSequence[]
   inspectionDocuments       InspectionDocument[]
   auditLogs                 AuditLog[]
@@ -470,6 +498,7 @@ model User {
   createdCustomerIntakeRequests CustomerIntakeRequest[] @relation("CustomerIntakeCreatedBy")
   approvedCustomerIntakeRequests CustomerIntakeRequest[] @relation("CustomerIntakeApprovedBy")
   reportTypeEligibilities TechnicianReportTypeEligibility[]
+  addedWorkOrderLineItems WorkOrderLineItem[] @relation("WorkOrderLineItemAddedBy")
 }
 
 model CustomerIntakeRequest {
@@ -920,6 +949,7 @@ model Inspection {
   reports               InspectionReport[]
   deficiencies          Deficiency[]
   billingSummary        InspectionBillingSummary?
+  workOrderLineItems    WorkOrderLineItem[]
     documents             InspectionDocument[]
       amendments            InspectionAmendment[]   @relation("OriginalInspectionAmendments")
       replacementAmendments InspectionAmendment[]   @relation("ReplacementInspectionAmendments")
@@ -1463,6 +1493,39 @@ model InspectionBillingSummary {
   @@index([tenantId, billingResolutionSnapshotId])
 }
 
+model WorkOrderLineItem {
+  id                       String                      @id @default(cuid())
+  tenantId                 String
+  inspectionId             String
+  catalogItemId            String?
+  itemType                 WorkOrderLineItemType
+  name                     String
+  description              String?
+  quantity                 Float                       @default(1)
+  unitPrice                Float?
+  totalPrice               Float?
+  taxable                  Boolean                     @default(false)
+  billableStatus           WorkOrderLineBillableStatus @default(billable)
+  technicianNotes          String?
+  source                   WorkOrderLineSource         @default(admin_added)
+  quickBooksItemId         String?
+  pricingSnapshot          Json?
+  addedByUserId            String?
+  invoicedBillingSummaryId String?
+  invoicedAt               DateTime?
+  createdAt                DateTime                    @default(now())
+  updatedAt                DateTime                    @updatedAt
+  tenant                   Tenant                      @relation(fields: [tenantId], references: [id])
+  inspection               Inspection                  @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  catalogItem              QuickBooksCatalogItem?      @relation(fields: [catalogItemId], references: [id])
+  addedBy                  User?                       @relation("WorkOrderLineItemAddedBy", fields: [addedByUserId], references: [id])
+
+  @@index([tenantId, inspectionId])
+  @@index([tenantId, catalogItemId])
+  @@index([tenantId, billableStatus])
+  @@index([tenantId, invoicedBillingSummaryId])
+}
+
 model TenantInvoiceSequence {
   id         String   @id @default(cuid())
   tenantId   String
@@ -1571,6 +1634,7 @@ model QuickBooksCatalogItem {
   tenant             Tenant   @relation(fields: [tenantId], references: [id])
   aliases            QuickBooksCatalogItemAlias[]
   billingItemMatches BillingItemCatalogMatch[]
+  workOrderLineItems WorkOrderLineItem[]
 
   @@unique([tenantId, quickbooksItemId])
   @@index([tenantId, active, itemType])

@@ -1,3 +1,5 @@
+import React from "react";
+
 import type { MetadataGridProps } from "../types/common";
 
 export function MetadataGrid({ items, columns = 2 }: MetadataGridProps) {

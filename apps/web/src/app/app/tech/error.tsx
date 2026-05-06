@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { useSmartBack } from "@/app/use-smart-back";
+
 export default function TechnicianAppError({
   error,
   reset
@@ -11,6 +13,7 @@ export default function TechnicianAppError({
   reset: () => void;
 }) {
   const [isOnline, setIsOnline] = useState(() => typeof window === "undefined" ? true : window.navigator.onLine);
+  const smartBack = useSmartBack("/app/tech/inspections");
 
   useEffect(() => {
     const updateOnlineState = () => setIsOnline(window.navigator.onLine);
@@ -67,12 +70,13 @@ export default function TechnicianAppError({
         >
           Inspections
         </Link>
-        <Link
+        <button
           className="flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
-          href="/app/tech"
+          onClick={() => smartBack()}
+          type="button"
         >
-          Home
-        </Link>
+          Back
+        </button>
       </div>
     </section>
   );

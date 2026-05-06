@@ -1,3 +1,5 @@
+import React from "react";
+
 import type { ComplianceBlockProps } from "../types/common";
 
 export function ComplianceBlock({ codes }: ComplianceBlockProps) {

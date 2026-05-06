@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { PageBackControl } from "@/app/page-back-control";
 import { auth } from "@/auth";
 import { getTeamWorkspaceData } from "@testworx/lib/server/index";
 
@@ -58,12 +59,16 @@ export default async function AdminTeamPage({
           <h1 className="mt-2 text-3xl font-semibold text-ink">Workspace access needs attention</h1>
           <p className="mt-3 text-sm leading-6 text-slate-600">{workspaceError ?? "Team access is temporarily unavailable."}</p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-5 py-3 text-sm font-semibold text-white"
-              href={workspaceError === "Your session is out of date. Sign in again to open Team and Portal Access." ? "/login" : "/app/admin"}
-            >
-              {workspaceError === "Your session is out of date. Sign in again to open Team and Portal Access." ? "Return to sign in" : "Back to admin"}
-            </Link>
+            {workspaceError === "Your session is out of date. Sign in again to open Team and Portal Access." ? (
+              <Link
+                className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-5 py-3 text-sm font-semibold text-white"
+                href="/login"
+              >
+                Return to sign in
+              </Link>
+            ) : (
+              <PageBackControl fallbackHref="/app/admin" />
+            )}
           </div>
         </section>
       </main>

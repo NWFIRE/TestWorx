@@ -5,8 +5,10 @@ coverage
 dist
 .env
 .env.local
+.env.runtime.*
 apps/web/.next
 apps/web/node_modules
 packages/*/dist
 package-lock.json
 
+.vercel

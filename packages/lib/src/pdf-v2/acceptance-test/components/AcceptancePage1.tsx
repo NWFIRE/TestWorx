@@ -1,3 +1,5 @@
+import React from "react";
+
 import { Badge } from "../../core/components/Badge";
 
 import type { AcceptanceTestRenderModel } from "../types/acceptanceTestRenderModel";

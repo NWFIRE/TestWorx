@@ -1,3 +1,5 @@
+import React from "react";
+
 import { MetricGrid } from "../../core/components/MetricGrid";
 import { PdfShell } from "../../core/components/PdfShell";
 import { ReportHeader } from "../../core/components/ReportHeader";

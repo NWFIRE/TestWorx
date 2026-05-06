@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { PageBackControl } from "@/app/page-back-control";
 import { auth } from "@/auth";
 import { getCustomerIntakeWorkspace } from "@testworx/lib/server/index";
 
@@ -73,12 +74,7 @@ export default async function CustomerIntakesPage({
         title="Pending customer setup"
         description="Send secure branded intake forms, review submitted customer details, and approve new customer records before they enter operations."
         actions={
-          <Link
-            className="inline-flex min-h-11 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 py-3 text-sm font-semibold text-[color:var(--text-secondary)]"
-            href="/app/admin/clients"
-          >
-            Back to clients
-          </Link>
+          <PageBackControl fallbackHref="/app/admin/clients" />
         }
         contentWidth="full"
       />

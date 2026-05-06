@@ -1,14 +1,33 @@
 import "server-only";
 
+import { existsSync } from "node:fs";
+
 async function resolveExecutablePath(chromium: {
   executablePath: () => Promise<string>;
 }) {
   const envPath = process.env.PUPPETEER_EXECUTABLE_PATH ?? process.env.CHROME_EXECUTABLE_PATH;
-  if (envPath) {
+  if (envPath && existsSync(envPath)) {
     return envPath;
   }
 
-  return chromium.executablePath();
+  const localChromeCandidates = [
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+  ];
+
+  const localExecutable = localChromeCandidates.find((candidate) => existsSync(candidate));
+  if (localExecutable) {
+    return localExecutable;
+  }
+
+  const bundledPath = await chromium.executablePath();
+  if (bundledPath && existsSync(bundledPath)) {
+    return bundledPath;
+  }
+
+  return bundledPath;
 }
 
 export async function renderPdfFromHtml(html: string): Promise<Buffer> {

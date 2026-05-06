@@ -22,6 +22,7 @@ import {
   type ReportPrimitiveValue
 } from "@testworx/lib";
 
+import { useSmartBack } from "@/app/use-smart-back";
 import type { TechnicianReportEditorData } from "./report-editor";
 import { getLocalReportDraft, putLocalReportDraft, subscribeToOfflineChanges } from "./offline/offline-db";
 import { initializeLocalReportRecord, queueReportDraftSync, queueReportFinalizeSync, startTechnicianSyncEngine } from "./offline/offline-sync";
@@ -325,6 +326,7 @@ export function MobileChecklistReportScreen({
   mode: "checklist" | "review";
 }) {
   const router = useRouter();
+  const smartBack = useSmartBack(`/app/tech/reports/${encodeURIComponent(inspectionId)}/${encodeURIComponent(taskId)}`);
   const initialDraft = createDerivedDraft(data.template, data.draft);
   const [draft, setDraft] = useState<ReportDraft>(initialDraft);
   const [saveState, setSaveState] = useState(data.reportStatus === "finalized" ? "Finalized" : "Saved");
@@ -1236,7 +1238,7 @@ export function MobileChecklistReportScreen({
             <div className="mt-3 grid grid-cols-2 gap-3">
               <button
                 className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
-                onClick={() => router.back()}
+                onClick={() => smartBack()}
                 type="button"
               >
                 Back to Checklist

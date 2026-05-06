@@ -1,3 +1,5 @@
+import React from "react";
+
 import { ComplianceBlock } from "../../core/components/ComplianceBlock";
 import { IdentityBand } from "../../core/components/IdentityBand";
 import { MetadataGrid } from "../../core/components/MetadataGrid";

@@ -88,6 +88,9 @@ type QuickBooksBillingSummary = {
     amount?: number | null;
     unit?: string;
     category: string;
+    reportType?: string;
+    sourceSection?: string;
+    sourceField?: string;
     linkedCatalogItemId?: string | null;
     linkedQuickBooksItemId?: string | null;
     linkedCatalogItemName?: string | null;
@@ -3082,6 +3085,48 @@ function requirePrice(item: QuickBooksBillingSummary["items"][number]) {
   return item.unitPrice;
 }
 
+function normalizeBillingMatchText(value: string | null | undefined) {
+  return (value ?? "")
+    .toLowerCase()
+    .replace(/#/g, " lb ")
+    .replace(/(\d)(lb|lbs|pound|pounds)\b/g, "$1 $2")
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function singularizeBillingMatchToken(token: string) {
+  if (["lb", "lbs", "pound", "pounds"].includes(token)) {
+    return "lb";
+  }
+  if (token.endsWith("ies") && token.length > 4) {
+    return `${token.slice(0, -3)}y`;
+  }
+  if (token.endsWith("es") && token.length > 3) {
+    return token.slice(0, -2);
+  }
+  if (token.endsWith("s") && token.length > 3) {
+    return token.slice(0, -1);
+  }
+  return token;
+}
+
+function buildBillingItemSourceKeyForQuickBooks(item: QuickBooksBillingSummary["items"][number]) {
+  return [
+    item.category,
+    item.reportType ?? "unknown_report",
+    item.sourceSection ?? "unknown_section",
+    item.sourceField ?? "unknown_field",
+    normalizeBillingMatchText(item.code ?? ""),
+    normalizeBillingMatchText(item.description)
+      .split(" ")
+      .map((token) => singularizeBillingMatchToken(token))
+      .filter(Boolean)
+      .join(" ")
+  ].join("|");
+}
+
 function resolveBillingItemCodeForQuickBooks(item: QuickBooksBillingSummary["items"][number]) {
   const explicitCode = item.code?.trim();
   if (explicitCode) {
@@ -3101,12 +3146,51 @@ function resolveBillingItemCodeForQuickBooks(item: QuickBooksBillingSummary["ite
   return null;
 }
 
+async function resolveStoredBillingItemCatalogMatchForQuickBooks(input: {
+  tenantId: string;
+  item: QuickBooksBillingSummary["items"][number];
+}) {
+  const storedMatch = await prisma.billingItemCatalogMatch.findUnique({
+    where: {
+      tenantId_sourceKey: {
+        tenantId: input.tenantId,
+        sourceKey: buildBillingItemSourceKeyForQuickBooks(input.item)
+      }
+    },
+    select: {
+      catalogItem: {
+        select: {
+          quickbooksItemId: true,
+          name: true,
+          active: true,
+          taxable: true
+        }
+      }
+    }
+  });
+
+  const catalogItem = storedMatch?.catalogItem;
+  if (!catalogItem) {
+    return null;
+  }
+
+  if (!catalogItem.active) {
+    throw new Error(`Billing item "${input.item.description}" is matched to inactive QuickBooks item "${catalogItem.name}". Change the match before syncing.`);
+  }
+
+  return {
+    qbItemId: catalogItem.quickbooksItemId,
+    qbItemName: catalogItem.name,
+    taxable: typeof input.item.taxable === "boolean" ? input.item.taxable : catalogItem.taxable
+  };
+}
+
 async function resolveLinkedBillingItemForQuickBooks(input: {
   tenantId: string;
   item: QuickBooksBillingSummary["items"][number];
 }) {
   if (!input.item.linkedCatalogItemId && !input.item.linkedQuickBooksItemId) {
-    return null;
+    return resolveStoredBillingItemCatalogMatchForQuickBooks(input);
   }
 
   const linkedCatalogItem = await prisma.quickBooksCatalogItem.findFirst({

@@ -1,14 +1,14 @@
 export const PDF_V2_TOKENS = {
   pageWidth: 612,
   pageHeight: 792,
-  margin: 36,
-  headerHeight: 104,
-  footerHeight: 26,
-  sectionGap: 18,
+  margin: 34,
+  headerHeight: 86,
+  footerHeight: 20,
+  sectionGap: 12,
   cardGap: 12,
   tableCellPaddingX: 10,
-  tableCellPaddingY: 11,
-  minContentBottomGap: 10
+  tableCellPaddingY: 8,
+  minContentBottomGap: 8
 } as const;
 
 export const PDF_V2_TYPOGRAPHY = {

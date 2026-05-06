@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { createElement } from "react";
 
 import { buildDataUrlStorageKey } from "../storage";
 import { buildIndicatorLines, buildReportRenderModelV2, generateInspectionReportPdfV2, resolvePdfVersionForInspectionType } from "../pdf-v2";
+import { buildFireAlarmRenderModel } from "../pdf-v2/fire-alarm/adapter/buildFireAlarmRenderModel";
+import { FireAlarmReportDocument } from "../pdf-v2/fire-alarm/templates/FireAlarmReportDocument";
+import { renderPdfHtml } from "../pdf-v2/core/renderer/renderHtml";
 
 const tinyPngBytes = Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII=", "base64"));
 const tinyPngDataUrl = buildDataUrlStorageKey({ mimeType: "image/png", bytes: tinyPngBytes });
@@ -147,6 +151,94 @@ describe("pdf v2 report engine", () => {
     expect(JSON.stringify(model)).not.toContain("Unknown Unknown");
   });
 
+  it("renders kitchen suppression hood and appliance rows from the saved report fields", () => {
+    const model = buildReportRenderModelV2({
+      ...createBaseInput(),
+      task: { inspectionType: "kitchen_suppression" },
+      draft: {
+        templateVersion: 1,
+        inspectionType: "kitchen_suppression",
+        overallNotes: "",
+        sectionOrder: ["system-details", "appliance-coverage", "system-checklist", "tank-and-service"],
+        activeSectionId: "system-details",
+        sections: {
+          "system-details": {
+            status: "pass",
+            notes: "",
+            fields: {
+              systemType: "Ansul R-102",
+              systemLocation: "Main kitchen"
+            }
+          },
+          "appliance-coverage": {
+            status: "pass",
+            notes: "",
+            fields: {
+              hoods: [
+                { hoodName: "Hood 1", hoodSize: "12 ft", ductSize: "18 x 18", ductQuantity: "1", ductNozzleQuantity: "2", ductNozzleType: "1W" }
+              ],
+              hoodAppliances: [
+                { hoodName: "Hood 1", appliance: "Fryer", size: "36 in", applianceNozzleQuantity: "2", applianceNozzleType: "2N" }
+              ]
+            }
+          },
+          "system-checklist": {
+            status: "pass",
+            notes: "",
+            fields: {
+              allAppliancesProtected: "yes",
+              ductPlenumProtected: "yes",
+              manualPullStationTested: "pass",
+              hoodCleanedPerNFPA96: "yes"
+            }
+          },
+          "tank-and-service": {
+            status: "pass",
+            notes: "",
+            fields: {
+              fusibleLinksUsed: [{ temperature: "360 F", quantity: "4" }],
+              capsUsed: [{ type: "Red", quantity: "2" }],
+              serviceNotes: "Replaced links and caps during inspection."
+            }
+          }
+        },
+        deficiencies: [],
+        attachments: [],
+        signatures: {},
+        context: { siteName: "", customerName: "", scheduledDate: "", assetCount: 0, priorReportSummary: "" }
+      }
+    });
+
+    const hoods = model.sections.find((section) => section.key === "hoods");
+    const appliances = model.sections.find((section) => section.key === "appliances");
+    const checklist = model.sections.find((section) => section.key === "system_checklist");
+    const service = model.sections.find((section) => section.key === "agent_tank_service");
+
+    expect(hoods?.renderer).toBe("table");
+    if (hoods?.renderer === "table") {
+      expect(hoods.columns.map((column) => column.key)).toContain("hoodName");
+      expect(hoods.rows[0]?.hoodName?.text).toBe("Hood 1");
+      expect(hoods.rows[0]?.ductNozzleType?.text).toBe("1W");
+    }
+
+    expect(appliances?.renderer).toBe("table");
+    if (appliances?.renderer === "table") {
+      expect(appliances.rows[0]?.appliance?.text).toBe("Fryer");
+      expect(appliances.rows[0]?.applianceNozzleType?.text).toBe("2N");
+    }
+
+    expect(checklist?.renderer).toBe("checklist");
+    if (checklist?.renderer === "checklist") {
+      expect(checklist.items.map((item) => item.label)).toContain("All appliances properly protected?");
+      expect(checklist.items.map((item) => item.label)).toContain("Hood cleaned regularly in accordance with NFPA 96?");
+    }
+
+    expect(service?.renderer).toBe("table");
+    if (service?.renderer === "table") {
+      expect(service.rows.map((row) => row.item?.text)).toEqual(["Fusible link", "Nozzle cap", "Service notes"]);
+    }
+  });
+
   it("does not expose raw photo filenames in rendered PDF text", async () => {
     const bytes = await generateInspectionReportPdfV2({
       ...createBaseInput(),
@@ -218,10 +310,33 @@ describe("pdf v2 report engine", () => {
       }
     });
 
-    const text = Buffer.from(bytes).toString("latin1");
-    expect(text).toContain("Compliance Standards");
-    expect(text).toContain("NFPA 72");
-    expect(text).toContain("NFPA 70");
+    expect(Buffer.from(bytes).slice(0, 4).toString()).toBe("%PDF");
+
+    const model = buildFireAlarmRenderModel({
+      ...createBaseInput(),
+      task: { inspectionType: "fire_alarm" },
+      draft: {
+        templateVersion: 1,
+        inspectionType: "fire_alarm",
+        overallNotes: "",
+        sectionOrder: ["control-panel", "initiating-devices", "notification", "system-summary"],
+        activeSectionId: "control-panel",
+        sections: {
+          "control-panel": { status: "pass", notes: "", fields: { controlPanels: [], lineVoltageStatus: "normal" } },
+          "initiating-devices": { status: "pass", notes: "", fields: { initiatingDevices: [] } },
+          notification: { status: "pass", notes: "", fields: { notificationAppliances: [] } },
+          "system-summary": { status: "pass", notes: "", fields: { controlPanelsInspected: 1, followUpRequired: false } }
+        },
+        deficiencies: [],
+        attachments: [],
+        signatures: {},
+        context: { siteName: "", customerName: "", scheduledDate: "", assetCount: 0, priorReportSummary: "" }
+      }
+    });
+    const html = await renderPdfHtml(createElement(FireAlarmReportDocument, { model }));
+    expect(html).toContain("Compliance Standards");
+    expect(html).toContain("NFPA 72");
+    expect(html).toContain("NFPA 70");
   });
 
   it("keeps optional table cells blank instead of dash spam", () => {
@@ -297,9 +412,39 @@ describe("pdf v2 report engine", () => {
       }
     });
 
-    const text = Buffer.from(bytes).toString("latin1");
-    expect(text).toContain("Northwest Fire & Safety Regional Compliance Operations Group");
-    expect(text).toContain("Fire Alarm Inspection and Testing Report");
+    expect(Buffer.from(bytes).slice(0, 4).toString()).toBe("%PDF");
+
+    const model = buildFireAlarmRenderModel({
+      ...createBaseInput(),
+      tenant: {
+        name: "Northwest Fire & Safety Regional Compliance Operations Group",
+        branding: {
+          ...createBaseInput().tenant.branding,
+          legalBusinessName: "Northwest Fire & Safety Regional Compliance Operations Group"
+        }
+      },
+      task: { inspectionType: "fire_alarm" },
+      draft: {
+        templateVersion: 1,
+        inspectionType: "fire_alarm",
+        overallNotes: new Array(80).fill("System inspected and documented.").join(" "),
+        sectionOrder: ["control-panel", "initiating-devices", "notification", "system-summary"],
+        activeSectionId: "control-panel",
+        sections: {
+          "control-panel": { status: "pass", notes: "", fields: { controlPanels: [], lineVoltageStatus: "normal" } },
+          "initiating-devices": { status: "pass", notes: "", fields: { initiatingDevices: Array.from({ length: 20 }, (_, i) => ({ location: `Area ${i + 1}`, deviceType: "Smoke Detector", functionalTestResult: "pass", physicalCondition: "good", sensitivityOrOperationResult: "pass" })) } },
+          notification: { status: "pass", notes: "", fields: { notificationAppliances: Array.from({ length: 20 }, (_, i) => ({ location: `Zone ${i + 1}`, applianceType: "Horn Strobe", audibleOperation: "pass", visualOperation: "pass" })) } },
+          "system-summary": { status: "pass", notes: "", fields: { controlPanelsInspected: 1, initiatingDevicesInspected: 20, notificationAppliancesInspected: 20 } }
+        },
+        deficiencies: [],
+        attachments: [],
+        signatures: {},
+        context: { siteName: "", customerName: "", scheduledDate: "", assetCount: 0, priorReportSummary: "" }
+      }
+    });
+    const html = await renderPdfHtml(createElement(FireAlarmReportDocument, { model }));
+    expect(html).toContain("Northwest Fire &amp; Safety Regional Compliance Operations Group");
+    expect(html).toContain("Fire Alarm Inspection and Testing Report");
   });
 
   it("routes non-bespoke report types through the generic v2 engine", async () => {

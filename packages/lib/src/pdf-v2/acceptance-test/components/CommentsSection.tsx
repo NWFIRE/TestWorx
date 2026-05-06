@@ -1,3 +1,5 @@
+import React from "react";
+
 import { EmptyState } from "../../core/components/EmptyState";
 import { SectionHeader } from "../../core/components/SectionHeader";
 

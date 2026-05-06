@@ -1,3 +1,5 @@
+import React from "react";
+
 import { Badge } from "../../core/components/Badge";
 import { DataTable } from "../../core/components/DataTable";
 import { SectionHeader } from "../../core/components/SectionHeader";

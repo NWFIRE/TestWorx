@@ -1,3 +1,5 @@
+import React from "react";
+
 import type { OutcomeHeroProps } from "../types/common";
 
 function toneClass(result: OutcomeHeroProps["result"]) {

@@ -17,16 +17,36 @@ UPDATE "Inspection" i
 SET
   "completedAt" = i."updatedAt",
   "archivedAt" = i."updatedAt",
-  "archiveCustomerName" = cc."name",
-  "archiveSiteName" = s."name",
-  "archiveSiteAddress" = CONCAT_WS(', ',
-    NULLIF(TRIM(COALESCE(s."addressLine1", '')), ''),
-    NULLIF(TRIM(COALESCE(s."addressLine2", '')), ''),
-    NULLIF(TRIM(CONCAT_WS(' ', s."city", s."state", s."postalCode")), '')
+  "archiveCustomerName" = (
+    SELECT cc."name"
+    FROM "CustomerCompany" cc
+    WHERE cc."id" = i."customerCompanyId"
   ),
-  "archiveSiteCity" = s."city",
+  "archiveSiteName" = (
+    SELECT s."name"
+    FROM "Site" s
+    WHERE s."id" = i."siteId"
+  ),
+  "archiveSiteAddress" = (
+    SELECT CONCAT_WS(', ',
+      NULLIF(TRIM(COALESCE(s."addressLine1", '')), ''),
+      NULLIF(TRIM(COALESCE(s."addressLine2", '')), ''),
+      NULLIF(TRIM(CONCAT_WS(' ', s."city", s."state", s."postalCode")), '')
+    )
+    FROM "Site" s
+    WHERE s."id" = i."siteId"
+  ),
+  "archiveSiteCity" = (
+    SELECT s."city"
+    FROM "Site" s
+    WHERE s."id" = i."siteId"
+  ),
   "archiveTechnicianName" = COALESCE(
-    assigned."name",
+    (
+      SELECT assigned."name"
+      FROM "User" assigned
+      WHERE assigned."id" = i."assignedTechnicianId"
+    ),
     (
       SELECT STRING_AGG(DISTINCT tech."name", ', ' ORDER BY tech."name")
       FROM "InspectionTechnicianAssignment" ita
@@ -87,11 +107,7 @@ SET
     FROM "InspectionReport" r
     WHERE r."inspectionId" = i."id"
   )
-FROM "CustomerCompany" cc
-JOIN "Site" s ON s."id" = i."siteId"
-LEFT JOIN "User" assigned ON assigned."id" = i."assignedTechnicianId"
-WHERE cc."id" = i."customerCompanyId"
-  AND i."status" IN ('completed', 'invoiced');
+WHERE i."status" IN ('completed', 'invoiced');
 
 CREATE INDEX "Inspection_tenantId_archivedAt_idx" ON "Inspection"("tenantId", "archivedAt");
 CREATE INDEX "Inspection_tenantId_completedAt_idx" ON "Inspection"("tenantId", "completedAt");

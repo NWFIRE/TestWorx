@@ -1,3 +1,5 @@
+import React from "react";
+
 import type { EmptyStateProps } from "../types/common";
 
 export function EmptyState({ message }: EmptyStateProps) {

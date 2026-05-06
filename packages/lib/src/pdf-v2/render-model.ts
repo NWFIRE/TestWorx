@@ -172,7 +172,7 @@ function renderRowsWithColumns(columns: RenderTableColumn[], rows: Array<Record<
     return nextRow;
   });
 
-  const visibleColumns = columns.filter((column) => normalizedRows.some((row) => cleanCustomerFacingText(row[column.key]?.text) || (row[column.key]?.lines?.length ?? 0) > 0));
+  const visibleColumns = columns;
   return {
     columns: visibleColumns,
     rows: normalizedRows.map((row) => Object.fromEntries(visibleColumns.map((column) => [column.key, row[column.key] ?? toCell("")])))
@@ -309,6 +309,97 @@ function getSourceSectionFields(input: PdfInput, sectionKey: string) {
   return input.draft.sections[sectionKey]?.fields ?? {};
 }
 
+function readSectionRows(input: PdfInput, sectionKey: string, fieldKey: string) {
+  const candidate = input.draft.sections[sectionKey]?.fields?.[fieldKey];
+  return Array.isArray(candidate) ? candidate as Array<Record<string, unknown>> : [];
+}
+
+function pickRowText(row: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = cleanCustomerFacingText(row[key]);
+    if (value) {
+      return value;
+    }
+  }
+  return "";
+}
+
+function mapKitchenHoodRow(row: Record<string, unknown>) {
+  return {
+    hoodName: pickRowText(row, ["hoodName", "location", "name"]),
+    hoodSize: pickRowText(row, ["hoodSize", "size"]),
+    ductSize: pickRowText(row, ["ductSize"]),
+    ductQuantity: pickRowText(row, ["ductQuantity", "quantity"]),
+    ductNozzleQuantity: pickRowText(row, ["ductNozzleQuantity", "nozzleQuantity"]),
+    ductNozzleType: pickRowText(row, ["ductNozzleType", "nozzleType"]),
+    notes: pickRowText(row, ["notes", "comments"])
+  };
+}
+
+function mapKitchenApplianceRow(row: Record<string, unknown>) {
+  return {
+    hoodName: pickRowText(row, ["hoodName", "hood", "location"]),
+    appliance: pickRowText(row, ["appliance", "applianceType", "type", "name"]),
+    size: pickRowText(row, ["size", "applianceSize"]),
+    applianceNozzleQuantity: pickRowText(row, ["applianceNozzleQuantity", "nozzleQuantity", "quantity"]),
+    applianceNozzleType: pickRowText(row, ["applianceNozzleType", "nozzleType"]),
+    notes: pickRowText(row, ["notes", "comments"])
+  };
+}
+
+function buildKitchenServiceMaterialRows(input: PdfInput) {
+  const tankFields = input.draft.sections["tank-and-service"]?.fields ?? {};
+  const rows: Array<Record<string, unknown>> = [];
+
+  for (const row of readSectionRows(input, "tank-and-service", "fusibleLinksUsed")) {
+    rows.push({
+      item: "Fusible link",
+      details: pickRowText(row, ["temperature", "type"]),
+      quantity: pickRowText(row, ["quantity"]),
+      notes: pickRowText(row, ["notes", "comments"])
+    });
+  }
+
+  for (const row of readSectionRows(input, "tank-and-service", "capsUsed")) {
+    rows.push({
+      item: "Nozzle cap",
+      details: pickRowText(row, ["type"]),
+      quantity: pickRowText(row, ["quantity"]),
+      notes: pickRowText(row, ["notes", "comments"])
+    });
+  }
+
+  for (const row of readSectionRows(input, "tank-and-service", "cartridgesUsed")) {
+    rows.push({
+      item: "Cartridge",
+      details: pickRowText(row, ["type"]),
+      quantity: pickRowText(row, ["quantity"]),
+      notes: pickRowText(row, ["notes", "comments"])
+    });
+  }
+
+  for (const row of readSectionRows(input, "tank-and-service", "serviceItems")) {
+    rows.push({
+      item: pickRowText(row, ["item", "type", "name"]),
+      details: pickRowText(row, ["location", "details"]),
+      quantity: pickRowText(row, ["quantity"]),
+      notes: pickRowText(row, ["notes", "comments"])
+    });
+  }
+
+  const serviceNotes = cleanCustomerFacingText(tankFields.serviceNotes);
+  if (serviceNotes) {
+    rows.push({
+      item: "Service notes",
+      details: serviceNotes,
+      quantity: "",
+      notes: ""
+    });
+  }
+
+  return rows;
+}
+
 function buildDatasetRows(input: PdfInput, dataset: string): Array<Record<string, unknown>> {
   const [sectionId, fieldId] = dataset.split(".", 2);
   if (sectionId && fieldId) {
@@ -324,11 +415,14 @@ function buildDatasetRows(input: PdfInput, dataset: string): Array<Record<string
     case "notificationAppliances":
       return Array.isArray(input.draft.sections.notification?.fields.notificationAppliances) ? input.draft.sections.notification?.fields.notificationAppliances as Array<Record<string, unknown>> : [];
     case "hoods":
-      return Array.isArray(input.draft.sections["appliance-coverage"]?.fields.hoods) ? input.draft.sections["appliance-coverage"]?.fields.hoods as Array<Record<string, unknown>> : [];
+      return readSectionRows(input, "appliance-coverage", "hoods").map(mapKitchenHoodRow);
     case "appliances":
-      return Array.isArray(input.draft.sections["appliance-coverage"]?.fields.hoodAppliances) ? input.draft.sections["appliance-coverage"]?.fields.hoodAppliances as Array<Record<string, unknown>> : [];
+      return [
+        ...readSectionRows(input, "appliance-coverage", "hoodAppliances"),
+        ...readSectionRows(input, "appliance-coverage", "appliances")
+      ].map(mapKitchenApplianceRow);
     case "fusibleLinksUsed":
-      return Array.isArray(input.draft.sections["tank-and-service"]?.fields.fusibleLinksUsed) ? input.draft.sections["tank-and-service"]?.fields.fusibleLinksUsed as Array<Record<string, unknown>> : [];
+      return buildKitchenServiceMaterialRows(input);
     case "extinguishers":
       return Array.isArray(input.draft.sections.inventory?.fields.extinguishers) ? input.draft.sections.inventory?.fields.extinguishers as Array<Record<string, unknown>> : [];
     case "serviceActions": {

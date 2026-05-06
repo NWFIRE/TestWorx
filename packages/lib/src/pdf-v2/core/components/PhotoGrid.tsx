@@ -1,3 +1,5 @@
+import React from "react";
+
 import type { PhotoGridProps } from "../types/common";
 
 import { EmptyState } from "./EmptyState";

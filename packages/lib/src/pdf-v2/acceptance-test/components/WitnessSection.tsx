@@ -1,3 +1,5 @@
+import React from "react";
+
 import { EmptyState } from "../../core/components/EmptyState";
 import { MetadataGrid } from "../../core/components/MetadataGrid";
 import { SectionHeader } from "../../core/components/SectionHeader";

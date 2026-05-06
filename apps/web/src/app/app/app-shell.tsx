@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { usePathname, useRouter } from "next/navigation";
 
 import { BrandLoader } from "@/app/brand-loader";
+import { useSmartBack } from "@/app/use-smart-back";
 import { getAppNavItemsForRole, getCurrentAppNavItem, isAppNavItemActive, type AppNavItem } from "./app-nav-config";
 import { MobilePullToRefresh } from "./mobile-pull-to-refresh";
 import { NativeTechnicianRouteGuard } from "./native-technician-route-guard";
@@ -256,24 +257,14 @@ function BrandBlock({
   );
 }
 
-function DesktopBackButton({ fallbackHref }: { fallbackHref: string }) {
-  const router = useRouter();
-
-  const handleBack = () => {
-    const hasSameOriginReferrer = typeof document !== "undefined" && document.referrer.startsWith(window.location.origin);
-    if (window.history.length > 1 && hasSameOriginReferrer) {
-      router.back();
-      return;
-    }
-
-    router.push(fallbackHref);
-  };
+function DesktopBackButton({ fallbackHref }: { fallbackHref?: string | null }) {
+  const smartBack = useSmartBack(fallbackHref);
 
   return (
     <button
       aria-label="Go back"
       className="pressable hidden h-8 items-center rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-500 shadow-[0_4px_12px_rgba(15,23,42,0.04)] transition hover:border-slate-300 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.28)] lg:inline-flex"
-      onClick={handleBack}
+      onClick={() => smartBack()}
       type="button"
     >
       Back
@@ -340,7 +331,7 @@ export function AppShell({
   const isTechnician = role === "technician";
   const navItems = useMemo(() => getAppNavItemsForRole(role, allowances, sidebarOrder), [allowances, role, sidebarOrder]);
   const currentItem = useMemo(() => getCurrentAppNavItem(role, pathname, allowances, sidebarOrder), [allowances, pathname, role, sidebarOrder]);
-  const desktopBackFallbackHref = currentItem?.href ?? (role === "customer_user" ? "/app/customer" : "/app/admin/dashboard");
+  const desktopBackFallbackHref = role === "customer_user" && pathname !== "/app/customer" ? "/app/customer" : null;
   const [isRefreshing, startRefreshTransition] = useTransition();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window === "undefined" || window.innerWidth < EXPANDED_SIDEBAR_BREAKPOINT

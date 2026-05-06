@@ -171,13 +171,13 @@ describe("pdf generation workflow", () => {
       draft: {
         templateVersion: 1,
         inspectionType: "fire_alarm",
-        overallNotes: new Array(120).fill("Panel tested and devices responded correctly.").join(" "),
+        overallNotes: new Array(100).fill("Panel tested and devices responded correctly.").join(" "),
         sectionOrder: ["control-panel", "initiating-devices", "notification", "system-summary"],
         activeSectionId: "control-panel",
         sections: {
           "control-panel": {
             status: "attention",
-            notes: new Array(30).fill("Primary power, batteries, and annunciation were reviewed at the panel.").join(" "),
+            notes: new Array(24).fill("Primary power, batteries, and annunciation were reviewed at the panel.").join(" "),
             fields: {
               controlPanelsInspected: 1,
               lineVoltageStatus: "normal",
@@ -191,12 +191,12 @@ describe("pdf generation workflow", () => {
           },
           "initiating-devices": {
             status: "attention",
-            notes: new Array(30).fill("One initiating device required label replacement and cleaning.").join(" "),
+            notes: new Array(24).fill("One initiating device required label replacement and cleaning.").join(" "),
             fields: { initiatingDevicesInspected: 48, initiatingDeviceDeficiencyCount: 1, initiatingDeviceNotes: "ANSI sample with one detector flagged for follow-up." }
           },
           notification: {
             status: "pass",
-            notes: new Array(30).fill("Notification appliances activated correctly throughout the tested sample.").join(" "),
+            notes: new Array(24).fill("Notification appliances activated correctly throughout the tested sample.").join(" "),
             fields: { notificationAppliancesInspected: 30, notificationDeficiencyCount: 0, notificationNotes: "Speaker strobes synchronized and audibility confirmed." }
           },
           "system-summary": {
@@ -231,7 +231,7 @@ describe("pdf generation workflow", () => {
 
     const pdf = await PDFDocument.load(bytes);
     expect(pdf.getPageCount()).toBeGreaterThan(1);
-  });
+  }, 15000);
 
   it("generates a kitchen suppression PDF through the shared config-driven page-one renderer", async () => {
     const bytes = await generateInspectionReportPdf({

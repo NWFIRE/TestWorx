@@ -122,7 +122,7 @@ export default async function ContractProvidersAdminPage({
   return (
     <AppPageShell density="wide">
       <PageHeader
-        backNavigation={{ fallbackHref: "/app/admin/dashboard", label: "Back to admin" }}
+        backNavigation={{ fallbackHref: "/app/admin", label: "Back" }}
         eyebrow="Contract provider billing"
         title="Contract providers"
         description="Keep third-party billing visible and explainable with provider accounts, billing contacts, and direct links into contract pricing."

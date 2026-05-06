@@ -125,6 +125,9 @@ const genericInspectionSitePostalCode = "Unknown";
 const nonDisplayableSiteLabels = new Set([
   genericInspectionSiteName.toLowerCase(),
   genericInspectionSiteAddressLine1.toLowerCase(),
+  "unknown",
+  "unknown unknown",
+  "unknown unknown unknown",
   "no fixed service address on file"
 ]);
 const nonDisplayableAddressParts = new Set([

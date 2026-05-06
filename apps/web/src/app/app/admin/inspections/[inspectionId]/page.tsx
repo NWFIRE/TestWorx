@@ -113,7 +113,7 @@ function inspectionTaskLabel(task: { inspectionType: string; customDisplayLabel?
 function resolveInspectionOrigin(value: string | undefined) {
   const candidate = (value ?? "").trim();
   if (!candidate.startsWith("/app/") || candidate.startsWith("/app/admin/inspections/")) {
-    return "/app/admin/dashboard";
+    return "/app/admin/inspections";
   }
 
   return candidate;

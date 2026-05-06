@@ -32,6 +32,7 @@ export const kitchenSuppressionReportConfigV2: ReportTypeConfig = {
       description: "Capture the core kitchen suppression system details for this hood system.",
       renderer: "keyValue",
       fields: [
+        { key: "systemType", label: "System Type" },
         { key: "systemSizeGallons", label: "System Size (Gallons)", format: "number" },
         { key: "numberOfCylinders", label: "Number of Cylinders", format: "number" },
         { key: "ul300Compliant", label: "UL 300 Compliant", format: "boolean" },
@@ -52,12 +53,12 @@ export const kitchenSuppressionReportConfigV2: ReportTypeConfig = {
         repeatHeader: true,
         emptyMessage: "No hoods recorded",
         columns: [
-          { key: "location", label: "Location", width: "20%" },
-          { key: "type", label: "Type", width: "14%", hideIfEmpty: true },
-          { key: "manufacturer", label: "Manufacturer", width: "14%", hideIfEmpty: true },
-          { key: "serviceKey", label: "Service Key", width: "12%", hideIfEmpty: true },
-          { key: "inspectionIndicators", label: "Inspection Indicators", width: "28%", renderMode: "stacked" },
-          { key: "notes", label: "Notes", width: "12%", hideIfEmpty: true }
+          { key: "hoodName", label: "Hood / Location", width: "24%" },
+          { key: "hoodSize", label: "Hood Size", width: "16%", hideIfEmpty: true },
+          { key: "ductSize", label: "Duct Size", width: "16%", hideIfEmpty: true },
+          { key: "ductQuantity", label: "Duct Qty", width: "12%", hideIfEmpty: true },
+          { key: "ductNozzleQuantity", label: "Duct Nozzle Qty", width: "16%", hideIfEmpty: true },
+          { key: "ductNozzleType", label: "Duct Nozzle Type", width: "16%", hideIfEmpty: true }
         ]
       }
     },
@@ -70,12 +71,11 @@ export const kitchenSuppressionReportConfigV2: ReportTypeConfig = {
         repeatHeader: true,
         emptyMessage: "No appliances recorded",
         columns: [
-          { key: "location", label: "Location", width: "20%" },
-          { key: "type", label: "Type", width: "18%" },
-          { key: "manufacturer", label: "Manufacturer", width: "14%", hideIfEmpty: true },
-          { key: "serviceKey", label: "Service Key", width: "12%", hideIfEmpty: true },
-          { key: "inspectionIndicators", label: "Inspection Indicators", width: "24%", renderMode: "stacked" },
-          { key: "notes", label: "Notes", width: "12%", hideIfEmpty: true }
+          { key: "hoodName", label: "Hood / Location", width: "24%" },
+          { key: "appliance", label: "Appliance", width: "22%" },
+          { key: "size", label: "Size", width: "16%", hideIfEmpty: true },
+          { key: "applianceNozzleQuantity", label: "Nozzle Qty", width: "18%", hideIfEmpty: true },
+          { key: "applianceNozzleType", label: "Nozzle Type", width: "20%", hideIfEmpty: true }
         ]
       }
     },
@@ -88,25 +88,30 @@ export const kitchenSuppressionReportConfigV2: ReportTypeConfig = {
         dataset: "systemChecklist",
         style: "passFailGrid",
         items: [
-          { key: "allAppliancesProperlyProtected", label: "All appliances properly protected?" },
-          { key: "ductAndPlenumProperlyProtected", label: "Duct & plenum properly protected?" },
-          { key: "systemNozzlesCorrect", label: "Positioning of all system nozzles correct?" },
-          { key: "installedPerMfgAndUl", label: "System installed properly per mfg & UL?" },
-          { key: "hoodAndDuctPenetrationsSealed", label: "Hood and duct penetrations sealed properly?" },
+          { key: "allAppliancesProtected", label: "All appliances properly protected?" },
+          { key: "ductPlenumProtected", label: "Duct & plenum properly protected?" },
+          { key: "nozzlePositioningCorrect", label: "Positioning of all system nozzles correct?" },
+          { key: "systemInstalledPerMfgUl", label: "System installed properly per mfg & UL?" },
+          { key: "penetrationsSealedProperly", label: "Hood and duct penetrations sealed properly?" },
+          { key: "pressureGaugeInRange", label: "Pressure gauge in operating range if equipped?" },
+          { key: "cartridgeWeightWithinSpec", label: "Cartridge weight within specifications if equipped?" },
           { key: "cylinderChemicalCondition", label: "Cylinder chemical in good condition?" },
-          { key: "manualPullStationOperated", label: "Operated system via manual pull station?" },
+          { key: "manualPullStationTested", label: "Operated system via manual pull station?" },
           { key: "testLinkOperated", label: "Operated system via test link?" },
           { key: "fuelShutdownVerified", label: "Verified shutdown of equipment fuel source?" },
-          { key: "nozzlesCleanCapsInPlace", label: "Nozzles clean and proper caps in place?" },
+          { key: "nozzlesCleanCapped", label: "Nozzles clean and proper caps in place?" },
           { key: "detectionLinksPlacement", label: "Proper placement of detection links?" },
           { key: "fusibleLinksReplaced", label: "Replaced fusible link(s)?" },
           { key: "cableTravelChecked", label: "Checked travel of cable/s-hooks?" },
-          { key: "pipingConduitSecure", label: "Piping/conduit tight & securely bracketed?" },
-          { key: "fireAlarmInterconnection", label: "Fire alarm interconnection functioning?" },
+          { key: "pipingSecured", label: "Piping/conduit tight & securely bracketed?" },
+          { key: "flameFryerSeparation", label: "Proper separation between flame and fryer?" },
+          { key: "fireAlarmInterconnectWorking", label: "Fire alarm interconnection functioning?" },
           { key: "gasValveTestedReset", label: "Gas valve tested & reset to operating position?" },
+          { key: "pipingObstructionTested", label: "Piping obstruction test performed?" },
+          { key: "filtersInstalledCorrectly", label: "Proper filters installed & in correct position?" },
           { key: "exhaustFanOperational", label: "Exhaust fan operational and warning sign on hood?" },
-          { key: "kClassChargedInPlace", label: "K-class fire extinguisher charged & in place?" },
-          { key: "hoodCleanedPerNfpa96", label: "Hood cleaned regularly in accordance with NFPA 96?" }
+          { key: "kClassExtinguisherPresent", label: "K-class fire extinguisher charged & in place?" },
+          { key: "hoodCleanedPerNFPA96", label: "Hood cleaned regularly in accordance with NFPA 96?" }
         ]
       }
     },
@@ -121,12 +126,10 @@ export const kitchenSuppressionReportConfigV2: ReportTypeConfig = {
         hideIfEmpty: false,
         emptyMessage: "No service materials recorded",
         columns: [
-          { key: "location", label: "Location", width: "18%", hideIfEmpty: true },
-          { key: "type", label: "Type", width: "16%", hideIfEmpty: true },
-          { key: "manufacturer", label: "Manufacturer", width: "14%", hideIfEmpty: true },
-          { key: "serviceKey", label: "Service Key", width: "12%", hideIfEmpty: true },
-          { key: "inspectionIndicators", label: "Inspection Indicators", width: "28%", renderMode: "stacked" },
-          { key: "notes", label: "Notes", width: "12%", hideIfEmpty: true }
+          { key: "item", label: "Item", width: "34%" },
+          { key: "details", label: "Details", width: "36%", hideIfEmpty: true },
+          { key: "quantity", label: "Quantity", width: "14%" },
+          { key: "notes", label: "Notes", width: "16%", hideIfEmpty: true }
         ]
       }
     },

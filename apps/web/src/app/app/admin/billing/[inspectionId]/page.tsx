@@ -109,6 +109,10 @@ function formatEditableQuantity(quantity: number) {
   return quantity > 0 ? String(Math.round(quantity)) : "";
 }
 
+function formatMoney(value: number | null | undefined) {
+  return `$${Number(value ?? 0).toFixed(2)}`;
+}
+
 function buildBillingItemContext(item: {
   code?: string | null;
   metadata?: Record<string, unknown> | null;
@@ -277,6 +281,7 @@ export default async function BillingSummaryDetailPage({
   const referenceLabels = Array.isArray(referenceSnapshot?.labels)
     ? referenceSnapshot.labels.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
     : [];
+  const invoiceTotals = summary.invoiceTotals;
 
   return (
     <AppPageShell density="wide">
@@ -300,7 +305,51 @@ export default async function BillingSummaryDetailPage({
         <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Labor hours</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.laborHoursTotal}</p></div>
         <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Material items</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.materialItemCount}</p></div>
         <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Missing prices</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.missingPriceCount}</p></div>
-        <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Subtotal</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.subtotal > 0 ? `$${summary.subtotal.toFixed(2)}` : "Pending pricing"}</p></div>
+        <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Total due</p><p className="mt-2 text-3xl font-semibold text-ink">{invoiceTotals.totalDue > 0 ? formatMoney(invoiceTotals.totalDue) : "Pending pricing"}</p></div>
+      </div>
+
+      <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Invoice totals</p>
+            <h3 className="mt-2 text-2xl font-semibold text-ink">Tax and subtotal snapshot</h3>
+            <p className="mt-2 max-w-2xl text-sm text-slate-500">
+              Totals are calculated from the saved invoice line snapshots, including QuickBooks taxable/non-taxable item status.
+            </p>
+          </div>
+          <div className="grid min-w-72 gap-2 text-sm">
+            <div className="flex items-center justify-between gap-8">
+              <span className="text-slate-500">Subtotal</span>
+              <span className="font-semibold text-ink">{formatMoney(invoiceTotals.subtotalBeforeTax)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-8">
+              <span className="text-slate-500">Taxable subtotal</span>
+              <span className="font-semibold text-ink">{formatMoney(invoiceTotals.taxableSubtotal)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-8">
+              <span className="text-slate-500">Non-taxable subtotal</span>
+              <span className="font-semibold text-ink">{formatMoney(invoiceTotals.nonTaxableSubtotal)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-8 border-t border-slate-200 pt-2">
+              <span className="text-slate-500">Sales tax</span>
+              <span className="font-semibold text-ink">{formatMoney(invoiceTotals.taxTotal)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-8 border-t border-slate-200 pt-3 text-base">
+              <span className="font-semibold text-ink">Total</span>
+              <span className="text-xl font-semibold text-ink">{formatMoney(invoiceTotals.totalDue)}</span>
+            </div>
+          </div>
+        </div>
+        {invoiceTotals.warnings.length > 0 ? (
+          <div className="mt-5 rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
+            <p className="font-semibold text-amber-950">Tax review needed</p>
+            <div className="mt-2 space-y-1">
+              {invoiceTotals.warnings.map((warning) => (
+                <p key={warning}>{warning}</p>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {isInvoiced ? (
@@ -355,6 +404,16 @@ export default async function BillingSummaryDetailPage({
                           Tax status: {item.taxable === true ? "Taxable" : item.taxable === false ? "Non-taxable" : "Not snapped yet"}
                           {item.taxableSource ? ` / ${item.taxableSource === "quickbooks" ? "Synced from QuickBooks" : item.taxableSource}` : ""}
                         </p>
+                        <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                          <span className={item.taxable ? "rounded-full bg-emerald-50 px-3 py-1 text-emerald-700" : "rounded-full bg-slate-100 px-3 py-1 text-slate-600"}>
+                            {item.taxable ? "Taxable" : "Non-taxable"}
+                          </span>
+                          {item.taxable ? (
+                            <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700">
+                              Line tax {formatMoney(item.taxAmount)}
+                            </span>
+                          ) : null}
+                        </div>
                         {buildBillingItemContext(item).map((line) => (
                           <p key={line} className="text-sm text-slate-500">{line}</p>
                         ))}
@@ -435,7 +494,9 @@ export default async function BillingSummaryDetailPage({
                           </button>
                         </div>
                         <p className="sm:col-span-2 2xl:col-span-1 text-xs text-slate-500">
-                          Subtotal: {item.unitPrice !== null && item.unitPrice !== undefined ? `$${(item.quantity * item.unitPrice).toFixed(2)}` : "Pending price"}
+                          Subtotal: {item.unitPrice !== null && item.unitPrice !== undefined ? formatMoney(item.lineSubtotal ?? item.quantity * item.unitPrice) : "Pending price"}
+                          {item.taxAmount ? ` | Tax: ${formatMoney(item.taxAmount)}` : ""}
+                          {item.lineTotal ? ` | Line total: ${formatMoney(item.lineTotal)}` : ""}
                         </p>
                       </form>
                     </div>

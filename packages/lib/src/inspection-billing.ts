@@ -41,6 +41,13 @@ export type BillableItem = {
   unit?: string;
   unitPrice?: number | null;
   amount?: number | null;
+  lineSubtotal?: number | null;
+  discountAmount?: number | null;
+  taxCodeId?: string | null;
+  taxCategory?: string | null;
+  taxRate?: number | null;
+  taxAmount?: number | null;
+  lineTotal?: number | null;
   metadata?: Record<string, unknown>;
   linkedCatalogItemId?: string | null;
   linkedCatalogItemName?: string | null;
@@ -51,6 +58,20 @@ export type BillableItem = {
   taxableSource?: "quickbooks" | "manual" | "default" | "override" | null;
   quickBooksTaxableStatus?: "taxable" | "non_taxable" | "unknown" | null;
   quickBooksTaxCodeRef?: string | null;
+};
+
+export type InvoiceTotals = {
+  taxableSubtotal: number;
+  nonTaxableSubtotal: number;
+  subtotalBeforeTax: number;
+  discountTotal: number;
+  taxTotal: number;
+  totalDue: number;
+  taxRate: number;
+  taxCodeId: string | null;
+  calculationVersion: "invoice_totals_v1";
+  calculatedAt: string;
+  warnings: string[];
 };
 
 export type BillingReviewGroup<T extends BillableItem = BillableItem> = T & {
@@ -951,8 +972,23 @@ function resolveBillableExtinguisherType(row: Record<string, ReportPrimitiveValu
   return row.billingExtinguisherType ?? row.extinguisherTypeOther ?? row.extinguisherType ?? null;
 }
 
+function roundMoney(value: number) {
+  return Number((Math.round((value + Number.EPSILON) * 100) / 100).toFixed(2));
+}
+
+function readNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 function calculateAmount(quantity: number, unitPrice?: number | null) {
-  return typeof unitPrice === "number" ? Number((quantity * unitPrice).toFixed(2)) : null;
+  return typeof unitPrice === "number" ? roundMoney(quantity * unitPrice) : null;
 }
 
 function resolveCalculatedSectionFieldValue(
@@ -1355,6 +1391,9 @@ export function groupBillingReviewItems<T extends BillableItem>(items: T[]) {
           ...item,
           quantity: Number(item.quantity.toFixed(2)),
           amount: calculateAmount(item.quantity, item.unitPrice ?? null),
+          lineSubtotal: calculateLineSubtotal(item),
+          taxAmount: item.taxAmount ?? calculateInvoiceLineSnapshot(item).taxAmount,
+          lineTotal: item.lineTotal ?? calculateInvoiceLineSnapshot(item).lineTotal,
           subtotal: Number((item.amount ?? calculateAmount(item.quantity, item.unitPrice ?? null) ?? 0).toFixed(2)),
           itemIds: [item.id],
           sourceItemCount: 1,
@@ -1369,6 +1408,9 @@ export function groupBillingReviewItems<T extends BillableItem>(items: T[]) {
         ...existing,
         quantity: combinedQuantity,
         amount: calculateAmount(combinedQuantity, existing.unitPrice ?? null),
+        lineSubtotal: roundMoney((existing.lineSubtotal ?? existing.subtotal) + calculateLineSubtotal(item)),
+        taxAmount: roundMoney((existing.taxAmount ?? 0) + (item.taxAmount ?? calculateInvoiceLineSnapshot(item).taxAmount)),
+        lineTotal: roundMoney((existing.lineTotal ?? existing.subtotal) + (item.lineTotal ?? calculateInvoiceLineSnapshot(item).lineTotal)),
         subtotal: Number((existing.subtotal + (item.amount ?? calculateAmount(item.quantity, item.unitPrice ?? null) ?? 0)).toFixed(2)),
         itemIds: [...existing.itemIds, item.id],
         sourceItemCount: existing.sourceItemCount + 1,
@@ -1963,8 +2005,170 @@ async function buildComplianceReportingFeeItemsTx(tx: TransactionClient, input: 
   return feeItems;
 }
 
+function readLineDiscountAmount(item: BillableItem) {
+  return Math.max(
+    0,
+    readNumber(item.discountAmount)
+      ?? readNumber(item.metadata?.discountAmount)
+      ?? readNumber(item.metadata?.lineDiscountAmount)
+      ?? 0
+  );
+}
+
+function readLineTaxRate(item: BillableItem, defaultTaxRate: number) {
+  const explicitRate =
+    readNumber(item.taxRate)
+      ?? readNumber(item.metadata?.taxRate)
+      ?? readNumber(item.metadata?.invoiceTaxRate);
+
+  if (explicitRate === null) {
+    return defaultTaxRate;
+  }
+
+  return explicitRate > 1 ? explicitRate / 100 : explicitRate;
+}
+
+function calculateLineSubtotal(item: BillableItem) {
+  const grossSubtotal = typeof item.unitPrice === "number"
+    ? calculateAmount(item.quantity, item.unitPrice) ?? 0
+    : readNumber(item.amount) ?? 0;
+  return roundMoney(Math.max(0, grossSubtotal - readLineDiscountAmount(item)));
+}
+
+function calculateInvoiceLineSnapshot(
+  item: BillableItem,
+  input: {
+    defaultTaxRate?: number;
+    defaultTaxCodeId?: string | null;
+  } = {}
+) {
+  const lineSubtotal = calculateLineSubtotal(item);
+  const discountAmount = readLineDiscountAmount(item);
+  const taxable = item.taxable === true;
+  const taxRate = taxable ? readLineTaxRate(item, input.defaultTaxRate ?? 0) : 0;
+  const existingTaxAmount = taxable ? readNumber(item.taxAmount) : 0;
+  const taxAmount = taxable
+    ? roundMoney(lineSubtotal * taxRate)
+    : 0;
+  const taxCodeId = item.taxCodeId
+    ?? item.quickBooksTaxCodeRef
+    ?? (typeof item.metadata?.taxCodeId === "string" ? item.metadata.taxCodeId : null)
+    ?? input.defaultTaxCodeId
+    ?? null;
+
+  return {
+    lineSubtotal,
+    discountAmount,
+    taxable,
+    taxRate,
+    taxCodeId,
+    taxAmount: taxRate > 0 ? taxAmount : roundMoney(existingTaxAmount ?? 0),
+    lineTotal: roundMoney(lineSubtotal + (taxRate > 0 ? taxAmount : existingTaxAmount ?? 0))
+  };
+}
+
+export function calculateInvoiceTotalsFromItems(
+  items: BillableItem[],
+  input: {
+    defaultTaxRate?: number;
+    defaultTaxCodeId?: string | null;
+    calculatedAt?: Date | string;
+  } = {}
+): InvoiceTotals {
+  const warnings = new Set<string>();
+  let taxableSubtotal = 0;
+  let nonTaxableSubtotal = 0;
+  let discountTotal = 0;
+  let taxTotal = 0;
+
+  for (const item of items) {
+    const line = calculateInvoiceLineSnapshot(item, input);
+    discountTotal += line.discountAmount;
+    taxTotal += line.taxAmount;
+
+    if (line.taxable) {
+      taxableSubtotal += line.lineSubtotal;
+      if (line.taxRate <= 0 && line.lineSubtotal > 0) {
+        warnings.add("One or more taxable lines are missing a tax rate, so sales tax is currently $0.00 until a tax rate/code is configured.");
+      }
+      if (!line.taxCodeId && line.lineSubtotal > 0) {
+        warnings.add("One or more taxable lines are missing a tax code.");
+      }
+    } else {
+      nonTaxableSubtotal += line.lineSubtotal;
+    }
+
+    if (item.taxable === null || item.taxable === undefined) {
+      warnings.add("One or more billable lines are missing a taxable/non-taxable snapshot.");
+    }
+  }
+
+  const roundedTaxableSubtotal = roundMoney(taxableSubtotal);
+  const roundedNonTaxableSubtotal = roundMoney(nonTaxableSubtotal);
+  const subtotalBeforeTax = roundMoney(roundedTaxableSubtotal + roundedNonTaxableSubtotal);
+  const roundedDiscountTotal = roundMoney(discountTotal);
+  const roundedTaxTotal = roundMoney(taxTotal);
+
+  return {
+    taxableSubtotal: roundedTaxableSubtotal,
+    nonTaxableSubtotal: roundedNonTaxableSubtotal,
+    subtotalBeforeTax,
+    discountTotal: roundedDiscountTotal,
+    taxTotal: roundedTaxTotal,
+    totalDue: roundMoney(subtotalBeforeTax + roundedTaxTotal),
+    taxRate: input.defaultTaxRate ?? 0,
+    taxCodeId: input.defaultTaxCodeId ?? null,
+    calculationVersion: "invoice_totals_v1",
+    calculatedAt: typeof input.calculatedAt === "string"
+      ? input.calculatedAt
+      : (input.calculatedAt ?? new Date()).toISOString(),
+    warnings: [...warnings]
+  };
+}
+
+function snapshotInvoiceLines(
+  items: BillableItem[],
+  input: {
+    defaultTaxRate?: number;
+    defaultTaxCodeId?: string | null;
+    calculatedAt?: Date | string;
+  } = {}
+) {
+  const calculatedAt = typeof input.calculatedAt === "string"
+    ? input.calculatedAt
+    : (input.calculatedAt ?? new Date()).toISOString();
+
+  return items.map((item) => {
+    const line = calculateInvoiceLineSnapshot(item, input);
+    return {
+      ...item,
+      amount: line.lineSubtotal,
+      lineSubtotal: line.lineSubtotal,
+      discountAmount: line.discountAmount,
+      taxCodeId: line.taxCodeId,
+      taxRate: line.taxRate,
+      taxAmount: line.taxAmount,
+      lineTotal: line.lineTotal,
+      metadata: {
+        ...(item.metadata ?? {}),
+        invoiceLineSnapshot: {
+          lineSubtotal: line.lineSubtotal,
+          discountAmount: line.discountAmount,
+          taxable: line.taxable,
+          taxCodeId: line.taxCodeId,
+          taxRate: line.taxRate,
+          taxAmount: line.taxAmount,
+          lineTotal: line.lineTotal,
+          calculationVersion: "invoice_totals_v1",
+          calculatedAt
+        }
+      }
+    } satisfies BillableItem;
+  });
+}
+
 function subtotalForItems(items: BillableItem[]) {
-  return Number(items.reduce((sum, item) => sum + (item.amount ?? 0), 0).toFixed(2));
+  return calculateInvoiceTotalsFromItems(items).subtotalBeforeTax;
 }
 
 function isMinimumTicketAdjustmentItem(item: BillableItem) {
@@ -2072,6 +2276,48 @@ function withMinimumTicketSnapshot(
   } satisfies JsonValue;
 }
 
+function readInvoiceTotalsSnapshot(pricingSnapshot: JsonValue | null): InvoiceTotals | null {
+  if (!pricingSnapshot || typeof pricingSnapshot !== "object" || Array.isArray(pricingSnapshot)) {
+    return null;
+  }
+
+  const invoiceTotals = (pricingSnapshot as Record<string, unknown>).invoiceTotals;
+  if (!invoiceTotals || typeof invoiceTotals !== "object" || Array.isArray(invoiceTotals)) {
+    return null;
+  }
+
+  const record = invoiceTotals as Record<string, unknown>;
+  return {
+    taxableSubtotal: readNumber(record.taxableSubtotal) ?? 0,
+    nonTaxableSubtotal: readNumber(record.nonTaxableSubtotal) ?? 0,
+    subtotalBeforeTax: readNumber(record.subtotalBeforeTax) ?? 0,
+    discountTotal: readNumber(record.discountTotal) ?? 0,
+    taxTotal: readNumber(record.taxTotal) ?? 0,
+    totalDue: readNumber(record.totalDue) ?? 0,
+    taxRate: readNumber(record.taxRate) ?? 0,
+    taxCodeId: typeof record.taxCodeId === "string" ? record.taxCodeId : null,
+    calculationVersion: "invoice_totals_v1",
+    calculatedAt: typeof record.calculatedAt === "string" ? record.calculatedAt : new Date(0).toISOString(),
+    warnings: Array.isArray(record.warnings)
+      ? record.warnings.filter((warning): warning is string => typeof warning === "string")
+      : []
+  };
+}
+
+function withInvoiceTotalsSnapshot(
+  pricingSnapshot: JsonValue | null,
+  totals: InvoiceTotals
+): JsonValue {
+  const base = pricingSnapshot && typeof pricingSnapshot === "object" && !Array.isArray(pricingSnapshot)
+    ? pricingSnapshot as Record<string, unknown>
+    : {};
+
+  return {
+    ...base,
+    invoiceTotals: totals
+  } satisfies JsonValue;
+}
+
 function readProviderMinimumTicketRuleMode(pricingSnapshot: JsonValue | null) {
   if (!pricingSnapshot || typeof pricingSnapshot !== "object" || Array.isArray(pricingSnapshot)) {
     return null;
@@ -2120,11 +2366,18 @@ async function applyMinimumTicketPricingToSummaryItemsTx(
   const items = minimumTicketAdjustmentItem
     ? [...itemsBeforeMinimum, minimumTicketAdjustmentItem]
     : itemsBeforeMinimum;
+  const snapshottedItems = snapshotInvoiceLines(items);
+  const invoiceTotals = calculateInvoiceTotalsFromItems(snapshottedItems);
+  const pricingSnapshot = withInvoiceTotalsSnapshot(
+    withMinimumTicketSnapshot(input.pricingSnapshot, minimumTicketResolution),
+    invoiceTotals
+  );
 
   return {
-    items,
-    subtotal: subtotalForItems(items),
-    pricingSnapshot: withMinimumTicketSnapshot(input.pricingSnapshot, minimumTicketResolution)
+    items: snapshottedItems,
+    subtotal: invoiceTotals.subtotalBeforeTax,
+    invoiceTotals,
+    pricingSnapshot
   };
 }
 
@@ -3527,8 +3780,13 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
         items: itemsWithCatalogState
       });
   const displayItems = displayMinimumPricedSummary.items as typeof itemsWithCatalogState;
+  const invoiceTotals = "invoiceTotals" in displayMinimumPricedSummary
+    ? displayMinimumPricedSummary.invoiceTotals as InvoiceTotals
+    : readInvoiceTotalsSnapshot(displayMinimumPricedSummary.pricingSnapshot)
+      ?? calculateInvoiceTotalsFromItems(displayItems);
+  const hasInvoiceTotalsSnapshot = Boolean(readInvoiceTotalsSnapshot(row.pricingSnapshot));
 
-  if (row.subtotal !== displayMinimumPricedSummary.subtotal) {
+  if (row.status !== "invoiced" && (row.subtotal !== displayMinimumPricedSummary.subtotal || !hasInvoiceTotalsSnapshot)) {
     await prisma.inspectionBillingSummary.update({
       where: { id: row.id },
       data: {
@@ -3543,6 +3801,7 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
     ...row,
     subtotal: displayMinimumPricedSummary.subtotal,
     pricingSnapshot: displayMinimumPricedSummary.pricingSnapshot,
+    invoiceTotals,
     siteName: getCustomerFacingSiteLabel(row.siteName) ?? row.customerName,
     status: row.status as BillingSummaryStatus,
     billingType: normalizeBillingType(row.billingType),

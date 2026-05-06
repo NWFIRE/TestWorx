@@ -46,7 +46,7 @@ const adminNavItems: AppNavItem[] = [
     description: "Operational overview, priorities, and work visibility",
     tone: "blue",
     matchMode: "exact",
-    matchPrefixes: ["/app/admin", "/app/admin/dashboard"]
+    matchPrefixes: ["/app/admin/dashboard"]
   },
   {
     href: "/app/admin/inspections",
@@ -355,5 +355,10 @@ export function isAppNavItemActive(pathname: string, item: AppNavItem) {
 }
 
 export function getCurrentAppNavItem(role: string, pathname: string, allowances?: InternalAllowances, sidebarOrder?: string[] | null) {
-  return getAppNavItemsForRole(role, allowances, sidebarOrder).find((item) => isAppNavItemActive(pathname, item)) ?? null;
+  const matches = getAppNavItemsForRole(role, allowances, sidebarOrder).filter((item) => isAppNavItemActive(pathname, item));
+  return matches.sort((first, second) => {
+    const firstLength = Math.max(first.href.length, ...(first.matchPrefixes ?? []).map((prefix) => prefix.length));
+    const secondLength = Math.max(second.href.length, ...(second.matchPrefixes ?? []).map((prefix) => prefix.length));
+    return secondLength - firstLength;
+  })[0] ?? null;
 }

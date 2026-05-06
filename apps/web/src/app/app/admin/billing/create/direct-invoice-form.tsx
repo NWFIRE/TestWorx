@@ -134,6 +134,16 @@ export function DirectInvoiceForm({
     () => value.lineItems.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0),
     [value.lineItems]
   );
+  const taxableSubtotal = useMemo(
+    () => value.lineItems.reduce((sum, line) => sum + (line.taxable ? line.quantity * line.unitPrice : 0), 0),
+    [value.lineItems]
+  );
+  const nonTaxableSubtotal = useMemo(
+    () => value.lineItems.reduce((sum, line) => sum + (!line.taxable ? line.quantity * line.unitPrice : 0), 0),
+    [value.lineItems]
+  );
+  const taxTotal = 0;
+  const totalDue = subtotal + taxTotal;
   const catalogOptions = useMemo<SearchSelectOption[]>(
     () => catalogItems.map((item) => ({
       value: item.id,
@@ -458,7 +468,25 @@ export function DirectInvoiceForm({
       <aside className="space-y-6">
         <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.04)]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Invoice total</p>
-          <p className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-slate-950">{toCurrency(subtotal)}</p>
+          <p className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-slate-950">{toCurrency(totalDue)}</p>
+          <div className="mt-5 grid gap-2 text-sm">
+            <div className="flex items-center justify-between gap-6">
+              <span className="text-slate-500">Subtotal</span>
+              <span className="font-semibold text-slate-950">{toCurrency(subtotal)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-6">
+              <span className="text-slate-500">Taxable subtotal</span>
+              <span className="font-semibold text-slate-950">{toCurrency(taxableSubtotal)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-6">
+              <span className="text-slate-500">Non-taxable subtotal</span>
+              <span className="font-semibold text-slate-950">{toCurrency(nonTaxableSubtotal)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-6 border-t border-slate-200 pt-2">
+              <span className="text-slate-500">Sales tax</span>
+              <span className="font-semibold text-slate-950">{toCurrency(taxTotal)}</span>
+            </div>
+          </div>
           <p className="mt-3 text-sm text-slate-500">
             {shouldSkipAutomaticFees
               ? "Walk-in invoices skip automatic service and compliance fee rules."

@@ -52,6 +52,7 @@ vi.mock("../quickbooks", () => ({
 }));
 
 import {
+  calculateInvoiceTotalsFromItems,
   clearBillingSummaryItemCatalogLink,
   extractBillableItemsFromDraft,
   extractBillableItemsFromFinalizedReport,
@@ -73,6 +74,120 @@ import { buildInitialReportDraft } from "../report-engine";
 import { mapInspectionTypeToComplianceReportingDivision } from "../compliance-reporting-fees";
 import { buildMinimumTicketResolution, resolveMinimumTicketRuleTx, selectMinimumTicketRule } from "../minimum-ticket-pricing";
 import { resolveInspectionServiceFeeTx, resolveServiceFeeForLocationTx } from "../service-fees";
+
+describe("invoice totals", () => {
+  it("splits taxable and non-taxable subtotals and taxes only taxable lines", () => {
+    const totals = calculateInvoiceTotalsFromItems([
+      {
+        id: "taxable_line",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        reportId: "report_1",
+        reportType: "fire_alarm",
+        category: "labor",
+        description: "Fire alarm labor",
+        quantity: 2,
+        unitPrice: 115,
+        amount: 230,
+        taxable: true,
+        taxableSource: "quickbooks",
+        quickBooksTaxableStatus: "taxable",
+        quickBooksTaxCodeRef: "TAX"
+      },
+      {
+        id: "non_taxable_line",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        reportId: "report_1",
+        reportType: "fire_alarm",
+        category: "fee",
+        description: "Service fee",
+        quantity: 1,
+        unitPrice: 65,
+        amount: 65,
+        taxable: false,
+        taxableSource: "quickbooks",
+        quickBooksTaxableStatus: "non_taxable",
+        quickBooksTaxCodeRef: "NON"
+      }
+    ], { defaultTaxRate: 0.0825, defaultTaxCodeId: "TAX" });
+
+    expect(totals.taxableSubtotal).toBe(230);
+    expect(totals.nonTaxableSubtotal).toBe(65);
+    expect(totals.subtotalBeforeTax).toBe(295);
+    expect(totals.taxTotal).toBe(18.98);
+    expect(totals.totalDue).toBe(313.98);
+  });
+
+  it("does not tax non-taxable invoices", () => {
+    const totals = calculateInvoiceTotalsFromItems([
+      {
+        id: "non_taxable_line",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        reportId: "report_1",
+        reportType: "fire_extinguisher",
+        category: "service",
+        description: "Annual inspection",
+        quantity: 3,
+        unitPrice: 25,
+        amount: 75,
+        taxable: false,
+        taxableSource: "quickbooks",
+        quickBooksTaxableStatus: "non_taxable",
+        quickBooksTaxCodeRef: "NON"
+      }
+    ], { defaultTaxRate: 0.0825 });
+
+    expect(totals.taxableSubtotal).toBe(0);
+    expect(totals.nonTaxableSubtotal).toBe(75);
+    expect(totals.taxTotal).toBe(0);
+    expect(totals.totalDue).toBe(75);
+  });
+
+  it("includes taxable minimum ticket adjustments before calculating tax", () => {
+    const totals = calculateInvoiceTotalsFromItems([
+      {
+        id: "service_line",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        reportId: "inspection_1",
+        reportType: "inspection",
+        category: "service",
+        description: "Walk-in extinguisher inspection",
+        quantity: 1,
+        unitPrice: 10,
+        amount: 10,
+        taxable: false,
+        taxableSource: "manual",
+        quickBooksTaxableStatus: null
+      },
+      {
+        id: "minimum_adjustment",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        reportId: "inspection_1",
+        reportType: "inspection",
+        category: "fee",
+        code: "MINIMUM_TICKET_ADJUSTMENT",
+        description: "Minimum Service Ticket Adjustment - Walk-In Minimum",
+        quantity: 1,
+        unitPrice: 15,
+        amount: 15,
+        taxable: true,
+        taxableSource: "quickbooks",
+        quickBooksTaxableStatus: "taxable",
+        quickBooksTaxCodeRef: "TAX"
+      }
+    ], { defaultTaxRate: 0.1, defaultTaxCodeId: "TAX" });
+
+    expect(totals.taxableSubtotal).toBe(15);
+    expect(totals.nonTaxableSubtotal).toBe(10);
+    expect(totals.subtotalBeforeTax).toBe(25);
+    expect(totals.taxTotal).toBe(1.5);
+    expect(totals.totalDue).toBe(26.5);
+  });
+});
 
 function buildKitchenDraftForManufacturer(manufacturer: string) {
   const draft = buildInitialReportDraft({

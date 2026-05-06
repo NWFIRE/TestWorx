@@ -1,3 +1,5 @@
+import React from "react";
+
 import type { BadgeProps } from "../types/common";
 
 const toneMap: Record<NonNullable<BadgeProps["tone"]>, string> = {

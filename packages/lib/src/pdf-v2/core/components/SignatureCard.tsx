@@ -1,3 +1,5 @@
+import React from "react";
+
 import type { SignatureCardProps } from "../types/common";
 
 export function SignatureCard({ role, name, signedAt, imageUrl }: SignatureCardProps) {

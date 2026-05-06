@@ -1,3 +1,5 @@
+import React from "react";
+
 import type { MetricGridProps } from "../types/common";
 
 function toneClass(tone?: "default" | "success" | "warning" | "danger") {
