@@ -1015,8 +1015,8 @@ describe("quickbooks billing sync hardening", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({
       QueryResponse: {
         Item: [
-          { Id: "qbo_item_1", Name: "FE-ANNUAL", Sku: "FE-ANNUAL", Type: "Service", Active: true, UnitPrice: 25 },
-          { Id: "qbo_item_2", Name: "Battery replacement", Sku: "EL-BATTERY", Type: "Service", Active: true, UnitPrice: 18 }
+          { Id: "qbo_item_1", Name: "FE-ANNUAL", Sku: "FE-ANNUAL", Type: "Service", Active: true, SalesTaxCodeRef: { value: "TAX" }, UnitPrice: 25 },
+          { Id: "qbo_item_2", Name: "Battery replacement", Sku: "EL-BATTERY", Type: "Service", Active: true, SalesTaxCodeRef: { value: "NON" }, UnitPrice: 18 }
         ]
       }
     }));
@@ -1037,7 +1037,12 @@ describe("quickbooks billing sync hardening", () => {
           sku: "FE-ANNUAL",
           itemType: "Service",
           active: true,
+          taxable: true,
           unitPrice: 25
+        }),
+        expect.objectContaining({
+          quickbooksItemId: "qbo_item_2",
+          taxable: false
         })
       ])
     });
@@ -1277,14 +1282,14 @@ describe("quickbooks billing sync hardening", () => {
             description: "Fire Extinguisher Recharge",
             quantity: 2,
             unitPrice: 85,
-            taxable: true
+            taxable: false
           },
           {
             catalogItemId: "catalog_1",
             description: "Fire Extinguisher Recharge",
             quantity: 3,
             unitPrice: 85,
-            taxable: true
+            taxable: false
           }
         ]
       }

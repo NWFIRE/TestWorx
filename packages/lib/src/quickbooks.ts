@@ -91,6 +91,10 @@ type QuickBooksBillingSummary = {
     linkedCatalogItemId?: string | null;
     linkedQuickBooksItemId?: string | null;
     linkedCatalogItemName?: string | null;
+    taxable?: boolean | null;
+    taxableSource?: string | null;
+    quickBooksTaxableStatus?: string | null;
+    quickBooksTaxCodeRef?: string | null;
   }>;
   quickbooksSyncStatus: string | null;
   quickbooksSendStatus: string | null;
@@ -1581,6 +1585,22 @@ async function normalizeQuickBooksCustomer(connection: QuickBooksTenantConnectio
   } satisfies QuickBooksCustomerRecord;
 }
 
+function readQuickBooksSalesTaxCodeRef(item: unknown) {
+  const salesTaxCodeRef = item && typeof item === "object"
+    ? ((item as Record<string, unknown>).SalesTaxCodeRef as Record<string, unknown> | undefined)
+    : undefined;
+
+  return readQuickBooksStringField(salesTaxCodeRef, "value")
+    ?? readQuickBooksStringField(salesTaxCodeRef, "name")
+    ?? readQuickBooksStringField(item, "SalesTaxCode")
+    ?? readQuickBooksStringField(item, "TaxCodeRef");
+}
+
+function isQuickBooksTaxableCode(value: string | null | undefined) {
+  const normalized = value?.trim().toUpperCase();
+  return normalized === "TAX" || normalized === "TAXABLE";
+}
+
 function normalizeQuickBooksCatalogItem(item: unknown) {
   const quickbooksItemId = readQuickBooksStringField(item, "Id");
   const name = readQuickBooksStringField(item, "Name");
@@ -1593,14 +1613,8 @@ function normalizeQuickBooksCatalogItem(item: unknown) {
   const incomeAccountRef = item && typeof item === "object"
     ? ((item as Record<string, unknown>).IncomeAccountRef as Record<string, unknown> | undefined)
     : undefined;
-  const salesTaxCodeRef = item && typeof item === "object"
-    ? ((item as Record<string, unknown>).SalesTaxCodeRef as Record<string, unknown> | undefined)
-    : undefined;
-  const salesTaxCode = readQuickBooksStringField(salesTaxCodeRef, "value")
-    ?? readQuickBooksStringField(salesTaxCodeRef, "name")
-    ?? readQuickBooksStringField(item, "SalesTaxCode")
-    ?? readQuickBooksStringField(item, "TaxCodeRef");
-  const taxable = salesTaxCode ? salesTaxCode.trim().toUpperCase() === "TAX" : false;
+  const salesTaxCode = readQuickBooksSalesTaxCodeRef(item);
+  const taxable = isQuickBooksTaxableCode(salesTaxCode);
 
   return {
     quickbooksItemId,
@@ -3122,7 +3136,7 @@ async function resolveLinkedBillingItemForQuickBooks(input: {
   return {
     qbItemId: linkedCatalogItem.quickbooksItemId,
     qbItemName: linkedCatalogItem.name,
-    taxable: linkedCatalogItem.taxable
+    taxable: typeof input.item.taxable === "boolean" ? input.item.taxable : linkedCatalogItem.taxable
   };
 }
 
@@ -4504,7 +4518,7 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
         unitPrice,
         qbItemId: resolvedItem.qbItemId,
         qbItemName: resolvedItem.qbItemName,
-        taxable: resolvedItem.taxable
+        taxable: typeof item.taxable === "boolean" ? item.taxable : resolvedItem.taxable
       }));
     }
 
@@ -5017,7 +5031,7 @@ export async function createDirectQuickBooksInvoice(
         unitPrice: line.unitPrice,
         qbItemId: catalogItem.quickbooksItemId,
         qbItemName: catalogItem.name,
-        taxable: line.taxable
+        taxable: catalogItem.taxable
       });
     });
 

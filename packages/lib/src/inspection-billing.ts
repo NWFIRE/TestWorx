@@ -47,6 +47,10 @@ export type BillableItem = {
   linkedQuickBooksItemId?: string | null;
   linkedMatchMethod?: string | null;
   linkedMatchConfidence?: number | null;
+  taxable?: boolean | null;
+  taxableSource?: "quickbooks" | "manual" | "default" | "override" | null;
+  quickBooksTaxableStatus?: "taxable" | "non_taxable" | "unknown" | null;
+  quickBooksTaxCodeRef?: string | null;
 };
 
 export type BillingReviewGroup<T extends BillableItem = BillableItem> = T & {
@@ -66,6 +70,7 @@ export type BillingCatalogMatchSuggestion = {
   itemType: string;
   description: string | null;
   unitPrice: number | null;
+  taxable: boolean;
   alias: string | null;
   confidence: number;
   matchMethod: BillingCatalogMatchMethod;
@@ -85,6 +90,7 @@ type BillingItemCatalogMatchRecord = {
     itemType: string;
     rawJson?: Prisma.JsonValue | null;
     unitPrice: number | null;
+    taxable: boolean;
   };
 };
 
@@ -96,6 +102,7 @@ type CatalogCandidateRecord = {
   itemType: string;
   rawJson: Prisma.JsonValue | null;
   unitPrice: number | null;
+  taxable: boolean;
 };
 
 const AUTO_MATCH_CONFIDENCE_THRESHOLD = 0.96;
@@ -522,7 +529,7 @@ function buildBillingItemSourceKey(item: Pick<BillableItem, "category" | "report
 
 function buildBillingReviewGroupKey(item: Pick<
   BillableItem,
-  "category" | "description" | "linkedCatalogItemId" | "linkedQuickBooksItemId" | "linkedCatalogItemName" | "unitPrice" | "unit" | "code"
+  "category" | "description" | "linkedCatalogItemId" | "linkedQuickBooksItemId" | "linkedCatalogItemName" | "unitPrice" | "unit" | "code" | "taxable"
 >) {
   return [
     item.category,
@@ -531,6 +538,7 @@ function buildBillingReviewGroupKey(item: Pick<
     item.linkedCatalogItemId ?? "no_catalog",
     item.linkedQuickBooksItemId ?? "no_qb",
     normalizeMatchText(item.linkedCatalogItemName ?? ""),
+    item.taxable === true ? "taxable" : item.taxable === false ? "non_taxable" : "tax_unknown",
     item.unit ?? "no_unit",
     item.unitPrice === null || item.unitPrice === undefined ? "no_price" : item.unitPrice.toFixed(2)
   ].join("|");
@@ -558,6 +566,45 @@ function readCatalogRawString(rawJson: Prisma.JsonValue | null | undefined, keys
 
 function readCatalogDescription(rawJson: Prisma.JsonValue | null | undefined) {
   return readCatalogRawString(rawJson, ["Description", "SalesDesc", "PurchaseDesc", "FullyQualifiedName"]);
+}
+
+function readCatalogTaxCodeRef(rawJson: Prisma.JsonValue | null | undefined) {
+  if (rawJson && typeof rawJson === "object" && !Array.isArray(rawJson)) {
+    const salesTaxCodeRef = (rawJson as Record<string, unknown>).SalesTaxCodeRef;
+    if (salesTaxCodeRef && typeof salesTaxCodeRef === "object" && !Array.isArray(salesTaxCodeRef)) {
+      const refRecord = salesTaxCodeRef as Record<string, unknown>;
+      const value = refRecord.value ?? refRecord.name;
+      if (typeof value === "string" && value.trim()) {
+        return value.trim();
+      }
+    }
+  }
+
+  return readCatalogRawString(rawJson, ["SalesTaxCode", "TaxCodeRef"]);
+}
+
+function buildCatalogTaxSnapshot(catalogItem: {
+  quickbooksItemId?: string | null;
+  taxable: boolean;
+  rawJson?: Prisma.JsonValue | null;
+}) {
+  return {
+    taxable: catalogItem.taxable,
+    taxableSource: catalogItem.quickbooksItemId ? "quickbooks" as const : "manual" as const,
+    quickBooksTaxableStatus: catalogItem.quickbooksItemId
+      ? (catalogItem.taxable ? "taxable" as const : "non_taxable" as const)
+      : null,
+    quickBooksTaxCodeRef: readCatalogTaxCodeRef(catalogItem.rawJson) ?? null
+  };
+}
+
+function clearCatalogTaxSnapshot() {
+  return {
+    taxable: null,
+    taxableSource: null,
+    quickBooksTaxableStatus: null,
+    quickBooksTaxCodeRef: null
+  };
 }
 
 function buildCatalogSearchText(catalogItem: Pick<CatalogCandidateRecord, "name" | "sku" | "itemType" | "quickbooksItemId" | "rawJson">, alias?: string | null) {
@@ -1399,7 +1446,8 @@ async function findStoredBillingItemCatalogMatch(tenantId: string, item: Billabl
           sku: true,
           itemType: true,
           rawJson: true,
-          unitPrice: true
+          unitPrice: true,
+          taxable: true
         }
       }
     }
@@ -1452,7 +1500,8 @@ async function findStoredQuickBooksCodeMapping(tenantId: string, item: BillableI
       sku: true,
       itemType: true,
       rawJson: true,
-      unitPrice: true
+      unitPrice: true,
+      taxable: true
     }
   });
 
@@ -1511,7 +1560,8 @@ async function searchCatalogCandidates(
         sku: true,
         itemType: true,
         rawJson: true,
-        unitPrice: true
+        unitPrice: true,
+        taxable: true
       },
       ...(isManualSearch ? {} : { take: 60 })
     }),
@@ -1540,7 +1590,8 @@ async function searchCatalogCandidates(
             sku: true,
             itemType: true,
             rawJson: true,
-            unitPrice: true
+            unitPrice: true,
+            taxable: true
           }
         }
       },
@@ -1577,6 +1628,7 @@ async function searchCatalogCandidates(
         itemType: catalogItem.itemType,
         description: readCatalogDescription(catalogItem.rawJson),
         unitPrice: catalogItem.unitPrice,
+        taxable: catalogItem.taxable,
         alias: null,
         confidence: manualSearchConfidence,
         matchMethod: isManualSearch && manualSearchConfidence === 0.2 ? "catalog_search" : scored.matchMethod,
@@ -1613,6 +1665,7 @@ async function searchCatalogCandidates(
         itemType: alias.catalogItem.itemType,
         description: readCatalogDescription(alias.catalogItem.rawJson),
         unitPrice: alias.catalogItem.unitPrice,
+        taxable: alias.catalogItem.taxable,
         alias: alias.alias,
         confidence: manualSearchConfidence,
         matchMethod: isManualSearch && manualSearchConfidence === 0.2 ? "catalog_search" : scored.matchMethod,
@@ -1668,7 +1721,8 @@ async function buildBillingItemCatalogState(tenantId: string, item: BillableItem
         sku: true,
         itemType: true,
         rawJson: true,
-        unitPrice: true
+        unitPrice: true,
+        taxable: true
       }
     });
 
@@ -1682,6 +1736,7 @@ async function buildBillingItemCatalogState(tenantId: string, item: BillableItem
           itemType: linkedItem.itemType,
           description: readCatalogDescription(linkedItem.rawJson),
           unitPrice: linkedItem.unitPrice,
+          taxable: linkedItem.taxable,
           alias: null,
           confidence: item.linkedMatchConfidence ?? 1,
           matchMethod: (item.linkedMatchMethod as BillingCatalogMatchMethod | null) ?? "manual",
@@ -1703,6 +1758,7 @@ async function buildBillingItemCatalogState(tenantId: string, item: BillableItem
         itemType: storedMatch.catalogItem.itemType,
         description: readCatalogDescription(storedMatch.catalogItem.rawJson),
         unitPrice: storedMatch.catalogItem.unitPrice,
+        taxable: storedMatch.catalogItem.taxable,
         alias: null,
         confidence: storedMatch.confidence,
         matchMethod: "source_mapping" as const,
@@ -1723,6 +1779,7 @@ async function buildBillingItemCatalogState(tenantId: string, item: BillableItem
         itemType: storedCodeMapping.catalogItem.itemType,
         description: readCatalogDescription(storedCodeMapping.catalogItem.rawJson),
         unitPrice: storedCodeMapping.catalogItem.unitPrice,
+        taxable: storedCodeMapping.catalogItem.taxable,
         alias: null,
         confidence: 1,
         matchMethod: storedCodeMapping.matchSource === "rule" ? "source_mapping" as const : "manual" as const,
@@ -2934,11 +2991,33 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
           linkedCatalogItemName: null,
           linkedQuickBooksItemId: null,
           linkedMatchMethod: null,
-          linkedMatchConfidence: null
+          linkedMatchConfidence: null,
+          ...clearCatalogTaxSnapshot()
         } satisfies BillableItem;
       }
 
       if (item.linkedCatalogItemId) {
+        if (typeof item.taxable !== "boolean") {
+          const linkedCatalogItem = await db.quickBooksCatalogItem.findFirst({
+            where: {
+              id: item.linkedCatalogItemId,
+              tenantId: input.tenantId
+            },
+            select: {
+              quickbooksItemId: true,
+              taxable: true,
+              rawJson: true
+            }
+          });
+
+          if (linkedCatalogItem) {
+            return {
+              ...item,
+              ...buildCatalogTaxSnapshot(linkedCatalogItem)
+            } satisfies BillableItem;
+          }
+        }
+
         return item;
       }
 
@@ -2955,7 +3034,8 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
         linkedCatalogItemName: storedMatch.catalogItem.name,
         linkedQuickBooksItemId: storedMatch.catalogItem.quickbooksItemId,
         linkedMatchMethod: "source_mapping",
-        linkedMatchConfidence: storedMatch.confidence
+        linkedMatchConfidence: storedMatch.confidence,
+        ...buildCatalogTaxSnapshot(storedMatch.catalogItem)
       } satisfies BillableItem;
     })
   );
@@ -3810,7 +3890,9 @@ export async function linkBillingSummaryItemCatalog(
       quickbooksItemId: true,
       name: true,
       sku: true,
-      unitPrice: true
+      unitPrice: true,
+      taxable: true,
+      rawJson: true
     }
   });
 
@@ -3828,7 +3910,8 @@ export async function linkBillingSummaryItemCatalog(
           linkedCatalogItemName: catalogItem.name,
           linkedQuickBooksItemId: catalogItem.quickbooksItemId,
           linkedMatchMethod: input.saveMapping ? "manual" : "manual",
-          linkedMatchConfidence: 1
+          linkedMatchConfidence: 1,
+          ...buildCatalogTaxSnapshot(catalogItem)
         }
       : candidate
   );
@@ -3994,7 +4077,9 @@ export async function linkBillingSummaryItemGroupCatalog(
       quickbooksItemId: true,
       name: true,
       sku: true,
-      unitPrice: true
+      unitPrice: true,
+      taxable: true,
+      rawJson: true
     }
   });
 
@@ -4013,7 +4098,8 @@ export async function linkBillingSummaryItemGroupCatalog(
           linkedCatalogItemName: catalogItem.name,
           linkedQuickBooksItemId: catalogItem.quickbooksItemId,
           linkedMatchMethod: "manual",
-          linkedMatchConfidence: 1
+          linkedMatchConfidence: 1,
+          ...buildCatalogTaxSnapshot(catalogItem)
         }
       : candidate
   );
@@ -4167,7 +4253,8 @@ export async function clearBillingSummaryItemCatalogLink(
           linkedCatalogItemName: null,
           linkedQuickBooksItemId: null,
           linkedMatchMethod: null,
-          linkedMatchConfidence: null
+          linkedMatchConfidence: null,
+          ...clearCatalogTaxSnapshot()
         }
       : candidate
   );
@@ -4240,7 +4327,8 @@ export async function clearBillingSummaryItemGroupCatalogLink(
           linkedCatalogItemName: null,
           linkedQuickBooksItemId: null,
           linkedMatchMethod: null,
-          linkedMatchConfidence: null
+          linkedMatchConfidence: null,
+          ...clearCatalogTaxSnapshot()
         }
       : candidate
   );

@@ -2767,7 +2767,9 @@ describe("inspection billing persistence and admin review", () => {
       quickbooksItemId: "qb_1",
       name: "Annual Inspection",
       sku: "FE-ANNUAL",
-      unitPrice: 45
+      unitPrice: 45,
+      taxable: true,
+      rawJson: { SalesTaxCodeRef: { value: "TAX" } }
     });
 
     await linkBillingSummaryItemCatalog(
@@ -2782,6 +2784,16 @@ describe("inspection billing persistence and admin review", () => {
     );
 
     expect(prismaMock.inspectionBillingSummary.update).toHaveBeenCalled();
+    const updateInput = prismaMock.inspectionBillingSummary.update.mock.calls[0]?.[0];
+    const updatedItems = Array.isArray(updateInput?.data?.items) ? updateInput.data.items : [];
+    expect(updatedItems.find((item) => item.id === "line_1")).toEqual(
+      expect.objectContaining({
+        taxable: true,
+        taxableSource: "quickbooks",
+        quickBooksTaxableStatus: "taxable",
+        quickBooksTaxCodeRef: "TAX"
+      })
+    );
     expect(prismaMock.billingItemCatalogMatch.upsert).toHaveBeenCalled();
     expect(prismaMock.quickBooksCatalogItemAlias.upsert).toHaveBeenCalled();
   });

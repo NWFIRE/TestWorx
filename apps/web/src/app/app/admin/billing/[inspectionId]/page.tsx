@@ -26,6 +26,7 @@ type BillingSummaryLineItem = BillingSummaryDetail["reviewGroupedItems"][keyof B
     itemType: string;
     description: string | null;
     unitPrice: number | null;
+    taxable: boolean;
     alias: string | null;
     confidence: number;
     matchMethod: string;
@@ -39,6 +40,7 @@ type BillingSummaryLineItem = BillingSummaryDetail["reviewGroupedItems"][keyof B
     itemType: string;
     description: string | null;
     unitPrice: number | null;
+    taxable: boolean;
     alias: string | null;
     confidence: number;
     matchMethod: string;
@@ -349,6 +351,10 @@ export default async function BillingSummaryDetailPage({
                         <p className="text-lg font-semibold text-ink">{item.description}</p>
                         <p className="text-sm text-slate-500">{item.reportType === "inspection" ? "inspection billing" : item.reportType.replaceAll("_", " ")} / {item.sourceSection?.replaceAll("-", " ") ?? "billables"}</p>
                         <p className="text-sm text-slate-500">Source: {item.sourceField ?? "report mapping"}</p>
+                        <p className="text-sm text-slate-500">
+                          Tax status: {item.taxable === true ? "Taxable" : item.taxable === false ? "Non-taxable" : "Not snapped yet"}
+                          {item.taxableSource ? ` / ${item.taxableSource === "quickbooks" ? "Synced from QuickBooks" : item.taxableSource}` : ""}
+                        </p>
                         {buildBillingItemContext(item).map((line) => (
                           <p key={line} className="text-sm text-slate-500">{line}</p>
                         ))}

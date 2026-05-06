@@ -254,12 +254,15 @@ export function QuickBooksCatalogManagementCard({
                 <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${item.active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
                   {item.active ? "Active" : "Inactive"}
                 </span>
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${item.taxable ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600"}`}>
+                  {item.taxable ? "Taxable" : "Non-taxable"}
+                </span>
               </div>
               {readOnly ? (
                 <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 sm:grid-cols-3">
                   <p><span className="font-semibold text-ink">SKU:</span> {item.sku ?? "Not recorded"}</p>
                   <p><span className="font-semibold text-ink">Unit price:</span> {item.unitPrice !== null ? `$${item.unitPrice.toFixed(2)}` : "Not recorded"}</p>
-                  <p><span className="font-semibold text-ink">Taxable:</span> {item.taxable ? "Yes" : "No"}</p>
+                  <p><span className="font-semibold text-ink">Tax source:</span> Synced from QuickBooks</p>
                 </div>
               ) : !editable ? (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
@@ -294,7 +297,7 @@ export function QuickBooksCatalogManagementCard({
                       </label>
                       <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
                         <input className="h-5 w-5 rounded border-slate-300" defaultChecked={item.taxable} name="taxable" type="checkbox" />
-                        Taxable item
+                        Taxable item synced from QuickBooks
                       </label>
                     </div>
                   </div>

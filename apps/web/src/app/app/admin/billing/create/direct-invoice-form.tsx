@@ -90,6 +90,7 @@ function buildCatalogSecondaryLabel(item: CatalogOption) {
     item.description,
     item.sku ? `SKU ${item.sku}` : null,
     item.unitPrice !== null ? `$${item.unitPrice.toFixed(2)}` : null,
+    item.taxable ? "Taxable" : "Non-taxable",
     item.quickbooksItemId ? `QB ${item.quickbooksItemId}` : null,
     item.quickbooksItemId ? "QuickBooks mapped" : "No QuickBooks mapping"
   ].filter(Boolean).join(" | ");
