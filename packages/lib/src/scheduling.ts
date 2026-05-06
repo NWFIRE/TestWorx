@@ -914,6 +914,10 @@ function getClaimableInspectionVisibleTasks<T extends {
   return inspection.tasks.filter((task) => task.status !== InspectionStatus.cancelled);
 }
 
+function isSharedQueueTaskSet<T extends { assignedTechnicianId?: string | null }>(tasks: T[]) {
+  return tasks.length > 0 && tasks.every((task) => !task.assignedTechnicianId);
+}
+
 function mapRecurringTaskDefinitions(input: {
   existingTasks: Array<{
     id: string;
@@ -5089,6 +5093,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
         inspection,
         currentTasks: getClaimableInspectionVisibleTasks(inspection)
       }))
+      .filter(({ currentTasks }) => isSharedQueueTaskSet(currentTasks))
       .map(({ inspection, currentTasks }) => ({
         ...inspection,
         tasks: withInspectionTaskDisplayLabels(currentTasks),
@@ -5189,6 +5194,11 @@ export async function claimInspection(actor: ActorContext, inspectionId: string)
         .map((task) => task.inspectionType as InspectionType),
       mode: "claim"
     });
+
+    const claimableTasks = getClaimableInspectionVisibleTasks(inspection);
+    if (!isSharedQueueTaskSet(claimableTasks)) {
+      throw new Error("Inspection is not claimable.");
+    }
 
     const claimed = await tx.inspection.updateMany({
       where: {
