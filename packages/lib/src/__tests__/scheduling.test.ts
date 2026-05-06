@@ -506,7 +506,7 @@ describe("recurrence logic", () => {
     expect(plan[0]?.tasks).toHaveLength(1);
   });
 
-  it("uses explicit eligibility rows as restrictions while allowing report types without saved rows", () => {
+  it("does not restrict technician claim or assignment access by report-type allowance rows", () => {
     expect(
       isTechnicianEligibleForReportTypesFromRows({
         rows: [],
@@ -565,7 +565,7 @@ describe("recurrence logic", () => {
         reportTypes: [InspectionType.fire_alarm, InspectionType.kitchen_suppression],
         mode: "claim"
       })
-    ).toBe(false);
+    ).toBe(true);
 
     expect(
       isTechnicianEligibleForReportTypesFromRows({

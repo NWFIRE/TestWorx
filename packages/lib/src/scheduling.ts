@@ -895,35 +895,7 @@ export function isTechnicianEligibleForReportTypesFromRows(input: {
   now?: Date;
 }) {
   const distinctReportTypes = [...new Set(input.reportTypes)];
-  if (!distinctReportTypes.length) {
-    return false;
-  }
-
-  const eligibilityReportTypes = distinctReportTypes.filter((reportType) => reportType !== InspectionType.work_order);
-  if (!eligibilityReportTypes.length) {
-    return true;
-  }
-
-  if (input.rows.length === 0) {
-    return true;
-  }
-
-  if (input.mode === "claim" && input.rows.every((row) => !row.canClaim)) {
-    return true;
-  }
-
-  const now = input.now ?? new Date();
-  const byReportType = new Map(input.rows.map((row) => [row.reportType, row]));
-  return eligibilityReportTypes.every((reportType) => {
-    const row = byReportType.get(reportType);
-    if (!row) {
-      return true;
-    }
-    if (row.expiresAt instanceof Date && !Number.isNaN(row.expiresAt.getTime()) && row.expiresAt < now) {
-      return false;
-    }
-    return input.mode === "claim" ? row.canClaim : row.canBeAssigned;
-  });
+  return distinctReportTypes.length > 0;
 }
 
 function getClaimableInspectionVisibleTasks<T extends {
@@ -1023,27 +995,6 @@ function getCurrentVisitReportTypes(tasks: Array<{ inspectionType: keyof typeof 
     .map((task) => task.inspectionType as InspectionType);
 }
 
-async function getTechnicianEligibilityRows(
-  tx: Prisma.TransactionClient,
-  tenantId: string,
-  technicianUserId: string
-): Promise<TechnicianEligibilityRow[]> {
-  if (!("technicianReportTypeEligibility" in tx) || !tx.technicianReportTypeEligibility) {
-    return [];
-  }
-
-  return tx.technicianReportTypeEligibility.findMany({
-    where: { tenantId, technicianUserId },
-    select: {
-      technicianUserId: true,
-      reportType: true,
-      canBeAssigned: true,
-      canClaim: true,
-      expiresAt: true
-    }
-  });
-}
-
 async function assertTechnicianEligibilityForReportTypes(input: {
   tx: Prisma.TransactionClient;
   tenantId: string;
@@ -1051,17 +1002,7 @@ async function assertTechnicianEligibilityForReportTypes(input: {
   reportTypes: InspectionType[];
   mode: TechnicianEligibilityMode;
 }) {
-  const rows = await getTechnicianEligibilityRows(input.tx, input.tenantId, input.technicianUserId);
-  if (!isTechnicianEligibleForReportTypesFromRows({
-    rows,
-    reportTypes: input.reportTypes,
-    mode: input.mode
-  })) {
-    const reportTypeLabels = [...new Set(input.reportTypes)]
-      .map((reportType) => formatInspectionTaskTypeLabel(reportType as keyof typeof inspectionTypeRegistry))
-      .join(", ");
-    throw new Error(`Technician is not eligible for every report type on this inspection${reportTypeLabels ? ` (${reportTypeLabels})` : ""}.`);
-  }
+  void input;
 }
 
 export function isTechnicianAssignedToInspection(input: {
@@ -5023,7 +4964,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(now);
 
-  const [assignedInspections, unassignedInspections, recentCompletedInspections, technicianEligibilityRows] = await Promise.all([
+  const [assignedInspections, unassignedInspections, recentCompletedInspections] = await Promise.all([
     prisma.inspection.findMany({
       where: {
         tenantId,
@@ -5099,7 +5040,6 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
       },
       orderBy: [{ scheduledStart: "desc" }]
     }),
-    getTechnicianEligibilityRows(prisma as unknown as Prisma.TransactionClient, tenantId, parsedActor.userId)
   ]);
 
   const assignedQueue = assignedInspections
@@ -5149,13 +5089,6 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
         inspection,
         currentTasks: getClaimableInspectionVisibleTasks(inspection)
       }))
-      .filter(({ currentTasks }) =>
-        isTechnicianEligibleForReportTypesFromRows({
-          rows: technicianEligibilityRows,
-          reportTypes: currentTasks.map((task) => task.inspectionType as InspectionType),
-          mode: "claim"
-        })
-      )
       .map(({ inspection, currentTasks }) => ({
         ...inspection,
         tasks: withInspectionTaskDisplayLabels(currentTasks),
