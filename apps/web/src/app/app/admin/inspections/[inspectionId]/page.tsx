@@ -818,6 +818,7 @@ export default async function EditInspectionPage({
                     ? dashboardData.technicians.find((technician) => technician.id === task.assignedTechnicianId)?.name ?? "Assigned"
                     : "Unassigned",
                   dueLabel: task.dueDate ? format(task.dueDate, "MMM d, yyyy") : task.dueMonth ?? "Not recorded",
+                  taskStatus: task.status,
                   reportStatus: task.report?.status === "finalized" ? "Finalized" : task.report?.status === "submitted" ? "Ready for Review" : "Draft",
                   schedulingStatus: task.schedulingStatus ?? "scheduled_now",
                   isAddedTask: Boolean(task.addedByUserId),

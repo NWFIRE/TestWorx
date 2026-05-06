@@ -23,6 +23,7 @@ type ManagedReportTask = {
   label: string;
   assignedTechnicianName: string;
   dueLabel: string;
+  taskStatus: string;
   reportStatus: string;
   schedulingStatus: string;
   isAddedTask: boolean;
@@ -42,20 +43,25 @@ export function InspectionReportTypeManagement(input: {
   const router = useRouter();
   const [reportTypeQuery, setReportTypeQuery] = useState("");
   const [actionTaskId, setActionTaskId] = useState<string | null>(null);
+  const [addedTaskId, setAddedTaskId] = useState<string | null>(null);
   const [reasonByTask, setReasonByTask] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
-  const activeReportTypes = useMemo(
-    () => new Set(input.tasks.map((task) => task.inspectionType)),
+  const activeTasks = useMemo(
+    () => input.tasks.filter((task) => task.taskStatus !== "cancelled" && task.schedulingStatus !== "not_scheduled"),
     [input.tasks]
+  );
+  const activeReportTypes = useMemo(
+    () => new Set(activeTasks.map((task) => task.inspectionType)),
+    [activeTasks]
   );
   const activeReportTypeCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const task of input.tasks) {
+    for (const task of activeTasks) {
       counts.set(task.inspectionType, (counts.get(task.inspectionType) ?? 0) + 1);
     }
     return counts;
-  }, [input.tasks]);
+  }, [activeTasks]);
   const filteredReportTypes = useMemo(() => {
     const query = reportTypeQuery.trim().toLowerCase();
     if (!query) {
@@ -71,12 +77,12 @@ export function InspectionReportTypeManagement(input: {
           <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Inspection reports / report types</p>
           <h3 className="mt-2 text-2xl font-semibold text-ink">Current visit scope</h3>
           <p className="mt-2 max-w-2xl text-sm text-slate-500">
-            Add work to this inspection while the technician is on-site, or safely remove report types that are no longer needed.
+            Add work directly to this inspection visit while the technician is on-site. This updates the current inspection and does not create another visit.
           </p>
         </div>
         <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 lg:max-w-md">
           <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500" htmlFor="report-type-search">
-            Add report type
+            Add report type to current visit
           </label>
           <input
             className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-ink outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
@@ -103,18 +109,20 @@ export function InspectionReportTypeManagement(input: {
                   onClick={() => {
                     const confirmed = window.confirm(
                       existingCount > 0
-                        ? `Add another ${reportType.label} report to this inspection?`
-                        : `Add ${reportType.label} to this inspection?`
+                        ? `Add another ${reportType.label} report to this current inspection visit? No new visit will be created.`
+                        : `Add ${reportType.label} to this current inspection visit? No new visit will be created.`
                     );
                     if (!confirmed) {
                       return;
                     }
                     startTransition(async () => {
                       setMessage(null);
+                      setAddedTaskId(null);
                       const result = await addInspectionTaskAdminAction(input.inspectionId, reportType.value as AddInspectionTaskType);
                       if (result.ok) {
                         setReportTypeQuery("");
-                        setMessage({ tone: "success", text: "Report type added to this inspection." });
+                        setAddedTaskId(result.taskId ?? null);
+                        setMessage({ tone: "success", text: "Report type added to this existing inspection. No new visit was created." });
                         router.refresh();
                         return;
                       }
@@ -148,6 +156,11 @@ export function InspectionReportTypeManagement(input: {
             : "border-rose-200 bg-rose-50 text-rose-700"
         }`}>
           {message.text}
+          {message.tone === "success" && addedTaskId ? (
+            <a className="ml-3 underline decoration-emerald-400 underline-offset-4" href={`/app/admin/reports/${input.inspectionId}/${addedTaskId}`}>
+              Open added report
+            </a>
+          ) : null}
         </p>
       ) : null}
 

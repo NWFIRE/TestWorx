@@ -2993,6 +2993,10 @@ export async function addInspectionTask(actor: ActorContext, input: {
       )
     );
 
+    const addedTaskStatus = isInspectionInUnstartedState(inspection.status)
+      ? InspectionStatus.to_be_completed
+      : inspection.status;
+
     const createdTask = await createInspectionTaskWithReport({
       tx,
       tenantId,
@@ -3000,7 +3004,7 @@ export async function addInspectionTask(actor: ActorContext, input: {
       inspectionType,
       frequency: getDefaultInspectionRecurrenceFrequency(inspectionType),
       scheduledStart: inspection.scheduledStart,
-      taskStatus: InspectionStatus.to_be_completed,
+      taskStatus: addedTaskStatus,
       technicianId: defaultTechnicianId,
       addedByUserId: parsedActor.userId,
       sortOrder: nextSortOrder,
@@ -3017,7 +3021,10 @@ export async function addInspectionTask(actor: ActorContext, input: {
       entityId: inspection.id,
       metadata: {
         inspectionTaskId: createdTask.id,
-        inspectionType
+        inspectionType,
+        addedToExistingInspection: true,
+        inspectionStatus: inspection.status,
+        taskStatus: addedTaskStatus
       }
     });
 

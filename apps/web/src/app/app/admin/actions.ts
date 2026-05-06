@@ -424,6 +424,8 @@ export async function addInspectionTaskAdminAction(inspectionId: string, inspect
     revalidatePath(`/app/admin/inspections/${inspectionId}`);
     revalidatePath(`/app/admin/reports/${inspectionId}/${task.id}`);
     revalidatePath("/app/tech");
+    revalidatePath("/app/tech/work");
+    revalidatePath("/app/tech/inspections");
     revalidatePath(`/app/tech/reports/${inspectionId}/${task.id}`);
     revalidatePath("/app/customer");
 

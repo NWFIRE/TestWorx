@@ -128,6 +128,53 @@ describe("inspection task addition", () => {
     expect(createdTask).toEqual({ id: "task_new" });
   });
 
+  it("allows office admins to add a report type directly to an in-progress inspection visit", async () => {
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      tenantId: "tenant_1",
+      assignedTechnicianId: "tech_1",
+      technicianAssignments: [{ technicianId: "tech_1" }],
+      tasks: [
+        {
+          inspectionType: "kitchen_suppression",
+          schedulingStatus: "scheduled_now",
+          sortOrder: 0,
+          status: InspectionStatus.in_progress
+        }
+      ],
+      scheduledStart: new Date("2026-03-18T09:00:00.000Z"),
+      status: InspectionStatus.in_progress
+    });
+
+    await addInspectionTask(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { inspectionId: "inspection_1", inspectionType: "fire_extinguisher" }
+    );
+
+    expect(txMock.inspectionTask.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        inspectionType: "fire_extinguisher",
+        status: InspectionStatus.in_progress,
+        addedByUserId: "office_1",
+        sortOrder: 1
+      })
+    });
+    expect(txMock.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "report_type_added",
+        entityId: "inspection_1",
+        metadata: expect.objectContaining({
+          addedToExistingInspection: true,
+          inspectionType: "fire_extinguisher",
+          inspectionStatus: InspectionStatus.in_progress,
+          taskStatus: InspectionStatus.in_progress
+        })
+      })
+    });
+  });
+
   it("blocks technicians who are not assigned to the inspection", async () => {
     txMock.inspection.findFirst.mockResolvedValue({
       id: "inspection_1",
@@ -324,13 +371,13 @@ describe("inspection task addition", () => {
     expect(txMock.inspectionTask.delete).not.toHaveBeenCalled();
   });
 
-  it("allows office admins to force delete a report after work has started or completed", async () => {
+  it("blocks office admins from deleting a report after work has started", async () => {
     txMock.inspection.findFirst.mockResolvedValue({
       id: "inspection_1",
       tenantId: "tenant_1",
       assignedTechnicianId: "tech_1",
       technicianAssignments: [{ technicianId: "tech_1" }],
-      status: InspectionStatus.completed
+      status: InspectionStatus.in_progress
     });
     txMock.inspectionTask.findFirst.mockResolvedValue({
       id: "task_existing",
@@ -348,25 +395,12 @@ describe("inspection task addition", () => {
     txMock.inspectionTask.findMany.mockResolvedValue([]);
     txMock.inspectionReport.count.mockResolvedValue(3);
 
-    const removedTask = await removeInspectionTask(
+    await expect(removeInspectionTask(
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
       { inspectionId: "inspection_1", inspectionTaskId: "task_existing", force: true }
-    );
+    )).rejects.toThrow(/already has report activity/i);
 
-    expect(txMock.inspectionReport.delete).toHaveBeenCalledWith({
-      where: { id: "report_existing" }
-    });
-    expect(txMock.inspectionTask.delete).toHaveBeenCalledWith({
-      where: { id: "task_existing" }
-    });
-    expect(txMock.auditLog.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        action: "inspection.task_removed",
-        metadata: expect.objectContaining({
-          forceRemoval: true
-        })
-      })
-    });
-    expect(removedTask).toEqual({ id: "task_existing" });
+    expect(txMock.inspectionReport.delete).not.toHaveBeenCalled();
+    expect(txMock.inspectionTask.delete).not.toHaveBeenCalled();
   });
 });
