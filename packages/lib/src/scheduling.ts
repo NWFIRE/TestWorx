@@ -4962,6 +4962,58 @@ function filterTasksForTechnician<T extends {
   });
 }
 
+const technicianDashboardReportSelect = {
+  id: true,
+  status: true,
+  finalizedAt: true,
+  autosaveVersion: true,
+  correctionState: true,
+  correctionRequestedAt: true,
+  correctionResolvedAt: true
+} satisfies Prisma.InspectionReportSelect;
+
+const technicianDashboardTaskSelect = {
+  id: true,
+  tenantId: true,
+  inspectionId: true,
+  inspectionType: true,
+  customDisplayLabel: true,
+  addedByUserId: true,
+  assignedTechnicianId: true,
+  dueMonth: true,
+  dueDate: true,
+  schedulingStatus: true,
+  notes: true,
+  status: true,
+  sortOrder: true,
+  createdAt: true,
+  updatedAt: true,
+  recurrence: {
+    select: {
+      id: true,
+      tenantId: true,
+      inspectionTaskId: true,
+      frequency: true,
+      intervalCount: true,
+      seriesId: true,
+      anchorScheduledStart: true,
+      nextDueAt: true,
+      createdAt: true,
+      updatedAt: true
+    }
+  },
+  report: {
+    select: technicianDashboardReportSelect
+  },
+  assignedTechnician: {
+    select: {
+      id: true,
+      name: true,
+      email: true
+    }
+  }
+} satisfies Prisma.InspectionTaskSelect;
+
 export async function getTechnicianDashboardData(actor: ActorContext) {
   const parsedActor = parseActor(actor);
   if (parsedActor.role !== "technician") {
@@ -4996,7 +5048,9 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
           }
         },
         convertedFromQuotes: { select: { id: true }, take: 1 },
-        tasks: { include: { recurrence: true, report: true, assignedTechnician: true } },
+        tasks: {
+          select: technicianDashboardTaskSelect
+        },
         attachments: {
           where: { kind: AttachmentKind.pdf },
           orderBy: [{ createdAt: "desc" }],
@@ -5029,7 +5083,16 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
     }),
     prisma.inspection.findMany({
       where: { tenantId, claimable: true, status: { in: [...claimableInspectionStatuses] } },
-      include: { site: true, customerCompany: true, assignedTechnician: true, technicianAssignments: { include: { technician: true } }, convertedFromQuotes: { select: { id: true }, take: 1 }, tasks: { include: { recurrence: true, report: true, assignedTechnician: true } } },
+      include: {
+        site: true,
+        customerCompany: true,
+        assignedTechnician: true,
+        technicianAssignments: { include: { technician: true } },
+        convertedFromQuotes: { select: { id: true }, take: 1 },
+        tasks: {
+          select: technicianDashboardTaskSelect
+        }
+      },
       orderBy: [{ scheduledStart: "asc" }]
     }),
     prisma.inspection.findMany({
@@ -5047,7 +5110,9 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
         customerCompany: true,
         assignedTechnician: true,
         technicianAssignments: { include: { technician: true } },
-        tasks: { include: { recurrence: true, report: true, assignedTechnician: true } }
+        tasks: {
+          select: technicianDashboardTaskSelect
+        }
       },
       orderBy: [{ scheduledStart: "desc" }]
     }),
@@ -5175,7 +5240,9 @@ export async function claimInspection(actor: ActorContext, inspectionId: string)
       where: { id: inspectionId, tenantId },
       include: {
         convertedFromQuotes: { select: { id: true }, take: 1 },
-        tasks: true,
+        tasks: {
+          select: technicianDashboardTaskSelect
+        },
         technicianAssignments: { select: { technicianId: true } }
       }
     });
@@ -5248,7 +5315,9 @@ export async function claimInspection(actor: ActorContext, inspectionId: string)
         customerCompany: true,
         assignedTechnician: true,
         technicianAssignments: { include: { technician: true } },
-        tasks: { include: { recurrence: true } }
+        tasks: {
+          select: technicianDashboardTaskSelect
+        }
       }
     });
   });
