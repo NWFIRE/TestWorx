@@ -52,6 +52,9 @@ const prismaMock = {
   billingItemCatalogMatch: {
     findUnique: vi.fn()
   },
+  quickBooksCatalogItemAlias: {
+    findMany: vi.fn()
+  },
   quickBooksItemCache: {
     findUnique: vi.fn(),
     findMany: vi.fn(),
@@ -246,6 +249,7 @@ describe("quickbooks billing sync hardening", () => {
     prismaMock.quickBooksItemCache.createMany.mockResolvedValue({ count: 0 });
     prismaMock.quickBooksItemCache.deleteMany.mockResolvedValue({ count: 0 });
     prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItemAlias.findMany.mockResolvedValue([]);
     prismaMock.serviceFeeRule.findMany.mockResolvedValue([]);
     prismaMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
     prismaMock.quoteLineItem.findMany.mockResolvedValue([]);
@@ -530,6 +534,129 @@ describe("quickbooks billing sync hardening", () => {
         }
       }
     });
+
+    const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    expect(createInvoiceBody.Line?.[0]?.SalesItemLineDetail?.ItemRef).toEqual({
+      value: "qb_fire_alarm_annual",
+      name: "Fire Alarm - Annual Inspection"
+    });
+  });
+
+  it("uses an embedded billing review catalog match before legacy ON_SITE_LABOR mapping", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: null });
+    prismaMock.customerCompany.update.mockResolvedValue(undefined);
+    prismaMock.site.findFirst.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
+    prismaMock.quickBooksItemMap.findUnique.mockResolvedValue(null);
+    prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValueOnce({
+      quickbooksItemId: "qb_fire_alarm_annual",
+      name: "Fire Alarm - Annual Inspection",
+      active: true,
+      taxable: false
+    });
+    prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue({
+      ...buildBillingSummary(),
+      subtotal: 230,
+      items: [
+        {
+          id: "item_1",
+          description: "On-site labor",
+          quantity: 2,
+          unitPrice: 115,
+          amount: 230,
+          unit: "hours",
+          category: "labor",
+          reportType: "fire_alarm",
+          sourceSection: "system-summary",
+          sourceField: "laborHours",
+          code: "ON_SITE_LABOR",
+          currentCatalogMatch: {
+            catalogItemId: "catalog_fire_alarm_annual",
+            quickbooksItemId: "qb_fire_alarm_annual",
+            name: "Fire Alarm - Annual Inspection"
+          }
+        }
+      ]
+    });
+    prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({}));
+
+    const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
+
+    await syncBillingSummaryToQuickBooks(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    expect(createInvoiceBody.Line?.[0]?.SalesItemLineDetail?.ItemRef).toEqual({
+      value: "qb_fire_alarm_annual",
+      name: "Fire Alarm - Annual Inspection"
+    });
+  });
+
+  it("uses alias-backed catalog matches for on-site labor before legacy ON_SITE_LABOR mapping", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: null });
+    prismaMock.customerCompany.update.mockResolvedValue(undefined);
+    prismaMock.site.findFirst.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
+    prismaMock.quickBooksItemMap.findUnique.mockResolvedValue(null);
+    prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItemAlias.findMany.mockResolvedValue([
+      {
+        alias: "On-site labor",
+        normalizedAlias: "on site labor",
+        catalogItem: {
+          quickbooksItemId: "qb_fire_alarm_annual",
+          name: "Fire Alarm - Annual Inspection",
+          active: true,
+          taxable: false
+        }
+      }
+    ]);
+    prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue({
+      ...buildBillingSummary(),
+      subtotal: 230,
+      items: [
+        {
+          id: "item_1",
+          description: "On-site labor",
+          quantity: 2,
+          unitPrice: 115,
+          amount: 230,
+          unit: "hours",
+          category: "labor",
+          reportType: "fire_alarm",
+          sourceSection: "system-summary",
+          sourceField: "laborHours",
+          code: "ON_SITE_LABOR"
+        }
+      ]
+    });
+    prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({}));
+
+    const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
+
+    await syncBillingSummaryToQuickBooks(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
 
     const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
     expect(createInvoiceBody.Line?.[0]?.SalesItemLineDetail?.ItemRef).toEqual({

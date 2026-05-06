@@ -3112,6 +3112,35 @@ function singularizeBillingMatchToken(token: string) {
   return token;
 }
 
+function buildNormalizedBillingTokenString(value: string | null | undefined) {
+  return normalizeBillingMatchText(value)
+    .split(" ")
+    .map((token) => singularizeBillingMatchToken(token))
+    .filter(Boolean)
+    .join(" ");
+}
+
+function tokenizeQuickBooksBillingMatch(value: string | null | undefined) {
+  return buildNormalizedBillingTokenString(value).split(" ").filter(Boolean);
+}
+
+function calculateTokenOverlapScore(left: string[], right: string[]) {
+  if (left.length === 0 || right.length === 0) {
+    return 0;
+  }
+
+  const leftSet = new Set(left);
+  const rightSet = new Set(right);
+  let shared = 0;
+  for (const token of leftSet) {
+    if (rightSet.has(token)) {
+      shared += 1;
+    }
+  }
+
+  return (2 * shared) / (leftSet.size + rightSet.size);
+}
+
 function buildBillingItemSourceKeyForQuickBooks(item: QuickBooksBillingSummary["items"][number]) {
   return [
     item.category,
@@ -3144,6 +3173,53 @@ function resolveBillingItemCodeForQuickBooks(item: QuickBooksBillingSummary["ite
   }
 
   return null;
+}
+
+async function resolveEmbeddedCatalogMatchForQuickBooks(input: {
+  tenantId: string;
+  item: QuickBooksBillingSummary["items"][number];
+}) {
+  const embeddedMatch = (input.item as unknown as { currentCatalogMatch?: unknown }).currentCatalogMatch;
+  if (!embeddedMatch || typeof embeddedMatch !== "object" || Array.isArray(embeddedMatch)) {
+    return null;
+  }
+
+  const matchRecord = embeddedMatch as Record<string, unknown>;
+  const catalogItemId = typeof matchRecord.catalogItemId === "string" ? matchRecord.catalogItemId.trim() : "";
+  const quickbooksItemId = typeof matchRecord.quickbooksItemId === "string" ? matchRecord.quickbooksItemId.trim() : "";
+  if (!catalogItemId && !quickbooksItemId) {
+    return null;
+  }
+
+  const catalogItem = await prisma.quickBooksCatalogItem.findFirst({
+    where: {
+      tenantId: input.tenantId,
+      OR: [
+        ...(catalogItemId ? [{ id: catalogItemId }] : []),
+        ...(quickbooksItemId ? [{ quickbooksItemId }] : [])
+      ]
+    },
+    select: {
+      quickbooksItemId: true,
+      name: true,
+      active: true,
+      taxable: true
+    }
+  });
+
+  if (!catalogItem) {
+    return null;
+  }
+
+  if (!catalogItem.active) {
+    throw new Error(`Billing item "${input.item.description}" is matched to inactive QuickBooks item "${catalogItem.name}". Change the match before syncing.`);
+  }
+
+  return {
+    qbItemId: catalogItem.quickbooksItemId,
+    qbItemName: catalogItem.name,
+    taxable: typeof input.item.taxable === "boolean" ? input.item.taxable : catalogItem.taxable
+  };
 }
 
 async function resolveStoredBillingItemCatalogMatchForQuickBooks(input: {
@@ -3185,43 +3261,116 @@ async function resolveStoredBillingItemCatalogMatchForQuickBooks(input: {
   };
 }
 
+async function resolveAliasCatalogMatchForQuickBooks(input: {
+  tenantId: string;
+  item: QuickBooksBillingSummary["items"][number];
+}) {
+  const sourceText = [
+    input.item.code,
+    input.item.description,
+    input.item.reportType?.replaceAll("_", " ")
+  ].filter(Boolean).join(" ");
+  const sourceTokens = tokenizeQuickBooksBillingMatch(sourceText);
+  const exactAliases = [
+    buildNormalizedBillingTokenString(input.item.description),
+    buildNormalizedBillingTokenString(input.item.code)
+  ].filter(Boolean);
+
+  if (sourceTokens.length === 0 && exactAliases.length === 0) {
+    return null;
+  }
+
+  const aliases = await prisma.quickBooksCatalogItemAlias.findMany({
+    where: {
+      tenantId: input.tenantId,
+      OR: [
+        ...exactAliases.map((alias) => ({ normalizedAlias: alias })),
+        ...sourceTokens.map((token) => ({ normalizedAlias: { contains: token } }))
+      ],
+      catalogItem: { is: { active: true } }
+    },
+    select: {
+      alias: true,
+      normalizedAlias: true,
+      catalogItem: {
+        select: {
+          quickbooksItemId: true,
+          name: true,
+          active: true,
+          taxable: true
+        }
+      }
+    },
+    take: 20
+  });
+
+  const scoredAliases = aliases
+    .map((alias) => {
+      const aliasTokens = tokenizeQuickBooksBillingMatch(alias.normalizedAlias || alias.alias);
+      const catalogTokens = tokenizeQuickBooksBillingMatch(alias.catalogItem.name);
+      const exactAlias = exactAliases.includes(buildNormalizedBillingTokenString(alias.normalizedAlias || alias.alias));
+      const score = exactAlias
+        ? 1
+        : Math.max(
+            calculateTokenOverlapScore(sourceTokens, aliasTokens),
+            calculateTokenOverlapScore(sourceTokens, catalogTokens)
+          );
+      return { alias, score };
+    })
+    .filter((candidate) => candidate.score >= 0.5)
+    .sort((left, right) => right.score - left.score);
+
+  const matchedAlias = scoredAliases[0]?.alias;
+  if (!matchedAlias) {
+    return null;
+  }
+
+  return {
+    qbItemId: matchedAlias.catalogItem.quickbooksItemId,
+    qbItemName: matchedAlias.catalogItem.name,
+    taxable: typeof input.item.taxable === "boolean" ? input.item.taxable : matchedAlias.catalogItem.taxable
+  };
+}
+
 async function resolveLinkedBillingItemForQuickBooks(input: {
   tenantId: string;
   item: QuickBooksBillingSummary["items"][number];
 }) {
-  if (!input.item.linkedCatalogItemId && !input.item.linkedQuickBooksItemId) {
-    return resolveStoredBillingItemCatalogMatchForQuickBooks(input);
-  }
+  if (input.item.linkedCatalogItemId || input.item.linkedQuickBooksItemId) {
+    const linkedCatalogItem = await prisma.quickBooksCatalogItem.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        OR: [
+          ...(input.item.linkedCatalogItemId ? [{ id: input.item.linkedCatalogItemId }] : []),
+          ...(input.item.linkedQuickBooksItemId ? [{ quickbooksItemId: input.item.linkedQuickBooksItemId }] : [])
+        ]
+      },
+      select: {
+        quickbooksItemId: true,
+        name: true,
+        active: true,
+        taxable: true
+      }
+    });
 
-  const linkedCatalogItem = await prisma.quickBooksCatalogItem.findFirst({
-    where: {
-      tenantId: input.tenantId,
-      OR: [
-        ...(input.item.linkedCatalogItemId ? [{ id: input.item.linkedCatalogItemId }] : []),
-        ...(input.item.linkedQuickBooksItemId ? [{ quickbooksItemId: input.item.linkedQuickBooksItemId }] : [])
-      ]
-    },
-    select: {
-      quickbooksItemId: true,
-      name: true,
-      active: true,
-      taxable: true
+    if (!linkedCatalogItem) {
+      throw new Error(`Billing item "${input.item.description}" is linked to a QuickBooks catalog item that is no longer available. Change the match before syncing.`);
     }
-  });
 
-  if (!linkedCatalogItem) {
-    throw new Error(`Billing item "${input.item.description}" is linked to a QuickBooks catalog item that is no longer available. Change the match before syncing.`);
+    if (!linkedCatalogItem.active) {
+      throw new Error(`Billing item "${input.item.description}" is linked to inactive QuickBooks item "${linkedCatalogItem.name}". Change the match before syncing.`);
+    }
+
+    return {
+      qbItemId: linkedCatalogItem.quickbooksItemId,
+      qbItemName: linkedCatalogItem.name,
+      taxable: typeof input.item.taxable === "boolean" ? input.item.taxable : linkedCatalogItem.taxable
+    };
   }
 
-  if (!linkedCatalogItem.active) {
-    throw new Error(`Billing item "${input.item.description}" is linked to inactive QuickBooks item "${linkedCatalogItem.name}". Change the match before syncing.`);
-  }
-
-  return {
-    qbItemId: linkedCatalogItem.quickbooksItemId,
-    qbItemName: linkedCatalogItem.name,
-    taxable: typeof input.item.taxable === "boolean" ? input.item.taxable : linkedCatalogItem.taxable
-  };
+  return await resolveStoredBillingItemCatalogMatchForQuickBooks(input)
+    ?? await resolveEmbeddedCatalogMatchForQuickBooks(input)
+    ?? await resolveAliasCatalogMatchForQuickBooks(input);
 }
 
 async function resolveBillingItemUnitPriceForQuickBooks(input: {
