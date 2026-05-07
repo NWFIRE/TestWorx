@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getAdminDeficiencyDashboardData } from "@testworx/lib/server/index";
 
-import { updateDeficiencyStatusAction } from "../admin/actions";
+import { generateQuoteFromDeficiencyAction, updateDeficiencyStatusAction } from "../admin/actions";
 import {
   AppPageShell,
   EmptyState,
@@ -27,9 +27,11 @@ type DeficiencyListItem = {
   assetTag: string | null;
   deviceType: string | null;
   location: string | null;
+  reportType: string;
   section: string;
   notes: string | null;
   photoStorageKey: string | null;
+  quoteId: string | null;
   customerName: string;
   siteName: string | null;
   inspection: { scheduledStart: Date };
@@ -111,7 +113,7 @@ function buildFilterHref(
 export default async function DeficienciesPage({
   searchParams
 }: {
-  searchParams: Promise<{ siteId?: string; status?: string; severity?: string }>;
+  searchParams: Promise<{ siteId?: string; status?: string; severity?: string; error?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -144,6 +146,8 @@ export default async function DeficienciesPage({
   const activeStatusFilter = requestedStatuses.length > 0 ? requestedStatuses.join(",") : undefined;
   const activeSeverityFilter =
     requestedSeverities.length > 0 ? requestedSeverities.join(",") : undefined;
+  const currentListHref = buildFilterHref(activeStatusFilter, activeSeverityFilter, data.filters.siteId);
+  const actionError = typeof params.error === "string" ? params.error : "";
 
   return (
     <AppPageShell>
@@ -160,6 +164,12 @@ export default async function DeficienciesPage({
         eyebrow="Deficiency center"
         title="Inspection failures ready for quote or repair follow-up"
       />
+
+      {actionError ? (
+        <div className="rounded-[24px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-semibold text-rose-800">
+          {actionError}
+        </div>
+      ) : null}
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         {[
@@ -275,11 +285,26 @@ export default async function DeficienciesPage({
                         ) : null}
                       </div>
                     </div>
+                    <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 text-sm text-blue-950">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Quote preview</p>
+                      <p className="mt-2 font-semibold">Included deficiency: {deficiency.title}</p>
+                      <p className="mt-1">System: {deficiency.reportType.replaceAll("_", " ")} | Severity: {deficiency.severity}</p>
+                      <p className="mt-1">Inspection: {format(deficiency.inspection.scheduledStart, "MMM d, yyyy h:mm a")}</p>
+                      <p className="mt-1">Recommended correction: review, price, and add repair/service line items before sending.</p>
+                    </div>
                   </div>
                   <div className="flex min-w-64 flex-col gap-3">
-                    <form action={updateDeficiencyStatusAction}>
+                    {deficiency.quoteId ? (
+                      <Link
+                        className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white"
+                        href={`/app/admin/quotes/${deficiency.quoteId}?from=${encodeURIComponent(currentListHref)}`}
+                      >
+                        Open linked quote
+                      </Link>
+                    ) : (
+                    <form action={generateQuoteFromDeficiencyAction}>
                       <input name="deficiencyId" type="hidden" value={deficiency.id} />
-                      <input name="status" type="hidden" value="quoted" />
+                      <input name="returnPath" type="hidden" value={currentListHref} />
                       <button
                         className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
                         type="submit"
@@ -287,6 +312,7 @@ export default async function DeficienciesPage({
                         Generate quote
                       </button>
                     </form>
+                    )}
                     <form action={updateDeficiencyStatusAction}>
                       <input name="deficiencyId" type="hidden" value={deficiency.id} />
                       <input name="status" type="hidden" value="scheduled" />

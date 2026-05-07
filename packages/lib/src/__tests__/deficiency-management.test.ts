@@ -7,6 +7,9 @@ const { prismaMock, txMock, buildFileDownloadResponseMock } = vi.hoisted(() => {
       update: vi.fn(),
       findUniqueOrThrow: vi.fn()
     },
+    inspectionTask: {
+      update: vi.fn()
+    },
     attachment: {
       deleteMany: vi.fn(),
       createMany: vi.fn()
@@ -18,7 +21,12 @@ const { prismaMock, txMock, buildFileDownloadResponseMock } = vi.hoisted(() => {
     deficiency: {
       findMany: vi.fn(),
       upsert: vi.fn(),
-      deleteMany: vi.fn()
+      deleteMany: vi.fn(),
+      updateMany: vi.fn()
+    },
+    quote: {
+      count: vi.fn(),
+      create: vi.fn()
     },
     auditLog: {
       create: vi.fn()
@@ -68,7 +76,7 @@ vi.mock("../storage", () => ({
 }));
 
 import { buildInitialReportDraft, validateDraftForTemplate } from "../report-engine";
-import { getAuthorizedDeficiencyPhotoDownload, updateDeficiencyStatus } from "../deficiency-service";
+import { generateQuoteFromDeficiencies, getAuthorizedDeficiencyPhotoDownload, updateDeficiencyStatus } from "../deficiency-service";
 import { saveReportDraft } from "../report-service";
 
 const fireAlarmAssets = [
@@ -123,6 +131,7 @@ function buildEditableFireAlarmReport() {
       siteId: "site_1",
       customerCompanyId: "customer_1",
       assignedTechnicianId: "tech_1",
+      status: "in_progress",
       scheduledStart: new Date("2026-03-20T15:00:00.000Z")
     },
     task: {
@@ -160,11 +169,15 @@ describe("deficiency management", () => {
     prismaMock.inspectionReport.findFirst.mockResolvedValue(buildEditableFireAlarmReport());
     prismaMock.asset.findMany.mockResolvedValue(fireAlarmAssets);
     txMock.inspectionReport.update.mockResolvedValue(undefined);
+    txMock.inspectionTask.update.mockResolvedValue(undefined);
     txMock.attachment.deleteMany.mockResolvedValue(undefined);
     txMock.signature.deleteMany.mockResolvedValue(undefined);
     txMock.deficiency.findMany.mockResolvedValue([]);
     txMock.deficiency.upsert.mockResolvedValue(undefined);
     txMock.deficiency.deleteMany.mockResolvedValue(undefined);
+    txMock.deficiency.updateMany.mockResolvedValue({ count: 0 });
+    txMock.quote.count.mockResolvedValue(0);
+    txMock.quote.create.mockResolvedValue({ id: "quote_1", quoteNumber: "Q-2026-0001" });
     txMock.auditLog.create.mockResolvedValue(undefined);
     txMock.inspectionReport.findUniqueOrThrow.mockResolvedValue({ id: "report_1", status: reportStatuses.draft });
     buildFileDownloadResponseMock.mockReturnValue({ ok: true, type: "photo-download" });
@@ -309,6 +322,107 @@ describe("deficiency management", () => {
       data: expect.objectContaining({
         action: "deficiency.status_updated",
         entityId: "def_1"
+      })
+    }));
+  });
+
+  it("creates and links a quote before marking a deficiency quoted", async () => {
+    prismaMock.deficiency.findMany.mockResolvedValue([
+      {
+        id: "def_1",
+        tenantId: "tenant_1",
+        siteId: "site_1",
+        inspectionId: "inspection_1",
+        inspectionReportId: "report_1",
+        reportType: "fire_alarm",
+        section: "notification-appliances",
+        source: "manual",
+        sourceRowKey: "manual_1",
+        assetId: null,
+        assetTag: null,
+        location: "Main lobby",
+        deviceType: "horn",
+        title: "Horn failed",
+        description: "Horn did not operate during alarm test.",
+        severity: "high",
+        status: "open",
+        photoStorageKey: "blob:tenant_1/photo/horn.png",
+        notes: "Quote replacement horn.",
+        createdAt: new Date("2026-04-20T15:00:00.000Z"),
+        updatedAt: new Date("2026-04-20T15:00:00.000Z"),
+        inspection: {
+          id: "inspection_1",
+          scheduledStart: new Date("2026-04-20T15:00:00.000Z"),
+          customerCompanyId: "customer_1",
+          customerCompany: {
+            id: "customer_1",
+            name: "Pinecrest Tower",
+            contactName: "Pat Customer",
+            billingEmail: "billing@example.com"
+          }
+        },
+        site: {
+          id: "site_1",
+          name: "Pinecrest Tower",
+          addressLine1: "100 Main",
+          city: "Enid",
+          state: "OK",
+          postalCode: "73701"
+        }
+      }
+    ]);
+    txMock.quote.count.mockResolvedValue(4);
+    txMock.quote.create.mockResolvedValue({ id: "quote_5", quoteNumber: "Q-2026-0005" });
+    txMock.deficiency.updateMany.mockResolvedValue({ count: 1 });
+
+    const quote = await generateQuoteFromDeficiencies(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      ["def_1"]
+    );
+
+    expect(quote).toEqual({ id: "quote_5", quoteNumber: "Q-2026-0005" });
+    expect(txMock.quote.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        tenantId: "tenant_1",
+        quoteNumber: "Q-2026-0005",
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        status: "draft",
+        lineItems: {
+          create: [
+            expect.objectContaining({
+              internalCode: "DEFICIENCY_REPAIR",
+              title: "Deficiency correction - Horn failed",
+              description: expect.stringContaining("Horn did not operate during alarm test."),
+              inspectionType: "fire_alarm",
+              category: "repair"
+            })
+          ]
+        }
+      }),
+      select: { id: true, quoteNumber: true }
+    }));
+    expect(txMock.deficiency.updateMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: "tenant_1",
+        id: { in: ["def_1"] }
+      },
+      data: {
+        status: "quoted",
+        quoteId: "quote_5"
+      }
+    });
+    expect(txMock.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        action: "quote.created_from_deficiencies",
+        entityId: "quote_5"
+      })
+    }));
+    expect(txMock.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        action: "deficiency.quoted",
+        entityId: "def_1",
+        metadata: expect.objectContaining({ quoteId: "quote_5" })
       })
     }));
   });

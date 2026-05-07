@@ -663,7 +663,7 @@ describe("quotes", () => {
         expiresAt: new Date("2026-05-01T12:00:00.000Z"),
         quoteAccessToken: "token_123",
         quoteAccessTokenRevokedAt: null,
-        quoteAccessTokenExpiresAt: new Date("2026-05-01T23:59:59.000Z"),
+        quoteAccessTokenExpiresAt: new Date("2026-12-01T23:59:59.000Z"),
         tenant: { name: "TradeWorx", branding: {}, billingEmail: "office@example.com" },
         lineItems: [],
         subtotal: 100,

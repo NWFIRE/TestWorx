@@ -162,6 +162,54 @@ export default async function QuoteDetailPage({
             submitPendingLabel="Saving..."
           />
 
+          {detail.deficiencies.length > 0 ? (
+            <SectionCard>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Deficiency context</p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Included deficiencies</h2>
+                  <p className="mt-2 text-sm text-slate-500">Use this context while preparing quote line items, pricing, and customer-facing notes.</p>
+                </div>
+                <StatusBadge label={`${detail.deficiencies.length} linked`} tone="blue" />
+              </div>
+              <div className="mt-4 space-y-3">
+                {detail.deficiencies.map((deficiency) => (
+                  <div key={deficiency.id} className="rounded-[24px] border border-slate-200/80 bg-slate-50/70 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-base font-semibold text-slate-950">{deficiency.title}</p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {deficiency.reportType.replaceAll("_", " ")} | {formatTenantDateTime(deficiency.inspection.scheduledStart, tenantTimezone)}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <StatusBadge label={deficiency.severity} tone={deficiency.severity === "critical" ? "rose" : deficiency.severity === "high" ? "amber" : "slate"} />
+                        <StatusBadge label={deficiency.status} tone="blue" />
+                      </div>
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-slate-700">{deficiency.description}</p>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                        <p>Location: {deficiency.location ?? "Not recorded"}</p>
+                        <p className="mt-1">Device: {deficiency.deviceType ?? "Not recorded"}</p>
+                        <p className="mt-1">Section: {deficiency.section.replaceAll("-", " ")}</p>
+                        {deficiency.assetTag ? <p className="mt-1">Asset tag: {deficiency.assetTag}</p> : null}
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                        <p>Notes: {deficiency.notes ?? "No follow-up notes recorded."}</p>
+                        {deficiency.photoStorageKey ? (
+                          <a className="mt-3 inline-flex font-semibold text-slateblue" href={`/api/deficiencies/${deficiency.id}/photo`}>
+                            View photo evidence
+                          </a>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          ) : null}
+
           <SectionCard>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>

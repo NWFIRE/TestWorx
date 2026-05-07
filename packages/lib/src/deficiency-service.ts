@@ -1,10 +1,13 @@
 import { prisma, type Prisma } from "@testworx/db";
+import { QuoteDeliveryStatus, QuoteStatus, QuoteSyncStatus } from "@prisma/client";
 import { z } from "zod";
 
 import type { ActorContext } from "@testworx/types";
 import { actorContextSchema, reportStatuses } from "@testworx/types";
 
 import { assertTenantContext } from "./permissions";
+import { getDefaultQuoteExpirationDate } from "./quote-terms";
+import { inspectionTypeRegistry } from "./report-config";
 import { getCustomerFacingSiteLabel, isTechnicianAssignedToInspection } from "./scheduling";
 import { buildFileDownloadResponse } from "./storage";
 
@@ -25,6 +28,36 @@ type DeficiencyDashboardDeficiency = Prisma.DeficiencyGetPayload<{
   };
 }>;
 
+type QuoteDeficiencyRecord = Prisma.DeficiencyGetPayload<{
+  include: {
+    inspection: {
+      select: {
+        id: true;
+        scheduledStart: true;
+        customerCompanyId: true;
+        customerCompany: {
+          select: {
+            id: true;
+            name: true;
+            contactName: true;
+            billingEmail: true;
+          };
+        };
+      };
+    };
+    site: {
+      select: {
+        id: true;
+        name: true;
+        addressLine1: true;
+        city: true;
+        state: true;
+        postalCode: true;
+      };
+    };
+  };
+}>;
+
 function readTechnicianAssignments(value: unknown): Array<{ technicianId: string }> {
   const assignments = (value as { technicianAssignments?: Array<{ technicianId: string }> } | null | undefined)?.technicianAssignments;
   return Array.isArray(assignments) ? assignments : [];
@@ -34,6 +67,96 @@ function parseActor(actor: ActorContext) {
   const parsed = actorContextSchema.parse(actor);
   assertTenantContext(parsed.role, parsed.tenantId);
   return parsed;
+}
+
+function assertDeficiencyAdminAccess(parsedActor: ReturnType<typeof parseActor>) {
+  if (!["tenant_admin", "office_admin", "platform_admin"].includes(parsedActor.role)) {
+    throw new Error("Only administrators can update deficiencies.");
+  }
+}
+
+function roundMoney(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function buildNextQuoteNumberFromCount(count: number) {
+  return `Q-${new Date().getFullYear()}-${String(count + 1).padStart(4, "0")}`;
+}
+
+function truncateText(value: string, maxLength: number) {
+  return value.length > maxLength ? `${value.slice(0, maxLength - 1).trimEnd()}…` : value;
+}
+
+function mapReportTypeToQuoteProposalType(reportType: string | null | undefined) {
+  switch (reportType) {
+    case "fire_alarm":
+      return "fire_alarm";
+    case "wet_fire_sprinkler":
+    case "dry_fire_sprinkler":
+    case "fire_pump":
+    case "backflow":
+      return "fire_sprinkler";
+    case "kitchen_suppression":
+      return "kitchen_suppression";
+    case "fire_extinguisher":
+      return "fire_extinguisher";
+    case "industrial_suppression":
+      return "industrial_suppression";
+    case "emergency_exit_lighting":
+      return "emergency_exit_lighting";
+    default:
+      return "general_fire_protection";
+  }
+}
+
+function buildQuoteLineDescription(deficiency: QuoteDeficiencyRecord) {
+  const parts = [
+    `Deficiency: ${deficiency.title}`,
+    `Summary: ${deficiency.description}`,
+    `System: ${String(deficiency.reportType).replaceAll("_", " ")}`,
+    `Severity: ${deficiency.severity}`,
+    deficiency.deviceType ? `Device: ${deficiency.deviceType}` : null,
+    deficiency.location ? `Location: ${deficiency.location}` : null,
+    deficiency.assetTag ? `Asset tag: ${deficiency.assetTag}` : null,
+    deficiency.notes ? `Notes: ${deficiency.notes}` : null,
+    "Recommended correction: Review, price, and add the needed repair/service line items before sending."
+  ];
+
+  return parts.filter(Boolean).join("\n");
+}
+
+function buildQuoteInternalNotes(deficiencies: QuoteDeficiencyRecord[]) {
+  return [
+    "Generated from deficiency records. Confirm selected deficiencies and add priced correction line items before sending.",
+    "",
+    ...deficiencies.flatMap((deficiency, index) => [
+      `${index + 1}. ${deficiency.title}`,
+      `Inspection: ${deficiency.inspectionId} on ${deficiency.inspection.scheduledStart.toISOString()}`,
+      `System: ${String(deficiency.reportType).replaceAll("_", " ")} | Severity: ${deficiency.severity}`,
+      deficiency.location ? `Location: ${deficiency.location}` : null,
+      deficiency.notes ? `Notes: ${deficiency.notes}` : null,
+      deficiency.photoStorageKey ? `Photo evidence attached to deficiency ${deficiency.id}.` : null,
+      ""
+    ].filter((line): line is string => Boolean(line)))
+  ].join("\n").trim();
+}
+
+function ensureSameQuoteContext(deficiencies: QuoteDeficiencyRecord[]) {
+  const first = deficiencies[0];
+  if (!first) {
+    throw new Error("Select at least one deficiency before generating a quote.");
+  }
+
+  const mismatched = deficiencies.find((deficiency) =>
+    deficiency.inspection.customerCompanyId !== first.inspection.customerCompanyId ||
+    deficiency.siteId !== first.siteId
+  );
+
+  if (mismatched) {
+    throw new Error("Selected deficiencies must belong to the same customer and service site.");
+  }
+
+  return first;
 }
 
 async function getAuthorizedCustomerCompanyId(parsedActor: ReturnType<typeof parseActor>) {
@@ -129,9 +252,7 @@ export async function getAdminDeficiencyDashboardData(actor: ActorContext, filte
 
 export async function updateDeficiencyStatus(actor: ActorContext, deficiencyId: string, status: string) {
   const parsedActor = parseActor(actor);
-  if (!["tenant_admin", "office_admin", "platform_admin"].includes(parsedActor.role)) {
-    throw new Error("Only administrators can update deficiencies.");
-  }
+  assertDeficiencyAdminAccess(parsedActor);
 
   const deficiency = await prisma.deficiency.findFirst({
     where: { id: deficiencyId, tenantId: parsedActor.tenantId as string }
@@ -158,6 +279,155 @@ export async function updateDeficiencyStatus(actor: ActorContext, deficiencyId: 
   });
 
   return updated;
+}
+
+export async function generateQuoteFromDeficiencies(actor: ActorContext, deficiencyIds: string[]) {
+  const parsedActor = parseActor(actor);
+  assertDeficiencyAdminAccess(parsedActor);
+  const tenantId = parsedActor.tenantId as string;
+  const uniqueDeficiencyIds = [...new Set(deficiencyIds.map((id) => id.trim()).filter(Boolean))];
+
+  if (uniqueDeficiencyIds.length === 0) {
+    throw new Error("Select at least one deficiency before generating a quote.");
+  }
+
+  const deficiencies = await prisma.deficiency.findMany({
+    where: {
+      tenantId,
+      id: { in: uniqueDeficiencyIds }
+    },
+    include: {
+      inspection: {
+        select: {
+          id: true,
+          scheduledStart: true,
+          customerCompanyId: true,
+          customerCompany: {
+            select: {
+              id: true,
+              name: true,
+              contactName: true,
+              billingEmail: true
+            }
+          }
+        }
+      },
+      site: {
+        select: {
+          id: true,
+          name: true,
+          addressLine1: true,
+          city: true,
+          state: true,
+          postalCode: true
+        }
+      }
+    },
+    orderBy: [{ severity: "desc" }, { createdAt: "asc" }]
+  });
+
+  if (deficiencies.length !== uniqueDeficiencyIds.length) {
+    throw new Error("One or more selected deficiencies could not be found.");
+  }
+
+  const quoteContext = ensureSameQuoteContext(deficiencies);
+  const now = new Date();
+  const lineItems = deficiencies.map((deficiency, index) => ({
+    tenantId,
+    sortOrder: index,
+    internalCode: "DEFICIENCY_REPAIR",
+    title: truncateText(`Deficiency correction - ${deficiency.title}`, 160),
+    description: buildQuoteLineDescription(deficiency),
+    quantity: 1,
+    unitPrice: 0,
+    discountAmount: 0,
+    taxable: false,
+    total: 0,
+    qbItemId: null,
+    inspectionType: deficiency.reportType in inspectionTypeRegistry ? deficiency.reportType : null,
+    category: "repair"
+  }));
+  const subtotal = roundMoney(lineItems.reduce((sum, line) => sum + line.total, 0));
+  const proposalType = mapReportTypeToQuoteProposalType(String(quoteContext.reportType));
+
+  return prisma.$transaction(async (tx) => {
+    const quoteNumber = buildNextQuoteNumberFromCount(await tx.quote.count({ where: { tenantId } }));
+    const quote = await tx.quote.create({
+      data: {
+        tenantId,
+        quoteNumber,
+        customerCompanyId: quoteContext.inspection.customerCompanyId,
+        siteId: quoteContext.siteId,
+        customSiteName: null,
+        contactName: quoteContext.inspection.customerCompany.contactName,
+        recipientEmail: quoteContext.inspection.customerCompany.billingEmail,
+        proposalType,
+        includeDepositRequirement: false,
+        issuedAt: now,
+        expiresAt: getDefaultQuoteExpirationDate(now),
+        status: QuoteStatus.draft,
+        syncStatus: QuoteSyncStatus.not_synced,
+        deliveryStatus: QuoteDeliveryStatus.not_sent,
+        subtotal,
+        taxAmount: 0,
+        total: subtotal,
+        internalNotes: buildQuoteInternalNotes(deficiencies),
+        customerNotes: "Deficiency correction proposal prepared for review.",
+        createdByUserId: parsedActor.userId,
+        updatedByUserId: parsedActor.userId,
+        lineItems: {
+          create: lineItems
+        }
+      },
+      select: {
+        id: true,
+        quoteNumber: true
+      }
+    });
+
+    await tx.deficiency.updateMany({
+      where: {
+        tenantId,
+        id: { in: uniqueDeficiencyIds }
+      },
+      data: {
+        status: "quoted",
+        quoteId: quote.id
+      }
+    });
+
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        actorUserId: parsedActor.userId,
+        action: "quote.created_from_deficiencies",
+        entityType: "Quote",
+        entityId: quote.id,
+        metadata: {
+          quoteNumber: quote.quoteNumber,
+          deficiencyIds: uniqueDeficiencyIds,
+          inspectionId: quoteContext.inspectionId,
+          siteId: quoteContext.siteId
+        }
+      }
+    });
+
+    await Promise.all(uniqueDeficiencyIds.map((deficiencyId) => tx.auditLog.create({
+      data: {
+        tenantId,
+        actorUserId: parsedActor.userId,
+        action: "deficiency.quoted",
+        entityType: "Deficiency",
+        entityId: deficiencyId,
+        metadata: {
+          quoteId: quote.id,
+          quoteNumber: quote.quoteNumber
+        }
+      }
+    })));
+
+    return quote;
+  });
 }
 
 export async function getAuthorizedDeficiencyPhotoDownload(actor: ActorContext, deficiencyId: string) {

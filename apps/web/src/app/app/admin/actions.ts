@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 
 import { auth } from "@/auth";
@@ -10,6 +11,7 @@ import {
   approveInspectionCloseoutRequest,
   dismissInspectionCloseoutRequest,
   createInspection,
+  generateQuoteFromDeficiencies,
   clearBillingSummaryItemCatalogLink,
   clearBillingSummaryItemGroupCatalogLink,
   createDirectQuickBooksInvoice,
@@ -680,6 +682,40 @@ export async function updateDeficiencyStatusAction(formData: FormData) {
 
   revalidatePath("/app/deficiencies");
   revalidatePath("/app/admin");
+}
+
+export async function generateQuoteFromDeficiencyAction(formData: FormData) {
+  const session = await auth();
+  const deficiencyId = String(formData.get("deficiencyId") ?? "");
+  const returnPath = String(formData.get("returnPath") ?? "/app/deficiencies");
+  const safeReturnPath = returnPath.startsWith("/app/deficiencies") ? returnPath : "/app/deficiencies";
+
+  if (!session?.user?.tenantId || !deficiencyId) {
+    redirect(`${safeReturnPath}${safeReturnPath.includes("?") ? "&" : "?"}error=${encodeURIComponent("Unable to generate quote. Please sign in and try again.")}`);
+  }
+
+  try {
+    const quote = await generateQuoteFromDeficiencies(
+      {
+        userId: session.user.id,
+        role: session.user.role,
+        tenantId: session.user.tenantId,
+        allowances: session.user.allowances ?? null
+      },
+      [deficiencyId]
+    );
+
+    revalidatePath("/app/deficiencies");
+    revalidatePath("/app/admin/quotes");
+    revalidatePath(`/app/admin/quotes/${quote.id}`);
+    redirect(`/app/admin/quotes/${quote.id}?quote=created-from-deficiency&from=${encodeURIComponent(safeReturnPath)}`);
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : "Quote creation failed. The deficiency was not changed.";
+    redirect(`${safeReturnPath}${safeReturnPath.includes("?") ? "&" : "?"}error=${encodeURIComponent(message)}`);
+  }
 }
 
 export async function updateBillingSummaryStatusAction(formData: FormData) {

@@ -1223,6 +1223,31 @@ async function getQuoteByIdForTenant(tenantId: string, quoteId: string) {
           status: true
         }
       },
+      deficiencies: {
+        orderBy: [{ createdAt: "asc" }],
+        select: {
+          id: true,
+          inspectionId: true,
+          inspectionReportId: true,
+          reportType: true,
+          title: true,
+          description: true,
+          severity: true,
+          status: true,
+          section: true,
+          location: true,
+          deviceType: true,
+          assetTag: true,
+          notes: true,
+          photoStorageKey: true,
+          createdAt: true,
+          inspection: {
+            select: {
+              scheduledStart: true
+            }
+          }
+        }
+      },
       lineItems: { orderBy: { sortOrder: "asc" } }
     }
   });
