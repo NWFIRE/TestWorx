@@ -215,6 +215,161 @@ describe("technician dashboard inspection access", () => {
     expect(result.unassigned[0]?.tasks).toHaveLength(3);
   });
 
+  it("hides same-period claimable visits when their report types are a subset of a more complete visit", async () => {
+    prismaMock.inspection.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "inspection_kitchen_only",
+          tenantId: "tenant_1",
+          customerCompanyId: "customer_cafe_garcia",
+          siteId: "site_cafe_garcia",
+          status: InspectionStatus.scheduled,
+          inspectionClassification: "standard",
+          isPriority: false,
+          scheduledStart: new Date("2026-05-17T09:00:00.000Z"),
+          site: { id: "site_cafe_garcia", name: "Cafe Garcia" },
+          customerCompany: { id: "customer_cafe_garcia", name: "Cafe Garcia" },
+          assignedTechnician: null,
+          technicianAssignments: [],
+          convertedFromQuotes: [],
+          tasks: [
+            {
+              id: "task_kitchen_only",
+              inspectionType: "kitchen_suppression",
+              assignedTechnicianId: null,
+              dueMonth: "2026-05",
+              dueDate: new Date("2026-05-01T00:00:00.000Z"),
+              schedulingStatus: "scheduled_now",
+              status: InspectionStatus.to_be_completed,
+              recurrence: null,
+              report: null
+            }
+          ]
+        },
+        {
+          id: "inspection_kitchen_and_extinguishers",
+          tenantId: "tenant_1",
+          customerCompanyId: "customer_cafe_garcia",
+          siteId: "site_cafe_garcia",
+          status: InspectionStatus.scheduled,
+          inspectionClassification: "standard",
+          isPriority: false,
+          scheduledStart: new Date("2026-05-17T09:00:00.000Z"),
+          site: { id: "site_cafe_garcia", name: "Cafe Garcia" },
+          customerCompany: { id: "customer_cafe_garcia", name: "Cafe Garcia" },
+          assignedTechnician: null,
+          technicianAssignments: [],
+          convertedFromQuotes: [],
+          tasks: [
+            {
+              id: "task_kitchen_combined",
+              inspectionType: "kitchen_suppression",
+              assignedTechnicianId: null,
+              dueMonth: "2026-05",
+              dueDate: new Date("2026-05-01T00:00:00.000Z"),
+              schedulingStatus: "scheduled_now",
+              status: InspectionStatus.to_be_completed,
+              recurrence: null,
+              report: null
+            },
+            {
+              id: "task_extinguisher_combined",
+              inspectionType: "fire_extinguisher",
+              assignedTechnicianId: null,
+              dueMonth: "2026-05",
+              dueDate: new Date("2026-05-01T00:00:00.000Z"),
+              schedulingStatus: "scheduled_now",
+              status: InspectionStatus.to_be_completed,
+              recurrence: null,
+              report: null
+            }
+          ]
+        }
+      ])
+      .mockResolvedValueOnce([]);
+
+    const result = await getTechnicianDashboardData({ userId: "tech_2", role: "technician", tenantId: "tenant_1" });
+
+    expect(result.unassigned).toHaveLength(1);
+    expect(result.unassigned[0]?.id).toBe("inspection_kitchen_and_extinguishers");
+    expect(result.unassigned[0]?.tasks.map((task: any) => task.inspectionType)).toEqual([
+      "kitchen_suppression",
+      "fire_extinguisher"
+    ]);
+  });
+
+  it("keeps separate same-period claimable visits when neither report task set is a subset", async () => {
+    prismaMock.inspection.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "inspection_kitchen",
+          tenantId: "tenant_1",
+          customerCompanyId: "customer_1",
+          siteId: "site_1",
+          status: InspectionStatus.scheduled,
+          inspectionClassification: "standard",
+          isPriority: false,
+          scheduledStart: new Date("2026-05-17T09:00:00.000Z"),
+          site: { id: "site_1", name: "Restaurant" },
+          customerCompany: { id: "customer_1", name: "Restaurant" },
+          assignedTechnician: null,
+          technicianAssignments: [],
+          convertedFromQuotes: [],
+          tasks: [
+            {
+              id: "task_kitchen",
+              inspectionType: "kitchen_suppression",
+              assignedTechnicianId: null,
+              dueMonth: "2026-05",
+              dueDate: new Date("2026-05-01T00:00:00.000Z"),
+              schedulingStatus: "scheduled_now",
+              status: InspectionStatus.to_be_completed,
+              recurrence: null,
+              report: null
+            }
+          ]
+        },
+        {
+          id: "inspection_alarm",
+          tenantId: "tenant_1",
+          customerCompanyId: "customer_1",
+          siteId: "site_1",
+          status: InspectionStatus.scheduled,
+          inspectionClassification: "standard",
+          isPriority: false,
+          scheduledStart: new Date("2026-05-17T09:00:00.000Z"),
+          site: { id: "site_1", name: "Restaurant" },
+          customerCompany: { id: "customer_1", name: "Restaurant" },
+          assignedTechnician: null,
+          technicianAssignments: [],
+          convertedFromQuotes: [],
+          tasks: [
+            {
+              id: "task_alarm",
+              inspectionType: "fire_alarm",
+              assignedTechnicianId: null,
+              dueMonth: "2026-05",
+              dueDate: new Date("2026-05-01T00:00:00.000Z"),
+              schedulingStatus: "scheduled_now",
+              status: InspectionStatus.to_be_completed,
+              recurrence: null,
+              report: null
+            }
+          ]
+        }
+      ])
+      .mockResolvedValueOnce([]);
+
+    const result = await getTechnicianDashboardData({ userId: "tech_2", role: "technician", tenantId: "tenant_1" });
+
+    expect(result.unassigned.map((inspection: any) => inspection.id)).toEqual([
+      "inspection_kitchen",
+      "inspection_alarm"
+    ]);
+  });
+
   it("keeps claimable inspections visible when stale assignment rows exist", async () => {
     prismaMock.inspection.findMany
       .mockResolvedValueOnce([])

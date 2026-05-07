@@ -954,6 +954,83 @@ function isInspectionInTechnicianClaimableWindow<T extends {
   return comparisonDate ? comparisonDate <= windowEnd : true;
 }
 
+function getClaimableInspectionPeriodKey<T extends {
+  dueDate?: Date | string | null;
+  dueMonth?: string | null;
+}>(inspection: { scheduledStart?: Date | string | null; tasks?: T[] | null }) {
+  const taskDuePeriods = (inspection.tasks ?? [])
+    .flatMap((task) => [
+      task.dueMonth?.trim() && /^\d{4}-\d{2}$/.test(task.dueMonth.trim()) ? task.dueMonth.trim() : null,
+      getDateDuePeriod(task.dueDate ?? null)
+    ])
+    .filter((period): period is string => Boolean(period));
+
+  if (taskDuePeriods.length) {
+    return taskDuePeriods.sort()[0]!;
+  }
+
+  return getDateDuePeriod(inspection.scheduledStart ?? null) ?? "unknown";
+}
+
+function getTaskTypeCounts<T extends { inspectionType: InspectionType | keyof typeof inspectionTypeRegistry }>(tasks: T[]) {
+  return tasks.reduce<Map<string, number>>((counts, task) => {
+    const key = String(task.inspectionType);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+    return counts;
+  }, new Map());
+}
+
+function isStrictTaskTypeSubset<T extends { inspectionType: InspectionType | keyof typeof inspectionTypeRegistry }>(candidateTasks: T[], comparisonTasks: T[]) {
+  if (candidateTasks.length >= comparisonTasks.length) {
+    return false;
+  }
+
+  const candidateCounts = getTaskTypeCounts(candidateTasks);
+  const comparisonCounts = getTaskTypeCounts(comparisonTasks);
+
+  for (const [inspectionType, count] of candidateCounts.entries()) {
+    if ((comparisonCounts.get(inspectionType) ?? 0) < count) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function filterSubsetDuplicateClaimableInspections<T extends {
+  id: string;
+  customerCompanyId?: string | null;
+  siteId?: string | null;
+  scheduledStart?: Date | string | null;
+  tasks: Array<{
+    dueDate?: Date | string | null;
+    dueMonth?: string | null;
+    inspectionType: InspectionType | keyof typeof inspectionTypeRegistry;
+  }>;
+}>(inspections: T[]) {
+  return inspections.filter((inspection) => {
+    const duplicateScopeKey = [
+      inspection.customerCompanyId ?? "unknown_customer",
+      inspection.siteId ?? "unknown_site",
+      getClaimableInspectionPeriodKey(inspection)
+    ].join("|");
+
+    return !inspections.some((other) => {
+      if (other.id === inspection.id) {
+        return false;
+      }
+
+      const otherScopeKey = [
+        other.customerCompanyId ?? "unknown_customer",
+        other.siteId ?? "unknown_site",
+        getClaimableInspectionPeriodKey(other)
+      ].join("|");
+
+      return duplicateScopeKey === otherScopeKey && isStrictTaskTypeSubset(inspection.tasks, other.tasks);
+    });
+  });
+}
+
 function dedupeInspectionsById<T extends { id: string }>(inspections: T[]) {
   const seen = new Set<string>();
   return inspections.filter((inspection) => {
@@ -5142,7 +5219,7 @@ export async function resolveClaimableInspectionsForTechnician(actor: ActorConte
     }))
     .filter((inspection) => inspection.tasks.length > 0);
 
-  const uniqueResolved = dedupeInspectionsById(resolved);
+  const uniqueResolved = filterSubsetDuplicateClaimableInspections(dedupeInspectionsById(resolved));
 
   if (
     process.env.NODE_ENV !== "production" &&
