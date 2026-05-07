@@ -150,6 +150,36 @@ describe("invoice totals", () => {
     expect(totals.totalDue).toBe(75);
   });
 
+  it("uses the configured default tax rate when a taxable line has a stale zero tax rate", () => {
+    const totals = calculateInvoiceTotalsFromItems([
+      {
+        id: "taxable_part",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        reportId: "report_1",
+        reportType: "fire_extinguisher",
+        category: "material",
+        description: "Recharge parts",
+        quantity: 2,
+        unitPrice: 50,
+        amount: 100,
+        taxable: true,
+        taxableSource: "quickbooks",
+        quickBooksTaxableStatus: "taxable",
+        quickBooksTaxCodeRef: "TAX",
+        taxRate: 0,
+        taxAmount: 0
+      }
+    ], { defaultTaxRate: 0.0825, defaultTaxCodeId: "TAX" });
+
+    expect(totals.taxableSubtotal).toBe(100);
+    expect(totals.nonTaxableSubtotal).toBe(0);
+    expect(totals.taxTotal).toBe(8.25);
+    expect(totals.totalDue).toBe(108.25);
+    expect(totals.taxRate).toBe(0.0825);
+    expect(totals.taxCodeId).toBe("TAX");
+  });
+
   it("includes taxable minimum ticket adjustments before calculating tax", () => {
     const totals = calculateInvoiceTotalsFromItems([
       {
@@ -866,6 +896,45 @@ describe("inspection billing extraction", () => {
         subtotal: 90
       })
     );
+  });
+
+  it("does not merge grouped review rows with different taxability", () => {
+    const grouped = groupBillingReviewItems([
+      {
+        id: "taxable_part_line",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        reportId: "report_1",
+        reportType: "fire_extinguisher",
+        category: "material",
+        description: "ABC extinguisher",
+        quantity: 1,
+        unitPrice: 95,
+        linkedCatalogItemId: "catalog_1",
+        linkedCatalogItemName: "ABC extinguisher",
+        linkedQuickBooksItemId: "qb_1",
+        taxable: true
+      },
+      {
+        id: "non_taxable_part_line",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        reportId: "report_2",
+        reportType: "fire_extinguisher",
+        category: "material",
+        description: "ABC extinguisher",
+        quantity: 1,
+        unitPrice: 95,
+        linkedCatalogItemId: "catalog_1",
+        linkedCatalogItemName: "ABC extinguisher",
+        linkedQuickBooksItemId: "qb_1",
+        taxable: false
+      }
+    ]);
+
+    expect(grouped.material).toHaveLength(2);
+    expect(grouped.material.some((group) => group.taxable === true && group.itemIds.includes("taxable_part_line"))).toBe(true);
+    expect(grouped.material.some((group) => group.taxable === false && group.itemIds.includes("non_taxable_part_line"))).toBe(true);
   });
 });
 

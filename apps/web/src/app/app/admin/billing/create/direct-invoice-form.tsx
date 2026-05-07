@@ -64,6 +64,8 @@ type DirectInvoiceResult = {
   sentTo: string | null;
 };
 
+const DEFAULT_OKLAHOMA_SALES_TAX_RATE = 0.0825;
+
 function toCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -142,7 +144,10 @@ export function DirectInvoiceForm({
     () => value.lineItems.reduce((sum, line) => sum + (!line.taxable ? line.quantity * line.unitPrice : 0), 0),
     [value.lineItems]
   );
-  const taxTotal = 0;
+  const taxTotal = useMemo(
+    () => Number((taxableSubtotal * DEFAULT_OKLAHOMA_SALES_TAX_RATE).toFixed(2)),
+    [taxableSubtotal]
+  );
   const totalDue = subtotal + taxTotal;
   const catalogOptions = useMemo<SearchSelectOption[]>(
     () => catalogItems.map((item) => ({

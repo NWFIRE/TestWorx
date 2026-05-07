@@ -142,6 +142,8 @@ const AUTO_MATCH_CONFIDENCE_THRESHOLD = 0.96;
 const SUGGESTED_MATCH_CONFIDENCE_THRESHOLD = 0.72;
 const MANUAL_SEARCH_CONFIDENCE_THRESHOLD = 0.15;
 const MINIMUM_TICKET_ADJUSTMENT_CODE = "MINIMUM_TICKET_ADJUSTMENT";
+const DEFAULT_OKLAHOMA_SALES_TAX_RATE = 0.0825;
+const DEFAULT_QUICKBOOKS_TAX_CODE_ID = "TAX";
 
 function isRuleControlledFeeItem(item: BillableItem) {
   return item.category === "fee" && item.metadata?.manualBillingLine !== true;
@@ -2151,7 +2153,8 @@ function readLineTaxRate(item: BillableItem, defaultTaxRate: number) {
     return defaultTaxRate;
   }
 
-  return explicitRate > 1 ? explicitRate / 100 : explicitRate;
+  const normalizedRate = explicitRate > 1 ? explicitRate / 100 : explicitRate;
+  return normalizedRate > 0 ? normalizedRate : defaultTaxRate;
 }
 
 function calculateLineSubtotal(item: BillableItem) {
@@ -2171,7 +2174,7 @@ function calculateInvoiceLineSnapshot(
   const lineSubtotal = calculateLineSubtotal(item);
   const discountAmount = readLineDiscountAmount(item);
   const taxable = item.taxable === true;
-  const taxRate = taxable ? readLineTaxRate(item, input.defaultTaxRate ?? 0) : 0;
+  const taxRate = taxable ? readLineTaxRate(item, input.defaultTaxRate ?? DEFAULT_OKLAHOMA_SALES_TAX_RATE) : 0;
   const existingTaxAmount = taxable ? readNumber(item.taxAmount) : 0;
   const taxAmount = taxable
     ? roundMoney(lineSubtotal * taxRate)
@@ -2180,6 +2183,7 @@ function calculateInvoiceLineSnapshot(
     ?? item.quickBooksTaxCodeRef
     ?? (typeof item.metadata?.taxCodeId === "string" ? item.metadata.taxCodeId : null)
     ?? input.defaultTaxCodeId
+    ?? (taxable ? DEFAULT_QUICKBOOKS_TAX_CODE_ID : null)
     ?? null;
 
   return {
@@ -2242,8 +2246,8 @@ export function calculateInvoiceTotalsFromItems(
     discountTotal: roundedDiscountTotal,
     taxTotal: roundedTaxTotal,
     totalDue: roundMoney(subtotalBeforeTax + roundedTaxTotal),
-    taxRate: input.defaultTaxRate ?? 0,
-    taxCodeId: input.defaultTaxCodeId ?? null,
+    taxRate: input.defaultTaxRate ?? DEFAULT_OKLAHOMA_SALES_TAX_RATE,
+    taxCodeId: input.defaultTaxCodeId ?? DEFAULT_QUICKBOOKS_TAX_CODE_ID,
     calculationVersion: "invoice_totals_v1",
     calculatedAt: typeof input.calculatedAt === "string"
       ? input.calculatedAt
@@ -3911,9 +3915,16 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
     ? displayMinimumPricedSummary.invoiceTotals as InvoiceTotals
     : readInvoiceTotalsSnapshot(displayMinimumPricedSummary.pricingSnapshot)
       ?? calculateInvoiceTotalsFromItems(displayItems);
-  const hasInvoiceTotalsSnapshot = Boolean(readInvoiceTotalsSnapshot(row.pricingSnapshot));
+  const existingInvoiceTotals = readInvoiceTotalsSnapshot(row.pricingSnapshot);
+  const hasInvoiceTotalsSnapshot = Boolean(existingInvoiceTotals);
+  const invoiceTotalsChanged = !existingInvoiceTotals
+    || existingInvoiceTotals.taxableSubtotal !== invoiceTotals.taxableSubtotal
+    || existingInvoiceTotals.nonTaxableSubtotal !== invoiceTotals.nonTaxableSubtotal
+    || existingInvoiceTotals.subtotalBeforeTax !== invoiceTotals.subtotalBeforeTax
+    || existingInvoiceTotals.taxTotal !== invoiceTotals.taxTotal
+    || existingInvoiceTotals.totalDue !== invoiceTotals.totalDue;
 
-  if (row.status !== "invoiced" && (row.subtotal !== displayMinimumPricedSummary.subtotal || !hasInvoiceTotalsSnapshot)) {
+  if (row.status !== "invoiced" && (row.subtotal !== displayMinimumPricedSummary.subtotal || !hasInvoiceTotalsSnapshot || invoiceTotalsChanged)) {
     await prisma.inspectionBillingSummary.update({
       where: { id: row.id },
       data: {
