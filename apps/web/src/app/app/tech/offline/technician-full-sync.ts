@@ -2,6 +2,7 @@
 
 import { putScreenSnapshot } from "./offline-db";
 import { buildSyncSummary, processSyncQueue, recordSuccessfulSync, startTechnicianSyncEngine } from "./offline-sync";
+import { markTechnicianScreenSnapshot } from "./screen-snapshot-version";
 import type { SyncSummary } from "./offline-types";
 
 type TechnicianSyncPayload = {
@@ -45,14 +46,14 @@ export async function runTechnicianFullSync(): Promise<TechnicianManualSyncResul
   const payload = await fetchTechnicianUpdates();
 
   await Promise.all([
-    putScreenSnapshot("technician-home", { dashboard: payload.dashboard, manuals: payload.manuals }, payload.syncedAt),
-    putScreenSnapshot("technician-work", { dashboard: payload.dashboard }, payload.syncedAt),
-    putScreenSnapshot("technician-inspections", { dashboard: payload.dashboard }, payload.syncedAt),
-    putScreenSnapshot("technician-profile", {
+    putScreenSnapshot("technician-home", markTechnicianScreenSnapshot({ dashboard: payload.dashboard, manuals: payload.manuals }), payload.syncedAt),
+    putScreenSnapshot("technician-work", markTechnicianScreenSnapshot({ dashboard: payload.dashboard }), payload.syncedAt),
+    putScreenSnapshot("technician-inspections", markTechnicianScreenSnapshot({ dashboard: payload.dashboard }), payload.syncedAt),
+    putScreenSnapshot("technician-profile", markTechnicianScreenSnapshot({
       dashboard: payload.dashboard,
       manuals: payload.manuals,
       user: payload.user
-    }, payload.syncedAt),
+    }), payload.syncedAt),
     recordSuccessfulSync(payload.syncedAt)
   ]);
 

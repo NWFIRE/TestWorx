@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { getScreenSnapshot, putScreenSnapshot } from "./offline-db";
 import { startTechnicianSyncEngine } from "./offline-sync";
+import { isCurrentTechnicianScreenSnapshot, markTechnicianScreenSnapshot } from "./screen-snapshot-version";
 import type { LocalScreenSnapshotKey } from "./offline-types";
 
 export function useOfflineScreenSnapshot<T>(key: LocalScreenSnapshotKey, initialData: T) {
@@ -15,13 +16,14 @@ export function useOfflineScreenSnapshot<T>(key: LocalScreenSnapshotKey, initial
     async function hydrate() {
       startTechnicianSyncEngine();
       const existing = await getScreenSnapshot<T>(key);
-      if (existing?.payload && !cancelled) {
+      if (existing?.payload && isCurrentTechnicianScreenSnapshot(existing.payload) && !cancelled) {
         setSnapshot(existing.payload);
       }
 
-      await putScreenSnapshot(key, initialData);
+      const versionedInitialData = markTechnicianScreenSnapshot(initialData);
+      await putScreenSnapshot(key, versionedInitialData);
       if (!cancelled) {
-        setSnapshot(initialData);
+        setSnapshot(versionedInitialData);
       }
     }
 
