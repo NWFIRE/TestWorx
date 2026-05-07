@@ -391,8 +391,7 @@ export async function generateQuoteFromDeficiencies(actor: ActorContext, deficie
         id: { in: uniqueDeficiencyIds }
       },
       data: {
-        status: "quoted",
-        quoteId: quote.id
+        status: "quoted"
       }
     });
 

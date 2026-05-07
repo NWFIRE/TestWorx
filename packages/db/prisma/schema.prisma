@@ -1039,7 +1039,6 @@ model Quote {
   convertedInspection     Inspection?         @relation("QuoteConvertedInspection", fields: [convertedInspectionId], references: [id])
   lineItems               QuoteLineItem[]
   reminderDispatches      QuoteReminderDispatch[]
-  deficiencies            Deficiency[]
 
   @@unique([tenantId, quoteNumber])
   @@index([tenantId, status])
@@ -1421,7 +1420,6 @@ model Deficiency {
   description        String
   severity           String
   status             String
-  quoteId            String?
   photoStorageKey    String?
   notes              String?
   createdAt          DateTime         @default(now())
@@ -1431,13 +1429,11 @@ model Deficiency {
   inspection         Inspection       @relation(fields: [inspectionId], references: [id])
   inspectionReport   InspectionReport @relation(fields: [inspectionReportId], references: [id])
   asset              Asset?           @relation(fields: [assetId], references: [id])
-  quote              Quote?           @relation(fields: [quoteId], references: [id], onDelete: SetNull)
 
   @@unique([inspectionReportId, source, section, sourceRowKey])
   @@index([tenantId, status])
   @@index([tenantId, siteId])
   @@index([tenantId, inspectionId])
-  @@index([tenantId, quoteId])
 }
 
 model InspectionBillingSummary {

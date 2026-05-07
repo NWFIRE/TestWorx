@@ -408,8 +408,7 @@ describe("deficiency management", () => {
         id: { in: ["def_1"] }
       },
       data: {
-        status: "quoted",
-        quoteId: "quote_5"
+        status: "quoted"
       }
     });
     expect(txMock.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({

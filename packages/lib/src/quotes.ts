@@ -1223,31 +1223,6 @@ async function getQuoteByIdForTenant(tenantId: string, quoteId: string) {
           status: true
         }
       },
-      deficiencies: {
-        orderBy: [{ createdAt: "asc" }],
-        select: {
-          id: true,
-          inspectionId: true,
-          inspectionReportId: true,
-          reportType: true,
-          title: true,
-          description: true,
-          severity: true,
-          status: true,
-          section: true,
-          location: true,
-          deviceType: true,
-          assetTag: true,
-          notes: true,
-          photoStorageKey: true,
-          createdAt: true,
-          inspection: {
-            select: {
-              scheduledStart: true
-            }
-          }
-        }
-      },
       lineItems: { orderBy: { sortOrder: "asc" } }
     }
   });
@@ -1298,6 +1273,67 @@ async function getQuoteByIdForTenant(tenantId: string, quoteId: string) {
       customSiteName: quote.customSiteName
     })
   };
+}
+
+function extractDeficiencyIdsFromQuoteAuditLogs(
+  auditLogs: Array<{ action: string; metadata: Prisma.JsonValue | null }>
+) {
+  const ids = auditLogs.flatMap((log) => {
+    if (log.action !== "quote.created_from_deficiencies") {
+      return [];
+    }
+
+    const metadata = log.metadata;
+    if (!metadata || Array.isArray(metadata) || typeof metadata !== "object") {
+      return [];
+    }
+
+    const deficiencyIds = (metadata as { deficiencyIds?: unknown }).deficiencyIds;
+    return Array.isArray(deficiencyIds)
+      ? deficiencyIds.filter((id): id is string => typeof id === "string" && id.length > 0)
+      : [];
+  });
+
+  return Array.from(new Set(ids));
+}
+
+async function getQuoteDeficiencyContext(input: {
+  tenantId: string;
+  deficiencyIds: string[];
+}) {
+  if (input.deficiencyIds.length === 0) {
+    return [];
+  }
+
+  return prisma.deficiency.findMany({
+    where: {
+      tenantId: input.tenantId,
+      id: { in: input.deficiencyIds }
+    },
+    orderBy: [{ createdAt: "asc" }],
+    select: {
+      id: true,
+      inspectionId: true,
+      inspectionReportId: true,
+      reportType: true,
+      title: true,
+      description: true,
+      severity: true,
+      status: true,
+      section: true,
+      location: true,
+      deviceType: true,
+      assetTag: true,
+      notes: true,
+      photoStorageKey: true,
+      createdAt: true,
+      inspection: {
+        select: {
+          scheduledStart: true
+        }
+      }
+    }
+  });
 }
 
 async function loadQuoteReferenceMaps(
@@ -1832,6 +1868,11 @@ export async function getQuoteDetail(actor: ActorContext, quoteId: string) {
   }
 
   const integrationId = await getTenantQuickBooksIntegrationId(parsedActor.tenantId as string);
+  const deficiencyIds = extractDeficiencyIdsFromQuoteAuditLogs(auditLogs);
+  const deficiencies = await getQuoteDeficiencyContext({
+    tenantId: parsedActor.tenantId as string,
+    deficiencyIds
+  });
   const lineItems = await Promise.all(quote.lineItems.map(async (line) => {
     let currentQuickBooksItem: {
       qbItemId: string;
@@ -1926,6 +1967,7 @@ export async function getQuoteDetail(actor: ActorContext, quoteId: string) {
     hostedQuoteUrl: quote.quoteAccessToken ? buildQuoteAccessUrl(quote.quoteAccessToken) : null,
     reminderSettings,
     reminderDispatches,
+    deficiencies,
     lineItems,
     auditLogs,
     formOptions

@@ -31,7 +31,6 @@ type DeficiencyListItem = {
   section: string;
   notes: string | null;
   photoStorageKey: string | null;
-  quoteId: string | null;
   customerName: string;
   siteName: string | null;
   inspection: { scheduledStart: Date };
@@ -294,14 +293,6 @@ export default async function DeficienciesPage({
                     </div>
                   </div>
                   <div className="flex min-w-64 flex-col gap-3">
-                    {deficiency.quoteId ? (
-                      <Link
-                        className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white"
-                        href={`/app/admin/quotes/${deficiency.quoteId}?from=${encodeURIComponent(currentListHref)}`}
-                      >
-                        Open linked quote
-                      </Link>
-                    ) : (
                     <form action={generateQuoteFromDeficiencyAction}>
                       <input name="deficiencyId" type="hidden" value={deficiency.id} />
                       <input name="returnPath" type="hidden" value={currentListHref} />
@@ -312,7 +303,6 @@ export default async function DeficienciesPage({
                         Generate quote
                       </button>
                     </form>
-                    )}
                     <form action={updateDeficiencyStatusAction}>
                       <input name="deficiencyId" type="hidden" value={deficiency.id} />
                       <input name="status" type="hidden" value="scheduled" />
