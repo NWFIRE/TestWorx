@@ -34,7 +34,6 @@ import {
   PageHeader,
   SectionCard,
   StatusBadge,
-  WorkQueueNav,
   WorkspaceSplit
 } from "../operations-ui";
 
@@ -423,8 +422,6 @@ export default async function AdminDashboardPage({
               />
             ))}
           </section>
-
-          <WorkQueueNav activeKey="all" />
 
           <WorkspaceSplit className="gap-5" variant="content-heavy">
             <div className="space-y-5 lg:space-y-6">
