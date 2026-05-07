@@ -28,8 +28,7 @@ import {
   PageHeader,
   PriorityBadge,
   SectionCard,
-  StatusBadge,
-  WorkQueueNav
+  StatusBadge
 } from "../operations-ui";
 import { InspectionCreatePanel } from "./inspection-create-panel";
 
@@ -299,8 +298,6 @@ export default async function AdminInspectionsPage({
         eyebrow="Inspections"
         title="Inspections"
       />
-
-      <WorkQueueNav activeKey="open" />
 
       <InspectionCreatePanel
         customers={dashboardData.customers}
