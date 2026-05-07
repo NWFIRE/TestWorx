@@ -38,6 +38,13 @@ const { prismaMock, txMock } = vi.hoisted(() => {
       deleteMany: vi.fn(),
       createMany: vi.fn()
     },
+    workOrderProviderContext: {
+      findFirst: vi.fn(),
+      create: vi.fn()
+    },
+    serviceSiteProviderAssignment: {
+      findFirst: vi.fn()
+    },
     auditLog: {
       create: vi.fn()
     }
@@ -89,6 +96,9 @@ describe("inspection recurrence rollover", () => {
     txMock.inspectionAmendment.create.mockResolvedValue({ id: "amendment_1" });
     txMock.inspectionTechnicianAssignment.deleteMany.mockResolvedValue({ count: 0 });
     txMock.inspectionTechnicianAssignment.createMany.mockResolvedValue({ count: 1 });
+    txMock.workOrderProviderContext.findFirst.mockResolvedValue(null);
+    txMock.workOrderProviderContext.create.mockResolvedValue({ id: "provider_context_1" });
+    txMock.serviceSiteProviderAssignment.findFirst.mockResolvedValue(null);
     txMock.auditLog.create.mockResolvedValue({ id: "audit_1" });
     txMock.inspection.findUniqueOrThrow.mockResolvedValue({ id: "replacement_1", status: "scheduled" });
   });

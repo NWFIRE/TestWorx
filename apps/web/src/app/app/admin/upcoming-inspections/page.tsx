@@ -60,6 +60,7 @@ export default async function UpcomingInspectionsPage({
       tenantId: session.user.tenantId
     },
     {
+      startMonth: selectedMonth,
       monthsAhead: 11
     }
   );

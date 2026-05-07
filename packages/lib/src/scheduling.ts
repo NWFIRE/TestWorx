@@ -1874,7 +1874,7 @@ async function createServiceSchedulesForInspectionInput(input: {
   tasks: ScheduledInspectionTaskInput[];
   scheduledStart: Date;
 }) {
-  if (!("serviceSchedule" in input.tx) || !input.tx.serviceSchedule) {
+  if (!await hasServiceScheduleInfrastructure(input.tx)) {
     return new Map<number, string>();
   }
 
@@ -1908,6 +1908,36 @@ async function createServiceSchedulesForInspectionInput(input: {
   );
 
   return scheduleIdsByTaskIndex;
+}
+
+type ServiceScheduleInfrastructureDatabase = Pick<Prisma.TransactionClient, "$queryRawUnsafe"> | Pick<typeof prisma, "$queryRawUnsafe">;
+
+async function hasServiceScheduleInfrastructure(db: ServiceScheduleInfrastructureDatabase) {
+  try {
+    const rows = await db.$queryRawUnsafe<Array<{
+      hasServiceSchedule: boolean;
+      hasInspectionTaskServiceScheduleId: boolean;
+    }>>(`
+      SELECT
+        EXISTS (
+          SELECT 1
+          FROM information_schema.tables
+          WHERE table_schema = 'public'
+            AND table_name = 'ServiceSchedule'
+        ) AS "hasServiceSchedule",
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'InspectionTask'
+            AND column_name = 'serviceScheduleId'
+        ) AS "hasInspectionTaskServiceScheduleId"
+    `);
+
+    return Boolean(rows[0]?.hasServiceSchedule && rows[0]?.hasInspectionTaskServiceScheduleId);
+  } catch {
+    return false;
+  }
 }
 
 async function writeInspectionTasks(
@@ -4302,6 +4332,405 @@ function resolvePlanningMonthStart(startMonth?: string | null) {
   return startOfMonth(new Date());
 }
 
+function serviceScheduleOccurrenceKey(input: {
+  customerCompanyId: string;
+  siteId: string;
+  reportType: InspectionType;
+  dueMonth: string;
+}) {
+  return [
+    input.customerCompanyId,
+    input.siteId,
+    input.reportType,
+    input.dueMonth
+  ].join("\u001f");
+}
+
+function serviceScheduleExactDueKey(input: {
+  customerCompanyId: string;
+  siteId: string;
+  reportType: InspectionType;
+  frequency: RecurrenceFrequency;
+  nextDueDate: Date;
+}) {
+  return [
+    input.customerCompanyId,
+    input.siteId,
+    input.reportType,
+    input.frequency,
+    input.nextDueDate.toISOString()
+  ].join("\u001f");
+}
+
+async function ensureServiceSchedulesForCompletedRecurringTasksTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    tenantId: string;
+    rangeStart: Date;
+    rangeEnd: Date;
+  }
+) {
+  const completedRecurringTasks = await tx.inspectionTask.findMany({
+    where: {
+      tenantId: input.tenantId,
+      serviceScheduleId: null,
+      inspectionType: { not: InspectionType.work_order },
+      schedulingStatus: { in: ["due_now", "scheduled_now", "completed"] },
+      inspection: {
+        status: { in: [InspectionStatus.completed, InspectionStatus.invoiced] }
+      },
+      recurrence: {
+        is: {
+          frequency: { not: RecurrenceFrequency.ONCE },
+          nextDueAt: {
+            gte: input.rangeStart,
+            lt: input.rangeEnd
+          }
+        }
+      }
+    },
+    select: {
+      id: true,
+      inspectionType: true,
+      inspection: {
+        select: {
+          customerCompanyId: true,
+          siteId: true
+        }
+      },
+      recurrence: {
+        select: {
+          frequency: true,
+          nextDueAt: true
+        }
+      }
+    }
+  });
+
+  const candidateTasks = completedRecurringTasks
+    .filter((task) => (
+      task.recurrence?.nextDueAt instanceof Date &&
+      !Number.isNaN(task.recurrence.nextDueAt.getTime()) &&
+      task.recurrence.frequency !== RecurrenceFrequency.ONCE
+    ));
+
+  if (!candidateTasks.length) {
+    return 0;
+  }
+
+  const existingSchedules = await tx.serviceSchedule.findMany({
+    where: {
+      tenantId: input.tenantId,
+      isActive: true,
+      nextDueDate: {
+        gte: input.rangeStart,
+        lt: input.rangeEnd
+      }
+    },
+    select: {
+      customerCompanyId: true,
+      siteId: true,
+      reportType: true,
+      cadence: true,
+      nextDueDate: true
+    }
+  });
+
+  const existingCountsByExactDue = new Map<string, number>();
+  for (const schedule of existingSchedules) {
+    if (!schedule.nextDueDate) {
+      continue;
+    }
+
+    const key = serviceScheduleExactDueKey({
+      customerCompanyId: schedule.customerCompanyId,
+      siteId: schedule.siteId,
+      reportType: schedule.reportType,
+      frequency: schedule.cadence,
+      nextDueDate: schedule.nextDueDate
+    });
+    existingCountsByExactDue.set(key, (existingCountsByExactDue.get(key) ?? 0) + 1);
+  }
+
+  let createdCount = 0;
+  for (const task of candidateTasks) {
+    const nextDueDate = task.recurrence?.nextDueAt;
+    const frequency = task.recurrence?.frequency;
+    if (!nextDueDate || !frequency || frequency === RecurrenceFrequency.ONCE) {
+      continue;
+    }
+
+    const key = serviceScheduleExactDueKey({
+      customerCompanyId: task.inspection.customerCompanyId,
+      siteId: task.inspection.siteId,
+      reportType: task.inspectionType,
+      frequency,
+      nextDueDate
+    });
+    const existingCount = existingCountsByExactDue.get(key) ?? 0;
+    if (existingCount > 0) {
+      existingCountsByExactDue.set(key, existingCount - 1);
+      continue;
+    }
+
+    const dueMonth = format(nextDueDate, "yyyy-MM");
+    await tx.serviceSchedule.create({
+      data: {
+        tenantId: input.tenantId,
+        customerCompanyId: task.inspection.customerCompanyId,
+        siteId: task.inspection.siteId,
+        serviceType: task.inspectionType,
+        reportType: task.inspectionType,
+        cadence: frequency,
+        nextDueDate,
+        dueMonth,
+        dueDayOrWindow: format(nextDueDate, "yyyy-MM-dd"),
+        isActive: true
+      }
+    });
+    createdCount += 1;
+  }
+
+  return createdCount;
+}
+
+async function generateMissingInspectionsFromServiceSchedulesTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    tenantId: string;
+    actorUserId: string;
+    rangeStart: Date;
+    rangeEnd: Date;
+  }
+) {
+  const schedules = await tx.serviceSchedule.findMany({
+    where: {
+      tenantId: input.tenantId,
+      isActive: true,
+      nextDueDate: {
+        gte: input.rangeStart,
+        lt: input.rangeEnd
+      }
+    },
+    orderBy: [
+      { nextDueDate: "asc" },
+      { customerCompanyId: "asc" },
+      { siteId: "asc" },
+      { reportType: "asc" }
+    ]
+  });
+
+  const dueSchedules = schedules.filter((schedule) => (
+    schedule.nextDueDate instanceof Date &&
+    !Number.isNaN(schedule.nextDueDate.getTime()) &&
+    schedule.cadence !== RecurrenceFrequency.ONCE
+  ));
+
+  if (!dueSchedules.length) {
+    return 0;
+  }
+
+  const existingTasks = await tx.inspectionTask.findMany({
+    where: {
+      tenantId: input.tenantId,
+      OR: [
+        { serviceScheduleId: { in: dueSchedules.map((schedule) => schedule.id) } },
+        {
+          inspectionType: { in: [...new Set(dueSchedules.map((schedule) => schedule.reportType))] },
+          inspection: {
+            status: { in: [...activeOperationalInspectionStatuses] },
+            scheduledStart: {
+              gte: input.rangeStart,
+              lt: input.rangeEnd
+            }
+          }
+        }
+      ]
+    },
+    select: {
+      serviceScheduleId: true,
+      inspectionType: true,
+      dueMonth: true,
+      inspection: {
+        select: {
+          customerCompanyId: true,
+          siteId: true,
+          scheduledStart: true
+        }
+      }
+    }
+  });
+
+  const existingScheduleIds = new Set(
+    existingTasks
+      .map((task) => task.serviceScheduleId)
+      .filter((serviceScheduleId): serviceScheduleId is string => Boolean(serviceScheduleId))
+  );
+  const existingCountsByOccurrence = new Map<string, number>();
+  for (const task of existingTasks) {
+    const dueMonth = task.dueMonth ?? format(task.inspection.scheduledStart, "yyyy-MM");
+    const key = serviceScheduleOccurrenceKey({
+      customerCompanyId: task.inspection.customerCompanyId,
+      siteId: task.inspection.siteId,
+      reportType: task.inspectionType,
+      dueMonth
+    });
+    existingCountsByOccurrence.set(key, (existingCountsByOccurrence.get(key) ?? 0) + 1);
+  }
+
+  const schedulesToCreate = [];
+  const scheduleIdsToAdvance = new Set<string>();
+  for (const schedule of dueSchedules) {
+    const nextDueDate = schedule.nextDueDate;
+    if (!nextDueDate) {
+      continue;
+    }
+
+    if (existingScheduleIds.has(schedule.id)) {
+      scheduleIdsToAdvance.add(schedule.id);
+      continue;
+    }
+
+    const dueMonth = format(nextDueDate, "yyyy-MM");
+    const occurrenceKey = serviceScheduleOccurrenceKey({
+      customerCompanyId: schedule.customerCompanyId,
+      siteId: schedule.siteId,
+      reportType: schedule.reportType,
+      dueMonth
+    });
+    const existingCount = existingCountsByOccurrence.get(occurrenceKey) ?? 0;
+    if (existingCount > 0) {
+      existingCountsByOccurrence.set(occurrenceKey, existingCount - 1);
+      scheduleIdsToAdvance.add(schedule.id);
+      continue;
+    }
+
+    schedulesToCreate.push(schedule);
+    scheduleIdsToAdvance.add(schedule.id);
+  }
+
+  const groupedSchedules = new Map<string, typeof schedulesToCreate>();
+  for (const schedule of schedulesToCreate) {
+    const groupKey = [
+      schedule.customerCompanyId,
+      schedule.siteId,
+      schedule.nextDueDate?.toISOString() ?? schedule.id
+    ].join("\u001f");
+    const group = groupedSchedules.get(groupKey) ?? [];
+    group.push(schedule);
+    groupedSchedules.set(groupKey, group);
+  }
+
+  let createdInspectionCount = 0;
+  for (const group of groupedSchedules.values()) {
+    const firstSchedule = group[0];
+    const scheduledStart = firstSchedule?.nextDueDate;
+    if (!firstSchedule || !scheduledStart) {
+      continue;
+    }
+
+    const inspection = await tx.inspection.create({
+      data: {
+        tenantId: input.tenantId,
+        customerCompanyId: firstSchedule.customerCompanyId,
+        siteId: firstSchedule.siteId,
+        assignedTechnicianId: null,
+        createdByUserId: input.actorUserId,
+        scheduledStart,
+        scheduledEnd: null,
+        status: InspectionStatus.to_be_completed,
+        notes: null,
+        claimable: true
+      }
+    });
+
+    await snapshotProviderAssignmentForInspectionTx(tx, {
+      tenantId: input.tenantId,
+      inspectionId: inspection.id,
+      siteId: firstSchedule.siteId,
+      scheduledStart
+    });
+
+    await syncInspectionTechnicianAssignments(tx, inspection.id, input.tenantId, []);
+    await writeInspectionTasks(
+      tx,
+      inspection.id,
+      input.tenantId,
+      scheduledStart,
+      scheduledStart,
+      group.map((schedule) => {
+        const dueDate = schedule.nextDueDate ?? scheduledStart;
+        return {
+          inspectionType: schedule.reportType,
+          serviceScheduleId: schedule.id,
+          frequency: schedule.cadence,
+          assignedTechnicianId: null,
+          dueMonth: format(dueDate, "yyyy-MM"),
+          dueDate,
+          schedulingStatus: "scheduled_now",
+          recurrenceSeriesId: schedule.id,
+          recurrenceAnchorScheduledStart: dueDate,
+          recurrenceNextDueAt: nextDueFrom(dueDate, schedule.cadence)
+        };
+      })
+    );
+
+    await createAuditLog(tx, {
+      tenantId: input.tenantId,
+      actorUserId: input.actorUserId,
+      action: "inspection.service_schedule_generated",
+      entityId: inspection.id,
+      metadata: {
+        serviceScheduleIds: group.map((schedule) => schedule.id),
+        scheduledStart: scheduledStart.toISOString()
+      }
+    });
+    createdInspectionCount += 1;
+  }
+
+  for (const schedule of dueSchedules) {
+    if (!scheduleIdsToAdvance.has(schedule.id) || !schedule.nextDueDate) {
+      continue;
+    }
+
+    const followingDueDate = nextDueFrom(schedule.nextDueDate, schedule.cadence);
+    await tx.serviceSchedule.update({
+      where: { id: schedule.id },
+      data: {
+        nextDueDate: followingDueDate,
+        dueMonth: followingDueDate ? format(followingDueDate, "yyyy-MM") : null,
+        dueDayOrWindow: followingDueDate ? format(followingDueDate, "yyyy-MM-dd") : null
+      }
+    });
+  }
+
+  return createdInspectionCount;
+}
+
+async function ensureUpcomingServiceScheduleInspections(input: {
+  tenantId: string;
+  actorUserId: string;
+  rangeStart: Date;
+  rangeEnd: Date;
+}) {
+  return prisma.$transaction(async (tx) => {
+    if (!await hasServiceScheduleInfrastructure(tx)) {
+      return {
+        serviceSchedulesBackfilled: 0,
+        inspectionsGenerated: 0
+      };
+    }
+
+    const serviceSchedulesBackfilled = await ensureServiceSchedulesForCompletedRecurringTasksTx(tx, input);
+    const inspectionsGenerated = await generateMissingInspectionsFromServiceSchedulesTx(tx, input);
+
+    return {
+      serviceSchedulesBackfilled,
+      inspectionsGenerated
+    };
+  });
+}
+
 export async function getAdminUpcomingInspectionsData(
   actor: ActorContext,
   input?: {
@@ -4318,6 +4747,13 @@ export async function getAdminUpcomingInspectionsData(
   const monthStart = resolvePlanningMonthStart(input?.startMonth ?? null);
   const monthsAhead = Math.min(Math.max(input?.monthsAhead ?? 6, 1), 12);
   const rangeEnd = addMonths(monthStart, monthsAhead);
+
+  await ensureUpcomingServiceScheduleInspections({
+    tenantId,
+    actorUserId: parsedActor.userId,
+    rangeStart: monthStart,
+    rangeEnd
+  });
 
   const [customers, sites, technicians, inspections] = await Promise.all([
     prisma.customerCompany.findMany({ where: { tenantId }, orderBy: { name: "asc" } }),
