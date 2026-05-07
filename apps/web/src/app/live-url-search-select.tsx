@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { SearchSelect, type SearchSelectOption } from "./search-select";
@@ -59,6 +59,7 @@ export function LiveUrlSearchSelect({
   const searchParams = useSearchParams();
   const [queryDraft, setQueryDraft] = useState<{ text: string; initialValue: string } | null>(null);
   const [pending, startTransition] = useTransition();
+  const searchDebounceRef = useRef<number | null>(null);
   const query = queryDraft?.initialValue === initialValue ? queryDraft.text : initialValue;
   const hasSelectedOption = options.some((option) => option.value === query);
   const resetPageKeyList = resetPageKeys.join("\u001f");
@@ -70,7 +71,12 @@ export function LiveUrlSearchSelect({
       return;
     }
 
+    if (searchDebounceRef.current !== null) {
+      window.clearTimeout(searchDebounceRef.current);
+    }
+
     const timeout = window.setTimeout(() => {
+      searchDebounceRef.current = null;
       const nextUrl = buildNextUrl({
         pathname,
         searchParams,
@@ -82,8 +88,14 @@ export function LiveUrlSearchSelect({
         router.replace(nextUrl, { scroll: false });
       });
     }, LIVE_SEARCH_DEBOUNCE_MS);
+    searchDebounceRef.current = timeout;
 
-    return () => window.clearTimeout(timeout);
+    return () => {
+      window.clearTimeout(timeout);
+      if (searchDebounceRef.current === timeout) {
+        searchDebounceRef.current = null;
+      }
+    };
   }, [initialValue, paramKey, pathname, query, resetPageKeyList, router, searchParams]);
 
   function updateQuery(nextQuery: string) {
@@ -112,13 +124,16 @@ export function LiveUrlSearchSelect({
       id={id}
       loading={pending}
       onChange={(nextValue, option) => {
-        setQueryDraft({ text: nextValue, initialValue });
         if (option?.href) {
-          startTransition(() => {
-            router.push(option.href as string);
-          });
+          if (searchDebounceRef.current !== null) {
+            window.clearTimeout(searchDebounceRef.current);
+            searchDebounceRef.current = null;
+          }
+          setQueryDraft(null);
+          router.push(option.href);
           return;
         }
+        setQueryDraft({ text: nextValue, initialValue });
         if (option) {
           applyQueryNow(nextValue);
         }

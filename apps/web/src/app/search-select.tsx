@@ -214,13 +214,13 @@ export function SearchSelect({
                     aria-selected={selected}
                     className={`flex w-full items-start justify-between gap-3 rounded-xl px-3 py-3 text-left transition ${
                       active || selected ? "bg-[var(--tenant-primary-soft)]" : "hover:bg-slate-50"
-                    } ${option.disabled ? "cursor-not-allowed opacity-50" : ""}`}
+                    } ${option.disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
                     disabled={option.disabled}
                     id={`${listboxId}-${index}`}
                     key={option.value}
+                    onClick={() => selectOption(option)}
                     onMouseDown={(event) => {
                       event.preventDefault();
-                      selectOption(option);
                     }}
                     onMouseEnter={() => setActiveIndex(index)}
                     role="option"
