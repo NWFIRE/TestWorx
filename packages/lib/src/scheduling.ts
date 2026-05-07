@@ -916,6 +916,17 @@ function isSharedQueueTaskSet<T extends { assignedTechnicianId?: string | null }
   return tasks.length > 0 && tasks.every((task) => !task.assignedTechnicianId);
 }
 
+function dedupeInspectionsById<T extends { id: string }>(inspections: T[]) {
+  const seen = new Set<string>();
+  return inspections.filter((inspection) => {
+    if (seen.has(inspection.id)) {
+      return false;
+    }
+    seen.add(inspection.id);
+    return true;
+  });
+}
+
 function mapRecurringTaskDefinitions(input: {
   existingTasks: Array<{
     id: string;
@@ -5012,6 +5023,103 @@ const technicianDashboardTaskSelect = {
   }
 } satisfies Prisma.InspectionTaskSelect;
 
+export async function resolveClaimableInspectionsForTechnician(actor: ActorContext) {
+  const parsedActor = parseActor(actor);
+  if (parsedActor.role !== "technician") {
+    throw new Error("Only technicians can access claimable inspections.");
+  }
+
+  const tenantId = parsedActor.tenantId as string;
+  const rawInspections = await prisma.inspection.findMany({
+    where: { tenantId, claimable: true, status: { in: [...claimableInspectionStatuses] } },
+    include: {
+      site: true,
+      customerCompany: true,
+      assignedTechnician: true,
+      technicianAssignments: { include: { technician: true } },
+      convertedFromQuotes: { select: { id: true }, take: 1 },
+      tasks: {
+        select: technicianDashboardTaskSelect
+      }
+    },
+    orderBy: [{ scheduledStart: "asc" }]
+  });
+
+  const rawTaskRowCount = rawInspections.reduce((count, inspection) => count + inspection.tasks.length, 0);
+  const duplicateInspectionIds = rawInspections
+    .map((inspection) => inspection.id)
+    .filter((id, index, ids) => ids.indexOf(id) !== index);
+
+  const resolved = rawInspections
+    .map((inspection) => {
+      const currentTasks = getClaimableInspectionVisibleTasks(inspection);
+      return { inspection, currentTasks };
+    })
+    .filter(({ currentTasks }) => isSharedQueueTaskSet(currentTasks))
+    .filter(({ currentTasks }) =>
+      isTechnicianEligibleForReportTypesFromRows({
+        rows: [],
+        reportTypes: currentTasks.map((task) => task.inspectionType),
+        mode: "claim"
+      })
+    )
+    .map(({ inspection, currentTasks }) => ({
+      ...inspection,
+      tasks: withInspectionTaskDisplayLabels(currentTasks),
+      ...getInspectionDisplayLabels({
+        siteName: inspection.site.name,
+        customerName: inspection.customerCompany.name,
+        siteAddressLine1: inspection.site.addressLine1,
+        siteAddressLine2: inspection.site.addressLine2,
+        siteCity: inspection.site.city,
+        siteState: inspection.site.state,
+        sitePostalCode: inspection.site.postalCode,
+        customerServiceAddressLine1: inspection.customerCompany.serviceAddressLine1,
+        customerServiceAddressLine2: inspection.customerCompany.serviceAddressLine2,
+        customerServiceCity: inspection.customerCompany.serviceCity,
+        customerServiceState: inspection.customerCompany.serviceState,
+        customerServicePostalCode: inspection.customerCompany.servicePostalCode,
+        customerBillingAddressLine1: inspection.customerCompany.billingAddressLine1,
+        customerBillingAddressLine2: inspection.customerCompany.billingAddressLine2,
+        customerBillingCity: inspection.customerCompany.billingCity,
+        customerBillingState: inspection.customerCompany.billingState,
+        customerBillingPostalCode: inspection.customerCompany.billingPostalCode
+      }),
+      displayStatus: getInspectionDisplayStatus({
+        status: inspection.status,
+        scheduledStart: inspection.scheduledStart,
+        tasks: currentTasks
+      }),
+      assignedTechnicianNames: formatAssignedTechnicianNames({
+        assignedTechnician: inspection.assignedTechnician,
+        technicianAssignments: readTechnicianNameAssignments(inspection)
+      })
+    }))
+    .filter((inspection) => inspection.tasks.length > 0);
+
+  const uniqueResolved = dedupeInspectionsById(resolved);
+
+  if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.DEBUG_TECH_CLAIMABLE === "1" &&
+    (duplicateInspectionIds.length > 0 || rawTaskRowCount !== uniqueResolved.length)
+  ) {
+    const taskCountsByInspectionId = rawInspections.reduce<Record<string, number>>((counts, inspection) => {
+      counts[inspection.id] = inspection.tasks.length;
+      return counts;
+    }, {});
+    console.info("[tech-claimable-resolver]", {
+      rawInspectionCount: rawInspections.length,
+      rawTaskRowCount,
+      uniqueInspectionCount: uniqueResolved.length,
+      duplicateInspectionIds: [...new Set(duplicateInspectionIds)],
+      taskCountsByInspectionId
+    });
+  }
+
+  return uniqueResolved;
+}
+
 export async function getTechnicianDashboardData(actor: ActorContext) {
   const parsedActor = parseActor(actor);
   if (parsedActor.role !== "technician") {
@@ -5025,7 +5133,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(now);
 
-  const [assignedInspections, unassignedInspections, recentCompletedInspections] = await Promise.all([
+  const [assignedInspections, claimableInspections, recentCompletedInspections] = await Promise.all([
     prisma.inspection.findMany({
       where: {
         tenantId,
@@ -5079,20 +5187,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
       },
       orderBy: [{ scheduledStart: "asc" }]
     }),
-    prisma.inspection.findMany({
-      where: { tenantId, claimable: true, status: { in: [...claimableInspectionStatuses] } },
-      include: {
-        site: true,
-        customerCompany: true,
-        assignedTechnician: true,
-        technicianAssignments: { include: { technician: true } },
-        convertedFromQuotes: { select: { id: true }, take: 1 },
-        tasks: {
-          select: technicianDashboardTaskSelect
-        }
-      },
-      orderBy: [{ scheduledStart: "asc" }]
-    }),
+    resolveClaimableInspectionsForTechnician(actor),
     prisma.inspection.findMany({
       where: {
         tenantId,
@@ -5158,41 +5253,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
     thisWeek: assignedWithDisplay.filter((inspection) => inspection.scheduledStart >= dayStart && inspection.scheduledStart <= weekEnd),
     thisMonth: monthAssignedWithDisplay,
     assigned: assignedWithDisplay,
-    unassigned: unassignedInspections
-      .map((inspection) => ({
-        inspection,
-        currentTasks: getClaimableInspectionVisibleTasks(inspection)
-      }))
-      .filter(({ currentTasks }) => isSharedQueueTaskSet(currentTasks))
-      .map(({ inspection, currentTasks }) => ({
-        ...inspection,
-        tasks: withInspectionTaskDisplayLabels(currentTasks),
-        ...getInspectionDisplayLabels({
-          siteName: inspection.site.name,
-          customerName: inspection.customerCompany.name,
-          siteAddressLine1: inspection.site.addressLine1,
-          siteAddressLine2: inspection.site.addressLine2,
-          siteCity: inspection.site.city,
-          siteState: inspection.site.state,
-          sitePostalCode: inspection.site.postalCode,
-          customerServiceAddressLine1: inspection.customerCompany.serviceAddressLine1,
-          customerServiceAddressLine2: inspection.customerCompany.serviceAddressLine2,
-          customerServiceCity: inspection.customerCompany.serviceCity,
-          customerServiceState: inspection.customerCompany.serviceState,
-          customerServicePostalCode: inspection.customerCompany.servicePostalCode,
-          customerBillingAddressLine1: inspection.customerCompany.billingAddressLine1,
-          customerBillingAddressLine2: inspection.customerCompany.billingAddressLine2,
-          customerBillingCity: inspection.customerCompany.billingCity,
-          customerBillingState: inspection.customerCompany.billingState,
-          customerBillingPostalCode: inspection.customerCompany.billingPostalCode
-        }),
-        displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart, tasks: inspection.tasks }),
-        assignedTechnicianNames: formatAssignedTechnicianNames({
-          assignedTechnician: inspection.assignedTechnician,
-          technicianAssignments: readTechnicianNameAssignments(inspection)
-        })
-      }))
-      .filter((inspection) => inspection.tasks.length > 0),
+    unassigned: claimableInspections,
     recentCompleted: recentCompletedInspections.map((inspection) => ({
       ...inspection,
       tasks: withInspectionTaskDisplayLabels(inspection.tasks),

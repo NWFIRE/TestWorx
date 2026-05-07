@@ -161,6 +161,59 @@ describe("technician dashboard inspection access", () => {
     expect(result.unassigned[0]?.id).toBe("inspection_shared");
   });
 
+  it("deduplicates claimable inspections while preserving multi-report task summaries", async () => {
+    const multiReportInspection = {
+      id: "inspection_multi_report",
+      tenantId: "tenant_1",
+      status: InspectionStatus.scheduled,
+      inspectionClassification: "standard",
+      isPriority: false,
+      scheduledStart: new Date("2026-03-17T09:00:00.000Z"),
+      site: { id: "site_1", name: "Pinecrest Tower" },
+      customerCompany: { id: "customer_1", name: "Pinecrest Property Management" },
+      assignedTechnician: null,
+      technicianAssignments: [],
+      convertedFromQuotes: [],
+      tasks: [
+        {
+          id: "task_kitchen",
+          inspectionType: "kitchen_suppression",
+          assignedTechnicianId: null,
+          schedulingStatus: "scheduled_now",
+          recurrence: null,
+          report: null
+        },
+        {
+          id: "task_extinguisher",
+          inspectionType: "fire_extinguisher",
+          assignedTechnicianId: null,
+          schedulingStatus: "scheduled_now",
+          recurrence: null,
+          report: null
+        },
+        {
+          id: "task_alarm",
+          inspectionType: "fire_alarm",
+          assignedTechnicianId: null,
+          schedulingStatus: "scheduled_now",
+          recurrence: null,
+          report: null
+        }
+      ]
+    };
+
+    prismaMock.inspection.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([multiReportInspection, { ...multiReportInspection }])
+      .mockResolvedValueOnce([]);
+
+    const result = await getTechnicianDashboardData({ userId: "tech_2", role: "technician", tenantId: "tenant_1" });
+
+    expect(result.unassigned).toHaveLength(1);
+    expect(result.unassigned[0]?.id).toBe("inspection_multi_report");
+    expect(result.unassigned[0]?.tasks).toHaveLength(3);
+  });
+
   it("keeps claimable inspections visible when stale assignment rows exist", async () => {
     prismaMock.inspection.findMany
       .mockResolvedValueOnce([])
