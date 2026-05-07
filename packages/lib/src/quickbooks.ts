@@ -998,13 +998,18 @@ function getQuickBooksIntegrationId(connection: Pick<QuickBooksTenantConnection,
 }
 
 function getQuickBooksRuleLabelForBillingCode(billingCode: string) {
+  const normalizedCode = billingCode.trim().toUpperCase();
+  if (normalizedCode.startsWith("COMPLIANCE_REPORTING_FEE_")) {
+    return "Compliance Reporting Fee";
+  }
+
   const ruleKeys: Record<string, string> = {
     "KS-INSPECTION": "Standard Hood Inspection",
     "KS-INSPECTION-GUARDIAN/DENLAR": "Guardian Denlar Hood Inspection",
     "KS-INSPECTION-CAPTIVEAIRE": "CaptiveAire Hood Inspection"
   };
 
-  return ruleKeys[billingCode] ?? null;
+  return ruleKeys[normalizedCode] ?? null;
 }
 
 function buildQuickBooksBillingCodeMappingError(params: {
@@ -1024,14 +1029,17 @@ function buildQuickBooksBillingCodeMappingError(params: {
       : " No QuickBooks item is mapped yet.";
   const normalizedCode = billingCode.trim().toUpperCase();
   const isServiceFee = normalizedCode.startsWith("SERVICE_FEE");
+  const isComplianceFee = normalizedCode.startsWith("COMPLIANCE_REPORTING_FEE_");
 
-  if (!isServiceFee) {
+  if (!isServiceFee && !isComplianceFee) {
     return `QuickBooks item not mapped for billing code "${billingCode}".${reasonText}${suggestionText}`;
   }
 
-  const guidance = normalizedCode === "SERVICE_FEE"
-    ? " This service fee price is already being resolved correctly from your location-based fee rules. Map billing code \"SERVICE_FEE\" to the QuickBooks item you want to use for all service fees, or give specific location rules their own fee codes like \"SERVICE_FEE_LOCAL\" and map those separately."
-    : ` This service fee price is already being resolved correctly from your location-based fee rules. QuickBooks still needs an item mapping for this specific fee code so it knows which product or service to use for "${description}".`;
+  const guidance = isComplianceFee
+    ? " This compliance reporting fee is being assessed correctly, but QuickBooks still needs an active product/service item named \"Compliance Reporting Fee\" or a manual mapping for this fee code."
+    : normalizedCode === "SERVICE_FEE"
+      ? " This service fee price is already being resolved correctly from your location-based fee rules. Map billing code \"SERVICE_FEE\" to the QuickBooks item you want to use for all service fees, or give specific location rules their own fee codes like \"SERVICE_FEE_LOCAL\" and map those separately."
+      : ` This service fee price is already being resolved correctly from your location-based fee rules. QuickBooks still needs an item mapping for this specific fee code so it knows which product or service to use for "${description}".`;
 
   return `QuickBooks item not mapped for billing code "${billingCode}".${reasonText}${guidance}${suggestionText}`;
 }
