@@ -22,6 +22,7 @@ import {
 } from "./minimum-ticket-pricing";
 import { saveQuickBooksItemMappingForCode } from "./quickbooks";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
+import { hasWorkOrderLineItemTable } from "./work-order-line-item-table";
 import { getCustomerFacingSiteLabel } from "./scheduling";
 
 type TransactionClient = Prisma.TransactionClient;
@@ -1394,6 +1395,10 @@ async function extractBillableItemsFromWorkOrderLineItemsTx(tx: TransactionClien
   tenantId: string;
   inspectionId: string;
 }) {
+  if (!await hasWorkOrderLineItemTable(tx)) {
+    return [] satisfies BillableItem[];
+  }
+
   const lines = await tx.workOrderLineItem.findMany({
     where: {
       tenantId: input.tenantId,

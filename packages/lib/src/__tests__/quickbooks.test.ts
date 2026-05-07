@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetServerEnvForTests } from "../env";
 
 const prismaMock = {
+  $queryRaw: vi.fn(),
+  $queryRawUnsafe: vi.fn(),
   tenant: {
     findUnique: vi.fn(),
     update: vi.fn()
@@ -74,6 +76,9 @@ const prismaMock = {
   inspection: {
     findFirst: vi.fn(),
     update: vi.fn()
+  },
+  workOrderLineItem: {
+    updateMany: vi.fn()
   },
   auditLog: {
     create: vi.fn(),
@@ -280,6 +285,8 @@ describe("quickbooks billing sync hardening", () => {
       deficiencies: []
     });
     prismaMock.inspection.update.mockResolvedValue(undefined);
+    prismaMock.$queryRawUnsafe.mockResolvedValue([{ exists: true }]);
+    prismaMock.workOrderLineItem.updateMany.mockResolvedValue({ count: 0 });
     prismaMock.$transaction.mockImplementation(async (input: unknown) => {
       if (Array.isArray(input)) {
         return Promise.all(input as Promise<unknown>[]);

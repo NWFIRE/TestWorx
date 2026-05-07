@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { prismaMock, txMock } = vi.hoisted(() => ({
   prismaMock: {
     $queryRaw: vi.fn(),
+    $queryRawUnsafe: vi.fn(),
     $executeRaw: vi.fn(),
     $transaction: vi.fn(),
     inspection: { findFirst: vi.fn() },
@@ -28,6 +29,7 @@ const { prismaMock, txMock } = vi.hoisted(() => ({
   },
   txMock: {
     $queryRaw: vi.fn(),
+    $queryRawUnsafe: vi.fn(),
     $executeRaw: vi.fn(),
     inspection: { findFirst: vi.fn() },
     customerCompany: { findFirst: vi.fn() },
@@ -486,6 +488,8 @@ describe("inspection billing extraction", () => {
     txMock.minimumTicketRule.findMany.mockReset();
     txMock.complianceReportingFeeRule.findFirst.mockReset();
     txMock.complianceReportingFeeRule.findMany.mockReset();
+    txMock.$queryRawUnsafe.mockResolvedValue([{ exists: true }]);
+    prismaMock.$queryRawUnsafe.mockResolvedValue([{ exists: true }]);
     txMock.workOrderLineItem.findMany.mockReset();
     prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue(null);
@@ -869,6 +873,7 @@ describe("inspection billing persistence and admin review", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     prismaMock.$queryRaw.mockReset();
+    prismaMock.$queryRawUnsafe.mockReset();
     prismaMock.$executeRaw.mockReset();
     prismaMock.billingItemCatalogMatch.findUnique.mockReset();
     prismaMock.quickBooksCatalogItem.findFirst.mockReset();
@@ -881,6 +886,7 @@ describe("inspection billing persistence and admin review", () => {
     prismaMock.minimumTicketRule.findMany.mockReset();
     prismaMock.auditLog.create.mockReset();
     txMock.$queryRaw.mockReset();
+    txMock.$queryRawUnsafe.mockReset();
     txMock.$executeRaw.mockReset();
     txMock.inspection.findFirst.mockReset();
     txMock.customerCompany.findFirst.mockReset();
@@ -940,6 +946,8 @@ describe("inspection billing persistence and admin review", () => {
     txMock.providerContractRate.findMany.mockResolvedValue([]);
     txMock.billingResolutionSnapshot.findFirst.mockResolvedValue(null);
     txMock.billingResolutionSnapshot.create.mockResolvedValue({ id: "billing_resolution_1" });
+    txMock.$queryRawUnsafe.mockResolvedValue([{ exists: true }]);
+    prismaMock.$queryRawUnsafe.mockResolvedValue([{ exists: true }]);
     txMock.workOrderLineItem.findMany.mockResolvedValue([]);
     prismaMock.tenant.findUnique.mockResolvedValue({
       defaultServiceFeeCode: "SERVICE_FEE",

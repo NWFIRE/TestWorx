@@ -6,6 +6,7 @@ import { actorContextSchema } from "@testworx/types";
 
 import { assertTenantContext } from "./permissions";
 import { syncInspectionBillingSummaryTx } from "./inspection-billing";
+import { assertWorkOrderLineItemTable, hasWorkOrderLineItemTable } from "./work-order-line-item-table";
 
 function parseActor(actor: ActorContext) {
   const parsed = actorContextSchema.parse(actor);
@@ -192,6 +193,10 @@ export async function getWorkOrderCatalogItems(actor: ActorContext, inspectionId
 
 export async function getWorkOrderLineItems(actor: ActorContext, inspectionId: string) {
   const { parsedActor } = await getAuthorizedWorkOrderInspection(actor, inspectionId);
+  if (!await hasWorkOrderLineItemTable()) {
+    return [] satisfies WorkOrderLineItemView[];
+  }
+
   const lines = await prisma.workOrderLineItem.findMany({
     where: {
       tenantId: parsedActor.tenantId as string,
@@ -213,6 +218,7 @@ export async function upsertWorkOrderLineItem(actor: ActorContext, input: {
   technicianNotes?: string | null;
 }) {
   const { parsedActor } = await getAuthorizedWorkOrderInspection(actor, input.inspectionId);
+  await assertWorkOrderLineItemTable();
   const tenantId = parsedActor.tenantId as string;
   const catalogItem = await prisma.quickBooksCatalogItem.findFirst({
     where: {
@@ -340,6 +346,10 @@ export async function deleteWorkOrderLineItem(actor: ActorContext, input: {
   lineItemId: string;
 }) {
   const { parsedActor } = await getAuthorizedWorkOrderInspection(actor, input.inspectionId);
+  if (!await hasWorkOrderLineItemTable()) {
+    return { ok: true };
+  }
+
   const tenantId = parsedActor.tenantId as string;
   const existing = await prisma.workOrderLineItem.findFirst({
     where: {

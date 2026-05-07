@@ -8,6 +8,7 @@ import { actorContextSchema } from "@testworx/types";
 import { resolveComplianceReportingFeeTx } from "./compliance-reporting-fees";
 import { assertEnvForFeature, getOptionalQuickBooksEnv, getServerEnv } from "./env";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
+import { hasWorkOrderLineItemTable } from "./work-order-line-item-table";
 import type { JsonObject } from "./json-types";
 import { assertTenantContext, canAccessProductsServicesWorkspace } from "./permissions";
 import { resolveServiceFeeForLocationTx } from "./service-fees";
@@ -4806,18 +4807,20 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
         where: { id: summary.inspectionId },
         data: { status: InspectionStatus.invoiced }
       });
-      await tx.workOrderLineItem.updateMany({
-        where: {
-          tenantId: parsedActor.tenantId as string,
-          inspectionId: summary.inspectionId,
-          billableStatus: "billable",
-          invoicedAt: null
-        },
-        data: {
-          invoicedBillingSummaryId: summary.id,
-          invoicedAt: new Date()
-        }
-      });
+      if (await hasWorkOrderLineItemTable(tx)) {
+        await tx.workOrderLineItem.updateMany({
+          where: {
+            tenantId: parsedActor.tenantId as string,
+            inspectionId: summary.inspectionId,
+            billableStatus: "billable",
+            invoicedAt: null
+          },
+          data: {
+            invoicedBillingSummaryId: summary.id,
+            invoicedAt: new Date()
+          }
+        });
+      }
       await syncInspectionArchiveStateTx(tx, {
         tenantId: parsedActor.tenantId as string,
         inspectionId: summary.inspectionId
