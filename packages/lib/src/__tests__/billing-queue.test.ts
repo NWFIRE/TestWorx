@@ -4,9 +4,10 @@ import { filterBillingSummariesForQueue, isOpenBillingQueueStatus } from "../bil
 
 describe("billing queue filtering", () => {
   const summaries = [
-    { id: "draft_1", status: "draft" },
-    { id: "ready_1", status: "reviewed" },
-    { id: "invoice_1", status: "invoiced" }
+    { id: "draft_1", status: "draft", metrics: { missingPriceCount: 0 } },
+    { id: "ready_1", status: "reviewed", metrics: { missingPriceCount: 0 } },
+    { id: "needs_pricing_1", status: "reviewed", metrics: { missingPriceCount: 2 } },
+    { id: "invoice_1", status: "invoiced", metrics: { missingPriceCount: 3 } }
   ];
 
   it("treats invoiced summaries as closed queue items", () => {
@@ -18,7 +19,14 @@ describe("billing queue filtering", () => {
   it("excludes invoiced summaries from the default open work queue", () => {
     expect(filterBillingSummariesForQueue(summaries, "all").map((summary) => summary.id)).toEqual([
       "draft_1",
-      "ready_1"
+      "ready_1",
+      "needs_pricing_1"
+    ]);
+  });
+
+  it("filters the needs pricing queue to open summaries with missing pricing", () => {
+    expect(filterBillingSummariesForQueue(summaries, "needs_pricing").map((summary) => summary.id)).toEqual([
+      "needs_pricing_1"
     ]);
   });
 

@@ -26,6 +26,7 @@ const statusTones = {
 
 const statusOptions = [
   { value: "all", label: "Ready To Bill" },
+  { value: "needs_pricing", label: "Needs pricing" },
   { value: "invoiced", label: "Invoiced" }
 ] as const;
 
@@ -205,7 +206,7 @@ export default async function AdminBillingPage({
           value={openSummaries.length}
         />
         <KPIStatCard
-          href={buildBillingHref()}
+          href={buildBillingHref("needs_pricing")}
           label="Needs pricing"
           note="Ready-to-bill summaries with missing pricing decisions."
           tone="amber"
