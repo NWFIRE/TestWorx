@@ -66,6 +66,23 @@ function formatQuickBooksSendStatus(status: string | null) {
   }
 }
 
+function formatQuickBooksSyncStatus(status: string | null) {
+  switch (status) {
+    case "synced":
+      return "synced";
+    case "sent":
+      return "sent";
+    case "action_required":
+      return "action required";
+    case "failed":
+      return "sync failed";
+    case "not_synced":
+    case null:
+    default:
+      return "not synced";
+  }
+}
+
 export function BillingSummaryStatusActions({
   summaryId,
   inspectionId,
@@ -137,6 +154,7 @@ export function BillingSummaryStatusActions({
           durationMs: sendFailed ? 8500 : undefined
         });
       } else if (result?.error) {
+        applyDetail(result.detail);
         showToast({ title: result.error, tone: "error" });
       }
       setActiveAction(null);
@@ -154,7 +172,7 @@ export function BillingSummaryStatusActions({
         <p>QuickBooks app mode: <span className="font-semibold text-ink">{quickbooksAppModeLabel}</span></p>
         <p className="mt-2">Connected company: <span className="font-semibold text-ink">{connectedCompany ?? "Not connected"}</span></p>
         <p className="mt-2">Connected realm: <span className="font-semibold text-ink">{connectedRealm ?? "Not connected"}</span></p>
-        <p className="mt-2">QuickBooks sync: <span className="font-semibold text-ink">{state.quickbooksSyncStatus ?? "not_synced"}</span></p>
+        <p className="mt-2">QuickBooks sync: <span className="font-semibold text-ink">{formatQuickBooksSyncStatus(state.quickbooksSyncStatus)}</span></p>
         <p className="mt-2">Invoice number: <span className="font-semibold text-ink">{state.quickbooksInvoiceNumber ?? "Not synced"}</span></p>
         <p className="mt-2">Invoice id: <span className="font-semibold text-ink">{state.quickbooksInvoiceId ?? "Not synced"}</span></p>
         <p className="mt-2">Invoice mode: <span className="font-semibold text-ink">{state.quickbooksMode ? (state.quickbooksMode === "sandbox" ? "Sandbox" : "Live") : "Not recorded"}</span></p>

@@ -1130,7 +1130,6 @@ describe("quickbooks billing sync hardening", () => {
 
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management", SyncToken: "0" } }))
-      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management" } }))
       .mockResolvedValueOnce(jsonResponse({ Invoice: {} }));
 
     const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
@@ -1145,11 +1144,8 @@ describe("quickbooks billing sync hardening", () => {
     expect(prismaMock.inspectionBillingSummary.update).toHaveBeenCalledWith({
       where: { id: "summary_1" },
       data: expect.objectContaining({
-        quickbooksInvoiceId: null,
-        quickbooksInvoiceNumber: null,
-        quickbooksCustomerId: null,
-        quickbooksSyncedAt: null,
-        quickbooksSyncStatus: "failed"
+        quickbooksSyncStatus: "failed",
+        quickbooksSyncError: "QuickBooks returned an incomplete invoice response."
       })
     });
   });
@@ -1164,7 +1160,6 @@ describe("quickbooks billing sync hardening", () => {
 
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management", SyncToken: "0" } }))
-      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management" } }))
       .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_missing", DocNumber: "TW2026-1000" } }))
       .mockResolvedValueOnce(new Response("Not found", { status: 404 }));
 
@@ -1181,11 +1176,10 @@ describe("quickbooks billing sync hardening", () => {
       where: { id: "summary_1" },
       data: expect.objectContaining({
         quickbooksSyncStatus: "failed",
-        quickbooksInvoiceId: null,
-        quickbooksInvoiceNumber: null
+        quickbooksSyncError: expect.stringMatching(/did not verify invoice/i)
       })
     });
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("requires a verified synced invoice before sending to QuickBooks", async () => {
@@ -1450,14 +1444,6 @@ describe("quickbooks billing sync hardening", () => {
         }
       }))
       .mockResolvedValueOnce(jsonResponse({
-        Customer: {
-          Id: "qb_customer_1",
-          SyncToken: "3",
-          DisplayName: "Walk-In Counter Sale",
-          PrimaryEmailAddr: { Address: "billing@example.com" }
-        }
-      }))
-      .mockResolvedValueOnce(jsonResponse({
         Invoice: {
           Id: "invoice_direct_1",
           DocNumber: "TW2026-1000"
@@ -1500,7 +1486,7 @@ describe("quickbooks billing sync hardening", () => {
       }
     );
 
-    const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body ?? "{}"));
     expect(createInvoiceBody).toHaveProperty("DocNumber", "TW2026-1000");
     expect(prismaMock.tenantInvoiceSequence.upsert).toHaveBeenCalledWith(expect.objectContaining({
       where: {
@@ -1510,7 +1496,7 @@ describe("quickbooks billing sync hardening", () => {
         }
       }
     }));
-    expect(fetchMock.mock.calls[2]?.[1]?.body).toContain("\"TaxCodeRef\":{\"value\":\"TAX\"}");
+    expect(fetchMock.mock.calls[1]?.[1]?.body).toContain("\"TaxCodeRef\":{\"value\":\"TAX\"}");
     expect(createInvoiceBody.Line).toHaveLength(1);
     expect(createInvoiceBody.Line[0]).toEqual(expect.objectContaining({
       Amount: 425,
@@ -1583,14 +1569,6 @@ describe("quickbooks billing sync hardening", () => {
         }
       }))
       .mockResolvedValueOnce(jsonResponse({
-        Customer: {
-          Id: "qb_customer_1",
-          SyncToken: "3",
-          DisplayName: "Orr Energy Services",
-          PrimaryEmailAddr: { Address: "ap@orr.example" }
-        }
-      }))
-      .mockResolvedValueOnce(jsonResponse({
         Invoice: {
           Id: "invoice_direct_3",
           DocNumber: "TW2026-1008"
@@ -1626,7 +1604,7 @@ describe("quickbooks billing sync hardening", () => {
       }
     );
 
-    const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body ?? "{}"));
     expect(createInvoiceBody.DocNumber).toBe("TW2026-1008");
     expect(result.invoiceNumber).toBe("TW2026-1008");
   });
@@ -1681,14 +1659,6 @@ describe("quickbooks billing sync hardening", () => {
           PrimaryEmailAddr: { Address: "ap@orr.example" }
         }
       }))
-      .mockResolvedValueOnce(jsonResponse({
-        Customer: {
-          Id: "qb_customer_1",
-          SyncToken: "3",
-          DisplayName: "Orr Energy Services",
-          PrimaryEmailAddr: { Address: "ap@orr.example" }
-        }
-      }))
       .mockResolvedValueOnce(quickBooksDuplicateDocNumberResponse("TW2026-1003"))
       .mockResolvedValueOnce(quickBooksDuplicateDocNumberResponse("TW2026-1004"))
       .mockResolvedValueOnce(quickBooksDuplicateDocNumberResponse("TW2026-1005"))
@@ -1731,7 +1701,7 @@ describe("quickbooks billing sync hardening", () => {
     );
 
     const attemptedDocNumbers = fetchMock.mock.calls
-      .slice(2, 8)
+      .slice(1, 7)
       .map((call) => JSON.parse(String(call[1]?.body ?? "{}")).DocNumber);
     expect(attemptedDocNumbers).toEqual([
       "TW2026-1003",
@@ -1879,14 +1849,6 @@ describe("quickbooks billing sync hardening", () => {
         }
       }))
       .mockResolvedValueOnce(jsonResponse({
-        Customer: {
-          Id: "qb_customer_1",
-          SyncToken: "3",
-          DisplayName: "Klemme Construction",
-          PrimaryEmailAddr: { Address: "billing@klemme.example" }
-        }
-      }))
-      .mockResolvedValueOnce(jsonResponse({
         Invoice: {
           Id: "invoice_direct_2",
           DocNumber: "TW2027-1000"
@@ -1923,7 +1885,7 @@ describe("quickbooks billing sync hardening", () => {
       }
     );
 
-    const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body ?? "{}"));
     expect(createInvoiceBody.DocNumber).toBe("TW2027-1000");
     expect(createInvoiceBody.Line).toHaveLength(3);
     expect(prismaMock.tenantInvoiceSequence.upsert).toHaveBeenCalledWith(expect.objectContaining({
@@ -2043,7 +2005,6 @@ describe("quickbooks billing sync hardening", () => {
 
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management", SyncToken: "0" } }))
-      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management" } }))
       .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
       .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }));
 
@@ -2054,8 +2015,8 @@ describe("quickbooks billing sync hardening", () => {
       "inspection_1"
     );
 
-    expect(fetchMock).toHaveBeenCalledTimes(5);
-    const invoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    const invoiceBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body ?? "{}"));
     expect(invoiceBody.Line?.[0]?.SalesItemLineDetail?.ItemRef).toEqual({
       value: "mapped_item_1",
       name: "Annual Inspection"

@@ -1077,11 +1077,16 @@ export async function syncBillingSummaryToQuickBooksAction(formData: FormData) {
       throw error;
     }
 
+    const detail = await getAdminBillingSummaryDetail(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      inspectionId
+    ).catch(() => null);
+
     return {
       ok: false,
       error: error instanceof Error ? error.message : "QuickBooks sync failed.",
       message: null,
-      detail: null
+      detail
     };
   }
 }

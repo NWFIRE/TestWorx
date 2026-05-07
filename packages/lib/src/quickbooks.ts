@@ -9,7 +9,7 @@ import { resolveComplianceReportingFeeTx } from "./compliance-reporting-fees";
 import { assertEnvForFeature, getOptionalQuickBooksEnv, getServerEnv } from "./env";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
 import { hasWorkOrderLineItemTable } from "./work-order-line-item-table";
-import type { JsonObject } from "./json-types";
+import type { JsonObject, JsonValue } from "./json-types";
 import { assertTenantContext, canAccessProductsServicesWorkspace } from "./permissions";
 import { resolveServiceFeeForLocationTx } from "./service-fees";
 import { getCustomerFacingSiteLabel } from "./scheduling";
@@ -246,6 +246,7 @@ type QuickBooksFailureLogInput = {
   httpStatus?: number | null;
   intuitTid?: string | null;
   rawBody?: string | null;
+  requestPayload?: JsonValue | null;
   connectionMode?: QuickBooksConnectionMode | null;
   metadata?: JsonObject;
 };
@@ -453,6 +454,9 @@ class QuickBooksRequestError extends Error {
   httpStatus: number | null;
   intuitTid: string | null;
   rawBody: string | null;
+  requestPayload: JsonValue | null;
+  entityType: string | null;
+  entityId: string | null;
   connectionMode: QuickBooksConnectionMode | null;
 
   constructor(input: {
@@ -461,6 +465,9 @@ class QuickBooksRequestError extends Error {
     httpStatus?: number | null;
     intuitTid?: string | null;
     rawBody?: string | null;
+    requestPayload?: JsonValue | null;
+    entityType?: string | null;
+    entityId?: string | null;
     connectionMode?: QuickBooksConnectionMode | null;
   }) {
     super(input.message);
@@ -469,6 +476,9 @@ class QuickBooksRequestError extends Error {
     this.httpStatus = input.httpStatus ?? null;
     this.intuitTid = input.intuitTid ?? null;
     this.rawBody = input.rawBody ?? null;
+    this.requestPayload = input.requestPayload ?? null;
+    this.entityType = input.entityType ?? null;
+    this.entityId = input.entityId ?? null;
     this.connectionMode = input.connectionMode ?? null;
   }
 }
@@ -526,7 +536,9 @@ async function createQuickBooksInvoiceWithTradeWorxNumber(input: {
         body: {
           ...input.body,
           DocNumber: docNumber
-        }
+        },
+        entityType: "QuickBooksInvoice",
+        entityId: docNumber
       });
 
       return {
@@ -756,6 +768,21 @@ function normalizeQuickBooksError(input: {
   });
 }
 
+function toQuickBooksLogJson(value: unknown): JsonValue | null {
+  if (value === undefined) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(JSON.stringify(value)) as JsonValue;
+  } catch {
+    return {
+      unavailable: true,
+      reason: "Request payload could not be serialized for logging."
+    };
+  }
+}
+
 function readQuickBooksFault(rawBody: string | null | undefined) {
   if (!rawBody) {
     return null;
@@ -788,6 +815,39 @@ function readQuickBooksFault(rawBody: string | null | undefined) {
   } catch {
     return null;
   }
+}
+
+function isQuickBooksBusinessValidationFault(error: unknown) {
+  if (!(error instanceof QuickBooksRequestError)) {
+    return false;
+  }
+
+  const fault = readQuickBooksFault(error.rawBody);
+  return Boolean(
+    fault
+    && (
+      fault.code === "-11622"
+      || /business validation/i.test(`${fault.message ?? ""} ${fault.detail ?? ""}`)
+      || /Unexpected user error/i.test(`${fault.message ?? ""} ${fault.detail ?? ""}`)
+    )
+  );
+}
+
+function buildQuickBooksRemediationGuidance(error: QuickBooksRequestError) {
+  const fault = readQuickBooksFault(error.rawBody);
+  if (fault?.code === "-11622" || /Unexpected user error/i.test(`${fault?.message ?? ""} ${fault?.detail ?? ""}`)) {
+    return "Action required: QuickBooks rejected this as a business validation issue. Review the linked QuickBooks customer, item mappings, item active status, tax settings, and address fields, then retry sync. TradeWorx preserved the local billing data.";
+  }
+
+  if (/customer/i.test(error.operation)) {
+    return "Action required: review the linked QuickBooks customer for inactive status, duplicate display name, unsupported address fields, or Business Network restrictions.";
+  }
+
+  if (/invoice/i.test(error.operation)) {
+    return "Action required: review the invoice customer, line item mappings, inactive QuickBooks items, tax settings, and document number, then retry sync.";
+  }
+
+  return "Action required: review the QuickBooks entity involved, then retry the operation when the QuickBooks record is valid.";
 }
 
 function isQuickBooksSendSystemFault(error: QuickBooksRequestError) {
@@ -827,6 +887,14 @@ function buildQuickBooksRequestErrorMessage(input: {
   }
 
   const readable = [fault.message, fault.detail].filter(Boolean).join(": ");
+  if (fault.code === "-11622" || /Unexpected user error/i.test(readable)) {
+    return [
+      `QuickBooks business validation failed during ${input.operation}.`,
+      readable || "Intuit returned an unexpected user validation error.",
+      "Action required: review the linked QuickBooks customer, item mappings, item active status, tax settings, and address fields, then retry sync."
+    ].join(" ");
+  }
+
   return readable ? `QuickBooks request failed: ${readable}` : "QuickBooks request failed.";
 }
 
@@ -857,6 +925,7 @@ async function createQuickBooksFailureAuditLog(input: QuickBooksFailureLogInput)
         httpStatus: input.httpStatus ?? null,
         intuitTid: input.intuitTid ?? null,
         rawBody: input.rawBody ?? null,
+        requestPayload: input.requestPayload ?? null,
         connectionMode: input.connectionMode ?? null,
         ...(input.metadata ?? {})
       } satisfies JsonObject
@@ -1093,6 +1162,8 @@ async function quickBooksApiRequest<T>(connection: QuickBooksTenantConnection, i
   method?: "GET" | "POST";
   searchParams?: URLSearchParams;
   body?: unknown;
+  entityType?: string;
+  entityId?: string;
 }) {
   const config = getQuickBooksConfiguration();
   const refreshed = await refreshQuickBooksTokenIfNeeded(connection);
@@ -1117,7 +1188,7 @@ async function quickBooksApiRequest<T>(connection: QuickBooksTenantConnection, i
 
   if (!response.ok) {
     const errorText = await response.text();
-    const operation = `${input.method ?? "GET"} ${input.path}`;
+    const operation = `${input.method ?? "GET"} ${input.path}${input.searchParams?.toString() ? `?${input.searchParams.toString()}` : ""}`;
     throw new QuickBooksRequestError({
       message: buildQuickBooksRequestErrorMessage({
         rawBody: errorText || null,
@@ -1128,6 +1199,9 @@ async function quickBooksApiRequest<T>(connection: QuickBooksTenantConnection, i
       httpStatus: response.status,
       intuitTid: readIntuitTid(response.headers),
       rawBody: errorText || null,
+      requestPayload: toQuickBooksLogJson(input.body),
+      entityType: input.entityType ?? null,
+      entityId: input.entityId ?? null,
       connectionMode: connection.quickbooksConnectionMode
     });
   }
@@ -2130,53 +2204,25 @@ async function resolveQuickBooksCustomer(connection: QuickBooksTenantConnection,
   if (customerRecord?.quickbooksCustomerId) {
     const existingCustomer = await fetchQuickBooksCustomerById(connection, customerRecord.quickbooksCustomerId).catch(() => null);
     if (existingCustomer?.quickbooksCustomerId) {
-      const updated = await quickBooksApiRequest<{ Customer?: unknown }>(connection, {
-        path: "/customer",
-        method: "POST",
-        searchParams: new URLSearchParams({ operation: "update" }),
-        body: {
-          Id: existingCustomer.quickbooksCustomerId,
-          SyncToken: existingCustomer.syncToken,
-          sparse: true,
-          ...buildQuickBooksCustomerPayload(summary)
-        }
-      });
-
-      const updatedCustomer = (await normalizeQuickBooksCustomer(connection, updated.Customer)) ?? existingCustomer;
-      await prisma.customerCompany.update({
-        where: { id: summary.customerCompanyId },
-        data: { quickbooksCustomerId: updatedCustomer.quickbooksCustomerId }
-      });
-      return updatedCustomer.quickbooksCustomerId;
+      return existingCustomer.quickbooksCustomerId;
     }
   }
 
   const existingCustomer = await fetchQuickBooksCustomerByDisplayName(connection, summary.customerName);
   if (existingCustomer?.quickbooksCustomerId) {
-    const updated = await quickBooksApiRequest<{ Customer?: unknown }>(connection, {
-      path: "/customer",
-      method: "POST",
-      searchParams: new URLSearchParams({ operation: "update" }),
-      body: {
-        Id: existingCustomer.quickbooksCustomerId,
-        SyncToken: existingCustomer.syncToken,
-        sparse: true,
-        ...buildQuickBooksCustomerPayload(summary)
-      }
-    });
-
-    const updatedCustomer = (await normalizeQuickBooksCustomer(connection, updated.Customer)) ?? existingCustomer;
     await prisma.customerCompany.update({
       where: { id: summary.customerCompanyId },
-      data: { quickbooksCustomerId: updatedCustomer.quickbooksCustomerId }
+      data: { quickbooksCustomerId: existingCustomer.quickbooksCustomerId }
     });
-    return updatedCustomer.quickbooksCustomerId;
+    return existingCustomer.quickbooksCustomerId;
   }
 
   const created = await quickBooksApiRequest<{ Customer?: { Id: string } }>(connection, {
     path: "/customer",
     method: "POST",
-    body: buildQuickBooksCustomerPayload(summary)
+    body: buildQuickBooksCustomerPayload(summary),
+    entityType: "CustomerCompany",
+    entityId: summary.customerCompanyId
   });
 
   const createdCustomerId = created.Customer?.Id;
@@ -2213,71 +2259,17 @@ async function resolveQuickBooksPayerAccount(connection: QuickBooksTenantConnect
   if (payerRecord?.quickbooksCustomerId) {
     const existingCustomer = await fetchQuickBooksCustomerById(connection, payerRecord.quickbooksCustomerId).catch(() => null);
     if (existingCustomer?.quickbooksCustomerId) {
-      const updated = await quickBooksApiRequest<{ Customer?: unknown }>(connection, {
-        path: "/customer",
-        method: "POST",
-        searchParams: new URLSearchParams({ operation: "update" }),
-        body: {
-          Id: existingCustomer.quickbooksCustomerId,
-          SyncToken: existingCustomer.syncToken,
-          sparse: true,
-          ...buildQuickBooksCustomerPayload({
-            customerName: payer.payerName,
-            billingEmail: payer.billingEmail,
-            phone: payer.phone,
-            siteName: payer.payerName,
-            billingAddressLine1: payer.billingAddressLine1,
-            billingAddressLine2: payer.billingAddressLine2,
-            billingCity: payer.billingCity,
-            billingState: payer.billingState,
-            billingPostalCode: payer.billingPostalCode,
-            billingCountry: payer.billingCountry,
-            notes: payer.notes
-          })
-        }
-      });
-
-      const updatedCustomer = (await normalizeQuickBooksCustomer(connection, updated.Customer)) ?? existingCustomer;
-      await prisma.billingPayerAccount.update({
-        where: { id: payer.payerAccountId },
-        data: { quickbooksCustomerId: updatedCustomer.quickbooksCustomerId }
-      });
-      return updatedCustomer.quickbooksCustomerId;
+      return existingCustomer.quickbooksCustomerId;
     }
   }
 
   const existingCustomer = await fetchQuickBooksCustomerByDisplayName(connection, payer.payerName);
   if (existingCustomer?.quickbooksCustomerId) {
-    const updated = await quickBooksApiRequest<{ Customer?: unknown }>(connection, {
-      path: "/customer",
-      method: "POST",
-      searchParams: new URLSearchParams({ operation: "update" }),
-      body: {
-        Id: existingCustomer.quickbooksCustomerId,
-        SyncToken: existingCustomer.syncToken,
-        sparse: true,
-        ...buildQuickBooksCustomerPayload({
-          customerName: payer.payerName,
-          billingEmail: payer.billingEmail,
-          phone: payer.phone,
-          siteName: payer.payerName,
-          billingAddressLine1: payer.billingAddressLine1,
-          billingAddressLine2: payer.billingAddressLine2,
-          billingCity: payer.billingCity,
-          billingState: payer.billingState,
-          billingPostalCode: payer.billingPostalCode,
-          billingCountry: payer.billingCountry,
-          notes: payer.notes
-        })
-      }
-    });
-
-    const updatedCustomer = (await normalizeQuickBooksCustomer(connection, updated.Customer)) ?? existingCustomer;
-    await prisma.billingPayerAccount.update({
+    await prisma.billingPayerAccount.updateMany({
       where: { id: payer.payerAccountId },
-      data: { quickbooksCustomerId: updatedCustomer.quickbooksCustomerId }
+      data: { quickbooksCustomerId: existingCustomer.quickbooksCustomerId }
     });
-    return updatedCustomer.quickbooksCustomerId;
+    return existingCustomer.quickbooksCustomerId;
   }
 
   const created = await quickBooksApiRequest<{ Customer?: { Id: string } }>(connection, {
@@ -2295,7 +2287,9 @@ async function resolveQuickBooksPayerAccount(connection: QuickBooksTenantConnect
       billingPostalCode: payer.billingPostalCode,
       billingCountry: payer.billingCountry,
       notes: payer.notes
-    })
+    }),
+    entityType: "BillingPayerAccount",
+    entityId: payer.payerAccountId
   });
 
   const createdCustomerId = created.Customer?.Id;
@@ -2345,32 +2339,7 @@ async function resolveQuickBooksInvoiceCustomer(connection: QuickBooksTenantConn
 
   const existingCustomer = await fetchQuickBooksCustomerByDisplayName(connection, summary.customerName);
   if (existingCustomer?.quickbooksCustomerId) {
-    const updated = await quickBooksApiRequest<{ Customer?: unknown }>(connection, {
-      path: "/customer",
-      method: "POST",
-      searchParams: new URLSearchParams({ operation: "update" }),
-      body: {
-        Id: existingCustomer.quickbooksCustomerId,
-        SyncToken: existingCustomer.syncToken,
-        sparse: true,
-        ...buildQuickBooksCustomerPayload({
-          customerName: summary.customerName,
-          billingEmail: summary.billingEmail,
-          phone: summary.phone,
-          siteName: summary.siteName,
-          billingAddressLine1: summary.billingAddressLine1,
-          billingAddressLine2: summary.billingAddressLine2,
-          billingCity: summary.billingCity,
-          billingState: summary.billingState,
-          billingPostalCode: summary.billingPostalCode,
-          billingCountry: summary.billingCountry,
-          notes: summary.notes
-        })
-      }
-    });
-
-    const updatedCustomer = (await normalizeQuickBooksCustomer(connection, updated.Customer)) ?? existingCustomer;
-    return updatedCustomer.quickbooksCustomerId;
+    return existingCustomer.quickbooksCustomerId;
   }
 
   const created = await quickBooksApiRequest<{ Customer?: { Id: string } }>(connection, {
@@ -2388,7 +2357,9 @@ async function resolveQuickBooksInvoiceCustomer(connection: QuickBooksTenantConn
       billingPostalCode: summary.billingPostalCode,
       billingCountry: summary.billingCountry,
       notes: summary.notes
-    })
+    }),
+    entityType: summary.customerCompanyId ? "CustomerCompany" : "QuickBooksCustomer",
+    entityId: summary.customerCompanyId ?? summary.customerName
   });
 
   const createdCustomerId = created.Customer?.Id;
@@ -4874,16 +4845,17 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
       fallbackOperation: "billing.sync",
       connectionMode: tenant.quickbooksConnectionMode
     });
+    const fault = readQuickBooksFault(normalizedError.rawBody);
+    const actionRequired = isQuickBooksBusinessValidationFault(normalizedError);
+    const syncErrorMessage = actionRequired
+      ? `${normalizedError.message} TradeWorx preserved the local billing data and marked this sync Action Required.`
+      : normalizedError.message;
+
     await prisma.inspectionBillingSummary.update({
       where: { id: summary.id },
       data: {
-        quickbooksInvoiceId: null,
-        quickbooksInvoiceNumber: null,
-        quickbooksConnectionMode: null,
-        quickbooksCustomerId: null,
-        quickbooksSyncedAt: null,
-        quickbooksSyncStatus: "failed",
-        quickbooksSyncError: normalizedError.message,
+        quickbooksSyncStatus: actionRequired ? "action_required" : "failed",
+        quickbooksSyncError: syncErrorMessage,
         quickbooksSendStatus: "not_sent",
         quickbooksSentAt: null,
         quickbooksSendError: null
@@ -4899,14 +4871,22 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
       httpStatus: normalizedError.httpStatus,
       intuitTid: normalizedError.intuitTid,
       rawBody: normalizedError.rawBody,
+      requestPayload: normalizedError.requestPayload,
       connectionMode: tenant.quickbooksConnectionMode,
-      entityType: "InspectionBillingSummary",
-      entityId: summary.id,
+      entityType: normalizedError.entityType ?? "InspectionBillingSummary",
+      entityId: normalizedError.entityId ?? summary.id,
       metadata: {
-        inspectionId: summary.inspectionId
+        inspectionId: summary.inspectionId,
+        summaryId: summary.id,
+        syncStatus: actionRequired ? "action_required" : "failed",
+        faultCode: fault?.code ?? null,
+        faultType: fault?.type ?? null,
+        faultElement: fault?.element ?? null,
+        remediation: buildQuickBooksRemediationGuidance(normalizedError)
       }
     });
 
+    normalizedError.message = syncErrorMessage;
     throw normalizedError;
   }
 }
@@ -5164,9 +5144,15 @@ export async function syncQuoteToQuickBooksEstimate(actor: ActorContext, quoteId
       httpStatus: normalizedError.httpStatus,
       intuitTid: normalizedError.intuitTid,
       rawBody: normalizedError.rawBody,
+      requestPayload: normalizedError.requestPayload,
       connectionMode: tenant.quickbooksConnectionMode,
       entityType: "Quote",
-      entityId: quote.id
+      entityId: quote.id,
+      metadata: {
+        quoteId: quote.id,
+        faultCode: readQuickBooksFault(normalizedError.rawBody)?.code ?? null,
+        remediation: buildQuickBooksRemediationGuidance(normalizedError)
+      }
     });
 
     throw normalizedError;
@@ -5410,9 +5396,14 @@ export async function createDirectQuickBooksInvoice(
       httpStatus: normalizedError.httpStatus,
       intuitTid: normalizedError.intuitTid,
       rawBody: normalizedError.rawBody,
+      requestPayload: normalizedError.requestPayload,
       connectionMode: tenant.quickbooksConnectionMode,
       entityType: "Tenant",
-      entityId: parsedActor.tenantId as string
+      entityId: parsedActor.tenantId as string,
+      metadata: {
+        faultCode: readQuickBooksFault(normalizedError.rawBody)?.code ?? null,
+        remediation: buildQuickBooksRemediationGuidance(normalizedError)
+      }
     });
     throw normalizedError;
   }
