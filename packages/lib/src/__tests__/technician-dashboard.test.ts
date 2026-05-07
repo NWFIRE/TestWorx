@@ -144,7 +144,7 @@ describe("technician dashboard inspection access", () => {
     const result = await getTechnicianDashboardData({ userId: "tech_2", role: "technician", tenantId: "tenant_1" });
 
     expect(prismaMock.inspection.findMany).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      where: {
+      where: expect.objectContaining({
         tenantId: "tenant_1",
         claimable: true,
         status: {
@@ -154,8 +154,9 @@ describe("technician dashboard inspection access", () => {
             InspectionStatus.in_progress,
             InspectionStatus.follow_up_required
           ]
-        }
-      }
+        },
+        scheduledStart: { lte: expect.any(Date) }
+      })
     }));
     expect(result.unassigned).toHaveLength(1);
     expect(result.unassigned[0]?.id).toBe("inspection_shared");
@@ -283,7 +284,10 @@ describe("technician dashboard inspection access", () => {
     expect(result.unassigned).toHaveLength(0);
   });
 
-  it("shows future claimable inspections when their future-scheduled tasks belong to that visit period", async () => {
+  it("shows near-term future claimable inspections when their future-scheduled tasks belong to that visit period", async () => {
+    const scheduledStart = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    const dueMonth = `${scheduledStart.getFullYear()}-${String(scheduledStart.getMonth() + 1).padStart(2, "0")}`;
+
     prismaMock.inspection.findMany
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
@@ -293,7 +297,7 @@ describe("technician dashboard inspection access", () => {
           status: InspectionStatus.to_be_completed,
           inspectionClassification: "standard",
           isPriority: false,
-          scheduledStart: new Date("2026-10-01T09:00:00.000Z"),
+          scheduledStart,
           site: { id: "site_1", name: "Pinecrest Tower" },
           customerCompany: { id: "customer_1", name: "Pinecrest Property Management" },
           assignedTechnician: null,
@@ -303,8 +307,8 @@ describe("technician dashboard inspection access", () => {
               id: "task_future_shared",
               inspectionType: "fire_alarm",
               assignedTechnicianId: null,
-              dueMonth: "2026-10",
-              dueDate: new Date("2026-10-01T00:00:00.000Z"),
+              dueMonth,
+              dueDate: scheduledStart,
               schedulingStatus: "scheduled_future",
               status: InspectionStatus.to_be_completed,
               recurrence: null,
@@ -320,6 +324,46 @@ describe("technician dashboard inspection access", () => {
     expect(result.unassigned).toHaveLength(1);
     expect(result.unassigned[0]?.id).toBe("inspection_future_shared");
     expect(result.unassigned[0]?.tasks).toHaveLength(1);
+  });
+
+  it("excludes far-future claimable inspections from the mobile shared queue", async () => {
+    const scheduledStart = new Date(Date.now() + 120 * 24 * 60 * 60 * 1000);
+    const dueMonth = `${scheduledStart.getFullYear()}-${String(scheduledStart.getMonth() + 1).padStart(2, "0")}`;
+
+    prismaMock.inspection.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "inspection_far_future_shared",
+          tenantId: "tenant_1",
+          status: InspectionStatus.to_be_completed,
+          inspectionClassification: "standard",
+          isPriority: false,
+          scheduledStart,
+          site: { id: "site_1", name: "Pinecrest Tower" },
+          customerCompany: { id: "customer_1", name: "Pinecrest Property Management" },
+          assignedTechnician: null,
+          technicianAssignments: [],
+          tasks: [
+            {
+              id: "task_far_future_shared",
+              inspectionType: "fire_alarm",
+              assignedTechnicianId: null,
+              dueMonth,
+              dueDate: scheduledStart,
+              schedulingStatus: "scheduled_future",
+              status: InspectionStatus.to_be_completed,
+              recurrence: null,
+              report: null
+            }
+          ]
+        }
+      ])
+      .mockResolvedValueOnce([]);
+
+    const result = await getTechnicianDashboardData({ userId: "tech_2", role: "technician", tenantId: "tenant_1" });
+
+    expect(result.unassigned).toHaveLength(0);
   });
 
   it("does not show claimable inspections when fallback tasks are cancelled", async () => {

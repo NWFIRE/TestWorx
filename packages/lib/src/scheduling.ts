@@ -1,4 +1,4 @@
-import { addMonths, endOfDay, endOfMonth, endOfWeek, format, isAfter, isSameDay, startOfDay, startOfMonth, subDays, subMonths } from "date-fns";
+import { addDays, addMonths, endOfDay, endOfMonth, endOfWeek, format, isAfter, isSameDay, startOfDay, startOfMonth, subDays, subMonths } from "date-fns";
 import {
   AttachmentKind,
   InspectionClassification,
@@ -99,6 +99,7 @@ export const claimableInspectionStatuses = [
   InspectionStatus.in_progress,
   InspectionStatus.follow_up_required
 ] as const;
+export const technicianClaimableLookaheadDays = 60;
 export const activeOperationalInspectionStatuses = [
   InspectionStatus.to_be_completed,
   InspectionStatus.scheduled,
@@ -909,11 +910,48 @@ function getClaimableInspectionVisibleTasks<T extends {
 }>(
   inspection: { tasks: T[]; convertedFromQuotes?: unknown[] | null; scheduledStart?: Date | string | null }
 ) {
-  return inspection.tasks.filter((task) => isCurrentVisitTaskForInspection(task, inspection));
+  return inspection.tasks.filter((task) => task.status !== InspectionStatus.cancelled && isCurrentVisitTaskForInspection(task, inspection));
 }
 
 function isSharedQueueTaskSet<T extends { assignedTechnicianId?: string | null }>(tasks: T[]) {
   return tasks.length > 0 && tasks.every((task) => !task.assignedTechnicianId);
+}
+
+function readClaimableWindowDate(value?: Date | string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function readDueMonthWindowDate(value?: string | null) {
+  const normalized = value?.trim();
+  if (!normalized || !/^\d{4}-\d{2}$/.test(normalized)) {
+    return null;
+  }
+
+  const date = new Date(`${normalized}-01T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function isInspectionInTechnicianClaimableWindow<T extends {
+  dueDate?: Date | string | null;
+  dueMonth?: string | null;
+}>(inspection: { scheduledStart?: Date | string | null; tasks?: T[] | null }, windowEnd: Date) {
+  const visitDate = readClaimableWindowDate(inspection.scheduledStart ?? null);
+  const taskDates = (inspection.tasks ?? [])
+    .flatMap((task) => [
+      readClaimableWindowDate(task.dueDate ?? null),
+      readDueMonthWindowDate(task.dueMonth ?? null)
+    ])
+    .filter((date): date is Date => Boolean(date));
+  const comparisonDate = taskDates.length
+    ? taskDates.reduce((earliest, current) => current.getTime() < earliest.getTime() ? current : earliest)
+    : visitDate;
+
+  return comparisonDate ? comparisonDate <= windowEnd : true;
 }
 
 function dedupeInspectionsById<T extends { id: string }>(inspections: T[]) {
@@ -5030,8 +5068,14 @@ export async function resolveClaimableInspectionsForTechnician(actor: ActorConte
   }
 
   const tenantId = parsedActor.tenantId as string;
+  const claimableWindowEnd = endOfDay(addDays(startOfDay(new Date()), technicianClaimableLookaheadDays));
   const rawInspections = await prisma.inspection.findMany({
-    where: { tenantId, claimable: true, status: { in: [...claimableInspectionStatuses] } },
+    where: {
+      tenantId,
+      claimable: true,
+      status: { in: [...claimableInspectionStatuses] },
+      scheduledStart: { lte: claimableWindowEnd }
+    },
     include: {
       site: true,
       customerCompany: true,
@@ -5055,6 +5099,7 @@ export async function resolveClaimableInspectionsForTechnician(actor: ActorConte
       const currentTasks = getClaimableInspectionVisibleTasks(inspection);
       return { inspection, currentTasks };
     })
+    .filter(({ inspection }) => isInspectionInTechnicianClaimableWindow(inspection, claimableWindowEnd))
     .filter(({ currentTasks }) => isSharedQueueTaskSet(currentTasks))
     .filter(({ currentTasks }) =>
       isTechnicianEligibleForReportTypesFromRows({

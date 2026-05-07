@@ -1,6 +1,6 @@
 "use client";
 
-export const TECHNICIAN_SCREEN_SNAPSHOT_VERSION = 2;
+export const TECHNICIAN_SCREEN_SNAPSHOT_VERSION = 3;
 const VERSION_FIELD = "__tradeWorxTechnicianSnapshotVersion";
 
 type VersionedSnapshot<T> = T & {
