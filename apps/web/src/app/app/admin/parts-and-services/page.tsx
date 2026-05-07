@@ -4,15 +4,20 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { canAccessProductsServicesWorkspace } from "@testworx/lib";
 import {
+  getQuickBooksItemMappingSettings,
   getPaginatedTenantQuickBooksCatalogSettings,
   getTenantQuickBooksConnectionSettings
 } from "@testworx/lib/server/index";
 
 import { AppPageShell, KPIStatCard, PageHeader } from "../operations-ui";
 import { QuickBooksCatalogManagementCard } from "../settings/quickbooks-catalog-management-card";
+import { QuickBooksItemMappingCard } from "../settings/quickbooks-item-mapping-card";
 import {
+  clearQuickBooksItemMappingInlineAction,
   createQuickBooksCatalogItemInlineAction,
   importQuickBooksCatalogItemsInlineAction,
+  resyncQuickBooksCatalogItemsFromPartsAction,
+  saveQuickBooksItemMappingInlineAction,
   updateQuickBooksCatalogItemInlineAction
 } from "./actions";
 
@@ -65,6 +70,9 @@ export default async function PartsAndServicesPage({
       status: catalogStatus
     })
   ]);
+  const mappingSettings = canManageCatalog
+    ? await getQuickBooksItemMappingSettings(actor)
+    : null;
 
   return (
     <AppPageShell density="wide">
@@ -132,6 +140,20 @@ export default async function PartsAndServicesPage({
         updateCatalogItemAction={updateQuickBooksCatalogItemInlineAction}
         inactiveItemCount={catalog.inactiveCount}
       />
+
+      {mappingSettings ? (
+        <QuickBooksItemMappingCard
+          availableItems={mappingSettings.availableItems}
+          clearMappingAction={clearQuickBooksItemMappingInlineAction}
+          configured={mappingSettings.configured}
+          connected={mappingSettings.connected}
+          modeMismatch={mappingSettings.modeMismatch}
+          reconnectRequired={mappingSettings.reconnectRequired}
+          resyncAction={resyncQuickBooksCatalogItemsFromPartsAction}
+          rows={mappingSettings.rows}
+          saveMappingAction={saveQuickBooksItemMappingInlineAction}
+        />
+      ) : null}
     </AppPageShell>
   );
 }

@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 
 import { auth } from "@/auth";
 import {
+  clearQuickBooksItemMappingForCode,
   createQuickBooksCatalogItem,
   importQuickBooksCatalogItems,
   quickBooksCatalogItemInputSchema,
+  saveQuickBooksItemMappingForCode,
   updateQuickBooksCatalogItem
 } from "@testworx/lib/server/index";
 
@@ -20,6 +22,20 @@ function revalidateCatalogPaths() {
   revalidatePath("/app/admin/settings");
   revalidatePath("/app/admin/billing");
   revalidatePath("/app/admin/quotes");
+}
+
+export async function resyncQuickBooksCatalogItemsFromPartsAction() {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return;
+  }
+
+  await importQuickBooksCatalogItems({
+    userId: session.user.id,
+    role: session.user.role,
+    tenantId: session.user.tenantId
+  });
+  revalidateCatalogPaths();
 }
 
 export async function importQuickBooksCatalogItemsInlineAction(
@@ -119,6 +135,97 @@ export async function updateQuickBooksCatalogItemInlineAction(formData: FormData
       ok: false,
       error: error instanceof Error ? error.message : "Unable to update product or service.",
       success: null
+    };
+  }
+}
+
+export async function saveQuickBooksItemMappingInlineAction(
+  _: {
+    error: string | null;
+    success: string | null;
+    internalCode?: string | null;
+    mapping?: {
+      qbItemId: string;
+      qbItemName: string;
+      qbItemType: string | null;
+      matchSource: string;
+      qbActive: boolean;
+    } | null;
+  },
+  formData: FormData
+) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { error: "Unauthorized", success: null, internalCode: null, mapping: null };
+  }
+
+  const internalCode = String(formData.get("internalCode") ?? "").trim();
+  const internalName = String(formData.get("internalName") ?? "").trim();
+  const qbItemId = String(formData.get("qbItemId") ?? "").trim();
+
+  if (!internalCode || !internalName || !qbItemId) {
+    return {
+      error: "QuickBooks item mapping is missing required values.",
+      success: null,
+      internalCode,
+      mapping: null
+    };
+  }
+
+  try {
+    const mapping = await saveQuickBooksItemMappingForCode(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      { internalCode, internalName, qbItemId }
+    );
+    revalidateCatalogPaths();
+    return {
+      error: null,
+      success: `${internalName} mapped successfully.`,
+      internalCode,
+      mapping: {
+        qbItemId: mapping.qbItemId,
+        qbItemName: mapping.qbItemName,
+        qbItemType: mapping.qbItemType,
+        matchSource: mapping.matchSource,
+        qbActive: mapping.qbActive
+      }
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Unable to save QuickBooks item mapping.",
+      success: null,
+      internalCode,
+      mapping: null
+    };
+  }
+}
+
+export async function clearQuickBooksItemMappingInlineAction(
+  _: { error: string | null; success: string | null; internalCode?: string | null },
+  formData: FormData
+) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { error: "Unauthorized", success: null, internalCode: null };
+  }
+
+  const internalCode = String(formData.get("internalCode") ?? "").trim();
+  if (!internalCode) {
+    return { error: "QuickBooks item mapping code is missing.", success: null, internalCode: null };
+  }
+
+  try {
+    await clearQuickBooksItemMappingForCode(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      internalCode
+    );
+    revalidateCatalogPaths();
+    return { error: null, success: `${internalCode} mapping cleared.`, internalCode };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Unable to clear QuickBooks item mapping.",
+      success: null,
+      internalCode
     };
   }
 }
