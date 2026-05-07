@@ -31,6 +31,20 @@ function QueueStatusCard({
   );
 }
 
+function uniqueInspections<T extends { id?: string | null }>(inspections: T[] = []) {
+  const seen = new Set<string>();
+  return inspections.filter((inspection) => {
+    if (!inspection.id) {
+      return true;
+    }
+    if (seen.has(inspection.id)) {
+      return false;
+    }
+    seen.add(inspection.id);
+    return true;
+  });
+}
+
 function NeedsAttentionCard({
   eyebrow,
   title,
@@ -75,7 +89,11 @@ export function TechnicianHomeScreen({
     return <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 text-sm text-slate-500">Loading field workspace...</div>;
   }
 
-  const dashboard = snapshot.dashboard;
+  const dashboard = {
+    ...snapshot.dashboard,
+    assigned: uniqueInspections(snapshot.dashboard.assigned ?? []),
+    unassigned: uniqueInspections(snapshot.dashboard.unassigned ?? [])
+  };
   const assignedOpen = dashboard.assigned.filter((inspection: any) =>
     inspection.tasks.some((task: any) => task.report?.status !== "finalized")
   );

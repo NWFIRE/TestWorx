@@ -84,21 +84,46 @@ function matchesQuery(inspection: any, query: string) {
   return haystack.includes(query);
 }
 
+function uniqueInspections<T extends { id?: string | null }>(inspections: T[] = []) {
+  const seen = new Set<string>();
+  return inspections.filter((inspection) => {
+    if (!inspection.id) {
+      return true;
+    }
+    if (seen.has(inspection.id)) {
+      return false;
+    }
+    seen.add(inspection.id);
+    return true;
+  });
+}
+
 export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
   const snapshot = useOfflineScreenSnapshot("technician-work", initialData);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const dashboard = useMemo(() => {
+    if (!snapshot?.dashboard) {
+      return null;
+    }
+
+    return {
+      ...snapshot.dashboard,
+      assigned: uniqueInspections(snapshot.dashboard.assigned ?? []),
+      today: uniqueInspections(snapshot.dashboard.today ?? []),
+      unassigned: uniqueInspections(snapshot.dashboard.unassigned ?? [])
+    };
+  }, [snapshot]);
 
   const filter = (searchParams.get("filter") as WorkFilter | null) ?? "today";
   const query = (searchParams.get("query") ?? "").trim().toLowerCase();
-  const claimableWorkCount = snapshot?.dashboard?.unassigned?.length ?? 0;
+  const claimableWorkCount = dashboard?.unassigned?.length ?? 0;
 
   const filtered = useMemo(() => {
-    if (!snapshot) {
+    if (!dashboard) {
       return { assigned: [], claimable: [], open: [] };
     }
 
-    const dashboard = snapshot.dashboard;
     if (filter === "open") {
       return {
         assigned: dashboard.assigned
@@ -137,7 +162,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
       claimable: claimableSource.filter((inspection: any) => matchesQuery(inspection, query)),
       open: []
     };
-  }, [filter, query, snapshot]);
+  }, [dashboard, filter, query]);
 
   if (!snapshot) {
     return <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 text-sm text-slate-500">Loading work queue…</div>;

@@ -306,7 +306,7 @@ describe("technician dashboard inspection access", () => {
     expect(result.unassigned).toHaveLength(0);
   });
 
-  it("keeps claimable inspections visible when legacy task scheduling metadata has no current task", async () => {
+  it("does not show claimable inspections when their only tasks are future-due for another visit period", async () => {
     prismaMock.inspection.findMany
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
@@ -340,8 +340,6 @@ describe("technician dashboard inspection access", () => {
 
     const result = await getTechnicianDashboardData({ userId: "tech_2", role: "technician", tenantId: "tenant_1" });
 
-    expect(result.unassigned).toHaveLength(1);
-    expect(result.unassigned[0]?.id).toBe("inspection_claimable_legacy_task");
-    expect(result.unassigned[0]?.tasks).toHaveLength(1);
+    expect(result.unassigned).toHaveLength(0);
   });
 });

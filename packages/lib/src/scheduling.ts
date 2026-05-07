@@ -909,12 +909,7 @@ function getClaimableInspectionVisibleTasks<T extends {
 }>(
   inspection: { tasks: T[]; convertedFromQuotes?: unknown[] | null; scheduledStart?: Date | string | null }
 ) {
-  const currentTasks = inspection.tasks.filter((task) => isCurrentVisitTaskForInspection(task, inspection));
-  if (currentTasks.length > 0) {
-    return currentTasks;
-  }
-
-  return inspection.tasks.filter((task) => task.status !== InspectionStatus.cancelled);
+  return inspection.tasks.filter((task) => isCurrentVisitTaskForInspection(task, inspection));
 }
 
 function isSharedQueueTaskSet<T extends { assignedTechnicianId?: string | null }>(tasks: T[]) {
