@@ -113,6 +113,12 @@ export function LiveUrlSearchSelect({
       loading={pending}
       onChange={(nextValue, option) => {
         setQueryDraft({ text: nextValue, initialValue });
+        if (option?.href) {
+          startTransition(() => {
+            router.push(option.href as string);
+          });
+          return;
+        }
         if (option) {
           applyQueryNow(nextValue);
         }

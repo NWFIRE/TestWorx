@@ -261,13 +261,22 @@ export default async function AdminInspectionsPage({
           ]
             .filter(Boolean)
             .join(" - ");
+      const reportSummary = formatInspectionTaskSummary(inspection.tasks);
+      const technicianSummary = inspection.assignedTechnicianNames.join(", ") || "Shared queue";
       return {
         value: inspection.id,
-        label: `Inspection ${inspection.id.slice(0, 8)}`,
-        secondaryLabel: [customerLabel, locationLabel, format(inspection.scheduledStart, "MMM d, yyyy h:mm a")]
+        label: customerLabel,
+        secondaryLabel: [
+          locationLabel,
+          format(inspection.scheduledStart, "MMM d, yyyy h:mm a"),
+          reportSummary,
+          technicianSummary,
+          `Ref ${inspection.id.slice(0, 8)}`
+        ]
           .filter(Boolean)
           .join(" | "),
-        badge: "Inspection"
+        badge: "Inspection",
+        href: `/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`
       };
     })
   ]);

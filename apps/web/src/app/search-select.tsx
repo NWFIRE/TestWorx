@@ -7,6 +7,7 @@ export type SearchSelectOption = {
   label: string;
   secondaryLabel?: string | null;
   badge?: string | null;
+  href?: string | null;
   disabled?: boolean;
 };
 
