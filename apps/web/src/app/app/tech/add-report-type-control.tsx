@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { inspectionTypeRegistry } from "@testworx/lib";
 
 import { addInspectionTaskAction } from "./actions";
+import { useConfirmDialog } from "../confirm-dialog";
 
 type InspectionType = keyof typeof inspectionTypeRegistry;
 
@@ -12,6 +13,7 @@ export function AddReportTypeControl({ inspectionId }: { inspectionId: string })
   const [selectedType, setSelectedType] = useState<InspectionType>("fire_extinguisher");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const { confirm, dialog } = useConfirmDialog();
   const inspectionTypeOptions = Object.entries(inspectionTypeRegistry) as Array<
     [InspectionType, (typeof inspectionTypeRegistry)[InspectionType]]
   >;
@@ -63,9 +65,16 @@ export function AddReportTypeControl({ inspectionId }: { inspectionId: string })
         <button
           className="min-h-12 rounded-2xl border border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary-soft)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary)] disabled:opacity-60"
           disabled={isPending}
-          onClick={() => {
+          onClick={async () => {
             const selectedLabel = inspectionTypeRegistry[selectedType].label;
-            const confirmed = window.confirm(`Add ${selectedLabel} to this inspection? This creates another report task for the current visit.`);
+            const confirmed = await confirm({
+              eyebrow: "Current visit",
+              title: `Add ${selectedLabel}?`,
+              description: "This creates another report task for the current inspection visit.",
+              confirmLabel: "Add report type",
+              cancelLabel: "Cancel",
+              variant: "default"
+            });
             if (!confirmed) {
               return;
             }
@@ -81,6 +90,7 @@ export function AddReportTypeControl({ inspectionId }: { inspectionId: string })
           {isPending ? "Adding..." : "Add report type"}
         </button>
       </div>
+      {dialog}
       {message ? <p className={`mt-2 text-sm ${message === "Report type added." ? "text-emerald-600" : "text-rose-600"}`}>{message}</p> : null}
     </div>
   );

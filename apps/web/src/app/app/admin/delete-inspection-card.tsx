@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useRef } from "react";
+
+import { useConfirmDialog } from "../confirm-dialog";
 
 const initialState = {
   error: null as string | null,
@@ -23,6 +25,9 @@ export function DeleteInspectionCard({
   disabled?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const confirmedSubmitRef = useRef(false);
+  const { confirm, dialog } = useConfirmDialog();
 
   useEffect(() => {
     if (state.success) {
@@ -34,10 +39,25 @@ export function DeleteInspectionCard({
     <form
       action={formAction}
       className="rounded-[2rem] border border-rose-200 bg-rose-50 p-6"
-      onSubmit={(event) => {
-        if (!window.confirm("Delete this inspection and all of its owned report records? This cannot be undone.")) {
+      ref={formRef}
+      onSubmit={async (event) => {
+        if (!confirmedSubmitRef.current) {
           event.preventDefault();
+          const confirmed = await confirm({
+            eyebrow: "Danger zone",
+            title: "Delete inspection?",
+            description: "This permanently deletes the inspection and all owned report records, attachments, signatures, deficiencies, and inspection documents. This cannot be undone.",
+            confirmLabel: "Delete inspection",
+            cancelLabel: "Cancel",
+            variant: "danger"
+          });
+          if (confirmed) {
+            confirmedSubmitRef.current = true;
+            formRef.current?.requestSubmit();
+          }
+          return;
         }
+        confirmedSubmitRef.current = false;
       }}
     >
       <input name="inspectionId" type="hidden" value={inspectionId} />
@@ -56,6 +76,7 @@ export function DeleteInspectionCard({
       >
         {pending ? "Deleting inspection..." : "Delete inspection"}
       </button>
+      {dialog}
     </form>
   );
 }

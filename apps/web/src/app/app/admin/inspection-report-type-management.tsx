@@ -8,6 +8,7 @@ import {
   markInspectionTaskNotNeededAdminAction,
   removeInspectionTaskAdminAction
 } from "./actions";
+import { useConfirmDialog } from "../confirm-dialog";
 
 type AddInspectionTaskType = Parameters<typeof addInspectionTaskAdminAction>[1];
 
@@ -47,6 +48,7 @@ export function InspectionReportTypeManagement(input: {
   const [reasonByTask, setReasonByTask] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [isPending, startTransition] = useTransition();
+  const { confirm, dialog } = useConfirmDialog();
   const activeTasks = useMemo(
     () => input.tasks.filter((task) => task.taskStatus !== "cancelled" && task.schedulingStatus !== "not_scheduled"),
     [input.tasks]
@@ -106,12 +108,15 @@ export function InspectionReportTypeManagement(input: {
                   }`}
                   disabled={isPending || !canAdd}
                   key={reportType.value}
-                  onClick={() => {
-                    const confirmed = window.confirm(
-                      existingCount > 0
-                        ? `Add another ${reportType.label} report to this current inspection visit? No new visit will be created.`
-                        : `Add ${reportType.label} to this current inspection visit? No new visit will be created.`
-                    );
+                  onClick={async () => {
+                    const confirmed = await confirm({
+                      eyebrow: "Current visit scope",
+                      title: existingCount > 0 ? `Add another ${reportType.label}?` : `Add ${reportType.label}?`,
+                      description: "This adds the report type directly to the current inspection visit. No new visit will be created.",
+                      confirmLabel: existingCount > 0 ? "Add another report" : "Add report type",
+                      cancelLabel: "Cancel",
+                      variant: "default"
+                    });
                     if (!confirmed) {
                       return;
                     }
@@ -207,12 +212,17 @@ export function InspectionReportTypeManagement(input: {
                       <button
                         className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-60"
                         disabled={isPending || reason.trim().length < 4}
-                        onClick={() => {
-                          const confirmed = window.confirm(
-                            task.isFinalized
-                              ? `This report is finalized. Void ${task.label} with the provided reason?`
-                              : `Mark ${task.label} as Not Needed and preserve its work history?`
-                          );
+                        onClick={async () => {
+                          const confirmed = await confirm({
+                            eyebrow: task.isFinalized ? "Void finalized report" : "Mark not needed",
+                            title: task.isFinalized ? `Void ${task.label}?` : `Mark ${task.label} as Not Needed?`,
+                            description: task.isFinalized
+                              ? "This finalized report cannot be deleted. It will be voided with the provided reason and preserved in audit history."
+                              : "This report will be removed from active technician work while preserving its work history.",
+                            confirmLabel: task.isFinalized ? "Void report" : "Mark Not Needed",
+                            cancelLabel: "Cancel",
+                            variant: "warning"
+                          });
                           if (!confirmed) {
                             return;
                           }
@@ -238,8 +248,15 @@ export function InspectionReportTypeManagement(input: {
                     <button
                       className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
                       disabled={isPending}
-                      onClick={() => {
-                        const confirmed = window.confirm(`Remove ${task.label} from this inspection? No technician work has been recorded for it.`);
+                      onClick={async () => {
+                        const confirmed = await confirm({
+                          eyebrow: "Remove report type",
+                          title: `Remove ${task.label}?`,
+                          description: "No technician work has been recorded for this report, so it can be removed from the current inspection.",
+                          confirmLabel: "Remove",
+                          cancelLabel: "Cancel",
+                          variant: "danger"
+                        });
                         if (!confirmed) {
                           return;
                         }
@@ -272,6 +289,7 @@ export function InspectionReportTypeManagement(input: {
           </div>
         )}
       </div>
+      {dialog}
     </div>
   );
 }

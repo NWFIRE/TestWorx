@@ -27,6 +27,7 @@ import {
 import type { TechnicianReportEditorData } from "./report-editor";
 import { useMobileReportDraftController } from "./use-mobile-report-draft-controller";
 import { SignaturePad } from "./signature-pad";
+import { useConfirmDialog } from "../confirm-dialog";
 
 const controlPanelChecklistFieldIds = [
   "lineVoltageStatus",
@@ -667,6 +668,7 @@ function FireAlarmControlPanelSection({
   expandedRowKey: string | null;
   onSetExpandedRow: (rowKey: string) => void;
 }) {
+  const { confirm, dialog } = useConfirmDialog();
   const scalarFields = scalarFieldIds
     .map((fieldId) => section.fields.find((candidate): candidate is Exclude<ReportFieldDefinition, { type: "repeater" }> => candidate.type !== "repeater" && candidate.id === fieldId))
     .filter((candidate): candidate is Exclude<ReportFieldDefinition, { type: "repeater" }> => Boolean(candidate));
@@ -679,7 +681,7 @@ function FireAlarmControlPanelSection({
         description={field.description}
         expandedRowKey={expandedRowKey}
         onAddRow={() => controller.addRepeaterRow(section.id, field)}
-        onRemoveRow={(rowKey) => {
+        onRemoveRow={async (rowKey) => {
           const rowIndex = rows.findIndex((row, index) => getRowKey(row, field.id, index) === rowKey);
           if (rowIndex < 0) {
             return;
@@ -688,8 +690,18 @@ function FireAlarmControlPanelSection({
           if (!row) {
             return;
           }
-          if (hasMeaningfulRowData(row) && !window.confirm("Remove this control panel entry?")) {
-            return;
+          if (hasMeaningfulRowData(row)) {
+            const confirmed = await confirm({
+              eyebrow: "Control panel",
+              title: "Remove this control panel entry?",
+              description: "This removes the entered control panel details from the current report draft.",
+              confirmLabel: "Remove entry",
+              cancelLabel: "Cancel",
+              variant: "danger"
+            });
+            if (!confirmed) {
+              return;
+            }
           }
           controller.removeRepeaterRow(section.id, field.id, rowIndex);
         }}
@@ -726,6 +738,7 @@ function FireAlarmControlPanelSection({
         }))}
         title="Control panels"
       />
+      {dialog}
 
       <div className="space-y-3">
         {scalarFields.map((field) => (
@@ -814,17 +827,19 @@ function FireAlarmRepeaterChecklistSection({
   expandedRowKey: string | null;
   onSetExpandedRow: (rowKey: string) => void;
 }) {
+  const { confirm, dialog } = useConfirmDialog();
   const completionFieldIds = field.completionFieldIds ?? [];
   const deficiencyFieldIds = [...(field.deficiencyFieldIds ?? []), ...(field.deficiencyFieldId ? [field.deficiencyFieldId] : [])];
 
   return (
+    <>
     <MobileRepeatableRows
       addLabel={field.addLabel ?? "Add item"}
       disabled={isReadOnly}
       description={field.description}
       expandedRowKey={expandedRowKey}
       onAddRow={() => controller.addRepeaterRow(sectionId, field)}
-      onRemoveRow={(rowKey) => {
+      onRemoveRow={async (rowKey) => {
         const rowIndex = rows.findIndex((row, index) => getRowKey(row, field.id, index) === rowKey);
         if (rowIndex < 0) {
           return;
@@ -833,8 +848,18 @@ function FireAlarmRepeaterChecklistSection({
         if (!row) {
           return;
         }
-        if (hasMeaningfulRowData(row) && !window.confirm("Remove this item?")) {
-          return;
+        if (hasMeaningfulRowData(row)) {
+          const confirmed = await confirm({
+            eyebrow: "Checklist item",
+            title: "Remove this item?",
+            description: "This removes the entered item details from the current report draft.",
+            confirmLabel: "Remove item",
+            cancelLabel: "Cancel",
+            variant: "danger"
+          });
+          if (!confirmed) {
+            return;
+          }
         }
         controller.removeRepeaterRow(sectionId, field.id, rowIndex);
       }}
@@ -869,6 +894,8 @@ function FireAlarmRepeaterChecklistSection({
       }))}
       title={field.label}
     />
+    {dialog}
+    </>
   );
 }
 

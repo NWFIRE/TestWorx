@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useRef } from "react";
+
+import { useConfirmDialog } from "../../confirm-dialog";
 
 const initialState = {
   error: null as string | null,
@@ -25,6 +27,9 @@ export function DeleteCustomerCard({
   disabled?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const confirmedSubmitRef = useRef(false);
+  const { confirm, dialog } = useConfirmDialog();
 
   useEffect(() => {
     if (state.success && state.redirectTo) {
@@ -37,10 +42,25 @@ export function DeleteCustomerCard({
       action={formAction}
       className="rounded-[28px] border border-rose-200 bg-rose-50 p-5 lg:p-6"
       id="delete-customer"
-      onSubmit={(event) => {
-        if (!window.confirm(`Delete ${customerName}? This permanently removes the customer record when no linked history remains.`)) {
+      ref={formRef}
+      onSubmit={async (event) => {
+        if (!confirmedSubmitRef.current) {
           event.preventDefault();
+          const confirmed = await confirm({
+            eyebrow: "Danger zone",
+            title: `Delete ${customerName}?`,
+            description: "This permanently removes the customer record when no linked history remains. TradeWorx will block deletion if linked users, sites, inspections, quotes, or billing history still exist.",
+            confirmLabel: "Delete customer",
+            cancelLabel: "Cancel",
+            variant: "danger"
+          });
+          if (confirmed) {
+            confirmedSubmitRef.current = true;
+            formRef.current?.requestSubmit();
+          }
+          return;
         }
+        confirmedSubmitRef.current = false;
       }}
     >
       <input name="customerCompanyId" type="hidden" value={customerCompanyId} />
@@ -60,6 +80,7 @@ export function DeleteCustomerCard({
       >
         {pending ? "Deleting customer..." : "Delete customer"}
       </button>
+      {dialog}
     </form>
   );
 }

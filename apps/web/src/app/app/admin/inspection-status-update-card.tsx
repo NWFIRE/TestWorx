@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useMemo, useRef, useState } from "react";
 
 import {
   editableInspectionStatuses,
@@ -9,6 +9,7 @@ import {
 } from "@testworx/lib";
 
 import { StatusBadge } from "./operations-ui";
+import { useConfirmDialog } from "../confirm-dialog";
 
 const initialState = {
   error: null as string | null,
@@ -56,6 +57,9 @@ export function InspectionStatusUpdateCard({
   const [state, formAction, pending] = useActionState(action, initialState);
   const [selectedStatus, setSelectedStatus] = useState<InspectionStatus>(currentStatus);
   const [note, setNote] = useState("");
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const confirmedSubmitRef = useRef(false);
+  const { confirm, dialog } = useConfirmDialog();
 
   const confirmationMessage = useMemo(
     () => getConfirmationMessage(currentStatus, selectedStatus),
@@ -66,15 +70,37 @@ export function InspectionStatusUpdateCard({
     <form
       action={formAction}
       className="rounded-[2rem] bg-white p-6 shadow-panel"
-      onSubmit={(event) => {
+      ref={formRef}
+      onSubmit={async (event) => {
         if (selectedStatus === currentStatus) {
           event.preventDefault();
           return;
         }
 
-        if (confirmationMessage && !window.confirm(confirmationMessage)) {
+        if (confirmationMessage && !confirmedSubmitRef.current) {
           event.preventDefault();
+          const confirmed = await confirm({
+            eyebrow: "Status update",
+            title: selectedStatus === "completed" ? "Mark inspection as completed?" : "Update inspection status?",
+            description: selectedStatus === "completed"
+              ? "This inspection will be removed from active work queues and may trigger billing, scheduling, and follow-up workflows."
+              : confirmationMessage,
+            confirmLabel: selectedStatus === "completed" ? "Mark Completed" : "Update Status",
+            cancelLabel: "Cancel",
+            variant: selectedStatus === "cancelled" ? "danger" : selectedStatus === "completed" || selectedStatus === "invoiced" ? "warning" : "default",
+            details: [
+              { label: "Current status", value: formatInspectionStatusLabel(currentStatus) },
+              { label: "New status", value: formatInspectionStatusLabel(selectedStatus) }
+            ]
+          });
+          if (confirmed) {
+            confirmedSubmitRef.current = true;
+            formRef.current?.requestSubmit();
+          }
+          return;
         }
+
+        confirmedSubmitRef.current = false;
       }}
     >
       <input name="inspectionId" type="hidden" value={inspectionId} />
@@ -150,6 +176,7 @@ export function InspectionStatusUpdateCard({
           Changes are audited and will update queue visibility after refresh.
         </p>
       </div>
+      {dialog}
     </form>
   );
 }

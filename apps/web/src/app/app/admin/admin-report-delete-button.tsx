@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { removeInspectionTaskAdminAction } from "./actions";
+import { useConfirmDialog } from "../confirm-dialog";
 
 export function AdminReportDeleteButton(input: {
   inspectionId: string;
@@ -13,16 +14,22 @@ export function AdminReportDeleteButton(input: {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { confirm, dialog } = useConfirmDialog();
 
   return (
     <div className="space-y-2">
       <button
         className="inline-flex min-h-11 items-center justify-center rounded-[1rem] border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-60"
         disabled={pending}
-        onClick={() => {
-          const confirmed = window.confirm(
-            `Remove ${input.taskLabel} from this inspection? This is only allowed when no technician work has been recorded.`
-          );
+        onClick={async () => {
+          const confirmed = await confirm({
+            eyebrow: "Report type",
+            title: `Remove ${input.taskLabel}?`,
+            description: "This removes the report from the current inspection only when no technician work has been recorded.",
+            confirmLabel: "Remove report",
+            cancelLabel: "Cancel",
+            variant: "danger"
+          });
           if (!confirmed) {
             return;
           }
@@ -40,6 +47,7 @@ export function AdminReportDeleteButton(input: {
       >
         {pending ? "Removing..." : "Remove report"}
       </button>
+      {dialog}
       {message ? <p className={`text-xs ${message === "Report removed." ? "text-emerald-600" : "text-rose-600"}`}>{message}</p> : null}
     </div>
   );

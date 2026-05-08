@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useRef } from "react";
+
+import { useConfirmDialog } from "../../confirm-dialog";
 
 const initialState = {
   error: null as string | null,
@@ -23,6 +25,9 @@ export function DeleteQuoteCard({
   disabled?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const confirmedSubmitRef = useRef(false);
+  const { confirm, dialog } = useConfirmDialog();
 
   useEffect(() => {
     if (state.success && state.redirectTo) {
@@ -34,10 +39,25 @@ export function DeleteQuoteCard({
     <form
       action={formAction}
       className="rounded-[28px] border border-rose-200 bg-rose-50 p-5 lg:p-6"
-      onSubmit={(event) => {
-        if (!window.confirm("Delete this quote? This permanently removes the quote and its hosted approval history inside TradeWorx.")) {
+      ref={formRef}
+      onSubmit={async (event) => {
+        if (!confirmedSubmitRef.current) {
           event.preventDefault();
+          const confirmed = await confirm({
+            eyebrow: "Danger zone",
+            title: "Delete this quote?",
+            description: "This permanently removes the quote, line items, hosted approval history, and reminder dispatch history inside TradeWorx.",
+            confirmLabel: "Delete quote",
+            cancelLabel: "Cancel",
+            variant: "danger"
+          });
+          if (confirmed) {
+            confirmedSubmitRef.current = true;
+            formRef.current?.requestSubmit();
+          }
+          return;
         }
+        confirmedSubmitRef.current = false;
       }}
     >
       <input name="quoteId" type="hidden" value={quoteId} />
@@ -58,6 +78,7 @@ export function DeleteQuoteCard({
       >
         {pending ? "Deleting quote..." : "Delete quote"}
       </button>
+      {dialog}
     </form>
   );
 }
