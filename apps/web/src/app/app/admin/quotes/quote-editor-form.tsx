@@ -5,7 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 import { ActionButton } from "@/app/action-button";
 import { SearchSelect, type SearchSelectOption } from "@/app/search-select";
 import { useToast } from "@/app/toast-provider";
-import { isUserFacingSiteLabel } from "@testworx/lib";
+import { DEFAULT_QUOTE_SALES_TAX_RATE, isUserFacingSiteLabel } from "@testworx/lib";
 
 type QuoteCatalogItem = {
   code: string;
@@ -18,6 +18,7 @@ type QuoteCatalogItem = {
   quickbooksItemId?: string;
   quickbooksItemType?: string;
   unitPrice?: number | null;
+  taxable?: boolean;
 };
 
 type CustomerOption = {
@@ -98,6 +99,14 @@ function parseQuantityInputValue(value: string) {
   return Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : 0;
 }
 
+function calculateLineSubtotal(line: Pick<QuoteLineValue, "discountAmount" | "quantity" | "unitPrice">) {
+  return Math.max(0, line.quantity * line.unitPrice - line.discountAmount);
+}
+
+function roundMoney(value: number) {
+  return Number(value.toFixed(2));
+}
+
 function formatSiteOptionLabel(site: SiteOption) {
   return site.city ? `${site.name} - ${site.city}` : site.name;
 }
@@ -168,13 +177,22 @@ export function QuoteEditorForm({
 
   const subtotal = useMemo(
     () =>
-      value.lineItems.reduce(
-        (sum, line) => sum + Math.max(0, line.quantity * line.unitPrice - line.discountAmount),
+      roundMoney(value.lineItems.reduce(
+        (sum, line) => sum + calculateLineSubtotal(line),
         0
-      ),
+      )),
     [value.lineItems]
   );
-  const total = subtotal + (value.taxAmount || 0);
+  const taxableSubtotal = useMemo(
+    () =>
+      roundMoney(value.lineItems.reduce(
+        (sum, line) => line.taxable ? sum + calculateLineSubtotal(line) : sum,
+        0
+      )),
+    [value.lineItems]
+  );
+  const taxAmount = roundMoney(taxableSubtotal * DEFAULT_QUOTE_SALES_TAX_RATE);
+  const total = roundMoney(subtotal + taxAmount);
 
   function updateLine(index: number, patch: Partial<QuoteLineValue>) {
     setValue((current) => ({
@@ -232,6 +250,7 @@ export function QuoteEditorForm({
       title: match?.title ?? "",
       description: match?.description ?? "",
       unitPrice: typeof match?.unitPrice === "number" ? match.unitPrice : 0,
+      taxable: typeof match?.taxable === "boolean" ? match.taxable : value.lineItems[index]?.taxable ?? false,
       inspectionType: match?.inspectionType ?? null,
       category: match?.category ?? null
     });
@@ -259,6 +278,7 @@ export function QuoteEditorForm({
     >
       {quoteId ? <input name="quoteId" type="hidden" value={quoteId} /> : null}
       <input name="lineItemsJson" type="hidden" value={JSON.stringify(value.lineItems)} />
+      <input name="taxAmount" type="hidden" value={taxAmount} />
 
       <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.04)]">
           <div className="grid gap-4 md:grid-cols-2">
@@ -397,7 +417,7 @@ export function QuoteEditorForm({
 
           <div className="space-y-4">
             {value.lineItems.map((line, index) => {
-              const lineTotal = Math.max(0, line.quantity * line.unitPrice - line.discountAmount);
+              const lineTotal = calculateLineSubtotal(line);
 
               return (
                 <div key={line.id ?? `${line.internalCode}-${index}`} className="rounded-[24px] border border-slate-200/80 bg-slate-50/70 p-4">
@@ -580,17 +600,14 @@ export function QuoteEditorForm({
               <span>Subtotal</span>
               <span className="font-semibold text-slate-950">{toCurrency(subtotal)}</span>
             </div>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-700">Tax amount</span>
-              <input
-                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
-                name="taxAmount"
-                onChange={(event) => setValue((current) => ({ ...current, taxAmount: Number(event.target.value || "0") }))}
-                step="0.01"
-                type="number"
-                value={value.taxAmount}
-              />
-            </label>
+            <div className="flex items-center justify-between text-sm text-slate-600">
+              <span>Taxable subtotal</span>
+              <span className="font-semibold text-slate-950">{toCurrency(taxableSubtotal)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm text-slate-600">
+              <span>Sales tax</span>
+              <span className="font-semibold text-slate-950">{toCurrency(taxAmount)}</span>
+            </div>
             <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-base font-semibold text-slate-950">
               <span>Total</span>
               <span>{toCurrency(total)}</span>

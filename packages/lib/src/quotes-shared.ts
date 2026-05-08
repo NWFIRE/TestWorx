@@ -10,6 +10,8 @@ const quoteStatusValues = [
   "cancelled"
 ] as const;
 
+export const DEFAULT_QUOTE_SALES_TAX_RATE = 0.0825;
+
 function formatQuoteStatusLabel(status: (typeof quoteStatusValues)[number]) {
   return status.replaceAll("_", " ").replace(/\b\w/g, (match) => match.toUpperCase());
 }

@@ -244,7 +244,8 @@ describe("quotes", () => {
         proposalType: "kitchen_suppression",
         includeDepositRequirement: true,
         subtotal: 105,
-        total: 115,
+        taxAmount: 0,
+        total: 105,
         lineItems: {
           create: [
             expect.objectContaining({
@@ -257,6 +258,63 @@ describe("quotes", () => {
       })
     }));
     expect(prismaMock.auditLog.create).toHaveBeenCalled();
+  });
+
+  it("calculates quote sales tax from taxable line subtotals", async () => {
+    prismaMock.quote.count.mockResolvedValue(4);
+    prismaMock.quote.create.mockResolvedValue({
+      id: "quote_taxable",
+      quoteNumber: "Q-2026-0005"
+    });
+
+    await createQuote(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        contactName: "Alyssa Reed",
+        recipientEmail: "alyssa@example.com",
+        proposalType: "fire_extinguisher",
+        includeDepositRequirement: false,
+        issuedAt: new Date("2026-04-06T12:00:00.000Z"),
+        expiresAt: new Date("2026-04-30T12:00:00.000Z"),
+        internalNotes: null,
+        customerNotes: null,
+        taxAmount: 0,
+        lineItems: [
+          {
+            internalCode: "EXTINGUISHER_ANNUAL",
+            title: "Taxable extinguisher service",
+            description: "Annual inspection",
+            quantity: 2,
+            unitPrice: 55,
+            discountAmount: 0,
+            taxable: true,
+            inspectionType: "fire_extinguisher",
+            category: "inspection"
+          },
+          {
+            internalCode: "SERVICE_FEE",
+            title: "Non-taxable service fee",
+            description: "Trip charge",
+            quantity: 1,
+            unitPrice: 65,
+            discountAmount: 0,
+            taxable: false,
+            inspectionType: null,
+            category: "service_fee"
+          }
+        ]
+      }
+    );
+
+    expect(prismaMock.quote.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        subtotal: 110,
+        taxAmount: 9.08,
+        total: 119.08
+      })
+    }));
   });
 
   it("automatically adds the location-based service fee when creating a quote", async () => {
