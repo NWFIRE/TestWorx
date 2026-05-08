@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { QuoteDeliveryStatus, QuoteStatus, QuoteSyncStatus } from "@prisma/client";
+import { QuoteDeliveryStatus, QuoteStatus, QuoteSyncStatus, WorkOrderLineItemType } from "@prisma/client";
 import { addDays } from "date-fns";
 
 const { prismaMock, sendQuoteEmailMock, sendQuoteReminderEmailMock, syncQuoteToQuickBooksEstimateMock, createInspectionMock, ensureGenericInspectionSiteMock, saveQuickBooksItemMappingForCodeMock, clearQuickBooksItemMappingForCodeMock, generateQuotePdfMock } = vi.hoisted(() => ({
   prismaMock: {
+    $queryRawUnsafe: vi.fn(),
+    $transaction: vi.fn(),
     quote: {
       count: vi.fn(),
       create: vi.fn(),
@@ -27,6 +29,9 @@ const { prismaMock, sendQuoteEmailMock, sendQuoteReminderEmailMock, syncQuoteToQ
     },
     quickBooksCatalogItem: {
       findMany: vi.fn()
+    },
+    workOrderLineItem: {
+      createMany: vi.fn()
     },
     quoteReminderDispatch: {
       create: vi.fn(),
@@ -129,6 +134,8 @@ import {
 describe("quotes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaMock.$queryRawUnsafe.mockResolvedValue([{ exists: true }]);
+    prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof prismaMock) => unknown) => callback(prismaMock));
     prismaMock.customerCompany.findMany.mockResolvedValue([]);
     prismaMock.customerCompany.findFirst.mockResolvedValue(null);
     prismaMock.site.findMany.mockResolvedValue([]);
@@ -173,6 +180,7 @@ describe("quotes", () => {
       internalCode: "WET_FIRE_SPRINKLER_ANNUAL"
     });
     prismaMock.quoteLineItem.update.mockResolvedValue(undefined);
+    prismaMock.workOrderLineItem.createMany.mockResolvedValue({ count: 0 });
     saveQuickBooksItemMappingForCodeMock.mockResolvedValue(undefined);
     clearQuickBooksItemMappingForCodeMock.mockResolvedValue(undefined);
     generateQuotePdfMock.mockResolvedValue(new Uint8Array([1, 2, 3]));
@@ -881,7 +889,7 @@ describe("quotes", () => {
     )).rejects.toThrow("Approve this quote before converting it into work.");
   });
 
-  it("converts approved quote lines into current-visit inspection tasks", async () => {
+  it("converts approved quote lines into an unassigned work order with copied billable lines", async () => {
     createInspectionMock.mockResolvedValue({ id: "inspection_1" });
     prismaMock.quote.findFirst.mockResolvedValue({
       id: "quote_1",
@@ -896,9 +904,17 @@ describe("quotes", () => {
       lineItems: [
         {
           id: "line_1",
+          internalCode: "EXTINGUISHER_ANNUAL",
           inspectionType: "fire_extinguisher",
           description: "Annual inspection",
-          title: "Fire extinguisher annual inspection"
+          title: "Fire extinguisher annual inspection",
+          quantity: 2,
+          unitPrice: 55,
+          discountAmount: 0,
+          taxable: true,
+          total: 110,
+          qbItemId: "qb_extinguisher",
+          category: "inspection"
         }
       ]
     });
@@ -913,14 +929,35 @@ describe("quotes", () => {
       expect.any(Object),
       expect.objectContaining({
         status: "to_be_completed",
+        assignedTechnicianIds: [],
         tasks: [
           expect.objectContaining({
-            inspectionType: "fire_extinguisher",
+            inspectionType: "work_order",
             schedulingStatus: "scheduled_now"
           })
         ]
       })
     );
+    expect(prismaMock.workOrderLineItem.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          inspectionId: "inspection_1",
+          name: "Fire extinguisher annual inspection",
+          description: "Annual inspection",
+          quantity: 2,
+          unitPrice: 55,
+          totalPrice: 110,
+          taxable: true,
+          itemType: WorkOrderLineItemType.inspection,
+          quickBooksItemId: "qb_extinguisher",
+          pricingSnapshot: expect.objectContaining({
+            source: "quote_conversion",
+            quoteLineItemId: "line_1",
+            internalCode: "EXTINGUISHER_ANNUAL"
+          })
+        })
+      ]
+    });
     expect(prismaMock.quote.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "quote_1" },
       data: expect.objectContaining({
@@ -971,7 +1008,7 @@ describe("quotes", () => {
     );
   });
 
-  it("converts QuickBooks catalog service lines by inferring the inspection type", async () => {
+  it("keeps inferred service context in work-order notes for QuickBooks catalog service lines", async () => {
     createInspectionMock.mockResolvedValue({ id: "inspection_qb" });
     prismaMock.quote.findFirst.mockResolvedValue({
       id: "quote_qb",
@@ -991,7 +1028,13 @@ describe("quotes", () => {
           title: "Kitchen System Recharge",
           description: "QuickBooks Service - SKU KS-RECHARGE",
           category: "service",
-          inspectionType: null
+          inspectionType: null,
+          quantity: 1,
+          unitPrice: 250,
+          discountAmount: 0,
+          taxable: false,
+          total: 250,
+          qbItemId: "qb_catalog_9"
         }
       ]
     });
@@ -1006,15 +1049,26 @@ describe("quotes", () => {
       expect.objectContaining({
         tasks: [
           expect.objectContaining({
-            inspectionType: "kitchen_suppression",
-            notes: "QuickBooks Service - SKU KS-RECHARGE"
+            inspectionType: "work_order",
+            notes: expect.stringContaining("Kitchen suppression")
           })
         ]
       })
     );
+    expect(prismaMock.workOrderLineItem.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          name: "Kitchen System Recharge",
+          unitPrice: 250,
+          totalPrice: 250,
+          itemType: WorkOrderLineItemType.material,
+          quickBooksItemId: "qb_catalog_9"
+        })
+      ]
+    });
   });
 
-  it("uses the proposal type as a fallback for service quote lines without report metadata", async () => {
+  it("uses the proposal type as a fallback when recording work-order service context", async () => {
     createInspectionMock.mockResolvedValue({ id: "inspection_proposal" });
     prismaMock.quote.findFirst.mockResolvedValue({
       id: "quote_proposal",
@@ -1034,7 +1088,13 @@ describe("quotes", () => {
           title: "Service Fee",
           description: "Travel/service fee",
           category: "service_fee",
-          inspectionType: null
+          inspectionType: null,
+          quantity: 1,
+          unitPrice: 65,
+          discountAmount: 0,
+          taxable: false,
+          total: 65,
+          qbItemId: "qb_service_fee"
         },
         {
           id: "line_2",
@@ -1042,7 +1102,13 @@ describe("quotes", () => {
           title: "Annual Service",
           description: "Annual inspection service",
           category: "service",
-          inspectionType: null
+          inspectionType: null,
+          quantity: 1,
+          unitPrice: 115,
+          discountAmount: 0,
+          taxable: false,
+          total: 115,
+          qbItemId: "qb_annual_service"
         }
       ]
     });
@@ -1057,12 +1123,26 @@ describe("quotes", () => {
       expect.objectContaining({
         tasks: [
           expect.objectContaining({
-            inspectionType: "fire_alarm",
-            notes: "Annual inspection service"
+            inspectionType: "work_order",
+            notes: expect.stringContaining("Fire alarm")
           })
         ]
       })
     );
+    expect(prismaMock.workOrderLineItem.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          name: "Service Fee",
+          itemType: WorkOrderLineItemType.fee,
+          quickBooksItemId: "qb_service_fee"
+        }),
+        expect.objectContaining({
+          name: "Annual Service",
+          itemType: WorkOrderLineItemType.inspection,
+          quickBooksItemId: "qb_annual_service"
+        })
+      ])
+    });
   });
 
   it("returns the existing converted inspection instead of failing repeated conversion clicks", async () => {

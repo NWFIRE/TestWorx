@@ -372,7 +372,7 @@ export default async function QuoteDetailPage({
 
           <SectionCard>
             <h2 className="text-xl font-semibold text-slate-950">Convert to work</h2>
-            <p className="mt-2 text-sm text-slate-500">Approved quotes can be converted into a new inspection without re-entering line items. Inspection-linked quote lines become service tasks on the new visit.</p>
+            <p className="mt-2 text-sm text-slate-500">Approved quotes convert into an unassigned work order with the quote services, labor, fees, materials, pricing, and tax flags preserved.</p>
             <form action={convertQuoteAction} className="mt-4">
               <input name="quoteId" type="hidden" value={detail.id} />
               <button
@@ -385,7 +385,7 @@ export default async function QuoteDetailPage({
             </form>
             {detail.convertedInspectionId ? (
               <Link className="mt-3 inline-flex text-sm font-semibold text-slateblue" href={`/app/admin/inspections/${detail.convertedInspectionId}`}>
-                Open converted inspection
+                Open converted work order
               </Link>
             ) : null}
           </SectionCard>

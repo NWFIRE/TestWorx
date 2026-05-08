@@ -5,7 +5,10 @@ import {
   QuoteDeliveryStatus,
   QuoteStatus,
   QuoteSyncStatus,
-  RecurrenceFrequency
+  RecurrenceFrequency,
+  WorkOrderLineBillableStatus,
+  WorkOrderLineItemType,
+  WorkOrderLineSource
 } from "@prisma/client";
 import { prisma } from "@testworx/db";
 import { z } from "zod";
@@ -31,6 +34,7 @@ import {
 } from "./quickbooks";
 import { createInspection, ensureGenericInspectionSite, getCustomerFacingSiteLabel } from "./scheduling";
 import { assertTenantContext, canAccessQuoteWorkspace } from "./permissions";
+import { assertWorkOrderLineItemTable } from "./work-order-line-item-table";
 
 const quoteStatusValues = Object.values(QuoteStatus);
 const quoteSyncStatusValues = Object.values(QuoteSyncStatus);
@@ -2724,6 +2728,102 @@ function defaultConversionStart() {
   return setMinutes(setHours(nextDay, 9), 0);
 }
 
+function inferWorkOrderLineItemType(line: Pick<NormalizedQuoteLineItem, "category" | "internalCode" | "title" | "description">) {
+  const haystack = [
+    line.category ?? "",
+    line.internalCode,
+    line.title,
+    line.description ?? ""
+  ].join(" ").toLowerCase();
+
+  if (haystack.includes("labor") || haystack.includes("hour")) {
+    return WorkOrderLineItemType.labor;
+  }
+  if (haystack.includes("inspection")) {
+    return WorkOrderLineItemType.inspection;
+  }
+  if (haystack.includes("part")) {
+    return WorkOrderLineItemType.part;
+  }
+  if (haystack.includes("material") || haystack.includes("agent") || haystack.includes("recharge")) {
+    return WorkOrderLineItemType.material;
+  }
+  if (haystack.includes("replacement") || haystack.includes("replace")) {
+    return WorkOrderLineItemType.replacement;
+  }
+  if (haystack.includes("fee") || haystack.includes("compliance") || haystack.includes("minimum")) {
+    return WorkOrderLineItemType.fee;
+  }
+
+  return WorkOrderLineItemType.service;
+}
+
+function buildQuoteWorkOrderLineItems(input: {
+  tenantId: string;
+  inspectionId: string;
+  quoteId: string;
+  quoteNumber: string;
+  actorUserId: string;
+  lineItems: Array<Pick<NormalizedQuoteLineItem,
+    "internalCode" | "title" | "description" | "quantity" | "unitPrice" | "discountAmount" | "taxable" | "total" | "qbItemId" | "inspectionType" | "category"
+  > & { id: string }>;
+}) {
+  return input.lineItems.map((line) => ({
+    tenantId: input.tenantId,
+    inspectionId: input.inspectionId,
+    catalogItemId: null,
+    itemType: inferWorkOrderLineItemType(line),
+    name: line.title,
+    description: line.description,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice,
+    totalPrice: line.total,
+    taxable: line.taxable,
+    billableStatus: WorkOrderLineBillableStatus.billable,
+    technicianNotes: `Converted from approved quote ${input.quoteNumber}.`,
+    source: WorkOrderLineSource.admin_added,
+    quickBooksItemId: line.qbItemId,
+    addedByUserId: input.actorUserId,
+    pricingSnapshot: {
+      source: "quote_conversion",
+      quoteId: input.quoteId,
+      quoteNumber: input.quoteNumber,
+      quoteLineItemId: line.id,
+      internalCode: line.internalCode,
+      title: line.title,
+      description: line.description,
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
+      discountAmount: line.discountAmount,
+      taxable: line.taxable,
+      total: line.total,
+      qbItemId: line.qbItemId,
+      inspectionType: line.inspectionType,
+      category: line.category
+    } satisfies Prisma.InputJsonObject
+  })) satisfies Prisma.WorkOrderLineItemCreateManyInput[];
+}
+
+function readDeficiencyIdsFromQuoteAuditLogs(logs: Array<{ metadata: Prisma.JsonValue | null }>) {
+  const ids = new Set<string>();
+  for (const log of logs) {
+    if (!log.metadata || typeof log.metadata !== "object" || Array.isArray(log.metadata)) {
+      continue;
+    }
+    const metadata = log.metadata as Record<string, unknown>;
+    const deficiencyIds = metadata.deficiencyIds;
+    if (!Array.isArray(deficiencyIds)) {
+      continue;
+    }
+    deficiencyIds.forEach((id) => {
+      if (typeof id === "string" && id.trim()) {
+        ids.add(id.trim());
+      }
+    });
+  }
+  return [...ids];
+}
+
 export async function convertQuoteToInspection(actor: ActorContext, quoteId: string) {
   const parsedActor = parseActor(actor);
   assertQuoteManagementAccess(parsedActor);
@@ -2741,6 +2841,10 @@ export async function convertQuoteToInspection(actor: ActorContext, quoteId: str
   if (getEffectiveQuoteStatus(quote.status, quote.expiresAt) !== QuoteStatus.approved) {
     throw new Error("Approve this quote before converting it into work.");
   }
+  if (quote.lineItems.length === 0) {
+    throw new Error("Add at least one approved quote line item before converting this quote into work.");
+  }
+  await assertWorkOrderLineItemTable();
   const conversionSiteId = quote.siteId ?? (await ensureGenericInspectionSite(
     { userId: parsedActor.userId, role: parsedActor.role, tenantId: parsedActor.tenantId },
     quote.customerCompanyId
@@ -2750,9 +2854,16 @@ export async function convertQuoteToInspection(actor: ActorContext, quoteId: str
     lineItems: quote.lineItems,
     proposalType: quote.proposalType
   });
-  if (convertibleLines.length === 0) {
-    throw new Error("Add at least one inspection service line, or set the quote proposal type, before converting this quote into work.");
-  }
+  const deficiencySourceLogs = await prisma.auditLog.findMany({
+    where: {
+      tenantId: parsedActor.tenantId as string,
+      entityType: "Quote",
+      entityId: quote.id,
+      action: "quote.created_from_deficiencies"
+    },
+    select: { metadata: true }
+  });
+  const sourceDeficiencyIds = readDeficiencyIdsFromQuoteAuditLogs(deficiencySourceLogs);
 
   const scheduledStart = defaultConversionStart();
   const inspection = await createInspection(
@@ -2767,35 +2878,87 @@ export async function convertQuoteToInspection(actor: ActorContext, quoteId: str
       assignedTechnicianIds: [],
       status: InspectionStatus.to_be_completed,
       notes: [`Converted from quote ${quote.quoteNumber}.`, quote.customerNotes ?? ""].filter(Boolean).join("\n"),
-      tasks: convertibleLines.map(({ line, inspectionType }) => ({
-        inspectionType,
+      tasks: [
+        {
+        inspectionType: "work_order",
         frequency: RecurrenceFrequency.ONCE,
         assignedTechnicianId: null,
         dueMonth: `${scheduledStart.getFullYear()}-${String(scheduledStart.getMonth() + 1).padStart(2, "0")}`,
         dueDate: scheduledStart,
         schedulingStatus: "scheduled_now" as const,
-        notes: line.description ?? line.title
-      }))
+        notes: [
+          `Converted from approved quote ${quote.quoteNumber}.`,
+          convertibleLines.length > 0
+            ? `Related service types: ${[...new Set(convertibleLines.map((line) => inspectionTypeRegistry[line.inspectionType]?.label ?? line.inspectionType))].join(", ")}.`
+            : null
+        ].filter(Boolean).join("\n")
+        }
+      ]
     }
   );
 
-  await prisma.quote.update({
-    where: { id: quote.id },
-    data: {
-      status: QuoteStatus.converted,
-      convertedAt: new Date(),
-      convertedInspectionId: inspection.id,
-      updatedByUserId: parsedActor.userId
+  await prisma.$transaction(async (tx) => {
+    const latestQuote = await tx.quote.findFirst({
+      where: { id: quote.id, tenantId: parsedActor.tenantId as string },
+      select: { convertedInspectionId: true }
+    });
+    if (latestQuote?.convertedInspectionId && latestQuote.convertedInspectionId !== inspection.id) {
+      throw new Error("This quote was already converted into work.");
     }
-  });
 
-  await createQuoteAuditLog({
-    tenantId: parsedActor.tenantId as string,
-    actorUserId: parsedActor.userId,
-    action: "quote.converted",
-    quoteId: quote.id,
-    metadata: {
-      inspectionId: inspection.id
+    await tx.workOrderLineItem.createMany({
+      data: buildQuoteWorkOrderLineItems({
+        tenantId: parsedActor.tenantId as string,
+        inspectionId: inspection.id,
+        quoteId: quote.id,
+        quoteNumber: quote.quoteNumber,
+        actorUserId: parsedActor.userId,
+        lineItems: quote.lineItems
+      })
+    });
+
+    await tx.quote.update({
+      where: { id: quote.id },
+      data: {
+        status: QuoteStatus.converted,
+        convertedAt: new Date(),
+        convertedInspectionId: inspection.id,
+        updatedByUserId: parsedActor.userId
+      }
+    });
+
+    await tx.auditLog.create({
+      data: {
+        tenantId: parsedActor.tenantId as string,
+        actorUserId: parsedActor.userId,
+        action: "quote.converted",
+        entityType: "Quote",
+        entityId: quote.id,
+        metadata: {
+          inspectionId: inspection.id,
+          workOrderLineItemCount: quote.lineItems.length,
+          relatedInspectionTypes: [...new Set(convertibleLines.map((line) => line.inspectionType))],
+          sourceDeficiencyIds
+        }
+      }
+    });
+
+    if (sourceDeficiencyIds.length > 0) {
+      await Promise.all(sourceDeficiencyIds.map((deficiencyId) => tx.auditLog.create({
+        data: {
+          tenantId: parsedActor.tenantId as string,
+          actorUserId: parsedActor.userId,
+          action: "deficiency.linked_to_work_order",
+          entityType: "Deficiency",
+          entityId: deficiencyId,
+          metadata: {
+            quoteId: quote.id,
+            quoteNumber: quote.quoteNumber,
+            inspectionId: inspection.id,
+            workOrderId: inspection.id
+          }
+        }
+      })));
     }
   });
 
