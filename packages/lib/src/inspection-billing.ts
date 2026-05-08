@@ -217,6 +217,7 @@ type BillingSummaryListRow = {
   siteId: string;
   siteName: string;
   inspectionDate: Date;
+  inspectionClassification: string | null;
   technicianName: string | null;
   status: BillingSummaryStatus;
   billingType: "standard" | "third_party";
@@ -3707,6 +3708,53 @@ async function applyMinimumTicketPricingToPersistedSummaryItems(
   });
 }
 
+async function refreshBillingSummaryListRowForDisplay(
+  tenantId: string,
+  row: BillingSummaryListRow
+): Promise<BillingSummaryListRow | null> {
+  const normalizedItems = normalizeExistingItems((row as unknown as { items: unknown }).items);
+  if (row.status === "invoiced") {
+    return {
+      ...row,
+      items: normalizedItems
+    };
+  }
+
+  try {
+    const refreshed = await syncInspectionBillingSummaryTx(prisma as unknown as TransactionClient, {
+      tenantId,
+      inspectionId: row.inspectionId
+    });
+    if (!refreshed) {
+      return null;
+    }
+
+    return {
+      ...row,
+      status: refreshed.status,
+      billingType: refreshed.billingType,
+      billToAccountId: refreshed.billToAccountId,
+      billToName: refreshed.billToName,
+      contractProfileId: refreshed.contractProfileId,
+      contractProfileName: refreshed.contractProfileName,
+      routingSnapshot: refreshed.routingSnapshot,
+      pricingSnapshot: refreshed.pricingSnapshot,
+      groupingSnapshot: refreshed.groupingSnapshot,
+      attachmentSnapshot: refreshed.attachmentSnapshot,
+      deliverySnapshot: refreshed.deliverySnapshot,
+      referenceSnapshot: refreshed.referenceSnapshot,
+      subtotal: refreshed.subtotal,
+      notes: refreshed.notes,
+      items: refreshed.items
+    };
+  } catch {
+    return {
+      ...row,
+      items: normalizedItems
+    };
+  }
+}
+
 export async function getAdminBillingSummaries(actor: ActorContext) {
   const parsedActor = parseActor(actor);
   ensureAdmin(parsedActor);
@@ -3756,8 +3804,12 @@ export async function getAdminBillingSummaries(actor: ActorContext) {
     ORDER BY i."scheduledStart" DESC
   `) as BillingSummaryListRow[];
 
-  return rows.map((row) => {
-    const items = normalizeExistingItems((row as unknown as { items: unknown }).items);
+  const displayRows = (
+    await Promise.all(rows.map((row) => refreshBillingSummaryListRowForDisplay(tenantId, row)))
+  ).filter((row): row is BillingSummaryListRow => Boolean(row));
+
+  return displayRows.map((row) => {
+    const items = normalizeExistingItems(row.items);
     const reportTypes = [...new Set(items.map((item) => item.reportType).filter((reportType) => reportType !== INSPECTION_LEVEL_REPORT_TYPE))];
     return {
       ...row,
