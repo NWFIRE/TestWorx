@@ -1551,6 +1551,107 @@ function toFinalizeDraftValidationError(error: unknown) {
   return new Error("Report draft is incomplete or out of date. Reopen the report, review required items, and finalize again.");
 }
 
+const finalizationActiveTaskSchedulingStatuses = ["due_now", "scheduled_now", "completed"] as const;
+
+function isInspectionTaskFinalized(task: {
+  status: InspectionStatus;
+  report: { status: ReportStatus; finalizedAt: Date | null } | null;
+}) {
+  return task.status === InspectionStatus.completed &&
+    task.report?.status === reportStatuses.finalized &&
+    Boolean(task.report.finalizedAt);
+}
+
+export async function resolveInspectionCompletionAfterTaskFinalizationTx(input: {
+  tx: Prisma.TransactionClient;
+  tenantId: string;
+  inspectionId: string;
+  finalizedAt: Date;
+  actorUserId: string;
+  source: "mobile_or_web_finalize" | "sync_finalize";
+}) {
+  const inspection = await input.tx.inspection.findFirst({
+    where: { id: input.inspectionId, tenantId: input.tenantId },
+    select: {
+      id: true,
+      status: true,
+      isPriority: true,
+      tasks: {
+        where: {
+          status: { not: InspectionStatus.cancelled },
+          schedulingStatus: { in: [...finalizationActiveTaskSchedulingStatuses] }
+        },
+        select: {
+          id: true,
+          status: true,
+          schedulingStatus: true,
+          report: { select: { id: true, status: true, finalizedAt: true } }
+        }
+      }
+    }
+  });
+
+  if (!inspection) {
+    throw new Error("Inspection not found.");
+  }
+
+  const blockingTasks = inspection.tasks.filter((task) => !isInspectionTaskFinalized(task));
+  const completed = blockingTasks.length === 0 && inspection.tasks.length > 0;
+
+  if (!completed) {
+    await createAuditLog(input.tx, {
+      tenantId: input.tenantId,
+      actorUserId: input.actorUserId,
+      action: "inspection.finalization_recalculated",
+      entityId: input.inspectionId,
+      metadata: {
+        source: input.source,
+        previousInspectionStatus: inspection.status,
+        newInspectionStatus: inspection.status,
+        activeTaskCount: inspection.tasks.length,
+        blockingTaskIds: blockingTasks.map((task) => task.id),
+        billingReadyTransition: false
+      }
+    });
+    return { completed: false, previousStatus: inspection.status, nextStatus: inspection.status, wasPriority: inspection.isPriority };
+  }
+
+  if (inspection.status !== InspectionStatus.completed) {
+    await input.tx.inspection.update({
+      where: { id: input.inspectionId },
+      data: {
+        status: InspectionStatus.completed,
+        isPriority: false,
+        priorityClearedAt: inspection.isPriority ? input.finalizedAt : undefined
+      }
+    });
+  }
+
+  await syncInspectionArchiveStateTx(input.tx, {
+    tenantId: input.tenantId,
+    inspectionId: input.inspectionId,
+    completedAtOverride: input.finalizedAt,
+    archivedAtOverride: input.finalizedAt
+  });
+
+  await createAuditLog(input.tx, {
+    tenantId: input.tenantId,
+    actorUserId: input.actorUserId,
+    action: "inspection.finalization_recalculated",
+    entityId: input.inspectionId,
+    metadata: {
+      source: input.source,
+      previousInspectionStatus: inspection.status,
+      newInspectionStatus: InspectionStatus.completed,
+      activeTaskCount: inspection.tasks.length,
+      finalizedTaskIds: inspection.tasks.map((task) => task.id),
+      billingReadyTransition: true
+    }
+  });
+
+  return { completed: true, previousStatus: inspection.status, nextStatus: InspectionStatus.completed, wasPriority: inspection.isPriority };
+}
+
 async function resolveFinalizeInspectionReportId(input: {
   tenantId: string;
   inspectionReportId: string | null;
@@ -1755,14 +1856,6 @@ export async function finalizeInspectionReport(actor: ActorContext, input: Final
       data: { status: "completed" }
     });
 
-    const remainingDrafts = await tx.inspectionReport.count({
-      where: {
-        tenantId: parsedActor.tenantId as string,
-        inspectionId: report.inspectionId,
-        status: { not: reportStatuses.finalized }
-      }
-    });
-
     const pendingRequiredInspectionDocuments = await tx.inspectionDocument.count({
       where: {
         tenantId: parsedActor.tenantId as string,
@@ -1774,28 +1867,23 @@ export async function finalizeInspectionReport(actor: ActorContext, input: Final
       }
     });
 
-    if (remainingDrafts === 0 && pendingRequiredInspectionDocuments === 0) {
-      await tx.inspection.update({
-        where: { id: report.inspectionId },
-        data: {
-          status: "completed",
-          isPriority: false,
-          priorityClearedAt: new Date()
-        }
-      });
-
-      await syncInspectionArchiveStateTx(tx, {
+    const completionResult = pendingRequiredInspectionDocuments === 0
+      ? await resolveInspectionCompletionAfterTaskFinalizationTx({
+        tx,
         tenantId: parsedActor.tenantId as string,
         inspectionId: report.inspectionId,
-        completedAtOverride: finalizedAt,
-        archivedAtOverride: finalizedAt
+        finalizedAt,
+        actorUserId: parsedActor.userId,
+        source: "mobile_or_web_finalize"
+      })
+      : { completed: false, previousStatus: finalized.inspection.status, nextStatus: finalized.inspection.status, wasPriority: finalized.inspection.isPriority };
+
+    if (completionResult.completed) {
+      await syncInspectionBillingSummaryTx(tx, {
+        tenantId: parsedActor.tenantId as string,
+        inspectionId: report.inspectionId
       });
     }
-
-    await syncInspectionBillingSummaryTx(tx, {
-      tenantId: parsedActor.tenantId as string,
-      inspectionId: report.inspectionId
-    });
 
     await createAuditLog(tx, {
       tenantId: parsedActor.tenantId as string,
@@ -1805,11 +1893,14 @@ export async function finalizeInspectionReport(actor: ActorContext, input: Final
       metadata: {
         inspectionId: report.inspectionId,
         inspectionTaskId: report.inspectionTaskId,
-        generatedAttachmentId: generatedAttachment.id
+        generatedAttachmentId: generatedAttachment.id,
+        previousInspectionStatus: completionResult.previousStatus,
+        newInspectionStatus: completionResult.nextStatus,
+        billingReadyTransition: completionResult.completed
       }
     });
 
-    if (remainingDrafts === 0 && pendingRequiredInspectionDocuments === 0 && finalized.inspection.isPriority) {
+    if (completionResult.completed && completionResult.wasPriority) {
       await createAuditLog(tx, {
         tenantId: parsedActor.tenantId as string,
         actorUserId: parsedActor.userId,
