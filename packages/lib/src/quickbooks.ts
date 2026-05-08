@@ -4549,7 +4549,11 @@ export async function updateQuickBooksCatalogItem(actor: ActorContext, input: z.
   }
 }
 
-export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspectionId: string) {
+export async function syncBillingSummaryToQuickBooks(
+  actor: ActorContext,
+  inspectionId: string,
+  options?: { sendEmail?: boolean }
+) {
   const parsedActor = parseActor(actor);
   if (!canManageQuickBooksSync(parsedActor.role)) {
     throw new Error("Only administrators can sync invoices to QuickBooks.");
@@ -4828,6 +4832,15 @@ export async function syncBillingSummaryToQuickBooks(actor: ActorContext, inspec
       invoiceId: verifiedInvoice.id,
       invoiceNumber: verifiedInvoice.docNumber ?? createdDocNumber ?? docNumber
     };
+
+    if (!options?.sendEmail) {
+      return {
+        ...syncResult,
+        quickbooksSendStatus: "not_sent",
+        quickbooksSendError: null,
+        quickbooksSentTo: null
+      };
+    }
 
     const sendResult = await sendQuickBooksInvoiceForSummary({
       parsedActor,

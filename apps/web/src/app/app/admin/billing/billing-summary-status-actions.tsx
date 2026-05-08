@@ -184,12 +184,18 @@ export function BillingSummaryStatusActions({
       </div>
 
       <div className="mt-4 grid gap-3">
+        {!hasVerifiedQuickBooksInvoice ? (
+          <p className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-500">
+            Choose Sync Only to create the QuickBooks invoice without emailing the customer. Use Sync and send only when you are ready for QuickBooks to deliver it.
+          </p>
+        ) : null}
         <ActionButton
           className="w-full"
           disabled={hasVerifiedQuickBooksInvoice || hasMissingPrices || !canUseQuickBooksActions}
           onClick={() => runAction("sync", () => {
             const formData = new FormData();
             formData.set("inspectionId", inspectionId);
+            formData.set("deliveryMode", "sync_only");
             return formData;
           }, syncBillingSummaryToQuickBooksAction)}
           pending={pending && activeAction === "sync"}
@@ -204,6 +210,23 @@ export function BillingSummaryStatusActions({
                 : "Synced - ready to send"
             : "Sync invoice to QuickBooks"}
         </ActionButton>
+
+        {!hasVerifiedQuickBooksInvoice ? (
+          <ActionButton
+            className="w-full"
+            disabled={hasMissingPrices || !canUseQuickBooksActions}
+            onClick={() => runAction("sync-send", () => {
+              const formData = new FormData();
+              formData.set("inspectionId", inspectionId);
+              formData.set("deliveryMode", "sync_and_send");
+              return formData;
+            }, syncBillingSummaryToQuickBooksAction)}
+            pending={pending && activeAction === "sync-send"}
+            pendingLabel="Syncing and sending..."
+          >
+            Sync and send from QuickBooks
+          </ActionButton>
+        ) : null}
 
         {hasVerifiedQuickBooksInvoice && !summaryModeMismatch && canUseQuickBooksActions && state.quickbooksSendStatus !== "sent" ? (
           <ActionButton

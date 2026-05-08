@@ -1060,6 +1060,8 @@ export async function createDirectQuickBooksInvoiceAction(formData: FormData) {
 export async function syncBillingSummaryToQuickBooksAction(formData: FormData) {
   const session = await auth();
   const inspectionId = String(formData.get("inspectionId") ?? "");
+  const deliveryMode = String(formData.get("deliveryMode") ?? "sync_only");
+  const sendEmail = deliveryMode === "sync_and_send" || String(formData.get("sendEmail") ?? "") === "true";
   if (!session?.user?.tenantId || !inspectionId) {
     return { ok: false, error: "Unauthorized", message: null, detail: null };
   }
@@ -1081,7 +1083,8 @@ export async function syncBillingSummaryToQuickBooksAction(formData: FormData) {
 
     const result = await syncBillingSummaryToQuickBooks(
       { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-      inspectionId
+      inspectionId,
+      { sendEmail }
     );
 
     revalidatePath("/app/admin");
@@ -1100,7 +1103,7 @@ export async function syncBillingSummaryToQuickBooksAction(formData: FormData) {
         ? result.quickbooksSendError ?? "Invoice synced to QuickBooks, but email send was skipped."
         : result.quickbooksSendStatus === "send_failed"
           ? result.quickbooksSendError ?? "Invoice synced to QuickBooks, but email send failed."
-          : "Invoice synced to QuickBooks.";
+          : "Invoice synced to QuickBooks. No customer email was sent.";
 
     return {
       ok: true,

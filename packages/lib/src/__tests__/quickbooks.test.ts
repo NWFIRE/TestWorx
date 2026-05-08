@@ -307,7 +307,7 @@ describe("quickbooks billing sync hardening", () => {
     resetServerEnvForTests();
   });
 
-  it("marks billing summaries synced and auto-sent after the created invoice is verified", async () => {
+  it("marks billing summaries synced without emailing by default after the created invoice is verified", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
     prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: null });
     prismaMock.customerCompany.update.mockResolvedValue(undefined);
@@ -322,8 +322,7 @@ describe("quickbooks billing sync hardening", () => {
       .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
       .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1" } }))
       .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
-      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
-      .mockResolvedValueOnce(jsonResponse({}));
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }));
 
     const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
 
@@ -337,9 +336,9 @@ describe("quickbooks billing sync hardening", () => {
       inspectionId: "inspection_1",
       invoiceId: "invoice_1",
       invoiceNumber: "TW2026-1000",
-      quickbooksSendStatus: "sent",
+      quickbooksSendStatus: "not_sent",
       quickbooksSendError: null,
-      quickbooksSentTo: "billing@pinecrest.example"
+      quickbooksSentTo: null
     });
     expect(prismaMock.inspectionBillingSummary.update).toHaveBeenCalledWith({
       where: { id: "summary_1" },
@@ -350,16 +349,12 @@ describe("quickbooks billing sync hardening", () => {
         quickbooksConnectionMode: "live",
         quickbooksInvoiceNumber: "TW2026-1000",
         quickbooksCustomerId: "qbo_customer_1",
-        quickbooksSyncError: null
-      })
-    });
-    expect(prismaMock.inspectionBillingSummary.update).toHaveBeenCalledWith({
-      where: { id: "summary_1" },
-      data: expect.objectContaining({
-        quickbooksSendStatus: "sent",
+        quickbooksSyncError: null,
+        quickbooksSendStatus: "not_sent",
         quickbooksSendError: null
       })
     });
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   }, 10000);
 
   it("uses linked catalog pricing when a persisted billing item is missing unit price", async () => {
@@ -897,7 +892,8 @@ describe("quickbooks billing sync hardening", () => {
 
     const result = await syncBillingSummaryToQuickBooks(
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
-      "inspection_1"
+      "inspection_1",
+      { sendEmail: true }
     );
 
     expect(result.quickbooksSendStatus).toBe("send_skipped");
@@ -959,7 +955,8 @@ describe("quickbooks billing sync hardening", () => {
 
     const result = await syncBillingSummaryToQuickBooks(
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
-      "inspection_1"
+      "inspection_1",
+      { sendEmail: true }
     );
 
     expect(result.quickbooksSentTo).toBe("ap@academy.test");
@@ -971,7 +968,7 @@ describe("quickbooks billing sync hardening", () => {
     });
   });
 
-  it("keeps invoice synced when auto-send fails after sync", async () => {
+  it("keeps invoice synced when explicit send fails after sync", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
     prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: null });
     prismaMock.customerCompany.update.mockResolvedValue(undefined);
@@ -992,7 +989,8 @@ describe("quickbooks billing sync hardening", () => {
 
     const result = await syncBillingSummaryToQuickBooks(
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
-      "inspection_1"
+      "inspection_1",
+      { sendEmail: true }
     );
 
     expect(result.quickbooksSendStatus).toBe("send_failed");
@@ -1046,7 +1044,8 @@ describe("quickbooks billing sync hardening", () => {
 
     const result = await syncBillingSummaryToQuickBooks(
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
-      "inspection_1"
+      "inspection_1",
+      { sendEmail: true }
     );
 
     expect(result.quickbooksSendStatus).toBe("send_failed");
@@ -1107,7 +1106,8 @@ describe("quickbooks billing sync hardening", () => {
 
     const result = await syncBillingSummaryToQuickBooks(
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
-      "inspection_1"
+      "inspection_1",
+      { sendEmail: true }
     );
 
     expect(result.quickbooksSendStatus).toBe("sent");
@@ -2017,7 +2017,7 @@ describe("quickbooks billing sync hardening", () => {
       "inspection_1"
     );
 
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     const invoiceBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body ?? "{}"));
     expect(invoiceBody.Line?.[0]?.SalesItemLineDetail?.ItemRef).toEqual({
       value: "mapped_item_1",
