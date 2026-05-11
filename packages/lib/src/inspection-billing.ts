@@ -451,6 +451,7 @@ const COMPLIANCE_FEE_REPORT_TYPE = "compliance_reporting";
 const COMPLIANCE_REPORTING_INSPECTION_TYPES: InspectionType[] = [
   "fire_extinguisher",
   "fire_alarm",
+  "joint_commission_fire_alarm",
   "wet_fire_sprinkler",
   "dry_fire_sprinkler",
   "joint_commission_fire_sprinkler",

@@ -4,6 +4,7 @@ import { buildInitialReportDraft } from "../report-engine";
 import { getReportPdfMetadata, inspectionTypeRegistry } from "../report-config";
 
 const additionalTypes = [
+  "joint_commission_fire_alarm",
   "joint_commission_fire_sprinkler",
   "work_order",
   "backflow",
@@ -44,5 +45,51 @@ describe("additional inspection report types", () => {
       expect(Array.isArray(metadata.nfpaReferences)).toBe(true);
       expect((metadata.nfpaReferences ?? []).length).toBeGreaterThan(0);
     }
+  });
+
+  it("defines a healthcare-ready smart Joint Commission fire alarm template", () => {
+    const template = inspectionTypeRegistry.joint_commission_fire_alarm;
+
+    expect(template.label).toBe("Joint Commission fire alarm");
+    expect(template.sections.map((section) => section.id)).toEqual([
+      "inspection-information",
+      "joint-commission-compliance-summary",
+      "fire-alarm-system-information",
+      "device-testing-summary",
+      "fire-alarm-control-unit-testing",
+      "notification-appliance-testing",
+      "smoke-detector-sensitivity-testing",
+      "elevator-recall-testing",
+      "sprinkler-monitoring-interface",
+      "central-station-communication",
+      "deficiencies-and-recommendations",
+      "joint-commission-documentation-review",
+      "technician-notes",
+      "customer-acknowledgment",
+      "technician-certification",
+      "final-outcome",
+      "follow-up-actions",
+      "attachments"
+    ]);
+
+    const systemInfo = template.sections.find((section) => section.id === "fire-alarm-system-information");
+    expect(systemInfo?.fields.find((field) => field.id === "manufacturer")?.optionProvider).toBe("jointCommissionFireAlarmManufacturerOptions");
+    expect(systemInfo?.fields.find((field) => field.id === "panelModel")?.optionProvider).toBe("jointCommissionFireAlarmPanelModelOptions");
+
+    const deviceSummary = template.sections.find((section) => section.id === "device-testing-summary");
+    const deviceRepeater = deviceSummary?.fields.find((field) => field.id === "deviceCategories");
+    expect(deviceRepeater?.type).toBe("repeater");
+    expect(deviceRepeater && deviceRepeater.type === "repeater" ? deviceRepeater.seedRows?.length : 0).toBeGreaterThanOrEqual(12);
+    expect(deviceRepeater && deviceRepeater.type === "repeater"
+      ? deviceRepeater.rowFields.find((field) => field.id === "category")?.optionProvider
+      : null).toBe("jointCommissionFireAlarmDeviceTypeOptions");
+
+    const metadata = getReportPdfMetadata("joint_commission_fire_alarm");
+    expect(metadata.nfpaReferences).toEqual([
+      "NFPA 72",
+      "NFPA 101",
+      "CMS Life Safety Code",
+      "Joint Commission Environment of Care"
+    ]);
   });
 });

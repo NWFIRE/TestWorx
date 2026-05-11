@@ -439,7 +439,7 @@ function divisionToInspectionTypes(division: string): InspectionType[] {
     case "fire_extinguishers":
       return ["fire_extinguisher"];
     case "fire_alarm":
-      return ["fire_alarm"];
+      return ["fire_alarm", "joint_commission_fire_alarm"];
     case "fire_sprinkler":
       return ["wet_fire_sprinkler", "dry_fire_sprinkler", "joint_commission_fire_sprinkler"];
     case "kitchen_suppression":

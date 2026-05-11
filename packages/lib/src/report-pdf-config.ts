@@ -157,6 +157,7 @@ export type ReportTypeConfig = {
 
 export const reportComplianceMap: Partial<Record<InspectionType, string[]>> = {
   fire_alarm: ["NFPA 72", "NFPA 70"],
+  joint_commission_fire_alarm: ["NFPA 72", "NFPA 101", "CMS Life Safety Code", "Joint Commission Environment of Care"],
   kitchen_suppression: ["NFPA 17A", "NFPA 96"],
   fire_extinguisher: ["NFPA 10"]
 };

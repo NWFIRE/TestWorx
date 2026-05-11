@@ -83,6 +83,7 @@ export function mapInspectionTypeToComplianceReportingDivision(inspectionType: I
     case "fire_extinguisher":
       return ComplianceReportingDivision.fire_extinguishers;
     case "fire_alarm":
+    case "joint_commission_fire_alarm":
       return ComplianceReportingDivision.fire_alarm;
     case "wet_fire_sprinkler":
     case "dry_fire_sprinkler":

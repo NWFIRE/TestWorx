@@ -218,5 +218,5 @@ export function buildMobileInspectionProgressSummary(
 }
 
 export function isFireAlarmInspectionType(inspectionType: InspectionType) {
-  return inspectionType === "fire_alarm";
+  return inspectionType === "fire_alarm" || inspectionType === "joint_commission_fire_alarm";
 }

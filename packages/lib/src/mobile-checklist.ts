@@ -6,6 +6,7 @@ import { describeRepeaterRowLabel } from "./report-engine";
 
 export const mobileChecklistInspectionTypeAllowlist = [
   "fire_alarm",
+  "joint_commission_fire_alarm",
   "kitchen_suppression",
   "fire_extinguisher"
 ] as const satisfies readonly InspectionType[];

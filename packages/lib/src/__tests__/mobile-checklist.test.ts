@@ -8,10 +8,12 @@ describe("mobile checklist", () => {
   it("uses an explicit allowlist for the first-pass technician checklist flow", () => {
     expect(mobileChecklistInspectionTypeAllowlist).toEqual([
       "fire_alarm",
+      "joint_commission_fire_alarm",
       "kitchen_suppression",
       "fire_extinguisher"
     ]);
     expect(isChecklistHeavyMobileInspectionType("fire_alarm")).toBe(true);
+    expect(isChecklistHeavyMobileInspectionType("joint_commission_fire_alarm")).toBe(true);
     expect(isChecklistHeavyMobileInspectionType("wet_chemical_acceptance_test")).toBe(false);
   });
 

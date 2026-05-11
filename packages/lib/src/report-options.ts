@@ -72,6 +72,26 @@ export type ReportOptionProviderKey =
   | "jointCommissionRequiredTimelineOptions"
   | "jointCommissionOverallResultOptions"
   | "jointCommissionPhotoCategoryOptions"
+  | "jointCommissionFireAlarmFrequencyOptions"
+  | "jointCommissionFireAlarmFacilityTypeOptions"
+  | "jointCommissionFireAlarmOccupancyOptions"
+  | "jointCommissionFireAlarmAhjOptions"
+  | "jointCommissionFireAlarmMonitoringProviderOptions"
+  | "jointCommissionFireAlarmManufacturerOptions"
+  | "jointCommissionFireAlarmPanelModelOptions"
+  | "jointCommissionFireAlarmReferenceOptions"
+  | "jointCommissionFireAlarmEcrReferenceOptions"
+  | "jointCommissionFireAlarmDeviceTypeOptions"
+  | "jointCommissionFireAlarmTestMethodOptions"
+  | "jointCommissionFireAlarmResultOptions"
+  | "jointCommissionFireAlarmDeficiencySeverityOptions"
+  | "jointCommissionFireAlarmCorrectiveActionOptions"
+  | "jointCommissionFireAlarmFollowUpActionOptions"
+  | "jointCommissionFireAlarmFireWatchRecommendationOptions"
+  | "jointCommissionFireAlarmImpairmentStatusOptions"
+  | "jointCommissionFireAlarmCommunicationPathOptions"
+  | "jointCommissionFireAlarmSignalTypeOptions"
+  | "jointCommissionFireAlarmFinalOutcomeOptions"
   | "alarmDeviceTypes"
   | "alarmNotificationApplianceTypes"
   | "communicationPathTypes"
@@ -986,6 +1006,203 @@ const sprinklerManufacturers: ReportOption[] = [
   { label: "Other", value: "other" }
 ];
 
+const jointCommissionFireAlarmFrequencyOptions: ReportOption[] = [
+  { label: "Annual", value: "annual" },
+  { label: "Semi-annual", value: "semi_annual" },
+  { label: "Quarterly", value: "quarterly" },
+  { label: "Monthly", value: "monthly" },
+  { label: "Post-repair / follow-up", value: "post_repair_follow_up" },
+  { label: "Acceptance / re-acceptance", value: "acceptance" },
+  { label: "Other", value: "other" }
+];
+
+const jointCommissionFireAlarmFacilityTypeOptions: ReportOption[] = [
+  { label: "Hospital", value: "hospital" },
+  { label: "Critical access hospital", value: "critical_access_hospital" },
+  { label: "Ambulatory surgery center", value: "ambulatory_surgery_center" },
+  { label: "Behavioral health", value: "behavioral_health" },
+  { label: "Long-term care", value: "long_term_care" },
+  { label: "Medical office building", value: "medical_office_building" },
+  { label: "Outpatient clinic", value: "outpatient_clinic" },
+  { label: "Other healthcare facility", value: "other_healthcare" }
+];
+
+const jointCommissionFireAlarmOccupancyOptions: ReportOption[] = [
+  { label: "Healthcare occupancy", value: "healthcare" },
+  { label: "Ambulatory health care occupancy", value: "ambulatory_healthcare" },
+  { label: "Business occupancy", value: "business" },
+  { label: "Mixed occupancy", value: "mixed" },
+  { label: "Institutional occupancy", value: "institutional" },
+  { label: "Other", value: "other" }
+];
+
+const jointCommissionFireAlarmAhjOptions: ReportOption[] = [
+  { label: "Local Fire Marshal", value: "local_fire_marshal" },
+  { label: "State Fire Marshal", value: "state_fire_marshal" },
+  { label: "CMS / State Survey Agency", value: "cms_state_survey" },
+  { label: "Facility AHJ", value: "facility_ahj" },
+  { label: "Other", value: "other" }
+];
+
+const jointCommissionFireAlarmMonitoringProviderOptions: ReportOption[] = [
+  { label: "Central station", value: "central_station" },
+  { label: "Proprietary supervising station", value: "proprietary_station" },
+  { label: "Remote supervising station", value: "remote_station" },
+  { label: "Local only / not monitored", value: "local_only" },
+  { label: "Other", value: "other" }
+];
+
+const jointCommissionFireAlarmManufacturerOptions: ReportOption[] = [
+  { label: "Notifier", value: "notifier" },
+  { label: "Fire-Lite", value: "fire_lite" },
+  { label: "Silent Knight", value: "silent_knight" },
+  { label: "Simplex", value: "simplex" },
+  { label: "Siemens", value: "siemens" },
+  { label: "Edwards / EST", value: "edwards_est" },
+  { label: "Gamewell-FCI", value: "gamewell_fci" },
+  { label: "Bosch", value: "bosch" },
+  { label: "Honeywell", value: "honeywell" },
+  { label: "Potter", value: "potter" },
+  { label: "Other", value: "other" }
+];
+
+const jointCommissionFireAlarmPanelModelOptions: ReportOption[] = [
+  { label: "NFS2-3030", value: "nfs2_3030" },
+  { label: "NFS2-640", value: "nfs2_640" },
+  { label: "MS-9200", value: "ms_9200" },
+  { label: "MS-9600", value: "ms_9600" },
+  { label: "ES-50X", value: "es_50x" },
+  { label: "ES-200X", value: "es_200x" },
+  { label: "4100ES", value: "4100es" },
+  { label: "EST3 / EST4", value: "est3_est4" },
+  { label: "FC901 / FC922", value: "fc901_fc922" },
+  { label: "Other / enter manually", value: "other" }
+];
+
+const jointCommissionFireAlarmReferenceOptions: ReportOption[] = [
+  { label: "NFPA 72", value: "nfpa_72" },
+  { label: "NFPA 101", value: "nfpa_101" },
+  { label: "CMS Life Safety Code", value: "cms_life_safety_code" },
+  { label: "Joint Commission Environment of Care", value: "joint_commission_ec" },
+  { label: "Local AHJ requirement", value: "local_ahj" },
+  { label: "Manufacturer requirements", value: "manufacturer_requirements" },
+  { label: "Other configurable reference", value: "other" }
+];
+
+const jointCommissionFireAlarmEcrReferenceOptions: ReportOption[] = [
+  { label: "Joint Commission EC reference", value: "joint_commission_ec" },
+  { label: "Joint Commission LS reference", value: "joint_commission_ls" },
+  { label: "CMS K-tag reference", value: "cms_k_tag" },
+  { label: "Facility policy reference", value: "facility_policy" },
+  { label: "Local AHJ reference", value: "local_ahj" },
+  { label: "Other configurable reference", value: "other" }
+];
+
+const jointCommissionFireAlarmDeviceTypeOptions: ReportOption[] = [
+  { label: "Smoke detector", value: "smoke_detector" },
+  { label: "Heat detector", value: "heat_detector" },
+  { label: "Pull station", value: "pull_station" },
+  { label: "Horn/strobe", value: "horn_strobe" },
+  { label: "Strobe", value: "strobe" },
+  { label: "Horn", value: "horn" },
+  { label: "Duct detector", value: "duct_detector" },
+  { label: "Waterflow switch", value: "waterflow_switch" },
+  { label: "Tamper switch", value: "tamper_switch" },
+  { label: "Monitor module", value: "monitor_module" },
+  { label: "Control module", value: "control_module" },
+  { label: "Elevator recall device", value: "elevator_recall_device" },
+  { label: "Beam detector", value: "beam_detector" },
+  { label: "Other", value: "other" }
+];
+
+const jointCommissionFireAlarmTestMethodOptions: ReportOption[] = [
+  { label: "Functional test", value: "functional_test" },
+  { label: "Visual inspection", value: "visual_inspection" },
+  { label: "Sensitivity test", value: "sensitivity_test" },
+  { label: "Signal verification", value: "signal_verification" },
+  { label: "Battery load test", value: "battery_load_test" },
+  { label: "Interface test", value: "interface_test" },
+  { label: "Record review", value: "record_review" },
+  { label: "Other", value: "other" }
+];
+
+const jointCommissionFireAlarmResultOptions: ReportOption[] = [
+  { label: "Pass", value: "pass" },
+  { label: "Fail", value: "fail" },
+  { label: "N/A", value: "na" },
+  { label: "Not tested", value: "not_tested" },
+  { label: "Corrected on site", value: "corrected_on_site" }
+];
+
+const jointCommissionFireAlarmDeficiencySeverityOptions: ReportOption[] = [
+  { label: "Low", value: "low" },
+  { label: "Medium", value: "medium" },
+  { label: "High", value: "high" },
+  { label: "Critical / life safety", value: "critical" }
+];
+
+const jointCommissionFireAlarmCorrectiveActionOptions: ReportOption[] = [
+  { label: "Repair recommended", value: "repair_recommended" },
+  { label: "Device replacement recommended", value: "device_replacement" },
+  { label: "Programming correction recommended", value: "programming_correction" },
+  { label: "Monitoring follow-up recommended", value: "monitoring_follow_up" },
+  { label: "Corrected during visit", value: "corrected_during_visit" },
+  { label: "Quote required", value: "quote_required" },
+  { label: "Other", value: "other" }
+];
+
+const jointCommissionFireAlarmFollowUpActionOptions: ReportOption[] = [
+  { label: "Deficiency quote required", value: "deficiency_quote_required" },
+  { label: "Return service required", value: "return_service_required" },
+  { label: "AHJ notification required", value: "ahj_notification_required" },
+  { label: "Monitoring company follow-up required", value: "monitoring_follow_up_required" },
+  { label: "Device replacement recommended", value: "device_replacement_recommended" },
+  { label: "No follow-up required", value: "none" }
+];
+
+const jointCommissionFireAlarmFireWatchRecommendationOptions: ReportOption[] = [
+  { label: "Not recommended", value: "not_recommended" },
+  { label: "Recommended for impairment", value: "recommended_for_impairment" },
+  { label: "Recommended until corrective action", value: "recommended_until_corrected" },
+  { label: "Facility/AHJ to determine", value: "facility_ahj_to_determine" }
+];
+
+const jointCommissionFireAlarmImpairmentStatusOptions: ReportOption[] = [
+  { label: "No impairment observed", value: "none_observed" },
+  { label: "Planned impairment", value: "planned_impairment" },
+  { label: "Emergency impairment", value: "emergency_impairment" },
+  { label: "Partial system impairment", value: "partial_impairment" },
+  { label: "Fire watch active", value: "fire_watch_active" },
+  { label: "Unknown", value: "unknown" }
+];
+
+const jointCommissionFireAlarmCommunicationPathOptions: ReportOption[] = [
+  { label: "DACT / phone line", value: "dact_phone" },
+  { label: "Cellular", value: "cellular" },
+  { label: "IP / network", value: "ip_network" },
+  { label: "Radio", value: "radio" },
+  { label: "AES mesh", value: "aes_mesh" },
+  { label: "Local only", value: "local_only" },
+  { label: "Other", value: "other" }
+];
+
+const jointCommissionFireAlarmSignalTypeOptions: ReportOption[] = [
+  { label: "Alarm", value: "alarm" },
+  { label: "Trouble", value: "trouble" },
+  { label: "Supervisory", value: "supervisory" },
+  { label: "Waterflow", value: "waterflow" },
+  { label: "Tamper", value: "tamper" },
+  { label: "Test / restore", value: "test_restore" }
+];
+
+const jointCommissionFireAlarmFinalOutcomeOptions: ReportOption[] = [
+  { label: "System Passed", value: "system_passed" },
+  { label: "Passed with Deficiencies", value: "passed_with_deficiencies" },
+  { label: "System Failed", value: "system_failed" },
+  { label: "Immediate Service Recommended", value: "immediate_service_recommended" },
+  { label: "Fire Watch Recommended", value: "fire_watch_recommended" }
+];
+
 const fusibleLinkTemperaturesNormalized: ReportOption[] = [
   { label: "165°F", value: "165°F" },
   { label: "212°F", value: "212°F" },
@@ -1067,6 +1284,26 @@ export const reportOptionProviders = {
   jointCommissionRequiredTimelineOptions,
   jointCommissionOverallResultOptions,
   jointCommissionPhotoCategoryOptions,
+  jointCommissionFireAlarmFrequencyOptions,
+  jointCommissionFireAlarmFacilityTypeOptions,
+  jointCommissionFireAlarmOccupancyOptions,
+  jointCommissionFireAlarmAhjOptions,
+  jointCommissionFireAlarmMonitoringProviderOptions,
+  jointCommissionFireAlarmManufacturerOptions,
+  jointCommissionFireAlarmPanelModelOptions,
+  jointCommissionFireAlarmReferenceOptions,
+  jointCommissionFireAlarmEcrReferenceOptions,
+  jointCommissionFireAlarmDeviceTypeOptions,
+  jointCommissionFireAlarmTestMethodOptions,
+  jointCommissionFireAlarmResultOptions,
+  jointCommissionFireAlarmDeficiencySeverityOptions,
+  jointCommissionFireAlarmCorrectiveActionOptions,
+  jointCommissionFireAlarmFollowUpActionOptions,
+  jointCommissionFireAlarmFireWatchRecommendationOptions,
+  jointCommissionFireAlarmImpairmentStatusOptions,
+  jointCommissionFireAlarmCommunicationPathOptions,
+  jointCommissionFireAlarmSignalTypeOptions,
+  jointCommissionFireAlarmFinalOutcomeOptions,
   workOrderJobsiteHours,
   workOrderPartsEquipmentOptions,
   workOrderServiceOptions,

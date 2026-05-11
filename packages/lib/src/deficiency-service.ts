@@ -90,6 +90,7 @@ function truncateText(value: string, maxLength: number) {
 function mapReportTypeToQuoteProposalType(reportType: string | null | undefined) {
   switch (reportType) {
     case "fire_alarm":
+    case "joint_commission_fire_alarm":
       return "fire_alarm";
     case "wet_fire_sprinkler":
     case "dry_fire_sprinkler":

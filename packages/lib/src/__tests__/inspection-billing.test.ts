@@ -2025,6 +2025,7 @@ describe("inspection billing persistence and admin review", () => {
   it("maps only supported inspection types into compliance reporting divisions", () => {
     expect(mapInspectionTypeToComplianceReportingDivision("fire_extinguisher")).toBe("fire_extinguishers");
     expect(mapInspectionTypeToComplianceReportingDivision("fire_alarm")).toBe("fire_alarm");
+    expect(mapInspectionTypeToComplianceReportingDivision("joint_commission_fire_alarm")).toBe("fire_alarm");
     expect(mapInspectionTypeToComplianceReportingDivision("wet_fire_sprinkler")).toBe("fire_sprinkler");
     expect(mapInspectionTypeToComplianceReportingDivision("joint_commission_fire_sprinkler")).toBe("fire_sprinkler");
     expect(mapInspectionTypeToComplianceReportingDivision("kitchen_suppression")).toBe("kitchen_suppression");

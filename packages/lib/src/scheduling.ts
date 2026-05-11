@@ -32,6 +32,7 @@ const inspectionTypeEnum = z.enum(Object.keys(inspectionTypeRegistry) as [keyof 
 export const multiSystemInspectionTypes = [
   InspectionType.kitchen_suppression,
   InspectionType.fire_alarm,
+  InspectionType.joint_commission_fire_alarm,
   InspectionType.wet_fire_sprinkler,
   InspectionType.dry_fire_sprinkler,
   InspectionType.joint_commission_fire_sprinkler,

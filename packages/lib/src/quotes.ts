@@ -114,6 +114,13 @@ const inspectionQuoteCatalog = [
     inspectionType: "fire_alarm" as const
   },
   {
+    code: "JOINT_COMMISSION_FIRE_ALARM",
+    title: "Joint Commission fire alarm inspection",
+    description: "Healthcare-ready Joint Commission fire alarm inspection and documentation.",
+    category: "inspection",
+    inspectionType: "joint_commission_fire_alarm" as const
+  },
+  {
     code: "WET_FIRE_SPRINKLER_ANNUAL",
     title: "Wet fire sprinkler annual inspection",
     description: "Annual inspection, testing coordination, and reporting for wet fire sprinkler systems.",
@@ -722,6 +729,7 @@ function inferInspectionTypeFromQuoteLine(
     line.category ?? ""
   ].join(" ").toLowerCase();
   const textMatches: Array<[RegExp, keyof typeof inspectionTypeRegistry]> = [
+    [/joint\s+commission.*fire\s+alarm|fire\s+alarm.*joint\s+commission/, "joint_commission_fire_alarm"],
     [/joint\s+commission/, "joint_commission_fire_sprinkler"],
     [/\bdry\b.*sprinkler|sprinkler.*\bdry\b/, "dry_fire_sprinkler"],
     [/\bwet\b.*sprinkler|sprinkler/, "wet_fire_sprinkler"],

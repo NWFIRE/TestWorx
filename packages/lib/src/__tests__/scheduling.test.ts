@@ -51,6 +51,7 @@ describe("schedule creation parsing", () => {
   it("marks multi-system report types as eligible for duplicate tasks", () => {
     expect(allowsMultipleInspectionTasks("kitchen_suppression")).toBe(true);
     expect(allowsMultipleInspectionTasks("fire_alarm")).toBe(true);
+    expect(allowsMultipleInspectionTasks("joint_commission_fire_alarm")).toBe(true);
     expect(allowsMultipleInspectionTasks("wet_fire_sprinkler")).toBe(true);
     expect(allowsMultipleInspectionTasks("fire_extinguisher")).toBe(false);
   });

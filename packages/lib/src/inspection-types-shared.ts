@@ -9,6 +9,11 @@ export const inspectionTypeRegistry = {
     description: "Inspection and testing for the fire alarm system.",
     defaultRecurrenceFrequency: "ANNUAL"
   },
+  joint_commission_fire_alarm: {
+    label: "Joint Commission Fire Alarm",
+    description: "Healthcare-ready Joint Commission fire alarm inspection documentation.",
+    defaultRecurrenceFrequency: "ANNUAL"
+  },
   wet_chemical_acceptance_test: {
     label: "Wet Chemical Acceptance Test",
     description: "Acceptance testing for wet chemical suppression systems.",
