@@ -37,6 +37,17 @@ function cleanAddress(input: PdfInput) {
   return joinNonEmpty([input.site.addressLine1, input.site.addressLine2, joinNonEmpty([input.site.city, input.site.state], ", "), input.site.postalCode], ", ");
 }
 
+function customerContactLine(input: PdfInput) {
+  return joinNonEmpty(
+    [
+      cleanTitleLikeText(input.customerCompany.contactName),
+      cleanText(input.customerCompany.phone),
+      cleanText(input.customerCompany.billingEmail)
+    ],
+    " | "
+  );
+}
+
 function readSection(draft: ReturnType<typeof reportDraftSchema.parse>, sectionId: string) {
   return draft.sections[sectionId]?.fields as Record<string, unknown> | undefined;
 }
@@ -100,6 +111,8 @@ export function buildFireAlarmRenderModel(rawReport: unknown): FireAlarmReportRe
   const result = status.result ?? "Pass";
   const scheduledWindow = joinNonEmpty([formatDateTime(input.inspection.scheduledStart), input.inspection.scheduledEnd ? formatDateTime(input.inspection.scheduledEnd) : undefined], " to ");
   const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name);
+  const customerContact = customerContactLine(input);
+  const serviceAddress = cleanAddress(input);
 
   return {
     report: {
@@ -126,17 +139,17 @@ export function buildFireAlarmRenderModel(rawReport: unknown): FireAlarmReportRe
     identity: {
       customerName: cleanTitleLikeText(input.customerCompany.name) ?? input.customerCompany.name,
       siteName: cleanTitleLikeText(customerFacingSiteName),
-      cleanAddress: cleanAddress(input),
+      cleanAddress: serviceAddress,
       technicianName: cleanTitleLikeText(input.report.technicianName),
-      billingContact: cleanTitleLikeText(input.customerCompany.contactName),
+      billingContact: customerContact,
       inspectionDate: formatShortDate(input.inspection.scheduledStart) ?? "",
       completionTimestamp: formatDateTime(input.report.finalizedAt),
       scheduledWindow
     },
     page1Metadata: [
       scheduledWindow ? { label: "Scheduled window", value: scheduledWindow } : null,
-      cleanText(input.customerCompany.billingEmail) ? { label: "Billing contact", value: input.customerCompany.billingEmail! } : null,
-      cleanAddress(input) ? { label: "Service address", value: cleanAddress(input)! } : null
+      customerContact ? { label: "Customer contact", value: customerContact } : null,
+      serviceAddress ? { label: "Service address", value: serviceAddress } : null
     ].filter((item): item is { label: string; value: string } => Boolean(item)),
     systemSummary: [
       { label: "Control Panels", value: toNumber(systemFields?.controlPanelsInspected) ?? toNumber(controlFields?.controlPanelsInspected) ?? readRows(draft, "control-panel", "controlPanels").length },

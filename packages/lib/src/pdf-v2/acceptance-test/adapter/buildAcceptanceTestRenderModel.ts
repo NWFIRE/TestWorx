@@ -108,6 +108,17 @@ function cleanSiteAddress(input: AcceptanceSourceInput) {
   );
 }
 
+function customerContactLine(input: AcceptanceSourceInput) {
+  return joinNonEmpty(
+    [
+      cleanText(input.customerCompany.contactName),
+      cleanText(input.customerCompany.phone),
+      cleanText(input.customerCompany.billingEmail)
+    ],
+    " | "
+  );
+}
+
 function readLicense(branding: unknown) {
   if (!branding || typeof branding !== "object") {
     return undefined;
@@ -190,7 +201,7 @@ export function buildAcceptanceTestRenderModel(rawReport: unknown): AcceptanceTe
       buildingName: cleanText(propertyFields?.buildingName) ?? cleanText(getCustomerFacingSiteLabel(input.site.name)),
       address: cleanText(propertyFields?.address) ?? cleanSiteAddress(input),
       buildingOwner: cleanText(propertyFields?.buildingOwner) ?? cleanText(input.customerCompany.name),
-      ownerContact: cleanText(propertyFields?.ownerContact) ?? cleanText(input.customerCompany.phone) ?? cleanText(input.customerCompany.billingEmail)
+      ownerContact: cleanText(propertyFields?.ownerContact) ?? customerContactLine(input)
     },
     installer: {
       companyName: installerCompanyName,

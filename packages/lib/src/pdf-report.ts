@@ -170,6 +170,32 @@ export function formatPdfAddress(input: {
   return address || input.fallback || "";
 }
 
+function formatServiceAddressLine(input: PdfInput) {
+  if (!getCustomerFacingSiteLabel(input.site.name)) {
+    return "";
+  }
+
+  return formatPdfAddress({
+    addressLine1: input.site.addressLine1,
+    addressLine2: input.site.addressLine2,
+    city: input.site.city,
+    state: input.site.state,
+    postalCode: input.site.postalCode,
+    fallback: NO_SITE_ADDRESS_COPY
+  });
+}
+
+function formatCustomerContactLine(input: PdfInput) {
+  return joinPresentValues(
+    [
+      input.customerCompany.contactName,
+      input.customerCompany.phone,
+      input.customerCompany.billingEmail
+    ],
+    " | "
+  );
+}
+
 function formatDateTime(value: Date | string | null | undefined) {
   if (!value) {
     return "";
@@ -819,6 +845,14 @@ function renderIdentityBand(
   if (pageOneConfig.identity.showSite && isMeaningful(customerFacingSiteName)) {
     facts.push({ label: "Site", value: customerFacingSiteName ?? "" });
   }
+  const serviceAddress = formatServiceAddressLine(input);
+  if (isMeaningful(serviceAddress)) {
+    facts.push({ label: "Service Address", value: serviceAddress });
+  }
+  const customerContact = formatCustomerContactLine(input);
+  if (isMeaningful(customerContact)) {
+    facts.push({ label: "Customer Contact", value: customerContact });
+  }
   if (pageOneConfig.identity.showTechnician && isMeaningful(input.report.technicianName ?? "")) {
     facts.push({ label: "Technician", value: input.report.technicianName ?? "" });
   }
@@ -1405,9 +1439,8 @@ function renderSummaryContext(
 
 function buildSummaryFacts(input: PdfInput, factKeys: SummaryFactKey[]): KeyValueRow[] {
   const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name);
-  const siteAddress = customerFacingSiteName
-    ? [input.site.addressLine1, input.site.addressLine2, [input.site.city, input.site.state, input.site.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ")
-    : null;
+  const siteAddress = formatServiceAddressLine(input);
+  const customerContact = formatCustomerContactLine(input);
 
   return factKeys.map((factKey) => {
     switch (factKey) {
@@ -1422,9 +1455,9 @@ function buildSummaryFacts(input: PdfInput, factKeys: SummaryFactKey[]): KeyValu
       case "technician":
         return { label: "Technician", value: input.report.technicianName ?? "" };
       case "billingContact":
-        return { label: "Billing Contact", value: input.customerCompany.billingEmail ?? input.customerCompany.phone ?? "" };
+        return { label: "Customer Contact", value: customerContact };
       case "siteAddress":
-        return { label: "Site Address", value: siteAddress ?? "" };
+        return { label: "Service Address", value: siteAddress };
       case "scheduledWindow":
         return {
           label: "Scheduled Window",
@@ -1594,14 +1627,12 @@ async function renderWorkOrderReport(
 
   drawSectionTitle(state, "Summary", "Customer, site, technician, and job summary details for this work order visit.", theme, boldFont, regularFont);
   const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name);
-  const customerFacingSiteAddress = customerFacingSiteName
-    ? [input.site.addressLine1, input.site.addressLine2, [input.site.city, input.site.state, input.site.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ")
-    : "";
+  const customerFacingSiteAddress = formatServiceAddressLine(input);
   renderKeyValueGrid(state, [
     { label: "Customer", value: input.customerCompany.name },
     { label: "Site", value: customerFacingSiteName ?? "" },
     { label: "Site address", value: customerFacingSiteAddress },
-    { label: "Customer contact", value: input.customerCompany.contactName ?? input.customerCompany.billingEmail ?? input.customerCompany.phone ?? "" },
+    { label: "Customer contact", value: formatCustomerContactLine(input) },
     { label: "Technician", value: input.report.technicianName ?? "" },
     { label: "Work date", value: formatDate(input.inspection.scheduledStart) },
     { label: "Completion date", value: input.report.finalizedAt ? formatDateTime(input.report.finalizedAt) : "" },

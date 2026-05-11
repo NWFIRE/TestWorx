@@ -13,7 +13,6 @@ export function ReportHeader({ company, report }: ReportHeaderProps) {
           <div className="pdf-header__brand">
             {company.logoUrl ? <img alt="" className="pdf-header__logo" src={company.logoUrl} /> : <div className="pdf-header__logo-fallback" />}
             <div>
-              <div className="pdf-kicker">TradeWorx document</div>
               <div className="pdf-company-name">{company.name}</div>
             </div>
           </div>
@@ -21,7 +20,6 @@ export function ReportHeader({ company, report }: ReportHeaderProps) {
           {company.address ? <div className="pdf-header__meta">{company.address}</div> : null}
         </div>
         <div className="pdf-header__right">
-          <div className="pdf-kicker">Customer-facing report</div>
           <div className="pdf-title">{report.title}</div>
           <div className="pdf-header__meta">
             <div>Report ID: {report.reportId}</div>

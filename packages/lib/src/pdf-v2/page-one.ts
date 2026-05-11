@@ -3,7 +3,17 @@ import { contentWidth, drawParagraph, drawRect, ensureSpace, measureParagraphHei
 import type { RenderKeyValueRow } from "./types";
 
 function renderIdentityBand(runtime: PdfV2Runtime, cursor: PageCursor) {
-  const height = 64;
+  const facts = [
+    runtime.model.identity.customer ? `Customer: ${runtime.model.identity.customer}` : "",
+    runtime.model.identity.site ? `Site: ${runtime.model.identity.site}` : "",
+    runtime.model.identity.serviceAddress ? `Service Address: ${runtime.model.identity.serviceAddress}` : "",
+    runtime.model.identity.customerContact ? `Customer Contact: ${runtime.model.identity.customerContact}` : "",
+    runtime.model.identity.technician ? `Technician: ${runtime.model.identity.technician}` : "",
+    runtime.model.identity.serviceDate ? `Service Date: ${runtime.model.identity.serviceDate}` : ""
+  ].filter(Boolean);
+  const factText = facts.join("   ");
+  const factHeight = measureParagraphHeight(runtime.regularFont, factText, contentWidth() - 28, PDF_V2_TYPOGRAPHY.metadataValue, 3, 3);
+  const height = Math.max(72, 42 + factHeight + 12);
   drawRect(cursor.page, PDF_V2_TOKENS.margin, cursor.y, contentWidth(), height, runtime.theme.surface, runtime.theme.line, 1);
   cursor.page.drawText(runtime.model.identity.title, {
     x: PDF_V2_TOKENS.margin + 14,
@@ -13,13 +23,7 @@ function renderIdentityBand(runtime: PdfV2Runtime, cursor: PageCursor) {
     color: runtime.theme.ink
   });
 
-  const facts = [
-    runtime.model.identity.customer,
-    runtime.model.identity.site,
-    runtime.model.identity.technician ? `Technician: ${runtime.model.identity.technician}` : "",
-    runtime.model.identity.serviceDate ? `Service Date: ${runtime.model.identity.serviceDate}` : ""
-  ].filter(Boolean);
-  drawParagraph(cursor.page, runtime.regularFont, facts.join("   "), PDF_V2_TOKENS.margin + 14, cursor.y - 38, contentWidth() - 28, PDF_V2_TYPOGRAPHY.metadataValue, runtime.theme.muted, 3, 3);
+  drawParagraph(cursor.page, runtime.regularFont, factText, PDF_V2_TOKENS.margin + 14, cursor.y - 38, contentWidth() - 28, PDF_V2_TYPOGRAPHY.metadataValue, runtime.theme.muted, 3, 3);
   cursor.y -= height + PDF_V2_TOKENS.sectionGap;
 }
 

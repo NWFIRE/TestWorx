@@ -17,7 +17,7 @@ export function IdentityBand({
     technicianName ? { label: "Technician", value: technicianName } : null,
     { label: "Inspection date", value: inspectionDate },
     completionTimestamp ? { label: "Completed", value: completionTimestamp } : null,
-    billingContact ? { label: "Billing contact", value: billingContact } : null,
+    billingContact ? { label: "Customer contact", value: billingContact } : null,
     cleanAddress ? { label: "Service address", value: cleanAddress } : null
   ].filter((item): item is { label: string; value: string } => Boolean(item));
 

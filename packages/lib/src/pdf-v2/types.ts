@@ -291,6 +291,8 @@ export type ReportRenderModelV2 = {
     title: string;
     customer: string;
     site: string;
+    serviceAddress: string;
+    customerContact: string;
     technician: string;
     serviceDate: string;
   };

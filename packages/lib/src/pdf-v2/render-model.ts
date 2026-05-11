@@ -36,9 +36,12 @@ function toCell(text: string, lines?: string[]): RenderTableCell {
   return { text, lines };
 }
 
-function mapSummaryFact(input: PdfInput, factKey: SummaryFactKey): RenderKeyValueRow {
-  const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name);
-  const siteAddress = formatPdfAddress({
+function buildServiceAddress(input: PdfInput) {
+  if (!getCustomerFacingSiteLabel(input.site.name)) {
+    return "";
+  }
+
+  return formatPdfAddress({
     addressLine1: input.site.addressLine1,
     addressLine2: input.site.addressLine2,
     city: input.site.city,
@@ -46,6 +49,22 @@ function mapSummaryFact(input: PdfInput, factKey: SummaryFactKey): RenderKeyValu
     postalCode: input.site.postalCode,
     fallback: customerFacingFieldRules.addressFallback
   });
+}
+
+function buildCustomerContactLine(input: PdfInput) {
+  return joinPresentValues(
+    [
+      input.customerCompany.contactName,
+      input.customerCompany.phone,
+      input.customerCompany.billingEmail
+    ],
+    " | "
+  );
+}
+
+function mapSummaryFact(input: PdfInput, factKey: SummaryFactKey): RenderKeyValueRow {
+  const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name);
+  const siteAddress = buildServiceAddress(input);
   const status = mapCustomerFacingReportStatus({
     isFinalized: Boolean(input.report.finalizedAt),
     isSigned: Boolean(input.technicianSignature || input.customerSignature),
@@ -64,9 +83,9 @@ function mapSummaryFact(input: PdfInput, factKey: SummaryFactKey): RenderKeyValu
     case "technician":
       return { label: "Technician", value: input.report.technicianName ?? "" };
     case "billingContact":
-      return { label: "Billing Contact", value: input.customerCompany.billingEmail ?? input.customerCompany.phone ?? "" };
+      return { label: "Customer Contact", value: buildCustomerContactLine(input) };
     case "siteAddress":
-      return { label: "Site Address", value: siteAddress };
+      return { label: "Service Address", value: siteAddress };
     case "scheduledWindow":
       return {
         label: "Scheduled Window",
@@ -550,6 +569,8 @@ export function buildReportRenderModelV2(input: PdfInput): ReportRenderModelV2 {
       title: config.title,
       customer: input.customerCompany.name,
       site: getCustomerFacingSiteLabel(input.site.name) ?? "",
+      serviceAddress: buildServiceAddress(input),
+      customerContact: buildCustomerContactLine(input),
       technician: input.report.technicianName ?? "",
       serviceDate: formatDate(input.inspection.scheduledStart)
     },
