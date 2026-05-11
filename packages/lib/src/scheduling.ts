@@ -228,6 +228,35 @@ export const scheduleInspectionSchema = z.object({
   });
 });
 
+export type DuplicateInspectionMatch = {
+  id: string;
+  customerName: string;
+  siteName: string;
+  siteAddress: string | null;
+  scheduledStart: string;
+  scheduledEnd: string | null;
+  status: string;
+  inspectionClassification: string;
+  reportTypes: Array<{
+    inspectionType: keyof typeof inspectionTypeRegistry;
+    label: string;
+    status: string;
+  }>;
+  assignedTechnicians: string[];
+  workOrderSource: string | null;
+  quoteSource: string | null;
+  duplicateReasons: string[];
+  missingReportTypes: Array<{
+    inspectionType: keyof typeof inspectionTypeRegistry;
+    label: string;
+  }>;
+  canAddReportTypesToExisting: boolean;
+};
+
+export type DuplicateInspectionDetectionResult = {
+  matches: DuplicateInspectionMatch[];
+};
+
 export function nextDueFrom(start: Date, frequency: RecurrenceFrequency) {
   switch (frequency) {
     case "MONTHLY":
@@ -1495,6 +1524,242 @@ function requiresAdvancedRecurrence(tasks: z.infer<typeof scheduleInspectionSche
 }
 export function parseUpdateInspectionFormData(formData: FormData) {
   return parseInspectionFormData(formData);
+}
+
+function uniqueInspectionTypes(tasks: Array<{ inspectionType: keyof typeof inspectionTypeRegistry }>) {
+  return [...new Set(tasks.map((task) => task.inspectionType))];
+}
+
+function formatInspectionSiteAddress(site: {
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+}) {
+  const lineOne = [site.addressLine1, site.addressLine2].filter(Boolean).join(" ");
+  const lineTwo = [site.city, site.state, site.postalCode].filter(Boolean).join(", ");
+  const value = [lineOne, lineTwo].filter(Boolean).join(" | ");
+  return value || null;
+}
+
+function buildDuplicateReasons(input: {
+  requestedTypes: Set<keyof typeof inspectionTypeRegistry>;
+  existingTypes: Set<keyof typeof inspectionTypeRegistry>;
+  status: InspectionStatus;
+  sameTechnician: boolean;
+  hasQuoteSource: boolean;
+  hasWorkOrderSource: boolean;
+}) {
+  const activeDuplicateStatuses = new Set<InspectionStatus>([
+    InspectionStatus.to_be_completed,
+    InspectionStatus.scheduled,
+    InspectionStatus.in_progress,
+    InspectionStatus.follow_up_required
+  ]);
+  const reasons = ["Same customer/site and scheduled day"];
+  const overlappingTypes = [...input.requestedTypes].filter((type) => input.existingTypes.has(type));
+  if (overlappingTypes.length) {
+    reasons.push(`Overlapping report type${overlappingTypes.length === 1 ? "" : "s"}: ${overlappingTypes.map(formatInspectionTaskTypeLabel).join(", ")}`);
+  } else {
+    reasons.push("Same visit window with different report types");
+  }
+  if (activeDuplicateStatuses.has(input.status)) {
+    reasons.push("Existing open inspection");
+  }
+  if (input.sameTechnician) {
+    reasons.push("Same assigned technician");
+  }
+  if (input.hasQuoteSource) {
+    reasons.push("Existing quote-converted work");
+  }
+  if (input.hasWorkOrderSource) {
+    reasons.push("Existing work-order source");
+  }
+  return reasons;
+}
+
+export async function detectPotentialDuplicateInspections(
+  actor: ActorContext,
+  input: z.infer<typeof scheduleInspectionSchema>
+): Promise<DuplicateInspectionDetectionResult> {
+  const parsedActor = parseActor(actor);
+  if (!["tenant_admin", "office_admin", "technician"].includes(parsedActor.role)) {
+    throw new Error("You do not have access to check duplicate inspections.");
+  }
+
+  const tenantId = parsedActor.tenantId as string;
+  const plannedInspectionGroups = buildServiceScheduleInspectionPlan({
+    tasks: input.tasks,
+    scheduledStart: input.scheduledStart,
+    inspectionMonth: input.inspectionMonth
+  });
+  if (!plannedInspectionGroups.length) {
+    return { matches: [] };
+  }
+
+  const matchesById = new Map<string, DuplicateInspectionMatch>();
+  for (const group of plannedInspectionGroups) {
+    const requestedTypes = new Set(uniqueInspectionTypes(group.tasks));
+    const scheduledStart = group.scheduledStart;
+    const existingInspections = await prisma.inspection.findMany({
+      where: {
+        tenantId,
+        customerCompanyId: input.customerCompanyId,
+        siteId: input.siteId,
+        status: { not: InspectionStatus.cancelled },
+        scheduledStart: {
+          gte: startOfDay(scheduledStart),
+          lte: endOfDay(scheduledStart)
+        }
+      },
+      include: {
+        customerCompany: { select: { name: true } },
+        site: {
+          select: {
+            name: true,
+            addressLine1: true,
+            addressLine2: true,
+            city: true,
+            state: true,
+            postalCode: true
+          }
+        },
+        assignedTechnician: { select: { name: true } },
+        technicianAssignments: { include: { technician: { select: { name: true } } } },
+        tasks: {
+          select: {
+            inspectionType: true,
+            status: true,
+            schedulingStatus: true
+          }
+        },
+        convertedFromQuotes: { select: { quoteNumber: true } },
+        providerContextRecord: {
+          select: {
+            sourceType: true,
+            providerAccount: { select: { name: true } }
+          }
+        }
+      },
+      orderBy: { scheduledStart: "asc" }
+    });
+
+    for (const inspection of existingInspections) {
+      const activeTasks = inspection.tasks.filter((task) =>
+        task.status !== InspectionStatus.cancelled &&
+        task.schedulingStatus !== "not_scheduled"
+      );
+      const existingTypes = new Set(activeTasks.map((task) => task.inspectionType as keyof typeof inspectionTypeRegistry));
+      const missingTypes = [...requestedTypes].filter((type) => !existingTypes.has(type));
+      const hasOverlappingTypes = [...requestedTypes].some((type) => existingTypes.has(type));
+      const assignedTechnicianIds = new Set(input.assignedTechnicianIds);
+      const sameTechnician = Boolean(
+        input.assignedTechnicianIds.length &&
+        (inspection.assignedTechnicianId && assignedTechnicianIds.has(inspection.assignedTechnicianId))
+      );
+      const activeDuplicateStatuses = new Set<InspectionStatus>([
+        InspectionStatus.to_be_completed,
+        InspectionStatus.scheduled,
+        InspectionStatus.in_progress,
+        InspectionStatus.follow_up_required
+      ]);
+      const sameDayCompletedDuplicateStatuses = new Set<InspectionStatus>([
+        InspectionStatus.completed,
+        InspectionStatus.invoiced
+      ]);
+      const isActiveDuplicate = activeDuplicateStatuses.has(inspection.status);
+      const isSameDayCompletedDuplicate = sameDayCompletedDuplicateStatuses.has(inspection.status) && hasOverlappingTypes;
+      if (!isActiveDuplicate && !isSameDayCompletedDuplicate) {
+        continue;
+      }
+
+      const existingMatch = matchesById.get(inspection.id);
+      const missingReportTypes = missingTypes.map((inspectionType) => ({
+        inspectionType,
+        label: formatInspectionTaskTypeLabel(inspectionType)
+      }));
+      const nextMatch: DuplicateInspectionMatch = {
+        id: inspection.id,
+        customerName: inspection.customerCompany.name,
+        siteName: getCustomerFacingSiteLabel(inspection.site.name) ?? inspection.site.name,
+        siteAddress: formatInspectionSiteAddress(inspection.site),
+        scheduledStart: inspection.scheduledStart.toISOString(),
+        scheduledEnd: inspection.scheduledEnd?.toISOString() ?? null,
+        status: inspection.status,
+        inspectionClassification: inspection.inspectionClassification,
+        reportTypes: activeTasks.map((task) => ({
+          inspectionType: task.inspectionType as keyof typeof inspectionTypeRegistry,
+          label: formatInspectionTaskTypeLabel(task.inspectionType as keyof typeof inspectionTypeRegistry),
+          status: task.status
+        })),
+        assignedTechnicians: [
+          inspection.assignedTechnician?.name ?? null,
+          ...readTechnicianNameAssignments(inspection).map((assignment) => assignment.technician.name)
+        ].filter((name): name is string => Boolean(name)),
+        workOrderSource: inspection.providerContextRecord
+          ? [inspection.providerContextRecord.providerAccount?.name, inspection.providerContextRecord.sourceType].filter(Boolean).join(" / ") || "Work order"
+          : null,
+        quoteSource: inspection.convertedFromQuotes[0]?.quoteNumber ?? null,
+        duplicateReasons: buildDuplicateReasons({
+          requestedTypes,
+          existingTypes,
+          status: inspection.status,
+          sameTechnician,
+          hasQuoteSource: inspection.convertedFromQuotes.length > 0,
+          hasWorkOrderSource: Boolean(inspection.providerContextRecord)
+        }),
+        missingReportTypes,
+        canAddReportTypesToExisting: isActiveDuplicate && missingReportTypes.length > 0
+      };
+
+      if (existingMatch) {
+        const mergedMissingTypes = new Map(existingMatch.missingReportTypes.map((type) => [type.inspectionType, type]));
+        for (const missingType of nextMatch.missingReportTypes) {
+          mergedMissingTypes.set(missingType.inspectionType, missingType);
+        }
+        matchesById.set(inspection.id, {
+          ...existingMatch,
+          duplicateReasons: [...new Set([...existingMatch.duplicateReasons, ...nextMatch.duplicateReasons])],
+          missingReportTypes: [...mergedMissingTypes.values()],
+          canAddReportTypesToExisting: existingMatch.canAddReportTypesToExisting || nextMatch.canAddReportTypesToExisting
+        });
+      } else {
+        matchesById.set(inspection.id, nextMatch);
+      }
+    }
+  }
+
+  return {
+    matches: [...matchesById.values()].sort((left, right) => {
+      if (left.canAddReportTypesToExisting !== right.canAddReportTypesToExisting) {
+        return left.canAddReportTypesToExisting ? -1 : 1;
+      }
+      return new Date(left.scheduledStart).getTime() - new Date(right.scheduledStart).getTime();
+    })
+  };
+}
+
+export async function recordInspectionDuplicateOverride(actor: ActorContext, input: {
+  inspectionId: string;
+  duplicateInspectionIds: string[];
+  resolution: "create_anyway";
+}) {
+  const parsedActor = parseActor(actor);
+  const tenantId = parsedActor.tenantId as string;
+  await prisma.auditLog.create({
+    data: {
+      tenantId,
+      actorUserId: parsedActor.userId,
+      action: "inspection.duplicate_override",
+      entityType: "Inspection",
+      entityId: input.inspectionId,
+      metadata: {
+        duplicateInspectionIds: input.duplicateInspectionIds,
+        resolution: input.resolution
+      }
+    }
+  });
 }
 
 export async function ensureGenericInspectionSite(

@@ -11,6 +11,7 @@ import {
   approveInspectionCloseoutRequest,
   dismissInspectionCloseoutRequest,
   createInspection,
+  detectPotentialDuplicateInspections,
   generateQuoteFromDeficiencies,
   clearBillingSummaryItemCatalogLink,
   clearBillingSummaryItemGroupCatalogLink,
@@ -28,6 +29,7 @@ import {
   uploadInspectionDocument,
   parseCreateInspectionFormData,
   parseUpdateInspectionFormData,
+  recordInspectionDuplicateOverride,
   sendQuickBooksInvoice,
   searchBillingSummaryItemCatalogMatches,
   syncBillingSummaryToQuickBooks,
@@ -153,7 +155,13 @@ async function resolveInspectionSiteSelection<T extends {
 }
 
 export async function createInspectionAction(
-  _: { error: string | null; success: string | null; redirectTo?: string | null; createdInspectionId?: string | null },
+  _: {
+    error: string | null;
+    success: string | null;
+    redirectTo?: string | null;
+    createdInspectionId?: string | null;
+    duplicateWarning?: Awaited<ReturnType<typeof detectPotentialDuplicateInspections>> | null;
+  },
   formData: FormData
 ) {
   const session = await auth();
@@ -169,7 +177,66 @@ export async function createInspectionAction(
   try {
     const actor = { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId };
     const resolvedInput = await resolveInspectionSiteSelection(actor, parsed.data, formData);
+    const duplicateResolution = String(formData.get("duplicateInspectionResolution") ?? "");
+    const duplicateExistingInspectionId = String(formData.get("duplicateExistingInspectionId") ?? "").trim();
+
+    if (duplicateResolution === "add_to_existing" && duplicateExistingInspectionId) {
+      const duplicateDetection = await detectPotentialDuplicateInspections(actor, resolvedInput);
+      const selectedMatch = duplicateDetection.matches.find((match) => match.id === duplicateExistingInspectionId);
+      if (!selectedMatch?.canAddReportTypesToExisting || selectedMatch.missingReportTypes.length === 0) {
+        return {
+          error: "That existing inspection can no longer accept the selected report type. Refresh and try again.",
+          success: null,
+          redirectTo: null,
+          createdInspectionId: null,
+          duplicateWarning: duplicateDetection
+        };
+      }
+
+      for (const reportType of selectedMatch.missingReportTypes) {
+        await addInspectionTask(actor, {
+          inspectionId: duplicateExistingInspectionId,
+          inspectionType: reportType.inspectionType
+        });
+      }
+
+      revalidatePath("/app/admin");
+      revalidatePath("/app/admin/dashboard");
+      revalidatePath("/app/admin/inspections");
+      revalidatePath(`/app/admin/inspections/${duplicateExistingInspectionId}`);
+      revalidatePath("/app/tech");
+      revalidatePath("/app/tech/work");
+      revalidatePath("/app/tech/inspections");
+      revalidatePath("/app/customer");
+
+      return {
+        error: null,
+        success: "Report type added to the existing inspection. No duplicate visit was created.",
+        redirectTo: `/app/admin/inspections/${duplicateExistingInspectionId}`,
+        createdInspectionId: duplicateExistingInspectionId,
+        duplicateWarning: null
+      };
+    }
+
+    const duplicateDetection = await detectPotentialDuplicateInspections(actor, resolvedInput);
+    if (duplicateResolution !== "create_anyway" && duplicateDetection.matches.length > 0) {
+      return {
+        error: null,
+        success: null,
+        redirectTo: null,
+        createdInspectionId: null,
+        duplicateWarning: duplicateDetection
+      };
+    }
+
     const inspection = await createInspection(actor, resolvedInput);
+    if (duplicateResolution === "create_anyway" && duplicateDetection.matches.length > 0) {
+      await recordInspectionDuplicateOverride(actor, {
+        inspectionId: inspection.id,
+        duplicateInspectionIds: duplicateDetection.matches.map((match) => match.id),
+        resolution: "create_anyway"
+      });
+    }
     revalidatePath("/app/admin");
     revalidatePath("/app/admin/dashboard");
     revalidatePath("/app/admin/inspections");
@@ -182,14 +249,16 @@ export async function createInspectionAction(
       error: null,
       success: `Inspection created successfully for ${inspection.scheduledStart.toLocaleString()}.`,
       redirectTo: null,
-      createdInspectionId: inspection.id
+      createdInspectionId: inspection.id,
+      duplicateWarning: null
     };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Unable to create inspection.",
       success: null,
       redirectTo: null,
-      createdInspectionId: null
+      createdInspectionId: null,
+      duplicateWarning: null
     };
   }
 }

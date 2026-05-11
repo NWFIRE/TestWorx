@@ -38,13 +38,33 @@ type InspectionSchedulerFormState = {
   success: string | null;
   redirectTo?: string | null;
   createdInspectionId?: string | null;
+  duplicateWarning?: {
+    matches: Array<{
+      id: string;
+      customerName: string;
+      siteName: string;
+      siteAddress: string | null;
+      scheduledStart: string;
+      scheduledEnd: string | null;
+      status: string;
+      inspectionClassification: string;
+      reportTypes: Array<{ inspectionType: InspectionType; label: string; status: string }>;
+      assignedTechnicians: string[];
+      workOrderSource: string | null;
+      quoteSource: string | null;
+      duplicateReasons: string[];
+      missingReportTypes: Array<{ inspectionType: InspectionType; label: string }>;
+      canAddReportTypesToExisting: boolean;
+    }>;
+  } | null;
 };
 
 const initialState: InspectionSchedulerFormState = {
   error: null,
   success: null,
   redirectTo: null,
-  createdInspectionId: null
+  createdInspectionId: null,
+  duplicateWarning: null
 };
 const inspectionTypeOptions = Object.keys(inspectionTypeRegistry) as InspectionType[];
 const serviceSchedulingOptions: InspectionTaskSchedulingStatus[] = [
@@ -148,6 +168,17 @@ function serializeInitialValues(initialValues?: InspectionSchedulerFormInitialVa
       notes: task.notes ?? null
     }))
   });
+}
+
+function formatDuplicateDateTime(value: string | null) {
+  if (!value) {
+    return "Not scheduled";
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
 }
 
 function resolveSchedulerSiteSelection(input: {
@@ -265,6 +296,8 @@ export function InspectionSchedulerForm({
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const externalDocumentsInputRef = useRef<HTMLInputElement>(null);
+  const duplicateResolutionInputRef = useRef<HTMLInputElement>(null);
+  const duplicateExistingInspectionInputRef = useRef<HTMLInputElement>(null);
   const lastErrorRef = useRef<string | null>(null);
   const lastSuccessRef = useRef<string | null>(null);
   const lastAppliedInitialValuesRef = useRef<string>(serializeInitialValues(initialValues));
@@ -296,6 +329,9 @@ export function InspectionSchedulerForm({
   const [serviceLines, setServiceLines] = useState<ServiceLineDraft[]>(() => buildInitialServiceLines(initialValues));
   const [newestServiceLineId, setNewestServiceLineId] = useState<string | null>(null);
   const [showProtectedSaveConfirm, setShowProtectedSaveConfirm] = useState(false);
+  const [duplicateWarningDismissed, setDuplicateWarningDismissed] = useState(false);
+  const [duplicateInspectionResolution, setDuplicateInspectionResolution] = useState("");
+  const [duplicateExistingInspectionId, setDuplicateExistingInspectionId] = useState("");
   const [externalDocumentFiles, setExternalDocumentFiles] = useState<File[]>([]);
   const [externalDocumentLabel, setExternalDocumentLabel] = useState("");
   const [externalDocumentsRequireSignature, setExternalDocumentsRequireSignature] = useState(true);
@@ -433,12 +469,20 @@ export function InspectionSchedulerForm({
     }
     return result;
   }, initialState);
+  const duplicateWarning = state.duplicateWarning?.matches.length && !duplicateWarningDismissed
+    ? state.duplicateWarning
+    : null;
 
   useEffect(() => {
-    if (state.error || state.success) {
+    if (state.error || state.success || state.duplicateWarning) {
       setSubmitLocked(false);
     }
-  }, [state.error, state.success]);
+    if (state.duplicateWarning) {
+      setDuplicateWarningDismissed(false);
+      setDuplicateInspectionResolution("");
+      setDuplicateExistingInspectionId("");
+    }
+  }, [state.error, state.success, state.duplicateWarning]);
 
   useEffect(() => {
     if (!newestServiceLineId) {
@@ -547,6 +591,20 @@ export function InspectionSchedulerForm({
     router.push(state.redirectTo);
   }, [router, state.redirectTo]);
 
+  useEffect(() => {
+    if (!duplicateWarning) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setDuplicateWarningDismissed(true);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [duplicateWarning]);
+
   return (
     <form
       action={formAction}
@@ -565,6 +623,8 @@ export function InspectionSchedulerForm({
       <input name="serviceLinesJson" type="hidden" value={serviceLinesJson} />
       <input name="inspectionClassification" type="hidden" value={inspectionClassification} />
       <input name="isPriority" type="hidden" value={isPriority ? "on" : ""} />
+      <input name="duplicateInspectionResolution" ref={duplicateResolutionInputRef} type="hidden" value={duplicateInspectionResolution} />
+      <input name="duplicateExistingInspectionId" ref={duplicateExistingInspectionInputRef} type="hidden" value={duplicateExistingInspectionId} />
       <div>
         <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500 sm:text-sm sm:tracking-[0.25em]">Visit details</p>
         <h3 className="mt-2 text-xl font-semibold text-ink sm:text-2xl">{title}</h3>
@@ -1016,6 +1076,136 @@ export function InspectionSchedulerForm({
             />
             Make signed versions visible in the customer portal
           </label>
+        </div>
+      ) : null}
+      {duplicateWarning ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 px-3 py-4 backdrop-blur-sm sm:items-center sm:px-6" role="dialog" aria-modal="true" aria-labelledby="duplicate-inspection-title">
+          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[2rem] border border-white/70 bg-white p-5 shadow-2xl sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-600">Duplicate protection</p>
+                <h3 className="mt-2 text-2xl font-semibold text-ink" id="duplicate-inspection-title">Potential Duplicate Inspection Detected</h3>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                  We found an existing inspection that may already cover this work. Review the matching visit before creating a second ticket.
+                </p>
+              </div>
+              <button
+                className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                onClick={() => setDuplicateWarningDismissed(true)}
+                type="button"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {duplicateWarning.matches.map((match) => (
+                <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50/60 p-4" key={match.id}>
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-white px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-amber-700">
+                          {formatInspectionStatusLabel(match.status as EditableInspectionStatus)}
+                        </span>
+                        <span className="rounded-full bg-white px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-slate-600">
+                          {formatInspectionClassificationLabel(match.inspectionClassification as InspectionClassification)}
+                        </span>
+                      </div>
+                      <h4 className="mt-3 text-lg font-semibold text-ink">{match.customerName}</h4>
+                      <p className="mt-1 text-sm font-medium text-slate-700">{match.siteName}</p>
+                      {match.siteAddress ? <p className="mt-1 text-sm text-slate-500">{match.siteAddress}</p> : null}
+                      <p className="mt-2 text-sm text-slate-600">
+                        {formatDuplicateDateTime(match.scheduledStart)}
+                        {match.scheduledEnd ? ` - ${formatDuplicateDateTime(match.scheduledEnd)}` : ""}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {match.reportTypes.map((reportType, index) => (
+                          <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700" key={`${reportType.inspectionType}-${index}`}>
+                            {reportType.label}
+                          </span>
+                        ))}
+                      </div>
+                      {match.assignedTechnicians.length ? (
+                        <p className="mt-3 text-sm text-slate-600">Assigned: {match.assignedTechnicians.join(", ")}</p>
+                      ) : (
+                        <p className="mt-3 text-sm text-slate-600">Unassigned / shared queue</p>
+                      )}
+                      {match.quoteSource || match.workOrderSource ? (
+                        <p className="mt-1 text-sm text-slate-600">
+                          {[match.quoteSource ? `Quote ${match.quoteSource}` : null, match.workOrderSource].filter(Boolean).join(" | ")}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="w-full space-y-2 lg:max-w-sm">
+                      <button
+                        className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                        onClick={() => router.push(`/app/admin/inspections/${match.id}`)}
+                        type="button"
+                      >
+                        Open Existing Inspection
+                      </button>
+                      {match.canAddReportTypesToExisting ? (
+                        <button
+                          className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                          disabled={pending || submitLocked || isUploadingExternalDocuments}
+                          onClick={() => {
+                            setDuplicateInspectionResolution("add_to_existing");
+                            setDuplicateExistingInspectionId(match.id);
+                            if (duplicateResolutionInputRef.current) {
+                              duplicateResolutionInputRef.current.value = "add_to_existing";
+                            }
+                            if (duplicateExistingInspectionInputRef.current) {
+                              duplicateExistingInspectionInputRef.current.value = match.id;
+                            }
+                          }}
+                          type="submit"
+                        >
+                          Add {match.missingReportTypes.map((type) => type.label).join(", ")} To Existing Inspection
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="mt-4 rounded-2xl bg-white/80 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Why TradeWorx flagged this</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {match.duplicateReasons.map((reason) => (
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600" key={reason}>
+                          {reason}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                onClick={() => setDuplicateWarningDismissed(true)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-amber-200 bg-amber-100 px-5 py-3 text-sm font-semibold text-amber-900 transition hover:bg-amber-200 disabled:opacity-60"
+                disabled={pending || submitLocked || isUploadingExternalDocuments}
+                onClick={() => {
+                  setDuplicateInspectionResolution("create_anyway");
+                  setDuplicateExistingInspectionId("");
+                  if (duplicateResolutionInputRef.current) {
+                    duplicateResolutionInputRef.current.value = "create_anyway";
+                  }
+                  if (duplicateExistingInspectionInputRef.current) {
+                    duplicateExistingInspectionInputRef.current.value = "";
+                  }
+                }}
+                type="submit"
+              >
+                Create New Inspection Anyway
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
       {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
