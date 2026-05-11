@@ -57,6 +57,15 @@ const priorityOptions = [
 
 const FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS = 60;
 const terminalInspectionStatusesForFastManagement = new Set(["completed", "invoiced", "cancelled"]);
+const inspectionSearchHistoryStatuses = [
+  "to_be_completed",
+  "scheduled",
+  "in_progress",
+  "follow_up_required",
+  "completed",
+  "invoiced",
+  "cancelled"
+];
 
 type AdminSchedulingInspection = Awaited<ReturnType<typeof getAdminSchedulingQueueData>>["inspections"][number];
 
@@ -163,6 +172,51 @@ function uniqueSearchOptions(options: SearchSelectOption[]) {
   });
 }
 
+function getInspectionSearchBadge(inspection: AdminSchedulingInspection) {
+  if (inspection.archivedAt) {
+    return "Archived";
+  }
+
+  if (["completed", "invoiced", "cancelled"].includes(inspection.status)) {
+    return formatInspectionStatusLabel(inspection.status as Parameters<typeof formatInspectionStatusLabel>[0]);
+  }
+
+  return "Inspection";
+}
+
+function buildInspectionSearchOption(inspection: AdminSchedulingInspection, currentPath: string): SearchSelectOption {
+  const customerLabel = inspection.customerLabel ?? inspection.customerCompany.name;
+  const locationLabel = inspection.isGenericSite
+    ? inspection.locationLabel ?? null
+    : [
+        inspection.locationLabel,
+        inspection.site.addressLine1,
+        inspection.site.city
+      ]
+        .filter(Boolean)
+        .join(" - ");
+  const reportSummary = formatInspectionTaskSummary(inspection.tasks);
+  const technicianSummary = inspection.assignedTechnicianNames.join(", ") || "Shared queue";
+  const historyStatusLabel = getInspectionSearchBadge(inspection);
+
+  return {
+    value: inspection.id,
+    label: customerLabel,
+    secondaryLabel: [
+      locationLabel,
+      format(inspection.scheduledStart, "MMM d, yyyy h:mm a"),
+      historyStatusLabel !== "Inspection" ? historyStatusLabel : null,
+      reportSummary,
+      technicianSummary,
+      `Ref ${inspection.id.slice(0, 8)}`
+    ]
+      .filter(Boolean)
+      .join(" | "),
+    badge: historyStatusLabel,
+    href: `/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`
+  };
+}
+
 export default async function AdminInspectionsPage({
   searchParams
 }: {
@@ -212,7 +266,7 @@ export default async function AdminInspectionsPage({
     tenantId: session.user.tenantId
   };
 
-  const [queueData, queueSearchData, dashboardData] = await Promise.all([
+  const [queueData, queueSearchData, historySearchData, dashboardData] = await Promise.all([
     getAdminSchedulingQueueData(actor, {
       statuses: effectiveStatuses,
       classifications: requestedClassifications,
@@ -227,6 +281,12 @@ export default async function AdminInspectionsPage({
       query: "",
       technicianId
     }),
+    query
+      ? getAdminSchedulingQueueData(actor, {
+          statuses: inspectionSearchHistoryStatuses,
+          query
+        })
+      : Promise.resolve(null),
     getAdminDashboardData(actor)
   ]);
   const initialCustomerId = dashboardData.customers.some((customer) => customer.id === requestedCustomerId)
@@ -250,35 +310,8 @@ export default async function AdminInspectionsPage({
       secondaryLabel: site.city || "Service location",
       badge: "Location"
     })),
-    ...queueSearchData.inspections.map((inspection) => {
-      const customerLabel = inspection.customerLabel ?? inspection.customerCompany.name;
-      const locationLabel = inspection.isGenericSite
-        ? inspection.locationLabel ?? null
-        : [
-            inspection.locationLabel,
-            inspection.site.addressLine1,
-            inspection.site.city
-          ]
-            .filter(Boolean)
-            .join(" - ");
-      const reportSummary = formatInspectionTaskSummary(inspection.tasks);
-      const technicianSummary = inspection.assignedTechnicianNames.join(", ") || "Shared queue";
-      return {
-        value: inspection.id,
-        label: customerLabel,
-        secondaryLabel: [
-          locationLabel,
-          format(inspection.scheduledStart, "MMM d, yyyy h:mm a"),
-          reportSummary,
-          technicianSummary,
-          `Ref ${inspection.id.slice(0, 8)}`
-        ]
-          .filter(Boolean)
-          .join(" | "),
-        badge: "Inspection",
-        href: `/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`
-      };
-    })
+    ...queueSearchData.inspections.map((inspection) => buildInspectionSearchOption(inspection, currentPath)),
+    ...(historySearchData?.inspections ?? []).map((inspection) => buildInspectionSearchOption(inspection, currentPath))
   ]);
   const fastManagementWindowEnd = endOfDay(addDays(startOfDay(new Date()), FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS));
   const fastManagementInspections = queueData.inspections.filter((inspection) =>
