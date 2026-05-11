@@ -34,6 +34,10 @@ export type FireAlarmReportRenderModel = {
     label: string;
     value: string;
   }>;
+  monitoringInfo: Array<{
+    label: string;
+    value: string;
+  }>;
   systemSummary: Array<{
     label: string;
     value: string | number;

@@ -20,6 +20,7 @@ export function FireAlarmPage1({ model }: { model: FireAlarmReportRenderModel })
       <ComplianceBlock codes={model.compliance.codes} />
       <IdentityBand {...model.identity} />
       <MetadataGrid columns={3} items={model.page1Metadata} />
+      <MetadataGrid columns={3} items={model.monitoringInfo} />
       <MetricGrid columns={4} items={model.systemSummary} />
     </>
   );

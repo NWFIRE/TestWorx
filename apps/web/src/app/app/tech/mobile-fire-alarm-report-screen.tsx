@@ -47,6 +47,13 @@ const controlPanelChecklistFieldIds = [
   "controlPanelCondition"
 ] as const;
 
+const monitoringInfoFieldIds = [
+  "monitoringCompanyName",
+  "monitoringAccountNumber",
+  "monitoringPhone",
+  "monitoringContactName"
+] as const;
+
 const summaryEditableFieldIds = [
   "fireAlarmSystemStatus",
   "laborHours",
@@ -672,6 +679,9 @@ function FireAlarmControlPanelSection({
   const scalarFields = scalarFieldIds
     .map((fieldId) => section.fields.find((candidate): candidate is Exclude<ReportFieldDefinition, { type: "repeater" }> => candidate.type !== "repeater" && candidate.id === fieldId))
     .filter((candidate): candidate is Exclude<ReportFieldDefinition, { type: "repeater" }> => Boolean(candidate));
+  const monitoringFields = monitoringInfoFieldIds
+    .map((fieldId) => section.fields.find((candidate): candidate is Exclude<ReportFieldDefinition, { type: "repeater" }> => candidate.type !== "repeater" && candidate.id === fieldId))
+    .filter((candidate): candidate is Exclude<ReportFieldDefinition, { type: "repeater" }> => Boolean(candidate));
 
   return (
     <div className="space-y-5">
@@ -739,6 +749,30 @@ function FireAlarmControlPanelSection({
         title="Control panels"
       />
       {dialog}
+
+      {monitoringFields.length > 0 ? (
+        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Monitoring</p>
+            <h3 className="mt-1 text-lg font-semibold text-slate-950">Monitoring company information</h3>
+            <p className="mt-1 text-sm text-slate-500">Capture the central station details so they appear near the top of the final fire alarm PDF.</p>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {monitoringFields.map((monitoringField) => (
+              <div key={monitoringField.id} className="space-y-2">
+                <label className="text-sm font-semibold text-slate-900">{monitoringField.label}</label>
+                <FieldInput
+                  disabled={isReadOnly}
+                  field={monitoringField}
+                  onChange={(value) => controller.updateSectionField(section.id, monitoringField.id, value)}
+                  reportId={data.reportId}
+                  value={getPrimitiveFieldValue(controller.draft, section.id, monitoringField.id)}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="space-y-3">
         {scalarFields.map((field) => (

@@ -48,6 +48,17 @@ function customerContactLine(input: PdfInput) {
   );
 }
 
+function buildMonitoringInfo(controlFields: Record<string, unknown> | undefined) {
+  return [
+    { label: "Monitoring company", value: cleanText(controlFields?.monitoringCompanyName) },
+    { label: "Monitoring account", value: cleanText(controlFields?.monitoringAccountNumber) },
+    { label: "Monitoring phone", value: cleanText(controlFields?.monitoringPhone) },
+    { label: "Monitoring contact", value: cleanText(controlFields?.monitoringContactName) },
+    { label: "Remote monitoring", value: formatYesNo(controlFields?.remoteMonitoring) },
+    { label: "Central station signal", value: humanize(controlFields?.centralStationSignalTest) }
+  ].filter((item): item is { label: string; value: string } => Boolean(item.value));
+}
+
 function readSection(draft: ReturnType<typeof reportDraftSchema.parse>, sectionId: string) {
   return draft.sections[sectionId]?.fields as Record<string, unknown> | undefined;
 }
@@ -113,6 +124,7 @@ export function buildFireAlarmRenderModel(rawReport: unknown): FireAlarmReportRe
   const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name);
   const customerContact = customerContactLine(input);
   const serviceAddress = cleanAddress(input);
+  const monitoringInfo = buildMonitoringInfo(controlFields);
 
   return {
     report: {
@@ -151,6 +163,7 @@ export function buildFireAlarmRenderModel(rawReport: unknown): FireAlarmReportRe
       customerContact ? { label: "Customer contact", value: customerContact } : null,
       serviceAddress ? { label: "Service address", value: serviceAddress } : null
     ].filter((item): item is { label: string; value: string } => Boolean(item)),
+    monitoringInfo,
     systemSummary: [
       { label: "Control Panels", value: toNumber(systemFields?.controlPanelsInspected) ?? toNumber(controlFields?.controlPanelsInspected) ?? readRows(draft, "control-panel", "controlPanels").length },
       { label: "Initiating Devices", value: toNumber(systemFields?.initiatingDevicesInspected) ?? toNumber(initiatingFields?.initiatingDevicesInspected) ?? readRows(draft, "initiating-devices", "initiatingDevices").length },
