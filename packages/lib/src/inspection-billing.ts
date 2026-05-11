@@ -22,6 +22,7 @@ import {
 } from "./minimum-ticket-pricing";
 import { saveQuickBooksItemMappingForCode } from "./quickbooks";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
+import { reconcileInspectionStatusTx } from "./inspection-status-consistency";
 import { hasWorkOrderLineItemTable } from "./work-order-line-item-table";
 import { getCustomerFacingSiteLabel } from "./scheduling";
 
@@ -4100,6 +4101,13 @@ export async function updateBillingSummaryStatus(actor: ActorContext, summaryId:
             : { status: nextInspectionStatus }
         });
 
+        await reconcileInspectionStatusTx(tx, {
+          tenantId: summary.tenantId,
+          inspectionId: summary.inspectionId,
+          actorUserId: actorContextSchema.parse(actor).userId,
+          source: "billing_status_update"
+        });
+
         await syncInspectionArchiveStateTx(tx, {
           tenantId: summary.tenantId,
           inspectionId: summary.inspectionId
@@ -4123,6 +4131,13 @@ export async function updateBillingSummaryStatus(actor: ActorContext, summaryId:
             ? { status: nextInspectionStatus, isPriority: false, priorityClearedAt: new Date() }
             : { status: nextInspectionStatus }
         });
+
+      await reconcileInspectionStatusTx(tx, {
+        tenantId: summary.tenantId,
+        inspectionId: summary.inspectionId,
+        actorUserId: actorContextSchema.parse(actor).userId,
+        source: "billing_status_update"
+      });
 
       await syncInspectionArchiveStateTx(tx, {
         tenantId: summary.tenantId,

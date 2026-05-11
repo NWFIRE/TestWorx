@@ -21,6 +21,7 @@ import type { JsonInputValue, JsonObject } from "./json-types";
 import { getDefaultInspectionRecurrenceFrequency, inspectionTypeRegistry } from "./report-config";
 import { deleteStoredFile } from "./storage";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
+import { reconcileInspectionStatusTx, repairInspectionStatusConsistencyTx } from "./inspection-status-consistency";
 import {
   createPriorityInspectionAssignedNotificationsTx,
   createWorkOrderReassignedNotificationsTx
@@ -115,6 +116,7 @@ export const terminalInspectionStatuses = [
   InspectionStatus.invoiced,
   InspectionStatus.cancelled
 ] as const;
+const closedBillingQueueStatuses = ["reviewed", "invoiced"] as const;
 export const genericInspectionSiteOptionValue = "__generic_site__";
 export const genericInspectionSiteName = "General / No Fixed Site";
 export const customInspectionSiteOptionValue = "__custom_site__";
@@ -1192,6 +1194,22 @@ export function isInspectionInUnstartedState(status: InspectionStatus) {
 
 export function isActiveOperationalInspectionStatus(status: InspectionStatus) {
   return activeOperationalInspectionStatuses.includes(status as (typeof activeOperationalInspectionStatuses)[number]);
+}
+
+function activeInspectionQueueConsistencyFilter(): Prisma.InspectionWhereInput {
+  return {
+    OR: [
+      { billingSummary: { is: null } },
+      {
+        billingSummary: {
+          is: {
+            status: { notIn: [...closedBillingQueueStatuses] },
+            quickbooksInvoiceId: null
+          }
+        }
+      }
+    ]
+  };
 }
 
 export function isTerminalInspectionStatus(status: InspectionStatus) {
@@ -2883,6 +2901,16 @@ export async function updateInspectionStatus(
       });
     }
 
+    if (status === InspectionStatus.completed || status === InspectionStatus.invoiced) {
+      await reconcileInspectionStatusTx(tx, {
+        tenantId,
+        inspectionId,
+        actorUserId: parsedActor.userId,
+        source: parsedActor.role === "technician" ? "tech_status_update" : "admin_status_update",
+        completedAt: inspection.completedAt ?? new Date()
+      });
+    }
+
     let generatedInspectionsCount = 0;
     if (status === InspectionStatus.completed) {
       const generatedInspections = await createRecurringFollowUpInspectionsTx(tx, {
@@ -3049,6 +3077,14 @@ export async function completeInspectionWithCloseoutRequest(
       });
     }
 
+    await reconcileInspectionStatusTx(tx, {
+      tenantId,
+      inspectionId,
+      actorUserId: parsedActor.userId,
+      source: parsedActor.role === "technician" ? "tech_status_update" : "admin_status_update",
+      completedAt: inspection.completedAt ?? new Date()
+    });
+
     if (inspection.isPriority && !priorityState.isPriority) {
       await createAuditLog(tx, {
         tenantId,
@@ -3065,6 +3101,18 @@ export async function completeInspectionWithCloseoutRequest(
 
     return updated;
   });
+}
+
+export async function repairInspectionStatusConsistency(actor: ActorContext) {
+  const parsedActor = parseActor(actor);
+  if (!["tenant_admin", "office_admin", "platform_admin"].includes(parsedActor.role)) {
+    throw new Error("Only administrators can repair inspection status consistency.");
+  }
+
+  return prisma.$transaction((tx) => repairInspectionStatusConsistencyTx(tx, {
+    tenantId: parsedActor.tenantId as string,
+    actorUserId: parsedActor.userId
+  }));
 }
 
 export async function addInspectionTask(actor: ActorContext, input: {
@@ -4197,7 +4245,11 @@ export async function getAdminDashboardData(actor: ActorContext) {
     prisma.site.findMany({ where: { tenantId }, orderBy: { name: "asc" } }),
     prisma.user.findMany({ where: { tenantId, role: "technician" }, orderBy: { name: "asc" } }),
     prisma.inspection.findMany({
-      where: { tenantId, status: { in: [...activeOperationalInspectionStatuses] } },
+      where: {
+        tenantId,
+        status: { in: [...activeOperationalInspectionStatuses] },
+        AND: [activeInspectionQueueConsistencyFilter()]
+      },
       include: {
         site: true,
         customerCompany: true,
@@ -4250,7 +4302,14 @@ export async function getAdminDashboardData(actor: ActorContext) {
       take: 20
     }),
     prisma.site.count({ where: { tenantId } }),
-    prisma.inspection.count({ where: { tenantId, claimable: true, status: { in: [...claimableInspectionStatuses] } } }),
+    prisma.inspection.count({
+      where: {
+        tenantId,
+        claimable: true,
+        status: { in: [...claimableInspectionStatuses] },
+        AND: [activeInspectionQueueConsistencyFilter()]
+      }
+    }),
     prisma.inspection.count({ where: { tenantId } }),
     prisma.inspection.count({ where: { tenantId, status: { in: [...completedOperationalInspectionStatuses] } } })
   ]);
@@ -4763,6 +4822,7 @@ export async function getAdminUpcomingInspectionsData(
       where: {
         tenantId,
         status: { in: [...activeOperationalInspectionStatuses] },
+        AND: [activeInspectionQueueConsistencyFilter()],
         scheduledStart: {
           gte: monthStart,
           lt: rangeEnd
@@ -4896,11 +4956,15 @@ export async function getAdminSchedulingQueueData(
         ]
       }
     : undefined;
+  const shouldApplyActiveConsistencyFilter =
+    requestedStatuses.length === 0 ||
+    requestedStatuses.every((status) => isActiveOperationalInspectionStatus(status as InspectionStatus));
 
   const inspections = await prisma.inspection.findMany({
     where: {
       tenantId,
       ...(statusFilter ? { status: statusFilter } : {}),
+      ...(shouldApplyActiveConsistencyFilter ? { AND: [activeInspectionQueueConsistencyFilter()] } : {}),
       ...(classificationFilter ? { inspectionClassification: classificationFilter } : {}),
       ...(typeof priorityFilter === "boolean" ? { isPriority: priorityFilter } : {}),
       ...(searchFilter ? searchFilter : {}),
@@ -5587,6 +5651,7 @@ export async function resolveClaimableInspectionsForTechnician(actor: ActorConte
       tenantId,
       claimable: true,
       status: { in: [...claimableInspectionStatuses] },
+      AND: [activeInspectionQueueConsistencyFilter()],
       scheduledStart: { lte: claimableWindowEnd }
     },
     include: {
@@ -5696,6 +5761,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
       where: {
         tenantId,
         status: { in: [...activeOperationalInspectionStatuses] },
+        AND: [activeInspectionQueueConsistencyFilter()],
         OR: [
           { assignedTechnicianId: parsedActor.userId },
           { technicianAssignments: { some: { technicianId: parsedActor.userId } } }

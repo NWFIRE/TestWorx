@@ -17,6 +17,9 @@ function buildTxMock() {
       findFirst: vi.fn(),
       update: vi.fn()
     },
+    inspectionTask: {
+      updateMany: vi.fn()
+    },
     auditLog: {
       create: vi.fn()
     }
@@ -78,7 +81,7 @@ describe("inspection completion after report finalization", () => {
     }));
     expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
-        action: "inspection.finalization_recalculated",
+        action: "inspection.status_reconciled",
         metadata: expect.objectContaining({
           previousInspectionStatus: InspectionStatus.in_progress,
           newInspectionStatus: InspectionStatus.completed,
@@ -125,7 +128,7 @@ describe("inspection completion after report finalization", () => {
     expect(syncInspectionArchiveStateTxMock).not.toHaveBeenCalled();
     expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
-        action: "inspection.finalization_recalculated",
+        action: "inspection.status_reconciled",
         metadata: expect.objectContaining({
           previousInspectionStatus: InspectionStatus.in_progress,
           newInspectionStatus: InspectionStatus.in_progress,
@@ -133,6 +136,42 @@ describe("inspection completion after report finalization", () => {
           billingReadyTransition: false
         })
       })
+    }));
+  });
+
+  it("repairs stale task statuses when reports are finalized", async () => {
+    const tx = buildTxMock();
+    const finalizedAt = new Date("2026-05-08T14:00:00.000Z");
+    tx.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      status: InspectionStatus.to_be_completed,
+      isPriority: false,
+      billingSummary: null,
+      tasks: [
+        {
+          id: "task_1",
+          status: InspectionStatus.to_be_completed,
+          schedulingStatus: "scheduled_now",
+          report: { id: "report_1", status: "finalized", finalizedAt }
+        }
+      ]
+    });
+
+    const result = await resolveInspectionCompletionAfterTaskFinalizationTx({
+      tx: tx as never,
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1",
+      finalizedAt,
+      actorUserId: "tech_1",
+      source: "sync_finalize"
+    });
+
+    expect(result.completed).toBe(true);
+    expect(tx.inspectionTask.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: { status: InspectionStatus.completed }
+    }));
+    expect(tx.inspection.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: InspectionStatus.completed })
     }));
   });
 });

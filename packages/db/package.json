@@ -13,6 +13,7 @@
     "prisma:migrate": "node ./scripts/run-prisma.cjs migrate deploy --schema ./prisma/schema.prisma",
     "prisma:seed": "node ./scripts/run-seed.cjs",
     "provider-billing:backfill": "node ./scripts/run-provider-billing-backfill.cjs",
+    "inspection-status:repair": "node ./scripts/run-inspection-status-repair.cjs",
     "bootstrap:pilot": "node ./scripts/run-bootstrap-pilot.cjs",
     "verify": "node ./scripts/verify.cjs"
   },

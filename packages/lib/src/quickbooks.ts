@@ -8,6 +8,7 @@ import { actorContextSchema } from "@testworx/types";
 import { resolveComplianceReportingFeeTx } from "./compliance-reporting-fees";
 import { assertEnvForFeature, getOptionalQuickBooksEnv, getServerEnv } from "./env";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
+import { reconcileInspectionStatusTx } from "./inspection-status-consistency";
 import { hasWorkOrderLineItemTable } from "./work-order-line-item-table";
 import type { JsonObject, JsonValue } from "./json-types";
 import { assertTenantContext, canAccessProductsServicesWorkspace } from "./permissions";
@@ -4789,6 +4790,12 @@ export async function syncBillingSummaryToQuickBooks(
       await tx.inspection.update({
         where: { id: summary.inspectionId },
         data: { status: InspectionStatus.invoiced }
+      });
+      await reconcileInspectionStatusTx(tx, {
+        tenantId: parsedActor.tenantId as string,
+        inspectionId: summary.inspectionId,
+        actorUserId: parsedActor.userId,
+        source: "quickbooks_sync"
       });
       if (await hasWorkOrderLineItemTable(tx)) {
         await tx.workOrderLineItem.updateMany({
