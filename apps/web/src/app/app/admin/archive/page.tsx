@@ -154,6 +154,7 @@ export default async function InspectionArchivePage({
           </div>
           <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-4">
             <LiveUrlSearchInput
+              debounceMs={450}
               initialValue={data.filters.query}
               paramKey="query"
               placeholder="Search inspection #, customer, site, address, city, or technician"
