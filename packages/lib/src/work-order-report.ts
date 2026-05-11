@@ -114,6 +114,32 @@ export const workOrderReportTemplate: ReportTemplateDefinition = {
       ]
     },
     {
+      id: "work-order-photos",
+      label: "Photos",
+      description: "Attach jobsite, equipment, parts, repair, or completion photos for office review and the customer packet.",
+      fields: [
+        {
+          id: "photos",
+          label: "Work order photos",
+          type: "repeater",
+          addLabel: "Add photo",
+          rowFields: [
+            {
+              id: "photo",
+              label: "Photo",
+              type: "photo"
+            },
+            {
+              id: "caption",
+              label: "Caption",
+              type: "text",
+              placeholder: "Optional photo note"
+            }
+          ]
+        }
+      ]
+    },
+    {
       id: "service-provided",
       label: "Service provided",
       description: "Track the service work performed, including extinguisher service actions and any applicable equipment type or custom service detail.",

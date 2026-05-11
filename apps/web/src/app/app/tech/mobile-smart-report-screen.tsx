@@ -193,6 +193,7 @@ export function MobileSmartReportScreen({
   const isReadOnly = !data.canEdit || data.reportStatus === "finalized" || controller.saveState === "Finalized";
   const activeSectionId = controller.draft.activeSectionId ?? data.template.sections[0]?.id ?? "";
   const activeSection = data.template.sections.find((section) => section.id === activeSectionId) ?? data.template.sections[0];
+  const isWorkOrder = data.template.label.toLowerCase() === "work order";
   const progressLabel = progress.completedCount !== null && progress.totalCount !== null && progress.totalCount > 0
     ? `${progress.completedCount} of ${progress.totalCount} complete`
     : null;
@@ -223,6 +224,59 @@ export function MobileSmartReportScreen({
       <div className="rounded-[2rem] border border-slate-200 bg-white px-5 py-8 text-sm text-slate-500 shadow-panel">
         Loading report from this device...
       </div>
+    );
+  }
+
+  if (isWorkOrder) {
+    return (
+      <MobileInspectionShell
+        activeSectionId=""
+        currentSectionLabel={null}
+        customerContactName={data.customerContactName}
+        customerEmail={data.customerEmail}
+        customerName={data.customerName}
+        customerPhone={data.customerPhone}
+        dispatchNotes={data.dispatchNotes}
+        serviceAddress={data.serviceAddress}
+        onSelectReport={handleReportSelect}
+        onSelectSection={() => undefined}
+        progressLabel={progressLabel}
+        progressPercent={progress.percent}
+        reportMode="edit"
+        reportStatus={progress.reportStatus}
+        saveState={controller.saveState}
+        sections={[]}
+        siteName={data.siteName}
+        stickyFooter={(
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">{controller.saveState}</p>
+              <p className="text-xs text-slate-500">{validationIssues.length > 0 ? `${validationIssues.length} item${validationIssues.length === 1 ? "" : "s"} need attention` : "Ready when signatures are complete"}</p>
+            </div>
+            <button
+              className="min-h-12 rounded-2xl bg-[var(--tenant-primary)] px-5 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)] disabled:opacity-50"
+              disabled={isReadOnly || controller.finalizeInFlight || controller.saveState === "Finalizing" || controller.saveState === "Finalize queued"}
+              onClick={handleFinalize}
+              type="button"
+            >
+              Finalize Work Order
+            </button>
+          </div>
+        )}
+        title={data.inspectionTypeLabel}
+        workspace={data.inspectionWorkspace}
+      >
+        <WorkOrderSinglePage
+          controller={controller}
+          data={data}
+          expandedRows={expandedRows}
+          finalizeQueued={finalizeQueued}
+          isReadOnly={isReadOnly}
+          onFinalize={handleFinalize}
+          setExpandedRows={setExpandedRows}
+          validationIssues={validationIssues}
+        />
+      </MobileInspectionShell>
     );
   }
 
@@ -377,6 +431,225 @@ function OverviewTab({
   );
 }
 
+function findTemplateSection(data: TechnicianReportEditorData, sectionId: string) {
+  return data.template.sections.find((section) => section.id === sectionId) ?? null;
+}
+
+function WorkOrderSinglePage({
+  data,
+  controller,
+  validationIssues,
+  expandedRows,
+  setExpandedRows,
+  isReadOnly,
+  finalizeQueued,
+  onFinalize
+}: {
+  data: TechnicianReportEditorData;
+  controller: ReturnType<typeof useMobileReportDraftController>;
+  validationIssues: ReturnType<typeof collectFinalizationValidationIssues>;
+  expandedRows: Record<string, string | null>;
+  setExpandedRows: (value: SetStateAction<Record<string, string | null>>) => void;
+  isReadOnly: boolean;
+  finalizeQueued: boolean;
+  onFinalize: () => void;
+}) {
+  const blockers = validationIssues.filter((issue) => issue.severity === "blocking");
+
+  return (
+    <div className="space-y-4">
+      {controller.errorMessage ? (
+        <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{controller.errorMessage}</p>
+      ) : null}
+      {controller.finalizeErrorMessage ? (
+        <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{controller.finalizeErrorMessage}</p>
+      ) : null}
+      {finalizeQueued ? (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          Finalization is saved on this device. TradeWorx will upload it automatically when service is available.
+        </div>
+      ) : null}
+
+      <WorkOrderProductsAndServicesCard data={data} disabled={isReadOnly} variant="parts" />
+      <WorkOrderProductsAndServicesCard data={data} disabled={isReadOnly} variant="labor" />
+      <WorkOrderSummarySection controller={controller} data={data} disabled={isReadOnly} />
+      <WorkOrderPhotosSection
+        controller={controller}
+        data={data}
+        disabled={isReadOnly}
+        expandedRows={expandedRows}
+        setExpandedRows={setExpandedRows}
+      />
+
+      <section className="space-y-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-panel">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Signatures</p>
+          <h3 className="mt-2 text-xl font-semibold text-slate-950">Customer and technician sign-off</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-500">Capture the obvious final approval after the work, parts, labor, and photos are complete.</p>
+        </div>
+        {blockers.length > 0 ? (
+          <div className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm font-semibold text-amber-900">Before finalizing</p>
+            {blockers.map((issue) => (
+              <p className="text-sm leading-6 text-amber-800" key={`${issue.label}:${issue.message}`}>{issue.message}</p>
+            ))}
+          </div>
+        ) : null}
+        <div className="grid gap-4 lg:grid-cols-2">
+          <SignaturePad
+            disabled={isReadOnly}
+            label="Technician signature"
+            onChange={(value) => controller.updateSignature("technician", controller.draft.signatures.technician?.signerName ?? "", value)}
+            onSignerNameChange={(value) => controller.updateSignerName("technician", value)}
+            signerName={controller.draft.signatures.technician?.signerName ?? ""}
+            value={resolveStoredMediaSrc(data.reportId, controller.draft.signatures.technician?.imageDataUrl) ?? controller.draft.signatures.technician?.imageDataUrl}
+          />
+          <SignaturePad
+            disabled={isReadOnly}
+            label="Customer signature"
+            onChange={(value) => controller.updateSignature("customer", controller.draft.signatures.customer?.signerName ?? "", value)}
+            onSignerNameChange={(value) => controller.updateSignerName("customer", value)}
+            signerName={controller.draft.signatures.customer?.signerName ?? ""}
+            value={resolveStoredMediaSrc(data.reportId, controller.draft.signatures.customer?.imageDataUrl) ?? controller.draft.signatures.customer?.imageDataUrl}
+          />
+        </div>
+        <button
+          className="min-h-12 w-full rounded-2xl bg-[var(--tenant-primary)] px-5 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)] disabled:opacity-50"
+          disabled={isReadOnly || blockers.length > 0 || controller.finalizeInFlight || controller.saveState === "Finalizing" || controller.saveState === "Finalize queued"}
+          onClick={onFinalize}
+          type="button"
+        >
+          {blockers.length > 0 ? "Resolve Required Items" : "Finalize Work Order"}
+        </button>
+      </section>
+    </div>
+  );
+}
+
+function WorkOrderSummarySection({
+  data,
+  controller,
+  disabled
+}: {
+  data: TechnicianReportEditorData;
+  controller: ReturnType<typeof useMobileReportDraftController>;
+  disabled: boolean;
+}) {
+  const section = findTemplateSection(data, "work-performed");
+  if (!section) {
+    return null;
+  }
+
+  const sectionState = controller.draft.sections[section.id] ?? { status: "pending", notes: "", fields: {} };
+  const fields = sectionState.fields as Record<string, ReportPrimitiveValue>;
+  const summaryFieldOrder = ["descriptionOfWork", "additionalNotes", "followUpRequired", "workOrderNumber"];
+  const visibleFields = summaryFieldOrder
+    .map((fieldId) => section.fields.find((field) => field.id === fieldId && field.type !== "repeater"))
+    .filter((field): field is Exclude<ReportFieldDefinition, { type: "repeater" }> => Boolean(field))
+    .filter((field) => isFieldVisible(field, fields));
+
+  return (
+    <section className="space-y-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-panel">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Summary of work performed</p>
+        <h3 className="mt-2 text-xl font-semibold text-slate-950">What was completed?</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-500">Keep this short and customer-ready. Add follow-up notes only when they matter.</p>
+      </div>
+      {visibleFields.map((field) => (
+        <FieldControl
+          disabled={disabled || Boolean(field.readOnly)}
+          field={field}
+          key={field.id}
+          onChange={(value) => controller.updateSectionField(section.id, field.id, value)}
+          onPhotoChange={(files) => controller.updateSectionPhotoField(section.id, field.id, files)}
+          reportId={data.reportId}
+          value={scalarValue(fields[field.id])}
+        />
+      ))}
+    </section>
+  );
+}
+
+function WorkOrderPhotosSection({
+  data,
+  controller,
+  expandedRows,
+  setExpandedRows,
+  disabled
+}: {
+  data: TechnicianReportEditorData;
+  controller: ReturnType<typeof useMobileReportDraftController>;
+  expandedRows: Record<string, string | null>;
+  setExpandedRows: (value: SetStateAction<Record<string, string | null>>) => void;
+  disabled: boolean;
+}) {
+  const section = findTemplateSection(data, "work-order-photos");
+  const photoRepeater = section?.fields.find((field): field is Extract<ReportFieldDefinition, { type: "repeater" }> => field.type === "repeater");
+  if (!section || !photoRepeater) {
+    return <PhotosTab data={data} draft={controller.draft} />;
+  }
+
+  const sectionState = controller.draft.sections[section.id] ?? { status: "pending", notes: "", fields: {} };
+  const fields = sectionState.fields as Record<string, ReportPrimitiveValue>;
+  const rows = Array.isArray(fields[photoRepeater.id])
+    ? fields[photoRepeater.id] as unknown as Array<Record<string, ReportPrimitiveValue>>
+    : [];
+  const expandedKey = `${section.id}:${photoRepeater.id}`;
+
+  return (
+    <section className="space-y-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-panel">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Photos</p>
+        <h3 className="mt-2 text-xl font-semibold text-slate-950">Add job photos</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-500">Attach equipment, parts used, repair, or completion photos. Photos save locally first and sync when service is available.</p>
+      </div>
+      <MobileRepeatableRows
+        addLabel={photoRepeater.addLabel ?? "Add photo"}
+        disabled={disabled}
+        expandedRowKey={expandedRows[expandedKey] ?? null}
+        onAddRow={() => controller.addRepeaterRow(section.id, photoRepeater)}
+        onRemoveRow={(_, rowIndex = -1) => {
+          const nextIndex = rowIndex >= 0 ? rowIndex : rows.findIndex((row, index) => rowKey(row, index) === expandedRows[expandedKey]);
+          if (nextIndex >= 0) {
+            controller.removeRepeaterRow(section.id, photoRepeater.id, nextIndex);
+          }
+        }}
+        onToggleRow={(key) => setExpandedRows((current) => ({ ...current, [expandedKey]: current[expandedKey] === key ? null : key }))}
+        renderExpandedRow={(key) => {
+          const rowIndex = rows.findIndex((row, index) => rowKey(row, index) === key);
+          const row = rows[rowIndex];
+          if (!row || rowIndex < 0) {
+            return null;
+          }
+          return (
+            <div className="space-y-4">
+              {photoRepeater.rowFields.filter((rowField) => isFieldVisible(rowField, row)).map((rowField) => (
+                <FieldControl
+                  disabled={disabled || Boolean(rowField.readOnly)}
+                  field={rowField}
+                  key={rowField.id}
+                  onChange={(value) => controller.updateRepeaterRowField(section.id, photoRepeater, rowIndex, rowField.id, value, { immediateQueue: rowField.type !== "text" })}
+                  onPhotoChange={(files) => controller.updateRepeaterRowPhoto(section.id, photoRepeater, rowIndex, rowField.id, files)}
+                  reportId={data.reportId}
+                  value={scalarValue(row[rowField.id])}
+                />
+              ))}
+            </div>
+          );
+        }}
+        rows={rows.map((row, index) => ({
+          key: rowKey(row, index),
+          title: displayValue(row.caption) || `Photo #${index + 1}`,
+          subtitle: displayValue(row.photo) ? "Photo attached" : "Tap to add photo",
+          status: displayValue(row.photo) ? "Ready" : "Missing",
+          issueCount: 0
+        }))}
+        title="Work order photos"
+      />
+    </section>
+  );
+}
+
 function formatCatalogType(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (match) => match.toUpperCase());
 }
@@ -420,15 +693,23 @@ function mergeWorkOrderLines(
 
 function WorkOrderProductsAndServicesCard({
   data,
-  disabled
+  disabled,
+  variant = "parts"
 }: {
   data: TechnicianReportEditorData;
   disabled: boolean;
+  variant?: "parts" | "labor";
 }) {
-  const catalogItems = useMemo(() => data.workOrderCatalogItems ?? [], [data.workOrderCatalogItems]);
+  const catalogItems = useMemo(() => (data.workOrderCatalogItems ?? []).filter((item) => {
+    const itemType = item.itemType.toLowerCase();
+    return variant === "labor" ? itemType === "labor" : itemType !== "labor";
+  }), [data.workOrderCatalogItems, variant]);
   const serverLines = useMemo(
-    () => (data.workOrderLineItems ?? []).map(toLocalWorkOrderLineRecord),
-    [data.workOrderLineItems]
+    () => (data.workOrderLineItems ?? []).map(toLocalWorkOrderLineRecord).filter((line) => {
+      const itemType = line.itemType.toLowerCase();
+      return variant === "labor" ? itemType === "labor" : itemType !== "labor";
+    }),
+    [data.workOrderLineItems, variant]
   );
   const [lines, setLines] = useState<LocalWorkOrderLineItemRecord[]>(serverLines);
   const [catalogItemId, setCatalogItemId] = useState("");
@@ -447,8 +728,13 @@ function WorkOrderProductsAndServicesCard({
 
   useEffect(() => {
     let cancelled = false;
+    function matchesVariant(line: LocalWorkOrderLineItemRecord) {
+      const itemType = line.itemType.toLowerCase();
+      return variant === "labor" ? itemType === "labor" : itemType !== "labor";
+    }
+
     async function hydrateLines() {
-      const localLines = await listLocalWorkOrderLineItems(data.inspectionWorkspace.inspectionId);
+      const localLines = (await listLocalWorkOrderLineItems(data.inspectionWorkspace.inspectionId)).filter(matchesVariant);
       if (cancelled) {
         return;
       }
@@ -463,7 +749,7 @@ function WorkOrderProductsAndServicesCard({
       cancelled = true;
       unsubscribe();
     };
-  }, [data.inspectionWorkspace.inspectionId, serverLines]);
+  }, [data.inspectionWorkspace.inspectionId, serverLines, variant]);
 
   function applyCatalogSelection(nextCatalogItemId: string) {
     const item = catalogItems.find((candidate) => candidate.id === nextCatalogItemId) ?? null;
@@ -534,15 +820,25 @@ function WorkOrderProductsAndServicesCard({
   const billableTotal = lines
     .filter((line) => line.billableStatus === "billable")
     .reduce((sum, line) => sum + Number(line.totalPrice ?? (line.quantity * (line.unitPrice ?? 0))), 0);
+  const heading = variant === "labor" ? "Labor" : "Parts / equipment used";
+  const eyebrow = variant === "labor" ? "Labor" : "Parts / equipment";
+  const description = variant === "labor"
+    ? "Add on-site labor from the catalog. Labor saves locally first and feeds billing after sync."
+    : "Add parts, equipment, materials, replacements, or other non-labor items used on this work order.";
+  const searchLabel = variant === "labor" ? "Labor item" : "Part / equipment";
+  const searchPlaceholder = variant === "labor" ? "Search labor catalog" : "Search parts and equipment";
+  const emptyText = variant === "labor" ? "No active labor items matched that search." : "No active parts or equipment matched that search.";
+  const addLabel = variant === "labor" ? "Add labor" : "Add part/equipment";
+  const noLinesText = variant === "labor" ? "No labor added yet." : "No parts or equipment added yet.";
 
   return (
     <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-panel">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Products & services</p>
-          <h3 className="mt-2 text-xl font-semibold text-slate-950">Work performed for billing</h3>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{eyebrow}</p>
+          <h3 className="mt-2 text-xl font-semibold text-slate-950">{heading}</h3>
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            Select actual parts, labor, services, or fees from the full catalog. These items save locally first and feed invoice billing after sync.
+            {description}
           </p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-right">
@@ -555,11 +851,11 @@ function WorkOrderProductsAndServicesCard({
         <SearchSelect
           customValue={selectedCatalogItem?.name ?? ""}
           disabled={disabled}
-          emptyText="No active products or services matched that search."
-          label="Product / service"
+          emptyText={emptyText}
+          label={searchLabel}
           onChange={applyCatalogSelection}
           options={options}
-          placeholder="Search full catalog"
+          placeholder={searchPlaceholder}
           value={catalogItemId}
         />
         <div className="grid gap-3 sm:grid-cols-[0.5fr_0.65fr_1fr]">
@@ -620,7 +916,7 @@ function WorkOrderProductsAndServicesCard({
           onClick={addLine}
           type="button"
         >
-          Add product/service
+          {addLabel}
         </button>
       </div>
 
@@ -628,7 +924,7 @@ function WorkOrderProductsAndServicesCard({
 
       <div className="mt-5 space-y-3">
         {lines.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No products or services added yet.</p>
+          <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">{noLinesText}</p>
         ) : lines.map((line) => (
           <div key={line.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
             <div className="flex items-start justify-between gap-3">
