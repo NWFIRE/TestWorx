@@ -5956,6 +5956,7 @@ export async function claimInspection(actor: ActorContext, inspectionId: string)
     if (!isSharedQueueTaskSet(claimableTasks)) {
       throw new Error("Inspection is not claimable.");
     }
+    const claimableTaskIds = claimableTasks.map((task) => task.id);
 
     const claimed = await tx.inspection.updateMany({
       where: {
@@ -5975,8 +5976,25 @@ export async function claimInspection(actor: ActorContext, inspectionId: string)
       throw new Error("This inspection was already claimed by another technician.");
     }
 
+    const assignedTasks = await tx.inspectionTask.updateMany({
+      where: {
+        tenantId,
+        inspectionId,
+        id: { in: claimableTaskIds },
+        assignedTechnicianId: null,
+        status: { not: InspectionStatus.cancelled }
+      },
+      data: {
+        assignedTechnicianId: parsedActor.userId
+      }
+    });
+
+    if (assignedTasks.count !== claimableTaskIds.length) {
+      throw new Error("This inspection was already claimed by another technician.");
+    }
+
     await tx.inspectionReport.updateMany({
-      where: { tenantId, inspectionId },
+      where: { tenantId, inspectionId, inspectionTaskId: { in: claimableTaskIds } },
       data: { technicianId: parsedActor.userId }
     });
     await syncInspectionTechnicianAssignments(tx, inspectionId, tenantId, [parsedActor.userId]);

@@ -277,6 +277,81 @@ describeIfDatabase("postgres-backed integration flows", () => {
     createdTenantIds.delete(fixture.tenant.id);
   }, 20000);
 
+  it("claims multi-service inspections as one ticket with all report tasks", async () => {
+    const fixture = await createTenantFixture();
+    const { inspection } = await createInspectionFixture({
+      tenantId: fixture.tenant.id,
+      customerCompanyId: fixture.customer.id,
+      siteId: fixture.site.id,
+      createdByUserId: fixture.officeAdmin.id,
+      inspectionType: "kitchen_suppression"
+    });
+
+    await prisma.inspectionTask.createMany({
+      data: [
+        {
+          tenantId: fixture.tenant.id,
+          inspectionId: inspection.id,
+          inspectionType: "fire_extinguisher",
+          sortOrder: 1
+        },
+        {
+          tenantId: fixture.tenant.id,
+          inspectionId: inspection.id,
+          inspectionType: "fire_alarm",
+          sortOrder: 2
+        }
+      ]
+    });
+    const addedTasks = await prisma.inspectionTask.findMany({
+      where: {
+        tenantId: fixture.tenant.id,
+        inspectionId: inspection.id,
+        report: null
+      },
+      orderBy: { sortOrder: "asc" }
+    });
+    await prisma.inspectionReport.createMany({
+      data: addedTasks.map((task) => ({
+        tenantId: fixture.tenant.id,
+        inspectionId: inspection.id,
+        inspectionTaskId: task.id,
+        status: reportStatuses.draft,
+        contentJson: { narrative: "" }
+      }))
+    });
+
+    const claimed = await claimInspection(
+      { userId: fixture.technicianA.id, role: "technician", tenantId: fixture.tenant.id },
+      inspection.id
+    );
+
+    expect(claimed.id).toBe(inspection.id);
+    expect(claimed.claimable).toBe(false);
+    expect(claimed.assignedTechnicianId).toBe(fixture.technicianA.id);
+
+    const [inspectionCount, tasks, reports] = await Promise.all([
+      prisma.inspection.count({ where: { id: inspection.id, tenantId: fixture.tenant.id } }),
+      prisma.inspectionTask.findMany({
+        where: { tenantId: fixture.tenant.id, inspectionId: inspection.id },
+        orderBy: { sortOrder: "asc" }
+      }),
+      prisma.inspectionReport.findMany({
+        where: { tenantId: fixture.tenant.id, inspectionId: inspection.id }
+      })
+    ]);
+
+    expect(inspectionCount).toBe(1);
+    expect(tasks).toHaveLength(3);
+    expect(tasks.map((task) => task.inspectionType).sort()).toEqual(["fire_alarm", "fire_extinguisher", "kitchen_suppression"]);
+    expect(tasks.every((task) => task.assignedTechnicianId === fixture.technicianA.id)).toBe(true);
+    expect(reports).toHaveLength(3);
+    expect(reports.every((report) => report.technicianId === fixture.technicianA.id)).toBe(true);
+
+    await cleanupTenant(fixture.tenant.id);
+    createdTenantIds.delete(fixture.tenant.id);
+  }, 20000);
+
   it("persists finalized reports, generated PDFs, and completed statuses", async () => {
     const fixture = await createTenantFixture();
     const { inspection, report } = await createInspectionFixture({
