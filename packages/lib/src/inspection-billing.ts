@@ -4225,7 +4225,8 @@ export async function updateBillingSummaryItemGroup(
   summaryId: string,
   itemIds: string[],
   quantity: number,
-  unitPrice: number | null
+  unitPrice: number | null,
+  taxable?: boolean
 ) {
   const { parsedActor, summary } = await getAuthorizedBillingSummary(actor, summaryId);
   if (summary.status === "invoiced") {
@@ -4260,11 +4261,27 @@ export async function updateBillingSummaryItemGroup(
           ? unitPrice
           : await resolveBillingItemMatchedUnitPrice(parsedActor.tenantId as string, item);
 
+      const taxabilityChanged = typeof taxable === "boolean" && item.taxable !== taxable;
+
       return {
         ...item,
         quantity: nextQuantity,
         unitPrice: resolvedUnitPrice,
-        amount: calculateAmount(nextQuantity, resolvedUnitPrice)
+        amount: calculateAmount(nextQuantity, resolvedUnitPrice),
+        ...(typeof taxable === "boolean"
+          ? {
+              taxable,
+              taxableSource: taxabilityChanged ? "override" as const : (item.taxableSource ?? null),
+              quickBooksTaxableStatus: taxabilityChanged
+                ? (taxable ? "taxable" as const : "non_taxable" as const)
+                : item.quickBooksTaxableStatus ?? null,
+              taxCodeId: taxable ? item.taxCodeId ?? item.quickBooksTaxCodeRef ?? DEFAULT_QUICKBOOKS_TAX_CODE_ID : null,
+              taxCategory: taxable ? item.taxCategory ?? null : null,
+              taxRate: taxable ? item.taxRate ?? DEFAULT_OKLAHOMA_SALES_TAX_RATE : 0,
+              taxAmount: taxabilityChanged ? 0 : item.taxAmount ?? null,
+              lineTotal: null
+            }
+          : {})
       };
     })
   );

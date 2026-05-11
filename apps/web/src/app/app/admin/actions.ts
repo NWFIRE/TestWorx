@@ -882,6 +882,7 @@ export async function updateBillingSummaryItemGroupAction(formData: FormData) {
   const quantity = Number(formData.get("quantity") ?? "0");
   const unitPriceRaw = String(formData.get("unitPrice") ?? "");
   const unitPrice = unitPriceRaw.trim().length > 0 ? Number(unitPriceRaw) : null;
+  const taxable = formData.has("taxable");
   if (!session?.user?.tenantId || !summaryId || !inspectionId || itemIds.length === 0) {
     return;
   }
@@ -891,7 +892,8 @@ export async function updateBillingSummaryItemGroupAction(formData: FormData) {
     summaryId,
     itemIds,
     Number.isFinite(quantity) ? quantity : 0,
-    unitPrice !== null && Number.isFinite(unitPrice) ? unitPrice : null
+    unitPrice !== null && Number.isFinite(unitPrice) ? unitPrice : null,
+    taxable
   );
 
   revalidatePath("/app/admin/billing");
