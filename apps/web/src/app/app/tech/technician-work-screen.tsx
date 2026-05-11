@@ -263,6 +263,15 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                   {formatTechnicianWorkTiming(inspection)}
                 </p>
                 <DispatchNotesCard className="mt-4" compact notes={inspection.notes} />
+                <div className="mt-4">
+                  <InspectionCustomerContactCard
+                    compact
+                    contactName={inspection.customerCompany?.contactName}
+                    email={inspection.customerCompany?.billingEmail}
+                    phone={inspection.customerCompany?.phone}
+                    serviceAddress={inspection.locationLabel}
+                  />
+                </div>
                 {hasAttachedPdfs(inspection) ? (
                   <div className="mt-4">
                     <MobileInspectionPdfAccessCard
