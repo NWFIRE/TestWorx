@@ -525,7 +525,18 @@ export function CustomerManagementCard({
     }
   }, [createState.error, createState.success, notice]);
 
+  const cancelPendingCustomerSearch = useCallback(() => {
+    requestSequenceRef.current += 1;
+    activeAbortRef.current?.abort();
+    activeAbortRef.current = null;
+    setIsLoadingResults(false);
+  }, []);
+
   const syncCustomersUrl = useCallback((page: number, query: string) => {
+    if (window.location.pathname !== pathname) {
+      return;
+    }
+
     const params = new URLSearchParams(searchParams.toString());
     params.set("customersPage", String(page));
     if (query) {
@@ -678,6 +689,7 @@ export function CustomerManagementCard({
                 <Link
                   className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue transition hover:border-slate-300 hover:bg-slate-50"
                   href={`/app/admin/clients/${encodeURIComponent(createState.customerCompanyId)}`}
+                  onClick={cancelPendingCustomerSearch}
                 >
                   Open profile
                 </Link>
@@ -745,6 +757,7 @@ export function CustomerManagementCard({
                 <Link
                   className="pressable inline-flex min-h-10 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slateblue transition hover:border-slate-300 hover:bg-slate-50"
                   href={`/app/admin/clients/${customer.id}`}
+                  onClick={cancelPendingCustomerSearch}
                 >
                   Open profile
                 </Link>
