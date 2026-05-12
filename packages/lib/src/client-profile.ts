@@ -391,6 +391,7 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
       id: customer.id,
       name: customer.name,
       contactName: customer.contactName,
+      contactEmails: customer.contactEmails,
       billingEmail: customer.billingEmail,
       phone: customer.phone,
       isActive: customer.isActive,

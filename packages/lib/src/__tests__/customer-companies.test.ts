@@ -46,6 +46,7 @@ function buildCustomerCompany(overrides: Partial<Record<string, unknown>> = {}) 
     id: "customer_1",
     name: "Acme Tower",
     contactName: "Jordan Lee",
+    contactEmails: "scheduling@acme.test",
     billingEmail: "billing@acme.test",
     phone: "312-555-0101",
     isTaxExempt: false,
@@ -121,6 +122,7 @@ describe("customer company settings", () => {
       {
         name: "Acme Tower",
         contactName: "Jordan Lee",
+        contactEmails: "scheduling@acme.test",
         billingEmail: "billing@acme.test",
         phone: "312-555-0101",
         isTaxExempt: true,
@@ -139,6 +141,7 @@ describe("customer company settings", () => {
       data: expect.objectContaining({
         tenantId: "tenant_1",
         name: "Acme Tower",
+        contactEmails: "scheduling@acme.test",
         serviceAddressLine1: "123 Market Street",
         billingAddressLine1: "123 Market Street",
         isTaxExempt: true,
@@ -189,6 +192,7 @@ describe("customer company settings", () => {
         customerCompanyId: "customer_1",
         name: "Acme Tower",
         contactName: "Jordan Lee",
+        contactEmails: "scheduling@acme.test",
         billingEmail: "billing@acme.test",
         phone: "312-555-0101",
         isTaxExempt: true,
@@ -212,6 +216,7 @@ describe("customer company settings", () => {
     expect(prismaMock.customerCompany.update).toHaveBeenCalledWith({
       where: { id: "customer_1" },
       data: expect.objectContaining({
+        contactEmails: "scheduling@acme.test",
         billingAddressSameAsService: false,
         billingAddressLine1: "PO Box 122",
         isTaxExempt: true,
@@ -339,6 +344,7 @@ describe("customer company settings", () => {
         OR: [
           { name: { contains: "harbor", mode: "insensitive" } },
           { contactName: { contains: "harbor", mode: "insensitive" } },
+          { contactEmails: { contains: "harbor", mode: "insensitive" } },
           { billingEmail: { contains: "harbor", mode: "insensitive" } },
           { phone: { contains: "harbor", mode: "insensitive" } }
         ]

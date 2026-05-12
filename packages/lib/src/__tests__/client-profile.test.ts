@@ -56,6 +56,7 @@ describe("client profile workspace data", () => {
       id: "customer_1",
       name: "Klemme Construction",
       contactName: "Brett Klemme",
+      contactEmails: "scheduling@klemme.test",
       billingEmail: "office@klemme.test",
       phone: "580-977-4084",
       isActive: true,
@@ -224,6 +225,7 @@ describe("client profile workspace data", () => {
     );
 
     expect(result?.customer.name).toBe("Klemme Construction");
+    expect(result?.customer.contactEmails).toBe("scheduling@klemme.test");
     expect(result?.overview.siteCount).toBe(1);
     expect(result?.overview.openQuoteCount).toBe(1);
     expect(result?.overview.upcomingInspectionCount).toBe(1);

@@ -26,6 +26,7 @@ type CustomerRecord = {
 type CustomerProfileSeed = Partial<{
   name: string | null;
   contactName: string | null;
+  contactEmails: string | null;
   billingEmail: string | null;
   phone: string | null;
   isTaxExempt: boolean;
@@ -108,6 +109,7 @@ type CustomerManagementCardProps = {
 type CustomerFormValues = {
   name: string;
   contactName: string;
+  contactEmails: string;
   billingEmail: string;
   phone: string;
   isTaxExempt: boolean;
@@ -145,6 +147,7 @@ function toFormValues(customer?: CustomerProfileSeed): CustomerFormValues {
   return {
     name: customer?.name ?? "",
     contactName: customer?.contactName ?? "",
+    contactEmails: customer?.contactEmails ?? "",
     billingEmail: customer?.billingEmail ?? "",
     phone: customer?.phone ?? "",
     isTaxExempt: customer?.isTaxExempt ?? false,
@@ -237,6 +240,18 @@ export function CustomerProfileFields({
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-contactName`}>Primary contact name</label>
             <input className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3" defaultValue={initialValues.contactName} id={`${formIdPrefix}-contactName`} name="contactName" />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-contactEmails`}>Contact emails</label>
+            <textarea
+              className="min-h-[52px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3"
+              defaultValue={initialValues.contactEmails}
+              id={`${formIdPrefix}-contactEmails`}
+              name="contactEmails"
+              placeholder="scheduling@example.com, manager@example.com"
+              rows={2}
+            />
+            <p className="mt-2 text-xs leading-5 text-slate-500">Used for scheduling and operations. Separate multiple emails with commas.</p>
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-billingEmail`}>Billing email</label>

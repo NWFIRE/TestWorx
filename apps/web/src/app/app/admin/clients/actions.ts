@@ -56,6 +56,7 @@ function buildCustomerCompanyPayload(formData: FormData) {
   return {
     name: String(formData.get("name") ?? ""),
     contactName: String(formData.get("contactName") ?? ""),
+    contactEmails: String(formData.get("contactEmails") ?? ""),
     billingEmail: String(formData.get("billingEmail") ?? ""),
     phone: String(formData.get("phone") ?? ""),
     isTaxExempt: formData.get("isTaxExempt") === "on",

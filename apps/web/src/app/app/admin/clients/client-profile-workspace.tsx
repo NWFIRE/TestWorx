@@ -382,9 +382,10 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
               One complete account workspace for operational history, billing visibility, site context, and customer communication.
             </p>
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
               <DetailField label="Primary contact" value={data.customer.contactName ?? "No contact saved"} />
               <DetailField label="Phone" value={data.customer.phone ?? "No phone saved"} />
+              <DetailField label="Contact emails" value={data.customer.contactEmails ?? "No contact emails saved"} />
               <DetailField label="Billing email" value={data.customer.billingEmail ?? "No billing email saved"} />
               <DetailField label="Payment terms" value={data.customer.paymentTermsLabel} />
             </div>

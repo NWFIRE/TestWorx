@@ -594,6 +594,7 @@ model CustomerCompany {
   tenantId                  String
   name                      String
   contactName               String?
+  contactEmails             String?
   billingEmail              String?
   phone                     String?
   isTaxExempt               Boolean  @default(false)

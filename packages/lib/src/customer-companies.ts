@@ -30,6 +30,7 @@ const customerCompanySelect = {
   id: true,
   name: true,
   contactName: true,
+  contactEmails: true,
   billingEmail: true,
   phone: true,
   isTaxExempt: true,
@@ -71,6 +72,7 @@ type SelectedCustomerCompany = {
   id: string;
   name: string;
   contactName: string | null;
+  contactEmails: string | null;
   billingEmail: string | null;
   phone: string | null;
   isTaxExempt: boolean;
@@ -129,6 +131,47 @@ function nullableTrimmedString(max: number) {
     .transform((value) => value || undefined);
 }
 
+function optionalEmailList(max: number) {
+  return z
+    .string()
+    .trim()
+    .max(max)
+    .optional()
+    .superRefine((value, context) => {
+      if (!value) {
+        return;
+      }
+
+      const emails = value
+        .split(/[,;\n]/)
+        .map((email) => email.trim())
+        .filter(Boolean);
+
+      for (const email of emails) {
+        const parsed = z.string().email().safeParse(email);
+        if (!parsed.success) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Enter a valid contact email: ${email}`
+          });
+        }
+      }
+    })
+    .transform((value) => {
+      if (!value) {
+        return undefined;
+      }
+
+      const normalized = value
+        .split(/[,;\n]/)
+        .map((email) => email.trim())
+        .filter(Boolean)
+        .join(", ");
+
+      return normalized || undefined;
+    });
+}
+
 function optionalPositiveInt() {
   return z
     .union([z.number().int().min(1).max(365), z.nan(), z.null(), z.undefined()])
@@ -175,6 +218,7 @@ export const customerCompanyInputSchema = z
     customerCompanyId: z.string().trim().optional(),
     name: z.string().trim().min(1, "Company name is required.").max(160),
     contactName: nullableTrimmedString(160),
+    contactEmails: optionalEmailList(1000),
     billingEmail: z
       .string()
       .trim()
@@ -279,6 +323,7 @@ function normalizeCustomerCompanyInput(input: z.infer<typeof customerCompanyInpu
     customerCompanyId: input.customerCompanyId?.trim() || undefined,
     name: input.name,
     contactName: input.contactName ?? null,
+    contactEmails: input.contactEmails ?? null,
     billingEmail: input.billingEmail ?? null,
     phone: input.phone ?? null,
     isTaxExempt: input.isTaxExempt ?? false,
@@ -386,6 +431,7 @@ export async function getPaginatedTenantCustomerCompanySettings(
           OR: [
             { name: { contains: query, mode: "insensitive" as const } },
             { contactName: { contains: query, mode: "insensitive" as const } },
+            { contactEmails: { contains: query, mode: "insensitive" as const } },
             { billingEmail: { contains: query, mode: "insensitive" as const } },
             { phone: { contains: query, mode: "insensitive" as const } }
           ]
@@ -460,6 +506,7 @@ export async function getPaginatedTenantCustomerCompanyDirectory(
           OR: [
             { name: { contains: query, mode: "insensitive" as const } },
             { contactName: { contains: query, mode: "insensitive" as const } },
+            { contactEmails: { contains: query, mode: "insensitive" as const } },
             { billingEmail: { contains: query, mode: "insensitive" as const } },
             { phone: { contains: query, mode: "insensitive" as const } }
           ]
@@ -586,6 +633,7 @@ export async function createCustomerCompany(
       entityId: customer.id,
       metadata: {
         name: customer.name,
+        contactEmails: customer.contactEmails,
         billingEmail: customer.billingEmail,
         phone: customer.phone,
         isTaxExempt: customer.isTaxExempt,
@@ -692,6 +740,7 @@ export async function updateCustomerCompany(
       entityId: customer.id,
       metadata: {
         name: customer.name,
+        contactEmails: customer.contactEmails,
         billingEmail: customer.billingEmail,
         phone: customer.phone,
         isTaxExempt: customer.isTaxExempt,

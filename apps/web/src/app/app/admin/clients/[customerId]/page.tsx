@@ -53,6 +53,7 @@ export default async function ClientProfilePage({
   const customerSeed = {
     name: data.customer.name,
     contactName: data.customer.contactName,
+    contactEmails: data.customer.contactEmails,
     billingEmail: data.customer.billingEmail,
     phone: data.customer.phone,
     isTaxExempt: data.customer.isTaxExempt,
