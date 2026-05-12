@@ -16,7 +16,7 @@ const paymentTermsOptions = [
   { value: "net_60", label: "Net 60" },
   { value: "custom", label: "Custom terms" }
 ] as const;
-const LIVE_SEARCH_DEBOUNCE_MS = 250;
+const LIVE_SEARCH_DEBOUNCE_MS = 400;
 
 type CustomerRecord = {
   id: string;
@@ -504,17 +504,20 @@ export function CustomerManagementCard({
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const requestSequenceRef = useRef(0);
   const activeAbortRef = useRef<AbortController | null>(null);
   const hydratedRef = useRef(false);
 
   useEffect(() => {
-    setQueryInput(filters.query);
+    if (!isSearchFocused) {
+      setQueryInput(filters.query);
+    }
     setCustomerRows(customers);
     setCustomerPagination(pagination);
     setActiveQuery(filters.query);
     hydratedRef.current = true;
-  }, [customers, filters.query, pagination]);
+  }, [customers, filters.query, isSearchFocused, pagination]);
 
   useEffect(() => {
     if (createState.error || createState.success || notice) {
@@ -615,6 +618,12 @@ export function CustomerManagementCard({
   function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter") {
       event.preventDefault();
+      void loadCustomers(1, queryInput.trim());
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.currentTarget.blur();
     }
   }
 
@@ -707,6 +716,8 @@ export function CustomerManagementCard({
             busy={isLoadingResults}
             onChange={(event) => setQueryInput(event.target.value)}
             onClear={clearSearch}
+            onBlur={() => setIsSearchFocused(false)}
+            onFocus={() => setIsSearchFocused(true)}
             onKeyDown={handleSearchKeyDown}
             placeholder="Search customer name, contact, billing email, or phone"
             value={queryInput}

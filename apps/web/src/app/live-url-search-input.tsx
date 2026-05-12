@@ -9,6 +9,7 @@ const LIVE_SEARCH_DEBOUNCE_MS = 400;
 
 export function LiveUrlSearchInput({
   id,
+  name,
   initialValue,
   paramKey,
   placeholder,
@@ -17,6 +18,7 @@ export function LiveUrlSearchInput({
   className
 }: {
   id?: string;
+  name?: string;
   initialValue: string;
   paramKey: string;
   placeholder: string;
@@ -82,6 +84,7 @@ export function LiveUrlSearchInput({
       className={className}
       busy={pending}
       id={id}
+      name={name}
       onChange={(event) => setValue(event.target.value)}
       onClear={() => {
         setValue("");
@@ -93,6 +96,11 @@ export function LiveUrlSearchInput({
         if (event.key === "Enter") {
           event.preventDefault();
           applySearch(value);
+          return;
+        }
+
+        if (event.key === "Escape") {
+          event.currentTarget.blur();
         }
       }}
       placeholder={placeholder}

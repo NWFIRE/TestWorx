@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { SearchSelect, type SearchSelectOption } from "./search-select";
 
-const LIVE_SEARCH_DEBOUNCE_MS = 250;
+const LIVE_SEARCH_DEBOUNCE_MS = 400;
 
 function buildNextUrl({
   pathname,
@@ -57,17 +57,54 @@ export function LiveUrlSearchSelect({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [queryDraft, setQueryDraft] = useState<{ text: string; initialValue: string } | null>(null);
+  const [query, setQuery] = useState(initialValue);
+  const [isFocused, setIsFocused] = useState(false);
   const [pending, startTransition] = useTransition();
   const searchDebounceRef = useRef<number | null>(null);
-  const query = queryDraft?.initialValue === initialValue ? queryDraft.text : initialValue;
+  const lastAppliedValueRef = useRef(initialValue.trim());
   const hasSelectedOption = options.some((option) => option.value === query);
   const resetPageKeyList = resetPageKeys.join("\u001f");
 
   useEffect(() => {
+    const nextAppliedValue = initialValue.trim();
+    const previousAppliedValue = lastAppliedValueRef.current;
+    lastAppliedValueRef.current = nextAppliedValue;
+
+    if (isFocused && query.trim() !== previousAppliedValue) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setQuery(initialValue), 0);
+    return () => window.clearTimeout(timeout);
+  }, [initialValue, isFocused, query]);
+
+  const applyQuery = useCallback((nextQuery: string) => {
+    const trimmedValue = nextQuery.trim();
+    if (trimmedValue === lastAppliedValueRef.current) {
+      return;
+    }
+
+    if (searchDebounceRef.current !== null) {
+      window.clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
+
+    const nextUrl = buildNextUrl({
+      pathname,
+      searchParams,
+      paramKey,
+      nextQuery: trimmedValue,
+      resetPageKeys: resetPageKeyList ? resetPageKeyList.split("\u001f") : []
+    });
+    lastAppliedValueRef.current = trimmedValue;
+    startTransition(() => {
+      router.replace(nextUrl, { scroll: false });
+    });
+  }, [paramKey, pathname, resetPageKeyList, router, searchParams]);
+
+  useEffect(() => {
     const trimmedValue = query.trim();
-    const trimmedInitialValue = initialValue.trim();
-    if (trimmedValue === trimmedInitialValue) {
+    if (trimmedValue === lastAppliedValueRef.current) {
       return;
     }
 
@@ -77,16 +114,7 @@ export function LiveUrlSearchSelect({
 
     const timeout = window.setTimeout(() => {
       searchDebounceRef.current = null;
-      const nextUrl = buildNextUrl({
-        pathname,
-        searchParams,
-        paramKey,
-        nextQuery: trimmedValue,
-        resetPageKeys: resetPageKeyList ? resetPageKeyList.split("\u001f") : []
-      });
-      startTransition(() => {
-        router.replace(nextUrl, { scroll: false });
-      });
+      applyQuery(trimmedValue);
     }, LIVE_SEARCH_DEBOUNCE_MS);
     searchDebounceRef.current = timeout;
 
@@ -96,23 +124,10 @@ export function LiveUrlSearchSelect({
         searchDebounceRef.current = null;
       }
     };
-  }, [initialValue, paramKey, pathname, query, resetPageKeyList, router, searchParams]);
+  }, [applyQuery, query]);
 
   function updateQuery(nextQuery: string) {
-    setQueryDraft({ text: nextQuery, initialValue });
-  }
-
-  function applyQueryNow(nextQuery: string) {
-    const nextUrl = buildNextUrl({
-      pathname,
-      searchParams,
-      paramKey,
-      nextQuery,
-      resetPageKeys: resetPageKeyList ? resetPageKeyList.split("\u001f") : []
-    });
-    startTransition(() => {
-      router.replace(nextUrl, { scroll: false });
-    });
+    setQuery(nextQuery);
   }
 
   return (
@@ -129,16 +144,19 @@ export function LiveUrlSearchSelect({
             window.clearTimeout(searchDebounceRef.current);
             searchDebounceRef.current = null;
           }
-          setQueryDraft(null);
+          setQuery(option.label);
           router.push(option.href);
           return;
         }
-        setQueryDraft({ text: nextValue, initialValue });
+        setQuery(nextValue);
         if (option) {
-          applyQueryNow(nextValue);
+          applyQuery(nextValue);
         }
       }}
       onCustomValueChange={updateQuery}
+      onInputBlur={() => setIsFocused(false)}
+      onInputFocus={() => setIsFocused(true)}
+      onQueryCommit={(nextQuery) => applyQuery(nextQuery)}
       onQueryChange={updateQuery}
       options={options}
       placeholder={placeholder}

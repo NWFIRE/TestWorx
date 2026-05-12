@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 import { BrandLoader } from "@/app/brand-loader";
 import { LiveUrlSearchInput } from "@/app/live-url-search-input";
@@ -593,10 +593,23 @@ function AsyncUserLookupSection({
     const timer = window.setTimeout(() => {
       setDebouncedQuery(query);
       setPage(0);
-    }, 200);
+    }, 400);
 
     return () => window.clearTimeout(timer);
   }, [query]);
+
+  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      setDebouncedQuery(query);
+      setPage(0);
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.currentTarget.blur();
+    }
+  }
 
   async function loadUsers(nextPage: number, replace = false) {
     const cacheKey = buildUserLookupCacheKey(kind, debouncedQuery, nextPage, statusFilter);
@@ -752,6 +765,7 @@ function AsyncUserLookupSection({
                     void loadUsers(0, true);
                   }
                 }}
+                onKeyDown={handleSearchKeyDown}
                 placeholder={kind === "internal" ? "Search name or email" : "Search name, email, or customer"}
                 value={query}
               />

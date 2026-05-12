@@ -6,7 +6,6 @@ import {
   CircleAlert,
   ClipboardList,
   FileText,
-  Search,
   ShieldCheck,
   Wrench
 } from "lucide-react";
@@ -36,6 +35,7 @@ import {
   StatusBadge,
   WorkspaceSplit
 } from "../operations-ui";
+import { DashboardGlobalSearch } from "./dashboard-global-search";
 
 type AdminDashboardData = Awaited<ReturnType<typeof getAdminDashboardData>>;
 type AdminBillingSummary = Awaited<ReturnType<typeof getAdminBillingSummaries>>[number];
@@ -354,13 +354,7 @@ export default async function AdminDashboardPage({
             <PageHeader
               actions={
                 <>
-                  <div className="relative min-w-[280px] flex-1">
-                    <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--text-tertiary)]" />
-                    <input
-                      placeholder="Search inspections, reports, customers"
-                      className="field-contrast h-12 w-full rounded-2xl border bg-white px-11 text-sm outline-none transition-all duration-200"
-                    />
-                  </div>
+                  <DashboardGlobalSearch />
                   <Link
                     className="inline-flex h-12 items-center gap-2 rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-medium text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
                     href="/app/deficiencies"
@@ -385,13 +379,7 @@ export default async function AdminDashboardPage({
 
           <div className="lg:hidden">
             <SectionCard className="space-y-4">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--text-tertiary)]" />
-                <input
-                  placeholder="Search inspections, reports, customers"
-                  className="field-contrast h-12 w-full rounded-2xl border bg-white px-11 text-sm outline-none transition-all duration-200"
-                />
-              </div>
+              <DashboardGlobalSearch />
               <div className="grid grid-cols-2 gap-3">
                 <Link
                   className="inline-flex h-12 items-center justify-center rounded-2xl border border-[color:var(--border-default)] bg-white text-sm font-medium text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-subtle)]"

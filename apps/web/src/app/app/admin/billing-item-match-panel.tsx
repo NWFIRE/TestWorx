@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SearchSelect, type SearchSelectOption } from "@/app/search-select";
 
@@ -38,7 +38,7 @@ const initialSearchState: SearchState = {
 };
 
 const initialActionState: ActionState = { error: null, success: null };
-const LIVE_SEARCH_DEBOUNCE_MS = 250;
+const LIVE_SEARCH_DEBOUNCE_MS = 400;
 
 function confidenceLabel(confidence: number) {
   if (confidence >= 0.96) {
@@ -110,6 +110,7 @@ export function BillingItemMatchPanel({
   const [linkState, linkFormAction] = useActionState(linkAction, initialActionState);
   const [clearState, clearFormAction] = useActionState(clearAction, initialActionState);
   const [searchQuery, setSearchQuery] = useState(itemDescription);
+  const searchDebounceRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (linkState.success || clearState.success) {
@@ -117,26 +118,37 @@ export function BillingItemMatchPanel({
     }
   }, [clearState.success, linkState.success, router]);
 
+  const submitCatalogSearch = useCallback((query: string) => {
+    const formData = new FormData();
+    formData.set("summaryId", summaryId);
+    formData.set("itemId", itemId);
+    for (const candidateId of itemIds ?? []) {
+      formData.append("itemIds", candidateId);
+    }
+    formData.set("searchNonce", String(Date.now()));
+    formData.set("query", query || itemDescription);
+    formData.set("page", "1");
+    searchFormAction(formData);
+  }, [itemDescription, itemId, itemIds, searchFormAction, summaryId]);
+
   useEffect(() => {
     if (!open) {
       return;
     }
 
     const timeout = window.setTimeout(() => {
-      const formData = new FormData();
-      formData.set("summaryId", summaryId);
-      formData.set("itemId", itemId);
-      for (const candidateId of itemIds ?? []) {
-        formData.append("itemIds", candidateId);
-      }
-      formData.set("searchNonce", String(Date.now()));
-      formData.set("query", searchQuery || itemDescription);
-      formData.set("page", "1");
-      searchFormAction(formData);
+      searchDebounceRef.current = null;
+      submitCatalogSearch(searchQuery);
     }, LIVE_SEARCH_DEBOUNCE_MS);
+    searchDebounceRef.current = timeout;
 
-    return () => window.clearTimeout(timeout);
-  }, [itemDescription, itemId, itemIds, open, searchFormAction, searchQuery, summaryId]);
+    return () => {
+      window.clearTimeout(timeout);
+      if (searchDebounceRef.current === timeout) {
+        searchDebounceRef.current = null;
+      }
+    };
+  }, [open, searchQuery, submitCatalogSearch]);
 
   const results = useMemo(() => {
     if (searchState.hasSearched) {
@@ -218,6 +230,13 @@ export function BillingItemMatchPanel({
             label="Parts / services catalog item"
             loading={searchPending}
             onChange={(catalogItemId) => linkCandidate(catalogItemId)}
+            onQueryCommit={(nextQuery) => {
+              if (searchDebounceRef.current !== null) {
+                window.clearTimeout(searchDebounceRef.current);
+                searchDebounceRef.current = null;
+              }
+              submitCatalogSearch(nextQuery);
+            }}
             onQueryChange={setSearchQuery}
             options={matchOptions}
             placeholder="Search by item, description, SKU, category, or QuickBooks id"

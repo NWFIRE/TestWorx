@@ -28,7 +28,10 @@ export function SearchSelect({
   className = "",
   allowCustomValue = false,
   customValue = "",
-  onCustomValueChange
+  onCustomValueChange,
+  onQueryCommit,
+  onInputFocus,
+  onInputBlur
 }: {
   id?: string;
   name?: string;
@@ -47,6 +50,9 @@ export function SearchSelect({
   allowCustomValue?: boolean;
   customValue?: string;
   onCustomValueChange?: (value: string) => void;
+  onQueryCommit?: (query: string) => void;
+  onInputFocus?: () => void;
+  onInputBlur?: () => void;
 }) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
@@ -141,10 +147,12 @@ export function SearchSelect({
           id={inputId}
           onChange={(event) => updateQuery(event.target.value)}
           onFocus={() => {
+            onInputFocus?.();
             if (!disabled) {
               setOpen(true);
             }
           }}
+          onBlur={onInputBlur}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
               setOpen(false);
@@ -169,7 +177,13 @@ export function SearchSelect({
               if (option) {
                 event.preventDefault();
                 selectOption(option);
+                return;
               }
+            }
+
+            if (event.key === "Enter") {
+              event.preventDefault();
+              onQueryCommit?.(query);
             }
           }}
           placeholder={disabled ? disabledPlaceholder ?? placeholder : placeholder}

@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { useMemo, type KeyboardEvent, type MouseEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import { LiveUrlSearchInput } from "@/app/live-url-search-input";
 import { ClaimButton } from "./claim-button";
 import { DispatchNotesCard } from "./dispatch-notes-card";
 import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
@@ -189,12 +190,11 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
     <div className="space-y-5 pb-4">
       <section className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_14px_35px_rgba(15,23,42,0.06)]">
         <form className="space-y-4">
-          <input
-            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-[15px] text-slate-900 outline-none transition focus:border-[var(--tenant-primary)]/30 focus:bg-white"
-            defaultValue={query}
+          <LiveUrlSearchInput
+            initialValue={query}
             name="query"
+            paramKey="query"
             placeholder="Search by site, customer, or job type"
-            type="search"
           />
           <div className="grid grid-cols-2 gap-2">
             {[
