@@ -1944,7 +1944,7 @@ describe("smart report foundations", () => {
     expect(() => validateFinalizationDraft(invalidBackflowDraft)).toThrow("Add at least one backflow assembly before finalizing.");
   });
 
-  it("builds the joint commission fire sprinkler report with quarterly and annual seeded sections and customer-safe internal notes", () => {
+  it("builds the simple Joint Commission fire sprinkler field report from the source compliance packet structure", () => {
     const draft = buildInitialReportDraft({
       inspectionType: "joint_commission_fire_sprinkler",
       siteName: "Harbor Main Campus",
@@ -1954,18 +1954,37 @@ describe("smart report foundations", () => {
       siteDefaults: { siteAddress: "123 Harbor Way" }
     });
 
-    expect(draft.sectionOrder).toContain("quarterly-inspection");
-    expect(draft.sectionOrder).toContain("annual-inspection");
-    expect(draft.sections.header?.fields.facilityName).toBe("Harbor View Hospital");
-    expect(draft.sections.header?.fields.siteName).toBe("Harbor Main Campus");
-    expect((draft.sections["quarterly-inspection"]?.fields.quarterlyItems as Array<Record<string, string>>)[0]?.epLabel).toBe("LS.02.01.35 EP 1");
-    expect((draft.sections["annual-inspection"]?.fields.annualItems as Array<Record<string, string>>)[0]?.epLabel).toBe("LS.02.01.35 EP 2");
-    expect(draft.sections.header?.fields).toHaveProperty("tagStatus");
-    expect(draft.sections["test-results"]?.fields).toHaveProperty("waterflowSwitches");
-    expect(draft.sections["test-results"]?.fields).toHaveProperty("tamperSwitches");
-    expect((draft.sections.photos?.fields.photoItems as Array<Record<string, string>>)[0]?.category).toBe("system_overview");
-    expect((draft.sections.photos?.fields.photoItems as Array<Record<string, string>>)[5]?.category).toBe("tags");
-    expect((draft.sections.deficiencies?.fields.deficiencyItems as Array<Record<string, string>> | undefined) ?? []).toHaveLength(0);
+    expect(draft.sectionOrder).toEqual([
+      "report-info",
+      "executive-summary",
+      "summary-dashboard",
+      "testing-matrix",
+      "sprinkler-overview",
+      "systems-detail",
+      "notes-verification",
+      "deficiencies",
+      "ep1-supervisory",
+      "ep2-tamper-valves",
+      "ep2-waterflow",
+      "ep9-main-drain",
+      "ep10-fdc",
+      "certification-acknowledgement"
+    ]);
+    expect(draft.sections["report-info"]?.fields.facilityCustomer).toBe("Harbor View Hospital");
+    expect(draft.sections["report-info"]?.fields.facilityAddress).toBe("123 Harbor Way");
+    expect(draft.sections["report-info"]?.fields.reportType).toBe("Quarterly Joint Commission Fire Sprinkler Inspection Report");
+    expect(draft.sections["report-info"]?.fields).toHaveProperty("tagStatus");
+    expect((draft.sections["summary-dashboard"]?.fields.dashboardRows as Array<Record<string, string>>)[0]?.inspectionArea).toBe("Supervisory Signals");
+    expect((draft.sections["testing-matrix"]?.fields.matrixRows as Array<Record<string, string>>)[0]?.deviceActivity).toBe("Supervisory signals except tamper switches");
+    expect((draft.sections["testing-matrix"]?.fields.matrixRows as Array<Record<string, string>>)[0]).toHaveProperty("apr");
+    expect((draft.sections["sprinkler-overview"]?.fields.overviewRows as Array<Record<string, string>>).length).toBeGreaterThan(20);
+    expect((draft.sections["systems-detail"]?.fields.systemDetailRows as Array<Record<string, string>>).length).toBeGreaterThan(20);
+    expect((draft.sections.deficiencies?.fields.deficiencyRows as Array<Record<string, string>>)[0]?.systemEp).toBe("EP1");
+    expect(draft.sections["ep1-supervisory"]?.fields).toHaveProperty("supervisorySignalDevices");
+    expect(draft.sections["ep2-tamper-valves"]?.fields).toHaveProperty("tamperSwitchControlValves");
+    expect(draft.sections["ep2-waterflow"]?.fields).toHaveProperty("waterflowSwitches");
+    expect(draft.sections["ep9-main-drain"]?.fields).toHaveProperty("mainDrainRows");
+    expect(draft.sections["ep10-fdc"]?.fields).toHaveProperty("fdcResultsOfTesting");
   });
 
   it("prefills fire pump assets and carries forward operational defaults", () => {

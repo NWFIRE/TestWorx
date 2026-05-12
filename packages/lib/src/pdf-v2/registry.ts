@@ -8,6 +8,7 @@ import {
 import { fireAlarmReportConfigV2 } from "./configs/fire-alarm";
 import { fireExtinguisherReportConfigV2 } from "./configs/fire-extinguisher";
 import { industrialDryChemicalReportConfigV2 } from "./configs/industrial-dry-chemical";
+import { jointCommissionFireSprinklerReportConfigV2 } from "./configs/joint-commission-fire-sprinkler";
 import { kitchenSuppressionReportConfigV2 } from "./configs/kitchen-suppression";
 import type { ReportTypeConfig } from "./types";
 
@@ -15,6 +16,7 @@ export const reportTypeRegistryV2: Partial<Record<InspectionType, ReportTypeConf
   fire_alarm: fireAlarmReportConfigV2,
   kitchen_suppression: kitchenSuppressionReportConfigV2,
   industrial_suppression: industrialDryChemicalReportConfigV2,
+  joint_commission_fire_sprinkler: jointCommissionFireSprinklerReportConfigV2,
   fire_extinguisher: fireExtinguisherReportConfigV2
 };
 

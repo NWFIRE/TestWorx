@@ -3,6 +3,7 @@ import { createElement } from "react";
 
 import { buildDataUrlStorageKey } from "../storage";
 import { buildIndicatorLines, buildReportRenderModelV2, generateInspectionReportPdfV2, resolvePdfVersionForInspectionType } from "../pdf-v2";
+import { buildInitialReportDraft } from "../report-engine";
 import { buildFireAlarmRenderModel } from "../pdf-v2/fire-alarm/adapter/buildFireAlarmRenderModel";
 import { FireAlarmReportDocument } from "../pdf-v2/fire-alarm/templates/FireAlarmReportDocument";
 import { renderPdfHtml } from "../pdf-v2/core/renderer/renderHtml";
@@ -149,6 +150,61 @@ describe("pdf v2 report engine", () => {
     });
 
     expect(JSON.stringify(model)).not.toContain("Unknown Unknown");
+  });
+
+  it("renders the Joint Commission sprinkler source-packet table flow", () => {
+    const draft = buildInitialReportDraft({
+      inspectionType: "joint_commission_fire_sprinkler",
+      siteName: "St. Mary's Regional Medical Center",
+      customerName: "St. Mary's",
+      scheduledDate: "2026-03-17T14:00:00.000Z",
+      assetCount: 0,
+      siteDefaults: { siteAddress: "305 S 5th St, Enid, OK 73701" }
+    });
+
+    const model = buildReportRenderModelV2({
+      ...createBaseInput(),
+      task: { inspectionType: "joint_commission_fire_sprinkler" },
+      draft
+    });
+
+    expect(model.title).toBe("Joint Commission Fire Sprinkler Inspection Report");
+    expect(model.sections.map((section) => section.key)).toEqual(expect.arrayContaining([
+      "summary-dashboard",
+      "testing-matrix",
+      "sprinkler-overview",
+      "systems-detail",
+      "ep1-supervisory",
+      "ep2-tamper-valves",
+      "ep2-waterflow",
+      "ep9-main-drain",
+      "ep10-fdc",
+      "certification-acknowledgement"
+    ]));
+
+    const matrix = model.sections.find((section) => section.key === "testing-matrix");
+    expect(matrix?.renderer).toBe("table");
+    if (matrix?.renderer === "table") {
+      expect(matrix.columns.map((column) => column.key)).toEqual([
+        "deviceCategory",
+        "deviceActivity",
+        "ep",
+        "frequency",
+        "apr",
+        "may",
+        "jun",
+        "jul",
+        "aug",
+        "sep",
+        "oct",
+        "nov",
+        "dec",
+        "jan",
+        "feb",
+        "mar"
+      ]);
+      expect(matrix.rows[0]?.deviceActivity?.text).toBe("Supervisory signals except tamper switches");
+    }
   });
 
   it("renders kitchen suppression hood and appliance rows from the saved report fields", () => {
