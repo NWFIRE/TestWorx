@@ -1,0 +1,4 @@
+-- This migration directory was created for the deficiency quote-link workflow,
+-- but the implemented workflow stores the relationship through existing quote
+-- records and audit metadata. Keep this as a no-op so Prisma migration deploy
+-- can continue through later additive migrations.
