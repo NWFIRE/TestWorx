@@ -2942,7 +2942,7 @@ describe("smart report foundations", () => {
       }
     }, "industrial_suppression");
 
-    expect(() => validateFinalizationDraft(invalidIndustrialDraft)).toThrow("Add at least one industrial suppression system before finalizing.");
+    expect(() => validateFinalizationDraft(invalidIndustrialDraft)).toThrow("items need attention before finalizing.");
   });
 
   it("prefills emergency exit lighting fixture groups from asset data and carries forward operational defaults", () => {

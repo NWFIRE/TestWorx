@@ -1418,7 +1418,8 @@ function collectFieldValidationIssues({
   }
 
   const isFailingValue = finalizationNegativeValues.has(String(value ?? "").trim().toLowerCase());
-  if (isFailingValue && field.requireNoteOnFail && !row?.deficiencyNotes && !row?.notes) {
+  const rowHasInlineIssueContext = row && Object.keys(row).length > 0;
+  if (isFailingValue && field.requireNoteOnFail && rowHasInlineIssueContext && !row?.deficiencyNotes && !row?.notes) {
     issues.push(buildValidationIssue({
       sectionId,
       itemId,
@@ -1428,7 +1429,7 @@ function collectFieldValidationIssues({
     }));
   }
 
-  if (isFailingValue && field.requirePhotoOnFail && !row?.deficiencyPhoto) {
+  if (isFailingValue && field.requirePhotoOnFail && rowHasInlineIssueContext && !row?.deficiencyPhoto) {
     issues.push(buildValidationIssue({
       sectionId,
       itemId,

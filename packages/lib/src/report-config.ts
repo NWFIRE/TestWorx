@@ -358,11 +358,43 @@ function resolveField(field: ReportFieldDefinition, context: ReportTemplateResol
   };
 }
 
+const sharedTagStatusSection: ReportSectionDefinition = {
+  id: "tag-status",
+  label: "Tag status",
+  description: "Select the physical service tag applied to the system before finalization.",
+  fields: [
+    {
+      id: "tagStatus",
+      label: "Tag status",
+      description: "Green = passed, Yellow = operational with deficiencies/recommendations, Red = failed or impaired.",
+      type: "select",
+      optionProvider: "tagStatusOptions",
+      requiredForFinalization: true,
+      prefill: [{ source: "priorField", sectionId: "tag-status", fieldId: "tagStatus" }]
+    }
+  ]
+};
+
+function reportTemplateHasTagStatus(template: ReportTemplateDefinition) {
+  return template.sections.some((section) =>
+    section.fields.some((field) => {
+      if (field.id === "tagStatus") {
+        return true;
+      }
+      return field.type === "repeater" && field.rowFields.some((rowField) => rowField.id === "tagStatus");
+    })
+  );
+}
+
 export function resolveReportTemplate(input: ReportTemplateResolutionContext): ReportTemplateDefinition {
   const template = inspectionTypeRegistry[input.inspectionType];
+  const sections = reportTemplateHasTagStatus(template)
+    ? template.sections
+    : [sharedTagStatusSection, ...template.sections];
+
   return {
     ...template,
-    sections: template.sections.map((section) => ({
+    sections: sections.map((section) => ({
       ...section,
       fields: section.fields.map((field) => resolveField(field, input))
     }))
@@ -1863,14 +1895,199 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
     ]
   },
   industrial_suppression: {
-    label: "Industrial suppression",
-    description: "Protected process equipment, release controls, and special-hazard suppression readiness.",
+    label: "Industrial dry chemical",
+    description: "Industrial dry chemical system details, checklist, fusible links, tag status, and service billing.",
     defaultRecurrenceFrequency: RecurrenceFrequency.SEMI_ANNUAL,
     pdf: {
-      subtitle: "Industrial Suppression Inspection Report",
+      subtitle: "Industrial Dry Chemical Inspection Report",
       nfpaReferences: ["NFPA 17"]
     },
+    billableMappings: {
+      fields: [
+        {
+          sourceSection: "system-information",
+          field: "systemLocation",
+          category: "service",
+          description: "Industrial Dry Chemical System Inspection",
+          code: "INDUSTRIAL_DRY_CHEMICAL_INSPECTION",
+          unit: "system",
+          quantitySource: "constant",
+          quantityConstant: 1,
+          alwaysInclude: true,
+          metadataFields: ["manufacturer", "model", "hazardProtected", "cylinderCount", "systemLocation", "tagStatus"]
+        }
+      ],
+      repeaters: [
+        {
+          sourceSection: "fusible-links",
+          repeater: "fusibleLinks",
+          field: "quantity",
+          category: "material",
+          descriptionTemplate: "Industrial dry chemical fusible link - {{linkTemperatureRating}} at {{linkLocation}}",
+          code: "INDUSTRIAL_DRY_CHEMICAL_FUSIBLE_LINK",
+          unit: "ea",
+          quantitySource: "fieldValue",
+          includeWhenGreaterThanZero: true,
+          includeWhenFieldValues: [{ field: "result", values: ["replaced"] }]
+        }
+      ]
+    },
     sections: [
+      {
+        id: "system-information",
+        label: "System information",
+        description: "Capture the protected hazard, dry chemical cylinder details, release components, and required tag status.",
+        fields: [
+          {
+            id: "tagStatus",
+            label: "Tag status",
+            description: "Green = passed, Yellow = operational with deficiencies/recommendations, Red = failed or impaired.",
+            type: "select",
+            optionProvider: "tagStatusOptions",
+            requiredForFinalization: true,
+            prefill: [{ source: "priorField", sectionId: "system-information", fieldId: "tagStatus" }]
+          },
+          {
+            id: "manufacturer",
+            label: "Manufacturer",
+            type: "select",
+            optionProvider: "industrial_dry_chemical_manufacturers",
+            customValueFieldId: "manufacturerOther",
+            customValueTrigger: "other",
+            prefill: [{ source: "priorField", sectionId: "system-information", fieldId: "manufacturer" }]
+          },
+          {
+            id: "manufacturerOther",
+            label: "Other manufacturer",
+            type: "text",
+            placeholder: "Enter manufacturer",
+            visibleWhen: { fieldId: "manufacturer", values: ["other"] },
+            prefill: [{ source: "priorField", sectionId: "system-information", fieldId: "manufacturerOther" }]
+          },
+          { id: "model", label: "Model", type: "text", placeholder: "System model", prefill: [{ source: "priorField", sectionId: "system-information", fieldId: "model" }] },
+          { id: "systemLocation", label: "System location", type: "text", placeholder: "Paint booth, dip tank, process line", prefill: [{ source: "priorField", sectionId: "system-information", fieldId: "systemLocation" }, { source: "siteDefault", key: "siteName" }] },
+          { id: "hazardProtected", label: "Hazard protected", type: "text", placeholder: "Paint booth, flammable liquid room, dust collector", prefill: [{ source: "priorField", sectionId: "system-information", fieldId: "hazardProtected" }] },
+          { id: "cylinderCount", label: "Cylinder / tank count", type: "number", placeholder: "0", prefill: [{ source: "priorField", sectionId: "system-information", fieldId: "cylinderCount" }] },
+          { id: "tankInformation", label: "Cylinder / tank information", type: "text", placeholder: "Serials, weights, dates, pressure details", prefill: [{ source: "priorField", sectionId: "system-information", fieldId: "tankInformation" }] },
+          { id: "actuatorReleasingMechanism", label: "Actuator / releasing mechanism", type: "text", placeholder: "Mechanical, pneumatic, electric, cartridge", prefill: [{ source: "priorField", sectionId: "system-information", fieldId: "actuatorReleasingMechanism" }] },
+          { id: "detectionMethod", label: "Detection method", type: "text", placeholder: "Fusible link, pneumatic tubing, electronic detection", prefill: [{ source: "priorField", sectionId: "system-information", fieldId: "detectionMethod" }] },
+          { id: "nozzlesPipingCondition", label: "Nozzles / piping condition", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, prefill: [{ source: "priorField", sectionId: "system-information", fieldId: "nozzlesPipingCondition" }] },
+          { id: "agentCondition", label: "Agent condition", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, prefill: [{ source: "priorField", sectionId: "system-information", fieldId: "agentCondition" }] },
+          { id: "pressureChargeStatus", label: "Pressure / charge status", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, prefill: [{ source: "priorField", sectionId: "system-information", fieldId: "pressureChargeStatus" }] },
+          { id: "manualPullStation", label: "Manual pull station", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, prefill: [{ source: "priorField", sectionId: "system-information", fieldId: "manualPullStation" }] },
+          { id: "automaticDetection", label: "Automatic detection", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, prefill: [{ source: "priorField", sectionId: "system-information", fieldId: "automaticDetection" }] },
+          { id: "shutdownInterlockChecks", label: "Shutdown / interlock checks", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, prefill: [{ source: "priorField", sectionId: "system-information", fieldId: "shutdownInterlockChecks" }] },
+          { id: "alarmInterfaceChecks", label: "Alarm / interface checks", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, prefill: [{ source: "priorField", sectionId: "system-information", fieldId: "alarmInterfaceChecks" }] },
+          { id: "dischargePathNozzleCoverage", label: "Discharge path / nozzle coverage", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, prefill: [{ source: "priorField", sectionId: "system-information", fieldId: "dischargePathNozzleCoverage" }] },
+          { id: "deficiencyNotes", label: "Deficiency notes", type: "text", placeholder: "Document deficiencies or recommendations reviewed with customer" },
+          { id: "technicianNotes", label: "Technician notes", type: "text", placeholder: "Service notes, customer requests, site conditions" },
+          { id: "customerAcknowledgement", label: "Customer acknowledgement", type: "text", placeholder: "Customer representative acknowledgement or notes" }
+        ]
+      },
+      {
+        id: "installation-compliance-checklist",
+        label: "Installation & Compliance",
+        description: "Verify installation condition, discharge status, and tampering evidence.",
+        fields: [
+          { id: "systemInstalledPerMfgUl", label: "1. System installed in accordance with MFG & UL?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "installation-compliance-checklist", fieldId: "systemInstalledPerMfgUl" }] },
+          { id: "systemDischargedPriorToArrival", label: "2. System discharged prior to arrival?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "installation-compliance-checklist", fieldId: "systemDischargedPriorToArrival" }] },
+          { id: "tamperingEvidence", label: "3. Evidence of tampering since last inspection?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "installation-compliance-checklist", fieldId: "tamperingEvidence" }] }
+        ]
+      },
+      {
+        id: "nozzles-piping-checklist",
+        label: "Nozzles & Piping",
+        description: "Confirm hazard coverage, nozzle alignment, piping, caps, and fire alarm interconnection.",
+        fields: [
+          { id: "hazardCoveredCorrectNozzles", label: "4. Hazard properly covered w/ correct nozzles?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "nozzles-piping-checklist", fieldId: "hazardCoveredCorrectNozzles" }] },
+          { id: "nozzlePositionChecked", label: "5. Check position of all nozzles?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "nozzles-piping-checklist", fieldId: "nozzlePositionChecked" }] },
+          { id: "pipingConduitSecured", label: "20. Piping/conduit secured bracketed?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "nozzles-piping-checklist", fieldId: "pipingConduitSecured" }] },
+          { id: "nozzlesCleanCapsInPlace", label: "21. Nozzles cleaned and proper caps in place?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "nozzles-piping-checklist", fieldId: "nozzlesCleanCapsInPlace" }] },
+          { id: "fireAlarmInterconnectionFunctioning", label: "22. Fire alarm interconnection functioning?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "nozzles-piping-checklist", fieldId: "fireAlarmInterconnectionFunctioning" }] }
+        ]
+      },
+      {
+        id: "cylinders-agent-hardware-checklist",
+        label: "Cylinders / Agent / Hardware",
+        description: "Inspect cylinder pressure, cartridge, pneumatic actuator, cylinder, and mount.",
+        fields: [
+          { id: "pressureGaugeProperRange", label: "6. Pressure gauge in proper range if equipped?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "cylinders-agent-hardware-checklist", fieldId: "pressureGaugeProperRange" }] },
+          { id: "cartridgeWeightCheckedOrReplaced", label: "7. Checked cartridge weight or replaced?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "cylinders-agent-hardware-checklist", fieldId: "cartridgeWeightCheckedOrReplaced" }] },
+          { id: "pneumaticActuatorChecked", label: "8. Checked pneumatic actuator?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "cylinders-agent-hardware-checklist", fieldId: "pneumaticActuatorChecked" }] },
+          { id: "cylinderAndMountInspected", label: "9. Inspected cylinder and mount?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "cylinders-agent-hardware-checklist", fieldId: "cylinderAndMountInspected" }] }
+        ]
+      },
+      {
+        id: "detection-actuation-checklist",
+        label: "Detection & Actuation",
+        description: "Check terminal link operation, electronic detection, cable travel, fusible links, manual pull, time delay, and micro-switch.",
+        fields: [
+          { id: "operatedWithTerminalLink", label: "10. Operated system with terminal link?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "detection-actuation-checklist", fieldId: "operatedWithTerminalLink" }] },
+          { id: "electronicDetectionChecked", label: "11. Checked operation of electronic detection?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "detection-actuation-checklist", fieldId: "electronicDetectionChecked" }] },
+          { id: "cableTravelLinkPositionChecked", label: "12. Checked travel of cable and link position?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "detection-actuation-checklist", fieldId: "cableTravelLinkPositionChecked" }] },
+          { id: "fusibleLinksReplaced", label: "13. Replaced fusible link(s)?", description: "Use the Fusible Link section below to document each replacement.", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "detection-actuation-checklist", fieldId: "fusibleLinksReplaced" }] },
+          { id: "manualPullStationChecked", label: "14. Checked operation of manual pull station?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "detection-actuation-checklist", fieldId: "manualPullStationChecked" }] },
+          { id: "timeDelayChecked", label: "15. Checked operation of time delay?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "detection-actuation-checklist", fieldId: "timeDelayChecked" }] },
+          { id: "microSwitchChecked", label: "16. Checked operation of micro-switch?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "detection-actuation-checklist", fieldId: "microSwitchChecked" }] }
+        ]
+      },
+      {
+        id: "shutdowns-interfaces-checklist",
+        label: "Shutdowns & Interfaces",
+        description: "Confirm gas valve, shutdowns, and reserve power behavior.",
+        fields: [
+          { id: "gasValveChecked", label: "17. Checked operation of gas valve?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "shutdowns-interfaces-checklist", fieldId: "gasValveChecked" }] },
+          { id: "shutdownsChecked", label: "18. Checked operation of shut downs?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "shutdowns-interfaces-checklist", fieldId: "shutdownsChecked" }] },
+          { id: "reservePowerSupplyChecked", label: "19. Checked reserve power supply?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "shutdowns-interfaces-checklist", fieldId: "reservePowerSupplyChecked" }] }
+        ]
+      },
+      {
+        id: "facility-readiness-checklist",
+        label: "Facility / Operational Readiness",
+        description: "Confirm extinguishers, personnel instruction, monthly inspections, discharge history, and final operating condition.",
+        fields: [
+          { id: "properExtinguishersOtherAreas", label: "23. Proper fire extinguishers for other areas?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "facility-readiness-checklist", fieldId: "properExtinguishersOtherAreas" }] },
+          { id: "personnelInstructed", label: "24. Personnel instructed on operation of system?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "facility-readiness-checklist", fieldId: "personnelInstructed" }] },
+          { id: "monthlyInspectionsPerformed", label: "25. Monthly inspections being performed?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "facility-readiness-checklist", fieldId: "monthlyInspectionsPerformed" }] },
+          { id: "systemDischargedSinceLastInspection", label: "26. System discharged since last inspection?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "facility-readiness-checklist", fieldId: "systemDischargedSinceLastInspection" }] },
+          { id: "systemDischargeDetails", label: "System discharge details", type: "text", placeholder: "Describe discharge date, cause, reset, and service performed", visibleWhen: { fieldId: "systemDischargedSinceLastInspection", values: ["fail"] } },
+          { id: "systemReturnedNormal", label: "27. System returned to normal operational condition?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "facility-readiness-checklist", fieldId: "systemReturnedNormal" }] }
+        ]
+      },
+      {
+        id: "documentation-compliance-checklist",
+        label: "Documentation & Compliance",
+        description: "Confirm original plans and inspection tag status.",
+        fields: [
+          { id: "originalPlansOnSite", label: "28. Plans of original installation on site?", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "documentation-compliance-checklist", fieldId: "originalPlansOnSite" }] },
+          { id: "inspectionTagInstalled", label: "29. Inspection tag installed on system?", description: "Select Green, Yellow, or Red in Tag status before finalizing.", type: "select", optionProvider: "passFailNA", requiredForFinalization: true, allowPhoto: true, requireNoteOnFail: true, prefill: [{ source: "priorField", sectionId: "documentation-compliance-checklist", fieldId: "inspectionTagInstalled" }] }
+        ]
+      },
+      {
+        id: "fusible-links",
+        label: "Fusible links",
+        description: "Document every fusible link inspected or replaced for the industrial dry chemical system.",
+        fields: [
+          {
+            id: "fusibleLinks",
+            label: "Fusible links",
+            type: "repeater",
+            addLabel: "Add fusible link",
+            rowFields: [
+              { id: "linkLocation", label: "Link location", type: "text", placeholder: "Detector line over booth opening" },
+              { id: "linkTemperatureRating", label: "Link temperature rating", type: "select", optionProvider: "fusible_link_temperatures_common" },
+              { id: "manufactureDate", label: "Manufacture date", type: "date" },
+              { id: "replacementDate", label: "Replacement date", type: "date" },
+              { id: "condition", label: "Condition", type: "select", optionProvider: "fusibleLinkConditionOptions" },
+              { id: "quantity", label: "Quantity", type: "select", optionProvider: "quantity_0_10" },
+              { id: "result", label: "Result", type: "select", optionProvider: "fusibleLinkResultOptions" },
+              { id: "notes", label: "Notes", type: "text", placeholder: "Reason replaced, condition, or access notes" },
+              { id: "photo", label: "Photo", type: "photo" }
+            ]
+          },
+          { id: "fusibleLinkNotes", label: "Fusible link notes", type: "text", placeholder: "Replacement interval warnings, skipped links, or access limitations" }
+        ]
+      },
       {
         id: "hazard-equipment",
         label: "Protected equipment",
@@ -1881,10 +2098,10 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
             label: "Protected systems",
             description: "Track each special-hazard suppression system inspected at the site.",
             type: "repeater",
+            hidden: true,
             addLabel: "Add protected system",
             repeatableSource: "siteAssets",
             rowIdentityField: "assetId",
-            validation: [{ type: "minRows", value: 1, message: "Add at least one industrial suppression system before finalizing." }],
             rowFields: [
               {
                 id: "assetId",
@@ -1975,12 +2192,14 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
             type: "number",
             placeholder: "0",
             calculation: { key: "assetCountFromRepeater", sourceFieldId: "protectedSystems" },
+            hidden: true,
             readOnly: true
           },
           {
             id: "equipmentProtected",
             label: "Equipment protected",
             type: "text",
+            hidden: true,
             placeholder: "Describe process line or hazard",
             prefill: [{ source: "priorField", sectionId: "hazard-equipment", fieldId: "equipmentProtected" }]
           },
@@ -1988,9 +2207,10 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
             id: "hazardBoundarySecure",
             label: "Hazard boundary secure",
             type: "boolean",
+            hidden: true,
             prefill: [{ source: "priorField", sectionId: "hazard-equipment", fieldId: "hazardBoundarySecure" }]
           },
-          { id: "hazardNotes", label: "Hazard notes", type: "text", placeholder: "Interlocks, enclosure condition, shutdown dependencies" }
+          { id: "hazardNotes", label: "Hazard notes", type: "text", hidden: true, placeholder: "Interlocks, enclosure condition, shutdown dependencies" }
         ]
       },
       {
@@ -2002,16 +2222,18 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
             id: "manualReleaseAccessible",
             label: "Manual release accessible",
             type: "boolean",
+            hidden: true,
             prefill: [{ source: "priorField", sectionId: "release-controls", fieldId: "manualReleaseAccessible" }]
           },
           {
             id: "controlLogicStatus",
             label: "Control logic status",
             type: "select",
+            hidden: true,
             optionProvider: "passFail",
             prefill: [{ source: "priorField", sectionId: "release-controls", fieldId: "controlLogicStatus" }]
           },
-          { id: "releaseControlNotes", label: "Release control notes", type: "text", placeholder: "Abort switch, panel, detector or shutdown notes" }
+          { id: "releaseControlNotes", label: "Release control notes", type: "text", hidden: true, placeholder: "Abort switch, panel, detector or shutdown notes" }
         ]
       },
       {
@@ -2030,16 +2252,18 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
               sourceFieldId: "protectedSystems",
               rowFieldId: "cylinderCount"
             },
+            hidden: true,
             readOnly: true
           },
           {
             id: "agentPressureStatus",
             label: "Agent pressure status",
             type: "select",
+            hidden: true,
             optionProvider: "pressure",
             prefill: [{ source: "priorField", sectionId: "agent-and-cylinders", fieldId: "agentPressureStatus" }]
           },
-          { id: "agentNotes", label: "Agent notes", type: "text", placeholder: "Weight, piping, manifold, or nozzle notes" }
+          { id: "agentNotes", label: "Agent notes", type: "text", hidden: true, placeholder: "Weight, piping, manifold, or nozzle notes" }
         ]
       }
     ]

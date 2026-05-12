@@ -307,6 +307,10 @@ function getLeadSupplementalSectionIds(inspectionType: string) {
     return ["system-details"];
   }
 
+  if (inspectionType === "industrial_suppression") {
+    return ["system-information", "fusible-links"];
+  }
+
   if (inspectionType === "fire_alarm") {
     return ["control-panel"];
   }

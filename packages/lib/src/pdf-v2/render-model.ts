@@ -110,6 +110,12 @@ function buildSectionFieldIndex(input: PdfInput) {
   return merged;
 }
 
+function buildTagStatusFact(input: PdfInput): RenderKeyValueRow | null {
+  const fields = buildSectionFieldIndex(input);
+  const tagStatus = formatFieldValue(fields.tagStatus, "badge");
+  return tagStatus ? { label: "Tag Status", value: tagStatus } : null;
+}
+
 function mapOutcomeMetric(
   input: PdfInput,
   config: ReportTypeConfig,
@@ -489,6 +495,9 @@ function buildSectionByConfig(input: PdfInput, sectionConfig: ReportSectionConfi
       if (sectionConfig.renderer === "table" && sectionConfig.table) {
         return buildTableSection(input, sectionConfig, buildDatasetRows(input, sectionConfig.table.dataset));
       }
+      if (sectionConfig.renderer === "checklist" && sectionConfig.checklist) {
+        return buildChecklistSection(getSourceSectionFields(input, sectionConfig.checklist.dataset), sectionConfig);
+      }
       if (sectionConfig.renderer === "keyValue") {
         return buildKeyValueSection(getSourceSectionFields(input, sectionConfig.key), sectionConfig);
       }
@@ -581,7 +590,10 @@ export function buildReportRenderModelV2(input: PdfInput): ReportRenderModelV2 {
     },
     outcomeCards: config.pageOne.outcomeMetrics.map((metric) => mapOutcomeMetric(input, config, preview, metric)),
     primaryFacts: config.pageOne.primaryFacts.map((fact) => mapSummaryFact(input, fact)).filter((item) => item.value),
-    overviewFacts: config.pageOne.overviewFacts.map((fact) => mapSummaryFact(input, fact)).filter((item) => item.value),
+    overviewFacts: [
+      ...config.pageOne.overviewFacts.map((fact) => mapSummaryFact(input, fact)).filter((item) => item.value),
+      buildTagStatusFact(input)
+    ].filter((item): item is RenderKeyValueRow => Boolean(item?.value)),
     systemSummary,
     sections
   };

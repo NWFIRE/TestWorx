@@ -8,6 +8,7 @@ export const mobileChecklistInspectionTypeAllowlist = [
   "fire_alarm",
   "joint_commission_fire_alarm",
   "kitchen_suppression",
+  "industrial_suppression",
   "fire_extinguisher"
 ] as const satisfies readonly InspectionType[];
 

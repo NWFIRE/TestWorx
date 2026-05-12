@@ -106,8 +106,12 @@ export type ReportOptionProviderKey =
   | "quantityZeroToTwenty"
   | "quantityZeroToHundred"
   | "fusible_link_temperatures_common"
+  | "tagStatusOptions"
+  | "fusibleLinkConditionOptions"
+  | "fusibleLinkResultOptions"
   | "caps_used_types"
   | "kitchen_suppression_manufacturers"
+  | "industrial_dry_chemical_manufacturers"
   | "emergency_light_types"
   | "emergency_light_battery_sizes"
   | "emergency_light_test_durations"
@@ -753,6 +757,26 @@ const fusibleLinkTemperaturesCommon: ReportOption[] = [
   { label: "450°F", value: "450°F" },
   { label: "500°F", value: "500°F" }
 ];
+const tagStatusOptions: ReportOption[] = [
+  { label: "Green - system passed / normal service condition", value: "green" },
+  { label: "Yellow - operational with deficiencies or recommendations", value: "yellow" },
+  { label: "Red - failed / impaired / immediate attention", value: "red" }
+];
+const fusibleLinkConditionOptions: ReportOption[] = [
+  { label: "Good", value: "good" },
+  { label: "Worn", value: "worn" },
+  { label: "Painted / contaminated", value: "contaminated" },
+  { label: "Damaged", value: "damaged" },
+  { label: "Expired", value: "expired" },
+  { label: "Replaced", value: "replaced" },
+  { label: "N/A", value: "na" }
+];
+const fusibleLinkResultOptions: ReportOption[] = [
+  { label: "Pass", value: "pass" },
+  { label: "Fail", value: "fail" },
+  { label: "Replaced", value: "replaced" },
+  { label: "N/A", value: "na" }
+];
 const capsUsedTypes: ReportOption[] = [
   { label: "Rubber", value: "Rubber" },
   { label: "Metal", value: "Metal" }
@@ -770,6 +794,18 @@ const kitchenSuppressionManufacturers: ReportOption[] = [
   { label: "Denlar", value: "Denlar" },
   { label: "Greenheck", value: "Greenheck" },
   { label: "CaptiveAire", value: "CaptiveAire" },
+  { label: "Other", value: "other" }
+];
+const industrialDryChemicalManufacturers: ReportOption[] = [
+  { label: "Ansul", value: "Ansul" },
+  { label: "Amerex", value: "Amerex" },
+  { label: "Kidde", value: "Kidde" },
+  { label: "Pyro-Chem", value: "Pyro-Chem" },
+  { label: "Buckeye", value: "Buckeye" },
+  { label: "Badger", value: "Badger" },
+  { label: "Fike", value: "Fike" },
+  { label: "Janus Fire Systems", value: "Janus Fire Systems" },
+  { label: "Minimax", value: "Minimax" },
   { label: "Other", value: "other" }
 ];
 const emergencyLightTypes: ReportOption[] = [
@@ -1318,8 +1354,12 @@ export const reportOptionProviders = {
   quantityZeroToTwenty,
   quantityZeroToHundred,
   fusible_link_temperatures_common: fusibleLinkTemperaturesNormalized,
+  tagStatusOptions,
+  fusibleLinkConditionOptions,
+  fusibleLinkResultOptions,
   caps_used_types: capsUsedTypes,
   kitchen_suppression_manufacturers: kitchenSuppressionManufacturers,
+  industrial_dry_chemical_manufacturers: industrialDryChemicalManufacturers,
   emergency_light_types: emergencyLightTypes,
   emergency_light_battery_sizes: emergencyLightBatterySizes,
   emergency_light_test_durations: emergencyLightTestDurations,

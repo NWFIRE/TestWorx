@@ -10,10 +10,12 @@ describe("mobile checklist", () => {
       "fire_alarm",
       "joint_commission_fire_alarm",
       "kitchen_suppression",
+      "industrial_suppression",
       "fire_extinguisher"
     ]);
     expect(isChecklistHeavyMobileInspectionType("fire_alarm")).toBe(true);
     expect(isChecklistHeavyMobileInspectionType("joint_commission_fire_alarm")).toBe(true);
+    expect(isChecklistHeavyMobileInspectionType("industrial_suppression")).toBe(true);
     expect(isChecklistHeavyMobileInspectionType("wet_chemical_acceptance_test")).toBe(false);
   });
 

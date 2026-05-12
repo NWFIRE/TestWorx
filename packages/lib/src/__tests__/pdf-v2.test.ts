@@ -239,6 +239,86 @@ describe("pdf v2 report engine", () => {
     }
   });
 
+  it("renders industrial dry chemical tag status, numbered checklist, and fusible links", () => {
+    const model = buildReportRenderModelV2({
+      ...createBaseInput(),
+      task: { inspectionType: "industrial_suppression" },
+      draft: {
+        templateVersion: 1,
+        inspectionType: "industrial_suppression",
+        overallNotes: "",
+        sectionOrder: [
+          "system-information",
+          "installation-compliance-checklist",
+          "documentation-compliance-checklist",
+          "fusible-links"
+        ],
+        activeSectionId: "system-information",
+        sections: {
+          "system-information": {
+            status: "pass",
+            notes: "",
+            fields: {
+              tagStatus: "green",
+              manufacturer: "Amerex",
+              model: "IS",
+              systemLocation: "Paint booth",
+              hazardProtected: "Paint booth line 2"
+            }
+          },
+          "installation-compliance-checklist": {
+            status: "pass",
+            notes: "",
+            fields: {
+              systemInstalledPerMfgUl: "pass",
+              systemDischargedPriorToArrival: "na",
+              tamperingEvidence: "pass"
+            }
+          },
+          "documentation-compliance-checklist": {
+            status: "pass",
+            notes: "",
+            fields: {
+              originalPlansOnSite: "pass",
+              inspectionTagInstalled: "pass"
+            }
+          },
+          "fusible-links": {
+            status: "pass",
+            notes: "",
+            fields: {
+              fusibleLinks: [
+                {
+                  linkLocation: "Booth detector line",
+                  linkTemperatureRating: "360 F",
+                  quantity: "2",
+                  result: "replaced",
+                  notes: "Changed during inspection"
+                }
+              ]
+            }
+          }
+        },
+        deficiencies: [],
+        attachments: [],
+        signatures: {},
+        context: { siteName: "", customerName: "", scheduledDate: "", assetCount: 0, priorReportSummary: "" }
+      }
+    });
+
+    expect(model.title).toBe("Industrial Dry Chemical Inspection Report");
+    expect(model.systemSummary?.items.find((item) => item.label === "Tag Status")?.value).toBe("Green");
+    expect(JSON.stringify(model.sections)).toContain("1. System installed in accordance with MFG & UL?");
+    expect(JSON.stringify(model.sections)).toContain("29. Inspection tag installed on system?");
+
+    const fusibleLinks = model.sections.find((section) => section.key === "fusible-links");
+    expect(fusibleLinks?.renderer).toBe("table");
+    if (fusibleLinks?.renderer === "table") {
+      expect(fusibleLinks.rows[0]?.linkLocation?.text).toBe("Booth detector line");
+      expect(fusibleLinks.rows[0]?.result?.text).toBe("replaced");
+    }
+  });
+
   it("does not expose raw photo filenames in rendered PDF text", async () => {
     const bytes = await generateInspectionReportPdfV2({
       ...createBaseInput(),
