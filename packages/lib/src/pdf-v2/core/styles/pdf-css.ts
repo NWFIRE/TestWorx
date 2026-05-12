@@ -47,8 +47,8 @@ export const pdfCss = `
     flex-direction: column;
     gap: var(--pdf-space-12);
     margin-bottom: var(--pdf-space-16);
-    break-after: auto;
-    page-break-after: auto;
+    break-after: page;
+    page-break-after: always;
   }
   .pdf-shell:last-child {
     break-after: auto;

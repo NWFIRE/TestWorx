@@ -27,6 +27,20 @@ function renderIdentityBand(runtime: PdfV2Runtime, cursor: PageCursor) {
   cursor.y -= height + PDF_V2_TOKENS.sectionGap;
 }
 
+function measureIdentityBandHeight(runtime: PdfV2Runtime) {
+  const facts = [
+    runtime.model.identity.customer ? `Customer: ${runtime.model.identity.customer}` : "",
+    runtime.model.identity.site ? `Site: ${runtime.model.identity.site}` : "",
+    runtime.model.identity.serviceAddress ? `Service Address: ${runtime.model.identity.serviceAddress}` : "",
+    runtime.model.identity.customerContact ? `Customer Contact: ${runtime.model.identity.customerContact}` : "",
+    runtime.model.identity.technician ? `Technician: ${runtime.model.identity.technician}` : "",
+    runtime.model.identity.serviceDate ? `Service Date: ${runtime.model.identity.serviceDate}` : ""
+  ].filter(Boolean);
+  const factText = facts.join("   ");
+  const factHeight = measureParagraphHeight(runtime.regularFont, factText, contentWidth() - 28, PDF_V2_TYPOGRAPHY.metadataValue, 3, 3);
+  return Math.max(72, 42 + factHeight + 12) + PDF_V2_TOKENS.sectionGap;
+}
+
 function renderComplianceBlock(runtime: PdfV2Runtime, cursor: PageCursor) {
   const descriptionHeight = measureParagraphHeight(runtime.regularFont, runtime.model.compliance.description, contentWidth() - 28, PDF_V2_TYPOGRAPHY.sectionDescriptor, 3, 2);
   const codeText = runtime.model.compliance.codes.join(" • ");
@@ -43,6 +57,13 @@ function renderComplianceBlock(runtime: PdfV2Runtime, cursor: PageCursor) {
   drawParagraph(cursor.page, runtime.regularFont, runtime.model.compliance.description, PDF_V2_TOKENS.margin + 14, cursor.y - 32, contentWidth() - 28, PDF_V2_TYPOGRAPHY.sectionDescriptor, runtime.theme.softText, 3, 2);
   drawParagraph(cursor.page, runtime.boldFont, codeText, PDF_V2_TOKENS.margin + 14, cursor.y - 50 - descriptionHeight, contentWidth() - 28, 12, runtime.theme.primary, 3, 2);
   cursor.y -= height + PDF_V2_TOKENS.sectionGap;
+}
+
+function measureComplianceBlockHeight(runtime: PdfV2Runtime) {
+  const descriptionHeight = measureParagraphHeight(runtime.regularFont, runtime.model.compliance.description, contentWidth() - 28, PDF_V2_TYPOGRAPHY.sectionDescriptor, 3, 2);
+  const codeText = runtime.model.compliance.codes.join(" â€¢ ");
+  const codeHeight = measureParagraphHeight(runtime.boldFont, codeText, contentWidth() - 28, 12, 3, 2);
+  return 20 + descriptionHeight + codeHeight + 18 + PDF_V2_TOKENS.sectionGap;
 }
 
 function renderOutcomeCards(runtime: PdfV2Runtime, cursor: PageCursor) {
@@ -65,6 +86,19 @@ function renderOutcomeCards(runtime: PdfV2Runtime, cursor: PageCursor) {
     drawParagraph(cursor.page, runtime.boldFont, card.value, x + 12, cursor.y - 36, width - 24, PDF_V2_TYPOGRAPHY.metricValue, valueColor, 3, 2);
   });
   cursor.y -= height + PDF_V2_TOKENS.sectionGap;
+}
+
+function measureOutcomeCardsHeight() {
+  return 68 + PDF_V2_TOKENS.sectionGap;
+}
+
+function measureMetadataGridHeight(runtime: PdfV2Runtime, title: string, description: string, items: RenderKeyValueRow[]) {
+  const titleHeight = title
+    ? 14 + measureParagraphHeight(runtime.regularFont, description, contentWidth(), PDF_V2_TYPOGRAPHY.sectionDescriptor, 3, 3) + 8
+    : 0;
+  const rows = Math.ceil(items.length / 2);
+  const gridHeight = Math.max(rows, 1) * 38;
+  return titleHeight + gridHeight + PDF_V2_TOKENS.sectionGap;
 }
 
 function renderMetadataGrid(runtime: PdfV2Runtime, cursor: PageCursor, title: string, description: string, items: RenderKeyValueRow[]) {
@@ -114,12 +148,28 @@ function renderSystemSummary(runtime: PdfV2Runtime, cursor: PageCursor) {
 }
 
 export function renderPageOneV2(runtime: PdfV2Runtime, cursor: PageCursor) {
-  cursor = ensureSpace(runtime, cursor, 470);
+  cursor = ensureSpace(runtime, cursor, measureIdentityBandHeight(runtime));
   renderIdentityBand(runtime, cursor);
+
+  cursor = ensureSpace(runtime, cursor, measureComplianceBlockHeight(runtime));
   renderComplianceBlock(runtime, cursor);
+
+  cursor = ensureSpace(runtime, cursor, measureOutcomeCardsHeight());
   renderOutcomeCards(runtime, cursor);
-  renderMetadataGrid(runtime, cursor, "Customer and Service Context", "Customer, site, technician, and completion context for this report.", runtime.model.primaryFacts);
-  renderMetadataGrid(runtime, cursor, "Inspection Overview", "Operational context and service details captured for this visit.", runtime.model.overviewFacts);
+
+  const customerContextTitle = "Customer and Service Context";
+  const customerContextDescription = "Customer, site, technician, and completion context for this report.";
+  cursor = ensureSpace(runtime, cursor, measureMetadataGridHeight(runtime, customerContextTitle, customerContextDescription, runtime.model.primaryFacts));
+  renderMetadataGrid(runtime, cursor, customerContextTitle, customerContextDescription, runtime.model.primaryFacts);
+
+  const inspectionOverviewTitle = "Inspection Overview";
+  const inspectionOverviewDescription = "Operational context and service details captured for this visit.";
+  cursor = ensureSpace(runtime, cursor, measureMetadataGridHeight(runtime, inspectionOverviewTitle, inspectionOverviewDescription, runtime.model.overviewFacts));
+  renderMetadataGrid(runtime, cursor, inspectionOverviewTitle, inspectionOverviewDescription, runtime.model.overviewFacts);
+
+  if (runtime.model.systemSummary?.renderer === "keyValue") {
+    cursor = ensureSpace(runtime, cursor, measureMetadataGridHeight(runtime, runtime.model.systemSummary.title, runtime.model.systemSummary.description ?? "", runtime.model.systemSummary.items.slice(0, 6)));
+  }
   renderSystemSummary(runtime, cursor);
   return cursor;
 }

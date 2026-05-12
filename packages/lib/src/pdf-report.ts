@@ -1052,6 +1052,26 @@ function renderKeyValueGrid(
   state.y -= totalHeight + 28;
 }
 
+function measureKeyValueGridBlockHeight(items: KeyValueRow[], regularFont: PDFFont, columns = 2) {
+  const filtered = items.filter((item) => isMeaningful(item.value));
+  const rows = filtered.length > 0 ? filtered : [{ label: "Details", value: DEFAULT_EMPTY_COPY }];
+  const gap = CARD_GAP;
+  const columnWidth = (CONTENT_WIDTH - gap * (columns - 1)) / columns;
+  const heights = rows.map((row) => 34 + measureParagraphHeight(regularFont, row.value, columnWidth - 20, 10, 3, 3));
+  const totalRows = Math.ceil(rows.length / columns);
+  const rowHeights = Array.from({ length: totalRows }, (_, rowIndex) => {
+    const slice = heights.slice(rowIndex * columns, rowIndex * columns + columns);
+    return Math.max(...slice, 54);
+  });
+  const totalHeight = rowHeights.reduce((sum, height) => sum + height, 0) + gap * Math.max(totalRows - 1, 0);
+
+  return totalHeight + 28;
+}
+
+function measureSectionTitleHeight(title: string, subtitle: string | undefined, regularFont: PDFFont) {
+  return 22 + (subtitle ? measureParagraphHeight(regularFont, subtitle, CONTENT_WIDTH - 12, 8.5, 3, 3) + 6 : 0);
+}
+
 function firstValue(row: Record<string, unknown>, keys: string[]) {
   for (const key of keys) {
     const normalized = normalizeDisplayValue(row[key] as ReportPrimitiveValue | undefined);
@@ -1349,16 +1369,52 @@ function renderPageOne(
   regularFont: PDFFont,
   logoEmbedded: PDFImage | null
 ) {
+  state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 180);
   renderIdentityBand(state, input, pageOneConfig, theme, boldFont, regularFont);
+
+  state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 90);
   renderComplianceStandards(state, pageOneConfig.compliance, theme, boldFont, regularFont);
+
+  state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 92);
   renderKpiStrip(state, preview, input, pageOneConfig.outcomeSummary.metrics, theme, boldFont, regularFont);
 
-  drawSectionTitle(state, "Customer and Service Context", "Customer, site, technician, and completion context for this report.", theme, boldFont, regularFont);
-  renderInspectionOverview(state, input, pageOneConfig.primaryFacts.fields, pageOneConfig.primaryFacts.layout, theme, boldFont, regularFont);
+  const customerContextSubtitle = "Customer, site, technician, and completion context for this report.";
+  const customerContextFacts = buildSummaryFacts(input, pageOneConfig.primaryFacts.fields);
+  const customerContextColumns = pageOneConfig.primaryFacts.layout === "stacked" ? 1 : 2;
+  state = ensureSpace(
+    state,
+    pdfDoc,
+    input,
+    branding,
+    theme,
+    boldFont,
+    regularFont,
+    logoEmbedded,
+    measureSectionTitleHeight("Customer and Service Context", customerContextSubtitle, regularFont)
+      + measureKeyValueGridBlockHeight(customerContextFacts, regularFont, customerContextColumns)
+      + 12
+  );
+  drawSectionTitle(state, "Customer and Service Context", customerContextSubtitle, theme, boldFont, regularFont);
+  renderKeyValueGrid(state, customerContextFacts, theme, boldFont, regularFont, customerContextColumns);
 
-  state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 160);
-  drawSectionTitle(state, "Inspection Overview", "Operational context and service details captured for this visit.", theme, boldFont, regularFont);
-  renderSummaryContext(state, input, pageOneConfig.overviewFacts.fields, pageOneConfig.overviewFacts.layout, theme, boldFont, regularFont);
+  const inspectionOverviewSubtitle = "Operational context and service details captured for this visit.";
+  const overviewFacts = buildSummaryFacts(input, pageOneConfig.overviewFacts.fields);
+  const overviewColumns = pageOneConfig.overviewFacts.layout === "stacked" ? 1 : 2;
+  state = ensureSpace(
+    state,
+    pdfDoc,
+    input,
+    branding,
+    theme,
+    boldFont,
+    regularFont,
+    logoEmbedded,
+    measureSectionTitleHeight("Inspection Overview", inspectionOverviewSubtitle, regularFont)
+      + measureKeyValueGridBlockHeight(overviewFacts, regularFont, overviewColumns)
+      + 12
+  );
+  drawSectionTitle(state, "Inspection Overview", inspectionOverviewSubtitle, theme, boldFont, regularFont);
+  renderKeyValueGrid(state, overviewFacts, theme, boldFont, regularFont, overviewColumns);
 
   const systemSection = orderedSections.find(({ sectionConfig }) => sectionConfig.key === pageOneConfig.systemSummary.sectionKey || sectionConfig.sourceSectionId === pageOneConfig.systemSummary.sectionKey);
   if (!systemSection) {
@@ -1366,7 +1422,17 @@ function renderPageOne(
   }
 
   const compactItems = getScalarSectionItems(systemSection.templateSection, systemSection.draftSection);
-  state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 140);
+  state = ensureSpace(
+    state,
+    pdfDoc,
+    input,
+    branding,
+    theme,
+    boldFont,
+    regularFont,
+    logoEmbedded,
+    60 + measureKeyValueGridBlockHeight(compactItems, regularFont, pageOneConfig.systemSummary.mode === "compact-metrics" ? 4 : 2)
+  );
   renderCompactSystemSummary(
     state,
     compactItems,
@@ -1623,12 +1689,13 @@ async function renderWorkOrderReport(
   const descriptionOfWork = normalizeDisplayValue(getDraftSectionFieldValue(input, "work-performed", "descriptionOfWork") as ReportPrimitiveValue | undefined);
   const additionalNotes = normalizeDisplayValue(getDraftSectionFieldValue(input, "work-performed", "additionalNotes") as ReportPrimitiveValue | undefined);
 
+  state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 90);
   renderWorkOrderSummaryStrip(state, input, theme, boldFont, regularFont);
 
-  drawSectionTitle(state, "Summary", "Customer, site, technician, and job summary details for this work order visit.", theme, boldFont, regularFont);
+  const workOrderSummarySubtitle = "Customer, site, technician, and job summary details for this work order visit.";
   const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name);
   const customerFacingSiteAddress = formatServiceAddressLine(input);
-  renderKeyValueGrid(state, [
+  const workOrderSummaryFacts = [
     { label: "Customer", value: input.customerCompany.name },
     { label: "Site", value: customerFacingSiteName ?? "" },
     { label: "Site address", value: customerFacingSiteAddress },
@@ -1639,7 +1706,22 @@ async function renderWorkOrderReport(
     { label: "Jobsite hours", value: jobsiteHours },
     { label: "Follow-up required", value: followUpRequired },
     { label: "Work order ID", value: isMeaningful(workOrderNumber) ? workOrderNumber : input.report.id }
-  ], theme, boldFont, regularFont, 2);
+  ];
+  state = ensureSpace(
+    state,
+    pdfDoc,
+    input,
+    branding,
+    theme,
+    boldFont,
+    regularFont,
+    logoEmbedded,
+    measureSectionTitleHeight("Summary", workOrderSummarySubtitle, regularFont)
+      + measureKeyValueGridBlockHeight(workOrderSummaryFacts, regularFont, 2)
+      + 12
+  );
+  drawSectionTitle(state, "Summary", workOrderSummarySubtitle, theme, boldFont, regularFont);
+  renderKeyValueGrid(state, workOrderSummaryFacts, theme, boldFont, regularFont, 2);
 
   state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 120);
   drawSectionTitle(state, "Work performed", "This work order outlines the service work completed and any supporting notes captured during the visit.", theme, boldFont, regularFont);
