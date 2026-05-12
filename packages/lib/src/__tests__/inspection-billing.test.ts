@@ -2112,15 +2112,30 @@ describe("inspection billing persistence and admin review", () => {
           inspectionDate: new Date("2026-03-20T15:00:00.000Z"),
           technicianName: "Alex Turner",
           status: "draft",
+          pricingSnapshot: null,
           subtotal: 0,
           notes: null,
-          items: extractBillableItemsFromDraft({
-            tenantId: "tenant_1",
-            inspectionId: "inspection_1",
-            reportId: "report_1",
-            reportType: "kitchen_suppression",
-            draft: buildKitchenDraft()
-          })
+          items: [
+            {
+              id: "taxable_line",
+              tenantId: "tenant_1",
+              inspectionId: "inspection_1",
+              reportId: "report_1",
+              reportType: "kitchen_suppression",
+              category: "material",
+              description: "Wet chemical agent",
+              quantity: 1,
+              unitPrice: 100,
+              taxable: true
+            },
+            ...extractBillableItemsFromDraft({
+              tenantId: "tenant_1",
+              inspectionId: "inspection_1",
+              reportId: "report_1",
+              reportType: "kitchen_suppression",
+              draft: buildKitchenDraft()
+            })
+          ]
         }
       ])
       .mockResolvedValueOnce([
@@ -2134,6 +2149,7 @@ describe("inspection billing persistence and admin review", () => {
           inspectionDate: new Date("2026-03-20T15:00:00.000Z"),
           technicianName: "Alex Turner",
           status: "draft",
+          pricingSnapshot: null,
           subtotal: 0,
           notes: "Review pricing",
           items: extractBillableItemsFromDraft({
@@ -2151,7 +2167,10 @@ describe("inspection billing persistence and admin review", () => {
     ).rejects.toThrow(/only administrators/i);
 
     const summaries = await getAdminBillingSummaries({ userId: "office_1", role: "office_admin", tenantId: "tenant_1" });
-    expect(summaries[0]?.metrics.materialItemCount).toBe(3);
+    expect(summaries[0]?.metrics.materialItemCount).toBe(4);
+    expect(summaries[0]?.invoiceTotals.taxableSubtotal).toBe(100);
+    expect(summaries[0]?.invoiceTotals.taxTotal).toBe(8.25);
+    expect(summaries[0]?.invoiceTotals.totalDue).toBeGreaterThan(summaries[0]?.invoiceTotals.subtotalBeforeTax ?? 0);
 
     prismaMock.$queryRaw
       .mockResolvedValueOnce([

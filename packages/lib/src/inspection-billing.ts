@@ -3812,11 +3812,14 @@ export async function getAdminBillingSummaries(actor: ActorContext) {
 
   return displayRows.map((row) => {
     const items = normalizeExistingItems(row.items);
+    const invoiceTotals = readInvoiceTotalsSnapshot(row.pricingSnapshot)
+      ?? calculateInvoiceTotalsFromItems(items);
     const reportTypes = [...new Set(items.map((item) => item.reportType).filter((reportType) => reportType !== INSPECTION_LEVEL_REPORT_TYPE))];
     return {
       ...row,
       siteName: getCustomerFacingSiteLabel(row.siteName) ?? row.customerName,
       items,
+      invoiceTotals,
       reportTypes,
       metrics: buildSummaryMetrics(items)
     };

@@ -127,10 +127,15 @@ function SummaryQueueSection({
                       <span className="font-semibold text-slate-950">{summary.metrics.feeCount}</span>
                     </p>
                     <p className="text-sm text-slate-600">
-                      Subtotal:{" "}
+                      Total due:{" "}
                       <span className="font-semibold text-slate-950">
-                        {summary.subtotal > 0 ? `$${summary.subtotal.toFixed(2)}` : "Pending pricing"}
+                        {summary.invoiceTotals.totalDue > 0 ? `$${summary.invoiceTotals.totalDue.toFixed(2)}` : "Pending pricing"}
                       </span>
+                      {summary.invoiceTotals.taxTotal > 0 ? (
+                        <span className="mt-1 block text-xs text-slate-500">
+                          Subtotal ${summary.invoiceTotals.subtotalBeforeTax.toFixed(2)} + tax ${summary.invoiceTotals.taxTotal.toFixed(2)}
+                        </span>
+                      ) : null}
                     </p>
                   </div>
                 </div>
