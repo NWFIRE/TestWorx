@@ -2249,6 +2249,79 @@ describe("inspection billing persistence and admin review", () => {
     expect(detail?.notes).toBe("Review pricing");
   });
 
+  it("uses detail-page catalog pricing resolution for billing summary totals", async () => {
+    prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue({
+      id: "catalog_labor",
+      quickbooksItemId: "qb_labor",
+      name: "Fire Alarm - Annual Inspection",
+      sku: null,
+      itemType: "service",
+      rawJson: null,
+      unitPrice: 115,
+      taxable: true
+    });
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      {
+        id: "summary_1",
+        inspectionId: "inspection_1",
+        customerCompanyId: "customer_1",
+        customerName: "Willow View Church - Enid",
+        siteId: "site_1",
+        siteName: "Willow View Church",
+        inspectionDate: new Date("2026-04-15T16:30:00.000Z"),
+        inspectionClassification: "standard",
+        technicianName: "Paul Sanders",
+        status: "invoiced",
+        billingType: "standard",
+        billToAccountId: null,
+        billToName: null,
+        contractProfileId: null,
+        contractProfileName: null,
+        routingSnapshot: null,
+        pricingSnapshot: null,
+        groupingSnapshot: null,
+        attachmentSnapshot: null,
+        deliverySnapshot: null,
+        referenceSnapshot: null,
+        quickbooksSyncStatus: "synced",
+        quickbooksInvoiceId: "qb_invoice_1",
+        quickbooksInvoiceNumber: "TW2026-1001",
+        quickbooksConnectionMode: "live",
+        quickbooksSyncedAt: new Date("2026-05-06T19:00:00.000Z"),
+        quickbooksSendStatus: "not_sent",
+        quickbooksSentAt: null,
+        quickbooksSyncError: null,
+        quickbooksSendError: null,
+        subtotal: 80,
+        notes: null,
+        items: [
+          {
+            id: "labor_line",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_1",
+            reportId: "report_1",
+            reportType: "fire_alarm",
+            category: "labor",
+            description: "On-site labor",
+            quantity: 2,
+            unitPrice: null,
+            linkedCatalogItemId: "catalog_labor",
+            linkedQuickBooksItemId: "qb_labor",
+            taxable: true
+          }
+        ]
+      }
+    ]);
+
+    const summaries = await getAdminBillingSummaries({ userId: "office_1", role: "office_admin", tenantId: "tenant_1" });
+
+    expect(summaries[0]?.subtotal).toBe(80);
+    expect(summaries[0]?.items[0]?.unitPrice).toBe(115);
+    expect(summaries[0]?.invoiceTotals.subtotalBeforeTax).toBe(230);
+    expect(summaries[0]?.invoiceTotals.taxTotal).toBe(18.98);
+    expect(summaries[0]?.invoiceTotals.totalDue).toBe(248.98);
+  });
+
   it("locks invoiced billing summaries from note and line edits", async () => {
     prismaMock.$queryRaw
       .mockResolvedValueOnce([

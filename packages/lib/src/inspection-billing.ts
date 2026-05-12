@@ -2200,6 +2200,22 @@ function calculateInvoiceLineSnapshot(
   };
 }
 
+async function buildBillingDisplayItems(tenantId: string, items: BillableItem[]) {
+  return Promise.all(
+    items.map(async (item) => {
+      const catalogState = await buildBillingItemCatalogState(tenantId, item);
+      const resolvedUnitPrice = item.unitPrice ?? catalogState.currentMatch?.unitPrice ?? null;
+      return {
+        ...item,
+        unitPrice: resolvedUnitPrice,
+        amount: calculateAmount(item.quantity, resolvedUnitPrice),
+        currentCatalogMatch: catalogState.currentMatch,
+        suggestedCatalogMatches: catalogState.suggestedMatches
+      };
+    })
+  );
+}
+
 export function calculateInvoiceTotalsFromItems(
   items: BillableItem[],
   input: {
@@ -3718,7 +3734,7 @@ async function refreshBillingSummaryListRowForDisplay(
   if (row.status === "invoiced") {
     return {
       ...row,
-      items: normalizedItems
+      items: await buildBillingDisplayItems(tenantId, normalizedItems)
     };
   }
 
@@ -3747,12 +3763,12 @@ async function refreshBillingSummaryListRowForDisplay(
       referenceSnapshot: refreshed.referenceSnapshot,
       subtotal: refreshed.subtotal,
       notes: refreshed.notes,
-      items: refreshed.items
+      items: await buildBillingDisplayItems(tenantId, refreshed.items)
     };
   } catch {
     return {
       ...row,
-      items: normalizedItems
+      items: await buildBillingDisplayItems(tenantId, normalizedItems)
     };
   }
 }
@@ -3938,19 +3954,7 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
   ]);
 
   const items = normalizeExistingItems(row.items);
-  const itemsWithCatalogState = await Promise.all(
-    items.map(async (item) => {
-      const catalogState = await buildBillingItemCatalogState(tenantId, item);
-      const resolvedUnitPrice = item.unitPrice ?? catalogState.currentMatch?.unitPrice ?? null;
-      return {
-        ...item,
-        unitPrice: resolvedUnitPrice,
-        amount: calculateAmount(item.quantity, resolvedUnitPrice),
-        currentCatalogMatch: catalogState.currentMatch,
-        suggestedCatalogMatches: catalogState.suggestedMatches
-      };
-    })
-  );
+  const itemsWithCatalogState = await buildBillingDisplayItems(tenantId, items);
   const displayMinimumPricedSummary = row.status === "invoiced"
     ? {
         items: itemsWithCatalogState,
