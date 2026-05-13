@@ -515,7 +515,6 @@ export function CustomerManagementCard({
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const requestSequenceRef = useRef(0);
   const activeAbortRef = useRef<AbortController | null>(null);
   const pendingSearchTimeoutRef = useRef<number | null>(null);
@@ -523,14 +522,16 @@ export function CustomerManagementCard({
   const hydratedRef = useRef(false);
 
   useEffect(() => {
-    if (!isSearchFocused) {
-      setQueryInput(filters.query);
+    if (isLeavingCustomerListRef.current) {
+      return;
     }
+
+    setQueryInput(filters.query);
     setCustomerRows(customers);
     setCustomerPagination(pagination);
     setActiveQuery(filters.query);
     hydratedRef.current = true;
-  }, [customers, filters.query, isSearchFocused, pagination]);
+  }, [customers, filters.query, pagination]);
 
   useEffect(() => {
     if (createState.error || createState.success || notice) {
@@ -772,8 +773,6 @@ export function CustomerManagementCard({
             busy={isLoadingResults}
             onChange={(event) => setQueryInput(event.target.value)}
             onClear={clearSearch}
-            onBlur={() => setIsSearchFocused(false)}
-            onFocus={() => setIsSearchFocused(true)}
             onKeyDown={handleSearchKeyDown}
             placeholder="Search customer name, contact, billing email, or phone"
             value={queryInput}
