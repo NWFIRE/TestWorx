@@ -14,7 +14,6 @@ import {
   allowsMultipleInspectionTasks,
   formatBillingPricingSourceLabel,
   formatBillingResolutionModeLabel,
-  formatWorkOrderProviderSourceLabel,
   getAdminDashboardData,
   getAdminInspectionPdfAttachments,
   getDefaultInspectionRecurrenceFrequency,
@@ -27,7 +26,7 @@ import {
   isDueAtTimeOfServiceCustomer
 } from "@testworx/lib/server/index";
 
-import { amendInspectionAction, deleteInspectionAction, regenerateCompletedReportPdfAction, reopenCompletedReportAction, updateInspectionAction, updateInspectionBillingSourceTypeAction, updateInspectionStatusAdminAction } from "../../actions";
+import { amendInspectionAction, deleteInspectionAction, regenerateCompletedReportPdfAction, reopenCompletedReportAction, updateInspectionAction, updateInspectionStatusAdminAction } from "../../actions";
 import { AdminReportDeleteButton } from "../../admin-report-delete-button";
 import { DeleteInspectionCard } from "../../delete-inspection-card";
 import { InspectionExternalDocumentsCard } from "../../inspection-external-documents-card";
@@ -453,9 +452,7 @@ export default async function EditInspectionPage({
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">Provider context</p>
               <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
-                {providerContext
-                  ? "This work order already carries a billing snapshot from the assigned provider context."
-                  : "No provider snapshot is attached, so this work order resolves to direct customer billing unless an explicit override is applied later."}
+                This inspection resolves to direct customer billing. Third-party provider billing has been removed from active workflows.
               </p>
             </div>
             {inspectionView.billingSummary?.billingResolutionSnapshot ? (
@@ -464,22 +461,6 @@ export default async function EditInspectionPage({
                 tone={inspectionView.billingSummary.billingResolutionSnapshot.resolvedMode === "contract_provider" ? "emerald" : "slate"}
               />
             ) : null}
-          </div>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <form action={updateInspectionBillingSourceTypeAction}>
-              <input name="inspectionId" type="hidden" value={inspection.id} />
-              <input name="sourceType" type="hidden" value="direct" />
-              <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" type="submit">
-                Bill direct customer
-              </button>
-            </form>
-            <form action={updateInspectionBillingSourceTypeAction}>
-              <input name="inspectionId" type="hidden" value={inspection.id} />
-              <input name="sourceType" type="hidden" value="third_party_provider" />
-              <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-50" disabled={!providerContext} type="submit">
-                Use snapped provider billing
-              </button>
-            </form>
           </div>
           {billingResolutionMetadata?.warnings?.length ? (
             <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
@@ -499,7 +480,7 @@ export default async function EditInspectionPage({
           <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-2xl border border-slate-200 bg-white p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Source type</p>
-              <p className="mt-2 text-sm font-semibold text-ink">{formatWorkOrderProviderSourceLabel(providerContext?.sourceType ?? inspection.sourceType)}</p>
+              <p className="mt-2 text-sm font-semibold text-ink">Direct</p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Provider</p>

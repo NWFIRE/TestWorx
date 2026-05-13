@@ -286,23 +286,14 @@ export const customerCompanyInputSchema = z
       }
     }
 
-    const parsedBilling = customerBillingSettingsInputSchema.safeParse({
-      billingType: input.billingType,
-      billToAccountId: input.billToAccountId,
-      contractProfileId: input.contractProfileId,
-      invoiceDeliverySettings: input.invoiceDeliverySettings,
-      autoBillingEnabled: input.autoBillingEnabled,
-      requiredBillingReferences: input.requiredBillingReferences
+    customerBillingSettingsInputSchema.parse({
+      billingType: "standard",
+      billToAccountId: undefined,
+      contractProfileId: undefined,
+      invoiceDeliverySettings: { method: "customer_email" },
+      autoBillingEnabled: false,
+      requiredBillingReferences: {}
     });
-
-    if (!parsedBilling.success) {
-      const firstIssue = parsedBilling.error.issues[0];
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: firstIssue?.path ?? ["billingType"],
-        message: firstIssue?.message ?? "Invalid billing settings."
-      });
-    }
   });
 
 function normalizeCustomerCompanyInput(input: z.infer<typeof customerCompanyInputSchema>) {
@@ -311,12 +302,12 @@ function normalizeCustomerCompanyInput(input: z.infer<typeof customerCompanyInpu
   const customPaymentTermsLabel = paymentTermsCode === "custom" ? input.customPaymentTermsLabel ?? null : null;
   const customPaymentTermsDays = paymentTermsCode === "custom" ? input.customPaymentTermsDays ?? null : null;
   const billingSettings = customerBillingSettingsInputSchema.parse({
-    billingType: input.billingType ?? "standard",
-    billToAccountId: input.billToAccountId ?? undefined,
-    contractProfileId: input.contractProfileId ?? undefined,
-    invoiceDeliverySettings: input.invoiceDeliverySettings ?? { method: "payer_email" },
-    autoBillingEnabled: input.autoBillingEnabled ?? false,
-    requiredBillingReferences: input.requiredBillingReferences ?? {}
+    billingType: "standard",
+    billToAccountId: undefined,
+    contractProfileId: undefined,
+    invoiceDeliverySettings: { method: "customer_email" },
+    autoBillingEnabled: false,
+    requiredBillingReferences: {}
   });
 
   return {

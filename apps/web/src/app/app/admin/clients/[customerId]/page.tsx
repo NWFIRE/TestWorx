@@ -1,12 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import {
-  getClientProfileData,
-  getContractProviderAssignmentOptions,
-  getTenantBillingContractProfiles,
-  getTenantBillingPayerAccounts
-} from "@testworx/lib/server/index";
+import { getClientProfileData } from "@testworx/lib/server/index";
 
 import { AppPageShell, PageHeader, SectionCard } from "../../operations-ui";
 import { ClientProfileWorkspace } from "../client-profile-workspace";
@@ -37,12 +32,8 @@ export default async function ClientProfilePage({
     role: session.user.role,
     tenantId: session.user.tenantId
   };
-  const [data, payerAccounts, contractProfiles, providerOptions] = await Promise.all([
-    getClientProfileData(actor, customerId),
-    getTenantBillingPayerAccounts(actor),
-    getTenantBillingContractProfiles(actor),
-    getContractProviderAssignmentOptions(actor)
-  ]);
+  const data = await getClientProfileData(actor, customerId);
+  const providerOptions = { providers: [] as Array<{ id: string; name: string; status: string; contracts: Array<{ id: string; name: string }> }> };
 
   if (!data) {
     notFound();
@@ -112,7 +103,7 @@ export default async function ClientProfilePage({
           </div>
           <form action={updateCustomerCompanyProfileAction} className="space-y-4">
             <input name="customerCompanyId" type="hidden" value={data.customer.id} />
-            <CustomerProfileFields contractProfiles={contractProfiles} customer={customerSeed} formIdPrefix={`customer-profile-${data.customer.id}`} payerAccounts={payerAccounts} />
+            <CustomerProfileFields customer={customerSeed} formIdPrefix={`customer-profile-${data.customer.id}`} />
             {customerNotice ? <p className="text-sm text-slateblue">{customerNotice}</p> : null}
             <div className="flex flex-wrap gap-3">
               <button className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white" type="submit">
@@ -133,6 +124,7 @@ export default async function ClientProfilePage({
         </SectionCard>
       ) : null}
 
+      <div className="hidden" data-removed-section="third-party-site-provider-billing">
       <SectionCard>
         <div className="mb-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
@@ -230,6 +222,7 @@ export default async function ClientProfilePage({
           ))}
         </div>
       </SectionCard>
+      </div>
 
       <ClientProfileWorkspace data={data} />
 

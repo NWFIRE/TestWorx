@@ -81,22 +81,19 @@ function buildCustomerCompanyPayload(formData: FormData) {
       const raw = String(formData.get("customPaymentTermsDays") ?? "").trim();
       return raw ? Number(raw) : undefined;
     })(),
-    billingType: String(formData.get("billingType") ?? "standard"),
-    billToAccountId: String(formData.get("billToAccountId") ?? ""),
-    contractProfileId: String(formData.get("contractProfileId") ?? ""),
+    billingType: "standard",
+    billToAccountId: "",
+    contractProfileId: "",
     invoiceDeliverySettings: {
-      method: String(formData.get("invoiceDeliveryMethod") ?? "payer_email"),
-      recipientEmail: String(formData.get("invoiceDeliveryRecipientEmail") ?? ""),
-      label: String(formData.get("invoiceDeliveryLabel") ?? "")
+      method: "customer_email",
+      recipientEmail: "",
+      label: ""
     },
-    autoBillingEnabled: formData.get("autoBillingEnabled") === "on",
+    autoBillingEnabled: false,
     requiredBillingReferences: {
-      requirePo: formData.get("requirePo") === "on",
-      requireCustomerReference: formData.get("requireCustomerReference") === "on",
-      labels: String(formData.get("requiredReferenceLabels") ?? "")
-        .split(",")
-        .map((value) => value.trim())
-        .filter(Boolean)
+      requirePo: false,
+      requireCustomerReference: false,
+      labels: []
     }
   };
 }

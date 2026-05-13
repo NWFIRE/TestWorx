@@ -102,8 +102,6 @@ type CustomerManagementCardProps = {
     formData: FormData
   ) => Promise<{ error: string | null; success: string | null; customerCompanyId?: string | null }>;
   notice?: string | null;
-  payerAccounts: BillingPayerOption[];
-  contractProfiles: BillingContractOption[];
 };
 
 type CustomerFormValues = {
@@ -169,16 +167,16 @@ function toFormValues(customer?: CustomerProfileSeed): CustomerFormValues {
     paymentTermsCode: customer?.paymentTermsCode ?? "net_30",
     customPaymentTermsLabel: customer?.customPaymentTermsLabel ?? "",
     customPaymentTermsDays: customer?.customPaymentTermsDays ? String(customer.customPaymentTermsDays) : "",
-    billingType: customer?.billingType ?? "standard",
-    billToAccountId: customer?.billToAccountId ?? "",
-    contractProfileId: customer?.contractProfileId ?? "",
-    invoiceDeliveryMethod: customer?.invoiceDeliveryMethod ?? "payer_email",
-    invoiceDeliveryRecipientEmail: customer?.invoiceDeliveryRecipientEmail ?? "",
-    invoiceDeliveryLabel: customer?.invoiceDeliveryLabel ?? "",
-    autoBillingEnabled: customer?.autoBillingEnabled ?? false,
-    requirePo: customer?.requirePo ?? false,
-    requireCustomerReference: customer?.requireCustomerReference ?? false,
-    requiredReferenceLabels: customer?.requiredReferenceLabels?.join(", ") ?? ""
+    billingType: "standard",
+    billToAccountId: "",
+    contractProfileId: "",
+    invoiceDeliveryMethod: "customer_email",
+    invoiceDeliveryRecipientEmail: "",
+    invoiceDeliveryLabel: "",
+    autoBillingEnabled: false,
+    requirePo: false,
+    requireCustomerReference: false,
+    requiredReferenceLabels: ""
   };
 }
 
@@ -204,27 +202,23 @@ function CustomerFieldGroup({
 
 export function CustomerProfileFields({
   customer,
-  formIdPrefix,
-  payerAccounts,
-  contractProfiles
+  formIdPrefix
 }: {
   customer?: CustomerProfileSeed;
   formIdPrefix: string;
-  payerAccounts: BillingPayerOption[];
-  contractProfiles: BillingContractOption[];
 }) {
   const [billingAddressSameAsService, setBillingAddressSameAsService] = useState(
     customer?.billingAddressSameAsService ?? true
   );
   const [paymentTermsCode, setPaymentTermsCode] = useState(customer?.paymentTermsCode ?? "net_30");
   const initialValues = useMemo(() => toFormValues(customer), [customer]);
-  const [billingType, setBillingType] = useState<"standard" | "third_party">(initialValues.billingType);
-  const [billToAccountId, setBillToAccountId] = useState(initialValues.billToAccountId);
+  const [billingType, setBillingType] = useState<"standard" | "third_party">("standard");
+  const setBillToAccountId = (_value: string) => {
+    void _value;
+  };
+  const payerAccounts: BillingPayerOption[] = [];
+  const availableContractProfiles: BillingContractOption[] = [];
   const showCustomTerms = paymentTermsCode === "custom";
-  const availableContractProfiles = useMemo(
-    () => contractProfiles.filter((profile) => !billToAccountId || !profile.payerAccountId || profile.payerAccountId === billToAccountId),
-    [billToAccountId, contractProfiles]
-  );
 
   return (
     <div className="space-y-4">
@@ -405,10 +399,7 @@ export function CustomerProfileFields({
         </div>
       </CustomerFieldGroup>
 
-      <CustomerFieldGroup
-        title="Third-party billing"
-        description="Route invoices through a bill-to payer and contract profile when this customer is serviced under another company’s contract."
-      >
+      <div className="hidden" data-removed-section="third-party-billing">
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-billingType`}>Billing type</label>
@@ -495,7 +486,14 @@ export function CustomerProfileFields({
             <p className="mt-2 text-xs text-slate-500">Comma-separated customer-facing labels shown during billing review.</p>
           </div>
         </div>
-      </CustomerFieldGroup>
+      </div>
+      <input name="billingType" type="hidden" value="standard" />
+      <input name="billToAccountId" type="hidden" value="" />
+      <input name="contractProfileId" type="hidden" value="" />
+      <input name="invoiceDeliveryMethod" type="hidden" value="customer_email" />
+      <input name="invoiceDeliveryRecipientEmail" type="hidden" value="" />
+      <input name="invoiceDeliveryLabel" type="hidden" value="" />
+      <input name="requiredReferenceLabels" type="hidden" value="" />
     </div>
   );
 }
@@ -505,9 +503,7 @@ export function CustomerManagementCard({
   pagination,
   filters,
   createCustomerAction,
-  notice,
-  payerAccounts,
-  contractProfiles
+  notice
 }: CustomerManagementCardProps) {
   const [createState, createFormAction, createPending] = useActionState(createCustomerAction, initialState);
   const pathname = usePathname();
@@ -684,7 +680,7 @@ export function CustomerManagementCard({
 
         {isCreateOpen ? (
           <form action={createFormAction} className="mt-5 space-y-4 border-t border-slate-200 pt-5">
-            <CustomerProfileFields contractProfiles={contractProfiles} formIdPrefix="create-customer" payerAccounts={payerAccounts} />
+            <CustomerProfileFields formIdPrefix="create-customer" />
             {createState.error ? <p className="text-sm text-rose-600">{createState.error}</p> : null}
             {createState.success ? <p className="text-sm text-emerald-600">{createState.success}</p> : null}
             {createState.success && createState.customerCompanyId ? (

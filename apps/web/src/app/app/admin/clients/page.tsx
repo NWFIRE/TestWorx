@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import { auth } from "@/auth";
-import { getPaginatedTenantCustomerCompanyDirectory, getTenantBillingContractProfiles, getTenantBillingPayerAccounts } from "@testworx/lib/server/index";
+import { getPaginatedTenantCustomerCompanyDirectory } from "@testworx/lib/server/index";
 
 import { AppPageShell, KPIStatCard, PageHeader } from "../operations-ui";
 import { CustomerManagementCard } from "../settings/customer-management-card";
@@ -47,15 +47,11 @@ export default async function ClientsPage({
       ? decodeURIComponent(params.customers)
       : null;
 
-  const [data, payerAccounts, contractProfiles] = await Promise.all([
-    getPaginatedTenantCustomerCompanyDirectory(actor, {
+  const data = await getPaginatedTenantCustomerCompanyDirectory(actor, {
       page: customersPage,
       limit: 10,
       query: customersQuery
-    }),
-    getTenantBillingPayerAccounts(actor),
-    getTenantBillingContractProfiles(actor)
-  ]);
+    });
 
   return (
     <AppPageShell density="wide">
@@ -107,8 +103,6 @@ export default async function ClientsPage({
         filters={data.filters}
         notice={customerNotice}
         pagination={data.pagination}
-        payerAccounts={payerAccounts}
-        contractProfiles={contractProfiles}
       />
     </AppPageShell>
   );

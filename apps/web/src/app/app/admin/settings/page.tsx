@@ -6,10 +6,8 @@ import { auth } from "@/auth";
 import {
   canManageBilling,
   getPaginatedTenantComplianceReportingFeeSettings,
-  getTenantBillingContractProfiles,
   getQuickBooksItemMappingSettings,
   getTenantMinimumTicketPricingSettings,
-  getTenantBillingPayerAccounts,
   getPaginatedTenantServiceFeeSettings,
   getTenantBillingSettings,
   getTenantBrandingSettings,
@@ -21,8 +19,6 @@ import { BrandLoader } from "@/app/brand-loader";
 import { getAppNavItemsForRole } from "../../app-nav-config";
 
 import {
-  createBillingContractProfileAction,
-  createBillingPayerAccountAction,
   createComplianceReportingFeeRuleAction,
   createServiceFeeRuleAction,
   deleteComplianceReportingFeeRuleAction,
@@ -35,8 +31,6 @@ import {
   saveQuickBooksItemMappingAction,
   clearQuickBooksItemMappingAction,
   syncQuickBooksCustomersActionState,
-  updateBillingContractProfileAction,
-  updateBillingPayerAccountAction,
   openBillingPortalAction,
   startQuickBooksConnectAction,
   startBillingCheckoutAction,
@@ -47,8 +41,6 @@ import {
   updateTenantSidebarOrderAction
 } from "./actions";
 import { BillingPlansSection } from "./billing-plans-section";
-import { BillingContractProfileSettingsCard } from "./billing-contract-profile-settings-card";
-import { BillingPayerSettingsCard } from "./billing-payer-settings-card";
 import { ComplianceReportingFeeSettingsCard } from "./compliance-reporting-fee-settings-card";
 import { MinimumTicketPricingSettingsCard } from "./minimum-ticket-pricing-settings-card";
 import { QuickBooksItemMappingCard } from "./quickbooks-item-mapping-card";
@@ -339,12 +331,10 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   const complianceFeePage = readPositiveInt(readSearchParam(params, "complianceFeePage", "1"), 1);
   const complianceFeeEditor = readSearchParam(params, "complianceFeeEditor") || null;
 
-  const [billingSettings, brandingSettings, quickBooksSettings, payerAccounts, contractProfiles] = await Promise.all([
+  const [billingSettings, brandingSettings, quickBooksSettings] = await Promise.all([
     getTenantBillingSettings(actor),
     getTenantBrandingSettings(actor),
-    getTenantQuickBooksConnectionSettings(actor),
-    getTenantBillingPayerAccounts(actor),
-    getTenantBillingContractProfiles(actor)
+    getTenantQuickBooksConnectionSettings(actor)
   ]);
   const canManageSubscription = canManageBilling(session.user.role);
   const quickBooksNotice = Array.isArray(params.quickbooks)
@@ -356,18 +346,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   const complianceFeesOpen = isSectionOpen(params, "complianceFeesOpen");
   const minimumTicketOpen = isSectionOpen(params, "minimumTicketOpen");
   const mappingsOpen = isSectionOpen(params, "mappingsOpen", quickBooksNotice);
-  const payerAccountsNotice = Array.isArray(params.billingPayers)
-    ? params.billingPayers[0]
-    : typeof params.billingPayers === "string"
-      ? decodeURIComponent(params.billingPayers)
-      : null;
-  const contractProfilesNotice = Array.isArray(params.billingContracts)
-    ? params.billingContracts[0]
-    : typeof params.billingContracts === "string"
-      ? decodeURIComponent(params.billingContracts)
-      : null;
-  const payerAccountsOpen = isSectionOpen(params, "payerAccountsOpen", payerAccountsNotice);
-  const contractProfilesOpen = isSectionOpen(params, "contractProfilesOpen", contractProfilesNotice);
   const sidebarItems = getAppNavItemsForRole(session.user.role, session.user.allowances ?? null)
     .filter((item) => item.href !== "/app/platform")
     .map((item) => ({
@@ -446,37 +424,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
           />
         </div>
         <div className="space-y-6">
-          <SettingsDisclosureCard
-            description="Create the external bill-to entities invoices can route through without turning serviced customers into billing-account exceptions."
-            eyebrow="Third-party payer accounts"
-            initialOpen={payerAccountsOpen}
-            openLabel="Open payer accounts"
-            queryKey="payerAccountsOpen"
-            title="Bill-to payer accounts"
-          >
-            <BillingPayerSettingsCard
-              createAction={createBillingPayerAccountAction}
-              notice={payerAccountsNotice}
-              payers={payerAccounts}
-              updateAction={updateBillingPayerAccountAction}
-            />
-          </SettingsDisclosureCard>
-          <SettingsDisclosureCard
-            description="Configure reusable effective-dated contract profiles with structured rule buckets for pricing overrides, delivery behavior, and required references."
-            eyebrow="Contract profiles"
-            initialOpen={contractProfilesOpen}
-            openLabel="Open contract profiles"
-            queryKey="contractProfilesOpen"
-            title="Third-party contract profiles"
-          >
-            <BillingContractProfileSettingsCard
-              createAction={createBillingContractProfileAction}
-              notice={contractProfilesNotice}
-              payerOptions={payerAccounts.map((payer) => ({ id: payer.id, name: payer.name }))}
-              profiles={contractProfiles}
-              updateAction={updateBillingContractProfileAction}
-            />
-          </SettingsDisclosureCard>
           <SettingsDisclosureCard
             description="Review stored QuickBooks item ids for each internal billing code, fix inactive references, and confirm suggested matches without loading the full section until you need it."
             eyebrow="QuickBooks item mappings"

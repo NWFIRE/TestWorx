@@ -4577,12 +4577,6 @@ export async function syncBillingSummaryToQuickBooks(
   }
 
   const deliverySnapshot = (summary.deliverySnapshot ?? {}) as Record<string, unknown>;
-  const blockingIssueCode = typeof deliverySnapshot.blockingIssueCode === "string"
-    ? deliverySnapshot.blockingIssueCode
-    : null;
-  if (blockingIssueCode === "provider_contract_expired") {
-    throw new Error("This billing summary is tied to an expired provider contract. Update the contract or override billing before syncing.");
-  }
 
   if (summary.quickbooksInvoiceId && isVerifiedQuickBooksSyncStatus(summary.quickbooksSyncStatus)) {
     throw new Error("This billing summary has already been synced to QuickBooks.");
@@ -4608,49 +4602,7 @@ export async function syncBillingSummaryToQuickBooks(
   }
 
   try {
-    const payerAccount = summary.billingType === "third_party" && summary.billToAccountId
-      ? summary.payerType === "provider"
-        ? await prisma.contractProviderAccount.findFirst({
-            where: {
-              id: summary.billToAccountId,
-              organizationId: parsedActor.tenantId as string
-            },
-            select: {
-              id: true,
-              name: true,
-              billingEmail: true,
-              billingPhone: true,
-              remittanceAddressLine1: true,
-              remittanceAddressLine2: true,
-              remittanceCity: true,
-              remittanceState: true,
-              remittancePostalCode: true,
-              notes: true
-            }
-          })
-        : await prisma.billingPayerAccount.findFirst({
-            where: {
-              id: summary.billToAccountId,
-              tenantId: parsedActor.tenantId as string
-            }
-          })
-      : null;
-
-    const customerId = payerAccount
-      ? await resolveQuickBooksPayerAccount(tenant, {
-          payerAccountId: payerAccount.id,
-          payerName: payerAccount.name,
-          billingEmail: payerAccount.billingEmail ?? null,
-          phone: "billingPhone" in payerAccount ? payerAccount.billingPhone ?? null : payerAccount.phone,
-          billingAddressLine1: "remittanceAddressLine1" in payerAccount ? payerAccount.remittanceAddressLine1 ?? null : payerAccount.billingAddressLine1,
-          billingAddressLine2: "remittanceAddressLine2" in payerAccount ? payerAccount.remittanceAddressLine2 ?? null : payerAccount.billingAddressLine2,
-          billingCity: "remittanceCity" in payerAccount ? payerAccount.remittanceCity ?? null : payerAccount.billingCity,
-          billingState: "remittanceState" in payerAccount ? payerAccount.remittanceState ?? null : payerAccount.billingState,
-          billingPostalCode: "remittancePostalCode" in payerAccount ? payerAccount.remittancePostalCode ?? null : payerAccount.billingPostalCode,
-          billingCountry: "billingCountry" in payerAccount ? payerAccount.billingCountry : null,
-          notes: "externalReference" in payerAccount ? payerAccount.externalReference : payerAccount.notes
-        })
-      : await resolveQuickBooksCustomer(tenant, {
+    const customerId = await resolveQuickBooksCustomer(tenant, {
           customerCompanyId: summary.customerCompanyId,
           customerName: summary.customerCompany.name,
           billingEmail: summary.customerCompany.billingEmail,
@@ -4667,7 +4619,7 @@ export async function syncBillingSummaryToQuickBooks(
 
     const sendToEmail = typeof deliverySnapshot.recipientEmail === "string" && deliverySnapshot.recipientEmail.trim().length > 0
       ? deliverySnapshot.recipientEmail.trim()
-      : payerAccount?.billingEmail ?? summary.customerCompany.billingEmail;
+      : summary.customerCompany.billingEmail;
 
     const itemRefCache = new Map<string, { qbItemId: string; qbItemName: string; taxable: boolean }>();
     const invoiceLines = [] as QuickBooksInvoiceLinePayload[];
@@ -5638,12 +5590,6 @@ export async function sendQuickBooksInvoice(
   }
 
   const deliverySnapshot = (summary.deliverySnapshot ?? {}) as Record<string, unknown>;
-  const blockingIssueCode = typeof deliverySnapshot.blockingIssueCode === "string"
-    ? deliverySnapshot.blockingIssueCode
-    : null;
-  if (blockingIssueCode === "provider_contract_expired") {
-    throw new Error("This billing summary is tied to an expired provider contract. Update the contract or override billing before sending.");
-  }
 
   if (!summary.quickbooksInvoiceId || !isVerifiedQuickBooksSyncStatus(summary.quickbooksSyncStatus)) {
     throw new Error("Sync and verify this billing summary in QuickBooks before sending it.");
@@ -5652,26 +5598,9 @@ export async function sendQuickBooksInvoice(
     throw new Error(`This billing summary was synced in QuickBooks ${summary.quickbooksConnectionMode ? formatQuickBooksConnectionModeLabel(summary.quickbooksConnectionMode as QuickBooksConnectionMode) : "Unknown"}. Re-sync it in ${connectionStatus.appModeLabel} mode before sending.`);
   }
 
-  const payerAccount = summary.billToAccountId
-    ? summary.payerType === "provider"
-      ? await prisma.contractProviderAccount.findFirst({
-          where: {
-            id: summary.billToAccountId,
-            organizationId: parsedActor.tenantId as string
-          },
-          select: { billingEmail: true }
-        })
-      : await prisma.billingPayerAccount.findFirst({
-          where: {
-            id: summary.billToAccountId,
-            tenantId: parsedActor.tenantId as string
-          },
-          select: { billingEmail: true }
-        })
-    : null;
   const billingEmail = typeof deliverySnapshot.recipientEmail === "string" && deliverySnapshot.recipientEmail.trim().length > 0
     ? deliverySnapshot.recipientEmail.trim()
-    : payerAccount?.billingEmail ?? summary.customerCompany.billingEmail;
+    : summary.customerCompany.billingEmail;
 
   return sendQuickBooksInvoiceForSummary({
     parsedActor,

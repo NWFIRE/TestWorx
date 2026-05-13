@@ -6,7 +6,6 @@ import { auth } from "@/auth";
 import {
   formatBillingPricingSourceLabel,
   formatBillingResolutionModeLabel,
-  formatWorkOrderProviderSourceLabel,
   getAdminBillingSummaryDetail,
   getTenantQuickBooksConnectionStatus
 } from "@testworx/lib/server/index";
@@ -559,7 +558,7 @@ export default async function BillingSummaryDetailPage({
                 <p className="mt-3 text-sm text-slate-600">Bill-to payer</p>
                 <p className="text-base font-semibold text-ink">{summary.billToName ?? summary.customerName}</p>
                 <p className="mt-3 text-sm text-slate-600">Contract profile</p>
-                <p className="text-base font-semibold text-ink">{summary.contractProfileName ?? "No third-party contract"}</p>
+                <p className="text-base font-semibold text-ink">Not used</p>
                 <p className="mt-3 text-sm text-slate-600">Auto billing eligible</p>
                 <p className="text-base font-semibold text-ink">{routingSnapshot?.autoBillingEnabled ? "Yes, future-ready" : "No, manual review only"}</p>
               </div>
@@ -580,26 +579,15 @@ export default async function BillingSummaryDetailPage({
             </div>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Provider work order context</p>
-                <p className="mt-3 text-sm text-slate-600">Source type</p>
-                <p className="text-base font-semibold text-ink">{formatWorkOrderProviderSourceLabel(summary.providerContext?.sourceType ?? "direct")}</p>
-                <p className="mt-3 text-sm text-slate-600">Provider</p>
-                <p className="text-base font-semibold text-ink">{summary.providerContext?.providerAccount?.name ?? "Direct customer"}</p>
-                <p className="mt-3 text-sm text-slate-600">Provider work order #</p>
-                <p className="text-base font-semibold text-ink">{summary.providerContext?.providerWorkOrderNumber ?? "Not captured"}</p>
-                <p className="mt-3 text-sm text-slate-600">Provider reference</p>
-                <p className="text-base font-semibold text-ink">{summary.providerContext?.providerReferenceNumber ?? "Not captured"}</p>
-              </div>
-              <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Billing resolution snapshot</p>
                 <p className="mt-3 text-sm text-slate-600">Bill To</p>
-                <p className="text-base font-semibold text-ink">{summary.billingResolution?.payerProviderAccount?.name ?? summary.billingResolution?.payerCustomer?.name ?? summary.billToName ?? summary.customerName}</p>
+                <p className="text-base font-semibold text-ink">{summary.billingResolution?.payerCustomer?.name ?? summary.billToName ?? summary.customerName}</p>
                 <p className="mt-3 text-sm text-slate-600">Resolved mode</p>
                 <p className="text-base font-semibold text-ink">{summary.billingResolution ? formatBillingResolutionModeLabel(summary.billingResolution.resolvedMode) : "Not resolved yet"}</p>
                 <p className="mt-3 text-sm text-slate-600">Pricing source</p>
                 <p className="text-base font-semibold text-ink">{summary.billingResolution ? formatBillingPricingSourceLabel(summary.billingResolution.pricingSource) : "Pending resolution"}</p>
                 <p className="mt-3 text-sm text-slate-600">Contract used</p>
-                <p className="text-base font-semibold text-ink">{summary.billingResolution?.providerContractProfile?.name ?? summary.contractProfileName ?? "No contract profile"}</p>
+                <p className="text-base font-semibold text-ink">Not used</p>
                 <p className="mt-3 text-sm text-slate-600">Resolution reason</p>
                 <p className="text-base font-semibold text-ink">{summary.billingResolution?.resolutionReason ?? "No resolution reason recorded yet."}</p>
                 <p className="mt-3 text-sm text-slate-600">Work-order override</p>

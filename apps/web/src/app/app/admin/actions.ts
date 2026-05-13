@@ -1263,9 +1263,9 @@ export async function sendQuickBooksInvoiceAction(formData: FormData) {
 export async function updateInspectionBillingSourceTypeAction(formData: FormData) {
   const session = await auth();
   const inspectionId = String(formData.get("inspectionId") ?? "");
-  const sourceType = String(formData.get("sourceType") ?? "");
+  const sourceType = "direct";
 
-  if (!session?.user?.tenantId || !inspectionId || (sourceType !== "direct" && sourceType !== "third_party_provider")) {
+  if (!session?.user?.tenantId || !inspectionId) {
     return;
   }
 

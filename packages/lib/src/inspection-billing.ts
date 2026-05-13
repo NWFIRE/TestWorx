@@ -3051,7 +3051,6 @@ async function resolveBillingOutcomeTx(
     tenantId: input.tenantId,
     inspectionId: input.inspectionId
   });
-  const billingDate = new Date();
   const hasDeficiencyWork = input.reportTypes.includes("work_order");
   const hasServiceWork = input.items.some((item) => item.category === "labor" || item.category === "service");
   const serviceType = input.inspectionClassification === "emergency"
@@ -3061,173 +3060,16 @@ async function resolveBillingOutcomeTx(
       : hasServiceWork
         ? "service"
         : "inspection";
-  const shouldUseProviderBilling = inspection.sourceType === "third_party_provider" && Boolean(inspection.providerContext);
-
-  if (shouldUseProviderBilling && inspection.providerContext) {
-    const providerAccount = inspection.providerContext.providerAccount;
-    const providerAccountId = inspection.providerContext.providerAccountId ?? providerAccount?.id ?? null;
-    if (!providerAccountId || !providerAccount || providerAccount.status !== "active") {
-      throw new Error("Third-party provider work orders require an active provider account.");
-    }
-
-    const contractResolution = await resolveProviderContractProfileTx(tx, {
-      tenantId: input.tenantId,
-      providerContext: inspection.providerContext,
-      billingDate
-    });
-    const contractProfile = contractResolution.profile;
-    const providerRate = contractProfile && contractResolution.contractResolutionStatus === "active"
-      ? await resolveProviderContractRateTx(tx, {
-          providerContractProfileId: contractProfile.id,
-          billingDate,
-          serviceType,
-          reportTypes: input.reportTypes,
-          items: input.items
-        })
-      : null;
-    const fallbackPricing = resolvePricingFallback({ items: input.items });
-    const pricedItems = providerRate ? applyProviderContractRateToItems(input.items, providerRate) : input.items;
-    const pricingSource = providerRate ? "provider_contract_rate" : fallbackPricing.pricingSource;
-    const pricingSourceReferenceId = providerRate ? providerRate.id : fallbackPricing.pricingSourceReferenceId;
-    const warnings = [
-      ...(contractResolution.warning ? [contractResolution.warning] : []),
-      ...(!providerRate
-        ? [
-            contractProfile
-              ? `No matching provider contract rate was found, so pricing fell back to ${fallbackPricing.pricingSource.replaceAll("_", " ")}.`
-              : "No active provider contract profile was found, so pricing fell back to the next available pricing source."
-          ]
-        : [])
-    ];
-    const warningCodes = [
-      ...(contractResolution.warningCode ? [contractResolution.warningCode] : []),
-      ...(!providerRate ? ["provider_rate_missing" as const] : [])
-    ];
-    const monthlyGroupingDeferred = contractProfile?.invoiceGroupingMode === "monthly_rollup";
-    const manualReviewRequired = true;
-    const blockingIssueCode = contractResolution.blockingIssueCode;
-    const resolutionReason = providerRate
-      ? `Resolved to contract provider billing for ${providerAccount.name} using contract rate ${providerRate.id}.`
-      : `Resolved to contract provider billing for ${providerAccount.name}; ${fallbackPricing.resolutionReason}`;
-    const routingSnapshot = {
-      billToAccountId: providerAccountId,
-      billToName: providerAccount.name,
-      quickbooksCustomerId: null,
-      autoBillingEnabled: true,
-      sourceType: inspection.providerContext.sourceType,
-      providerWorkOrderNumber: inspection.providerContext.providerWorkOrderNumber,
-      providerReferenceNumber: inspection.providerContext.providerReferenceNumber
-    } satisfies JsonValue;
-    const pricingSnapshot = {
-      source: pricingSource,
-      sourceReferenceId: pricingSourceReferenceId,
-      serviceType,
-      pricingMethod: providerRate?.pricingMethod ?? null,
-      providerRateId: providerRate?.id ?? null,
-      providerMinimumTicketRuleMode: contractProfile?.minimumTicketRuleMode ?? "organization_default",
-      contractResolutionStatus: contractResolution.contractResolutionStatus,
-      warningCodes,
-      warnings
-    } satisfies JsonValue;
-    const groupingSnapshot = mapProviderGroupingMode(contractProfile?.invoiceGroupingMode ?? "per_work_order");
-    const attachmentSnapshot = {
-      requireFinalizedReport: true,
-      requireSignedDocument: false,
-      requiredDocumentLabels: []
-    } satisfies JsonValue;
-    const deliverySnapshot = {
-      holdForManualReview: manualReviewRequired,
-      method: "manual",
-      recipientEmail: null,
-      blockingIssueCode,
-      warnings,
-      warningCodes,
-      contractResolutionStatus: contractResolution.contractResolutionStatus,
-      monthlyGroupingDeferred,
-      manualReviewRequired
-    } satisfies JsonValue;
-    const referenceLabels = [
-      ...(contractProfile?.requireProviderWorkOrderNumber ? ["Provider work order number"] : []),
-      ...(contractProfile?.requireSiteReferenceNumber ? ["Site reference number"] : [])
-    ];
-    const referenceSnapshot = {
-      requirePo: contractProfile?.requireProviderWorkOrderNumber ?? false,
-      requireCustomerReference: contractProfile?.requireSiteReferenceNumber ?? false,
-      labels: referenceLabels
-    } satisfies JsonValue;
-    const snapshotData = JSON.stringify({
-      resolvedMode: "contract_provider",
-      payerProviderAccountId: providerAccountId,
-      providerContractProfileId: contractProfile?.id ?? null,
-      siteProviderAssignmentId: inspection.providerContext.siteProviderAssignmentId ?? null,
-      pricingSource,
-      pricingSourceReferenceId,
-      resolutionReason,
-      warningCodes,
-      warnings,
-      blockingIssueCode,
-      manualReviewRequired,
-      contractResolutionStatus: contractResolution.contractResolutionStatus,
-      monthlyGroupingDeferred,
-      workOrderLevelOverride: false,
-      routingSnapshot,
-      pricingSnapshot
-    });
-
-    return {
-      billingType: "third_party",
-      payerType: "provider",
-      payerCustomerId: null,
-      payerProviderAccountId: providerAccountId,
-      billToAccountId: providerAccountId,
-      billToName: providerAccount.name,
-      contractProfileId: contractProfile?.id ?? null,
-      contractProfileName: contractProfile?.name ?? null,
-      routingSnapshot,
-      pricingSnapshot,
-      groupingSnapshot,
-      attachmentSnapshot,
-      deliverySnapshot,
-      referenceSnapshot,
-      resolutionSnapshot: {
-        resolvedMode: "contract_provider",
-        pricingSource,
-        pricingSourceReferenceId,
-        providerContractProfileId: contractProfile?.id ?? null,
-        siteProviderAssignmentId: inspection.providerContext.siteProviderAssignmentId ?? null,
-        payerCustomerId: null,
-        payerProviderAccountId: providerAccountId,
-        resolutionReason,
-        snapshotData
-      },
-      items: pricedItems
-    };
-  }
-
   const fallbackPricing = resolvePricingFallback({ items: input.items });
-  const directWarnings = [
-    ...(inspection.providerContext && inspection.sourceType === "direct"
-      ? ["Provider context exists on this work order, but billing was intentionally overridden to direct customer billing."]
-      : []),
-    ...(!inspection.providerContext && inspection.sourceType === "third_party_provider"
-      ? ["No provider snapshot was attached to this work order, so billing defaulted to the direct customer."]
-      : [])
-  ];
-  const directWarningCodes = [
-    ...(inspection.providerContext && inspection.sourceType === "direct"
-      ? ["provider_context_override_direct" as const]
-      : []),
-    ...(!inspection.providerContext && inspection.sourceType === "third_party_provider"
-      ? ["provider_context_missing" as const]
-      : [])
-  ];
+  const directWarnings: string[] = [];
+  const directWarningCodes: string[] = [];
   const routingSnapshot = {
     billToAccountId: null,
     billToName: inspection.customerCompanyName,
     quickbooksCustomerId: inspection.customerQuickbooksCustomerId,
     autoBillingEnabled: false,
-    sourceType: inspection.sourceType,
-    workOrderLevelOverride: inspection.providerContext ? inspection.sourceType === "direct" : false
+    sourceType: "direct",
+    workOrderLevelOverride: false
   } satisfies JsonValue;
   const pricingSnapshot = {
     source: fallbackPricing.pricingSource,
@@ -3271,7 +3113,7 @@ async function resolveBillingOutcomeTx(
     manualReviewRequired: false,
     contractResolutionStatus: "not_applicable",
     monthlyGroupingDeferred: false,
-    workOrderLevelOverride: inspection.providerContext ? inspection.sourceType === "direct" : false,
+    workOrderLevelOverride: false,
     routingSnapshot,
     pricingSnapshot
   });
@@ -3451,7 +3293,10 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
         select: { id: true }
       })
     : null;
-  const existingResolvedSummary = existing && existingResolutionSnapshot
+  const existingResolvedSummary = existing
+    && existingResolutionSnapshot
+    && existing.billingType === "standard"
+    && existing.payerType === "customer"
     ? existing
     : null;
   const billingResolution = existingResolvedSummary
@@ -3505,8 +3350,9 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
   const pricedItems = minimumPricedSummary.items;
   const subtotal = minimumPricedSummary.subtotal;
   const pricingSnapshot = minimumPricedSummary.pricingSnapshot;
-  const billingResolutionSnapshotId = existingResolutionSnapshot?.id
-    ?? (
+  const billingResolutionSnapshotId = existingResolvedSummary && existingResolutionSnapshot?.id
+    ? existingResolutionSnapshot.id
+    : (
       await db.billingResolutionSnapshot.create({
         data: {
           organizationId: input.tenantId,
@@ -3567,7 +3413,7 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
       "payerType" = EXCLUDED."payerType",
       "payerCustomerId" = EXCLUDED."payerCustomerId",
       "payerProviderAccountId" = EXCLUDED."payerProviderAccountId",
-      "billingResolutionSnapshotId" = COALESCE("InspectionBillingSummary"."billingResolutionSnapshotId", EXCLUDED."billingResolutionSnapshotId"),
+      "billingResolutionSnapshotId" = EXCLUDED."billingResolutionSnapshotId",
       "billToAccountId" = EXCLUDED."billToAccountId",
       "billToName" = EXCLUDED."billToName",
       "contractProfileId" = EXCLUDED."contractProfileId",

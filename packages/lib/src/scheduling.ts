@@ -2333,74 +2333,15 @@ async function snapshotProviderAssignmentForInspectionTx(
     scheduledStart: Date;
   }
 ) {
-  const existingContext = await tx.workOrderProviderContext.findFirst({
-    where: { workOrderId: input.inspectionId },
-    select: { id: true }
-  });
-
-  if (existingContext) {
-    await tx.inspection.update({
-      where: { id: input.inspectionId },
-      data: {
-        providerContextId: existingContext.id
-      }
-    });
-    return existingContext.id;
-  }
-
-  const assignment = await tx.serviceSiteProviderAssignment.findFirst({
-    where: {
-      organizationId: input.tenantId,
-      serviceSiteId: input.siteId,
-      status: "active",
-      OR: [
-        { effectiveStartDate: null },
-        { effectiveStartDate: { lte: input.scheduledStart } }
-      ],
-      AND: [
-        {
-          OR: [
-            { effectiveEndDate: null },
-            { effectiveEndDate: { gte: input.scheduledStart } }
-          ]
-        }
-      ]
-    },
-    orderBy: [
-      { effectiveStartDate: "desc" },
-      { updatedAt: "desc" }
-    ],
-    select: {
-      id: true,
-      providerAccountId: true,
-      providerContractProfileId: true
-    }
-  });
-
-  if (!assignment) {
-    return null;
-  }
-
-  const providerContext = await tx.workOrderProviderContext.create({
-    data: {
-      workOrderId: input.inspectionId,
-      providerAccountId: assignment.providerAccountId,
-      providerContractProfileId: assignment.providerContractProfileId,
-      siteProviderAssignmentId: assignment.id,
-      sourceType: "third_party_provider"
-    },
-    select: { id: true }
-  });
-
   await tx.inspection.update({
     where: { id: input.inspectionId },
     data: {
-      providerContextId: providerContext.id,
-      sourceType: "third_party_provider"
+      providerContextId: null,
+      sourceType: "direct"
     }
   });
 
-  return providerContext.id;
+  return null;
 }
 
 export async function updateInspectionBillingSourceType(
@@ -2433,20 +2374,11 @@ export async function updateInspectionBillingSourceType(
     throw new Error("Inspection not found.");
   }
 
-  const providerContextId = inspection.providerContextId
-    ?? inspection.providerContextRecord?.id
-    ?? inspection.providerContextSnapshot?.id
-    ?? null;
-
-  if (input.sourceType === "third_party_provider" && !providerContextId) {
-    throw new Error("This work order does not have a provider snapshot to use for third-party billing.");
-  }
-
   return prisma.inspection.update({
     where: { id: inspection.id },
     data: {
-      sourceType: input.sourceType,
-      providerContextId
+      sourceType: "direct",
+      providerContextId: null
     },
     select: {
       id: true,
