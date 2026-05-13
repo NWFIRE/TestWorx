@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { KeyboardEvent, ReactNode } from "react";
 
 import { BrandLoader } from "@/app/brand-loader";
@@ -507,6 +507,7 @@ export function CustomerManagementCard({
 }: CustomerManagementCardProps) {
   const [createState, createFormAction, createPending] = useActionState(createCustomerAction, initialState);
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [queryInput, setQueryInput] = useState(filters.query);
   const [customerRows, setCustomerRows] = useState(customers);
@@ -666,6 +667,11 @@ export function CustomerManagementCard({
     cancelPendingCustomerSearch();
   }, [cancelPendingCustomerSearch]);
 
+  const openCustomerProfile = useCallback((customerId: string) => {
+    prepareCustomerProfileNavigation();
+    router.push(`/app/admin/clients/${encodeURIComponent(customerId)}`);
+  }, [prepareCustomerProfileNavigation, router]);
+
   function clearSearch() {
     setQueryInput("");
     setSearchError(null);
@@ -731,13 +737,14 @@ export function CustomerManagementCard({
                 >
                   Send welcome email
                 </Link>
-                <Link
+                <button
                   className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue transition hover:border-slate-300 hover:bg-slate-50"
-                  href={`/app/admin/clients/${encodeURIComponent(createState.customerCompanyId)}`}
-                  onClick={prepareCustomerProfileNavigation}
+                  onClick={() => openCustomerProfile(createState.customerCompanyId as string)}
+                  onMouseDown={(event) => event.preventDefault()}
+                  type="button"
                 >
                   Open profile
-                </Link>
+                </button>
               </div>
             ) : null}
             {notice ? <p className="text-sm text-slateblue">{notice}</p> : null}
@@ -797,13 +804,14 @@ export function CustomerManagementCard({
                   <p className="text-lg font-semibold text-ink">{customer.name}</p>
                   <p className="mt-1 text-sm text-slate-500">Open the profile to view contact details, locations, billing, and customer history.</p>
                 </div>
-                <Link
+                <button
                   className="pressable inline-flex min-h-10 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slateblue transition hover:border-slate-300 hover:bg-slate-50"
-                  href={`/app/admin/clients/${encodeURIComponent(customer.id)}`}
-                  onClick={prepareCustomerProfileNavigation}
+                  onClick={() => openCustomerProfile(customer.id)}
+                  onMouseDown={(event) => event.preventDefault()}
+                  type="button"
                 >
                   Open profile
-                </Link>
+                </button>
               </div>
             </div>
           ))
