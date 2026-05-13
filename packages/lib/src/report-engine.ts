@@ -197,8 +197,30 @@ const reportScalarFieldValueSchema = z.union([z.string(), z.number(), z.boolean(
 const reportRepeaterRowSchema = z.record(reportScalarFieldValueSchema);
 const reportFieldValueSchema = z.union([reportScalarFieldValueSchema, z.array(reportRepeaterRowSchema)]);
 
+const reportSectionStatusSchema = z.preprocess((value) => {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (["complete", "completed", "finalized", "signed"].includes(normalized)) {
+    return "pass";
+  }
+  if (["needs_attention", "needs-review", "needs_review", "review"].includes(normalized)) {
+    return "attention";
+  }
+  if (["failed", "deficiency"].includes(normalized)) {
+    return "fail";
+  }
+  if (["in_progress", "in-progress", "draft", "not_started"].includes(normalized)) {
+    return "pending";
+  }
+
+  return value;
+}, z.enum(["pass", "attention", "fail", "pending"]));
+
 export const reportSectionStateSchema = z.object({
-  status: z.enum(["pass", "attention", "fail", "pending"]).default("pending"),
+  status: reportSectionStatusSchema.default("pending"),
   notes: z.string().max(MAX_SECTION_NOTES_LENGTH).default(""),
   fields: z.record(reportFieldValueSchema).default({})
 });
