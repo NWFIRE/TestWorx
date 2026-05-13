@@ -518,6 +518,8 @@ export function CustomerManagementCard({
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const requestSequenceRef = useRef(0);
   const activeAbortRef = useRef<AbortController | null>(null);
+  const pendingSearchTimeoutRef = useRef<number | null>(null);
+  const isLeavingCustomerListRef = useRef(false);
   const hydratedRef = useRef(false);
 
   useEffect(() => {
@@ -537,6 +539,10 @@ export function CustomerManagementCard({
   }, [createState.error, createState.success, notice]);
 
   const cancelPendingCustomerSearch = useCallback(() => {
+    if (pendingSearchTimeoutRef.current !== null) {
+      window.clearTimeout(pendingSearchTimeoutRef.current);
+      pendingSearchTimeoutRef.current = null;
+    }
     requestSequenceRef.current += 1;
     activeAbortRef.current?.abort();
     activeAbortRef.current = null;
@@ -544,6 +550,10 @@ export function CustomerManagementCard({
   }, []);
 
   const syncCustomersUrl = useCallback((page: number, query: string) => {
+    if (isLeavingCustomerListRef.current) {
+      return;
+    }
+
     if (window.location.pathname !== pathname) {
       return;
     }
@@ -561,6 +571,10 @@ export function CustomerManagementCard({
   }, [pathname, searchParams]);
 
   const loadCustomers = useCallback(async (page: number, nextQuery: string) => {
+    if (isLeavingCustomerListRef.current) {
+      return;
+    }
+
     const trimmedQuery = nextQuery.trim();
     const sequence = requestSequenceRef.current + 1;
     requestSequenceRef.current = sequence;
@@ -621,16 +635,35 @@ export function CustomerManagementCard({
       return;
     }
 
-    const timeout = window.setTimeout(() => {
+    if (pendingSearchTimeoutRef.current !== null) {
+      window.clearTimeout(pendingSearchTimeoutRef.current);
+      pendingSearchTimeoutRef.current = null;
+    }
+
+    pendingSearchTimeoutRef.current = window.setTimeout(() => {
+      pendingSearchTimeoutRef.current = null;
       void loadCustomers(1, normalizedQuery);
     }, LIVE_SEARCH_DEBOUNCE_MS);
 
-    return () => window.clearTimeout(timeout);
+    return () => {
+      if (pendingSearchTimeoutRef.current !== null) {
+        window.clearTimeout(pendingSearchTimeoutRef.current);
+        pendingSearchTimeoutRef.current = null;
+      }
+    };
   }, [activeQuery, loadCustomers, queryInput]);
 
   useEffect(() => () => {
+    if (pendingSearchTimeoutRef.current !== null) {
+      window.clearTimeout(pendingSearchTimeoutRef.current);
+    }
     activeAbortRef.current?.abort();
   }, []);
+
+  const prepareCustomerProfileNavigation = useCallback(() => {
+    isLeavingCustomerListRef.current = true;
+    cancelPendingCustomerSearch();
+  }, [cancelPendingCustomerSearch]);
 
   function clearSearch() {
     setQueryInput("");
@@ -700,7 +733,7 @@ export function CustomerManagementCard({
                 <Link
                   className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue transition hover:border-slate-300 hover:bg-slate-50"
                   href={`/app/admin/clients/${encodeURIComponent(createState.customerCompanyId)}`}
-                  onClick={cancelPendingCustomerSearch}
+                  onClick={prepareCustomerProfileNavigation}
                 >
                   Open profile
                 </Link>
@@ -767,8 +800,8 @@ export function CustomerManagementCard({
                 </div>
                 <Link
                   className="pressable inline-flex min-h-10 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slateblue transition hover:border-slate-300 hover:bg-slate-50"
-                  href={`/app/admin/clients/${customer.id}`}
-                  onClick={cancelPendingCustomerSearch}
+                  href={`/app/admin/clients/${encodeURIComponent(customer.id)}`}
+                  onClick={prepareCustomerProfileNavigation}
                 >
                   Open profile
                 </Link>
