@@ -6,7 +6,7 @@ import { auth } from "@/auth";
 import { getCustomerIntakeWorkspace } from "@testworx/lib/server/index";
 
 import { AppPageShell, KPIStatCard, PageHeader, SectionCard, StatusBadge } from "../operations-ui";
-import { sendCustomerIntakeFormAction } from "./actions";
+import { resendCustomerIntakeFormAction, sendCustomerIntakeFormAction } from "./actions";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -43,6 +43,10 @@ function statusTone(status: string) {
 
 function titleCase(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function canResend(status: string) {
+  return status === "sent" || status === "expired";
 }
 
 export default async function CustomerIntakesPage({
@@ -155,9 +159,8 @@ export default async function CustomerIntakesPage({
               const contactName = typeof submitted?.primaryContactName === "string" ? submitted.primaryContactName : request.recipientName;
               const requestedServiceType = typeof submitted?.requestedServiceType === "string" ? submitted.requestedServiceType : "Not submitted yet";
               return (
-                <Link
-                  className="block rounded-[24px] border border-slate-200 bg-slate-50/70 p-4 transition hover:border-[var(--tenant-primary)] hover:bg-white"
-                  href={`/app/admin/customer-intakes/${request.id}`}
+                <div
+                  className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4 transition hover:border-[var(--tenant-primary)] hover:bg-white"
                   key={request.id}
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -173,7 +176,24 @@ export default async function CustomerIntakesPage({
                     <span>Submitted: {formatDate(request.submittedAt)}</span>
                     <span>Files: {request.attachments.length}</span>
                   </div>
-                </Link>
+                  <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                    <Link
+                      className="inline-flex min-h-10 flex-1 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-[var(--tenant-primary)] hover:text-[var(--tenant-primary)]"
+                      href={`/app/admin/customer-intakes/${request.id}`}
+                    >
+                      Open intake
+                    </Link>
+                    {canResend(request.status) ? (
+                      <form action={resendCustomerIntakeFormAction} className="flex-1">
+                        <input name="intakeRequestId" type="hidden" value={request.id} />
+                        <input name="returnTo" type="hidden" value="list" />
+                        <button className="min-h-10 w-full rounded-2xl border border-sky-200 bg-sky-50 px-4 text-sm font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-sky-100" type="submit">
+                          Resend form
+                        </button>
+                      </form>
+                    ) : null}
+                  </div>
+                </div>
               );
             }) : (
               <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-[color:var(--text-muted)]">

@@ -10,7 +10,8 @@ import {
   createCustomerIntakeRequest,
   customerIntakeSendSchema,
   rejectCustomerIntakeRequest,
-  reopenCustomerIntakeRequest
+  reopenCustomerIntakeRequest,
+  resendCustomerIntakeRequest
 } from "@testworx/lib/server/index";
 
 type OfficeSession = {
@@ -91,6 +92,32 @@ export async function sendCustomerIntakeFormAction(formData: FormData) {
       throw error;
     }
     redirect(intakeHref({ error: error instanceof Error ? error.message : "Unable to send intake form." }));
+  }
+}
+
+export async function resendCustomerIntakeFormAction(formData: FormData) {
+  const session = requireOfficeSession(await auth());
+  const intakeRequestId = String(formData.get("intakeRequestId") ?? "").trim();
+  const returnTo = String(formData.get("returnTo") ?? "detail");
+  if (!intakeRequestId) {
+    redirect("/app/admin/customer-intakes");
+  }
+
+  const href = returnTo === "list" ? intakeHref : (values?: { notice?: string; error?: string }) => detailHref(intakeRequestId, values);
+
+  try {
+    const result = await resendCustomerIntakeRequest(actorFromSession(session), intakeRequestId);
+    revalidatePath("/app/admin/customer-intakes");
+    revalidatePath(`/app/admin/customer-intakes/${intakeRequestId}`);
+    const deliverySuffix = result.delivery.sent
+      ? " Email resent."
+      : ` Link refreshed, but email needs attention: ${result.delivery.error ?? "email is not configured."}`;
+    redirect(href({ notice: `Customer intake request resent.${deliverySuffix}` }));
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+    redirect(href({ error: error instanceof Error ? error.message : "Unable to resend intake form." }));
   }
 }
 

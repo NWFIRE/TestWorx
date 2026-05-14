@@ -456,6 +456,88 @@ export async function createCustomerIntakeRequest(actor: ActorContext, input: z.
   return { request, delivery };
 }
 
+export async function resendCustomerIntakeRequest(actor: ActorContext, intakeRequestId: string) {
+  const parsedActor = parseActor(actor);
+  ensureOfficeActor(parsedActor);
+  const tenantId = parsedActor.tenantId as string;
+  const request = await prisma.customerIntakeRequest.findFirst({
+    where: {
+      id: intakeRequestId,
+      organizationId: tenantId
+    },
+    include: {
+      organization: {
+        select: { id: true, name: true, billingEmail: true, branding: true }
+      }
+    }
+  });
+  if (!request) {
+    throw new Error("Customer intake request not found.");
+  }
+  if (request.status !== CustomerIntakeStatus.sent && request.status !== CustomerIntakeStatus.expired) {
+    throw new Error("Only sent or expired intake requests can be resent.");
+  }
+
+  const sender = await prisma.user.findFirst({
+    where: { id: parsedActor.userId, tenantId },
+    select: { name: true }
+  });
+  const token = createRawToken();
+  const expiresAt = addDays(new Date(), customerIntakeExpirationDays);
+  const branding = resolveTenantBranding({
+    tenantName: request.organization.name,
+    branding: request.organization.branding,
+    billingEmail: request.organization.billingEmail
+  });
+
+  await prisma.customerIntakeRequest.update({
+    where: { id: request.id },
+    data: {
+      tokenHash: hashToken(token),
+      status: CustomerIntakeStatus.sent,
+      sentAt: new Date(),
+      expiresAt
+    }
+  });
+
+  const delivery = await sendCustomerIntakeRequestEmail({
+    recipientEmail: request.recipientEmail,
+    recipientName: request.recipientName || "there",
+    tenantName: request.organization.name,
+    intakeUrl: buildIntakeUrl(token),
+    senderName: sender?.name ?? "TradeWorx",
+    optionalMessage: request.optionalMessage,
+    expiresAt,
+    branding: {
+      companyName: branding.legalBusinessName,
+      phone: branding.phone,
+      email: branding.email,
+      website: branding.website,
+      logoDataUrl: branding.logoDataUrl,
+      primaryColor: branding.primaryColor,
+      accentColor: branding.accentColor
+    }
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      tenantId,
+      actorUserId: parsedActor.userId,
+      action: "customer_intake.resent",
+      entityType: "CustomerIntakeRequest",
+      entityId: request.id,
+      metadata: {
+        recipientEmail: request.recipientEmail,
+        deliveryReason: delivery.reason,
+        deliveryError: delivery.error,
+        expiresAt: expiresAt.toISOString()
+      } as Prisma.InputJsonValue
+    }
+  });
+
+  return { requestId: request.id, delivery, expiresAt };
+}
+
 export async function getCustomerIntakeWorkspace(actor: ActorContext) {
   const parsedActor = parseActor(actor);
   ensureOfficeActor(parsedActor);

@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 import { getCustomerIntakeReview, serviceSystemTypeLabels } from "@testworx/lib/server/index";
 
 import { AppPageShell, PageHeader, SectionCard, StatusBadge } from "../../operations-ui";
-import { approveCustomerIntakeAction, rejectCustomerIntakeAction, reopenCustomerIntakeAction } from "../actions";
+import { approveCustomerIntakeAction, rejectCustomerIntakeAction, reopenCustomerIntakeAction, resendCustomerIntakeFormAction } from "../actions";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -42,6 +42,10 @@ function statusTone(status: string) {
 
 function titleCase(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function canResend(status: string) {
+  return status === "sent" || status === "expired";
 }
 
 function DetailField({
@@ -174,6 +178,17 @@ export default async function CustomerIntakeDetailPage({
               <p>Expires: {formatDate(request.expiresAt)}</p>
               <p>Created by: {request.createdBy.name}</p>
             </div>
+            {canResend(request.status) ? (
+              <form action={resendCustomerIntakeFormAction} className="mt-5">
+                <input name="intakeRequestId" type="hidden" value={request.id} />
+                <button className="btn-brand-primary min-h-12 w-full rounded-2xl px-4 text-sm font-semibold" type="submit">
+                  Resend Intake Form
+                </button>
+                <p className="mt-2 text-xs leading-5 text-[color:var(--text-muted)]">
+                  Refreshes the secure link, extends the expiration, and emails {request.recipientEmail}.
+                </p>
+              </form>
+            ) : null}
             {request.status === "submitted" ? (
               <div className="mt-5 space-y-3">
                 <form action={approveCustomerIntakeAction} className="space-y-3">
