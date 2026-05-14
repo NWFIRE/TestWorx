@@ -20,7 +20,7 @@ import {
   deleteStoredFile
 } from "./storage";
 
-const MAX_INSPECTION_DOCUMENT_BYTES = 12 * 1024 * 1024;
+const MAX_INSPECTION_DOCUMENT_BYTES = 50 * 1024 * 1024;
 const documentAnnotationSchema = z.object({
   version: z.literal(1),
   strokes: z.array(z.object({
@@ -387,7 +387,7 @@ export async function uploadInspectionDocument(actor: ActorContext, input: {
   }
 
   if (input.bytes.byteLength === 0 || input.bytes.byteLength > MAX_INSPECTION_DOCUMENT_BYTES) {
-    throw new Error("Inspection document uploads must be between 1 byte and 12 MB.");
+    throw new Error("Inspection document uploads must be between 1 byte and 50 MB.");
   }
 
   const payload = await buildStoredFilePayload({

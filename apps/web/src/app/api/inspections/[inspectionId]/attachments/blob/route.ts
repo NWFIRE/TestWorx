@@ -37,7 +37,7 @@ export async function POST(
 
         return {
           allowedContentTypes: ["application/pdf"],
-          maximumSizeInBytes: 12 * 1024 * 1024,
+          maximumSizeInBytes: 50 * 1024 * 1024,
           addRandomSuffix: false
         };
       },

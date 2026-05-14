@@ -1948,7 +1948,7 @@ export async function regenerateFinalizedReportPdf(actor: ActorContext, input: {
   return regenerated;
 }
 
-const MAX_UPLOADED_PDF_BYTES = 12 * 1024 * 1024;
+const MAX_UPLOADED_PDF_BYTES = 50 * 1024 * 1024;
 
 export async function uploadInspectionPdfAttachment(actor: ActorContext, input: {
   inspectionId: string;
@@ -1973,7 +1973,7 @@ export async function uploadInspectionPdfAttachment(actor: ActorContext, input: 
   }
 
   if (input.bytes.byteLength === 0 || input.bytes.byteLength > MAX_UPLOADED_PDF_BYTES) {
-    throw new Error("PDF uploads must be between 1 byte and 12 MB.");
+    throw new Error("PDF uploads must be between 1 byte and 50 MB.");
   }
 
   const inspection = await prisma.inspection.findFirst({

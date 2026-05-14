@@ -16,6 +16,25 @@ const statusClasses: Record<string, string> = {
   EXPORTED: "bg-sky-50 text-sky-700"
 };
 
+const MAX_INSPECTION_DOCUMENT_UPLOAD_BYTES = 50 * 1024 * 1024;
+const MAX_INSPECTION_DOCUMENT_UPLOAD_LABEL = "50 MB";
+
+function isPdfFile(file: File) {
+  return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+}
+
+function formatFileSize(bytes: number) {
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function normalizeUploadError(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (/file is too large|file length cannot be greater|maximumSizeInBytes/i.test(message)) {
+    return `This PDF is too large. Upload PDFs up to ${MAX_INSPECTION_DOCUMENT_UPLOAD_LABEL}, or compress/split the file and try again.`;
+  }
+  return message || "Unable to upload PDF.";
+}
+
 export function InspectionExternalDocumentsCard({
   inspectionId,
   documents,
@@ -52,6 +71,14 @@ export function InspectionExternalDocumentsCard({
     const file = formData.get("document");
     if (!(file instanceof File) || file.size === 0) {
       setError("Select a PDF to upload.");
+      return;
+    }
+    if (!isPdfFile(file)) {
+      setError(`${file.name} is not a PDF. Upload PDF files only.`);
+      return;
+    }
+    if (file.size > MAX_INSPECTION_DOCUMENT_UPLOAD_BYTES) {
+      setError(`${file.name} is ${formatFileSize(file.size)}. Upload PDFs up to ${MAX_INSPECTION_DOCUMENT_UPLOAD_LABEL}, or compress/split the file and try again.`);
       return;
     }
 
@@ -106,7 +133,7 @@ export function InspectionExternalDocumentsCard({
           router.refresh();
           form.reset();
         } catch (submitError) {
-          setError(submitError instanceof Error ? submitError.message : "Unable to upload PDF.");
+          setError(normalizeUploadError(submitError));
         }
       })();
     });
@@ -128,6 +155,7 @@ export function InspectionExternalDocumentsCard({
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="document">Upload PDF</label>
           <input accept="application/pdf" className="block w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" id="document" name="document" type="file" />
+          <p className="mt-2 text-xs text-slate-500">Maximum {MAX_INSPECTION_DOCUMENT_UPLOAD_LABEL} per PDF.</p>
         </div>
         <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
           <input className="h-5 w-5 rounded border-slate-300" defaultChecked name="requiresSignature" type="checkbox" />
