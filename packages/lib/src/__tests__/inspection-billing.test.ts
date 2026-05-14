@@ -222,6 +222,32 @@ describe("invoice totals", () => {
     expect(totals.taxTotal).toBe(1.5);
     expect(totals.totalDue).toBe(26.5);
   });
+
+  it("forces taxable lines to non-taxable for tax exempt customers", () => {
+    const totals = calculateInvoiceTotalsFromItems([
+      {
+        id: "taxable_part",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        reportId: "report_1",
+        reportType: "fire_extinguisher",
+        category: "material",
+        description: "Recharge parts",
+        quantity: 2,
+        unitPrice: 50,
+        amount: 100,
+        taxable: true,
+        taxableSource: "quickbooks",
+        quickBooksTaxableStatus: "taxable",
+        quickBooksTaxCodeRef: "TAX"
+      }
+    ], { defaultTaxRate: 0.0825, defaultTaxCodeId: "TAX", taxExempt: true });
+
+    expect(totals.taxableSubtotal).toBe(0);
+    expect(totals.nonTaxableSubtotal).toBe(100);
+    expect(totals.taxTotal).toBe(0);
+    expect(totals.totalDue).toBe(100);
+  });
 });
 
 function buildKitchenDraftForManufacturer(manufacturer: string) {

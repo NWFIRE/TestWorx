@@ -14,6 +14,14 @@ import type { JsonObject, JsonValue } from "./json-types";
 import { assertTenantContext, canAccessProductsServicesWorkspace } from "./permissions";
 import { resolveServiceFeeForLocationTx } from "./service-fees";
 import { getCustomerFacingSiteLabel } from "./scheduling";
+import {
+  calculateInvoiceTotalsFromItems,
+  calculateInvoiceLineSnapshot,
+  DEFAULT_QUICKBOOKS_NON_TAX_CODE_ID,
+  DEFAULT_QUICKBOOKS_TAX_CODE_ID,
+  roundMoney,
+  snapshotInvoiceLines
+} from "./billing-tax";
 
 type QuickBooksTokenResponse = {
   access_token: string;
@@ -98,6 +106,13 @@ type QuickBooksBillingSummary = {
     linkedCatalogItemName?: string | null;
     taxable?: boolean | null;
     taxableSource?: string | null;
+    lineSubtotal?: number | null;
+    discountAmount?: number | null;
+    taxCodeId?: string | null;
+    taxRate?: number | null;
+    taxAmount?: number | null;
+    lineTotal?: number | null;
+    metadata?: Record<string, unknown> | null;
     quickBooksTaxableStatus?: string | null;
     quickBooksTaxCodeRef?: string | null;
   }>;
@@ -3425,9 +3440,12 @@ function toQuickBooksInvoiceLine(input: {
   qbItemId: string;
   qbItemName?: string;
   taxable?: boolean;
+  taxCodeRef?: string | null;
 }) {
+  const taxCodeRef = input.taxCodeRef?.trim()
+    || (input.taxable ? DEFAULT_QUICKBOOKS_TAX_CODE_ID : DEFAULT_QUICKBOOKS_NON_TAX_CODE_ID);
   return {
-    Amount: input.amount,
+    Amount: roundMoney(input.amount),
     Description: input.description,
     DetailType: "SalesItemLineDetail",
     SalesItemLineDetail: {
@@ -3438,7 +3456,7 @@ function toQuickBooksInvoiceLine(input: {
         ...(input.qbItemName ? { name: input.qbItemName } : {})
       },
       TaxCodeRef: {
-        value: input.taxable ? "TAX" : "NON"
+        value: taxCodeRef
       }
     }
   };
@@ -4600,6 +4618,7 @@ export async function syncBillingSummaryToQuickBooks(
   if (normalizedSummary.items.length === 0) {
     throw new Error("There are no billing items to sync.");
   }
+  const taxExempt = summary.customerCompany.isTaxExempt === true;
 
   try {
     const customerId = await resolveQuickBooksCustomer(tenant, {
@@ -4623,6 +4642,7 @@ export async function syncBillingSummaryToQuickBooks(
 
     const itemRefCache = new Map<string, { qbItemId: string; qbItemName: string; taxable: boolean }>();
     const invoiceLines = [] as QuickBooksInvoiceLinePayload[];
+    const syncedItems = [] as QuickBooksBillingSummary["items"];
 
     for (const item of normalizedSummary.items) {
       const unitPrice = requirePrice({
@@ -4680,17 +4700,61 @@ export async function syncBillingSummaryToQuickBooks(
         }
         itemRefCache.set(cacheKey, resolvedItem);
       }
+      const resolvedTaxable = taxExempt
+        ? false
+        : item.taxableSource === "override"
+          ? item.taxable === true
+          : resolvedItem.taxable;
+      const taxCodeRef = resolvedTaxable
+        ? item.taxCodeId ?? item.quickBooksTaxCodeRef ?? DEFAULT_QUICKBOOKS_TAX_CODE_ID
+        : DEFAULT_QUICKBOOKS_NON_TAX_CODE_ID;
+      const lineSnapshot = calculateInvoiceLineSnapshot({
+        ...item,
+        taxable: resolvedTaxable,
+        taxCodeId: taxCodeRef,
+        unitPrice
+      }, { taxExempt });
+      syncedItems.push({
+        ...item,
+        unitPrice,
+        amount: lineSnapshot.lineSubtotal,
+        lineSubtotal: lineSnapshot.lineSubtotal,
+        discountAmount: lineSnapshot.discountAmount,
+        taxable: lineSnapshot.taxable,
+        taxCodeId: lineSnapshot.taxCodeId,
+        taxRate: lineSnapshot.taxRate,
+        taxAmount: lineSnapshot.taxAmount,
+        lineTotal: lineSnapshot.lineTotal,
+        metadata: {
+          ...(item.metadata ?? {}),
+          invoiceLineSnapshot: {
+            lineSubtotal: lineSnapshot.lineSubtotal,
+            discountAmount: lineSnapshot.discountAmount,
+            taxable: lineSnapshot.taxable,
+            taxCodeId: lineSnapshot.taxCodeId,
+            taxRate: lineSnapshot.taxRate,
+            taxAmount: lineSnapshot.taxAmount,
+            lineTotal: lineSnapshot.lineTotal,
+            calculationVersion: "invoice_totals_v1",
+            calculatedAt: new Date().toISOString(),
+            source: item.taxableSource === "override" ? "override" : "quickbooks_catalog",
+            taxExempt
+          }
+        }
+      });
 
       invoiceLines.push(toQuickBooksInvoiceLine({
-        amount: Number(((item.quantity ?? 0) * unitPrice).toFixed(2)),
+        amount: lineSnapshot.lineSubtotal,
         description: item.description,
         quantity: item.quantity,
         unitPrice,
         qbItemId: resolvedItem.qbItemId,
         qbItemName: resolvedItem.qbItemName,
-        taxable: typeof item.taxable === "boolean" ? item.taxable : resolvedItem.taxable
+        taxable: lineSnapshot.taxable,
+        taxCodeRef: lineSnapshot.taxCodeId
       }));
     }
+    const invoiceTotals = calculateInvoiceTotalsFromItems(syncedItems, { taxExempt });
 
     const { docNumber, invoiceResponse } = await createQuickBooksInvoiceWithTradeWorxNumber({
       connection: tenant,
@@ -4700,6 +4764,7 @@ export async function syncBillingSummaryToQuickBooks(
         CustomerRef: { value: customerId },
         ...(sendToEmail ? { BillEmail: { Address: sendToEmail } } : {}),
         PrivateNote: summary.notes ?? `Synced from TradeWorx inspection ${summary.inspectionId}`,
+        GlobalTaxCalculation: "TaxExcluded",
         Line: groupQuickBooksInvoiceLines(invoiceLines)
       }
     });
@@ -4736,7 +4801,15 @@ export async function syncBillingSummaryToQuickBooks(
           quickbooksSyncedAt: new Date(),
           quickbooksSyncError: null,
           quickbooksSentAt: null,
-          quickbooksSendError: null
+          quickbooksSendError: null,
+          items: syncedItems as unknown as Prisma.InputJsonValue,
+          subtotal: invoiceTotals.subtotalBeforeTax,
+          pricingSnapshot: {
+            ...((summary.pricingSnapshot && typeof summary.pricingSnapshot === "object" && !Array.isArray(summary.pricingSnapshot))
+              ? summary.pricingSnapshot as Record<string, unknown>
+              : {}),
+            invoiceTotals
+          } as Prisma.InputJsonValue
         }
       });
       await tx.inspection.update({
@@ -4780,7 +4853,9 @@ export async function syncBillingSummaryToQuickBooks(
           inspectionId: summary.inspectionId,
           invoiceId: verifiedInvoice.id,
           invoiceNumber: verifiedInvoice.docNumber ?? createdDocNumber ?? docNumber,
-          customerId
+          customerId,
+          totals: invoiceTotals,
+          taxExempt
         }
       }
     });
@@ -5184,6 +5259,7 @@ export async function createDirectQuickBooksInvoice(
           serviceState: true,
           servicePostalCode: true,
           serviceCountry: true,
+          isTaxExempt: true,
           notes: true
         }
       })
@@ -5232,20 +5308,40 @@ export async function createDirectQuickBooksInvoice(
       notes: selectedCustomer?.notes ?? null
     });
 
-    const invoiceLines = parsedInput.lineItems.map((line) => {
+    const directBillingLines = parsedInput.lineItems.map((line) => {
       const catalogItem = catalogById.get(line.catalogItemId);
       if (!catalogItem) {
         throw new Error("Selected product or service is no longer available.");
       }
 
+      return {
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        amount: roundMoney(line.quantity * line.unitPrice),
+        description: line.description,
+        taxable: selectedCustomer?.isTaxExempt ? false : catalogItem.taxable,
+        taxCodeId: selectedCustomer?.isTaxExempt
+          ? DEFAULT_QUICKBOOKS_NON_TAX_CODE_ID
+          : catalogItem.taxable
+            ? DEFAULT_QUICKBOOKS_TAX_CODE_ID
+            : DEFAULT_QUICKBOOKS_NON_TAX_CODE_ID,
+        qbItemId: catalogItem.quickbooksItemId,
+        qbItemName: catalogItem.name
+      };
+    });
+    const snapshottedDirectLines = snapshotInvoiceLines(directBillingLines, {
+      taxExempt: selectedCustomer?.isTaxExempt === true
+    });
+    const invoiceLines = snapshottedDirectLines.map((line) => {
       return toQuickBooksInvoiceLine({
-        amount: Number((line.quantity * line.unitPrice).toFixed(2)),
+        amount: line.lineSubtotal,
         description: line.description,
         quantity: line.quantity,
         unitPrice: line.unitPrice,
-        qbItemId: catalogItem.quickbooksItemId,
-        qbItemName: catalogItem.name,
-        taxable: catalogItem.taxable
+        qbItemId: line.qbItemId,
+        qbItemName: line.qbItemName,
+        taxable: line.taxable,
+        taxCodeRef: line.taxCodeId
       });
     });
 
@@ -5263,6 +5359,18 @@ export async function createDirectQuickBooksInvoice(
       });
       invoiceLines.push(...automaticFeeLines);
     }
+    const directInvoiceTotals = calculateInvoiceTotalsFromItems([
+      ...snapshottedDirectLines,
+      ...invoiceLines
+        .slice(snapshottedDirectLines.length)
+        .map((line) => ({
+          quantity: line.SalesItemLineDetail.Qty,
+          unitPrice: line.SalesItemLineDetail.UnitPrice,
+          amount: line.Amount,
+          taxable: line.SalesItemLineDetail.TaxCodeRef.value === DEFAULT_QUICKBOOKS_TAX_CODE_ID,
+          taxCodeId: line.SalesItemLineDetail.TaxCodeRef.value
+        }))
+    ], { taxExempt: selectedCustomer?.isTaxExempt === true });
 
     const { docNumber, invoiceResponse } = await createQuickBooksInvoiceWithTradeWorxNumber({
       connection: tenant,
@@ -5273,6 +5381,7 @@ export async function createDirectQuickBooksInvoice(
         TxnDate: issueDate.toISOString().slice(0, 10),
         ...(dueDate ? { DueDate: dueDate.toISOString().slice(0, 10) } : {}),
         ...(parsedInput.memo?.trim() ? { CustomerMemo: { value: parsedInput.memo.trim() } } : {}),
+        GlobalTaxCalculation: "TaxExcluded",
         Line: groupQuickBooksInvoiceLines(invoiceLines)
       }
     });
@@ -5346,6 +5455,7 @@ export async function createDirectQuickBooksInvoice(
             issueDate: issueDate.toISOString().slice(0, 10),
             dueDate: dueDate ? dueDate.toISOString().slice(0, 10) : null,
             sendEmail: parsedInput.sendEmail,
+          totals: directInvoiceTotals,
           sendStatus: sendResult?.sendStatus ?? "not_sent",
           connectionMode: connectionStatus.appMode
         } satisfies JsonObject

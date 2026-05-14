@@ -25,6 +25,18 @@ import { syncInspectionArchiveStateTx } from "./inspection-archive";
 import { reconcileInspectionStatusTx } from "./inspection-status-consistency";
 import { hasWorkOrderLineItemTable } from "./work-order-line-item-table";
 import { getCustomerFacingSiteLabel } from "./scheduling";
+import {
+  calculateInvoiceTotalsFromItems,
+  calculateInvoiceLineSnapshot,
+  calculateLineSubtotal,
+  DEFAULT_OKLAHOMA_SALES_TAX_RATE,
+  DEFAULT_QUICKBOOKS_TAX_CODE_ID,
+  type InvoiceTotals,
+  roundMoney,
+  snapshotInvoiceLines
+} from "./billing-tax";
+
+export { calculateInvoiceTotalsFromItems } from "./billing-tax";
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -60,20 +72,6 @@ export type BillableItem = {
   taxableSource?: "quickbooks" | "manual" | "default" | "override" | null;
   quickBooksTaxableStatus?: "taxable" | "non_taxable" | "unknown" | null;
   quickBooksTaxCodeRef?: string | null;
-};
-
-export type InvoiceTotals = {
-  taxableSubtotal: number;
-  nonTaxableSubtotal: number;
-  subtotalBeforeTax: number;
-  discountTotal: number;
-  taxTotal: number;
-  totalDue: number;
-  taxRate: number;
-  taxCodeId: string | null;
-  calculationVersion: "invoice_totals_v1";
-  calculatedAt: string;
-  warnings: string[];
 };
 
 export type BillingReviewGroup<T extends BillableItem = BillableItem> = T & {
@@ -143,8 +141,6 @@ const AUTO_MATCH_CONFIDENCE_THRESHOLD = 0.96;
 const SUGGESTED_MATCH_CONFIDENCE_THRESHOLD = 0.72;
 const MANUAL_SEARCH_CONFIDENCE_THRESHOLD = 0.15;
 const MINIMUM_TICKET_ADJUSTMENT_CODE = "MINIMUM_TICKET_ADJUSTMENT";
-const DEFAULT_OKLAHOMA_SALES_TAX_RATE = 0.0825;
-const DEFAULT_QUICKBOOKS_TAX_CODE_ID = "TAX";
 
 function isRuleControlledFeeItem(item: BillableItem) {
   return item.category === "fee" && item.metadata?.manualBillingLine !== true;
@@ -1024,10 +1020,6 @@ function buildRepeaterBillableMetadata(
 
 function resolveBillableExtinguisherType(row: Record<string, ReportPrimitiveValue>) {
   return row.billingExtinguisherType ?? row.extinguisherTypeOther ?? row.extinguisherType ?? null;
-}
-
-function roundMoney(value: number) {
-  return Number((Math.round((value + Number.EPSILON) * 100) / 100).toFixed(2));
 }
 
 function readNumber(value: unknown) {
@@ -2136,70 +2128,6 @@ async function buildComplianceReportingFeeItemsTx(tx: TransactionClient, input: 
   return feeItems;
 }
 
-function readLineDiscountAmount(item: BillableItem) {
-  return Math.max(
-    0,
-    readNumber(item.discountAmount)
-      ?? readNumber(item.metadata?.discountAmount)
-      ?? readNumber(item.metadata?.lineDiscountAmount)
-      ?? 0
-  );
-}
-
-function readLineTaxRate(item: BillableItem, defaultTaxRate: number) {
-  const explicitRate =
-    readNumber(item.taxRate)
-      ?? readNumber(item.metadata?.taxRate)
-      ?? readNumber(item.metadata?.invoiceTaxRate);
-
-  if (explicitRate === null) {
-    return defaultTaxRate;
-  }
-
-  const normalizedRate = explicitRate > 1 ? explicitRate / 100 : explicitRate;
-  return normalizedRate > 0 ? normalizedRate : defaultTaxRate;
-}
-
-function calculateLineSubtotal(item: BillableItem) {
-  const grossSubtotal = typeof item.unitPrice === "number"
-    ? calculateAmount(item.quantity, item.unitPrice) ?? 0
-    : readNumber(item.amount) ?? 0;
-  return roundMoney(Math.max(0, grossSubtotal - readLineDiscountAmount(item)));
-}
-
-function calculateInvoiceLineSnapshot(
-  item: BillableItem,
-  input: {
-    defaultTaxRate?: number;
-    defaultTaxCodeId?: string | null;
-  } = {}
-) {
-  const lineSubtotal = calculateLineSubtotal(item);
-  const discountAmount = readLineDiscountAmount(item);
-  const taxable = item.taxable === true;
-  const taxRate = taxable ? readLineTaxRate(item, input.defaultTaxRate ?? DEFAULT_OKLAHOMA_SALES_TAX_RATE) : 0;
-  const existingTaxAmount = taxable ? readNumber(item.taxAmount) : 0;
-  const taxAmount = taxable
-    ? roundMoney(lineSubtotal * taxRate)
-    : 0;
-  const taxCodeId = item.taxCodeId
-    ?? item.quickBooksTaxCodeRef
-    ?? (typeof item.metadata?.taxCodeId === "string" ? item.metadata.taxCodeId : null)
-    ?? input.defaultTaxCodeId
-    ?? (taxable ? DEFAULT_QUICKBOOKS_TAX_CODE_ID : null)
-    ?? null;
-
-  return {
-    lineSubtotal,
-    discountAmount,
-    taxable,
-    taxRate,
-    taxCodeId,
-    taxAmount: taxRate > 0 ? taxAmount : roundMoney(existingTaxAmount ?? 0),
-    lineTotal: roundMoney(lineSubtotal + (taxRate > 0 ? taxAmount : existingTaxAmount ?? 0))
-  };
-}
-
 async function buildBillingDisplayItems(tenantId: string, items: BillableItem[]) {
   return Promise.all(
     items.map(async (item) => {
@@ -2214,106 +2142,6 @@ async function buildBillingDisplayItems(tenantId: string, items: BillableItem[])
       };
     })
   );
-}
-
-export function calculateInvoiceTotalsFromItems(
-  items: BillableItem[],
-  input: {
-    defaultTaxRate?: number;
-    defaultTaxCodeId?: string | null;
-    calculatedAt?: Date | string;
-  } = {}
-): InvoiceTotals {
-  const warnings = new Set<string>();
-  let taxableSubtotal = 0;
-  let nonTaxableSubtotal = 0;
-  let discountTotal = 0;
-  let taxTotal = 0;
-
-  for (const item of items) {
-    const line = calculateInvoiceLineSnapshot(item, input);
-    discountTotal += line.discountAmount;
-    taxTotal += line.taxAmount;
-
-    if (line.taxable) {
-      taxableSubtotal += line.lineSubtotal;
-      if (line.taxRate <= 0 && line.lineSubtotal > 0) {
-        warnings.add("One or more taxable lines are missing a tax rate, so sales tax is currently $0.00 until a tax rate/code is configured.");
-      }
-      if (!line.taxCodeId && line.lineSubtotal > 0) {
-        warnings.add("One or more taxable lines are missing a tax code.");
-      }
-    } else {
-      nonTaxableSubtotal += line.lineSubtotal;
-    }
-
-    if (item.taxable === null || item.taxable === undefined) {
-      warnings.add("One or more billable lines are missing a taxable/non-taxable snapshot.");
-    }
-  }
-
-  const roundedTaxableSubtotal = roundMoney(taxableSubtotal);
-  const roundedNonTaxableSubtotal = roundMoney(nonTaxableSubtotal);
-  const subtotalBeforeTax = roundMoney(roundedTaxableSubtotal + roundedNonTaxableSubtotal);
-  const roundedDiscountTotal = roundMoney(discountTotal);
-  const roundedTaxTotal = roundMoney(taxTotal);
-
-  return {
-    taxableSubtotal: roundedTaxableSubtotal,
-    nonTaxableSubtotal: roundedNonTaxableSubtotal,
-    subtotalBeforeTax,
-    discountTotal: roundedDiscountTotal,
-    taxTotal: roundedTaxTotal,
-    totalDue: roundMoney(subtotalBeforeTax + roundedTaxTotal),
-    taxRate: input.defaultTaxRate ?? DEFAULT_OKLAHOMA_SALES_TAX_RATE,
-    taxCodeId: input.defaultTaxCodeId ?? DEFAULT_QUICKBOOKS_TAX_CODE_ID,
-    calculationVersion: "invoice_totals_v1",
-    calculatedAt: typeof input.calculatedAt === "string"
-      ? input.calculatedAt
-      : (input.calculatedAt ?? new Date()).toISOString(),
-    warnings: [...warnings]
-  };
-}
-
-function snapshotInvoiceLines(
-  items: BillableItem[],
-  input: {
-    defaultTaxRate?: number;
-    defaultTaxCodeId?: string | null;
-    calculatedAt?: Date | string;
-  } = {}
-) {
-  const calculatedAt = typeof input.calculatedAt === "string"
-    ? input.calculatedAt
-    : (input.calculatedAt ?? new Date()).toISOString();
-
-  return items.map((item) => {
-    const line = calculateInvoiceLineSnapshot(item, input);
-    return {
-      ...item,
-      amount: line.lineSubtotal,
-      lineSubtotal: line.lineSubtotal,
-      discountAmount: line.discountAmount,
-      taxCodeId: line.taxCodeId,
-      taxRate: line.taxRate,
-      taxAmount: line.taxAmount,
-      lineTotal: line.lineTotal,
-      metadata: {
-        ...(item.metadata ?? {}),
-        invoiceLineSnapshot: {
-          lineSubtotal: line.lineSubtotal,
-          discountAmount: line.discountAmount,
-          taxable: line.taxable,
-          taxCodeId: line.taxCodeId,
-          taxRate: line.taxRate,
-          taxAmount: line.taxAmount,
-          lineTotal: line.lineTotal,
-          calculationVersion: "invoice_totals_v1",
-          calculatedAt
-        }
-      }
-    } satisfies BillableItem;
-  });
 }
 
 function subtotalForItems(items: BillableItem[]) {
@@ -2493,6 +2321,14 @@ async function applyMinimumTicketPricingToSummaryItemsTx(
 ) {
   const itemsBeforeMinimum = input.items.filter((item) => !isMinimumTicketAdjustmentItem(item));
   const subtotalBeforeMinimum = subtotalForItems(itemsBeforeMinimum);
+  const customerTaxState = await tx.customerCompany.findFirst({
+    where: {
+      id: input.customerCompanyId,
+      tenantId: input.tenantId
+    },
+    select: { isTaxExempt: true }
+  });
+  const taxExempt = customerTaxState?.isTaxExempt === true;
   const minimumTicketResolution = await resolveMinimumTicketRuleTx(tx, {
     tenantId: input.tenantId,
     customerCompanyId: input.customerCompanyId,
@@ -2515,8 +2351,8 @@ async function applyMinimumTicketPricingToSummaryItemsTx(
   const items = minimumTicketAdjustmentItem
     ? [...itemsBeforeMinimum, minimumTicketAdjustmentItem]
     : itemsBeforeMinimum;
-  const snapshottedItems = snapshotInvoiceLines(items);
-  const invoiceTotals = calculateInvoiceTotalsFromItems(snapshottedItems);
+  const snapshottedItems = snapshotInvoiceLines(items, { taxExempt });
+  const invoiceTotals = calculateInvoiceTotalsFromItems(snapshottedItems, { taxExempt });
   const pricingSnapshot = withInvoiceTotalsSnapshot(
     withMinimumTicketSnapshot(input.pricingSnapshot, minimumTicketResolution),
     invoiceTotals
