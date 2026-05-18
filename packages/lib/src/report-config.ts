@@ -1589,8 +1589,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
             type: "text",
             placeholder: "Main kitchen line",
             prefill: [
-              { source: "priorField", sectionId: "system-details", fieldId: "systemLocation" },
-              { source: "siteDefault", key: "siteName" }
+              { source: "priorField", sectionId: "system-details", fieldId: "systemLocation" }
             ]
           },
           {

@@ -2520,6 +2520,18 @@ describe("smart report foundations", () => {
     expect(draft.sections["tank-and-service"]?.fields.serviceNotes).toBe("");
   });
 
+  it("does not prefill kitchen system location from customer or site name", () => {
+    const draft = buildInitialReportDraft({
+      inspectionType: "kitchen_suppression",
+      siteName: "2nd & Elm Onion Burgers",
+      customerName: "2nd & Elm Onion Burgers",
+      scheduledDate: "2026-03-20T15:00:00.000Z",
+      assetCount: 0
+    });
+
+    expect(draft.sections["system-details"]?.fields.systemLocation).toBe("");
+  });
+
   it("preserves hood and appliance repeater rows for kitchen suppression during normalization", () => {
     const normalized = validateDraftForTemplate({
       templateVersion: 1,

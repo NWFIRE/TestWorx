@@ -328,6 +328,54 @@ describe("pdf v2 report engine", () => {
     }
   });
 
+  it("does not prepend customer names to kitchen system location in the PDF model", () => {
+    const model = buildReportRenderModelV2({
+      ...createBaseInput(),
+      customerCompany: {
+        ...createBaseInput().customerCompany,
+        name: "2nd & Elm Onion Burgers"
+      },
+      site: {
+        ...createBaseInput().site,
+        name: "2nd & Elm Onion Burgers"
+      },
+      task: { inspectionType: "kitchen_suppression" },
+      draft: {
+        templateVersion: 1,
+        inspectionType: "kitchen_suppression",
+        overallNotes: "",
+        sectionOrder: ["system-details", "appliance-coverage", "system-checklist", "tank-and-service"],
+        activeSectionId: "system-details",
+        sections: {
+          "system-details": {
+            status: "pass",
+            notes: "",
+            fields: {
+              systemSizeGallons: 3,
+              numberOfCylinders: 1,
+              ul300Compliant: true,
+              systemLocation: "2nd & Elm Onion Burgers Left Of Hood",
+              areaProtected: "Hood(s) Duct(s) Appliance(s)"
+            }
+          },
+          "appliance-coverage": { status: "pass", notes: "", fields: { hoods: [], hoodAppliances: [] } },
+          "system-checklist": { status: "pass", notes: "", fields: {} },
+          "tank-and-service": { status: "pass", notes: "", fields: { fusibleLinksUsed: [] } }
+        },
+        deficiencies: [],
+        attachments: [],
+        signatures: {},
+        context: { siteName: "", customerName: "", scheduledDate: "", assetCount: 0, priorReportSummary: "" }
+      }
+    });
+
+    const systemDetails = model.systemSummary;
+    expect(systemDetails?.renderer).toBe("keyValue");
+    if (systemDetails?.renderer === "keyValue") {
+      expect(systemDetails.items.find((item) => item.label === "System Location")?.value).toBe("Left Of Hood");
+    }
+  });
+
   it("renders industrial dry chemical tag status, numbered checklist, and fusible links", () => {
     const model = buildReportRenderModelV2({
       ...createBaseInput(),

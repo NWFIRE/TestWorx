@@ -168,8 +168,27 @@ function mapOutcomeMetric(
 
 function buildKeyValueSection(
   sourceFields: Record<string, unknown>,
-  sectionConfig: ReportSectionConfig
+  sectionConfig: ReportSectionConfig,
+  options?: { customerName?: string; siteName?: string }
 ): Extract<RenderSection, { renderer: "keyValue" }> {
+  const cleanValue = (fieldKey: string, value: string) => {
+    if (!["system-details", "system_details"].includes(sectionConfig.key) || fieldKey !== "systemLocation") {
+      return value;
+    }
+
+    const namesToStrip = [options?.customerName, options?.siteName]
+      .map((name) => cleanCustomerFacingText(name))
+      .filter(Boolean)
+      .sort((a, b) => b.length - a.length);
+    let nextValue = value.trim();
+    for (const name of namesToStrip) {
+      if (nextValue.toLowerCase().startsWith(name.toLowerCase())) {
+        nextValue = nextValue.slice(name.length).replace(/^[-–—:|,\s]+/, "").trim();
+      }
+    }
+    return nextValue;
+  };
+
   return {
     key: sectionConfig.key,
     title: sectionConfig.title,
@@ -180,7 +199,7 @@ function buildKeyValueSection(
     items: (sectionConfig.fields ?? [])
       .map((field) => ({
         label: field.label,
-        value: formatFieldValue(sourceFields[field.key], field.format, field.fallback)
+        value: cleanValue(field.key, formatFieldValue(sourceFields[field.key], field.format, field.fallback))
       }))
       .filter((item) => item.value || !sectionConfig.fields?.find((field) => field.label === item.label)?.hideIfEmpty)
   };
@@ -481,7 +500,10 @@ function buildSectionByConfig(input: PdfInput, sectionConfig: ReportSectionConfi
     case "general_system_summary":
       return buildKeyValueSection(getSourceSectionFields(input, "system-summary"), sectionConfig);
     case "system_details":
-      return buildKeyValueSection(getSourceSectionFields(input, "system-details"), sectionConfig);
+      return buildKeyValueSection(getSourceSectionFields(input, "system-details"), sectionConfig, {
+        customerName: input.customerCompany.name,
+        siteName: input.site.name
+      });
     case "extinguisher_summary": {
       const inventoryFields = getSourceSectionFields(input, "inventory");
       const rows = Array.isArray(inventoryFields.extinguishers) ? inventoryFields.extinguishers as Array<Record<string, unknown>> : [];
@@ -506,7 +528,10 @@ function buildSectionByConfig(input: PdfInput, sectionConfig: ReportSectionConfi
         return buildChecklistSection(getSourceSectionFields(input, sectionConfig.checklist.dataset), sectionConfig);
       }
       if (sectionConfig.renderer === "keyValue") {
-        return buildKeyValueSection(getSourceSectionFields(input, sectionConfig.key), sectionConfig);
+        return buildKeyValueSection(getSourceSectionFields(input, sectionConfig.key), sectionConfig, {
+          customerName: input.customerCompany.name,
+          siteName: input.site.name
+        });
       }
       return null;
   }
