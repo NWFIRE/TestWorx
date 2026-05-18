@@ -1029,7 +1029,7 @@ function isStrictTaskTypeSubset<T extends { inspectionType: InspectionType | key
   return true;
 }
 
-function filterSubsetDuplicateClaimableInspections<T extends {
+export function filterSubsetDuplicateOperationalInspections<T extends {
   id: string;
   customerCompanyId?: string | null;
   siteId?: string | null;
@@ -5158,6 +5158,13 @@ export async function getAdminSchedulingQueueData(
     requestedStatuses.length === 0 ||
     requestedStatuses.every((status) => isActiveOperationalInspectionStatus(status as InspectionStatus));
 
+  if (shouldApplyActiveConsistencyFilter) {
+    await prisma.$transaction((tx) => repairInspectionStatusConsistencyTx(tx, {
+      tenantId,
+      actorUserId: parsedActor.userId
+    }));
+  }
+
   const inspections = await prisma.inspection.findMany({
     where: {
       tenantId,
@@ -5918,7 +5925,7 @@ export async function resolveClaimableInspectionsForTechnician(actor: ActorConte
     }))
     .filter((inspection) => inspection.tasks.length > 0);
 
-  const uniqueResolved = filterSubsetDuplicateClaimableInspections(dedupeInspectionsById(resolved));
+  const uniqueResolved = filterSubsetDuplicateOperationalInspections(dedupeInspectionsById(resolved));
 
   if (
     process.env.NODE_ENV !== "production" &&

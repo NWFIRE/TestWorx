@@ -29,6 +29,9 @@ export async function claimInspectionAction(inspectionId: string): Promise<Actio
     await claimInspection({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId);
     revalidatePath("/app/tech");
     revalidatePath("/app/admin");
+    revalidatePath("/app/admin/inspections");
+    revalidatePath("/app/admin/dashboard");
+    revalidatePath(`/app/admin/inspections/${inspectionId}`);
     return { ok: true, error: null };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unable to claim this inspection." };
@@ -45,6 +48,9 @@ export async function updateInspectionStatusAction(inspectionId: string, status:
     await updateInspectionStatus({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId, status);
     revalidatePath("/app/tech");
     revalidatePath("/app/admin");
+    revalidatePath("/app/admin/inspections");
+    revalidatePath("/app/admin/dashboard");
+    revalidatePath(`/app/admin/inspections/${inspectionId}`);
     return { ok: true, error: null };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unable to update inspection status." };
@@ -64,6 +70,8 @@ export async function addInspectionTaskAction(inspectionId: string, inspectionTy
     );
     revalidatePath("/app/tech");
     revalidatePath("/app/admin");
+    revalidatePath("/app/admin/inspections");
+    revalidatePath("/app/admin/dashboard");
     revalidatePath(`/app/admin/inspections/${inspectionId}`);
     return { ok: true, error: null };
   } catch (error) {
@@ -90,6 +98,8 @@ export async function completeInspectionWithCloseoutRequestAction(
     );
     revalidatePath("/app/tech");
     revalidatePath("/app/admin");
+    revalidatePath("/app/admin/inspections");
+    revalidatePath("/app/admin/dashboard");
     revalidatePath("/app/admin/amendments");
     revalidatePath(`/app/admin/inspections/${inspectionId}`);
     return { ok: true, error: null };
@@ -111,6 +121,8 @@ export async function removeInspectionTaskAction(inspectionId: string, inspectio
     );
     revalidatePath("/app/tech");
     revalidatePath("/app/admin");
+    revalidatePath("/app/admin/inspections");
+    revalidatePath("/app/admin/dashboard");
     revalidatePath(`/app/admin/inspections/${inspectionId}`);
     return { ok: true, error: null };
   } catch (error) {

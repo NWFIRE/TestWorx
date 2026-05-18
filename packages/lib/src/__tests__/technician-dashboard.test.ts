@@ -13,7 +13,7 @@ vi.mock("@testworx/db", () => ({
   prisma: prismaMock
 }));
 
-import { getTechnicianDashboardData } from "../scheduling";
+import { filterSubsetDuplicateOperationalInspections, getTechnicianDashboardData } from "../scheduling";
 
 describe("technician dashboard inspection access", () => {
   beforeEach(() => {
@@ -110,6 +110,44 @@ describe("technician dashboard inspection access", () => {
     expect(result.assigned[0]?.id).toBe("inspection_1");
     expect(result.assigned[0]?.documents).toHaveLength(1);
     expect(result.assigned[0]?.attachments).toHaveLength(1);
+  });
+
+  it("removes same-period duplicate operational inspections when one visit is only a report-type subset", () => {
+    const inspections = filterSubsetDuplicateOperationalInspections([
+      {
+        id: "inspection_kitchen_only",
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        scheduledStart: new Date("2026-05-01T09:00:00.000Z"),
+        tasks: [
+          { inspectionType: "kitchen_suppression", dueMonth: "2026-05" }
+        ]
+      },
+      {
+        id: "inspection_kitchen_and_extinguishers",
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        scheduledStart: new Date("2026-05-01T09:00:00.000Z"),
+        tasks: [
+          { inspectionType: "kitchen_suppression", dueMonth: "2026-05" },
+          { inspectionType: "fire_extinguisher", dueMonth: "2026-05" }
+        ]
+      },
+      {
+        id: "inspection_other_site",
+        customerCompanyId: "customer_1",
+        siteId: "site_2",
+        scheduledStart: new Date("2026-05-01T09:00:00.000Z"),
+        tasks: [
+          { inspectionType: "kitchen_suppression", dueMonth: "2026-05" }
+        ]
+      }
+    ]);
+
+    expect(inspections.map((inspection) => inspection.id)).toEqual([
+      "inspection_kitchen_and_extinguishers",
+      "inspection_other_site"
+    ]);
   });
 
   it("shows unassigned claimable inspections in the shared queue for technicians", async () => {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 
 import { auth } from "@/auth";
 import { finalizeInspectionReport, isPrivateBlobStoreConfigurationError } from "@testworx/lib/server/index";
@@ -39,6 +40,18 @@ export async function POST(request: Request) {
       },
       body
     );
+
+    const inspectionId = typeof body?.inspectionId === "string" ? body.inspectionId : null;
+    revalidatePath("/app/admin");
+    revalidatePath("/app/admin/inspections");
+    revalidatePath("/app/admin/dashboard");
+    revalidatePath("/app/admin/billing");
+    revalidatePath("/app/tech");
+    revalidatePath("/app/tech/inspections");
+    revalidatePath("/app/tech/work");
+    if (inspectionId) {
+      revalidatePath(`/app/admin/inspections/${inspectionId}`);
+    }
 
     return NextResponse.json({ ok: true, status: finalized.status, finalizedAt: finalized.finalizedAt?.toISOString() ?? null });
   } catch (error) {

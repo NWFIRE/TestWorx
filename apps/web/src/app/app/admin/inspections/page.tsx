@@ -8,6 +8,7 @@ import { LiveUrlSelectFilter } from "@/app/live-url-select-filter";
 import type { SearchSelectOption } from "@/app/search-select";
 import {
   activeOperationalInspectionStatuses,
+  filterSubsetDuplicateOperationalInspections,
   formatInspectionTaskSummary,
   formatInspectionClassificationLabel,
   formatInspectionStatusLabel,
@@ -314,8 +315,10 @@ export default async function AdminInspectionsPage({
     ...(historySearchData?.inspections ?? []).map((inspection) => buildInspectionSearchOption(inspection, currentPath))
   ]);
   const fastManagementWindowEnd = endOfDay(addDays(startOfDay(new Date()), FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS));
-  const fastManagementInspections = queueData.inspections.filter((inspection) =>
-    isInFastManagementWindow(inspection, fastManagementWindowEnd)
+  const fastManagementInspections = filterSubsetDuplicateOperationalInspections(
+    queueData.inspections.filter((inspection) =>
+      isInFastManagementWindow(inspection, fastManagementWindowEnd)
+    )
   );
 
   return (
