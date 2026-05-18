@@ -100,13 +100,14 @@ export function calculateInvoiceLineSnapshot(
 ) {
   const lineSubtotal = calculateLineSubtotal(item);
   const discountAmount = readLineDiscountAmount(item);
-  const taxable = input.taxExempt ? false : item.taxable === true;
-  const taxRate = taxable ? readLineTaxRate(item, input.defaultTaxRate ?? DEFAULT_OKLAHOMA_SALES_TAX_RATE) : 0;
-  const existingTaxAmount = taxable ? readNumber(item.taxAmount) : 0;
-  const taxAmount = taxable
+  const taxable = item.taxable === true;
+  const effectiveTaxable = taxable && input.taxExempt !== true;
+  const taxRate = effectiveTaxable ? readLineTaxRate(item, input.defaultTaxRate ?? DEFAULT_OKLAHOMA_SALES_TAX_RATE) : 0;
+  const existingTaxAmount = effectiveTaxable ? readNumber(item.taxAmount) : 0;
+  const taxAmount = effectiveTaxable
     ? roundMoney(lineSubtotal * taxRate)
     : 0;
-  const taxCodeId = taxable
+  const taxCodeId = effectiveTaxable
     ? (
         item.taxCodeId
         ?? item.quickBooksTaxCodeRef
@@ -120,6 +121,7 @@ export function calculateInvoiceLineSnapshot(
     lineSubtotal,
     discountAmount,
     taxable,
+    effectiveTaxable,
     taxRate,
     taxCodeId,
     taxAmount: taxRate > 0 ? taxAmount : roundMoney(existingTaxAmount ?? 0),
@@ -144,10 +146,10 @@ export function calculateInvoiceTotalsFromItems(
 
     if (line.taxable) {
       taxableSubtotal += line.lineSubtotal;
-      if (line.taxRate <= 0 && line.lineSubtotal > 0) {
+      if (line.effectiveTaxable && line.taxRate <= 0 && line.lineSubtotal > 0) {
         warnings.add("One or more taxable lines are missing a tax rate, so sales tax is currently $0.00 until a tax rate/code is configured.");
       }
-      if (!line.taxCodeId && line.lineSubtotal > 0) {
+      if (line.effectiveTaxable && !line.taxCodeId && line.lineSubtotal > 0) {
         warnings.add("One or more taxable lines are missing a tax code.");
       }
     } else {
@@ -208,6 +210,7 @@ export function snapshotInvoiceLines<T extends BillingTaxLineInput>(
           lineSubtotal: line.lineSubtotal,
           discountAmount: line.discountAmount,
           taxable: line.taxable,
+          effectiveTaxable: line.effectiveTaxable,
           taxCodeId: line.taxCodeId,
           taxRate: line.taxRate,
           taxAmount: line.taxAmount,

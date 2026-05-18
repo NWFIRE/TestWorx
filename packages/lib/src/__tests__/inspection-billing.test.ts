@@ -79,6 +79,7 @@ import { buildInitialReportDraft } from "../report-engine";
 import { mapInspectionTypeToComplianceReportingDivision } from "../compliance-reporting-fees";
 import { buildMinimumTicketResolution, resolveMinimumTicketRuleTx, selectMinimumTicketRule } from "../minimum-ticket-pricing";
 import { resolveInspectionServiceFeeTx, resolveServiceFeeForLocationTx } from "../service-fees";
+import { snapshotInvoiceLines } from "../billing-tax";
 
 describe("invoice totals", () => {
   it("splits taxable and non-taxable subtotals and taxes only taxable lines", () => {
@@ -223,8 +224,8 @@ describe("invoice totals", () => {
     expect(totals.totalDue).toBe(26.5);
   });
 
-  it("forces taxable lines to non-taxable for tax exempt customers", () => {
-    const totals = calculateInvoiceTotalsFromItems([
+  it("preserves taxable item status while charging zero tax for tax exempt customers", () => {
+    const items = [
       {
         id: "taxable_part",
         tenantId: "tenant_1",
@@ -241,10 +242,19 @@ describe("invoice totals", () => {
         quickBooksTaxableStatus: "taxable",
         quickBooksTaxCodeRef: "TAX"
       }
-    ], { defaultTaxRate: 0.0825, defaultTaxCodeId: "TAX", taxExempt: true });
+    ];
+    const totals = calculateInvoiceTotalsFromItems(items, { defaultTaxRate: 0.0825, defaultTaxCodeId: "TAX", taxExempt: true });
+    const [snapshottedLine] = snapshotInvoiceLines(items, { defaultTaxRate: 0.0825, defaultTaxCodeId: "TAX", taxExempt: true });
 
-    expect(totals.taxableSubtotal).toBe(0);
-    expect(totals.nonTaxableSubtotal).toBe(100);
+    expect(snapshottedLine?.taxable).toBe(true);
+    expect(snapshottedLine?.taxCodeId).toBe("NON");
+    expect(snapshottedLine?.metadata.invoiceLineSnapshot).toEqual(expect.objectContaining({
+      taxable: true,
+      effectiveTaxable: false,
+      taxExempt: true
+    }));
+    expect(totals.taxableSubtotal).toBe(100);
+    expect(totals.nonTaxableSubtotal).toBe(0);
     expect(totals.taxTotal).toBe(0);
     expect(totals.totalDue).toBe(100);
   });
@@ -2762,6 +2772,176 @@ describe("inspection billing persistence and admin review", () => {
     expect(executeRawText).toContain("\"unitPrice\":50");
     expect(executeRawText).toContain("\"id\":\"line_1\"");
     expect(executeRawText).toContain("\"id\":\"line_2\"");
+  });
+
+  it("persists taxable overrides across every underlying item in a grouped billing row", async () => {
+    prismaMock.$queryRaw
+      .mockResolvedValueOnce([
+        {
+          id: "summary_1",
+          tenantId: "tenant_1",
+          inspectionId: "inspection_1",
+          status: "draft",
+          subtotal: 45,
+          notes: null,
+          quickbooksSyncStatus: "not_synced",
+          quickbooksInvoiceId: null,
+          items: [
+            {
+              id: "line_1",
+              tenantId: "tenant_1",
+              inspectionId: "inspection_1",
+              reportId: "report_1",
+              reportType: "kitchen_suppression",
+              sourceSection: "tank and service",
+              sourceField: "quantity",
+              category: "material",
+              code: "FUSIBLE_LINK_360",
+              description: "Fusible links used (360°F)",
+              quantity: 1,
+              unitPrice: 15,
+              amount: 15,
+              taxable: false,
+              taxableSource: "quickbooks",
+              quickBooksTaxableStatus: "non_taxable",
+              taxCodeId: "NON",
+              taxRate: 0,
+              linkedCatalogItemId: "catalog_link",
+              linkedCatalogItemName: "Fusible Link - 360°",
+              linkedQuickBooksItemId: "qb_link"
+            },
+            {
+              id: "line_2",
+              tenantId: "tenant_1",
+              inspectionId: "inspection_1",
+              reportId: "report_1",
+              reportType: "kitchen_suppression",
+              sourceSection: "tank and service",
+              sourceField: "quantity",
+              category: "material",
+              code: "FUSIBLE_LINK_360",
+              description: "Fusible links used (360°F)",
+              quantity: 2,
+              unitPrice: 15,
+              amount: 30,
+              taxable: false,
+              taxableSource: "quickbooks",
+              quickBooksTaxableStatus: "non_taxable",
+              taxCodeId: "NON",
+              taxRate: 0,
+              linkedCatalogItemId: "catalog_link",
+              linkedCatalogItemName: "Fusible Link - 360°",
+              linkedQuickBooksItemId: "qb_link"
+            }
+          ]
+        }
+      ])
+      .mockResolvedValueOnce([
+        { inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }
+      ]);
+
+    await updateBillingSummaryItemGroup(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "summary_1",
+      ["line_1", "line_2"],
+      3,
+      15,
+      true
+    );
+
+    const updateCall = prismaMock.$executeRaw.mock.calls.at(-1);
+    const persistedItems = JSON.parse(String(updateCall?.[1] ?? "[]"));
+    const persistedSourceItems = persistedItems.filter((item: { id?: string }) => item.id === "line_1" || item.id === "line_2");
+
+    expect(persistedSourceItems).toHaveLength(2);
+    expect(persistedSourceItems).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "line_1",
+        taxable: true,
+        taxableSource: "override",
+        quickBooksTaxableStatus: "taxable",
+        taxCodeId: "TAX",
+        taxRate: 0.0825,
+        taxAmount: 1.24,
+        lineTotal: 16.24
+      }),
+      expect.objectContaining({
+        id: "line_2",
+        taxable: true,
+        taxableSource: "override",
+        quickBooksTaxableStatus: "taxable",
+        taxCodeId: "TAX",
+        taxRate: 0.0825,
+        taxAmount: 2.48,
+        lineTotal: 32.48
+      })
+    ]));
+  });
+
+  it("persists non-taxable overrides for grouped rows that were previously taxable", async () => {
+    prismaMock.$queryRaw
+      .mockResolvedValueOnce([
+        {
+          id: "summary_1",
+          tenantId: "tenant_1",
+          inspectionId: "inspection_1",
+          status: "draft",
+          subtotal: 45,
+          notes: null,
+          quickbooksSyncStatus: "not_synced",
+          quickbooksInvoiceId: null,
+          items: [
+            {
+              id: "line_1",
+              tenantId: "tenant_1",
+              inspectionId: "inspection_1",
+              reportId: "report_1",
+              reportType: "kitchen_suppression",
+              sourceSection: "tank and service",
+              sourceField: "quantity",
+              category: "material",
+              code: "FUSIBLE_LINK_360",
+              description: "Fusible links used (360°F)",
+              quantity: 3,
+              unitPrice: 15,
+              amount: 45,
+              taxable: true,
+              taxableSource: "quickbooks",
+              quickBooksTaxableStatus: "taxable",
+              taxCodeId: "TAX",
+              taxRate: 0.0825,
+              linkedCatalogItemId: "catalog_link",
+              linkedCatalogItemName: "Fusible Link - 360°",
+              linkedQuickBooksItemId: "qb_link"
+            }
+          ]
+        }
+      ])
+      .mockResolvedValueOnce([
+        { inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }
+      ]);
+
+    await updateBillingSummaryItemGroup(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "summary_1",
+      ["line_1"],
+      3,
+      15,
+      false
+    );
+
+    const updateCall = prismaMock.$executeRaw.mock.calls.at(-1);
+    const persistedItems = JSON.parse(String(updateCall?.[1] ?? "[]"));
+
+    expect(persistedItems[0]).toEqual(expect.objectContaining({
+      taxable: false,
+      taxableSource: "override",
+      quickBooksTaxableStatus: "non_taxable",
+      taxCodeId: "NON",
+      taxRate: 0,
+      taxAmount: 0,
+      lineTotal: 45
+    }));
   });
 
   it("suggests normalized and alias-based catalog matches without forcing manual renames", async () => {

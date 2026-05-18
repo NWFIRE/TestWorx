@@ -4700,12 +4700,10 @@ export async function syncBillingSummaryToQuickBooks(
         }
         itemRefCache.set(cacheKey, resolvedItem);
       }
-      const resolvedTaxable = taxExempt
-        ? false
-        : item.taxableSource === "override"
-          ? item.taxable === true
-          : resolvedItem.taxable;
-      const taxCodeRef = resolvedTaxable
+      const resolvedTaxable = item.taxableSource === "override"
+        ? item.taxable === true
+        : resolvedItem.taxable;
+      const taxCodeRef = !taxExempt && resolvedTaxable
         ? item.taxCodeId ?? item.quickBooksTaxCodeRef ?? DEFAULT_QUICKBOOKS_TAX_CODE_ID
         : DEFAULT_QUICKBOOKS_NON_TAX_CODE_ID;
       const lineSnapshot = calculateInvoiceLineSnapshot({
@@ -4731,6 +4729,7 @@ export async function syncBillingSummaryToQuickBooks(
             lineSubtotal: lineSnapshot.lineSubtotal,
             discountAmount: lineSnapshot.discountAmount,
             taxable: lineSnapshot.taxable,
+            effectiveTaxable: lineSnapshot.effectiveTaxable,
             taxCodeId: lineSnapshot.taxCodeId,
             taxRate: lineSnapshot.taxRate,
             taxAmount: lineSnapshot.taxAmount,
@@ -4750,7 +4749,7 @@ export async function syncBillingSummaryToQuickBooks(
         unitPrice,
         qbItemId: resolvedItem.qbItemId,
         qbItemName: resolvedItem.qbItemName,
-        taxable: lineSnapshot.taxable,
+        taxable: lineSnapshot.effectiveTaxable,
         taxCodeRef: lineSnapshot.taxCodeId
       }));
     }

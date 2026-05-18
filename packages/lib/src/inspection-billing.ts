@@ -211,6 +211,7 @@ type BillingSummaryListRow = {
   inspectionId: string;
   customerCompanyId: string;
   customerName: string;
+  customerIsTaxExempt: boolean;
   siteId: string;
   siteName: string;
   inspectionDate: Date;
@@ -247,6 +248,7 @@ type AdminBillingSummaryDetailRow = {
   inspectionId: string;
   customerCompanyId: string;
   customerName: string;
+  customerIsTaxExempt: boolean;
   siteId: string;
   siteName: string;
   inspectionDate: Date;
@@ -639,6 +641,12 @@ function clearCatalogTaxSnapshot() {
     quickBooksTaxableStatus: null,
     quickBooksTaxCodeRef: null
   };
+}
+
+function resolveTaxRateForOverride(item: Pick<BillableItem, "taxRate">) {
+  return typeof item.taxRate === "number" && Number.isFinite(item.taxRate) && item.taxRate > 0
+    ? item.taxRate
+    : DEFAULT_OKLAHOMA_SALES_TAX_RATE;
 }
 
 function mapWorkOrderLineItemTypeToBillingCategory(itemType: string): BillableCategory {
@@ -3466,6 +3474,7 @@ export async function getAdminBillingSummaries(actor: ActorContext) {
       s."inspectionId",
       s."customerCompanyId",
       c."name" AS "customerName",
+      c."isTaxExempt" AS "customerIsTaxExempt",
       s."siteId",
       site."name" AS "siteName",
       i."scheduledStart" AS "inspectionDate",
@@ -3554,6 +3563,7 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
       s."inspectionId",
       s."customerCompanyId",
       c."name" AS "customerName",
+      c."isTaxExempt" AS "customerIsTaxExempt",
       s."siteId",
       site."name" AS "siteName",
       i."scheduledStart" AS "inspectionDate",
@@ -3960,13 +3970,11 @@ export async function updateBillingSummaryItemGroup(
         ...(typeof taxable === "boolean"
           ? {
               taxable,
-              taxableSource: taxabilityChanged ? "override" as const : (item.taxableSource ?? null),
-              quickBooksTaxableStatus: taxabilityChanged
-                ? (taxable ? "taxable" as const : "non_taxable" as const)
-                : item.quickBooksTaxableStatus ?? null,
-              taxCodeId: taxable ? item.taxCodeId ?? item.quickBooksTaxCodeRef ?? DEFAULT_QUICKBOOKS_TAX_CODE_ID : null,
+              taxableSource: "override" as const,
+              quickBooksTaxableStatus: taxable ? "taxable" as const : "non_taxable" as const,
+              taxCodeId: taxable ? DEFAULT_QUICKBOOKS_TAX_CODE_ID : null,
               taxCategory: taxable ? item.taxCategory ?? null : null,
-              taxRate: taxable ? item.taxRate ?? DEFAULT_OKLAHOMA_SALES_TAX_RATE : 0,
+              taxRate: taxable ? resolveTaxRateForOverride(item) : 0,
               taxAmount: taxabilityChanged ? 0 : item.taxAmount ?? null,
               lineTotal: null
             }

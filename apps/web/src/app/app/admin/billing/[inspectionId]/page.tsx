@@ -361,6 +361,14 @@ export default async function BillingSummaryDetailPage({
             </div>
           </div>
         ) : null}
+        {summary.customerIsTaxExempt ? (
+          <div className="mt-5 rounded-[1.5rem] border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-blue-900">
+            <p className="font-semibold text-blue-950">Tax-exempt customer</p>
+            <p className="mt-2">
+              Taxable items stay marked as taxable for item tracking and QuickBooks mapping, but this invoice will calculate $0.00 sales tax while the customer is tax exempt.
+            </p>
+          </div>
+        ) : null}
       </div>
 
       {isInvoiced ? (
