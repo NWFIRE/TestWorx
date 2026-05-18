@@ -1,7 +1,7 @@
 import { resolveTenantBranding } from "../../../branding";
 import { buildComplianceSection } from "../../../compliance-references";
 import { reportDraftSchema } from "../../../report-engine";
-import { getCustomerFacingSiteLabel } from "../../../scheduling";
+import { formatCustomerFacingInspectionAddress, getCustomerFacingSiteLabel } from "../../../scheduling";
 import type { PdfInput } from "../../types";
 import { formatDateTime, formatShortDate } from "../../core/formatting/dates";
 import { isNullEquivalent } from "../../core/formatting/empty";
@@ -30,11 +30,24 @@ function humanize(value: unknown) {
 }
 
 function cleanAddress(input: PdfInput) {
-  if (!getCustomerFacingSiteLabel(input.site.name)) {
-    return undefined;
-  }
-
-  return joinNonEmpty([input.site.addressLine1, input.site.addressLine2, joinNonEmpty([input.site.city, input.site.state], ", "), input.site.postalCode], ", ");
+  return cleanText(formatCustomerFacingInspectionAddress({
+    siteName: input.site.name,
+    siteAddressLine1: input.site.addressLine1,
+    siteAddressLine2: input.site.addressLine2,
+    siteCity: input.site.city,
+    siteState: input.site.state,
+    sitePostalCode: input.site.postalCode,
+    customerServiceAddressLine1: input.customerCompany.serviceAddressLine1,
+    customerServiceAddressLine2: input.customerCompany.serviceAddressLine2,
+    customerServiceCity: input.customerCompany.serviceCity,
+    customerServiceState: input.customerCompany.serviceState,
+    customerServicePostalCode: input.customerCompany.servicePostalCode,
+    customerBillingAddressLine1: input.customerCompany.billingAddressLine1,
+    customerBillingAddressLine2: input.customerCompany.billingAddressLine2,
+    customerBillingCity: input.customerCompany.billingCity,
+    customerBillingState: input.customerCompany.billingState,
+    customerBillingPostalCode: input.customerCompany.billingPostalCode
+  }));
 }
 
 function customerContactLine(input: PdfInput) {

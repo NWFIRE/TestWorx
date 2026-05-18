@@ -139,7 +139,12 @@ const nonDisplayableAddressParts = new Set([
   genericInspectionSiteCity.toLowerCase(),
   genericInspectionSiteState.toLowerCase(),
   genericInspectionSitePostalCode.toLowerCase(),
-  "no fixed service address on file"
+  "no fixed service address on file",
+  "n/a",
+  "na",
+  "-",
+  "–",
+  "—"
 ]);
 export const inspectionStatusLabels: Record<InspectionStatus | "past_due", string> = {
   to_be_completed: "To Be Completed",

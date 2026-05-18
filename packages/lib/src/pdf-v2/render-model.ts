@@ -2,7 +2,7 @@ import { resolveTenantBranding } from "../branding";
 import { buildComplianceSection } from "../compliance-references";
 import { buildReportPreview } from "../report-engine";
 import type { ReportPrimitiveValue } from "../report-config";
-import { getCustomerFacingSiteLabel } from "../scheduling";
+import { formatCustomerFacingInspectionAddress, getCustomerFacingSiteLabel } from "../scheduling";
 import { buildIndicatorLines } from "./indicators";
 import {
   buildPhotoCaption,
@@ -38,18 +38,24 @@ function toCell(text: string, lines?: string[]): RenderTableCell {
 }
 
 function buildServiceAddress(input: PdfInput) {
-  if (!getCustomerFacingSiteLabel(input.site.name)) {
-    return "";
-  }
-
-  return formatPdfAddress({
-    addressLine1: input.site.addressLine1,
-    addressLine2: input.site.addressLine2,
-    city: input.site.city,
-    state: input.site.state,
-    postalCode: input.site.postalCode,
-    fallback: customerFacingFieldRules.addressFallback
-  });
+  return formatCustomerFacingInspectionAddress({
+    siteName: input.site.name,
+    siteAddressLine1: input.site.addressLine1,
+    siteAddressLine2: input.site.addressLine2,
+    siteCity: input.site.city,
+    siteState: input.site.state,
+    sitePostalCode: input.site.postalCode,
+    customerServiceAddressLine1: input.customerCompany.serviceAddressLine1,
+    customerServiceAddressLine2: input.customerCompany.serviceAddressLine2,
+    customerServiceCity: input.customerCompany.serviceCity,
+    customerServiceState: input.customerCompany.serviceState,
+    customerServicePostalCode: input.customerCompany.servicePostalCode,
+    customerBillingAddressLine1: input.customerCompany.billingAddressLine1,
+    customerBillingAddressLine2: input.customerCompany.billingAddressLine2,
+    customerBillingCity: input.customerCompany.billingCity,
+    customerBillingState: input.customerCompany.billingState,
+    customerBillingPostalCode: input.customerCompany.billingPostalCode
+  }) || customerFacingFieldRules.addressFallback;
 }
 
 function buildCustomerContactLine(input: PdfInput) {

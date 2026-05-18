@@ -5,7 +5,22 @@ import type { ReportDraft } from "../report-engine";
 
 export type PdfInput = {
   tenant: { name: string; branding: unknown };
-  customerCompany: { name: string; contactName: string | null; billingEmail: string | null; phone: string | null };
+  customerCompany: {
+    name: string;
+    contactName: string | null;
+    billingEmail: string | null;
+    phone: string | null;
+    serviceAddressLine1?: string | null;
+    serviceAddressLine2?: string | null;
+    serviceCity?: string | null;
+    serviceState?: string | null;
+    servicePostalCode?: string | null;
+    billingAddressLine1?: string | null;
+    billingAddressLine2?: string | null;
+    billingCity?: string | null;
+    billingState?: string | null;
+    billingPostalCode?: string | null;
+  };
   site: { name: string; addressLine1: string; addressLine2: string | null; city: string; state: string; postalCode: string };
   inspection: { id: string; scheduledStart: Date; scheduledEnd: Date | null; status: string; notes: string | null };
   task: { inspectionType: InspectionType };

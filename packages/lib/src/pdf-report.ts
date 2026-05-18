@@ -25,7 +25,7 @@ import {
   type SummaryFactKey,
   type SummaryMetricKey
 } from "./report-pdf-config";
-import { getCustomerFacingSiteLabel } from "./scheduling";
+import { formatCustomerFacingInspectionAddress, getCustomerFacingSiteLabel } from "./scheduling";
 import { decodeStoredFile } from "./storage";
 import type { PdfInput } from "./pdf-v2";
 
@@ -172,18 +172,24 @@ export function formatPdfAddress(input: {
 }
 
 function formatServiceAddressLine(input: PdfInput) {
-  if (!getCustomerFacingSiteLabel(input.site.name)) {
-    return "";
-  }
-
-  return formatPdfAddress({
-    addressLine1: input.site.addressLine1,
-    addressLine2: input.site.addressLine2,
-    city: input.site.city,
-    state: input.site.state,
-    postalCode: input.site.postalCode,
-    fallback: NO_SITE_ADDRESS_COPY
-  });
+  return formatCustomerFacingInspectionAddress({
+    siteName: input.site.name,
+    siteAddressLine1: input.site.addressLine1,
+    siteAddressLine2: input.site.addressLine2,
+    siteCity: input.site.city,
+    siteState: input.site.state,
+    sitePostalCode: input.site.postalCode,
+    customerServiceAddressLine1: input.customerCompany.serviceAddressLine1,
+    customerServiceAddressLine2: input.customerCompany.serviceAddressLine2,
+    customerServiceCity: input.customerCompany.serviceCity,
+    customerServiceState: input.customerCompany.serviceState,
+    customerServicePostalCode: input.customerCompany.servicePostalCode,
+    customerBillingAddressLine1: input.customerCompany.billingAddressLine1,
+    customerBillingAddressLine2: input.customerCompany.billingAddressLine2,
+    customerBillingCity: input.customerCompany.billingCity,
+    customerBillingState: input.customerCompany.billingState,
+    customerBillingPostalCode: input.customerCompany.billingPostalCode
+  }) || NO_SITE_ADDRESS_COPY;
 }
 
 function formatCustomerContactLine(input: PdfInput) {

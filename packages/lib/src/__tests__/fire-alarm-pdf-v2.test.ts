@@ -24,6 +24,32 @@ describe("fire alarm pdf v2", () => {
     expect(serialized).not.toContain("raw-filename-photo.jpg");
   });
 
+  it("falls back to the customer address when the site is generic", () => {
+    const model = buildFireAlarmRenderModel({
+      ...fireAlarmSample,
+      customerCompany: {
+        ...fireAlarmSample.customerCompany,
+        serviceAddressLine1: "700 Hospital Service Dr",
+        serviceAddressLine2: "Building B",
+        serviceCity: "Enid",
+        serviceState: "OK",
+        servicePostalCode: "73701"
+      },
+      site: {
+        ...fireAlarmSample.site,
+        name: "General / No Fixed Site",
+        addressLine1: "No fixed service address",
+        addressLine2: null,
+        city: "Unknown",
+        state: "Unknown",
+        postalCode: "Unknown"
+      }
+    });
+
+    expect(model.identity.cleanAddress).toBe("700 Hospital Service Dr, Building B, Enid OK 73701");
+    expect(model.page1Metadata.some((item) => item.label === "Service address" && item.value.includes("700 Hospital Service Dr"))).toBe(true);
+  });
+
   it("keeps notification modality type-aware", () => {
     const model = buildFireAlarmRenderModel(fireAlarmSample);
     const strobeOnly = model.notificationAppliancesSection.rows.find((row) => /strobe/i.test(row.applianceType) && !/horn/i.test(row.applianceType));

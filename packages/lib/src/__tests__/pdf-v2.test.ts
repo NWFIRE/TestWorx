@@ -152,6 +152,39 @@ describe("pdf v2 report engine", () => {
     expect(JSON.stringify(model)).not.toContain("Unknown Unknown");
   });
 
+  it("keeps the customer address visible when the inspection uses a generic site", () => {
+    const model = buildReportRenderModelV2({
+      ...createBaseInput(),
+      customerCompany: {
+        ...createBaseInput().customerCompany,
+        serviceAddressLine1: "500 Customer Service Rd",
+        serviceAddressLine2: "Suite 12",
+        serviceCity: "Enid",
+        serviceState: "OK",
+        servicePostalCode: "73701"
+      },
+      site: {
+        name: "General / No Fixed Site",
+        addressLine1: "No fixed service address",
+        addressLine2: null,
+        city: "Unknown",
+        state: "Unknown",
+        postalCode: "Unknown"
+      },
+      task: { inspectionType: "fire_extinguisher" },
+      draft: buildInitialReportDraft({
+        inspectionType: "fire_extinguisher",
+        siteName: "Commercial Fire LLC",
+        customerName: "Commercial Fire LLC",
+        scheduledDate: "2026-04-01T09:00:00.000Z",
+        assetCount: 0
+      })
+    });
+
+    expect(model.identity.serviceAddress).toBe("500 Customer Service Rd, Suite 12, Enid OK 73701");
+    expect(model.overviewFacts.some((item) => item.label === "Service Address" && item.value.includes("500 Customer Service Rd"))).toBe(true);
+  });
+
   it("renders the Joint Commission sprinkler source-packet table flow", () => {
     const draft = buildInitialReportDraft({
       inspectionType: "joint_commission_fire_sprinkler",
