@@ -120,7 +120,10 @@ export const wetSprinklerReportTemplate: ReportTemplateDefinition = {
   description: "Comprehensive wet-pipe inspection workflow that preserves the existing form coverage while adding smarter frequency-based inspection, testing, maintenance, and deficiency documentation.",
   pdf: {
     subtitle: "Wet Fire Sprinkler Inspection Report",
-    nfpaReferences: ["NFPA 13", "NFPA 25"]
+    nfpaReferences: [
+      "NFPA 13 (2025 Edition) - Standard for the Installation of Sprinkler Systems",
+      "NFPA 25 (2026 Edition) - Standard for the Inspection, Testing, and Maintenance of Water-Based Fire Protection Systems"
+    ]
   },
   sections: [
     {

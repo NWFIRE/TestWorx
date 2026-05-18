@@ -1,5 +1,6 @@
 import type { InspectionType } from "@testworx/types";
 
+import { formatComplianceReferenceList } from "./compliance-references";
 import { getReportPdfMetadata, inspectionTypeRegistry } from "./report-config";
 
 export type SummaryMetricKey =
@@ -156,12 +157,17 @@ export type ReportTypeConfig = {
 };
 
 export const reportComplianceMap: Partial<Record<InspectionType, string[]>> = {
-  fire_alarm: ["NFPA 72", "NFPA 70"],
-  joint_commission_fire_alarm: ["NFPA 72", "NFPA 101", "CMS Life Safety Code", "Joint Commission Environment of Care"],
-  joint_commission_fire_sprinkler: ["NFPA 25", "NFPA 72", "Joint Commission EC.02.03.05"],
-  kitchen_suppression: ["NFPA 17A", "NFPA 96"],
-  industrial_suppression: ["NFPA 17"],
-  fire_extinguisher: ["NFPA 10"]
+  fire_alarm: formatComplianceReferenceList({ inspectionType: "fire_alarm" }),
+  joint_commission_fire_alarm: formatComplianceReferenceList({ inspectionType: "joint_commission_fire_alarm" }),
+  joint_commission_fire_sprinkler: formatComplianceReferenceList({ inspectionType: "joint_commission_fire_sprinkler" }),
+  kitchen_suppression: formatComplianceReferenceList({ inspectionType: "kitchen_suppression" }),
+  industrial_suppression: formatComplianceReferenceList({ inspectionType: "industrial_suppression" }),
+  fire_extinguisher: formatComplianceReferenceList({ inspectionType: "fire_extinguisher" }),
+  wet_fire_sprinkler: formatComplianceReferenceList({ inspectionType: "wet_fire_sprinkler" }),
+  dry_fire_sprinkler: formatComplianceReferenceList({ inspectionType: "dry_fire_sprinkler" }),
+  fire_pump: formatComplianceReferenceList({ inspectionType: "fire_pump" }),
+  emergency_exit_lighting: formatComplianceReferenceList({ inspectionType: "emergency_exit_lighting" }),
+  backflow: formatComplianceReferenceList({ inspectionType: "backflow" })
 };
 
 export const defaultReportPageOneConfig: ReportPageOneConfig = {
@@ -173,8 +179,8 @@ export const defaultReportPageOneConfig: ReportPageOneConfig = {
   },
   compliance: {
     enabled: true,
-    label: "Compliance Standards",
-    description: "This inspection was performed in accordance with the following standards.",
+    label: "Applicable Codes, Standards & Compliance References",
+    description: "This report includes editioned code references, applicability notes, and survey-ready compliance documentation.",
     codes: []
   },
   outcomeSummary: {
@@ -225,10 +231,10 @@ export const fireAlarmReportConfig: ReportTypeConfig = {
   title: "Fire Alarm Inspection and Testing Report",
   documentCategory: "inspection",
   compliance: {
-    label: "Applicable Codes",
-    codes: ["NFPA 72", "NFPA 70"],
+    label: "Applicable Codes, Standards & Compliance References",
+    codes: reportComplianceMap.fire_alarm ?? [],
     prominent: true,
-    description: "This inspection was performed in accordance with the following standards."
+    description: "This report includes editioned code references, applicability notes, and survey-ready compliance documentation."
   },
   statusMapping: {
     finalizedLabel: "Finalized",
@@ -247,9 +253,9 @@ export const fireAlarmReportConfig: ReportTypeConfig = {
     ...defaultReportPageOneConfig,
     compliance: {
       enabled: true,
-      label: "Compliance Standards",
-      description: "This inspection was performed in accordance with the following standards.",
-      codes: ["NFPA 72", "NFPA 70"]
+      label: "Applicable Codes, Standards & Compliance References",
+      description: "This report includes editioned code references, applicability notes, and survey-ready compliance documentation.",
+      codes: reportComplianceMap.fire_alarm ?? []
     },
     outcomeSummary: {
       metrics: ["documentStatus", "outcome", "deficiencyCount", "completionPercent"]
@@ -280,10 +286,10 @@ export const kitchenSuppressionReportConfig: ReportTypeConfig = {
   title: "Kitchen Suppression Inspection Report",
   documentCategory: "inspection",
   compliance: {
-    label: "Applicable Codes",
-    codes: ["NFPA 17A", "NFPA 96"],
+    label: "Applicable Codes, Standards & Compliance References",
+    codes: reportComplianceMap.kitchen_suppression ?? [],
     prominent: true,
-    description: "This inspection was performed in accordance with the following standards."
+    description: "This report includes editioned code references, applicability notes, and survey-ready compliance documentation."
   },
   statusMapping: {
     finalizedLabel: "Finalized",
@@ -302,9 +308,9 @@ export const kitchenSuppressionReportConfig: ReportTypeConfig = {
     ...defaultReportPageOneConfig,
     compliance: {
       enabled: true,
-      label: "Compliance Standards",
-      description: "This inspection was performed in accordance with the following standards.",
-      codes: ["NFPA 17A", "NFPA 96"]
+      label: "Applicable Codes, Standards & Compliance References",
+      description: "This report includes editioned code references, applicability notes, and survey-ready compliance documentation.",
+      codes: reportComplianceMap.kitchen_suppression ?? []
     },
     overviewFacts: {
       fields: ["scheduledWindow", "billingContact", "siteAddress", "inspectionStatus"],
@@ -335,7 +341,7 @@ export const kitchenSuppressionReportConfig: ReportTypeConfig = {
           { key: "fuelShutdownVerified", label: "Fuel shutdown verified?" },
           { key: "fireAlarmInterconnectWorking", label: "Fire alarm interconnection functioning?" },
           { key: "kClassExtinguisherPresent", label: "K-Class extinguisher in place?" },
-          { key: "hoodCleanedPerNFPA96", label: "Hood cleaned per NFPA 96?" }
+          { key: "hoodCleanedPerNFPA96", label: "Hood cleaned per NFPA 96 (2024 Edition)?" }
         ]
       }
     },
@@ -352,10 +358,10 @@ export const fireExtinguisherReportConfig: ReportTypeConfig = {
   title: "Fire Extinguisher Inspection and Service Report",
   documentCategory: "inspection",
   compliance: {
-    label: "Applicable Codes",
-    codes: ["NFPA 10"],
+    label: "Applicable Codes, Standards & Compliance References",
+    codes: reportComplianceMap.fire_extinguisher ?? [],
     prominent: true,
-    description: "This inspection was performed in accordance with the following standards."
+    description: "This report includes editioned code references, applicability notes, and survey-ready compliance documentation."
   },
   statusMapping: {
     finalizedLabel: "Finalized",
@@ -374,9 +380,9 @@ export const fireExtinguisherReportConfig: ReportTypeConfig = {
     ...defaultReportPageOneConfig,
     compliance: {
       enabled: true,
-      label: "Compliance Standards",
-      description: "This inspection was performed in accordance with the following standards.",
-      codes: ["NFPA 10"]
+      label: "Applicable Codes, Standards & Compliance References",
+      description: "This report includes editioned code references, applicability notes, and survey-ready compliance documentation.",
+      codes: reportComplianceMap.fire_extinguisher ?? []
     },
     overviewFacts: {
       fields: ["scheduledWindow", "billingContact", "siteAddress", "inspectionStatus"],
@@ -413,10 +419,10 @@ function buildDefaultReportTypeConfig(type: InspectionType): ReportTypeConfig {
     subtitle: pdf.subtitle,
     documentCategory: type === "work_order" ? "service" : "inspection",
     compliance: {
-      label: "Applicable Codes",
+      label: "Applicable Codes, Standards & Compliance References",
       codes: reportComplianceMap[type] ?? pdf.nfpaReferences ?? [],
       prominent: true,
-      description: "This inspection was performed in accordance with the following standards."
+      description: "This report includes editioned code references, applicability notes, and survey-ready compliance documentation."
     },
     statusMapping: {
       finalizedLabel: "Finalized",
@@ -435,8 +441,8 @@ function buildDefaultReportTypeConfig(type: InspectionType): ReportTypeConfig {
       ...defaultReportPageOneConfig,
       compliance: {
         enabled: true,
-        label: "Compliance Standards",
-        description: "This inspection was performed in accordance with the following standards.",
+        label: "Applicable Codes, Standards & Compliance References",
+        description: "This report includes editioned code references, applicability notes, and survey-ready compliance documentation.",
         codes: reportComplianceMap[type] ?? pdf.nfpaReferences ?? []
       },
       overviewFacts: {

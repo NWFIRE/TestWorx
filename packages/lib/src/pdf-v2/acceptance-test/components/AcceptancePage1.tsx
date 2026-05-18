@@ -1,6 +1,7 @@
 import React from "react";
 
 import { Badge } from "../../core/components/Badge";
+import { ComplianceBlock } from "../../core/components/ComplianceBlock";
 
 import type { AcceptanceTestRenderModel } from "../types/acceptanceTestRenderModel";
 
@@ -41,6 +42,11 @@ export function AcceptancePage1({ model }: { model: AcceptanceTestRenderModel })
           </div>
         </div>
       </section>
+      <ComplianceBlock
+        codes={model.compliance.references.map((reference) => reference.formattedReference)}
+        references={model.compliance.references}
+        title={model.compliance.title}
+      />
     </section>
   );
 }

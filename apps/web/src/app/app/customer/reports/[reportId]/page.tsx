@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { buildReportPreview, describeRepeaterValueLines, getCustomerFacingSiteLabel, getCustomerReportDetail, isCustomerVisibleField, type ReportFieldDefinition } from "@testworx/lib/server/index";
+import { buildComplianceSection, buildReportPreview, describeRepeaterValueLines, getCustomerFacingSiteLabel, getCustomerReportDetail, isCustomerVisibleField, type ReportFieldDefinition } from "@testworx/lib/server/index";
 
 import { InspectionPacketCard } from "../../../inspection-packet-card";
 import { AppPageShell, PageHeader, SectionCard, StatusBadge, WorkspaceSplit } from "../../../admin/operations-ui";
@@ -64,6 +64,31 @@ function formatHostedInspectionOutcome(
   return inspectionStatus === "deficiencies_found" ? "Deficiencies Found" : "Pass";
 }
 
+function ComplianceReferenceCard({ section }: { section: ReturnType<typeof buildComplianceSection> }) {
+  return (
+    <SectionCard>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--tenant-primary)]">{section.title}</p>
+      <p className="mt-3 text-sm leading-7 text-slate-600">
+        This hosted report includes editioned standards, applicability notes, cited chapters/sections, and healthcare survey references when applicable. These references are preserved with the finalized report.
+      </p>
+      <div className="mt-5 space-y-3">
+        {section.references.map((reference) => (
+          <div key={reference.id} className="rounded-[22px] border border-slate-200 bg-slate-50/65 p-4">
+            <p className="font-semibold text-slate-950">{reference.formattedReference}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Applies to: {reference.applicableInspectionSections.join(", ")}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Reason used: {reference.applicabilityReason}</p>
+            {reference.chapterReferences.length || reference.nfpaSections.length ? (
+              <p className="mt-2 text-sm leading-6 text-slate-600">Chapters/sections: {[...reference.chapterReferences, ...reference.nfpaSections.map((item) => `Section ${item}`)].join("; ")}</p>
+            ) : null}
+            {reference.tableReferences.length ? <p className="mt-2 text-sm leading-6 text-slate-600">Tables: {reference.tableReferences.join("; ")}</p> : null}
+            {reference.jointCommissionEPReferences.length ? <p className="mt-2 text-sm leading-6 text-slate-600">Joint Commission: {reference.jointCommissionEPReferences.join(", ")}</p> : null}
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
 export default async function CustomerReportDetailPage({ params }: { params: Promise<{ reportId: string }> }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -96,6 +121,13 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
     }>;
   }).packetDocuments ?? [];
   const preview = buildReportPreview(detail.draft);
+  const complianceSection = buildComplianceSection({
+    inspectionType: detail.report.task.inspectionType,
+    draft: detail.draft,
+    customerCompany: detail.report.inspection.customerCompany as unknown as Record<string, unknown>,
+    site: detail.report.inspection.site as unknown as Record<string, unknown>,
+    generatedAt: detail.report.finalizedAt ?? detail.report.updatedAt
+  });
 
   if (detail.report.task.inspectionType === "wet_chemical_acceptance_test") {
     const signaturesByKind = Object.fromEntries(detail.report.signatures.map((signature) => [signature.kind, signature])) as Record<
@@ -157,6 +189,7 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
             <p className="text-sm text-slate-500">Completed {format(reportView.finalizedAt ?? reportView.updatedAt, "MMM d, yyyy h:mm a")}</p>
           </div>
         </SectionCard>
+        <ComplianceReferenceCard section={complianceSection} />
 
         <WorkspaceSplit variant="content-heavy">
           <AcceptanceReportView model={model} />
@@ -205,6 +238,7 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
           <p className="text-sm text-slate-500">Completed {format(reportView.finalizedAt ?? reportView.updatedAt, "MMM d, yyyy h:mm a")}</p>
         </div>
       </SectionCard>
+      <ComplianceReferenceCard section={complianceSection} />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SectionCard>

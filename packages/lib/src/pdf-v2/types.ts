@@ -1,5 +1,6 @@
 import type { InspectionType } from "@testworx/types";
 
+import type { ComplianceReferenceSnapshot } from "../compliance-references";
 import type { ReportDraft } from "../report-engine";
 
 export type PdfInput = {
@@ -118,6 +119,7 @@ export type ReportTypeConfig = {
     label: string;
     description?: string;
     codes: string[];
+    references?: ComplianceReferenceSnapshot[];
   };
   pageOne: {
     outcomeMetrics: SummaryMetricKey[];
@@ -300,6 +302,8 @@ export type ReportRenderModelV2 = {
     title: string;
     description: string;
     codes: string[];
+    references: ComplianceReferenceSnapshot[];
+    healthcareContext: boolean;
   };
   outcomeCards: RenderMetricCard[];
   primaryFacts: RenderKeyValueRow[];

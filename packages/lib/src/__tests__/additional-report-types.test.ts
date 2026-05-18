@@ -29,7 +29,7 @@ describe("additional inspection report types", () => {
       });
 
       expect(template.sections.length).toBeGreaterThanOrEqual(1);
-      expect(draft.sectionOrder).toHaveLength(template.sections.length);
+      expect(draft.sectionOrder).toEqual(expect.arrayContaining(template.sections.map((section) => section.id)));
       expect(draft.context.customerName).toBe("Harbor View Hospital");
 
       for (const section of template.sections) {
@@ -86,10 +86,10 @@ describe("additional inspection report types", () => {
 
     const metadata = getReportPdfMetadata("joint_commission_fire_alarm");
     expect(metadata.nfpaReferences).toEqual([
-      "NFPA 72",
-      "NFPA 101",
-      "CMS Life Safety Code",
-      "Joint Commission Environment of Care"
+      "NFPA 72 (2025 Edition) - National Fire Alarm and Signaling Code",
+      "NFPA 101 (2024 Edition) - Life Safety Code",
+      "CMS Life Safety Code - Current adopted healthcare life safety requirements",
+      "Joint Commission EC.02.03.05 - Fire protection systems documentation"
     ]);
   });
 });

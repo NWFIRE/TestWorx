@@ -1,7 +1,9 @@
+import type { ComplianceSectionSnapshot } from "../../../compliance-references";
+
 export type AcceptanceTestRenderModel = {
   report: {
     title: "Wet Chemical System Acceptance Test Report";
-    standard: "NFPA 17A";
+    standard: string;
     result: "Pass" | "Fail" | "Partial";
     completionDate?: string;
     narrative: string;
@@ -51,6 +53,7 @@ export type AcceptanceTestRenderModel = {
     passed: number;
     failed: number;
   };
+  compliance: ComplianceSectionSnapshot;
   witness: {
     witnessedBy?: string;
   };

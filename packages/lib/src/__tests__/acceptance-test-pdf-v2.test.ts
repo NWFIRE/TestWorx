@@ -16,7 +16,7 @@ describe("acceptance test pdf v2", () => {
     expect(model.report.result).toBe("Pass");
     expect(serialized).not.toContain("Unknown Unknown");
     expect(serialized).not.toContain("\"comments\":\"—\"");
-    expect(serialized).not.toContain("Na");
+    expect(serialized).not.toContain("\"Na\"");
   });
 
   it("fails the overall result when any required test fails", () => {
@@ -39,7 +39,7 @@ describe("acceptance test pdf v2", () => {
     const installerIndex = html.indexOf("Installer Information");
     const systemIndex = html.indexOf("System Information");
     const resultsIndex = html.indexOf("Acceptance Test Results");
-    const summaryIndex = html.indexOf("Total Tests");
+    const summaryIndex = html.lastIndexOf("Total Tests");
     const witnessIndex = html.indexOf("Witness Information");
     const commentsIndex = html.indexOf("Additional Comments");
     const signaturesIndex = html.indexOf("Signatures");
@@ -53,7 +53,7 @@ describe("acceptance test pdf v2", () => {
     expect(witnessIndex).toBeGreaterThan(summaryIndex);
     expect(commentsIndex).toBeGreaterThan(witnessIndex);
     expect(signaturesIndex).toBeGreaterThan(commentsIndex);
-    expect(html).toContain("NFPA 17A");
+    expect(html).toContain("NFPA 17A (2024 Edition)");
     expect(html).toContain(">Result<");
     expect(html).not.toContain(">Pass / Fail<");
     expect(html).not.toContain(">Yes / No<");

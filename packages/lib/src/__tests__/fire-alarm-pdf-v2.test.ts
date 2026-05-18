@@ -20,14 +20,14 @@ describe("fire alarm pdf v2", () => {
 
     expect(serialized).not.toContain("Unknown Unknown");
     expect(serialized).not.toContain("—");
-    expect(serialized).not.toContain("Na");
+    expect(serialized).not.toContain("\"Na\"");
     expect(serialized).not.toContain("raw-filename-photo.jpg");
   });
 
   it("keeps notification modality type-aware", () => {
     const model = buildFireAlarmRenderModel(fireAlarmSample);
     const strobeOnly = model.notificationAppliancesSection.rows.find((row) => /strobe/i.test(row.applianceType) && !/horn/i.test(row.applianceType));
-    const hornStrobe = model.notificationAppliancesSection.rows.find((row) => /horn strobe/i.test(row.applianceType));
+    const hornStrobe = model.notificationAppliancesSection.rows.find((row) => /horn[_ ]strobe/i.test(row.applianceType));
 
     expect(strobeOnly?.audibleOperation).toBeUndefined();
     expect(strobeOnly?.visibleOperation).toBe("Pass");
@@ -40,7 +40,7 @@ describe("fire alarm pdf v2", () => {
     const html = await renderPdfHtml(createElement(FireAlarmReportDocument, { model }));
 
     const outcomeIndex = html.indexOf("Inspection outcome");
-    const complianceIndex = html.indexOf("Compliance Standards");
+    const complianceIndex = html.indexOf("Applicable Codes, Standards");
     const identityIndex = html.indexOf("Customer and site");
     const metricsIndex = html.indexOf("Control Panels");
 
@@ -48,8 +48,8 @@ describe("fire alarm pdf v2", () => {
     expect(complianceIndex).toBeGreaterThan(outcomeIndex);
     expect(identityIndex).toBeGreaterThan(complianceIndex);
     expect(metricsIndex).toBeGreaterThan(identityIndex);
-    expect(html).toContain("NFPA 72");
-    expect(html).toContain("NFPA 70");
+    expect(html).toContain("NFPA 72 (2025 Edition)");
+    expect(html).toContain("NFPA 70 (2026 Edition)");
     expect(html).not.toContain("raw-filename-photo.jpg");
   });
 });

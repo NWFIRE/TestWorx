@@ -20,6 +20,7 @@ export * from "../billing-queue";
 export * from "../billing";
 export * from "../branding";
 export * from "../client-profile";
+export * from "../compliance-references";
 export * from "../contract-provider-billing";
 export * from "../compliance-reporting-fees";
 export * from "../customer-companies";

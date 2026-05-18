@@ -294,10 +294,10 @@ const backflowTagStatusOptions: ReportOption[] = [
 ];
 
 const backflowCodeEditionOptions: ReportOption[] = [
-  { label: "NFPA 25 2026", value: "nfpa25_2026" },
-  { label: "NFPA 25 2023", value: "nfpa25_2023" },
-  { label: "NFPA 25 2020", value: "nfpa25_2020" },
-  { label: "NFPA 25 2017", value: "nfpa25_2017" },
+  { label: "NFPA 25 (2026 Edition)", value: "nfpa25_2026" },
+  { label: "NFPA 25 (2023 Edition)", value: "nfpa25_2023" },
+  { label: "NFPA 25 (2020 Edition)", value: "nfpa25_2020" },
+  { label: "NFPA 25 (2017 Edition)", value: "nfpa25_2017" },
   { label: "AHJ-specific requirement set", value: "ahj_specific" },
   { label: "Other", value: "other" }
 ];
@@ -561,10 +561,10 @@ const jointCommissionInspectionTypeOptions: ReportOption[] = [
 ];
 
 const jointCommissionCodeEditionOptions: ReportOption[] = [
-  { label: "NFPA 25 2026", value: "nfpa25_2026" },
-  { label: "NFPA 25 2023", value: "nfpa25_2023" },
-  { label: "NFPA 25 2020", value: "nfpa25_2020" },
-  { label: "NFPA 25 2017", value: "nfpa25_2017" },
+  { label: "NFPA 25 (2026 Edition)", value: "nfpa25_2026" },
+  { label: "NFPA 25 (2023 Edition)", value: "nfpa25_2023" },
+  { label: "NFPA 25 (2020 Edition)", value: "nfpa25_2020" },
+  { label: "NFPA 25 (2017 Edition)", value: "nfpa25_2017" },
   { label: "AHJ-specific", value: "ahj_specific" }
 ];
 
@@ -1116,8 +1116,8 @@ const jointCommissionFireAlarmPanelModelOptions: ReportOption[] = [
 ];
 
 const jointCommissionFireAlarmReferenceOptions: ReportOption[] = [
-  { label: "NFPA 72", value: "nfpa_72" },
-  { label: "NFPA 101", value: "nfpa_101" },
+  { label: "NFPA 72 (2025 Edition)", value: "nfpa_72" },
+  { label: "NFPA 101 (2024 Edition)", value: "nfpa_101" },
   { label: "CMS Life Safety Code", value: "cms_life_safety_code" },
   { label: "Joint Commission Environment of Care", value: "joint_commission_ec" },
   { label: "Local AHJ requirement", value: "local_ahj" },

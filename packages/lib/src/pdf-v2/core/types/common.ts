@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { ComplianceReferenceSnapshot } from "../../../compliance-references";
 
 export type PdfShellProps = {
   children: ReactNode;
@@ -34,6 +35,9 @@ export type OutcomeHeroProps = {
 
 export type ComplianceBlockProps = {
   codes: string[];
+  title?: string;
+  description?: string;
+  references?: ComplianceReferenceSnapshot[];
 };
 
 export type IdentityBandProps = {

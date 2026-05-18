@@ -1,4 +1,5 @@
 import { resolveTenantBranding } from "../branding";
+import { buildComplianceSection } from "../compliance-references";
 import { buildReportPreview } from "../report-engine";
 import type { ReportPrimitiveValue } from "../report-config";
 import { getCustomerFacingSiteLabel } from "../scheduling";
@@ -541,6 +542,13 @@ export function buildReportRenderModelV2(input: PdfInput): ReportRenderModelV2 {
     isSigned: Boolean(input.technicianSignature || input.customerSignature),
     workflowStatus: input.inspection.status
   });
+  const complianceSection = buildComplianceSection({
+    inspectionType: input.task.inspectionType,
+    draft: input.draft,
+    customerCompany: input.customerCompany as unknown as Record<string, unknown>,
+    site: input.site as unknown as Record<string, unknown>,
+    generatedAt: input.report.finalizedAt ?? new Date()
+  });
 
   return {
     version: {
@@ -584,9 +592,11 @@ export function buildReportRenderModelV2(input: PdfInput): ReportRenderModelV2 {
       serviceDate: formatDate(input.inspection.scheduledStart)
     },
     compliance: {
-      title: config.compliance.label,
-      description: config.compliance.description ?? "",
-      codes: config.compliance.codes
+      title: complianceSection.title,
+      description: "This finalized report package includes standards, edition years, cited chapters/sections, applicability explanations, and healthcare survey references when applicable. These references are snapshotted with the report for audit, AHJ, and Joint Commission review.",
+      codes: complianceSection.references.map((reference) => reference.formattedReference),
+      references: complianceSection.references,
+      healthcareContext: complianceSection.healthcareContext
     },
     outcomeCards: config.pageOne.outcomeMetrics.map((metric) => mapOutcomeMetric(input, config, preview, metric)),
     primaryFacts: config.pageOne.primaryFacts.map((fact) => mapSummaryFact(input, fact)).filter((item) => item.value),

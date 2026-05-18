@@ -255,6 +255,34 @@ export const reportSignatureSchema = z.object({
   signedAt: z.string().default("")
 });
 
+const complianceReferenceSnapshotSchema = z.object({
+  id: z.string().min(1),
+  standardCode: z.string().min(1),
+  editionYear: z.string().min(1),
+  fullTitle: z.string().min(1),
+  shortTitle: z.string().default(""),
+  applicableInspectionSections: z.array(z.string()).default([]),
+  chapterReferences: z.array(z.string()).default([]),
+  tableReferences: z.array(z.string()).default([]),
+  nfpaSections: z.array(z.string()).default([]),
+  jointCommissionEPReferences: z.array(z.string()).default([]),
+  complianceExplanation: z.string().default(""),
+  applicabilityReason: z.string().default(""),
+  displayOrder: z.number().default(0),
+  jurisdictionOverrideSupport: z.boolean().default(true),
+  formattedReference: z.string().min(1),
+  snapshotSource: z.enum(["registry", "historical_snapshot"]).default("historical_snapshot")
+});
+
+const complianceSectionSnapshotSchema = z.object({
+  title: z.string().default("Applicable Codes, Standards & Compliance References"),
+  generatedAt: z.string().default(""),
+  sourceVersion: z.string().default(""),
+  healthcareContext: z.boolean().default(false),
+  inspectionType: z.string().default(""),
+  references: z.array(complianceReferenceSnapshotSchema).default([])
+});
+
 export const reportDraftSchema = z.object({
   templateVersion: z.number().default(1),
   inspectionType: z.string().min(1),
@@ -268,6 +296,7 @@ export const reportDraftSchema = z.object({
     technician: reportSignatureSchema.optional(),
     customer: reportSignatureSchema.optional()
   }).default({}),
+  complianceSnapshot: complianceSectionSnapshotSchema.optional(),
   context: z.object({
     siteName: z.string().max(160).default(""),
     customerName: z.string().max(160).default(""),

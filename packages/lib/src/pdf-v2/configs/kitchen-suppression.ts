@@ -1,4 +1,5 @@
 import type { ReportTypeConfig } from "../types";
+import { reportComplianceMap } from "../compliance";
 
 export const kitchenSuppressionReportConfigV2: ReportTypeConfig = {
   type: "kitchen_suppression",
@@ -7,9 +8,9 @@ export const kitchenSuppressionReportConfigV2: ReportTypeConfig = {
   documentCategory: "inspection",
   compliance: {
     enabled: true,
-    label: "Compliance Standards",
-    description: "This inspection was performed in accordance with the following standards.",
-    codes: ["NFPA 17A", "NFPA 96"]
+    label: "Applicable Codes, Standards & Compliance References",
+    description: "This report includes editioned code references, applicability notes, and survey-ready compliance documentation.",
+    codes: reportComplianceMap.kitchen_suppression ?? []
   },
   pageOne: {
     outcomeMetrics: ["documentStatus", "outcome", "deficiencyCount", "serviceDate"],
@@ -111,7 +112,7 @@ export const kitchenSuppressionReportConfigV2: ReportTypeConfig = {
           { key: "filtersInstalledCorrectly", label: "Proper filters installed & in correct position?" },
           { key: "exhaustFanOperational", label: "Exhaust fan operational and warning sign on hood?" },
           { key: "kClassExtinguisherPresent", label: "K-class fire extinguisher charged & in place?" },
-          { key: "hoodCleanedPerNFPA96", label: "Hood cleaned regularly in accordance with NFPA 96?" }
+          { key: "hoodCleanedPerNFPA96", label: "Hood cleaned regularly in accordance with NFPA 96 (2024 Edition)?" }
         ]
       }
     },

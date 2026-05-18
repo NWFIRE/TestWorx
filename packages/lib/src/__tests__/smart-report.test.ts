@@ -1723,7 +1723,7 @@ describe("smart report foundations", () => {
                 requirementEditionLabel: "2023 baseline",
                 frequencyLabel: "Annual inspection / test",
                 displayLabel: "Assembly is accessible for inspection, testing, and service.",
-                codeRef: "NFPA 25 backflow visual inspection baseline",
+                codeRef: "NFPA 25 (2026 Edition) backflow visual inspection baseline",
                 result: "pass",
                 condition: "good",
                 comments: "",

@@ -8,6 +8,7 @@ import { actorContextSchema, reportStatuses } from "@testworx/types";
 
 import { resolveTenantBranding } from "./branding";
 import { assertTenantEntitlementForTenant } from "./billing";
+import { snapshotComplianceReferences } from "./compliance-references";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
 import { syncInspectionBillingSummaryTx } from "./inspection-billing";
 import { reconcileInspectionStatusTx } from "./inspection-status-consistency";
@@ -1699,7 +1700,17 @@ export async function finalizeInspectionReport(actor: ActorContext, input: Final
   const finalized = await prisma.$transaction(async (tx) => {
     const transactionalReport = await tx.inspectionReport.findFirst({
       where: { id: report.id, tenantId: parsedActor.tenantId as string },
-      include: { inspection: true, task: true, attachments: true, signatures: true }
+      include: {
+        inspection: {
+          include: {
+            site: true,
+            customerCompany: true
+          }
+        },
+        task: true,
+        attachments: true,
+        signatures: true
+      }
     });
 
     if (!transactionalReport) {
@@ -1721,11 +1732,17 @@ export async function finalizeInspectionReport(actor: ActorContext, input: Final
     });
     persisted.staleStorageKeys.forEach((storageKey) => staleStorageKeys.add(storageKey));
 
+    const complianceDraft = snapshotComplianceReferences(persisted.draft, {
+      inspectionType: transactionalReport.task.inspectionType,
+      customerCompany: transactionalReport.inspection.customerCompany as unknown as Record<string, unknown>,
+      site: transactionalReport.inspection.site as unknown as Record<string, unknown>
+    });
+
     await persistReportDraftTransaction({
       tx,
       parsedActor,
       report: transactionalReport,
-      draft: persisted.draft,
+      draft: complianceDraft,
       taskDisplayLabel: nextTaskDisplayLabel,
       nextStatus: reportStatuses.draft
     });

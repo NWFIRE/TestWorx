@@ -1,4 +1,5 @@
 import type { ReportTypeConfig } from "../types";
+import { reportComplianceMap } from "../compliance";
 
 export const industrialDryChemicalReportConfigV2: ReportTypeConfig = {
   type: "industrial_suppression",
@@ -7,9 +8,9 @@ export const industrialDryChemicalReportConfigV2: ReportTypeConfig = {
   documentCategory: "inspection",
   compliance: {
     enabled: true,
-    label: "Compliance Standards",
-    description: "This inspection was performed in accordance with the following standards.",
-    codes: ["NFPA 17"]
+    label: "Applicable Codes, Standards & Compliance References",
+    description: "This report includes editioned code references, applicability notes, and survey-ready compliance documentation.",
+    codes: reportComplianceMap.industrial_suppression ?? []
   },
   pageOne: {
     outcomeMetrics: ["documentStatus", "outcome", "deficiencyCount", "serviceDate"],

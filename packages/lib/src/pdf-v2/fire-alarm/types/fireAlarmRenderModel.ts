@@ -1,3 +1,5 @@
+import type { ComplianceSectionSnapshot } from "../../../compliance-references";
+
 export type FireAlarmReportRenderModel = {
   report: {
     title: string;
@@ -17,9 +19,7 @@ export type FireAlarmReportRenderModel = {
     website?: string;
     address?: string;
   };
-  compliance: {
-    codes: string[];
-  };
+  compliance: ComplianceSectionSnapshot;
   identity: {
     customerName: string;
     siteName?: string;

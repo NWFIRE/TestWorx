@@ -17,7 +17,11 @@ export function FireAlarmPage1({ model }: { model: FireAlarmReportRenderModel })
         narrative={model.report.narrative}
         result={model.report.result ?? "Pass"}
       />
-      <ComplianceBlock codes={model.compliance.codes} />
+      <ComplianceBlock
+        codes={model.compliance.references.map((reference) => reference.formattedReference)}
+        references={model.compliance.references}
+        title={model.compliance.title}
+      />
       <IdentityBand {...model.identity} />
       <MetadataGrid columns={3} items={model.page1Metadata} />
       <MetadataGrid columns={3} items={model.monitoringInfo} />

@@ -9,7 +9,7 @@ import type { AcceptanceTestRenderModel } from "../types/acceptanceTestRenderMod
 export function TestResultsSection({ model }: { model: AcceptanceTestRenderModel }) {
   return (
     <section className="pdf-section">
-      <SectionHeader title="Acceptance Test Results" subtitle="NFPA 17A acceptance checkpoints normalized to one clear result system." />
+      <SectionHeader title="Acceptance Test Results" subtitle="NFPA 17A (2024 Edition) acceptance checkpoints normalized to one clear result system." />
       <DataTable
         density="compact"
         rows={model.tests}

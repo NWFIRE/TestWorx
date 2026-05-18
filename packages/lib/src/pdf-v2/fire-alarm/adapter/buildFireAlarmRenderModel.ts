@@ -1,5 +1,5 @@
 import { resolveTenantBranding } from "../../../branding";
-import { inspectionTypeRegistry } from "../../../report-config";
+import { buildComplianceSection } from "../../../compliance-references";
 import { reportDraftSchema } from "../../../report-engine";
 import { getCustomerFacingSiteLabel } from "../../../scheduling";
 import type { PdfInput } from "../../types";
@@ -145,9 +145,13 @@ export function buildFireAlarmRenderModel(rawReport: unknown): FireAlarmReportRe
       website: cleanText(branding.website),
       address: joinNonEmpty([branding.addressLine1, branding.addressLine2, joinNonEmpty([branding.city, branding.state], ", "), branding.postalCode], ", ")
     },
-    compliance: {
-      codes: inspectionTypeRegistry.fire_alarm.pdf?.nfpaReferences ?? ["NFPA 72", "NFPA 70"]
-    },
+    compliance: buildComplianceSection({
+      inspectionType: input.task.inspectionType,
+      draft,
+      customerCompany: input.customerCompany as unknown as Record<string, unknown>,
+      site: input.site as unknown as Record<string, unknown>,
+      generatedAt: input.report.finalizedAt ?? new Date()
+    }),
     identity: {
       customerName: cleanTitleLikeText(input.customerCompany.name) ?? input.customerCompany.name,
       siteName: cleanTitleLikeText(customerFacingSiteName),

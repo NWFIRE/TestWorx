@@ -9,6 +9,7 @@ import {
   getCustomerFacingReportState,
   getPdfComplianceStandards
 } from "../pdf-report";
+import { buildComplianceSection, formatNFPAReference, getApplicableStandardsForReport, snapshotComplianceReferences } from "../compliance-references";
 import { defaultReportPageOneConfig, resolveReportTypeConfig } from "../report-pdf-config";
 import { buildDataUrlStorageKey, decodeStoredFile } from "../storage";
 
@@ -18,10 +19,13 @@ const tinyPngDataUrl = buildDataUrlStorageKey({ mimeType: "image/png", bytes: ti
 describe("pdf generation workflow", () => {
   it("formats shared PDF customer-facing helpers cleanly", () => {
     expect(buildPdfPhotoCaption(0)).toBe("Photo 1");
-    expect(getPdfComplianceStandards("kitchen_suppression")).toEqual(["NFPA 17A", "NFPA 96"]);
+    expect(getPdfComplianceStandards("kitchen_suppression")).toEqual(expect.arrayContaining([
+      expect.stringContaining("NFPA 17A (2024 Edition)"),
+      expect.stringContaining("NFPA 96 (2024 Edition)")
+    ]));
     expect(resolveReportTypeConfig("fire_alarm").title).toBe("Fire Alarm Inspection and Testing Report");
     expect(resolveReportTypeConfig("fire_alarm").sections[0]?.key).toBe("control-panel");
-    expect(resolveReportTypeConfig("fire_alarm").pageOne.compliance.label).toBe("Compliance Standards");
+    expect(resolveReportTypeConfig("fire_alarm").pageOne.compliance.label).toBe("Applicable Codes, Standards & Compliance References");
     expect(resolveReportTypeConfig("fire_alarm").pageOne.outcomeSummary.metrics).toEqual(["documentStatus", "outcome", "deficiencyCount", "completionPercent"]);
     expect(resolveReportTypeConfig("kitchen_suppression").pageOne.systemSummary.sectionKey).toBe("system-details");
     expect(defaultReportPageOneConfig.primaryFacts.layout).toBe("two-column-grid");
@@ -55,14 +59,47 @@ describe("pdf generation workflow", () => {
     const kitchenSuppression = resolveReportTypeConfig("kitchen_suppression");
     const extinguisher = resolveReportTypeConfig("fire_extinguisher");
 
-    expect(fireAlarm.pageOne.compliance.codes).toEqual(["NFPA 72", "NFPA 70"]);
+    expect(fireAlarm.pageOne.compliance.codes).toEqual(expect.arrayContaining([
+      expect.stringContaining("NFPA 72 (2025 Edition)"),
+      expect.stringContaining("NFPA 70 (2026 Edition)")
+    ]));
     expect(fireAlarm.pageOne.systemSummary.sectionKey).toBe("system-summary");
 
-    expect(kitchenSuppression.pageOne.compliance.codes).toEqual(["NFPA 17A", "NFPA 96"]);
+    expect(kitchenSuppression.pageOne.compliance.codes).toEqual(expect.arrayContaining([
+      expect.stringContaining("NFPA 17A (2024 Edition)"),
+      expect.stringContaining("NFPA 96 (2024 Edition)")
+    ]));
     expect(kitchenSuppression.pageOne.systemSummary.sectionKey).toBe("system-details");
 
-    expect(extinguisher.pageOne.compliance.codes).toEqual(["NFPA 10"]);
+    expect(extinguisher.pageOne.compliance.codes).toEqual(expect.arrayContaining([
+      expect.stringContaining("NFPA 10 (2026 Edition)")
+    ]));
     expect(extinguisher.pageOne.systemSummary.sectionKey).toBe("service");
+  });
+
+  it("builds centralized Joint Commission-level compliance references with edition snapshots", () => {
+    const sprinkler = buildComplianceSection({
+      inspectionType: "joint_commission_fire_sprinkler",
+      customerCompany: { name: "St Mary Hospital" },
+      generatedAt: new Date("2026-05-18T12:00:00.000Z")
+    });
+    expect(sprinkler.title).toBe("Applicable Codes, Standards & Compliance References");
+    expect(sprinkler.healthcareContext).toBe(true);
+    expect(sprinkler.references.map((reference) => reference.formattedReference)).toEqual(expect.arrayContaining([
+      expect.stringContaining("NFPA 25 (2026 Edition)"),
+      expect.stringContaining("NFPA 72 (2025 Edition)")
+    ]));
+    expect(sprinkler.references.flatMap((reference) => reference.jointCommissionEPReferences)).toContain("EC.02.03.05 EP2");
+
+    const kitchen = getApplicableStandardsForReport({ inspectionType: "kitchen_suppression" });
+    expect(kitchen.map((reference) => formatNFPAReference(reference))).toEqual(expect.arrayContaining([
+      expect.stringContaining("NFPA 17A (2024 Edition)"),
+      expect.stringContaining("NFPA 96 (2024 Edition)")
+    ]));
+
+    const draft = snapshotComplianceReferences({ sections: {} }, { inspectionType: "fire_alarm", generatedAt: new Date("2026-05-18T12:00:00.000Z") });
+    expect(draft.complianceSnapshot.references.every((reference) => /\(\d{4} Edition\)|\(Current Edition\)/.test(reference.formattedReference))).toBe(true);
+    expect(buildComplianceSection({ inspectionType: "fire_alarm", draft }).generatedAt).toBe("2026-05-18T12:00:00.000Z");
   });
 
   it("generates a branded inspection report PDF payload", async () => {

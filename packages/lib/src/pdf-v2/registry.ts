@@ -93,8 +93,8 @@ function buildDefaultReportTypeConfigV2(type: InspectionType): ReportTypeConfig 
     documentCategory: type === "work_order" ? "service" : "inspection",
     compliance: {
       enabled: true,
-      label: "Compliance Standards",
-      description: "This inspection was performed in accordance with the following standards.",
+      label: "Applicable Codes, Standards & Compliance References",
+      description: "This report includes editioned code references, applicability notes, and survey-ready compliance documentation.",
       codes: pdf.nfpaReferences ?? []
     },
     pageOne: {

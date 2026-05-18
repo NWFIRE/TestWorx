@@ -4,7 +4,7 @@ import { acceptanceTestDefinitions } from "./acceptance-test-definition";
 const acceptanceTestResultFields: ReportFieldDefinition[] = acceptanceTestDefinitions.map((test) => ({
   id: test.key,
   label: test.label,
-  description: test.code ? `NFPA 17A ${test.code}` : undefined,
+  description: test.code ? `NFPA 17A (2024 Edition) ${test.code}` : undefined,
   type: "select",
   optionProvider: "acceptanceTestResultOptions",
   prefill: [{ source: "priorField", sectionId: "test-results", fieldId: test.key }],
@@ -17,7 +17,7 @@ export const acceptanceTestReportTemplate: ReportTemplateDefinition = {
   defaultRecurrenceFrequency: undefined,
   pdf: {
     subtitle: "Wet Chemical System Acceptance Test Report",
-    nfpaReferences: ["NFPA 17A"]
+    nfpaReferences: ["NFPA 17A (2024 Edition) - Standard for Wet Chemical Extinguishing Systems"]
   },
   sections: [
     {
@@ -183,7 +183,7 @@ export const acceptanceTestReportTemplate: ReportTemplateDefinition = {
     {
       id: "test-results",
       label: "Acceptance Test Results",
-      description: "Record each required NFPA 17A acceptance test with one clean normalized result.",
+      description: "Record each required NFPA 17A (2024 Edition) acceptance test with one clean normalized result.",
       fields: [
         ...acceptanceTestResultFields,
         {

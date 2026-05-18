@@ -41,11 +41,33 @@ function measureIdentityBandHeight(runtime: PdfV2Runtime) {
   return Math.max(72, 42 + factHeight + 12) + PDF_V2_TOKENS.sectionGap;
 }
 
+function buildComplianceDetailText(reference: PdfV2Runtime["model"]["compliance"]["references"][number]) {
+  return [
+    reference.chapterReferences.length ? `Chapters/sections: ${[...reference.chapterReferences, ...reference.nfpaSections.map((section) => `Section ${section}`)].join("; ")}` : "",
+    reference.tableReferences.length ? `Tables: ${reference.tableReferences.join("; ")}` : "",
+    reference.applicableInspectionSections.length ? `Applies to: ${reference.applicableInspectionSections.join(", ")}` : "",
+    reference.applicabilityReason ? `Reason used: ${reference.applicabilityReason}` : "",
+    reference.jointCommissionEPReferences.length ? `Joint Commission: ${reference.jointCommissionEPReferences.join(", ")}` : ""
+  ].filter(Boolean).join("\n");
+}
+
+function measureComplianceReferenceHeight(runtime: PdfV2Runtime, width: number, reference: PdfV2Runtime["model"]["compliance"]["references"][number]) {
+  const detailText = buildComplianceDetailText(reference);
+  return 14
+    + measureParagraphHeight(runtime.boldFont, reference.formattedReference, width, 10.2, 3, 2)
+    + measureParagraphHeight(runtime.regularFont, detailText, width, 8.7, 2, 2)
+    + 8;
+}
+
 function renderComplianceBlock(runtime: PdfV2Runtime, cursor: PageCursor) {
-  const descriptionHeight = measureParagraphHeight(runtime.regularFont, runtime.model.compliance.description, contentWidth() - 28, PDF_V2_TYPOGRAPHY.sectionDescriptor, 3, 2);
-  const codeText = runtime.model.compliance.codes.join(" • ");
-  const codeHeight = measureParagraphHeight(runtime.boldFont, codeText, contentWidth() - 28, 12, 3, 2);
-  const height = 20 + descriptionHeight + codeHeight + 18;
+  const width = contentWidth() - 28;
+  const descriptionHeight = measureParagraphHeight(runtime.regularFont, runtime.model.compliance.description, width, PDF_V2_TYPOGRAPHY.sectionDescriptor, 3, 2);
+  const referencesHeight = runtime.model.compliance.references.reduce((sum, reference) => sum + measureComplianceReferenceHeight(runtime, width, reference), 0);
+  const fallbackCodeText = runtime.model.compliance.codes.join(" | ");
+  const fallbackCodeHeight = runtime.model.compliance.references.length === 0
+    ? measureParagraphHeight(runtime.boldFont, fallbackCodeText, width, 12, 3, 2)
+    : 0;
+  const height = 26 + descriptionHeight + referencesHeight + fallbackCodeHeight + 18;
   drawRect(cursor.page, PDF_V2_TOKENS.margin, cursor.y, contentWidth(), height, runtime.theme.softSurface, runtime.theme.line, 1);
   cursor.page.drawText(runtime.model.compliance.title, {
     x: PDF_V2_TOKENS.margin + 14,
@@ -54,16 +76,31 @@ function renderComplianceBlock(runtime: PdfV2Runtime, cursor: PageCursor) {
     font: runtime.boldFont,
     color: runtime.theme.ink
   });
-  drawParagraph(cursor.page, runtime.regularFont, runtime.model.compliance.description, PDF_V2_TOKENS.margin + 14, cursor.y - 32, contentWidth() - 28, PDF_V2_TYPOGRAPHY.sectionDescriptor, runtime.theme.softText, 3, 2);
-  drawParagraph(cursor.page, runtime.boldFont, codeText, PDF_V2_TOKENS.margin + 14, cursor.y - 50 - descriptionHeight, contentWidth() - 28, 12, runtime.theme.primary, 3, 2);
+  drawParagraph(cursor.page, runtime.regularFont, runtime.model.compliance.description, PDF_V2_TOKENS.margin + 14, cursor.y - 32, width, PDF_V2_TYPOGRAPHY.sectionDescriptor, runtime.theme.softText, 3, 2);
+  let nextY = cursor.y - 50 - descriptionHeight;
+  if (runtime.model.compliance.references.length > 0) {
+    for (const reference of runtime.model.compliance.references) {
+      drawParagraph(cursor.page, runtime.boldFont, reference.formattedReference, PDF_V2_TOKENS.margin + 14, nextY, width, 10.2, runtime.theme.primary, 3, 2);
+      nextY -= measureParagraphHeight(runtime.boldFont, reference.formattedReference, width, 10.2, 3, 2) + 3;
+      const detailText = buildComplianceDetailText(reference);
+      drawParagraph(cursor.page, runtime.regularFont, detailText, PDF_V2_TOKENS.margin + 14, nextY, width, 8.7, runtime.theme.softText, 2, 2);
+      nextY -= measureParagraphHeight(runtime.regularFont, detailText, width, 8.7, 2, 2) + 8;
+    }
+  } else {
+    drawParagraph(cursor.page, runtime.boldFont, fallbackCodeText, PDF_V2_TOKENS.margin + 14, nextY, width, 12, runtime.theme.primary, 3, 2);
+  }
   cursor.y -= height + PDF_V2_TOKENS.sectionGap;
 }
 
 function measureComplianceBlockHeight(runtime: PdfV2Runtime) {
-  const descriptionHeight = measureParagraphHeight(runtime.regularFont, runtime.model.compliance.description, contentWidth() - 28, PDF_V2_TYPOGRAPHY.sectionDescriptor, 3, 2);
-  const codeText = runtime.model.compliance.codes.join(" â€¢ ");
-  const codeHeight = measureParagraphHeight(runtime.boldFont, codeText, contentWidth() - 28, 12, 3, 2);
-  return 20 + descriptionHeight + codeHeight + 18 + PDF_V2_TOKENS.sectionGap;
+  const width = contentWidth() - 28;
+  const descriptionHeight = measureParagraphHeight(runtime.regularFont, runtime.model.compliance.description, width, PDF_V2_TYPOGRAPHY.sectionDescriptor, 3, 2);
+  const referencesHeight = runtime.model.compliance.references.reduce((sum, reference) => sum + measureComplianceReferenceHeight(runtime, width, reference), 0);
+  const fallbackCodeText = runtime.model.compliance.codes.join(" | ");
+  const fallbackCodeHeight = runtime.model.compliance.references.length === 0
+    ? measureParagraphHeight(runtime.boldFont, fallbackCodeText, width, 12, 3, 2)
+    : 0;
+  return 26 + descriptionHeight + referencesHeight + fallbackCodeHeight + 18 + PDF_V2_TOKENS.sectionGap;
 }
 
 function renderOutcomeCards(runtime: PdfV2Runtime, cursor: PageCursor) {

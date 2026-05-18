@@ -1,5 +1,6 @@
 import { acceptanceTestDefinitions, acceptanceTestInstallerDefaults } from "../../../acceptance-test-definition";
 import { resolveTenantBranding } from "../../../branding";
+import { buildComplianceSection } from "../../../compliance-references";
 import { reportDraftSchema } from "../../../report-engine";
 import { getCustomerFacingSiteLabel } from "../../../scheduling";
 import type { PdfInput } from "../../types";
@@ -179,7 +180,7 @@ export function buildAcceptanceTestRenderModel(rawReport: unknown): AcceptanceTe
   return {
     report: {
       title: "Wet Chemical System Acceptance Test Report",
-      standard: "NFPA 17A",
+      standard: "NFPA 17A (2024 Edition)",
       result: overallResult,
       completionDate: formatDateTime(input.report.finalizedAt),
       narrative: buildNarrative(overallResult, failed, incomplete),
@@ -187,6 +188,13 @@ export function buildAcceptanceTestRenderModel(rawReport: unknown): AcceptanceTe
       assignedTo: cleanText(input.report.assignedTo),
       status: resolveWorkflowStatus(input, failed, incomplete)
     },
+    compliance: buildComplianceSection({
+      inspectionType: input.task.inspectionType,
+      draft,
+      customerCompany: input.customerCompany as unknown as Record<string, unknown>,
+      site: input.site as unknown as Record<string, unknown>,
+      generatedAt: input.report.finalizedAt ?? new Date()
+    }),
     company: {
       name: branding.legalBusinessName || acceptanceTestInstallerDefaults.companyName,
       logoUrl: cleanText((input.tenant.branding as Record<string, unknown> | undefined)?.logoDataUrl),

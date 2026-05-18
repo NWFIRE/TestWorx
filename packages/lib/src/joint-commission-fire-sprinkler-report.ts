@@ -39,11 +39,11 @@ const matrixMonths = [
 ] as const;
 
 const summaryDashboardRows = [
-  { inspectionArea: "Supervisory Signals", epStandard: "EP1 / NFPA 72 / NFPA 25", result: "", details: "" },
-  { inspectionArea: "Valve Tamper & Control Valves", epStandard: "EP2 / NFPA 25 13.2.6", result: "", details: "" },
-  { inspectionArea: "Waterflow Switches", epStandard: "EP2 / NFPA 25 13.2.6", result: "", details: "" },
-  { inspectionArea: "Main Drain Test", epStandard: "EP9 / NFPA 25", result: "", details: "" },
-  { inspectionArea: "Fire Department Connection", epStandard: "EP10 / NFPA 25", result: "", details: "" },
+  { inspectionArea: "Supervisory Signals", epStandard: "EP1 / NFPA 72 (2025 Edition) / NFPA 25 (2026 Edition)", result: "", details: "" },
+  { inspectionArea: "Valve Tamper & Control Valves", epStandard: "EP2 / NFPA 25 (2026 Edition) Section 13.2", result: "", details: "" },
+  { inspectionArea: "Waterflow Switches", epStandard: "EP2 / NFPA 25 (2026 Edition) Section 13.3", result: "", details: "" },
+  { inspectionArea: "Main Drain Test", epStandard: "EP9 / NFPA 25 (2026 Edition)", result: "", details: "" },
+  { inspectionArea: "Fire Department Connection", epStandard: "EP10 / NFPA 25 (2026 Edition)", result: "", details: "" },
   { inspectionArea: "Deficiencies", epStandard: "Inspection Comments", result: "", details: "" }
 ];
 
@@ -183,7 +183,11 @@ export const jointCommissionFireSprinklerReportTemplate: ReportTemplateDefinitio
   description: "Simple field-technician Joint Commission fire sprinkler inspection report modeled after NW Fire & Safety's healthcare compliance packet.",
   pdf: {
     subtitle: "Joint Commission Fire Sprinkler Inspection Report",
-    nfpaReferences: ["NFPA 25", "NFPA 72", "Joint Commission EC.02.03.05"]
+    nfpaReferences: [
+      "NFPA 25 (2026 Edition) - Standard for the Inspection, Testing, and Maintenance of Water-Based Fire Protection Systems",
+      "NFPA 72 (2025 Edition) - National Fire Alarm and Signaling Code",
+      "Joint Commission EC.02.03.05 - Fire protection systems documentation"
+    ]
   },
   sections: [
     section({
@@ -319,7 +323,7 @@ export const jointCommissionFireSprinklerReportTemplate: ReportTemplateDefinitio
     section({
       id: "ep1-supervisory",
       label: "EP1 - Supervisory Signal Devices",
-      description: "NFPA 72 / NFPA 25 supervisory signal device list for Joint Commission EC.02.03.05 EP1 documentation.",
+      description: "NFPA 72 (2025 Edition) and NFPA 25 (2026 Edition) supervisory signal device list for Joint Commission EC.02.03.05 EP1 documentation.",
       fields: [
         {
           id: "supervisorySignalDevices",
@@ -340,7 +344,7 @@ export const jointCommissionFireSprinklerReportTemplate: ReportTemplateDefinitio
     section({
       id: "ep2-tamper-valves",
       label: "EP2 - Tamper Switches / Control Valve List",
-      description: "NFPA 25 valve tamper/control valve list for Joint Commission EC.02.03.05 EP2 documentation.",
+      description: "NFPA 25 (2026 Edition) valve tamper/control valve list for Joint Commission EC.02.03.05 EP2 documentation.",
       fields: [
         {
           id: "tamperSwitchControlValves",
@@ -384,7 +388,7 @@ export const jointCommissionFireSprinklerReportTemplate: ReportTemplateDefinitio
     section({
       id: "ep9-main-drain",
       label: "EP9 - Main Drain",
-      description: "Main drain results for NFPA 25 and Joint Commission EC.02.03.05 EP9 documentation.",
+      description: "Main drain results for NFPA 25 (2026 Edition) and Joint Commission EC.02.03.05 EP9 documentation.",
       fields: [
         {
           id: "mainDrainRows",

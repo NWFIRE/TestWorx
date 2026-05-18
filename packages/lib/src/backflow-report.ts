@@ -44,7 +44,7 @@ export const backflowReportTemplate: ReportTemplateDefinition = {
   description: "NFPA-25-style fire sprinkler backflow inspection and test workflow with smart asset prefill, structured visual/test documentation, and polished customer-facing output.",
   pdf: {
     subtitle: "Fire Sprinkler Backflow Inspection Report",
-    nfpaReferences: ["NFPA 25"]
+    nfpaReferences: ["NFPA 25 (2026 Edition) - Standard for the Inspection, Testing, and Maintenance of Water-Based Fire Protection Systems"]
   },
   sections: [
     {

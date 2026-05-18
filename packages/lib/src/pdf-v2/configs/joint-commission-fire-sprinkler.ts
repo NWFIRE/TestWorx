@@ -1,4 +1,5 @@
 import type { ReportTypeConfig } from "../types";
+import { reportComplianceMap } from "../compliance";
 
 const table = (
   key: string,
@@ -28,9 +29,9 @@ export const jointCommissionFireSprinklerReportConfigV2: ReportTypeConfig = {
   documentCategory: "inspection",
   compliance: {
     enabled: true,
-    label: "Compliance Package",
+    label: "Applicable Codes, Standards & Compliance References",
     description: "Generated for customer compliance records. Maintain with facility life safety documentation.",
-    codes: ["NFPA 25", "NFPA 72", "Joint Commission EC.02.03.05"]
+    codes: reportComplianceMap.joint_commission_fire_sprinkler ?? []
   },
   pageOne: {
     outcomeMetrics: ["documentStatus", "outcome", "deficiencyCount", "serviceDate"],
@@ -151,7 +152,7 @@ export const jointCommissionFireSprinklerReportConfigV2: ReportTypeConfig = {
       { key: "location", label: "Location", width: "25%" },
       { key: "testResult", label: "Test Result", width: "12%" },
       { key: "commentsNotes", label: "Comments & Notes", width: "26%" }
-    ], "NFPA 72 2010 Table 14.4.5, NFPA 25 2011 Table 5.1.1.2, and Joint Commission EC.02.03.05 EP1."),
+    ], "NFPA 72 (2025 Edition), NFPA 25 (2026 Edition), and Joint Commission EC.02.03.05 EP1."),
     table("ep2-tamper-valves", "EP2 - Tamper Switches / Control Valve List", "ep2-tamper-valves.tamperSwitchControlValves", [
       { key: "addressZone", label: "Address / Zone", width: "14%" },
       { key: "valveTypeSize", label: "Valve Type / Size", width: "15%" },
@@ -160,7 +161,7 @@ export const jointCommissionFireSprinklerReportConfigV2: ReportTypeConfig = {
       { key: "valveSecured", label: "Valve Secured?", width: "13%" },
       { key: "result", label: "Result", width: "10%" },
       { key: "commentsNotes", label: "Comments & Notes", width: "16%" }
-    ], "NFPA 72 2010 tables 14.4.2.2 and NFPA 25 2011 13.2.6. Joint Commission EC.02.03.05 EP2."),
+    ], "NFPA 72 (2025 Edition), NFPA 25 (2026 Edition), and Joint Commission EC.02.03.05 EP2."),
     table("ep2-waterflow", "EP2 - Waterflow Switches", "ep2-waterflow.waterflowSwitches", [
       { key: "addressZone", label: "Address / Zone", width: "14%" },
       { key: "deviceType", label: "Device Type", width: "13%" },
@@ -177,11 +178,11 @@ export const jointCommissionFireSprinklerReportConfigV2: ReportTypeConfig = {
       { key: "residualPressure", label: "Residual Pressure", width: "16%" },
       { key: "returnTimeToStaticPsi", label: "Return Time to Static PSI", width: "18%" },
       { key: "resultOfTest", label: "Result of Test", width: "14%" }
-    ], "NFPA 25 2011 13.2.5, 13.3.3.4, tables 13.1.1.2 and 13.8.1. Joint Commission EC.02.03.05 EP9."),
+    ], "NFPA 25 (2026 Edition) main drain and water-based fire protection documentation. Joint Commission EC.02.03.05 EP9."),
     {
       key: "ep10-fdc",
       title: "EP10 - Fire Department Connection",
-      description: "NFPA 25 2011 13.7 and table 13.1.1.2. Joint Commission EC.02.03.05 EP10.",
+      description: "NFPA 25 (2026 Edition) fire department connection documentation. Joint Commission EC.02.03.05 EP10.",
       renderer: "keyValue",
       pageBreakBehavior: "avoid-inside",
       fields: [

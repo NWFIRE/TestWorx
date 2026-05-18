@@ -411,7 +411,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
     description: "Portable extinguisher inventory, visual condition, and service readiness.",
     pdf: {
       subtitle: "Portable Fire Extinguisher Inspection Report",
-      nfpaReferences: ["NFPA 10"]
+      nfpaReferences: ["NFPA 10 (2026 Edition) - Standard for Portable Fire Extinguishers"]
     },
     sections: [
       {
@@ -728,7 +728,10 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
     description: "Control panel, device, notification, monitoring, and system-summary inspection workflow.",
     pdf: {
       subtitle: "Fire Alarm Inspection and Testing Report",
-      nfpaReferences: ["NFPA 72", "NFPA 70"]
+      nfpaReferences: [
+        "NFPA 72 (2025 Edition) - National Fire Alarm and Signaling Code",
+        "NFPA 70 (2026 Edition) - National Electrical Code"
+      ]
     },
     billableMappings: {
       fields: [
@@ -1128,7 +1131,10 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
     description: "Pump room readiness, controller status, and weekly/monthly operational checks.",
     pdf: {
       subtitle: "Fire Pump Inspection Report",
-      nfpaReferences: ["NFPA 20", "NFPA 25"]
+      nfpaReferences: [
+        "NFPA 20 (2025 Edition) - Standard for the Installation of Stationary Pumps for Fire Protection",
+        "NFPA 25 (2026 Edition) - Standard for the Inspection, Testing, and Maintenance of Water-Based Fire Protection Systems"
+      ]
     },
     sections: [
       {
@@ -1284,7 +1290,10 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
     description: "Dry valve trim, air supply, low-point drains, and trip readiness.",
     pdf: {
       subtitle: "Dry Fire Sprinkler Inspection Report",
-      nfpaReferences: ["NFPA 13", "NFPA 25"]
+      nfpaReferences: [
+        "NFPA 13 (2025 Edition) - Standard for the Installation of Sprinkler Systems",
+        "NFPA 25 (2026 Edition) - Standard for the Inspection, Testing, and Maintenance of Water-Based Fire Protection Systems"
+      ]
     },
     sections: [
       {
@@ -1459,7 +1468,10 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
     defaultRecurrenceFrequency: RecurrenceFrequency.SEMI_ANNUAL,
     pdf: {
       subtitle: "Kitchen Suppression Inspection Report",
-      nfpaReferences: ["NFPA 17A", "NFPA 96"]
+      nfpaReferences: [
+        "NFPA 17A (2024 Edition) - Standard for Wet Chemical Extinguishing Systems",
+        "NFPA 96 (2024 Edition) - Standard for Ventilation Control and Fire Protection of Commercial Cooking Operations"
+      ]
     },
     billableMappings: {
       fields: [
@@ -1806,7 +1818,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
           { id: "filtersInstalledCorrectly", label: "Proper filters installed & in correct position?", type: "select", optionProvider: "yesNoNA", prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "filtersInstalledCorrectly" }, { source: "reportDefault", value: "na" }] },
           { id: "exhaustFanOperational", label: "Exhaust fan operational and warning sign on hood?", type: "select", optionProvider: "yesNoNA", prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "exhaustFanOperational" }, { source: "reportDefault", value: "na" }] },
           { id: "kClassExtinguisherPresent", label: "K-Class fire extinguisher charged & in place?", type: "select", optionProvider: "yesNoNA", prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "kClassExtinguisherPresent" }, { source: "reportDefault", value: "na" }] },
-          { id: "hoodCleanedPerNFPA96", label: "Hood cleaned regularly in accordance with NFPA 96?", type: "select", optionProvider: "yesNoNA", prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "hoodCleanedPerNFPA96" }, { source: "reportDefault", value: "na" }] }
+          { id: "hoodCleanedPerNFPA96", label: "Hood cleaned regularly in accordance with NFPA 96 (2024 Edition)?", type: "select", optionProvider: "yesNoNA", prefill: [{ source: "priorField", sectionId: "system-checklist", fieldId: "hoodCleanedPerNFPA96" }, { source: "reportDefault", value: "na" }] }
         ]
       },
       {
@@ -1900,7 +1912,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
     defaultRecurrenceFrequency: RecurrenceFrequency.SEMI_ANNUAL,
     pdf: {
       subtitle: "Industrial Dry Chemical Inspection Report",
-      nfpaReferences: ["NFPA 17"]
+      nfpaReferences: ["NFPA 17 (2024 Edition) - Standard for Dry Chemical Extinguishing Systems"]
     },
     billableMappings: {
       fields: [
@@ -2273,7 +2285,10 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
     description: "Exit sign visibility, unit equipment readiness, and timed illumination testing.",
     pdf: {
       subtitle: "Emergency Exit Lighting Inspection Report",
-      nfpaReferences: ["NFPA 101", "NFPA 70"]
+      nfpaReferences: [
+        "NFPA 101 (2024 Edition) - Life Safety Code",
+        "NFPA 70 (2026 Edition) - National Electrical Code"
+      ]
     },
     billableMappings: {
       repeaters: [

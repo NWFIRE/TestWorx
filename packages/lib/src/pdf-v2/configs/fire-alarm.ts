@@ -1,4 +1,5 @@
 import type { ReportTypeConfig } from "../types";
+import { reportComplianceMap } from "../compliance";
 
 export const fireAlarmReportConfigV2: ReportTypeConfig = {
   type: "fire_alarm",
@@ -7,9 +8,9 @@ export const fireAlarmReportConfigV2: ReportTypeConfig = {
   documentCategory: "inspection",
   compliance: {
     enabled: true,
-    label: "Compliance Standards",
-    description: "This inspection was performed in accordance with the following standards.",
-    codes: ["NFPA 72", "NFPA 70"]
+    label: "Applicable Codes, Standards & Compliance References",
+    description: "This report includes editioned code references, applicability notes, and survey-ready compliance documentation.",
+    codes: reportComplianceMap.fire_alarm ?? []
   },
   pageOne: {
     outcomeMetrics: ["documentStatus", "outcome", "deficiencyCount", "completionPercent"],

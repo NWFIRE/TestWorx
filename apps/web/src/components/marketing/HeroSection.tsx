@@ -144,7 +144,7 @@ export function HeroSection() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-semibold">Wet Chemical System Acceptance Test</p>
-                          <p className="mt-1 text-sm text-white/65">NFPA 17A • Hosted report ready</p>
+                          <p className="mt-1 text-sm text-white/65">NFPA 17A (2024 Edition) • Hosted report ready</p>
                         </div>
                         <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-200">
                           Finalized
@@ -185,7 +185,7 @@ export function HeroSection() {
                         <div className="space-y-3">
                           <div>
                             <p className="text-sm font-semibold tracking-[-0.02em] text-slate-950">Wet Chemical System Acceptance Test</p>
-                            <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">NFPA 17A hosted report</p>
+                            <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">NFPA 17A (2024 Edition) hosted report</p>
                           </div>
                           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
                             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Summary</p>

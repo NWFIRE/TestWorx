@@ -4,6 +4,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFP
 import type { InspectionType } from "@testworx/types";
 
 import { resolveTenantBranding } from "./branding";
+import { formatComplianceReferenceList } from "./compliance-references";
 import {
   buildReportPreview,
   isCustomerVisibleField,
@@ -84,7 +85,7 @@ const NO_SITE_ADDRESS_COPY = "No fixed service address on file";
 const NO_NOTES_COPY = "No notes provided";
 const NO_PHOTOS_COPY = "No inspection photos included";
 const NO_SIGNATURE_COPY = "Not captured";
-const COMPLIANCE_SUBTITLE = "This inspection was performed in accordance with the following standards.";
+const COMPLIANCE_SUBTITLE = "This report includes editioned code references, applicability notes, and survey-ready compliance documentation.";
 
 function hexToRgb(hex: string, fallback: { r: number; g: number; b: number }) {
   const normalized = hex.replace("#", "").trim();
@@ -422,7 +423,7 @@ export function buildPdfPhotoCaption(index: number) {
 }
 
 export function getPdfComplianceStandards(inspectionType: InspectionType) {
-  return resolveReportTypeConfig(inspectionType).compliance.codes;
+  return formatComplianceReferenceList({ inspectionType });
 }
 
 function getDisplayCompletionStatus(input: PdfInput) {
@@ -816,7 +817,7 @@ function renderComplianceStandards(
   const blockHeight = Math.max(64, contentHeight);
 
   drawRect(state.page, PAGE_MARGIN, state.y, CONTENT_WIDTH, blockHeight, theme.softSurface, theme.line, 1);
-  state.page.drawText((compliance.label || "Compliance Standards").toUpperCase(), {
+  state.page.drawText((compliance.label || "Applicable Codes, Standards & Compliance References").toUpperCase(), {
     x: PAGE_MARGIN + 12,
     y: state.y - 16,
     size: 7.5,

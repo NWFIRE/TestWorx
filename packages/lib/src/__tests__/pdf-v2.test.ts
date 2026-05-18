@@ -286,7 +286,7 @@ describe("pdf v2 report engine", () => {
     expect(checklist?.renderer).toBe("checklist");
     if (checklist?.renderer === "checklist") {
       expect(checklist.items.map((item) => item.label)).toContain("All appliances properly protected?");
-      expect(checklist.items.map((item) => item.label)).toContain("Hood cleaned regularly in accordance with NFPA 96?");
+      expect(checklist.items.map((item) => item.label)).toContain("Hood cleaned regularly in accordance with NFPA 96 (2024 Edition)?");
     }
 
     expect(service?.renderer).toBe("table");
@@ -423,7 +423,7 @@ describe("pdf v2 report engine", () => {
     expect(lines.join(" ")).not.toContain("Audible operation");
   });
 
-  it("renders a dedicated Compliance Standards block with NFPA codes", async () => {
+  it("renders a dedicated compliance references block with editioned NFPA codes", async () => {
     const bytes = await generateInspectionReportPdfV2({
       ...createBaseInput(),
       task: { inspectionType: "fire_alarm" },
@@ -470,10 +470,10 @@ describe("pdf v2 report engine", () => {
       }
     });
     const html = await renderPdfHtml(createElement(FireAlarmReportDocument, { model }));
-    expect(html).toContain("Compliance Standards");
-    expect(html).toContain("NFPA 72");
-    expect(html).toContain("NFPA 70");
-  });
+    expect(html).toContain("Applicable Codes, Standards &amp; Compliance References");
+    expect(html).toContain("NFPA 72 (2025 Edition)");
+    expect(html).toContain("NFPA 70 (2026 Edition)");
+  }, 15000);
 
   it("keeps optional table cells blank instead of dash spam", () => {
     const model = buildReportRenderModelV2({
