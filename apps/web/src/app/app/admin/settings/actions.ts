@@ -43,6 +43,7 @@ import {
   updateServiceFeeRule,
   updateTenantBranding,
   updateTenantDefaultServiceFee,
+  updateWorkOrderLaborTypeSettings,
   updateTenantSidebarOrder,
   upsertMinimumTicketRule
 } from "@testworx/lib/server/index";
@@ -336,6 +337,32 @@ export async function updateTenantSidebarOrderAction(_: { error: string | null; 
     return { error: null, success: "Sidebar order updated." };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unable to update sidebar order.", success: null };
+  }
+}
+
+export async function updateWorkOrderLaborTypeAction(_: { error: string | null; success: string | null }, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    return { error: "Unauthorized", success: null };
+  }
+
+  try {
+    await updateWorkOrderLaborTypeSettings(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      {
+        laborTypeId: String(formData.get("laborTypeId") ?? ""),
+        rate: Number(formData.get("rate") ?? 0),
+        taxable: formData.get("taxable") === "on",
+        active: formData.get("active") === "on",
+        catalogItemId: String(formData.get("catalogItemId") ?? "") || null
+      }
+    );
+
+    revalidatePath("/app/admin/settings");
+    revalidatePath("/app/admin/billing");
+    return { error: null, success: "Work order labor rate updated." };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Unable to update work order labor rate.", success: null };
   }
 }
 

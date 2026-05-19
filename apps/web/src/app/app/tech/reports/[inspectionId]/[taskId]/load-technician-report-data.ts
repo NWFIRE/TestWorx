@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getInspectionDisplayLabels, getInspectionReportDraft, getWorkOrderCatalogItems, getWorkOrderLineItems, isDueAtTimeOfServiceCustomer } from "@testworx/lib/server/index";
+import { getInspectionDisplayLabels, getInspectionReportDraft, getWorkOrderCatalogItems, getWorkOrderLaborTypes, getWorkOrderLineItems, isDueAtTimeOfServiceCustomer } from "@testworx/lib/server/index";
 
 import type { TechnicianReportEditorData } from "../../../report-editor";
 
@@ -70,12 +70,13 @@ export async function loadTechnicianReportData(inspectionId: string, taskId: str
   });
 
   const isWorkOrderReport = report.task.inspectionType === "work_order";
-  const [workOrderCatalogItems, workOrderLineItems] = isWorkOrderReport
+  const [workOrderCatalogItems, workOrderLineItems, workOrderLaborTypes] = isWorkOrderReport
     ? await Promise.all([
         getWorkOrderCatalogItems({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId),
-        getWorkOrderLineItems({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId)
+        getWorkOrderLineItems({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId),
+        getWorkOrderLaborTypes({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId)
       ])
-    : [[], []];
+    : [[], [], []];
 
   const data: TechnicianReportEditorData = {
     reportId: report.id,
@@ -120,6 +121,7 @@ export async function loadTechnicianReportData(inspectionId: string, taskId: str
       : null,
     workOrderCatalogItems,
     workOrderLineItems,
+    workOrderLaborTypes,
     template: report.template,
     draft: report.draft
   };

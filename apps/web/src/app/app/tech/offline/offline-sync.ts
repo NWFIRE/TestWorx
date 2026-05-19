@@ -437,6 +437,28 @@ export async function queueWorkOrderLineItemUpsert(input: {
   void processSyncQueue();
 }
 
+export async function queueWorkOrderLaborLineItemUpsert(input: {
+  id: string;
+  inspectionId: string;
+  laborTypeId: string;
+  laborHours: number;
+  billableStatus: string;
+  technicianNotes: string | null;
+}) {
+  await deleteSyncQueueEntry(buildWorkOrderLineQueueId(input.id, "work_order_line_delete"));
+  await upsertPendingQueueEntry({
+    id: buildWorkOrderLineQueueId(input.id, "work_order_line_upsert"),
+    entityType: "work_order_line_item",
+    entityId: input.id,
+    operation: "work_order_line_upsert",
+    payload: {
+      ...input,
+      action: "upsert_labor"
+    }
+  });
+  void processSyncQueue();
+}
+
 export async function queueWorkOrderLineItemDelete(input: {
   id: string;
   inspectionId: string;

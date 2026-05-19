@@ -1438,15 +1438,23 @@ async function extractBillableItemsFromWorkOrderLineItemsTx(tx: TransactionClien
       sourceSection: "work-order-line-items",
       sourceField: line.source,
       category: mapWorkOrderLineItemTypeToBillingCategory(line.itemType),
-      code: line.quickBooksItemId ? `CATALOG_${line.quickBooksItemId}` : undefined,
+      code: line.quickBooksItemId
+        ? `CATALOG_${line.quickBooksItemId}`
+        : typeof line.laborTypeId === "string" && line.laborTypeId
+          ? `WORK_ORDER_LABOR_${line.laborTypeId}`
+          : undefined,
       description: line.description?.trim() || line.name,
       quantity,
-      unit: "each",
+      unit: line.itemType === "labor" ? "hour" : "each",
       unitPrice,
       amount: calculateAmount(quantity, unitPrice),
       metadata: {
         workOrderLineItemId: line.id,
         catalogItemId: line.catalogItemId,
+        laborTypeId: typeof line.laborTypeId === "string" ? line.laborTypeId : null,
+        laborTypeName: typeof line.laborTypeName === "string" ? line.laborTypeName : null,
+        laborRate: typeof line.laborRate === "number" ? line.laborRate : null,
+        laborTotal: typeof line.laborTotal === "number" ? line.laborTotal : null,
         source: line.source,
         billableStatus: line.billableStatus,
         technicianNotes: line.technicianNotes,

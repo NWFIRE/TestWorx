@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { deleteWorkOrderLineItem, upsertWorkOrderLineItem } from "@testworx/lib/server/index";
+import { deleteWorkOrderLineItem, upsertWorkOrderLaborLineItem, upsertWorkOrderLineItem } from "@testworx/lib/server/index";
 
 function getStatusCode(error: unknown) {
   if (!(error instanceof Error)) {
@@ -41,6 +41,21 @@ export async function POST(request: Request) {
         }
       );
       return NextResponse.json({ ok: true });
+    }
+
+    if (action === "upsert_labor") {
+      const lineItem = await upsertWorkOrderLaborLineItem(
+        { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+        {
+          id: typeof body.id === "string" ? body.id : null,
+          inspectionId: String(body.inspectionId ?? ""),
+          laborTypeId: String(body.laborTypeId ?? ""),
+          laborHours: Number(body.laborHours ?? body.quantity ?? 0),
+          billableStatus: typeof body.billableStatus === "string" ? body.billableStatus : "billable",
+          technicianNotes: typeof body.technicianNotes === "string" ? body.technicianNotes : null
+        }
+      );
+      return NextResponse.json({ ok: true, lineItem });
     }
 
     const lineItem = await upsertWorkOrderLineItem(

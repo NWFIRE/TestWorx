@@ -14,6 +14,15 @@ const workOrderLineItemTableCheckSql = `
   ) AS "exists"
 `;
 
+const workOrderLaborTypeTableCheckSql = `
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'WorkOrderLaborType'
+  ) AS "exists"
+`;
+
 export async function hasWorkOrderLineItemTable(db: QueryableDatabase = prisma) {
   try {
     const rows = db.$queryRawUnsafe
@@ -39,4 +48,31 @@ export async function assertWorkOrderLineItemTable(db?: QueryableDatabase) {
   }
 
   throw new Error("Work order line items are not enabled for this database yet.");
+}
+
+export async function hasWorkOrderLaborTypeTable(db: QueryableDatabase = prisma) {
+  try {
+    const rows = db.$queryRawUnsafe
+      ? await db.$queryRawUnsafe(workOrderLaborTypeTableCheckSql) as Array<{ exists: boolean }>
+      : await db.$queryRaw<Array<{ exists: boolean }>>`
+          SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name = 'WorkOrderLaborType'
+          ) AS "exists"
+        `;
+
+    return Boolean(rows[0]?.exists);
+  } catch {
+    return false;
+  }
+}
+
+export async function assertWorkOrderLaborTypeTable(db?: QueryableDatabase) {
+  if (await hasWorkOrderLaborTypeTable(db)) {
+    return;
+  }
+
+  throw new Error("Work order labor type settings are not enabled for this database yet.");
 }

@@ -41,8 +41,24 @@ export type WorkOrderLineItemForMobile = {
   technicianNotes: string | null;
   source: string;
   quickBooksItemId: string | null;
+  laborTypeId: string | null;
+  laborTypeName: string | null;
+  laborRate: number | null;
+  laborTotal: number | null;
   synced: boolean;
   invoiced: boolean;
+};
+
+export type WorkOrderLaborTypeForMobile = {
+  id: string;
+  name: string;
+  code: string;
+  description: string | null;
+  rate: number;
+  taxable: boolean;
+  quickBooksItemId: string | null;
+  catalogItemId: string | null;
+  catalogItemName: string | null;
 };
 
 export type TechnicianReportEditorData = {
@@ -74,6 +90,7 @@ export type TechnicianReportEditorData = {
   paymentCollectionNotice?: string | null;
   workOrderCatalogItems?: WorkOrderCatalogItemForMobile[];
   workOrderLineItems?: WorkOrderLineItemForMobile[];
+  workOrderLaborTypes?: WorkOrderLaborTypeForMobile[];
   template: ReportTemplateDefinition;
   draft: ReportDraft;
 };

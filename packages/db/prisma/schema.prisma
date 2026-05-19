@@ -419,6 +419,7 @@ model Tenant {
   deficiencies              Deficiency[]
   billingSummaries          InspectionBillingSummary[]
   workOrderLineItems        WorkOrderLineItem[]
+  workOrderLaborTypes       WorkOrderLaborType[]
   invoiceSequences          TenantInvoiceSequence[]
   inspectionDocuments       InspectionDocument[]
   auditLogs                 AuditLog[]
@@ -1511,6 +1512,10 @@ model WorkOrderLineItem {
   technicianNotes          String?
   source                   WorkOrderLineSource         @default(admin_added)
   quickBooksItemId         String?
+  laborTypeId              String?
+  laborTypeName            String?
+  laborRate                Float?
+  laborTotal               Float?
   pricingSnapshot          Json?
   addedByUserId            String?
   invoicedBillingSummaryId String?
@@ -1520,10 +1525,12 @@ model WorkOrderLineItem {
   tenant                   Tenant                      @relation(fields: [tenantId], references: [id])
   inspection               Inspection                  @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
   catalogItem              QuickBooksCatalogItem?      @relation(fields: [catalogItemId], references: [id])
+  laborType                WorkOrderLaborType?         @relation(fields: [laborTypeId], references: [id])
   addedBy                  User?                       @relation("WorkOrderLineItemAddedBy", fields: [addedByUserId], references: [id])
 
   @@index([tenantId, inspectionId])
   @@index([tenantId, catalogItemId])
+  @@index([tenantId, laborTypeId])
   @@index([tenantId, billableStatus])
   @@index([tenantId, invoicedBillingSummaryId])
 }
@@ -1637,11 +1644,35 @@ model QuickBooksCatalogItem {
   aliases            QuickBooksCatalogItemAlias[]
   billingItemMatches BillingItemCatalogMatch[]
   workOrderLineItems WorkOrderLineItem[]
+  workOrderLaborTypes WorkOrderLaborType[]
 
   @@unique([tenantId, quickbooksItemId])
   @@index([tenantId, active, itemType])
   @@index([tenantId, name])
   @@index([tenantId, sku])
+}
+
+model WorkOrderLaborType {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  name               String
+  code               String
+  description        String?
+  rate               Float    @default(0)
+  taxable            Boolean  @default(false)
+  active             Boolean  @default(true)
+  quickBooksItemId   String?
+  catalogItemId      String?
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  catalogItem        QuickBooksCatalogItem? @relation(fields: [catalogItemId], references: [id])
+  workOrderLineItems WorkOrderLineItem[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, active])
+  @@index([tenantId, catalogItemId])
 }
 
 model QuickBooksItemMap {

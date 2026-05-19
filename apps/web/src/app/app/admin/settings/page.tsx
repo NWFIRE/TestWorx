@@ -8,6 +8,7 @@ import {
   getPaginatedTenantComplianceReportingFeeSettings,
   getQuickBooksItemMappingSettings,
   getTenantMinimumTicketPricingSettings,
+  getTenantWorkOrderLaborTypeSettings,
   getPaginatedTenantServiceFeeSettings,
   getTenantBillingSettings,
   getTenantBrandingSettings,
@@ -38,6 +39,7 @@ import {
   updateDefaultServiceFeeAction,
   upsertMinimumTicketRuleAction,
   updateServiceFeeRuleAction,
+  updateWorkOrderLaborTypeAction,
   updateTenantSidebarOrderAction
 } from "./actions";
 import { BillingPlansSection } from "./billing-plans-section";
@@ -49,6 +51,7 @@ import { QuickBooksSettingsCard } from "./quickbooks-settings-card";
 import { SettingsDisclosureCard } from "./settings-disclosure-card";
 import { SidebarOrderForm } from "./sidebar-order-form";
 import { TenantBrandingForm } from "./tenant-branding-form";
+import { WorkOrderLaborTypeSettingsCard } from "./work-order-labor-type-settings-card";
 
 type SettingsSearchParams = Record<string, string | string[] | undefined>;
 
@@ -274,6 +277,38 @@ async function MinimumTicketPricingSection({
   );
 }
 
+async function WorkOrderLaborTypesSection({
+  actor
+}: {
+  actor: { userId: string; role: string; tenantId: string };
+}) {
+  let data: Awaited<ReturnType<typeof getTenantWorkOrderLaborTypeSettings>>;
+
+  try {
+    data = await getTenantWorkOrderLaborTypeSettings(actor);
+  } catch (error) {
+    return (
+      <LazySectionCard
+        actionHref={buildSettingsHref({ workOrderLaborOpen: "1" }, { workOrderLaborOpen: 1 })}
+        actionLabel="Try again"
+        description={error instanceof Error ? error.message : "Unable to load work order labor type settings right now."}
+        eyebrow="Work order labor billing"
+        title="Labor types and rates"
+        tone="error"
+      />
+    );
+  }
+
+  return (
+    <WorkOrderLaborTypeSettingsCard
+      catalogItems={data.catalogItems}
+      laborTypes={data.laborTypes}
+      storageReady={data.storageReady}
+      updateAction={updateWorkOrderLaborTypeAction}
+    />
+  );
+}
+
 async function QuickBooksMappingsSection({
   actor,
   notice
@@ -345,6 +380,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   const feesOpen = isSectionOpen(params, "feesOpen");
   const complianceFeesOpen = isSectionOpen(params, "complianceFeesOpen");
   const minimumTicketOpen = isSectionOpen(params, "minimumTicketOpen");
+  const workOrderLaborOpen = isSectionOpen(params, "workOrderLaborOpen");
   const mappingsOpen = isSectionOpen(params, "mappingsOpen", quickBooksNotice);
   const sidebarItems = getAppNavItemsForRole(session.user.role, session.user.allowances ?? null)
     .filter((item) => item.href !== "/app/platform")
@@ -494,6 +530,30 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
               }
             >
               <MinimumTicketPricingSection actor={actor} />
+            </Suspense>
+          </SettingsDisclosureCard>
+          <SettingsDisclosureCard
+            description="Configure the labor categories, hourly rates, taxability, and QuickBooks product/service mappings used by work orders."
+            eyebrow="Work order labor billing"
+            initialOpen={workOrderLaborOpen}
+            openLabel="Open labor rates"
+            queryKey="workOrderLaborOpen"
+            title="Labor types and rates"
+          >
+            <Suspense
+              key="work-order-labor-types"
+              fallback={
+                <LazySectionCard
+                  actionHref={buildSettingsHref(params, { workOrderLaborOpen: 1 })}
+                  actionLabel="Reload section"
+                  description="Loading labor types and QuickBooks mapping options..."
+                  eyebrow="Work order labor billing"
+                  title="Labor types and rates"
+                  tone="loading"
+                />
+              }
+            >
+              <WorkOrderLaborTypesSection actor={actor} />
             </Suspense>
           </SettingsDisclosureCard>
           <SettingsDisclosureCard

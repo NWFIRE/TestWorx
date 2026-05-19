@@ -1602,6 +1602,92 @@ describe("inspection billing persistence and admin review", () => {
     }));
   });
 
+  it("includes configured work order labor type charges in auto billing summaries", async () => {
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      sourceType: "direct",
+      inspectionClassification: null,
+      customerCompany: {
+        id: "customer_1",
+        name: "Acme",
+        quickbooksCustomerId: null,
+        billingEmail: null
+      },
+      providerContextRecord: null
+    });
+    txMock.tenant.findUnique.mockResolvedValue({
+      defaultServiceFeeCode: "SERVICE_FEE",
+      defaultServiceFeeUnitPrice: 0
+    });
+    txMock.site.findFirst.mockResolvedValue({ city: "Enid", state: "OK" });
+    txMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    txMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
+    txMock.workOrderLineItem.findMany.mockResolvedValue([
+      {
+        id: "labor_line_1",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        catalogItemId: "catalog_labor_1",
+        itemType: "labor",
+        name: "Fire Alarm Labor",
+        description: "Fire alarm labor",
+        quantity: 2,
+        unitPrice: 125,
+        totalPrice: 250,
+        taxable: false,
+        billableStatus: "billable",
+        technicianNotes: "Panel troubleshooting",
+        source: "technician_selected",
+        quickBooksItemId: "qb_labor_fire_alarm",
+        laborTypeId: "labor_type_fire_alarm",
+        laborTypeName: "Fire Alarm",
+        laborRate: 125,
+        laborTotal: 250,
+        invoicedAt: null,
+        catalogItem: {
+          id: "catalog_labor_1",
+          name: "Fire Alarm Labor",
+          quickbooksItemId: "qb_labor_fire_alarm",
+          taxable: false,
+          unitPrice: 125,
+          rawJson: { SalesTaxCodeRef: { value: "NON" } }
+        }
+      }
+    ]);
+
+    txMock.$queryRaw
+      .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1", inspectionClassification: "standard" }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const summary = await syncInspectionBillingSummaryTx(txMock as never, {
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1"
+    });
+
+    const laborLine = summary?.items.find((item) => item.metadata?.workOrderLineItemId === "labor_line_1");
+    expect(laborLine).toEqual(expect.objectContaining({
+      reportType: "work_order",
+      category: "labor",
+      description: "Fire alarm labor",
+      quantity: 2,
+      unit: "hour",
+      unitPrice: 125,
+      amount: 250,
+      linkedCatalogItemId: "catalog_labor_1",
+      linkedQuickBooksItemId: "qb_labor_fire_alarm",
+      taxable: false
+    }));
+    expect(laborLine?.metadata).toEqual(expect.objectContaining({
+      laborTypeId: "labor_type_fire_alarm",
+      laborTypeName: "Fire Alarm",
+      laborRate: 125,
+      laborTotal: 250
+    }));
+  });
+
   it.skip("snapshots contract-provider billing resolution during summary sync", async () => {
     const kitchenDraft = buildKitchenDraft();
 

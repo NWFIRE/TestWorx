@@ -28,7 +28,7 @@ import type { TechnicianReportEditorData } from "./report-editor";
 import { SearchSelect, type SearchSelectOption } from "@/app/search-select";
 import { SignaturePad } from "./signature-pad";
 import { deleteLocalWorkOrderLineItem, listLocalWorkOrderLineItems, putLocalWorkOrderLineItem, subscribeToOfflineChanges } from "./offline/offline-db";
-import { queueWorkOrderLineItemDelete, queueWorkOrderLineItemUpsert } from "./offline/offline-sync";
+import { queueWorkOrderLaborLineItemUpsert, queueWorkOrderLineItemDelete, queueWorkOrderLineItemUpsert } from "./offline/offline-sync";
 import type { LocalWorkOrderLineItemRecord } from "./offline/offline-types";
 import { useMobileReportDraftController } from "./use-mobile-report-draft-controller";
 
@@ -581,27 +581,108 @@ function WorkOrderLaborHoursSection({
 }) {
   const section = findTemplateSection(data, "work-performed");
   const field = section?.fields.find((candidate) => candidate.id === "jobsiteHours" && candidate.type === "select");
+  const sectionId = section?.id ?? "work-performed";
+  const fieldId = field?.id ?? "jobsiteHours";
+  const sectionState = controller.draft.sections[sectionId] ?? { status: "pending", notes: "", fields: {} };
+  const fields = sectionState.fields as Record<string, ReportPrimitiveValue>;
+  const laborTypes = useMemo(() => data.workOrderLaborTypes ?? [], [data.workOrderLaborTypes]);
+  const serverLaborLine = useMemo(
+    () => (data.workOrderLineItems ?? []).find((line) => line.itemType.toLowerCase() === "labor" && line.laborTypeId),
+    [data.workOrderLineItems]
+  );
+  const [laborLineId, setLaborLineId] = useState(serverLaborLine?.id ?? buildLocalWorkOrderLineId());
+  const [laborTypeId, setLaborTypeId] = useState(serverLaborLine?.laborTypeId ?? "");
+  const [billableStatus, setBillableStatus] = useState(serverLaborLine?.billableStatus ?? "billable");
+  const [internalNotes, setInternalNotes] = useState(serverLaborLine?.technicianNotes ?? "");
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const selectedLaborType = laborTypes.find((laborType) => laborType.id === laborTypeId) ?? null;
+  const laborHours = Number(fields[fieldId] ?? 0);
+  const safeLaborHours = Number.isFinite(laborHours) ? Math.max(0, laborHours) : 0;
+  const laborRate = selectedLaborType?.rate ?? 0;
+  const laborTotal = Number((safeLaborHours * laborRate).toFixed(2));
+  const laborTypeOptions = useMemo<SearchSelectOption[]>(() => laborTypes.map((laborType) => ({
+    value: laborType.id,
+    label: laborType.name,
+    secondaryLabel: [
+      `$${laborType.rate.toFixed(2)}/hr`,
+      laborType.taxable ? "Taxable" : "Non-taxable",
+      laborType.quickBooksItemId ? "QuickBooks mapped" : "Needs QuickBooks mapping"
+    ].join(" | "),
+    badge: laborType.quickBooksItemId ? "QB mapped" : "Unmapped"
+  })), [laborTypes]);
+
   if (!section || !field || field.type !== "select") {
     return null;
   }
 
-  const sectionState = controller.draft.sections[section.id] ?? { status: "pending", notes: "", fields: {} };
-  const fields = sectionState.fields as Record<string, ReportPrimitiveValue>;
+  async function saveLaborLine() {
+    if (disabled || !selectedLaborType) {
+      return;
+    }
+
+    const record: LocalWorkOrderLineItemRecord = {
+      id: laborLineId,
+      inspectionId: data.inspectionWorkspace.inspectionId,
+      catalogItemId: selectedLaborType.catalogItemId,
+      itemType: "labor",
+      name: `${selectedLaborType.name} Labor`,
+      description: selectedLaborType.description ?? selectedLaborType.catalogItemName ?? `${selectedLaborType.name} labor`,
+      quantity: safeLaborHours,
+      unitPrice: laborRate,
+      totalPrice: laborTotal,
+      taxable: selectedLaborType.taxable,
+      billableStatus,
+      technicianNotes: internalNotes.trim() || null,
+      source: "technician_selected",
+      quickBooksItemId: selectedLaborType.quickBooksItemId,
+      laborTypeId: selectedLaborType.id,
+      laborTypeName: selectedLaborType.name,
+      laborRate,
+      laborTotal,
+      synced: false,
+      invoiced: false,
+      localUpdatedAt: new Date().toISOString(),
+      syncStatus: "pending",
+      lastError: null
+    };
+
+    await putLocalWorkOrderLineItem(record);
+    await queueWorkOrderLaborLineItemUpsert({
+      id: record.id,
+      inspectionId: record.inspectionId,
+      laborTypeId: selectedLaborType.id,
+      laborHours: safeLaborHours,
+      billableStatus,
+      technicianNotes: record.technicianNotes
+    });
+    setLaborLineId(record.id);
+    setStatusMessage(window.navigator.onLine ? "Labor billing saved and queued for sync." : "Labor billing saved on this device. It will sync when service returns.");
+  }
 
   return (
     <section className="space-y-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-panel">
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Labor Hours</p>
-        <h3 className="mt-2 text-xl font-semibold text-slate-950">Select total labor hours</h3>
-        <p className="mt-2 text-sm leading-6 text-slate-500">Choose the total time spent on this work order visit.</p>
+        <h3 className="mt-2 text-xl font-semibold text-slate-950">Labor type and hours</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-500">Choose the labor category and hours. TradeWorx snapshots the rate for billing, invoices, and QuickBooks.</p>
       </div>
+      <SearchSelect
+        customValue={selectedLaborType?.name ?? ""}
+        disabled={disabled}
+        emptyText="No active labor types are configured yet."
+        label="Labor Type"
+        onChange={setLaborTypeId}
+        options={laborTypeOptions}
+        placeholder="Select labor type"
+        value={laborTypeId}
+      />
       <label className="block text-sm font-semibold text-slate-900">
         Labor Hours
         <select
           className="mt-3 min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-950 outline-none focus:border-[var(--tenant-primary)] focus:ring-4 focus:ring-[rgb(var(--tenant-primary-rgb)/0.12)] disabled:bg-slate-100"
           disabled={disabled}
           onChange={(event) => controller.updateSectionField(section.id, field.id, event.target.value)}
-          value={String(fields[field.id] ?? "")}
+          value={String(fields[fieldId] ?? "")}
         >
           <option value="">Select labor hours</option>
           {(field.options ?? []).map((option) => (
@@ -609,6 +690,54 @@ function WorkOrderLaborHoursSection({
           ))}
         </select>
       </label>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Rate</p>
+          <p className="mt-1 text-lg font-semibold text-slate-950">${laborRate.toFixed(2)}/hr</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Labor total</p>
+          <p className="mt-1 text-lg font-semibold text-slate-950">${laborTotal.toFixed(2)}</p>
+        </div>
+        <label className="block text-sm font-semibold text-slate-900">
+          Billing status
+          <select
+            className="mt-2 min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-950 disabled:bg-slate-100"
+            disabled={disabled}
+            onChange={(event) => setBillableStatus(event.target.value)}
+            value={billableStatus}
+          >
+            <option value="billable">Billable</option>
+            <option value="included">Included</option>
+            <option value="no_charge">No charge</option>
+            <option value="warranty">Warranty</option>
+          </select>
+        </label>
+      </div>
+      <label className="block text-sm font-semibold text-slate-900">
+        Internal notes
+        <textarea
+          className="mt-2 min-h-24 w-full rounded-2xl border border-slate-200 px-4 py-3 text-base disabled:bg-slate-50"
+          disabled={disabled}
+          onChange={(event) => setInternalNotes(event.target.value)}
+          placeholder="Optional notes for office billing review"
+          value={internalNotes}
+        />
+      </label>
+      {selectedLaborType && !selectedLaborType.quickBooksItemId ? (
+        <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          This labor type needs a QuickBooks item mapping before invoice sync.
+        </p>
+      ) : null}
+      {statusMessage ? <p className="rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-800">{statusMessage}</p> : null}
+      <button
+        className="min-h-12 rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+        disabled={disabled || !selectedLaborType}
+        onClick={saveLaborLine}
+        type="button"
+      >
+        Save labor billing
+      </button>
     </section>
   );
 }
