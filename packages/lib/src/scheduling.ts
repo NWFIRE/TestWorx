@@ -5196,16 +5196,18 @@ export async function getAdminSchedulingQueueData(
     }));
   }
 
+  const queueWhere: Prisma.InspectionWhereInput = {
+    tenantId,
+    ...(statusFilter ? { status: statusFilter } : {}),
+    ...(andFilters.length ? { AND: andFilters } : {}),
+    ...(classificationFilter ? { inspectionClassification: classificationFilter } : {}),
+    ...(typeof priorityFilter === "boolean" ? { isPriority: priorityFilter } : {}),
+    ...(searchFilter ? searchFilter : {}),
+    ...(technicianFilter ? technicianFilter : {})
+  };
+
   const inspections = await prisma.inspection.findMany({
-    where: {
-      tenantId,
-      ...(statusFilter ? { status: statusFilter } : {}),
-      ...(andFilters.length ? { AND: andFilters } : {}),
-      ...(classificationFilter ? { inspectionClassification: classificationFilter } : {}),
-      ...(typeof priorityFilter === "boolean" ? { isPriority: priorityFilter } : {}),
-      ...(searchFilter ? searchFilter : {}),
-      ...(technicianFilter ? technicianFilter : {})
-    },
+    where: queueWhere,
     include: {
       site: true,
       customerCompany: true,
@@ -5217,6 +5219,30 @@ export async function getAdminSchedulingQueueData(
     orderBy: [{ scheduledStart: "asc" }],
     ...(limit ? { take: limit } : {})
   });
+  const countInspections = limit
+    ? await prisma.inspection.findMany({
+        where: queueWhere,
+        select: {
+          id: true,
+          status: true,
+          isPriority: true,
+          scheduledStart: true,
+          assignedTechnicianId: true,
+          convertedFromQuotes: { select: { id: true }, take: 1 },
+          technicianAssignments: { select: { id: true } },
+          tasks: {
+            select: {
+              assignedTechnicianId: true,
+              dueDate: true,
+              dueMonth: true,
+              inspectionType: true,
+              schedulingStatus: true,
+              status: true
+            }
+          }
+        }
+      })
+    : inspections;
 
   const mapped = inspections.map((inspection) => {
     const currentTasks = withInspectionTaskDisplayLabels(
@@ -5257,6 +5283,11 @@ export async function getAdminSchedulingQueueData(
     };
   }).filter((inspection) => inspection.tasks.length > 0);
 
+  const countRows = countInspections.map((inspection) => ({
+    ...inspection,
+    tasks: inspection.tasks.filter((task) => isCurrentVisitTaskForInspection(task, inspection))
+  })).filter((inspection) => inspection.tasks.length > 0);
+
   const technicianOptions = await prisma.user.findMany({
     where: {
       tenantId,
@@ -5286,12 +5317,17 @@ export async function getAdminSchedulingQueueData(
       toBeCompleted: mapped.filter((inspection) => inspection.status === InspectionStatus.to_be_completed).length,
       scheduled: mapped.filter((inspection) => inspection.status === InspectionStatus.scheduled).length,
       inProgress: mapped.filter((inspection) => inspection.status === InspectionStatus.in_progress).length,
-      completed: mapped.filter((inspection) => inspection.status === InspectionStatus.completed).length,
-      invoiced: mapped.filter((inspection) => inspection.status === InspectionStatus.invoiced).length,
-      cancelled: mapped.filter((inspection) => inspection.status === InspectionStatus.cancelled).length,
-      followUpRequired: mapped.filter((inspection) => inspection.status === InspectionStatus.follow_up_required).length,
-      open: mapped.filter((inspection) => isActiveOperationalInspectionStatus(inspection.status)).length,
-      sharedQueue: mapped.filter((inspection) => inspection.tasks.every((task) => !task.assignedTechnicianId)).length
+      completed: countRows.filter((inspection) => inspection.status === InspectionStatus.completed).length,
+      invoiced: countRows.filter((inspection) => inspection.status === InspectionStatus.invoiced).length,
+      cancelled: countRows.filter((inspection) => inspection.status === InspectionStatus.cancelled).length,
+      followUpRequired: countRows.filter((inspection) => inspection.status === InspectionStatus.follow_up_required).length,
+      open: countRows.filter((inspection) => isActiveOperationalInspectionStatus(inspection.status)).length,
+      priority: countRows.filter((inspection) => inspection.isPriority).length,
+      sharedQueue: countRows.filter((inspection) =>
+        !inspection.assignedTechnicianId &&
+        inspection.technicianAssignments.length === 0 &&
+        inspection.tasks.every((task) => !task.assignedTechnicianId)
+      ).length
     },
     inspections: mapped
   };

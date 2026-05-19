@@ -187,6 +187,75 @@ describe("technician dashboard inspection access", () => {
     expect(prismaMock.inspection.findMany.mock.calls[0]?.[0]).not.toHaveProperty("take");
   });
 
+  it("calculates admin inspection KPI counts from the full matching queue instead of the capped display rows", async () => {
+    const buildInspection = (index: number) => ({
+      id: `inspection_${index}`,
+      tenantId: "tenant_1",
+      status: InspectionStatus.to_be_completed,
+      inspectionClassification: "standard",
+      isPriority: true,
+      scheduledStart: new Date(`2026-05-${String((index % 28) + 1).padStart(2, "0")}T09:00:00.000Z`),
+      assignedTechnicianId: null,
+      site: {
+        id: `site_${index}`,
+        name: `Site ${index}`,
+        addressLine1: "100 Main St",
+        addressLine2: null,
+        city: "Enid",
+        state: "OK",
+        postalCode: "73701"
+      },
+      customerCompany: {
+        id: `customer_${index}`,
+        name: `Customer ${index}`,
+        serviceAddressLine1: null,
+        serviceAddressLine2: null,
+        serviceCity: null,
+        serviceState: null,
+        servicePostalCode: null,
+        billingAddressLine1: null,
+        billingAddressLine2: null,
+        billingCity: null,
+        billingState: null,
+        billingPostalCode: null
+      },
+      assignedTechnician: null,
+      technicianAssignments: [],
+      convertedFromQuotes: [],
+      tasks: [
+        {
+          id: `task_${index}`,
+          inspectionType: "fire_extinguisher",
+          assignedTechnicianId: null,
+          schedulingStatus: "scheduled_now",
+          status: InspectionStatus.to_be_completed,
+          dueDate: null,
+          dueMonth: "2026-05",
+          recurrence: null,
+          report: null,
+          assignedTechnician: null
+        }
+      ]
+    });
+    const allRows = Array.from({ length: 41 }, (_, index) => buildInspection(index + 1));
+    prismaMock.inspection.findMany
+      .mockResolvedValueOnce(allRows.slice(0, 40))
+      .mockResolvedValueOnce(allRows);
+
+    const result = await getAdminSchedulingQueueData({
+      userId: "admin_1",
+      role: "office_admin",
+      tenantId: "tenant_1"
+    });
+
+    expect(result.inspections).toHaveLength(40);
+    expect(result.counts.open).toBe(41);
+    expect(result.counts.priority).toBe(41);
+    expect(result.counts.sharedQueue).toBe(41);
+    expect(prismaMock.inspection.findMany.mock.calls[0]?.[0]).toHaveProperty("take", 40);
+    expect(prismaMock.inspection.findMany.mock.calls[1]?.[0]).not.toHaveProperty("take");
+  });
+
   it("shows unassigned claimable inspections in the shared queue for technicians", async () => {
     prismaMock.inspection.findMany
       .mockResolvedValueOnce([])

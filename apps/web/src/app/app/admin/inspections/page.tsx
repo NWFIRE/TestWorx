@@ -378,7 +378,7 @@ export default async function AdminInspectionsPage({
           label="Priority"
           note="Flagged work that should stand out in dispatch."
           tone="amber"
-          value={queueData.inspections.filter((inspection) => inspection.isPriority).length}
+          value={queueData.counts.priority}
         />
         <KPIStatCard
           label="Shared queue"
