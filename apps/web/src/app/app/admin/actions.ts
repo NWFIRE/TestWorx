@@ -887,14 +887,26 @@ export async function updateBillingSummaryItemGroupAction(formData: FormData) {
     return;
   }
 
-  await updateBillingSummaryItemGroup(
-    { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-    summaryId,
-    itemIds,
-    Number.isFinite(quantity) ? quantity : 0,
-    unitPrice !== null && Number.isFinite(unitPrice) ? unitPrice : null,
-    taxable
-  );
+  try {
+    await updateBillingSummaryItemGroup(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      summaryId,
+      itemIds,
+      Number.isFinite(quantity) ? quantity : 0,
+      unitPrice !== null && Number.isFinite(unitPrice) ? unitPrice : null,
+      taxable
+    );
+  } catch (error) {
+    if (!(error instanceof Error) || !/Billing item group not found/i.test(error.message)) {
+      throw error;
+    }
+
+    console.warn("Billing line save ignored stale item group", {
+      summaryId,
+      inspectionId,
+      itemIds
+    });
+  }
 
   revalidatePath("/app/admin/billing");
   revalidatePath(`/app/admin/billing/${inspectionId}`);
