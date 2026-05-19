@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QuoteDeliveryStatus, QuoteStatus, QuoteSyncStatus, WorkOrderLineItemType } from "@prisma/client";
 import { addDays } from "date-fns";
 
-const { prismaMock, sendQuoteEmailMock, sendQuoteReminderEmailMock, syncQuoteToQuickBooksEstimateMock, createInspectionMock, ensureGenericInspectionSiteMock, saveQuickBooksItemMappingForCodeMock, clearQuickBooksItemMappingForCodeMock, generateQuotePdfMock } = vi.hoisted(() => ({
+const { prismaMock, sendQuoteEmailMock, sendQuoteReminderEmailMock, sendQuoteStatusNotificationEmailMock, syncQuoteToQuickBooksEstimateMock, createInspectionMock, ensureGenericInspectionSiteMock, saveQuickBooksItemMappingForCodeMock, clearQuickBooksItemMappingForCodeMock, generateQuotePdfMock } = vi.hoisted(() => ({
   prismaMock: {
     $queryRawUnsafe: vi.fn(),
     $transaction: vi.fn(),
@@ -52,11 +52,13 @@ const { prismaMock, sendQuoteEmailMock, sendQuoteReminderEmailMock, syncQuoteToQ
       findFirst: vi.fn()
     },
     user: {
-      findFirst: vi.fn()
+      findFirst: vi.fn(),
+      findMany: vi.fn()
     }
   },
   sendQuoteEmailMock: vi.fn(),
   sendQuoteReminderEmailMock: vi.fn(),
+  sendQuoteStatusNotificationEmailMock: vi.fn(),
   syncQuoteToQuickBooksEstimateMock: vi.fn(),
   createInspectionMock: vi.fn(),
   ensureGenericInspectionSiteMock: vi.fn(),
@@ -75,7 +77,8 @@ vi.mock("@testworx/db", () => ({
 
 vi.mock("../account-email", () => ({
   sendQuoteEmail: sendQuoteEmailMock,
-  sendQuoteReminderEmail: sendQuoteReminderEmailMock
+  sendQuoteReminderEmail: sendQuoteReminderEmailMock,
+  sendQuoteStatusNotificationEmail: sendQuoteStatusNotificationEmailMock
 }));
 
 vi.mock("../env", () => ({
@@ -117,6 +120,7 @@ import {
   convertQuoteToInspection,
   createQuote,
   deleteQuote,
+  declineQuoteByAccessToken,
   getHostedQuoteDetailByToken,
   getCustomerQuoteDetail,
   getQuoteFormOptions,
@@ -127,6 +131,7 @@ import {
   clearQuoteLineItemQuickBooksMapping,
   sendQuote,
   updateQuote,
+  updateQuoteStatus,
   updateQuoteReminderControl,
   updateQuoteReminderSettings
 } from "../quotes";
@@ -179,6 +184,7 @@ describe("quotes", () => {
       quoteId: "quote_1",
       internalCode: "WET_FIRE_SPRINKLER_ANNUAL"
     });
+    prismaMock.user.findMany.mockResolvedValue([]);
     prismaMock.quoteLineItem.update.mockResolvedValue(undefined);
     prismaMock.workOrderLineItem.createMany.mockResolvedValue({ count: 0 });
     saveQuickBooksItemMappingForCodeMock.mockResolvedValue(undefined);
@@ -193,6 +199,13 @@ describe("quotes", () => {
       sent: true,
       provider: "resend",
       messageId: "reminder_msg_1",
+      error: null,
+      reason: "sent"
+    });
+    sendQuoteStatusNotificationEmailMock.mockResolvedValue({
+      sent: true,
+      provider: "resend",
+      messageId: "quote_status_msg_1",
       error: null,
       reason: "sent"
     });
@@ -917,7 +930,191 @@ describe("quotes", () => {
         customerResponseNote: "Please schedule next week."
       })
     }));
+    expect(sendQuoteStatusNotificationEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+      recipientEmail: "office@example.com",
+      quoteNumber: "Q-2026-0009",
+      customerName: "Acme",
+      siteName: "Main campus",
+      statusLabel: "Approved",
+      responseNote: "Please schedule next week.",
+      quoteTotal: "$100.00",
+      quoteUrl: "https://tradeworx.example/app/admin/quotes/quote_1"
+    }));
     expect(result.accessState).toBe("approved");
+  });
+
+  it("keeps hosted quote approval successful when the internal notification email fails", async () => {
+    prismaMock.quote.findFirst.mockResolvedValue({
+      id: "quote_1",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      quoteNumber: "Q-2026-0009",
+      contactName: "Alyssa Reed",
+      recipientEmail: "alyssa@example.com",
+      status: QuoteStatus.viewed,
+      issuedAt: new Date("2026-04-06T12:00:00.000Z"),
+      expiresAt: null,
+      quoteAccessToken: "token_approve",
+      quoteAccessTokenRevokedAt: null,
+      quoteAccessTokenExpiresAt: addDays(new Date(), 5),
+      quoteAccessTokenSentToEmail: "alyssa@example.com",
+      approvedAt: null,
+      declinedAt: null,
+      subtotal: 100,
+      taxAmount: 0,
+      total: 100,
+      customerNotes: null,
+      customerCompany: { name: "Acme", contactName: "Alyssa", billingEmail: "alyssa@example.com", phone: null },
+      site: { name: "Main campus", addressLine1: "123 Main", addressLine2: null, city: "Austin", state: "TX", postalCode: "78701" },
+      tenant: { id: "tenant_1", name: "TradeWorx", branding: {}, billingEmail: "office@example.com" },
+      lineItems: []
+    });
+    prismaMock.quote.update.mockResolvedValue({
+      id: "quote_1",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      quoteNumber: "Q-2026-0009",
+      contactName: "Alyssa Reed",
+      recipientEmail: "alyssa@example.com",
+      status: QuoteStatus.approved,
+      issuedAt: new Date("2026-04-06T12:00:00.000Z"),
+      expiresAt: null,
+      quoteAccessToken: "token_approve",
+      quoteAccessTokenRevokedAt: null,
+      quoteAccessTokenExpiresAt: addDays(new Date(), 5),
+      quoteAccessTokenSentToEmail: "alyssa@example.com",
+      approvedAt: new Date(),
+      declinedAt: null,
+      subtotal: 100,
+      taxAmount: 0,
+      total: 100,
+      customerNotes: null,
+      customerResponseNote: null,
+      customerCompany: { name: "Acme", contactName: "Alyssa", billingEmail: "alyssa@example.com", phone: null },
+      site: { name: "Main campus", addressLine1: "123 Main", addressLine2: null, city: "Austin", state: "TX", postalCode: "78701" },
+      tenant: { id: "tenant_1", name: "TradeWorx", branding: {}, billingEmail: "office@example.com" },
+      lineItems: []
+    });
+    sendQuoteStatusNotificationEmailMock.mockRejectedValueOnce(new Error("Resend unavailable"));
+
+    const result = await approveQuoteByAccessToken("token_approve");
+
+    expect(result.accessState).toBe("approved");
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        action: "quote.status_notification_failed"
+      })
+    }));
+  });
+
+  it("emails admins when a customer declines a hosted quote", async () => {
+    prismaMock.user.findMany.mockResolvedValue([
+      { email: "admin@example.com", name: "Office Admin" }
+    ]);
+    prismaMock.quote.findFirst.mockResolvedValue({
+      id: "quote_1",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      siteId: null,
+      quoteNumber: "Q-2026-0012",
+      contactName: "Alyssa Reed",
+      recipientEmail: "alyssa@example.com",
+      status: QuoteStatus.viewed,
+      issuedAt: new Date("2026-04-06T12:00:00.000Z"),
+      expiresAt: null,
+      quoteAccessToken: "token_decline",
+      quoteAccessTokenRevokedAt: null,
+      quoteAccessTokenExpiresAt: addDays(new Date(), 5),
+      quoteAccessTokenSentToEmail: "alyssa@example.com",
+      approvedAt: null,
+      declinedAt: null,
+      subtotal: 250,
+      taxAmount: 0,
+      total: 250,
+      customerNotes: null,
+      customerCompany: { name: "Acme", contactName: "Alyssa", billingEmail: "alyssa@example.com", phone: null },
+      site: null,
+      tenant: { id: "tenant_1", name: "TradeWorx", branding: {}, billingEmail: "office@example.com" },
+      lineItems: []
+    });
+    prismaMock.quote.update.mockResolvedValue({
+      id: "quote_1",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      siteId: null,
+      quoteNumber: "Q-2026-0012",
+      contactName: "Alyssa Reed",
+      recipientEmail: "alyssa@example.com",
+      status: QuoteStatus.declined,
+      issuedAt: new Date("2026-04-06T12:00:00.000Z"),
+      expiresAt: null,
+      quoteAccessToken: "token_decline",
+      quoteAccessTokenRevokedAt: null,
+      quoteAccessTokenExpiresAt: addDays(new Date(), 5),
+      quoteAccessTokenSentToEmail: "alyssa@example.com",
+      approvedAt: null,
+      declinedAt: new Date(),
+      subtotal: 250,
+      taxAmount: 0,
+      total: 250,
+      customerNotes: null,
+      customerResponseNote: "Too expensive right now.",
+      customerCompany: { name: "Acme", contactName: "Alyssa", billingEmail: "alyssa@example.com", phone: null },
+      site: null,
+      tenant: { id: "tenant_1", name: "TradeWorx", branding: {}, billingEmail: "office@example.com" },
+      lineItems: []
+    });
+
+    const result = await declineQuoteByAccessToken("token_decline", { note: "Too expensive right now." });
+
+    expect(result.accessState).toBe("declined");
+    expect(sendQuoteStatusNotificationEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+      recipientEmail: "admin@example.com",
+      statusLabel: "Declined",
+      responseNote: "Too expensive right now.",
+      quoteTotal: "$250.00"
+    }));
+    expect(sendQuoteStatusNotificationEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+      recipientEmail: "office@example.com",
+      statusLabel: "Declined"
+    }));
+  });
+
+  it("emails admins when an office user changes a quote to a terminal status", async () => {
+    prismaMock.user.findMany.mockResolvedValue([
+      { email: "admin@example.com", name: "Office Admin" }
+    ]);
+    prismaMock.quote.findFirst.mockResolvedValue({
+      id: "quote_1",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      quoteNumber: "Q-2026-0013",
+      status: QuoteStatus.sent,
+      expiresAt: null,
+      total: 400,
+      customerResponseNote: null,
+      customerCompany: { name: "Acme" },
+      site: { name: "Main campus" },
+      tenant: { name: "TradeWorx", billingEmail: null }
+    });
+    prismaMock.quote.update.mockResolvedValue(undefined);
+
+    await updateQuoteStatus(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      "quote_1",
+      QuoteStatus.approved,
+      { note: "Approved by phone." }
+    );
+
+    expect(sendQuoteStatusNotificationEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+      recipientEmail: "admin@example.com",
+      statusLabel: "Approved",
+      responseNote: "Approved by phone.",
+      quoteUrl: "https://tradeworx.example/app/admin/quotes/quote_1"
+    }));
   });
 
   it("blocks quote conversion until the quote is approved", async () => {

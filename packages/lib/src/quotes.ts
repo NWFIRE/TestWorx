@@ -6,6 +6,7 @@ import {
   QuoteStatus,
   QuoteSyncStatus,
   RecurrenceFrequency,
+  UserRole,
   WorkOrderLineBillableStatus,
   WorkOrderLineItemType,
   WorkOrderLineSource
@@ -17,7 +18,7 @@ import type { ActorContext, InspectionType } from "@testworx/types";
 import { actorContextSchema } from "@testworx/types";
 import type { QuoteReminderDispatchStatus, QuoteReminderType } from "@prisma/client";
 
-import { sendQuoteEmail, sendQuoteReminderEmail } from "./account-email";
+import { sendQuoteEmail, sendQuoteReminderEmail, sendQuoteStatusNotificationEmail } from "./account-email";
 import { resolveTenantBranding } from "./branding";
 import { getServerEnv } from "./env";
 import { buildQuoteEmailDefaultMessage, buildQuoteEmailSubject } from "./quote-email";
@@ -677,8 +678,16 @@ function buildQuoteAccessUrl(token: string) {
   return `${getServerEnv().APP_URL}/quote/${token}`;
 }
 
+function buildAdminQuoteUrl(quoteId: string) {
+  return `${getServerEnv().APP_URL}/app/admin/quotes/${quoteId}`;
+}
+
 function roundMoney(value: number) {
   return Number(value.toFixed(2));
+}
+
+function formatMoney(value: number | null | undefined) {
+  return `$${(value ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function calculateLineTotal(input: { quantity: number; unitPrice: number; discountAmount: number }) {
@@ -1007,6 +1016,159 @@ async function createQuoteAuditLog(input: {
       entityType: "Quote",
       entityId: input.quoteId,
       metadata: input.metadata
+    }
+  });
+}
+
+function shouldSendQuoteStatusNotification(status: QuoteStatus) {
+  const notificationStatuses: QuoteStatus[] = [
+    QuoteStatus.approved,
+    QuoteStatus.declined,
+    QuoteStatus.converted,
+    QuoteStatus.cancelled,
+    QuoteStatus.expired
+  ];
+  return notificationStatuses.includes(status);
+}
+
+function normalizeRecipientEmailList(recipients: Array<{ email: string | null | undefined; name?: string | null }>) {
+  const seen = new Set<string>();
+  return recipients
+    .map((recipient) => ({
+      email: normalizeNullableString(recipient.email),
+      name: normalizeNullableString(recipient.name)
+    }))
+    .filter((recipient): recipient is { email: string; name: string | null } => {
+      if (!recipient.email) {
+        return false;
+      }
+      const key = recipient.email.toLowerCase();
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+}
+
+async function getQuoteStatusNotificationRecipients(input: {
+  tenantId: string;
+  tenantBillingEmail?: string | null;
+}) {
+  const admins = await prisma.user.findMany({
+    where: {
+      tenantId: input.tenantId,
+      isActive: true,
+      role: { in: [UserRole.tenant_admin, UserRole.office_admin] }
+    },
+    select: {
+      email: true,
+      name: true
+    },
+    orderBy: [{ role: "asc" }, { name: "asc" }, { email: "asc" }]
+  });
+
+  return normalizeRecipientEmailList([
+    ...admins,
+    { email: input.tenantBillingEmail, name: "Billing team" }
+  ]);
+}
+
+async function sendQuoteStatusNotifications(input: {
+  quote: {
+    id: string;
+    tenantId: string;
+    quoteNumber: string;
+    status: QuoteStatus;
+    total: number;
+    customerResponseNote: string | null;
+    tenant: {
+      name: string;
+      billingEmail: string | null;
+    };
+    customerCompany: {
+      name: string;
+    };
+    site: {
+      name: string;
+    } | null;
+  };
+  previousStatus?: QuoteStatus | null;
+  nextStatus: QuoteStatus;
+  source: "secure_link" | "admin";
+  actorUserId?: string | null;
+  note?: string | null;
+}) {
+  if (input.previousStatus === input.nextStatus || !shouldSendQuoteStatusNotification(input.nextStatus)) {
+    return;
+  }
+
+  const recipients = await getQuoteStatusNotificationRecipients({
+    tenantId: input.quote.tenantId,
+    tenantBillingEmail: input.quote.tenant.billingEmail
+  });
+  if (recipients.length === 0) {
+    await createQuoteAuditLog({
+      tenantId: input.quote.tenantId,
+      actorUserId: input.actorUserId ?? null,
+      action: "quote.status_notification_skipped",
+      quoteId: input.quote.id,
+      metadata: {
+        previousStatus: input.previousStatus ?? null,
+        nextStatus: input.nextStatus,
+        source: input.source,
+        reason: "no_admin_recipient"
+      }
+    });
+    return;
+  }
+
+  const statusLabel = quoteStatusLabels[input.nextStatus] ?? formatQuoteStatusLabel(input.nextStatus);
+  const deliveryResults = await Promise.all(recipients.map(async (recipient) => {
+    try {
+      const delivery = await sendQuoteStatusNotificationEmail({
+        recipientEmail: recipient.email,
+        recipientName: recipient.name ?? recipient.email,
+        tenantName: input.quote.tenant.name,
+        quoteNumber: input.quote.quoteNumber,
+        customerName: input.quote.customerCompany.name,
+        siteName: input.quote.site?.name ?? null,
+        statusLabel,
+        responseNote: normalizeNullableString(input.note) ?? input.quote.customerResponseNote,
+        quoteTotal: formatMoney(input.quote.total),
+        quoteUrl: buildAdminQuoteUrl(input.quote.id)
+      });
+
+      return {
+        recipientEmail: recipient.email,
+        sent: delivery.sent,
+        reason: delivery.reason,
+        messageId: delivery.messageId,
+        error: delivery.error
+      };
+    } catch (error) {
+      return {
+        recipientEmail: recipient.email,
+        sent: false,
+        reason: "provider_error",
+        messageId: null,
+        error: error instanceof Error ? error.message : "Unable to send quote status notification."
+      };
+    }
+  }));
+
+  await createQuoteAuditLog({
+    tenantId: input.quote.tenantId,
+    actorUserId: input.actorUserId ?? null,
+    action: deliveryResults.some((result) => result.sent)
+      ? "quote.status_notification_sent"
+      : "quote.status_notification_failed",
+    quoteId: input.quote.id,
+    metadata: {
+      previousStatus: input.previousStatus ?? null,
+      nextStatus: input.nextStatus,
+      source: input.source,
+      recipients: deliveryResults
     }
   });
 }
@@ -2700,7 +2862,11 @@ export async function updateQuoteStatus(
 
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, tenantId: parsedActor.tenantId as string },
-    select: { id: true, status: true }
+    include: {
+      customerCompany: { select: { name: true } },
+      site: { select: { name: true } },
+      tenant: { select: { name: true, billingEmail: true } }
+    }
   });
 
   if (!quote) {
@@ -2734,6 +2900,25 @@ export async function updateQuoteStatus(
   });
 
   await refreshQuoteReminderState(quoteId);
+
+  await sendQuoteStatusNotifications({
+    quote: {
+      id: quote.id,
+      tenantId: quote.tenantId,
+      quoteNumber: quote.quoteNumber,
+      status,
+      total: quote.total,
+      customerResponseNote: normalizeNullableString(options?.note) ?? quote.customerResponseNote,
+      tenant: quote.tenant,
+      customerCompany: quote.customerCompany,
+      site: quote.site
+    },
+    previousStatus: quote.status,
+    nextStatus: status,
+    source: "admin",
+    actorUserId: parsedActor.userId,
+    note: options?.note
+  });
 }
 
 function defaultConversionStart() {
@@ -3208,6 +3393,25 @@ async function respondToQuoteByAccessToken(input: {
   });
 
   await refreshQuoteReminderState(updated.id);
+
+  await sendQuoteStatusNotifications({
+    quote: {
+      id: updated.id,
+      tenantId: updated.tenantId,
+      quoteNumber: updated.quoteNumber,
+      status: updated.status,
+      total: updated.total,
+      customerResponseNote: updated.customerResponseNote,
+      tenant: updated.tenant,
+      customerCompany: updated.customerCompany,
+      site: updated.site
+    },
+    previousStatus: quote.status,
+    nextStatus,
+    source: "secure_link",
+    actorUserId: null,
+    note
+  });
 
   return {
     accessState: input.response,

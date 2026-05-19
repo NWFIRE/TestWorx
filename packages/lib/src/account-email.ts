@@ -69,6 +69,16 @@ type QuoteReminderEmailPayload = BaseEmailPayload & {
   expiresAt?: Date | null;
 };
 
+type QuoteStatusNotificationEmailPayload = BaseEmailPayload & {
+  quoteNumber: string;
+  customerName: string;
+  siteName?: string | null;
+  statusLabel: string;
+  responseNote?: string | null;
+  quoteTotal?: string | null;
+  quoteUrl: string;
+};
+
 type CustomerIntakeRequestEmailPayload = BaseEmailPayload & {
   intakeUrl: string;
   senderName: string;
@@ -369,6 +379,28 @@ export async function sendQuoteReminderEmail(payload: QuoteReminderEmailPayload)
       actionHref: payload.quoteUrl,
       actionLabel: payload.actionLabel ?? "View quote",
       footer: "Use the secure online quote page to review details, download the PDF, and approve or decline when you're ready."
+    })
+  });
+}
+
+export async function sendQuoteStatusNotificationEmail(payload: QuoteStatusNotificationEmailPayload) {
+  const statusLower = payload.statusLabel.toLowerCase();
+  return sendWithResend({
+    from: NO_REPLY_FROM_EMAIL,
+    to: payload.recipientEmail,
+    subject: `Quote ${statusLower}: ${payload.quoteNumber} - ${payload.customerName}`,
+    html: buildShell({
+      eyebrow: "Quote status update",
+      title: `Quote ${payload.statusLabel}`,
+      body: [
+        `Quote ${payload.quoteNumber} for ${escapeHtml(payload.customerName)}${payload.siteName ? ` at ${escapeHtml(payload.siteName)}` : ""} was marked <strong>${escapeHtml(payload.statusLabel)}</strong>.`,
+        payload.quoteTotal ? `Quote total: ${escapeHtml(payload.quoteTotal)}.` : "",
+        payload.responseNote ? `Customer note: ${escapeHtml(payload.responseNote)}` : "",
+        "Open the quote in TradeWorx to review the response, convert approved work, or follow up with the customer."
+      ].filter(Boolean),
+      actionHref: payload.quoteUrl,
+      actionLabel: "Open Quote",
+      footer: "This internal notification was sent because you are listed as an administrator for this TradeWorx workspace."
     })
   });
 }
