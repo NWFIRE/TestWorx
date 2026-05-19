@@ -3085,46 +3085,31 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
         } satisfies BillableItem;
       }
 
-      if (item.linkedCatalogItemId) {
-        if (typeof item.taxable !== "boolean") {
-          const linkedCatalogItem = await db.quickBooksCatalogItem.findFirst({
-            where: {
-              id: item.linkedCatalogItemId,
-              tenantId: input.tenantId
-            },
-            select: {
-              quickbooksItemId: true,
-              taxable: true,
-              rawJson: true
-            }
+      const catalogState = await buildBillingItemCatalogState(input.tenantId, item);
+      const currentMatch = catalogState.currentMatch;
+      if (!currentMatch) {
+        return item;
+      }
+
+      const resolvedUnitPrice = item.unitPrice ?? currentMatch.unitPrice ?? null;
+      const taxSnapshot = typeof item.taxable === "boolean"
+        ? {}
+        : buildCatalogTaxSnapshot({
+            quickbooksItemId: currentMatch.quickbooksItemId,
+            taxable: currentMatch.taxable,
+            rawJson: null
           });
-
-          if (linkedCatalogItem) {
-            return {
-              ...item,
-              ...buildCatalogTaxSnapshot(linkedCatalogItem)
-            } satisfies BillableItem;
-          }
-        }
-
-        return item;
-      }
-
-      const storedMatch = await findStoredBillingItemCatalogMatch(input.tenantId, item);
-      if (!storedMatch) {
-        return item;
-      }
 
       return {
         ...item,
-        unitPrice: item.unitPrice ?? storedMatch.catalogItem.unitPrice ?? null,
-        amount: calculateAmount(item.quantity, item.unitPrice ?? storedMatch.catalogItem.unitPrice ?? null),
-        linkedCatalogItemId: storedMatch.catalogItem.id,
-        linkedCatalogItemName: storedMatch.catalogItem.name,
-        linkedQuickBooksItemId: storedMatch.catalogItem.quickbooksItemId,
-        linkedMatchMethod: "source_mapping",
-        linkedMatchConfidence: storedMatch.confidence,
-        ...buildCatalogTaxSnapshot(storedMatch.catalogItem)
+        unitPrice: resolvedUnitPrice,
+        amount: calculateAmount(item.quantity, resolvedUnitPrice),
+        linkedCatalogItemId: currentMatch.catalogItemId,
+        linkedCatalogItemName: currentMatch.name,
+        linkedQuickBooksItemId: currentMatch.quickbooksItemId,
+        linkedMatchMethod: currentMatch.matchMethod,
+        linkedMatchConfidence: currentMatch.confidence,
+        ...taxSnapshot
       } satisfies BillableItem;
     })
   );

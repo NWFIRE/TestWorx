@@ -43,6 +43,7 @@ const { prismaMock, txMock } = vi.hoisted(() => ({
     serviceFeeRule: { findMany: vi.fn() },
     minimumTicketRule: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     complianceReportingFeeRule: { findFirst: vi.fn(), findMany: vi.fn() },
+    quickBooksCatalogItem: { findFirst: vi.fn(), findMany: vi.fn() },
     workOrderLineItem: { findMany: vi.fn(), updateMany: vi.fn() }
   }
 }));
@@ -554,6 +555,8 @@ describe("inspection billing extraction", () => {
     txMock.minimumTicketRule.findMany.mockReset();
     txMock.complianceReportingFeeRule.findFirst.mockReset();
     txMock.complianceReportingFeeRule.findMany.mockReset();
+    txMock.quickBooksCatalogItem.findFirst.mockReset();
+    txMock.quickBooksCatalogItem.findMany.mockReset();
     txMock.$queryRawUnsafe.mockResolvedValue([{ exists: true }]);
     prismaMock.$queryRawUnsafe.mockResolvedValue([{ exists: true }]);
     txMock.workOrderLineItem.findMany.mockReset();
@@ -1066,6 +1069,8 @@ describe("inspection billing persistence and admin review", () => {
     });
     prismaMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
     txMock.minimumTicketRule.findMany.mockResolvedValue([]);
+    txMock.quickBooksCatalogItem.findFirst.mockResolvedValue(null);
+    txMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
     prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
@@ -1448,6 +1453,83 @@ describe("inspection billing persistence and admin review", () => {
       })
     );
     expect(txMock.$executeRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it("hydrates catalog match prices before saving ready-to-bill summary totals", async () => {
+    const fireAlarmDraft = buildFireAlarmDraft();
+    fireAlarmDraft.sections["system-summary"]!.fields.laborHours = 2;
+
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      site: {
+        city: "Chicago",
+        state: "IL",
+        postalCode: "60601",
+        customerCompany: {
+          serviceCity: null,
+          serviceState: null,
+          servicePostalCode: null,
+          billingCity: null,
+          billingState: null,
+          billingPostalCode: null
+        }
+      }
+    });
+    txMock.tenant.findUnique.mockResolvedValue({
+      defaultServiceFeeCode: "SERVICE_FEE",
+      defaultServiceFeeUnitPrice: 0
+    });
+    txMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    txMock.site.findFirst.mockResolvedValue({
+      city: "Chicago",
+      state: "IL"
+    });
+    txMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
+    prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue({
+      sourceKey: "laborHours:ON_SITE_LABOR",
+      catalogItemId: "catalog_labor",
+      confidence: 1,
+      matchMethod: "source_mapping",
+      catalogItem: {
+        id: "catalog_labor",
+        quickbooksItemId: "qb_labor",
+        name: "Fire Alarm - Annual Inspection",
+        sku: null,
+        itemType: "service",
+        rawJson: null,
+        unitPrice: 115,
+        taxable: false
+      }
+    });
+
+    txMock.$queryRaw
+      .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1", inspectionClassification: "standard" }])
+      .mockResolvedValueOnce([
+        {
+          id: "report_1",
+          inspectionId: "inspection_1",
+          tenantId: "tenant_1",
+          contentJson: fireAlarmDraft,
+          inspectionType: "fire_alarm"
+        }
+      ])
+      .mockResolvedValueOnce([]);
+
+    const summary = await syncInspectionBillingSummaryTx(txMock as never, {
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1"
+    });
+
+    const laborLine = summary?.items.find((item) => item.category === "labor");
+    expect(laborLine).toEqual(expect.objectContaining({
+      quantity: 2,
+      unitPrice: 115,
+      amount: 230,
+      linkedCatalogItemId: "catalog_labor"
+    }));
+    expect(summary?.subtotal).toBe(230);
   });
 
   it("includes billable work order line items in auto billing summaries", async () => {
