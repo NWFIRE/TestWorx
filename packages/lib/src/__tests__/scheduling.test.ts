@@ -15,6 +15,7 @@ import {
   getInspectionDisplayStatus,
   getInspectionStatusTone,
   isInspectionPastDue,
+  isInspectionVisibleToTechnicianForDueMonth,
   isTechnicianEligibleForReportTypesFromRows,
   nextDueFrom,
   parseCreateInspectionFormData,
@@ -624,7 +625,7 @@ describe("month defaults and past-due status", () => {
     expect(defaultScheduledStartForMonth("2026-03", "2026-03-19T14:45")).toBe("2026-03-01T14:45");
   });
 
-  it("keeps due-month inspections out of past due after month end", () => {
+  it("marks due-month inspections past due after their due month has fully passed", () => {
     expect(
       isInspectionPastDue({
         status: InspectionStatus.scheduled,
@@ -638,10 +639,10 @@ describe("month defaults and past-due status", () => {
         ],
         now: new Date("2026-04-01T06:00:00.000Z")
       })
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it("does not treat old first-of-month due-date placeholders as hard scheduled dates", () => {
+  it("treats old first-of-month due-date placeholders as due-month work", () => {
     expect(
       isInspectionPastDue({
         status: InspectionStatus.scheduled,
@@ -655,10 +656,10 @@ describe("month defaults and past-due status", () => {
         ],
         now: new Date("2026-04-01T06:00:00.000Z")
       })
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it("marks incomplete inspections as past due only after a hard scheduled date passes", () => {
+  it("does not mark incomplete inspections past due when a hard scheduled date passes inside the same due month", () => {
     expect(
       isInspectionPastDue({
         status: InspectionStatus.scheduled,
@@ -672,7 +673,40 @@ describe("month defaults and past-due status", () => {
         ],
         now: new Date("2026-03-16T06:00:00.000Z")
       })
-    ).toBe(true);
+    ).toBe(false);
+  });
+
+  it("keeps due-month inspections active through the final day of the due month", () => {
+    expect(
+      isInspectionPastDue({
+        status: InspectionStatus.scheduled,
+        scheduledStart: new Date("2026-05-31T09:00:00.000Z"),
+        tasks: [
+          {
+            dueMonth: "2026-05",
+            dueDate: new Date("2026-05-31T09:00:00.000Z"),
+            schedulingStatus: "scheduled_now"
+          }
+        ],
+        now: new Date("2026-05-31T23:59:59.000Z")
+      })
+    ).toBe(false);
+  });
+
+  it("activates technician visibility when the due month begins", () => {
+    const inspection = {
+      scheduledStart: new Date("2026-06-01T09:00:00.000Z"),
+      tasks: [
+        {
+          dueMonth: "2026-06",
+          dueDate: new Date("2026-06-01T09:00:00.000Z"),
+          schedulingStatus: "scheduled_now"
+        }
+      ]
+    };
+
+    expect(isInspectionVisibleToTechnicianForDueMonth(inspection, new Date(2026, 4, 19, 12))).toBe(false);
+    expect(isInspectionVisibleToTechnicianForDueMonth(inspection, new Date(2026, 5, 1, 12))).toBe(true);
   });
 
   it("does not mark completed inspections as past due", () => {

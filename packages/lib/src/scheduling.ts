@@ -1,4 +1,4 @@
-import { addDays, addMonths, endOfDay, endOfMonth, endOfWeek, format, isAfter, isSameDay, startOfDay, startOfMonth, subDays, subMonths } from "date-fns";
+import { addMonths, endOfDay, endOfMonth, endOfWeek, format, isSameDay, startOfDay, startOfMonth, subDays, subMonths } from "date-fns";
 import {
   AttachmentKind,
   InspectionClassification,
@@ -101,7 +101,6 @@ export const claimableInspectionStatuses = [
   InspectionStatus.in_progress,
   InspectionStatus.follow_up_required
 ] as const;
-export const technicianClaimableLookaheadDays = 60;
 export const activeOperationalInspectionStatuses = [
   InspectionStatus.to_be_completed,
   InspectionStatus.scheduled,
@@ -436,21 +435,6 @@ function isPlaceholderMonthAnchorDueDate(input: { dueDate?: Date | null; dueMont
 
   const monthAnchor = formatDueMonthDateAnchor(input.dueMonth);
   return Boolean(monthAnchor && input.dueDate.toISOString().slice(0, 10) === monthAnchor);
-}
-
-function getHardScheduledDueDate(tasks?: Array<{ dueDate?: Date | null; dueMonth?: string | null; schedulingStatus?: string | null }> | null) {
-  const hardDates = (tasks ?? [])
-    .filter((task) => isCurrentVisitTaskSchedulingStatus(task.schedulingStatus ?? "scheduled_now"))
-    .map((task) => task.dueDate instanceof Date && !Number.isNaN(task.dueDate.getTime()) && !isPlaceholderMonthAnchorDueDate(task)
-      ? task.dueDate
-      : null)
-    .filter((date): date is Date => Boolean(date));
-
-  if (!hardDates.length) {
-    return null;
-  }
-
-  return hardDates.reduce((earliest, current) => current.getTime() < earliest.getTime() ? current : earliest);
 }
 
 function normalizeTaskDueMonth(input: { dueMonth?: string | null; dueDate?: Date | null; fallbackMonth?: string | null }) {
@@ -954,41 +938,30 @@ function isSharedQueueTaskSet<T extends { assignedTechnicianId?: string | null }
   return tasks.length > 0 && tasks.every((task) => !task.assignedTechnicianId);
 }
 
-function readClaimableWindowDate(value?: Date | string | null) {
-  if (!value) {
-    return null;
-  }
-
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function readDueMonthWindowDate(value?: string | null) {
-  const normalized = value?.trim();
-  if (!normalized || !/^\d{4}-\d{2}$/.test(normalized)) {
-    return null;
-  }
-
-  const date = new Date(`${normalized}-01T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function isInspectionInTechnicianClaimableWindow<T extends {
+function getInspectionDuePeriod<T extends {
   dueDate?: Date | string | null;
   dueMonth?: string | null;
-}>(inspection: { scheduledStart?: Date | string | null; tasks?: T[] | null }, windowEnd: Date) {
-  const visitDate = readClaimableWindowDate(inspection.scheduledStart ?? null);
-  const taskDates = (inspection.tasks ?? [])
-    .flatMap((task) => [
-      readClaimableWindowDate(task.dueDate ?? null),
-      readDueMonthWindowDate(task.dueMonth ?? null)
-    ])
-    .filter((date): date is Date => Boolean(date));
-  const comparisonDate = taskDates.length
-    ? taskDates.reduce((earliest, current) => current.getTime() < earliest.getTime() ? current : earliest)
-    : visitDate;
+  schedulingStatus?: string | null;
+  status?: InspectionStatus | string | null;
+}>(inspection: { scheduledStart?: Date | string | null; tasks?: T[] | null }) {
+  const taskDuePeriods = (inspection.tasks ?? [])
+    .filter((task) => task.status !== InspectionStatus.cancelled)
+    .filter((task) => isCurrentVisitTaskSchedulingStatus(task.schedulingStatus ?? "scheduled_now"))
+    .map((task) => getTaskDuePeriodForVisibility(task))
+    .filter((period): period is string => Boolean(period))
+    .sort();
 
-  return comparisonDate ? comparisonDate <= windowEnd : true;
+  return taskDuePeriods[0] ?? getDateDuePeriod(inspection.scheduledStart ?? null);
+}
+
+export function isInspectionVisibleToTechnicianForDueMonth<T extends {
+  dueDate?: Date | string | null;
+  dueMonth?: string | null;
+  schedulingStatus?: string | null;
+  status?: InspectionStatus | string | null;
+}>(inspection: { scheduledStart?: Date | string | null; tasks?: T[] | null }, now = new Date()) {
+  const duePeriod = getInspectionDuePeriod(inspection);
+  return duePeriod ? duePeriod <= format(now, "yyyy-MM") : true;
 }
 
 function getClaimableInspectionPeriodKey<T extends {
@@ -1199,25 +1172,25 @@ export function formatAssignedTechnicianNames(input: {
 export function isInspectionPastDue(input: {
   status: InspectionStatus;
   scheduledStart: Date;
-  tasks?: Array<{ dueDate?: Date | null; dueMonth?: string | null; schedulingStatus?: string | null }> | null;
+  tasks?: Array<{ dueDate?: Date | null; dueMonth?: string | null; schedulingStatus?: string | null; status?: InspectionStatus | string | null }> | null;
   now?: Date;
 }) {
   if (isTerminalInspectionStatus(input.status)) {
     return false;
   }
 
-  const hardScheduledDueDate = getHardScheduledDueDate(input.tasks);
-  if (!hardScheduledDueDate) {
+  const duePeriod = getInspectionDuePeriod(input);
+  if (!duePeriod) {
     return false;
   }
 
-  return isAfter(input.now ?? new Date(), endOfDay(hardScheduledDueDate));
+  return duePeriod < format(input.now ?? new Date(), "yyyy-MM");
 }
 
 export function getInspectionDisplayStatus(input: {
   status: InspectionStatus;
   scheduledStart: Date;
-  tasks?: Array<{ dueDate?: Date | null; dueMonth?: string | null; schedulingStatus?: string | null }> | null;
+  tasks?: Array<{ dueDate?: Date | null; dueMonth?: string | null; schedulingStatus?: string | null; status?: InspectionStatus | string | null }> | null;
   now?: Date;
 }) {
   return isInspectionPastDue(input) ? "past_due" : input.status;
@@ -5917,14 +5890,20 @@ export async function resolveClaimableInspectionsForTechnician(actor: ActorConte
   }
 
   const tenantId = parsedActor.tenantId as string;
-  const claimableWindowEnd = endOfDay(addDays(startOfDay(new Date()), technicianClaimableLookaheadDays));
+  const now = new Date();
+  const activeDueMonthEnd = endOfMonth(now);
+  const activeDueMonth = format(now, "yyyy-MM");
   const rawInspections = await prisma.inspection.findMany({
     where: {
       tenantId,
       claimable: true,
       status: { in: [...claimableInspectionStatuses] },
       AND: [activeInspectionQueueConsistencyFilter()],
-      scheduledStart: { lte: claimableWindowEnd }
+      OR: [
+        { scheduledStart: { lte: activeDueMonthEnd } },
+        { tasks: { some: { dueDate: { lte: activeDueMonthEnd } } } },
+        { tasks: { some: { dueMonth: { lte: activeDueMonth } } } }
+      ]
     },
     include: {
       site: true,
@@ -5949,7 +5928,7 @@ export async function resolveClaimableInspectionsForTechnician(actor: ActorConte
       const currentTasks = getClaimableInspectionVisibleTasks(inspection);
       return { inspection, currentTasks };
     })
-    .filter(({ inspection }) => isInspectionInTechnicianClaimableWindow(inspection, claimableWindowEnd))
+    .filter(({ inspection }) => isInspectionVisibleToTechnicianForDueMonth(inspection, now))
     .filter(({ currentTasks }) => isSharedQueueTaskSet(currentTasks))
     .filter(({ currentTasks }) =>
       isTechnicianEligibleForReportTypesFromRows({
@@ -5983,7 +5962,8 @@ export async function resolveClaimableInspectionsForTechnician(actor: ActorConte
       displayStatus: getInspectionDisplayStatus({
         status: inspection.status,
         scheduledStart: inspection.scheduledStart,
-        tasks: currentTasks
+        tasks: currentTasks,
+        now
       }),
       assignedTechnicianNames: formatAssignedTechnicianNames({
         assignedTechnician: inspection.assignedTechnician,
@@ -6112,7 +6092,8 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
       ...inspection,
       tasks: withInspectionTaskDisplayLabels(filterTasksForTechnician(inspection.tasks, parsedActor.userId, inspection))
     }))
-    .filter((inspection) => inspection.tasks.length > 0);
+    .filter((inspection) => inspection.tasks.length > 0)
+    .filter((inspection) => isInspectionVisibleToTechnicianForDueMonth(inspection, now));
   const monthAssigned = assignedQueue.filter((inspection) => inspection.scheduledStart >= monthStart && inspection.scheduledStart <= monthEnd);
   const assignedWithDisplay = assignedQueue.map((inspection) => ({
     ...inspection,
@@ -6136,7 +6117,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
       customerBillingPostalCode: inspection.customerCompany.billingPostalCode
     }),
     closeoutRequest: inspection.closeoutRequest,
-    displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart, tasks: inspection.tasks }),
+    displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart, tasks: inspection.tasks, now }),
     assignedTechnicianNames: formatAssignedTechnicianNames({
       assignedTechnician: inspection.assignedTechnician,
       technicianAssignments: readTechnicianNameAssignments(inspection)
@@ -6172,7 +6153,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
         customerBillingState: inspection.customerCompany.billingState,
         customerBillingPostalCode: inspection.customerCompany.billingPostalCode
       }),
-      displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart, tasks: inspection.tasks }),
+      displayStatus: getInspectionDisplayStatus({ status: inspection.status, scheduledStart: inspection.scheduledStart, tasks: inspection.tasks, now }),
       assignedTechnicianNames: formatAssignedTechnicianNames({
         assignedTechnician: inspection.assignedTechnician,
         technicianAssignments: readTechnicianNameAssignments(inspection)

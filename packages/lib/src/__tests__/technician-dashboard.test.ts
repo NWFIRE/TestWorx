@@ -1,5 +1,5 @@
 import { AttachmentKind, InspectionStatus } from "@prisma/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
@@ -21,9 +21,15 @@ import { filterSubsetDuplicateOperationalInspections, getAdminSchedulingQueueDat
 
 describe("technician dashboard inspection access", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-19T12:00:00.000Z"));
     vi.clearAllMocks();
     prismaMock.$transaction.mockResolvedValue(null);
     prismaMock.user.findMany.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("excludes completed inspections from technician dashboard results", async () => {
@@ -116,6 +122,49 @@ describe("technician dashboard inspection access", () => {
     expect(result.assigned[0]?.id).toBe("inspection_1");
     expect(result.assigned[0]?.documents).toHaveLength(1);
     expect(result.assigned[0]?.attachments).toHaveLength(1);
+  });
+
+  it("hides assigned future-month inspections from technician active work until the due month starts", async () => {
+    prismaMock.inspection.findMany
+      .mockResolvedValueOnce([
+        {
+          id: "inspection_future_assigned",
+          tenantId: "tenant_1",
+          status: InspectionStatus.scheduled,
+          inspectionClassification: "standard",
+          isPriority: false,
+          scheduledStart: new Date("2026-06-01T09:00:00.000Z"),
+          site: { id: "site_1", name: "Pinecrest Tower" },
+          customerCompany: { id: "customer_1", name: "Pinecrest Property Management" },
+          assignedTechnician: { id: "tech_1", name: "Alex Turner" },
+          technicianAssignments: [],
+          closeoutRequest: null,
+          convertedFromQuotes: [],
+          tasks: [
+            {
+              id: "task_future_assigned",
+              inspectionType: "fire_alarm",
+              assignedTechnicianId: "tech_1",
+              dueMonth: "2026-06",
+              dueDate: new Date("2026-06-01T00:00:00.000Z"),
+              schedulingStatus: "scheduled_now",
+              status: InspectionStatus.to_be_completed,
+              recurrence: null,
+              report: null
+            }
+          ],
+          attachments: [],
+          documents: []
+        }
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const result = await getTechnicianDashboardData({ userId: "tech_1", role: "technician", tenantId: "tenant_1" });
+
+    expect(result.assigned).toHaveLength(0);
+    expect(result.thisMonth).toHaveLength(0);
+    expect(result.today).toHaveLength(0);
   });
 
   it("removes same-period duplicate operational inspections when one visit is only a report-type subset", () => {
@@ -299,7 +348,11 @@ describe("technician dashboard inspection access", () => {
             InspectionStatus.follow_up_required
           ]
         },
-        scheduledStart: { lte: expect.any(Date) }
+        OR: expect.arrayContaining([
+          { scheduledStart: { lte: expect.any(Date) } },
+          { tasks: { some: { dueDate: { lte: expect.any(Date) } } } },
+          { tasks: { some: { dueMonth: { lte: "2026-05" } } } }
+        ])
       })
     }));
     expect(result.unassigned).toHaveLength(1);
@@ -583,7 +636,7 @@ describe("technician dashboard inspection access", () => {
     expect(result.unassigned).toHaveLength(0);
   });
 
-  it("shows near-term future claimable inspections when their future-scheduled tasks belong to that visit period", async () => {
+  it("hides future-month claimable inspections until their due month becomes active", async () => {
     const scheduledStart = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
     const dueMonth = `${scheduledStart.getFullYear()}-${String(scheduledStart.getMonth() + 1).padStart(2, "0")}`;
 
@@ -620,9 +673,7 @@ describe("technician dashboard inspection access", () => {
 
     const result = await getTechnicianDashboardData({ userId: "tech_2", role: "technician", tenantId: "tenant_1" });
 
-    expect(result.unassigned).toHaveLength(1);
-    expect(result.unassigned[0]?.id).toBe("inspection_future_shared");
-    expect(result.unassigned[0]?.tasks).toHaveLength(1);
+    expect(result.unassigned).toHaveLength(0);
   });
 
   it("excludes far-future claimable inspections from the mobile shared queue", async () => {
