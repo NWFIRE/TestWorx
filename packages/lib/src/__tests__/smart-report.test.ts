@@ -117,6 +117,24 @@ describe("smart report foundations", () => {
     expect(draft.sections.inventory?.fields.unitsInspected).toBe(2);
   });
 
+  it("does not add the shared tag status section to fire extinguisher reports", () => {
+    const template = resolveReportTemplate({
+      inspectionType: "fire_extinguisher",
+      assets: []
+    });
+    const draft = buildInitialReportDraft({
+      inspectionType: "fire_extinguisher",
+      siteName: "Pinecrest Tower",
+      customerName: "Pinecrest Property Management",
+      scheduledDate: "2026-03-20T15:00:00.000Z",
+      assetCount: 0
+    });
+
+    expect(template.sections.map((section) => section.id)).not.toContain("tag-status");
+    expect(draft.sectionOrder).not.toContain("tag-status");
+    expect(draft.sections).not.toHaveProperty("tag-status");
+  });
+
   it("hides asset tags from repeater display labels and visible row lines", () => {
     const template = resolveReportTemplate({
       inspectionType: "fire_extinguisher",

@@ -375,6 +375,8 @@ const sharedTagStatusSection: ReportSectionDefinition = {
   ]
 };
 
+const inspectionTypesWithoutSharedTagStatus = new Set<InspectionType>(["fire_extinguisher"]);
+
 function reportTemplateHasTagStatus(template: ReportTemplateDefinition) {
   return template.sections.some((section) =>
     section.fields.some((field) => {
@@ -388,9 +390,12 @@ function reportTemplateHasTagStatus(template: ReportTemplateDefinition) {
 
 export function resolveReportTemplate(input: ReportTemplateResolutionContext): ReportTemplateDefinition {
   const template = inspectionTypeRegistry[input.inspectionType];
-  const sections = input.inspectionType === "work_order" || reportTemplateHasTagStatus(template)
-    ? template.sections
-    : [sharedTagStatusSection, ...template.sections];
+  const shouldAddSharedTagStatus = input.inspectionType !== "work_order"
+    && !inspectionTypesWithoutSharedTagStatus.has(input.inspectionType)
+    && !reportTemplateHasTagStatus(template);
+  const sections = shouldAddSharedTagStatus
+    ? [sharedTagStatusSection, ...template.sections]
+    : template.sections;
 
   return {
     ...template,
