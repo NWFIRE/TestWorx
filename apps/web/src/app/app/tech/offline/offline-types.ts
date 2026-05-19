@@ -48,8 +48,10 @@ export type LocalWorkOrderLineItemRecord = {
   quickBooksItemId: string | null;
   laborTypeId?: string | null;
   laborTypeName?: string | null;
+  laborHours?: number | null;
   laborRate?: number | null;
   laborTotal?: number | null;
+  laborBillingLineId?: string | null;
   synced: boolean;
   invoiced: boolean;
   localUpdatedAt: string;

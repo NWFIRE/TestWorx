@@ -6,7 +6,7 @@ import { actorContextSchema } from "@testworx/types";
 
 import { assertTenantContext } from "./permissions";
 import { syncInspectionBillingSummaryTx } from "./inspection-billing";
-import { assertWorkOrderLaborTypeTable, assertWorkOrderLineItemTable, hasWorkOrderLaborTypeTable, hasWorkOrderLineItemTable } from "./work-order-line-item-table";
+import { assertWorkOrderLaborTypeTable, assertWorkOrderLineItemTable, hasWorkOrderLaborLineColumns, hasWorkOrderLaborTypeTable, hasWorkOrderLineItemTable } from "./work-order-line-item-table";
 
 function parseActor(actor: ActorContext) {
   const parsed = actorContextSchema.parse(actor);
@@ -159,8 +159,10 @@ export type WorkOrderLineItemView = {
   quickBooksItemId: string | null;
   laborTypeId: string | null;
   laborTypeName: string | null;
+  laborHours: number | null;
   laborRate: number | null;
   laborTotal: number | null;
+  laborBillingLineId: string | null;
   synced: boolean;
   invoiced: boolean;
 };
@@ -196,8 +198,10 @@ function toLineItemView(line: {
   quickBooksItemId: string | null;
   laborTypeId?: string | null;
   laborTypeName?: string | null;
+  laborHours?: number | null;
   laborRate?: number | null;
   laborTotal?: number | null;
+  laborBillingLineId?: string | null;
   invoicedAt: Date | null;
 }): WorkOrderLineItemView {
   return {
@@ -217,8 +221,10 @@ function toLineItemView(line: {
     quickBooksItemId: line.quickBooksItemId,
     laborTypeId: line.laborTypeId ?? null,
     laborTypeName: line.laborTypeName ?? null,
+    laborHours: line.laborHours ?? null,
     laborRate: line.laborRate ?? null,
     laborTotal: line.laborTotal ?? null,
+    laborBillingLineId: line.laborBillingLineId ?? null,
     synced: true,
     invoiced: Boolean(line.invoicedAt)
   };
@@ -262,10 +268,38 @@ export async function getWorkOrderLineItems(actor: ActorContext, inspectionId: s
     return [] satisfies WorkOrderLineItemView[];
   }
 
+  const laborColumnsReady = await hasWorkOrderLaborLineColumns();
   const lines = await prisma.workOrderLineItem.findMany({
     where: {
       tenantId: parsedActor.tenantId as string,
       inspectionId
+    },
+    select: {
+      id: true,
+      inspectionId: true,
+      catalogItemId: true,
+      itemType: true,
+      name: true,
+      description: true,
+      quantity: true,
+      unitPrice: true,
+      totalPrice: true,
+      taxable: true,
+      billableStatus: true,
+      technicianNotes: true,
+      source: true,
+      quickBooksItemId: true,
+      invoicedAt: true,
+      ...(laborColumnsReady
+        ? {
+            laborTypeId: true,
+            laborTypeName: true,
+            laborHours: true,
+            laborRate: true,
+            laborTotal: true,
+            laborBillingLineId: true
+          }
+        : {})
     },
     orderBy: [{ createdAt: "asc" }]
   });
@@ -506,6 +540,7 @@ export async function upsertWorkOrderLineItem(actor: ActorContext, input: {
     snapshottedAt: new Date().toISOString()
   };
 
+  const laborColumnsReady = await hasWorkOrderLaborLineColumns();
   const data = {
     tenantId,
     inspectionId: input.inspectionId,
@@ -521,12 +556,18 @@ export async function upsertWorkOrderLineItem(actor: ActorContext, input: {
     technicianNotes: input.technicianNotes?.trim() || null,
     source,
     quickBooksItemId: catalogItem.quickbooksItemId,
-    laborTypeId: null,
-    laborTypeName: null,
-    laborRate: null,
-    laborTotal: null,
     pricingSnapshot,
-    addedByUserId: parsedActor.userId
+    addedByUserId: parsedActor.userId,
+    ...(laborColumnsReady
+      ? {
+          laborTypeId: null,
+          laborTypeName: null,
+          laborHours: null,
+          laborRate: null,
+          laborTotal: null,
+          laborBillingLineId: null
+        }
+      : {})
   };
 
   const saved = existing
@@ -587,6 +628,9 @@ export async function upsertWorkOrderLaborLineItem(actor: ActorContext, input: {
   const { parsedActor } = await getAuthorizedWorkOrderInspection(actor, input.inspectionId);
   await assertWorkOrderLineItemTable();
   await assertWorkOrderLaborTypeTable();
+  if (!await hasWorkOrderLaborLineColumns()) {
+    throw new Error("Work order labor billing settings are still being deployed. Try again after the database migration finishes.");
+  }
   const tenantId = parsedActor.tenantId as string;
   const laborType = await prisma.workOrderLaborType.findFirst({
     where: {
@@ -682,8 +726,10 @@ export async function upsertWorkOrderLaborLineItem(actor: ActorContext, input: {
     quickBooksItemId: linkedQuickBooksItemId,
     laborTypeId: laborType.id,
     laborTypeName: laborType.name,
+    laborHours,
     laborRate,
     laborTotal,
+    laborBillingLineId: null,
     pricingSnapshot,
     addedByUserId: parsedActor.userId
   };

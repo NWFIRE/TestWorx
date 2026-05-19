@@ -1514,8 +1514,10 @@ model WorkOrderLineItem {
   quickBooksItemId         String?
   laborTypeId              String?
   laborTypeName            String?
+  laborHours               Float?
   laborRate                Float?
   laborTotal               Float?
+  laborBillingLineId       String?
   pricingSnapshot          Json?
   addedByUserId            String?
   invoicedBillingSummaryId String?

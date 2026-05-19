@@ -23,7 +23,7 @@ import {
 import { saveQuickBooksItemMappingForCode } from "./quickbooks";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
 import { reconcileInspectionStatusTx } from "./inspection-status-consistency";
-import { hasWorkOrderLineItemTable } from "./work-order-line-item-table";
+import { hasWorkOrderLaborLineColumns, hasWorkOrderLineItemTable } from "./work-order-line-item-table";
 import { getCustomerFacingSiteLabel } from "./scheduling";
 import {
   calculateInvoiceTotalsFromItems,
@@ -1404,6 +1404,7 @@ async function extractBillableItemsFromWorkOrderLineItemsTx(tx: TransactionClien
     return [] satisfies BillableItem[];
   }
 
+  const laborColumnsReady = await hasWorkOrderLaborLineColumns(tx);
   const lines = await tx.workOrderLineItem.findMany({
     where: {
       tenantId: input.tenantId,
@@ -1411,7 +1412,32 @@ async function extractBillableItemsFromWorkOrderLineItemsTx(tx: TransactionClien
       billableStatus: "billable",
       invoicedAt: null
     },
-    include: {
+    select: {
+      id: true,
+      inspectionId: true,
+      catalogItemId: true,
+      itemType: true,
+      name: true,
+      description: true,
+      quantity: true,
+      unitPrice: true,
+      totalPrice: true,
+      taxable: true,
+      billableStatus: true,
+      technicianNotes: true,
+      source: true,
+      quickBooksItemId: true,
+      invoicedAt: true,
+      ...(laborColumnsReady
+        ? {
+            laborTypeId: true,
+            laborTypeName: true,
+            laborHours: true,
+            laborRate: true,
+            laborTotal: true,
+            laborBillingLineId: true
+          }
+        : {}),
       catalogItem: {
         select: {
           id: true,
@@ -1427,6 +1453,14 @@ async function extractBillableItemsFromWorkOrderLineItemsTx(tx: TransactionClien
   });
 
   return lines.map((line) => {
+    const laborLine = line as typeof line & {
+      laborTypeId?: string | null;
+      laborTypeName?: string | null;
+      laborHours?: number | null;
+      laborRate?: number | null;
+      laborTotal?: number | null;
+      laborBillingLineId?: string | null;
+    };
     const quantity = line.quantity > 0 ? line.quantity : 1;
     const unitPrice = line.unitPrice ?? line.catalogItem?.unitPrice ?? 0;
     return {
@@ -1440,8 +1474,8 @@ async function extractBillableItemsFromWorkOrderLineItemsTx(tx: TransactionClien
       category: mapWorkOrderLineItemTypeToBillingCategory(line.itemType),
       code: line.quickBooksItemId
         ? `CATALOG_${line.quickBooksItemId}`
-        : typeof line.laborTypeId === "string" && line.laborTypeId
-          ? `WORK_ORDER_LABOR_${line.laborTypeId}`
+        : typeof laborLine.laborTypeId === "string" && laborLine.laborTypeId
+          ? `WORK_ORDER_LABOR_${laborLine.laborTypeId}`
           : undefined,
       description: line.description?.trim() || line.name,
       quantity,
@@ -1451,10 +1485,12 @@ async function extractBillableItemsFromWorkOrderLineItemsTx(tx: TransactionClien
       metadata: {
         workOrderLineItemId: line.id,
         catalogItemId: line.catalogItemId,
-        laborTypeId: typeof line.laborTypeId === "string" ? line.laborTypeId : null,
-        laborTypeName: typeof line.laborTypeName === "string" ? line.laborTypeName : null,
-        laborRate: typeof line.laborRate === "number" ? line.laborRate : null,
-        laborTotal: typeof line.laborTotal === "number" ? line.laborTotal : null,
+        laborTypeId: typeof laborLine.laborTypeId === "string" ? laborLine.laborTypeId : null,
+        laborTypeName: typeof laborLine.laborTypeName === "string" ? laborLine.laborTypeName : null,
+        laborHours: typeof laborLine.laborHours === "number" ? laborLine.laborHours : null,
+        laborRate: typeof laborLine.laborRate === "number" ? laborLine.laborRate : null,
+        laborTotal: typeof laborLine.laborTotal === "number" ? laborLine.laborTotal : null,
+        laborBillingLineId: typeof laborLine.laborBillingLineId === "string" ? laborLine.laborBillingLineId : null,
         source: line.source,
         billableStatus: line.billableStatus,
         technicianNotes: line.technicianNotes,

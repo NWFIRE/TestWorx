@@ -23,6 +23,21 @@ const workOrderLaborTypeTableCheckSql = `
   ) AS "exists"
 `;
 
+const workOrderLaborLineColumnsCheckSql = `
+  SELECT COUNT(*)::int AS "count"
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+    AND table_name = 'WorkOrderLineItem'
+    AND column_name IN (
+      'laborTypeId',
+      'laborTypeName',
+      'laborHours',
+      'laborRate',
+      'laborTotal',
+      'laborBillingLineId'
+    )
+`;
+
 export async function hasWorkOrderLineItemTable(db: QueryableDatabase = prisma) {
   try {
     const rows = db.$queryRawUnsafe
@@ -75,4 +90,29 @@ export async function assertWorkOrderLaborTypeTable(db?: QueryableDatabase) {
   }
 
   throw new Error("Work order labor type settings are not enabled for this database yet.");
+}
+
+export async function hasWorkOrderLaborLineColumns(db: QueryableDatabase = prisma) {
+  try {
+    const rows = db.$queryRawUnsafe
+      ? await db.$queryRawUnsafe(workOrderLaborLineColumnsCheckSql) as Array<{ count: number | bigint }>
+      : await db.$queryRaw<Array<{ count: number | bigint }>>`
+          SELECT COUNT(*)::int AS "count"
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'WorkOrderLineItem'
+            AND column_name IN (
+              'laborTypeId',
+              'laborTypeName',
+              'laborHours',
+              'laborRate',
+              'laborTotal',
+              'laborBillingLineId'
+            )
+        `;
+
+    return Number(rows[0]?.count ?? 0) >= 6;
+  } catch {
+    return false;
+  }
 }
