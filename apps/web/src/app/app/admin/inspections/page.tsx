@@ -329,6 +329,14 @@ export default async function AdminInspectionsPage({
       isInFastManagementWindow(inspection, fastManagementWindowEnd)
     )
   );
+  const fastManagementCounts = {
+    open: fastManagementInspections.filter((inspection) =>
+      activeOperationalInspectionStatuses.includes(inspection.status as (typeof activeOperationalInspectionStatuses)[number])
+    ).length,
+    priority: fastManagementInspections.filter((inspection) => inspection.isPriority).length,
+    sharedQueue: fastManagementInspections.filter((inspection) => inspection.assignedTechnicianNames.length === 0).length,
+    completed: fastManagementInspections.filter((inspection) => inspection.status === "completed").length
+  };
 
   return (
     <AppPageShell density="wide">
@@ -372,25 +380,25 @@ export default async function AdminInspectionsPage({
           label="Open"
           note="Inspections still moving through live execution."
           tone="blue"
-          value={queueData.counts.open}
+          value={fastManagementCounts.open}
         />
         <KPIStatCard
           label="Priority"
           note="Flagged work that should stand out in dispatch."
           tone="amber"
-          value={queueData.counts.priority}
+          value={fastManagementCounts.priority}
         />
         <KPIStatCard
           label="Shared queue"
           note="Inspections with no technician assignment yet."
           tone="slate"
-          value={queueData.counts.sharedQueue}
+          value={fastManagementCounts.sharedQueue}
         />
         <KPIStatCard
           label="Completed"
           note="Visits returned by the current filter set."
           tone="emerald"
-          value={queueData.counts.completed}
+          value={fastManagementCounts.completed}
         />
       </section>
 
