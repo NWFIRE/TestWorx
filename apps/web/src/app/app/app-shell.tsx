@@ -171,13 +171,15 @@ function NavItem({
   active,
   collapsed,
   compact,
+  onPrefetch,
   onNavigate
 }: {
   item: AppNavItem;
   active: boolean;
   collapsed: boolean;
   compact: boolean;
-  onNavigate?: () => void;
+  onPrefetch?: (href: string) => void;
+  onNavigate?: (href: string) => void;
 }) {
   const toneClasses: Record<NonNullable<AppNavItem["tone"]>, { activeBar: string; activeIcon: string }> = {
     blue: {
@@ -213,7 +215,10 @@ function NavItem({
           : "text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-base)] hover:text-slate-950"
       } ${tone.activeBar} ${collapsed ? "justify-center px-2" : ""} ${compact ? "min-h-[48px]" : ""}`}
       href={item.href}
-      onClick={onNavigate}
+      onClick={() => onNavigate?.(item.href)}
+      onFocus={() => onPrefetch?.(item.href)}
+      onPointerEnter={() => onPrefetch?.(item.href)}
+      prefetch
       title={collapsed ? item.label : undefined}
     >
       <span
@@ -276,14 +281,16 @@ function NavSection({
   collapsed,
   compact,
   navItems,
+  onPrefetch,
   pathname,
   onNavigate
 }: {
   collapsed: boolean;
   compact: boolean;
   navItems: AppNavItem[];
+  onPrefetch?: (href: string) => void;
   pathname: string;
-  onNavigate?: () => void;
+  onNavigate?: (href: string) => void;
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -299,6 +306,7 @@ function NavSection({
               collapsed={collapsed}
               compact={compact}
               item={item}
+              onPrefetch={onPrefetch}
               onNavigate={onNavigate}
             />
           ))}
@@ -330,7 +338,11 @@ export function AppShell({
   const pathname = usePathname();
   const isTechnician = role === "technician";
   const navItems = useMemo(() => getAppNavItemsForRole(role, allowances, sidebarOrder), [allowances, role, sidebarOrder]);
-  const currentItem = useMemo(() => getCurrentAppNavItem(role, pathname, allowances, sidebarOrder), [allowances, pathname, role, sidebarOrder]);
+  const [pendingNavHref, setPendingNavHref] = useState<string | null>(null);
+  const activePathname = pendingNavHref && !isAppNavItemActive(pathname, { href: pendingNavHref, label: "", shortLabel: "", abbreviation: "" })
+    ? pendingNavHref
+    : pathname;
+  const currentItem = useMemo(() => getCurrentAppNavItem(role, activePathname, allowances, sidebarOrder), [activePathname, allowances, role, sidebarOrder]);
   const desktopBackFallbackHref = role === "customer_user" && pathname !== "/app/customer" ? "/app/customer" : null;
   const [isRefreshing, startRefreshTransition] = useTransition();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
@@ -341,6 +353,19 @@ export function AppShell({
   const drawerRef = useRef<HTMLDivElement | null>(null);
   const shellContentRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLElement | null>(null);
+  const pendingNavTimeoutRef = useRef<number | null>(null);
+
+  const prefetchNavHref = useCallback((href: string) => {
+    router.prefetch(href);
+  }, [router]);
+
+  const handleSidebarNavigate = useCallback((href: string) => {
+    prefetchNavHref(href);
+    if (href !== pathname) {
+      setPendingNavHref(href);
+    }
+    setDrawerOpen(false);
+  }, [pathname, prefetchNavHref]);
 
   const updateViewportMetrics = useCallback(() => {
     if (typeof window === "undefined" || typeof document === "undefined") {
@@ -363,6 +388,53 @@ export function AppShell({
       router.refresh();
     });
   }, [router]);
+
+  useEffect(() => {
+    if (!pendingNavHref) {
+      return;
+    }
+
+    if (pendingNavTimeoutRef.current) {
+      window.clearTimeout(pendingNavTimeoutRef.current);
+    }
+
+    pendingNavTimeoutRef.current = window.setTimeout(() => {
+      setPendingNavHref(null);
+      pendingNavTimeoutRef.current = null;
+    }, 3500);
+
+    return () => {
+      if (pendingNavTimeoutRef.current) {
+        window.clearTimeout(pendingNavTimeoutRef.current);
+        pendingNavTimeoutRef.current = null;
+      }
+    };
+  }, [pendingNavHref]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || navItems.length === 0) {
+      return;
+    }
+
+    const uniqueHrefs = Array.from(new Set(navItems.map((item) => item.href)));
+    const browserWindow = window as Window & typeof globalThis & {
+      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    const warmRoutes = () => {
+      for (const href of uniqueHrefs) {
+        router.prefetch(href);
+      }
+    };
+
+    if (browserWindow.requestIdleCallback && browserWindow.cancelIdleCallback) {
+      const idleId = browserWindow.requestIdleCallback(warmRoutes, { timeout: 1800 });
+      return () => browserWindow.cancelIdleCallback?.(idleId);
+    }
+
+    const timeoutId = globalThis.setTimeout(warmRoutes, 250);
+    return () => globalThis.clearTimeout(timeoutId);
+  }, [navItems, router]);
 
   const keepFocusedElementVisible = useCallback((target: HTMLElement) => {
     const container = contentRef.current;
@@ -621,7 +693,14 @@ export function AppShell({
               </div>
             ) : null}
           </div>
-          <NavSection collapsed={sidebarCollapsed} compact={false} navItems={navItems} pathname={pathname} />
+          <NavSection
+            collapsed={sidebarCollapsed}
+            compact={false}
+            navItems={navItems}
+            onNavigate={handleSidebarNavigate}
+            onPrefetch={prefetchNavHref}
+            pathname={activePathname}
+          />
         </aside>
       ) : null}
 
@@ -663,8 +742,9 @@ export function AppShell({
               collapsed={false}
               compact={true}
               navItems={navItems}
-              onNavigate={closeDrawer}
-              pathname={pathname}
+              onNavigate={handleSidebarNavigate}
+              onPrefetch={prefetchNavHref}
+              pathname={activePathname}
             />
           </aside>
         </>
