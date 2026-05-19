@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
+    $transaction: vi.fn(),
     inspection: {
+      findMany: vi.fn()
+    },
+    user: {
       findMany: vi.fn()
     }
   }
@@ -13,11 +17,13 @@ vi.mock("@testworx/db", () => ({
   prisma: prismaMock
 }));
 
-import { filterSubsetDuplicateOperationalInspections, getTechnicianDashboardData } from "../scheduling";
+import { filterSubsetDuplicateOperationalInspections, getAdminSchedulingQueueData, getTechnicianDashboardData } from "../scheduling";
 
 describe("technician dashboard inspection access", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaMock.$transaction.mockResolvedValue(null);
+    prismaMock.user.findMany.mockResolvedValue([]);
   });
 
   it("excludes completed inspections from technician dashboard results", async () => {
@@ -148,6 +154,37 @@ describe("technician dashboard inspection access", () => {
       "inspection_kitchen_and_extinguishers",
       "inspection_other_site"
     ]);
+  });
+
+  it("allows admin fast inspection management to query the full due window without the default 40-row truncation", async () => {
+    const dueWindowEnd = new Date("2026-07-18T23:59:59.999Z");
+    prismaMock.inspection.findMany.mockResolvedValueOnce([]);
+
+    await getAdminSchedulingQueueData(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        statuses: [InspectionStatus.to_be_completed, InspectionStatus.scheduled],
+        dueWindowEnd,
+        limit: null
+      }
+    );
+
+    expect(prismaMock.inspection.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        tenantId: "tenant_1",
+        status: { in: [InspectionStatus.to_be_completed, InspectionStatus.scheduled] },
+        AND: expect.arrayContaining([
+          expect.objectContaining({
+            OR: expect.arrayContaining([
+              { scheduledStart: { lte: dueWindowEnd } },
+              { tasks: { some: { dueDate: { lte: dueWindowEnd } } } },
+              { tasks: { some: { dueMonth: { lte: "2026-07" } } } }
+            ])
+          })
+        ])
+      })
+    }));
+    expect(prismaMock.inspection.findMany.mock.calls[0]?.[0]).not.toHaveProperty("take");
   });
 
   it("shows unassigned claimable inspections in the shared queue for technicians", async () => {

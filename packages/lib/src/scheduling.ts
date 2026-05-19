@@ -5115,6 +5115,8 @@ export async function getAdminSchedulingQueueData(
     priority?: InspectionPriorityFilterValue;
     query?: string | null;
     technicianId?: string | null;
+    dueWindowEnd?: Date | string | null;
+    limit?: number | null;
   }
 ) {
   const parsedActor = parseActor(actor);
@@ -5128,6 +5130,16 @@ export async function getAdminSchedulingQueueData(
   const requestedPriority = normalizeInspectionPriorityFilter(input?.priority);
   const requestedQuery = (input?.query ?? "").trim();
   const requestedTechnicianId = (input?.technicianId ?? "").trim();
+  const requestedDueWindowEnd = input?.dueWindowEnd
+    ? input.dueWindowEnd instanceof Date
+      ? input.dueWindowEnd
+      : new Date(input.dueWindowEnd)
+    : null;
+  const dueWindowEnd = requestedDueWindowEnd && !Number.isNaN(requestedDueWindowEnd.getTime())
+    ? requestedDueWindowEnd
+    : null;
+  const dueWindowEndMonth = dueWindowEnd ? format(dueWindowEnd, "yyyy-MM") : null;
+  const limit = input?.limit === null ? null : typeof input?.limit === "number" ? Math.max(1, input.limit) : 40;
   const statusFilter = requestedStatuses.length
     ? { in: requestedStatuses as InspectionStatus[] }
     : undefined;
@@ -5159,9 +5171,23 @@ export async function getAdminSchedulingQueueData(
         ]
       }
     : undefined;
+  const dueWindowFilter = dueWindowEnd
+    ? {
+        OR: [
+          { status: { in: [...terminalInspectionStatuses] } },
+          { scheduledStart: { lte: dueWindowEnd } },
+          { tasks: { some: { dueDate: { lte: dueWindowEnd } } } },
+          ...(dueWindowEndMonth ? [{ tasks: { some: { dueMonth: { lte: dueWindowEndMonth } } } }] : [])
+        ]
+      } satisfies Prisma.InspectionWhereInput
+    : null;
   const shouldApplyActiveConsistencyFilter =
     requestedStatuses.length === 0 ||
     requestedStatuses.every((status) => isActiveOperationalInspectionStatus(status as InspectionStatus));
+  const andFilters = [
+    shouldApplyActiveConsistencyFilter ? activeInspectionQueueConsistencyFilter() : null,
+    dueWindowFilter
+  ].filter((filter): filter is Prisma.InspectionWhereInput => Boolean(filter));
 
   if (shouldApplyActiveConsistencyFilter) {
     await prisma.$transaction((tx) => repairInspectionStatusConsistencyTx(tx, {
@@ -5174,7 +5200,7 @@ export async function getAdminSchedulingQueueData(
     where: {
       tenantId,
       ...(statusFilter ? { status: statusFilter } : {}),
-      ...(shouldApplyActiveConsistencyFilter ? { AND: [activeInspectionQueueConsistencyFilter()] } : {}),
+      ...(andFilters.length ? { AND: andFilters } : {}),
       ...(classificationFilter ? { inspectionClassification: classificationFilter } : {}),
       ...(typeof priorityFilter === "boolean" ? { isPriority: priorityFilter } : {}),
       ...(searchFilter ? searchFilter : {}),
@@ -5189,7 +5215,7 @@ export async function getAdminSchedulingQueueData(
       tasks: { include: { recurrence: true, report: true, assignedTechnician: true } }
     },
     orderBy: [{ scheduledStart: "asc" }],
-    take: 40
+    ...(limit ? { take: limit } : {})
   });
 
   const mapped = inspections.map((inspection) => {

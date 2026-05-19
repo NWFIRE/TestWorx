@@ -267,13 +267,23 @@ export default async function AdminInspectionsPage({
     tenantId: session.user.tenantId
   };
 
-  const [queueData, queueSearchData, historySearchData, dashboardData] = await Promise.all([
+  const fastManagementWindowEnd = endOfDay(addDays(startOfDay(new Date()), FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS));
+  const [queueData, fastQueueData, queueSearchData, historySearchData, dashboardData] = await Promise.all([
     getAdminSchedulingQueueData(actor, {
       statuses: effectiveStatuses,
       classifications: requestedClassifications,
       priority: requestedPriority,
       query,
       technicianId
+    }),
+    getAdminSchedulingQueueData(actor, {
+      statuses: effectiveStatuses,
+      classifications: requestedClassifications,
+      priority: requestedPriority,
+      query,
+      technicianId,
+      dueWindowEnd: fastManagementWindowEnd,
+      limit: null
     }),
     getAdminSchedulingQueueData(actor, {
       statuses: effectiveStatuses,
@@ -314,9 +324,8 @@ export default async function AdminInspectionsPage({
     ...queueSearchData.inspections.map((inspection) => buildInspectionSearchOption(inspection, currentPath)),
     ...(historySearchData?.inspections ?? []).map((inspection) => buildInspectionSearchOption(inspection, currentPath))
   ]);
-  const fastManagementWindowEnd = endOfDay(addDays(startOfDay(new Date()), FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS));
   const fastManagementInspections = filterSubsetDuplicateOperationalInspections(
-    queueData.inspections.filter((inspection) =>
+    fastQueueData.inspections.filter((inspection) =>
       isInFastManagementWindow(inspection, fastManagementWindowEnd)
     )
   );
