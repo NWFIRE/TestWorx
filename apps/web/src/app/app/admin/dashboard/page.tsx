@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { addDays, endOfDay, startOfDay } from "date-fns";
 import {
   Bell,
   CalendarDays,
@@ -12,6 +13,8 @@ import {
 
 import { auth } from "@/auth";
 import {
+  activeOperationalInspectionStatuses,
+  filterSubsetDuplicateOperationalInspections,
   formatInspectionTaskSummary,
   formatInspectionStatusLabel,
   formatTenantDate,
@@ -43,6 +46,8 @@ type CompletedDashboardInspection = AdminDashboardData["completedInspections"][n
 type ActiveDashboardInspection = AdminDashboardData["activeInspections"][number];
 type DashboardInspection = CompletedDashboardInspection | ActiveDashboardInspection;
 type DashboardTask = DashboardInspection["tasks"][number];
+
+const FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS = 60;
 
 function inspectionStatusLabel(status: string) {
   return formatInspectionStatusLabel(
@@ -264,6 +269,7 @@ export default async function AdminDashboardPage({
     role: session.user.role,
     tenantId: session.user.tenantId
   };
+  const fastManagementWindowEnd = endOfDay(addDays(startOfDay(new Date()), FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS));
 
   const [data, schedulingQueueData, billingSummaries, deficiencyData] = await Promise.all([
     getAdminDashboardData({
@@ -271,7 +277,11 @@ export default async function AdminDashboardPage({
       role: session.user.role,
       tenantId: session.user.tenantId
     }),
-    getAdminSchedulingQueueData(actor, { statuses: ["to_be_completed", "scheduled", "in_progress", "follow_up_required"] }),
+    getAdminSchedulingQueueData(actor, {
+      statuses: [...activeOperationalInspectionStatuses],
+      dueWindowEnd: fastManagementWindowEnd,
+      limit: null
+    }),
     getAdminBillingSummaries(actor),
     getAdminDeficiencyDashboardData(
       actor,
@@ -285,7 +295,8 @@ export default async function AdminDashboardPage({
 
   const greeting = getGreetingByHour(new Date(), data.timezone);
   const firstName = getGreetingName(session.user.name);
-  const openInspectionCount = schedulingQueueData.inspections.length;
+  const dashboardOperationalInspections = filterSubsetDuplicateOperationalInspections(schedulingQueueData.inspections);
+  const openInspectionCount = dashboardOperationalInspections.length;
   const readyToBillSummaryCount = billingSummaries.filter((summary) => isOpenBillingQueueStatus(summary.status)).length;
   const alerts = buildAlertItems(data, readyToBillSummaryCount, inspectionNotice);
   const complianceFlags = deficiencyData.deficiencies.filter(
@@ -303,7 +314,7 @@ export default async function AdminDashboardPage({
       label: "Open inspections",
       value: openInspectionCount.toString(),
       change: openInspectionCount
-        ? `${schedulingQueueData.counts.inProgress} currently in progress`
+        ? `${dashboardOperationalInspections.filter((inspection) => inspection.status === "in_progress").length} currently in progress`
         : "Dispatch queue is clear",
       icon: ClipboardList,
       href: "/app/admin/inspections?status=open",
