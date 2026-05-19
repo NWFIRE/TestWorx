@@ -816,17 +816,29 @@ const emergencyLightTypes: ReportOption[] = [
   { label: "Other", value: "Other" }
 ];
 const workOrderJobsiteHours: ReportOption[] = [
-  { label: "0.5 hours", value: "0.5" },
   { label: "1 hour", value: "1" },
   { label: "1.5 hours", value: "1.5" },
   { label: "2 hours", value: "2" },
   { label: "2.5 hours", value: "2.5" },
   { label: "3 hours", value: "3" },
+  { label: "3.5 hours", value: "3.5" },
   { label: "4 hours", value: "4" },
+  { label: "4.5 hours", value: "4.5" },
   { label: "5 hours", value: "5" },
+  { label: "5.5 hours", value: "5.5" },
   { label: "6 hours", value: "6" },
+  { label: "6.5 hours", value: "6.5" },
+  { label: "7 hours", value: "7" },
+  { label: "7.5 hours", value: "7.5" },
   { label: "8 hours", value: "8" },
-  { label: "Other", value: "other" }
+  { label: "8.5 hours", value: "8.5" },
+  { label: "9 hours", value: "9" },
+  { label: "9.5 hours", value: "9.5" },
+  { label: "10 hours", value: "10" },
+  { label: "10.5 hours", value: "10.5" },
+  { label: "11 hours", value: "11" },
+  { label: "11.5 hours", value: "11.5" },
+  { label: "12 hours", value: "12" }
 ];
 const workOrderPartsEquipmentOptions: ReportOption[] = [
   ...extinguisherTypes

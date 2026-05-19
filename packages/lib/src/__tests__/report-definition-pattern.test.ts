@@ -43,6 +43,24 @@ describe("report definition pattern", () => {
     })).toBe("KS-INSPECTION");
   });
 
+  it("keeps work orders as a simple single-page field workflow without tag or follow-up sections", () => {
+    const template = resolveReportTemplate({ inspectionType: "work_order", assets: [] });
+
+    expect(template.sections.map((section) => section.id)).toEqual([
+      "work-performed",
+      "parts-equipment-used",
+      "work-order-photos"
+    ]);
+    expect(template.sections.some((section) => section.id === "tag-status")).toBe(false);
+    expect(template.sections.flatMap((section) => section.fields.map((field) => field.id))).not.toContain("followUpRequired");
+
+    const workPerformed = template.sections.find((section) => section.id === "work-performed");
+    expect(workPerformed?.fields.map((field) => field.id)).toEqual(["descriptionOfWork", "jobsiteHours"]);
+    const laborHours = workPerformed?.fields.find((field) => field.id === "jobsiteHours");
+    expect(laborHours?.type).toBe("select");
+    expect(laborHours && "options" in laborHours ? laborHours.options?.map((option) => option.value) : []).toEqual(expect.arrayContaining(["1", "1.5", "2", "2.5", "3", "3.5"]));
+  });
+
   it("defines fire extinguisher smart fields entirely through flat configuration keys", () => {
     const template = resolveReportTemplate({
       inspectionType: "fire_extinguisher",

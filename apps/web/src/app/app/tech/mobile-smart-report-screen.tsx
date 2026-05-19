@@ -470,9 +470,9 @@ function WorkOrderSinglePage({
         </div>
       ) : null}
 
-      <WorkOrderProductsAndServicesCard data={data} disabled={isReadOnly} variant="parts" />
-      <WorkOrderProductsAndServicesCard data={data} disabled={isReadOnly} variant="labor" />
       <WorkOrderSummarySection controller={controller} data={data} disabled={isReadOnly} />
+      <WorkOrderLaborHoursSection controller={controller} data={data} disabled={isReadOnly} />
+      <WorkOrderProductsAndServicesCard data={data} disabled={isReadOnly} variant="parts" />
       <WorkOrderPhotosSection
         controller={controller}
         data={data}
@@ -542,7 +542,7 @@ function WorkOrderSummarySection({
 
   const sectionState = controller.draft.sections[section.id] ?? { status: "pending", notes: "", fields: {} };
   const fields = sectionState.fields as Record<string, ReportPrimitiveValue>;
-  const summaryFieldOrder = ["descriptionOfWork", "additionalNotes", "followUpRequired", "workOrderNumber"];
+  const summaryFieldOrder = ["descriptionOfWork"];
   const visibleFields = summaryFieldOrder
     .map((fieldId) => section.fields.find((field) => field.id === fieldId && field.type !== "repeater"))
     .filter((field): field is Exclude<ReportFieldDefinition, { type: "repeater" }> => Boolean(field))
@@ -551,9 +551,9 @@ function WorkOrderSummarySection({
   return (
     <section className="space-y-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-panel">
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Summary of work performed</p>
-        <h3 className="mt-2 text-xl font-semibold text-slate-950">What was completed?</h3>
-        <p className="mt-2 text-sm leading-6 text-slate-500">Keep this short and customer-ready. Add follow-up notes only when they matter.</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Work Performed</p>
+        <h3 className="mt-2 text-xl font-semibold text-slate-950">What work was performed?</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-500">Type the work completed on site. Keep it clear and customer-ready.</p>
       </div>
       {visibleFields.map((field) => (
         <FieldControl
@@ -566,6 +566,49 @@ function WorkOrderSummarySection({
           value={scalarValue(fields[field.id])}
         />
       ))}
+    </section>
+  );
+}
+
+function WorkOrderLaborHoursSection({
+  data,
+  controller,
+  disabled
+}: {
+  data: TechnicianReportEditorData;
+  controller: ReturnType<typeof useMobileReportDraftController>;
+  disabled: boolean;
+}) {
+  const section = findTemplateSection(data, "work-performed");
+  const field = section?.fields.find((candidate) => candidate.id === "jobsiteHours" && candidate.type === "select");
+  if (!section || !field || field.type !== "select") {
+    return null;
+  }
+
+  const sectionState = controller.draft.sections[section.id] ?? { status: "pending", notes: "", fields: {} };
+  const fields = sectionState.fields as Record<string, ReportPrimitiveValue>;
+
+  return (
+    <section className="space-y-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-panel">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Labor Hours</p>
+        <h3 className="mt-2 text-xl font-semibold text-slate-950">Select total labor hours</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-500">Choose the total time spent on this work order visit.</p>
+      </div>
+      <label className="block text-sm font-semibold text-slate-900">
+        Labor Hours
+        <select
+          className="mt-3 min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-950 outline-none focus:border-[var(--tenant-primary)] focus:ring-4 focus:ring-[rgb(var(--tenant-primary-rgb)/0.12)] disabled:bg-slate-100"
+          disabled={disabled}
+          onChange={(event) => controller.updateSectionField(section.id, field.id, event.target.value)}
+          value={String(fields[field.id] ?? "")}
+        >
+          <option value="">Select labor hours</option>
+          {(field.options ?? []).map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </label>
     </section>
   );
 }

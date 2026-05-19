@@ -388,7 +388,7 @@ function reportTemplateHasTagStatus(template: ReportTemplateDefinition) {
 
 export function resolveReportTemplate(input: ReportTemplateResolutionContext): ReportTemplateDefinition {
   const template = inspectionTypeRegistry[input.inspectionType];
-  const sections = reportTemplateHasTagStatus(template)
+  const sections = input.inspectionType === "work_order" || reportTemplateHasTagStatus(template)
     ? template.sections
     : [sharedTagStatusSection, ...template.sections];
 

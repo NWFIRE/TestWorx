@@ -1593,36 +1593,33 @@ function renderWorkOrderSummaryStrip(
   const gap = 10;
   const cardWidth = (CONTENT_WIDTH - gap * 2) / 3;
   const cardHeight = 68;
-  const workOrderNumber = normalizeDisplayValue(getDraftSectionFieldValue(input, "work-performed", "workOrderNumber") as ReportPrimitiveValue | undefined);
   const jobsiteHours = formatWorkOrderHours(
     getDraftSectionFieldValue(input, "work-performed", "jobsiteHours"),
     getDraftSectionFieldValue(input, "work-performed", "jobsiteHoursCustom")
   );
-  const followUpRequired = getDraftSectionFieldValue(input, "work-performed", "followUpRequired") === true ? "Yes" : "No";
+  const scheduledDate = formatDate(input.inspection.scheduledStart);
   const cards = [
-    { label: "Work Order", value: isMeaningful(workOrderNumber) ? workOrderNumber : input.report.id, tone: "neutral" as const },
-    { label: "Jobsite Hours", value: jobsiteHours, tone: "neutral" as const },
-    { label: "Follow-Up", value: followUpRequired, tone: followUpRequired === "Yes" ? "warn" as const : "pass" as const }
+    { label: "Work Date", value: scheduledDate, tone: "neutral" as const },
+    { label: "Labor Hours", value: jobsiteHours, tone: "neutral" as const }
   ];
+  const resolvedCardWidth = (CONTENT_WIDTH - gap * (cards.length - 1)) / cards.length;
 
   cards.forEach((card, index) => {
-    const x = PAGE_MARGIN + index * (cardWidth + gap);
-    const bg = card.tone === "pass" ? theme.passBg : card.tone === "warn" ? theme.warnBg : theme.softSurface;
-    const text = card.tone === "pass" ? theme.passText : card.tone === "warn" ? theme.warnText : theme.primary;
-    drawRect(state.page, x, state.y, cardWidth, cardHeight, bg, theme.line, 1);
+    const x = PAGE_MARGIN + index * (resolvedCardWidth + gap);
+    drawRect(state.page, x, state.y, resolvedCardWidth, cardHeight, theme.softSurface, theme.line, 1);
     state.page.drawText(card.label.toUpperCase(), {
-      x: x + cardWidth / 2 - boldFont.widthOfTextAtSize(card.label.toUpperCase(), 7) / 2,
+      x: x + resolvedCardWidth / 2 - boldFont.widthOfTextAtSize(card.label.toUpperCase(), 7) / 2,
       y: state.y - 16,
       size: 7,
       font: boldFont,
       color: theme.softText
     });
     state.page.drawText(card.value, {
-      x: x + cardWidth / 2 - boldFont.widthOfTextAtSize(card.value, 16) / 2,
+      x: x + resolvedCardWidth / 2 - boldFont.widthOfTextAtSize(card.value, 16) / 2,
       y: state.y - 42,
       size: 16,
       font: boldFont,
-      color: text
+      color: theme.primary
     });
   });
 
@@ -1687,14 +1684,11 @@ async function renderWorkOrderReport(
   logoEmbedded: PDFImage | null
 ) {
   let state = addPage(pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 1);
-  const workOrderNumber = normalizeDisplayValue(getDraftSectionFieldValue(input, "work-performed", "workOrderNumber") as ReportPrimitiveValue | undefined);
   const jobsiteHours = formatWorkOrderHours(
     getDraftSectionFieldValue(input, "work-performed", "jobsiteHours"),
     getDraftSectionFieldValue(input, "work-performed", "jobsiteHoursCustom")
   );
-  const followUpRequired = getDraftSectionFieldValue(input, "work-performed", "followUpRequired") === true ? "Yes" : "No";
   const descriptionOfWork = normalizeDisplayValue(getDraftSectionFieldValue(input, "work-performed", "descriptionOfWork") as ReportPrimitiveValue | undefined);
-  const additionalNotes = normalizeDisplayValue(getDraftSectionFieldValue(input, "work-performed", "additionalNotes") as ReportPrimitiveValue | undefined);
 
   state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 90);
   renderWorkOrderSummaryStrip(state, input, theme, boldFont, regularFont);
@@ -1710,9 +1704,7 @@ async function renderWorkOrderReport(
     { label: "Technician", value: input.report.technicianName ?? "" },
     { label: "Work date", value: formatDate(input.inspection.scheduledStart) },
     { label: "Completion date", value: input.report.finalizedAt ? formatDateTime(input.report.finalizedAt) : "" },
-    { label: "Jobsite hours", value: jobsiteHours },
-    { label: "Follow-up required", value: followUpRequired },
-    { label: "Work order ID", value: isMeaningful(workOrderNumber) ? workOrderNumber : input.report.id }
+    { label: "Labor hours", value: jobsiteHours }
   ];
   state = ensureSpace(
     state,
@@ -1732,11 +1724,7 @@ async function renderWorkOrderReport(
 
   state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 120);
   drawSectionTitle(state, "Work performed", "This work order outlines the service work completed and any supporting notes captured during the visit.", theme, boldFont, regularFont);
-  renderWorkOrderNarrative(state, "Description of Work", descriptionOfWork, theme, boldFont, regularFont);
-  if (isMeaningful(additionalNotes)) {
-    state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 96);
-    renderWorkOrderNarrative(state, "Additional Notes", additionalNotes, theme, boldFont, regularFont);
-  }
+  renderWorkOrderNarrative(state, "Work Performed", descriptionOfWork, theme, boldFont, regularFont);
 
   state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 88);
   drawSectionTitle(state, "Parts / Equipment Used", "Parts, equipment, and replacement devices supplied during this work order visit.", theme, boldFont, regularFont);
@@ -1747,21 +1735,6 @@ async function renderWorkOrderReport(
     { key: "notes", label: "Notes", width: 0.32 }
   ];
   state = renderTableBlock(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, "Parts / Equipment Used", partColumns, buildWorkOrderPartsRows(input), "No parts or equipment recorded.");
-
-  state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 88);
-  drawSectionTitle(state, "Service Provided", "Review the service actions completed during this job, along with any applicable device or equipment type.", theme, boldFont, regularFont);
-  const serviceColumns: TableColumn[] = [
-    { key: "service", label: "Service", width: 0.28 },
-    { key: "equipment", label: "Applicable Type / Equipment", width: 0.3 },
-    { key: "quantity", label: "Qty", width: 0.1 },
-    { key: "notes", label: "Notes", width: 0.32 }
-  ];
-  state = renderTableBlock(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, "Service Provided", serviceColumns, buildWorkOrderServiceRows(input), "No service entries recorded.");
-
-  if (followUpRequired === "Yes") {
-    state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 80);
-    renderFindingsBlock(state, "Follow-up requirements", ["Follow-up is required for this job."], "warn", theme, boldFont, regularFont);
-  }
 
   state = ensureSpace(state, pdfDoc, input, branding, theme, boldFont, regularFont, logoEmbedded, 170);
   drawSectionTitle(state, "Signatures", "Technician and customer sign-off captured for this work order report.", theme, boldFont, regularFont);
