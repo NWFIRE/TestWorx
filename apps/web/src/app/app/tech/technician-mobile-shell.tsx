@@ -188,6 +188,9 @@ export function TechnicianMobileTabBar({
 }) {
   const notifications = useTechnicianNotifications();
   const technicianTabs = useMemo(() => getTechnicianTabs(allowances), [allowances]);
+  const hasUnreadPriorityAssignment = notifications.items.some((item) =>
+    !item.isRead && item.type === "priority_inspection_assigned"
+  );
 
   return (
     <nav
@@ -205,6 +208,7 @@ export function TechnicianMobileTabBar({
                 : tab.label === "Inspections"
                   ? notifications.counts.inspections
                   : 0;
+              const priorityBadge = tab.label === "Work" && hasUnreadPriorityAssignment;
               return (
                 <Link
                   key={tab.href}
@@ -214,8 +218,13 @@ export function TechnicianMobileTabBar({
                   href={tab.href}
                 >
                   {badgeCount > 0 ? (
-                    <span className="absolute right-3 top-2 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold leading-none text-white">
-                      {badgeCount > 9 ? "9+" : badgeCount}
+                    <span
+                      aria-label={priorityBadge ? `${badgeCount} work notifications, priority assignment included` : `${badgeCount} notifications`}
+                      className={priorityBadge
+                        ? "absolute right-3 top-2 inline-flex min-h-6 min-w-6 animate-pulse items-center justify-center rounded-full border border-amber-200 bg-amber-500 px-1.5 text-[10px] font-bold leading-none text-white shadow-[0_0_0_4px_rgba(245,158,11,0.18)]"
+                        : "absolute right-3 top-2 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold leading-none text-white"}
+                    >
+                      {priorityBadge ? "!" : badgeCount > 9 ? "9+" : badgeCount}
                     </span>
                   ) : null}
                   <MobileTabIcon active={active} label={tab.label} />

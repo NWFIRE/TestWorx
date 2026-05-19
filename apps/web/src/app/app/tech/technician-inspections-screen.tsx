@@ -10,6 +10,7 @@ import { DispatchNotesCard } from "./dispatch-notes-card";
 import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
 import { MobileInspectionPdfAccessCard } from "./mobile-inspection-pdf-access-card";
 import { useOfflineScreenSnapshot } from "./offline/use-offline-screen-snapshot";
+import { PriorityInspectionBadge } from "./priority-inspection-badge";
 import { toDateValue } from "./date-value";
 
 function activeTasks(inspection: any) {
@@ -23,6 +24,12 @@ function openTaskLink(inspection: any) {
 
 function hasAttachedPdfs(inspection: any) {
   return (inspection.documents?.length ?? 0) > 0 || (inspection.attachments?.length ?? 0) > 0;
+}
+
+function inspectionCardClassName(inspection: any) {
+  return inspection.isPriority
+    ? "rounded-[1.75rem] border border-amber-300 bg-amber-50/70 p-4 shadow-[0_16px_38px_rgba(217,119,6,0.12)]"
+    : "rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]";
 }
 
 export function TechnicianInspectionsScreen({ initialData }: { initialData: any }) {
@@ -61,8 +68,11 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
           <h3 className="mt-1 text-xl font-semibold text-slate-950">In field right now</h3>
         </div>
         {active.length > 0 ? active.map((inspection: any) => (
-          <article className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" key={inspection.id}>
-            <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
+          <article className={inspectionCardClassName(inspection)} key={inspection.id}>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
+              {inspection.isPriority ? <PriorityInspectionBadge compact /> : null}
+            </div>
             {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
             {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}
             <div className="mt-3 flex flex-wrap items-center gap-2">

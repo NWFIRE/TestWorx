@@ -13,6 +13,7 @@ import { InspectionCustomerContactCard } from "./inspection-customer-contact-car
 import { isTechnicianActionableSchedulingStatus } from "./mobile-inspection-workspace";
 import { MobileInspectionPdfAccessCard } from "./mobile-inspection-pdf-access-card";
 import { useOfflineScreenSnapshot } from "./offline/use-offline-screen-snapshot";
+import { PriorityInspectionBadge } from "./priority-inspection-badge";
 import { toDateValue } from "./date-value";
 
 type WorkFilter = "today" | "upcoming" | "overdue" | "open" | "claimable";
@@ -97,6 +98,18 @@ function uniqueInspections<T extends { id?: string | null }>(inspections: T[] = 
     seen.add(inspection.id);
     return true;
   });
+}
+
+function inspectionCardClassName(inspection: any) {
+  return inspection.isPriority
+    ? "cursor-pointer rounded-[1.75rem] border border-amber-300 bg-amber-50/70 p-4 shadow-[0_16px_38px_rgba(217,119,6,0.12)] transition hover:border-amber-400 hover:shadow-[0_18px_42px_rgba(217,119,6,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+    : "cursor-pointer rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)] transition hover:border-[color:var(--tenant-primary-border)] hover:shadow-[0_16px_36px_rgba(15,23,42,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--tenant-primary)]";
+}
+
+function passiveInspectionCardClassName(inspection: any) {
+  return inspection.isPriority
+    ? "rounded-[1.75rem] border border-amber-300 bg-amber-50/70 p-4 shadow-[0_16px_38px_rgba(217,119,6,0.12)]"
+    : "rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]";
 }
 
 export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
@@ -241,8 +254,8 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
             const href = inspectionHref(inspection);
             return (
               <article
-                aria-label={`Open ${inspection.primaryTitle}`}
-                className="cursor-pointer rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)] transition hover:border-[color:var(--tenant-primary-border)] hover:shadow-[0_16px_36px_rgba(15,23,42,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--tenant-primary)]"
+                aria-label={`${inspection.isPriority ? "Priority inspection. " : ""}Open ${inspection.primaryTitle}`}
+                className={inspectionCardClassName(inspection)}
                 key={inspection.id}
                 onClick={(event) => openInspectionFromCard(href, event)}
                 onKeyDown={(event) => openInspectionFromKeyboard(href, event)}
@@ -251,6 +264,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
+                    {inspection.isPriority ? <div className="mb-2"><PriorityInspectionBadge compact /></div> : null}
                     <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
                     {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
                     {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}
@@ -292,7 +306,8 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
       ) : filter === "claimable" ? (
         <section className="space-y-3">
           {filtered.claimable.length > 0 ? filtered.claimable.map((inspection: any) => (
-            <article className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" key={inspection.id}>
+            <article className={passiveInspectionCardClassName(inspection)} key={inspection.id}>
+              {inspection.isPriority ? <div className="mb-2"><PriorityInspectionBadge compact /></div> : null}
               <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
               {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
               {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}
@@ -329,8 +344,8 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
               const href = inspectionHref(inspection);
               return (
                 <article
-                  aria-label={`Open ${inspection.primaryTitle}`}
-                  className="cursor-pointer rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)] transition hover:border-[color:var(--tenant-primary-border)] hover:shadow-[0_16px_36px_rgba(15,23,42,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--tenant-primary)]"
+                  aria-label={`${inspection.isPriority ? "Priority inspection. " : ""}Open ${inspection.primaryTitle}`}
+                  className={inspectionCardClassName(inspection)}
                   key={inspection.id}
                   onClick={(event) => openInspectionFromCard(href, event)}
                   onKeyDown={(event) => openInspectionFromKeyboard(href, event)}
@@ -339,6 +354,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
+                      {inspection.isPriority ? <div className="mb-2"><PriorityInspectionBadge compact /></div> : null}
                       <p className="truncate text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
                       {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
                       {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}
@@ -394,7 +410,8 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
               <h2 className="mt-1 text-xl font-semibold text-slate-950">Shared queue</h2>
             </div>
             {filtered.claimable.length > 0 ? filtered.claimable.map((inspection: any) => (
-              <article className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" key={inspection.id}>
+              <article className={passiveInspectionCardClassName(inspection)} key={inspection.id}>
+                {inspection.isPriority ? <div className="mb-2"><PriorityInspectionBadge compact /></div> : null}
                 <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
                 {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
                 {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}

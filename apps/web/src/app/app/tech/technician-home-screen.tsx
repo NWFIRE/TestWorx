@@ -12,21 +12,38 @@ function QueueStatusCard({
   title,
   count,
   href,
-  helper
+  helper,
+  priorityCount = 0
 }: {
   title: string;
   count: number;
   href: string;
   helper: string;
+  priorityCount?: number;
 }) {
+  const hasPriority = priorityCount > 0;
+
   return (
     <Link
-      className="rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)] transition hover:border-[color:var(--tenant-primary-border)] hover:bg-[var(--tenant-primary-soft)]"
+      aria-label={hasPriority ? `${title}: ${count}. ${priorityCount} priority inspection${priorityCount === 1 ? "" : "s"}.` : `${title}: ${count}.`}
+      className={hasPriority
+        ? "relative rounded-[1.4rem] border border-amber-300 bg-amber-50/80 p-4 shadow-[0_16px_38px_rgba(217,119,6,0.12)] transition hover:border-amber-400 hover:bg-amber-100/70"
+        : "rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)] transition hover:border-[color:var(--tenant-primary-border)] hover:bg-[var(--tenant-primary-soft)]"}
       href={href}
     >
+      {hasPriority ? (
+        <span className="absolute right-3 top-3 inline-flex min-h-6 items-center rounded-full bg-amber-500 px-2 text-[10px] font-bold uppercase tracking-[0.14em] text-white shadow-sm">
+          Priority
+        </span>
+      ) : null}
       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{title}</p>
       <p className="mt-3 text-3xl font-semibold text-slate-950">{count}</p>
       <p className="mt-2 text-sm leading-6 text-slate-500">{helper}</p>
+      {hasPriority ? (
+        <p className="mt-2 text-sm font-semibold text-amber-900">
+          {priorityCount} priority inspection{priorityCount === 1 ? "" : "s"} need attention.
+        </p>
+      ) : null}
     </Link>
   );
 }
@@ -97,6 +114,7 @@ export function TechnicianHomeScreen({
   const assignedOpen = dashboard.assigned.filter((inspection: any) =>
     inspection.tasks.some((task: any) => task.report?.status !== "finalized")
   );
+  const priorityAssignedOpen = assignedOpen.filter((inspection: any) => inspection.isPriority);
   const inProgress = dashboard.assigned.filter((inspection: any) =>
     inspection.tasks.some((task: any) => task.report?.status === "draft" || task.report?.status === "submitted")
   );
@@ -168,6 +186,7 @@ export function TechnicianHomeScreen({
             count={assignedOpen.length}
             helper="Assigned work that still needs action."
             href="/app/tech/work?filter=open"
+            priorityCount={priorityAssignedOpen.length}
             title="Assigned"
           />
           <QueueStatusCard

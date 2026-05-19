@@ -63,6 +63,7 @@ export type TechnicianReportEditorData = {
   customerPhone?: string | null;
   customerEmail?: string | null;
   scheduledDateLabel: string;
+  isPriority?: boolean;
   inspectionWorkspace: {
     inspectionId: string;
     totalTaskCount: number;
@@ -1050,6 +1051,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
         customerName={data.customerName}
         customerPhone={data.customerPhone}
         dispatchNotes={data.dispatchNotes}
+        isPriority={data.isPriority}
         saveState={saveState}
         scheduledDateLabel={data.scheduledDateLabel}
         serviceAddress={data.serviceAddress}

@@ -9,6 +9,7 @@ import {
 } from "./mobile-inspection-workspace";
 import { DispatchNotesCard } from "./dispatch-notes-card";
 import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
+import { PriorityInspectionBadge } from "./priority-inspection-badge";
 
 type InspectionWorkspaceData = {
   inspectionId: string;
@@ -54,6 +55,7 @@ export function MobileInspectionWorkspaceShell({
   customerEmail,
   dispatchNotes,
   scheduledDateLabel,
+  isPriority,
   currentMode,
   saveState
 }: {
@@ -66,6 +68,7 @@ export function MobileInspectionWorkspaceShell({
   customerEmail?: string | null;
   dispatchNotes?: string | null;
   scheduledDateLabel: string;
+  isPriority?: boolean;
   currentMode: "edit" | "review";
   saveState?: string | null;
 }) {
@@ -75,9 +78,10 @@ export function MobileInspectionWorkspaceShell({
   const hasCustomerContact = Boolean(serviceAddress?.trim() || customerContactName?.trim() || customerPhone?.trim() || customerEmail?.trim());
 
   return (
-    <section className="rounded-[1.85rem] border border-slate-200 bg-white p-5 shadow-panel">
+    <section className={isPriority ? "rounded-[1.85rem] border border-amber-300 bg-amber-50/70 p-5 shadow-[0_18px_44px_rgba(217,119,6,0.14)]" : "rounded-[1.85rem] border border-slate-200 bg-white p-5 shadow-panel"}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
+          {isPriority ? <div className="mb-2"><PriorityInspectionBadge compact /></div> : null}
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{modeLabel}</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">{siteName}</h1>
           <p className="mt-2 text-sm text-slate-500">{customerName} • {scheduledDateLabel}</p>

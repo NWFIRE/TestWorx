@@ -1136,6 +1136,7 @@ export function MobileChecklistReportScreen({
           customerName={data.customerName}
           customerPhone={data.customerPhone}
           dispatchNotes={data.dispatchNotes}
+          isPriority={data.isPriority}
           saveState={saveState}
           scheduledDateLabel={data.scheduledDateLabel}
           serviceAddress={data.serviceAddress}
@@ -1274,6 +1275,7 @@ export function MobileChecklistReportScreen({
         customerName={data.customerName}
         customerPhone={data.customerPhone}
         dispatchNotes={data.dispatchNotes}
+        isPriority={data.isPriority}
         saveState={saveState}
         scheduledDateLabel={formatChecklistTimestamp(data.scheduledDateLabel)}
         serviceAddress={data.serviceAddress}

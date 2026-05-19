@@ -95,6 +95,7 @@ export async function loadTechnicianReportData(inspectionId: string, taskId: str
     customerPhone: report.inspection.customerCompany.phone ?? null,
     customerEmail: report.inspection.customerCompany.billingEmail ?? null,
     scheduledDateLabel: format(report.inspection.scheduledStart, "MMM d, yyyy h:mm a"),
+    isPriority: report.inspection.isPriority,
     inspectionWorkspace: {
       inspectionId,
       totalTaskCount: report.relatedTasks.length,
