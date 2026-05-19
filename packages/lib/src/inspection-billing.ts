@@ -3880,7 +3880,10 @@ export async function updateBillingSummaryItem(actor: ActorContext, summaryId: s
         ...item,
         quantity,
         unitPrice: resolvedUnitPrice,
-        amount: calculateAmount(quantity, resolvedUnitPrice)
+        amount: calculateAmount(quantity, resolvedUnitPrice),
+        lineSubtotal: null,
+        taxAmount: null,
+        lineTotal: null
       };
     })
   );
@@ -3953,13 +3956,12 @@ export async function updateBillingSummaryItemGroup(
           ? unitPrice
           : await resolveBillingItemMatchedUnitPrice(parsedActor.tenantId as string, item);
 
-      const taxabilityChanged = typeof taxable === "boolean" && item.taxable !== taxable;
-
       return {
         ...item,
         quantity: nextQuantity,
         unitPrice: resolvedUnitPrice,
         amount: calculateAmount(nextQuantity, resolvedUnitPrice),
+        lineSubtotal: null,
         ...(typeof taxable === "boolean"
           ? {
               taxable,
@@ -3968,10 +3970,13 @@ export async function updateBillingSummaryItemGroup(
               taxCodeId: taxable ? DEFAULT_QUICKBOOKS_TAX_CODE_ID : null,
               taxCategory: taxable ? item.taxCategory ?? null : null,
               taxRate: taxable ? resolveTaxRateForOverride(item) : 0,
-              taxAmount: taxabilityChanged ? 0 : item.taxAmount ?? null,
+              taxAmount: null,
               lineTotal: null
             }
-          : {})
+          : {
+              taxAmount: null,
+              lineTotal: null
+            })
       };
     })
   );
