@@ -1037,6 +1037,7 @@ export async function getInspectionReportDraft(actor: ActorContext, inspectionId
     where: {
       tenantId: parsedActor.tenantId as string,
       id: { not: report.id },
+      inspectionId: { not: report.inspectionId },
       task: { inspectionType: report.task.inspectionType },
       inspection: { siteId: report.inspection.siteId },
       status: reportStatuses.finalized

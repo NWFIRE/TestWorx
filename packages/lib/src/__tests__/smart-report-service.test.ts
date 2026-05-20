@@ -77,7 +77,12 @@ describe("smart report service tenant scoping", () => {
     }));
     expect(prismaMock.inspectionReport.findFirst).toHaveBeenNthCalledWith(2, expect.objectContaining({
       where: expect.objectContaining({
-        tenantId: "tenant_1"
+        tenantId: "tenant_1",
+        id: { not: "report_1" },
+        inspectionId: { not: "inspection_1" },
+        task: { inspectionType: "fire_extinguisher" },
+        inspection: { siteId: "site_1" },
+        status: "finalized"
       })
     }));
     expect(prismaMock.asset.findMany).toHaveBeenCalledWith(expect.objectContaining({
