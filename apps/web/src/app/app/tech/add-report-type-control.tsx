@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import { inspectionTypeRegistry } from "@testworx/lib";
 
@@ -10,6 +11,7 @@ import { useConfirmDialog } from "../confirm-dialog";
 type InspectionType = keyof typeof inspectionTypeRegistry;
 
 export function AddReportTypeControl({ inspectionId }: { inspectionId: string }) {
+  const router = useRouter();
   const [selectedType, setSelectedType] = useState<InspectionType>("fire_extinguisher");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -83,6 +85,9 @@ export function AddReportTypeControl({ inspectionId }: { inspectionId: string })
               setMessage(null);
               const result = await addInspectionTaskAction(inspectionId, selectedType);
               setMessage(result.ok ? "Report type added." : result.error ?? "Unable to add report type.");
+              if (result.ok) {
+                router.refresh();
+              }
             });
           }}
           type="button"

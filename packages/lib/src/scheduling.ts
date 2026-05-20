@@ -3401,6 +3401,7 @@ export async function addInspectionTask(actor: ActorContext, input: {
         inspectionTaskId: createdTask.id,
         inspectionType,
         addedToExistingInspection: true,
+        source: parsedActor.role === "technician" ? "technician_added" : "admin_added",
         inspectionStatus: inspection.status,
         taskStatus: addedTaskStatus
       }

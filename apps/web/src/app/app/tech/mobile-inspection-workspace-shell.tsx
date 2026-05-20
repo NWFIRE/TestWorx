@@ -7,6 +7,7 @@ import {
   getTechnicianMobileTaskStatusLabel,
   type TechnicianMobileTaskWorkspaceSummary
 } from "./mobile-inspection-workspace";
+import { AddReportTypeControl } from "./add-report-type-control";
 import { DispatchNotesCard } from "./dispatch-notes-card";
 import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
 import { PriorityInspectionBadge } from "./priority-inspection-badge";
@@ -207,6 +208,12 @@ export function MobileInspectionWorkspaceShell({
               {resolveWorkspaceTaskStatusLabel({ task: currentTask, currentMode })}
             </div>
           </div>
+        </div>
+      ) : null}
+
+      {currentMode === "edit" ? (
+        <div className="mt-4">
+          <AddReportTypeControl inspectionId={workspace.inspectionId} />
         </div>
       ) : null}
     </section>

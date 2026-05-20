@@ -28,6 +28,8 @@ export async function claimInspectionAction(inspectionId: string): Promise<Actio
   try {
     await claimInspection({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId);
     revalidatePath("/app/tech");
+    revalidatePath("/app/tech/inspections");
+    revalidatePath("/app/tech/work");
     revalidatePath("/app/admin");
     revalidatePath("/app/admin/inspections");
     revalidatePath("/app/admin/dashboard");
@@ -69,6 +71,8 @@ export async function addInspectionTaskAction(inspectionId: string, inspectionTy
       { inspectionId, inspectionType }
     );
     revalidatePath("/app/tech");
+    revalidatePath("/app/tech/inspections");
+    revalidatePath("/app/tech/work");
     revalidatePath("/app/admin");
     revalidatePath("/app/admin/inspections");
     revalidatePath("/app/admin/dashboard");
