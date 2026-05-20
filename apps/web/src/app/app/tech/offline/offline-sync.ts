@@ -153,7 +153,7 @@ async function syncWorkOrderLineUpsert(entry: SyncQueueEntry) {
   const response = await fetch("/api/work-orders/line-items", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "upsert", ...entry.payload })
+    body: JSON.stringify({ ...entry.payload, action: (entry.payload as { action?: string }).action ?? "upsert" })
   });
   const payload = await response.json().catch(() => ({}));
 
