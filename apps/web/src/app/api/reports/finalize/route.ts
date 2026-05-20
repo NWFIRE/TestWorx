@@ -41,17 +41,25 @@ export async function POST(request: Request) {
       body
     );
 
-    const inspectionId = typeof body?.inspectionId === "string" ? body.inspectionId : null;
+    const inspectionId = typeof body?.inspectionId === "string" ? body.inspectionId : finalized.inspectionId ?? null;
+    const taskId = typeof body?.taskId === "string" ? body.taskId : finalized.inspectionTaskId ?? null;
     revalidatePath("/app/admin");
     revalidatePath("/app/admin/inspections");
     revalidatePath("/app/admin/dashboard");
     revalidatePath("/app/admin/billing");
+    revalidatePath("/app/admin/archive");
+    revalidatePath("/app/customer");
     revalidatePath("/app/tech");
     revalidatePath("/app/tech/inspections");
     revalidatePath("/app/tech/work");
     if (inspectionId) {
       revalidatePath(`/app/admin/inspections/${inspectionId}`);
+      revalidatePath(`/app/customer/inspections/${inspectionId}`);
     }
+    if (inspectionId && taskId) {
+      revalidatePath(`/app/admin/reports/${inspectionId}/${taskId}`);
+    }
+    revalidatePath(`/app/customer/reports/${finalized.id}`);
 
     return NextResponse.json({ ok: true, status: finalized.status, finalizedAt: finalized.finalizedAt?.toISOString() ?? null });
   } catch (error) {
