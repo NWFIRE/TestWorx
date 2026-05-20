@@ -20,6 +20,7 @@ const DRAWER_SELECTOR =
 
 const MOBILE_KEYBOARD_THRESHOLD = 120;
 const EXPANDED_SIDEBAR_BREAKPOINT = 1280;
+const SIMPLIFIED_WORKSPACE_NAV_ENABLED = process.env.NEXT_PUBLIC_SIMPLIFIED_WORKSPACE_NAV !== "0";
 
 function isKeyboardFocusableElement(target: EventTarget | null): target is HTMLElement {
   return target instanceof HTMLElement && Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
@@ -292,23 +293,81 @@ function NavSection({
   pathname: string;
   onNavigate?: (href: string) => void;
 }) {
+  const groupedNavItems = useMemo(() => {
+    if (!SIMPLIFIED_WORKSPACE_NAV_ENABLED) {
+      return [
+        {
+          group: "Workspace",
+          items: navItems,
+        },
+      ];
+    }
+
+    const groupOrder: NonNullable<AppNavItem["group"]>[] = ["Dashboard", "Work", "Billing", "Customers", "Operations", "Settings", "Portal"];
+    const simplifiedRank = new Map([
+      ["/app/admin/dashboard", 10],
+      ["/app/admin/inspections", 20],
+      ["/app/admin/upcoming-inspections", 30],
+      ["/app/admin/archive", 40],
+      ["/app/admin/amendments", 50],
+      ["/app/deficiencies", 60],
+      ["/app/admin/billing", 70],
+      ["/app/admin/quotes", 80],
+      ["/app/admin/clients", 90],
+      ["/app/admin/email-reminders", 100],
+      ["/app/admin/parts-and-services", 110],
+      ["/app/admin/settings", 120],
+      ["/app/manuals", 130],
+      ["/app/admin/team", 140]
+    ]);
+    const sortGroup = (items: AppNavItem[]) => [...items].sort((left, right) => {
+      const leftRank = simplifiedRank.get(left.href);
+      const rightRank = simplifiedRank.get(right.href);
+      if (leftRank === undefined && rightRank === undefined) {
+        return navItems.indexOf(left) - navItems.indexOf(right);
+      }
+      return (leftRank ?? Number.MAX_SAFE_INTEGER) - (rightRank ?? Number.MAX_SAFE_INTEGER);
+    });
+    const grouped = new Map<string, AppNavItem[]>();
+    for (const item of navItems) {
+      const group = item.group ?? "Dashboard";
+      grouped.set(group, [...(grouped.get(group) ?? []), item]);
+    }
+
+    const knownGroups = groupOrder
+      .filter((group) => grouped.has(group))
+      .map((group) => ({ group, items: sortGroup(grouped.get(group) ?? []) }));
+    const unknownGroups = [...grouped.entries()]
+      .filter(([group]) => !groupOrder.includes(group as NonNullable<AppNavItem["group"]>))
+      .map(([group, items]) => ({ group, items: sortGroup(items) }));
+
+    return [...knownGroups, ...unknownGroups];
+  }, [navItems]);
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <nav aria-label="Primary navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
         {!collapsed ? (
-          <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--text-tertiary)]">Core workflows</p>
+          <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--text-tertiary)]">Workspace</p>
         ) : null}
-        <div className="space-y-1.5">
-          {navItems.map((item) => (
-            <NavItem
-              key={item.href}
-              active={isAppNavItemActive(pathname, item)}
-              collapsed={collapsed}
-              compact={compact}
-              item={item}
-              onPrefetch={onPrefetch}
-              onNavigate={onNavigate}
-            />
+        <div className="space-y-4">
+          {groupedNavItems.map(({ group, items }) => (
+            <div className="space-y-1.5" key={group}>
+              {!collapsed && groupedNavItems.length > 1 ? (
+                <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--text-tertiary)]">{group}</p>
+              ) : null}
+              {items.map((item) => (
+                <NavItem
+                  key={item.href}
+                  active={isAppNavItemActive(pathname, item)}
+                  collapsed={collapsed}
+                  compact={compact}
+                  item={item}
+                  onPrefetch={onPrefetch}
+                  onNavigate={onNavigate}
+                />
+              ))}
+            </div>
           ))}
         </div>
       </nav>

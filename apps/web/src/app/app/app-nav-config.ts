@@ -8,6 +8,7 @@ export type AppNavItem = {
   icon?: "calendar" | "branch" | "alert" | "invoice" | "settings" | "grid" | "clipboard" | "portal" | "team" | "mail" | "book";
   description?: string;
   tone?: "blue" | "amber" | "emerald" | "violet" | "slate";
+  group?: "Dashboard" | "Work" | "Billing" | "Customers" | "Operations" | "Settings" | "Portal";
   matchMode?: "exact" | "prefix";
   matchPrefixes?: string[];
 };
@@ -22,6 +23,7 @@ const quotesNavItem: AppNavItem = {
   icon: "invoice",
   description: "Create, send, approve, and sync quotes",
   tone: "blue",
+  group: "Billing",
   matchMode: "exact",
   matchPrefixes: ["/app/admin/quotes"]
 };
@@ -33,7 +35,8 @@ const partsAndServicesNavItem: AppNavItem = {
   abbreviation: "PS",
   icon: "grid",
   description: "QuickBooks products, services, and invoice items",
-  tone: "blue"
+  tone: "blue",
+  group: "Operations"
 };
 
 const adminNavItems: AppNavItem[] = [
@@ -45,6 +48,7 @@ const adminNavItems: AppNavItem[] = [
     icon: "calendar",
     description: "Operational overview, priorities, and work visibility",
     tone: "blue",
+    group: "Dashboard",
     matchMode: "exact",
     matchPrefixes: ["/app/admin/dashboard"]
   },
@@ -56,6 +60,7 @@ const adminNavItems: AppNavItem[] = [
     icon: "clipboard",
     description: "Create, filter, and manage inspection work",
     tone: "blue",
+    group: "Work",
     matchMode: "exact",
     matchPrefixes: ["/app/admin/inspections", "/app/admin/scheduling"]
   },
@@ -66,7 +71,8 @@ const adminNavItems: AppNavItem[] = [
     abbreviation: "IR",
     icon: "branch",
     description: "Visit review, follow-up requests, and linked history",
-    tone: "violet"
+    tone: "violet",
+    group: "Work"
   },
   quotesNavItem,
   {
@@ -76,7 +82,8 @@ const adminNavItems: AppNavItem[] = [
     abbreviation: "DC",
     icon: "alert",
     description: "Quotes, approvals, and open issues",
-    tone: "amber"
+    tone: "amber",
+    group: "Work"
   },
   {
     href: "/app/admin/upcoming-inspections",
@@ -85,7 +92,8 @@ const adminNavItems: AppNavItem[] = [
     abbreviation: "UI",
     icon: "calendar",
     description: "Month-by-month planning and future inspection scheduling",
-    tone: "blue"
+    tone: "blue",
+    group: "Work"
   },
   partsAndServicesNavItem,
   {
@@ -96,6 +104,7 @@ const adminNavItems: AppNavItem[] = [
     icon: "book",
     description: "Field-ready manuals, favorites, and recent documentation",
     tone: "blue",
+    group: "Operations",
     matchMode: "exact",
     matchPrefixes: ["/app/manuals", "/app/admin/manuals"]
   },
@@ -106,7 +115,8 @@ const adminNavItems: AppNavItem[] = [
     abbreviation: "CL",
     icon: "team",
     description: "Customer records, billing profiles, and QuickBooks links",
-    tone: "slate"
+    tone: "slate",
+    group: "Customers"
   },
   {
     href: "/app/admin/billing",
@@ -115,7 +125,8 @@ const adminNavItems: AppNavItem[] = [
     abbreviation: "BL",
     icon: "invoice",
     description: "Ready To Bill work and invoiced history",
-    tone: "emerald"
+    tone: "emerald",
+    group: "Billing"
   },
   {
     href: "/app/admin/email-reminders",
@@ -124,7 +135,8 @@ const adminNavItems: AppNavItem[] = [
     abbreviation: "ER",
     icon: "mail",
     description: "Prepare and send branded customer reminder emails",
-    tone: "blue"
+    tone: "blue",
+    group: "Customers"
   },
   {
     href: "/app/admin/archive",
@@ -133,7 +145,8 @@ const adminNavItems: AppNavItem[] = [
     abbreviation: "AR",
     icon: "clipboard",
     description: "Completed inspection history, reports, and documents",
-    tone: "slate"
+    tone: "slate",
+    group: "Work"
   },
   {
     href: "/app/admin/team",
@@ -142,7 +155,8 @@ const adminNavItems: AppNavItem[] = [
     abbreviation: "TM",
     icon: "team",
     description: "Invites, access, and account controls",
-    tone: "slate"
+    tone: "slate",
+    group: "Operations"
   },
   {
     href: "/app/admin/settings",
@@ -151,7 +165,8 @@ const adminNavItems: AppNavItem[] = [
     abbreviation: "SF",
     icon: "settings",
     description: "Branding, billing, and service fee rules",
-    tone: "slate"
+    tone: "slate",
+    group: "Settings"
   }
 ];
 
@@ -166,7 +181,8 @@ const navByRole: Record<string, AppNavItem[]> = {
       abbreviation: "PA",
       icon: "grid",
       description: "Cross-tenant controls and oversight",
-      tone: "slate"
+      tone: "slate",
+      group: "Settings"
     },
     ...adminNavItems
   ],
@@ -179,6 +195,7 @@ const navByRole: Record<string, AppNavItem[]> = {
       icon: "grid",
       description: "Today, upcoming work, and technician quick actions",
       tone: "blue",
+      group: "Dashboard",
       matchMode: "exact"
     },
     {
@@ -189,6 +206,7 @@ const navByRole: Record<string, AppNavItem[]> = {
       icon: "clipboard",
       description: "Assigned jobs, claimable work, and field execution",
       tone: "blue",
+      group: "Work",
       matchMode: "exact",
       matchPrefixes: ["/app/tech/work"]
     },
@@ -200,6 +218,7 @@ const navByRole: Record<string, AppNavItem[]> = {
       icon: "calendar",
       description: "Active inspections, drafts, and completion flow",
       tone: "violet",
+      group: "Work",
       matchMode: "exact",
       matchPrefixes: ["/app/tech/inspections", "/app/tech/reports"]
     },
@@ -211,6 +230,7 @@ const navByRole: Record<string, AppNavItem[]> = {
       icon: "book",
       description: "Favorites, recent manuals, and field documentation",
       tone: "blue",
+      group: "Operations",
       matchMode: "exact",
       matchPrefixes: ["/app/manuals"]
     },
@@ -222,6 +242,7 @@ const navByRole: Record<string, AppNavItem[]> = {
       icon: "team",
       description: "Sync status, offline readiness, and technician account tools",
       tone: "slate",
+      group: "Settings",
       matchMode: "exact",
       matchPrefixes: ["/app/tech/profile"]
     }
@@ -235,6 +256,7 @@ const navByRole: Record<string, AppNavItem[]> = {
       icon: "portal",
       description: "Reports, documents, and history",
       tone: "emerald",
+      group: "Portal",
       matchMode: "exact",
       matchPrefixes: ["/app/customer/reports", "/app/customer/quotes"]
     }

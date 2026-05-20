@@ -157,12 +157,12 @@ export function TechnicianMobileHeader({
   );
 
   const subtitleByTab: Record<string, string> = {
-    Home: "Assignments, progress, and action items",
-    Work: "Assigned jobs and claimable field work",
-    Inspections: "Drafts, active inspections, and closeout",
-    Quotes: "Customer quotes, follow-up, and approvals",
-    Manuals: "Field manuals and offline-ready references",
-    Profile: "Sync, readiness, and technician tools"
+    Home: "Today's work and next action",
+    Work: "Assigned and claimable jobs",
+    Inspections: "Start, finish, and finalize reports",
+    Quotes: "Customer quote follow-up",
+    Manuals: "Field references",
+    Profile: "Sync and offline status"
   };
 
   return (
