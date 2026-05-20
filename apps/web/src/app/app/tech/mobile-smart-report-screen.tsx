@@ -994,16 +994,16 @@ function WorkOrderProductsAndServicesCard({
   const billableTotal = lines
     .filter((line) => line.billableStatus === "billable")
     .reduce((sum, line) => sum + Number(line.totalPrice ?? (line.quantity * (line.unitPrice ?? 0))), 0);
-  const heading = variant === "labor" ? "Labor" : "Parts / equipment used";
-  const eyebrow = variant === "labor" ? "Labor" : "Parts / equipment";
+  const heading = variant === "labor" ? "Labor" : "Products & services used";
+  const eyebrow = variant === "labor" ? "Labor" : "Full catalog";
   const description = variant === "labor"
     ? "Add on-site labor from the catalog. Labor saves locally first and feeds billing after sync."
-    : "Add parts, equipment, materials, replacements, or other non-labor items used on this work order.";
-  const searchLabel = variant === "labor" ? "Labor item" : "Part / equipment";
-  const searchPlaceholder = variant === "labor" ? "Search labor catalog" : "Search parts and equipment";
-  const emptyText = variant === "labor" ? "No active labor items matched that search." : "No active parts or equipment matched that search.";
-  const addLabel = variant === "labor" ? "Add labor" : "Add part/equipment";
-  const noLinesText = variant === "labor" ? "No labor added yet." : "No parts or equipment added yet.";
+    : "Search the entire synced products/services catalog for inspections, parts, materials, tags, fees, replacements, or other billable work performed.";
+  const searchLabel = variant === "labor" ? "Labor item" : "Product / service";
+  const searchPlaceholder = variant === "labor" ? "Search labor catalog" : "Search products, services, tags, parts, fees";
+  const emptyText = variant === "labor" ? "No active labor items matched that search." : "No active synced catalog items matched that search.";
+  const addLabel = variant === "labor" ? "Add labor" : "Add product/service";
+  const noLinesText = variant === "labor" ? "No labor added yet." : "No products or services added yet.";
 
   return (
     <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-panel">
@@ -1032,6 +1032,15 @@ function WorkOrderProductsAndServicesCard({
           placeholder={searchPlaceholder}
           value={catalogItemId}
         />
+        {selectedCatalogItem ? (
+          <div className="rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm leading-6 text-blue-950">
+            <span className="font-semibold">{formatCatalogType(selectedCatalogItem.itemType)}</span>
+            {selectedCatalogItem.description ? ` | ${selectedCatalogItem.description}` : ""}
+            {selectedCatalogItem.unitPrice !== null ? ` | $${selectedCatalogItem.unitPrice.toFixed(2)}` : ""}
+            {selectedCatalogItem.taxable ? " | Taxable" : " | Non-taxable"}
+            {selectedCatalogItem.quickbooksItemId ? " | QuickBooks mapped" : " | Needs QuickBooks mapping"}
+          </div>
+        ) : null}
         <div className="grid gap-3 sm:grid-cols-[0.5fr_0.65fr_1fr]">
           <label className="block text-sm text-slate-600">
             Quantity

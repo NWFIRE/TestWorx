@@ -1602,6 +1602,82 @@ describe("inspection billing persistence and admin review", () => {
     }));
   });
 
+  it("includes technician-selected service catalog items and quantities in work order auto billing", async () => {
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      inspectionClassification: "standard"
+    });
+    txMock.tenant.findUnique.mockResolvedValue({
+      defaultServiceFeeCode: "SERVICE_FEE",
+      defaultServiceFeeUnitPrice: 0
+    });
+    txMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    txMock.site.findFirst.mockResolvedValue({
+      city: "Enid",
+      state: "OK"
+    });
+    txMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
+    txMock.workOrderLineItem.findMany.mockResolvedValue([
+      {
+        id: "work_line_annual_extinguisher",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        catalogItemId: "catalog_service_annual",
+        itemType: "service",
+        name: "Fire extinguisher annual inspection",
+        description: "Annual portable extinguisher inspection",
+        quantity: 2,
+        unitPrice: 7.7,
+        totalPrice: 15.4,
+        taxable: false,
+        billableStatus: "billable",
+        technicianNotes: "Inspected two extinguishers.",
+        source: "technician_selected",
+        quickBooksItemId: "qb_service_annual",
+        invoicedAt: null,
+        catalogItem: {
+          id: "catalog_service_annual",
+          name: "Fire extinguisher annual inspection",
+          quickbooksItemId: "qb_service_annual",
+          taxable: false,
+          unitPrice: 7.7,
+          rawJson: { SalesTaxCodeRef: { value: "NON" } }
+        }
+      }
+    ]);
+
+    txMock.$queryRaw
+      .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1", inspectionClassification: "standard" }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const summary = await syncInspectionBillingSummaryTx(txMock as never, {
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1"
+    });
+
+    const serviceLine = summary?.items.find((item) => item.metadata?.workOrderLineItemId === "work_line_annual_extinguisher");
+    expect(serviceLine).toEqual(expect.objectContaining({
+      reportType: "work_order",
+      category: "service",
+      description: "Annual portable extinguisher inspection",
+      quantity: 2,
+      unit: "each",
+      unitPrice: 7.7,
+      amount: 15.4,
+      linkedCatalogItemId: "catalog_service_annual",
+      linkedQuickBooksItemId: "qb_service_annual",
+      taxable: false
+    }));
+    expect(serviceLine?.metadata).toEqual(expect.objectContaining({
+      source: "technician_selected",
+      technicianNotes: "Inspected two extinguishers.",
+      sourceQuantity: 2
+    }));
+  });
+
   it("includes configured work order labor type charges in auto billing summaries", async () => {
     txMock.inspection.findFirst.mockResolvedValue({
       id: "inspection_1",
