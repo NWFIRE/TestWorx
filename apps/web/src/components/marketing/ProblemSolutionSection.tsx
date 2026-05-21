@@ -95,18 +95,18 @@ const rows = [
     )
   },
   {
-    title: "Handle direct and 3rd-party billing without workarounds",
-    body: "Manage invoicing, contract pricing, and provider-billed work from one system.",
-    pills: ["Provider billing", "Contract pricing", "Billing resolution snapshots"],
+    title: "Move from completed work to clean invoices",
+    body: "Review charges, taxability, minimums, and QuickBooks sync from one billing workflow.",
+    pills: ["Ready To Bill", "Tax snapshots", "QuickBooks sync"],
     textFirst: true,
     visual: (
       <ScreenshotCard className="min-h-[340px]" title="Billing and contract support">
         <div className="grid gap-4 lg:grid-cols-[1fr_0.95fr]">
           <div className="space-y-3">
             {[
-              ["Bill to", "3rd Party Provider"],
-              ["Contract used", "3rd Party Provider Annual"],
-              ["Pricing source", "Provider contract rate"]
+              ["Bill to", "Customer account"],
+              ["Tax snapshot", "Line-level taxable status"],
+              ["Pricing source", "Catalog and admin review"]
             ].map(([label, value]) => (
               <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
@@ -120,7 +120,7 @@ const rows = [
               <CreditCard className="h-5 w-5 text-blue-300" />
             </div>
             <div className="mt-5 space-y-3">
-              {["Monthly rollup ready", "Per-site or per-work-order", "Warnings for expired contracts"].map((item) => (
+              {["Ready To Bill queue", "Invoice totals verified", "QuickBooks mapping warnings"].map((item) => (
                 <div key={item} className="rounded-2xl bg-white/10 px-3 py-3 text-sm text-white/85">{item}</div>
               ))}
             </div>

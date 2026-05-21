@@ -12,7 +12,7 @@ export function TrustStrip() {
     },
     {
       title: "Billing",
-      body: "Direct billing, provider billing, contract pricing, one unified system."
+      body: "Direct billing, tax snapshots, invoice review, and QuickBooks sync."
     }
   ];
 

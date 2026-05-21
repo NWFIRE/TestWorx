@@ -12,8 +12,6 @@ import {
   formatInspectionStatusLabel,
   formatInspectionTaskTypeLabel,
   allowsMultipleInspectionTasks,
-  formatBillingPricingSourceLabel,
-  formatBillingResolutionModeLabel,
   getAdminDashboardData,
   getAdminInspectionPdfAttachments,
   getDefaultInspectionRecurrenceFrequency,
@@ -246,51 +244,6 @@ export default async function EditInspectionPage({
       deficiencyCount: number;
       readyForOfficeReview: boolean;
     };
-    providerContextRecord?: {
-      id: string;
-      sourceType: "direct" | "third_party_provider";
-      providerWorkOrderNumber: string | null;
-      providerReferenceNumber: string | null;
-      providerAccount?: { id: string; name: string } | null;
-      providerContractProfile?: { id: string; name: string } | null;
-      siteProviderAssignment?: {
-        id: string;
-        externalAccountName?: string | null;
-        externalAccountNumber?: string | null;
-        externalLocationCode?: string | null;
-      } | null;
-    } | null;
-    providerContextSnapshot?: {
-      id: string;
-      sourceType: "direct" | "third_party_provider";
-      providerWorkOrderNumber: string | null;
-      providerReferenceNumber: string | null;
-      providerAccount?: { id: string; name: string } | null;
-      providerContractProfile?: { id: string; name: string } | null;
-      siteProviderAssignment?: {
-        id: string;
-        externalAccountName?: string | null;
-        externalAccountNumber?: string | null;
-        externalLocationCode?: string | null;
-      } | null;
-    } | null;
-    billingSummary?: {
-      billingResolutionSnapshot?: {
-        resolvedMode: "direct_customer" | "contract_provider";
-        pricingSource: "provider_contract_rate" | "customer_pricing" | "default_pricing" | "manual_override";
-        resolutionReason?: string | null;
-        createdAt: Date;
-        payerCustomer?: { id: string; name: string } | null;
-        payerProviderAccount?: { id: string; name: string } | null;
-        providerContractProfile?: { id: string; name: string } | null;
-      } | null;
-      billingResolutionMetadata?: {
-        warnings: string[];
-        blockingIssueCode: string | null;
-        monthlyGroupingDeferred: boolean;
-        workOrderLevelOverride: boolean;
-      } | null;
-    } | null;
   };
   const attachmentView = attachments as unknown as Array<{ id: string; fileName: string; source: "uploaded" | "generated"; customerVisible: boolean; createdAt: Date }>;
   const externalDocumentView = documents as unknown as Array<{
@@ -343,8 +296,6 @@ export default async function EditInspectionPage({
         customerName: inspectionView.outgoingAmendment.replacementInspection.customerCompany.name
       })
     : null;
-  const providerContext = inspectionView.providerContextRecord ?? inspectionView.providerContextSnapshot ?? null;
-  const billingResolutionMetadata = inspectionView.billingSummary?.billingResolutionMetadata ?? null;
   return (
     <section className="space-y-6">
       <div className="rounded-[2rem] border border-[color:rgb(203_215_230_/_0.92)] bg-white p-6 shadow-panel">
@@ -447,86 +398,6 @@ export default async function EditInspectionPage({
             ) : null}
           </div>
         ) : null}
-        <div className="mt-4 rounded-2xl border border-[color:var(--border-default)] bg-[color:rgb(248_250_252_/_0.98)] p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">Provider context</p>
-              <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
-                This inspection resolves to direct customer billing. Third-party provider billing has been removed from active workflows.
-              </p>
-            </div>
-            {inspectionView.billingSummary?.billingResolutionSnapshot ? (
-              <StatusBadge
-                label={formatBillingResolutionModeLabel(inspectionView.billingSummary.billingResolutionSnapshot.resolvedMode)}
-                tone={inspectionView.billingSummary.billingResolutionSnapshot.resolvedMode === "contract_provider" ? "emerald" : "slate"}
-              />
-            ) : null}
-          </div>
-          {billingResolutionMetadata?.warnings?.length ? (
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-900">Billing warnings</p>
-              <div className="mt-2 space-y-2 text-sm text-amber-900">
-                {billingResolutionMetadata.warnings.map((warning) => (
-                  <p key={warning}>{warning}</p>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          {billingResolutionMetadata?.blockingIssueCode === "provider_contract_expired" ? (
-            <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50/80 p-4 text-sm text-rose-900">
-              This work order is still snapped to an expired provider contract. Update the contract or switch the work order back to direct billing before invoicing.
-            </div>
-          ) : null}
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Source type</p>
-              <p className="mt-2 text-sm font-semibold text-ink">Direct</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Provider</p>
-              <p className="mt-2 text-sm font-semibold text-ink">{providerContext?.providerAccount?.name ?? "Direct customer"}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Contract</p>
-              <p className="mt-2 text-sm font-semibold text-ink">{providerContext?.providerContractProfile?.name ?? inspectionView.billingSummary?.billingResolutionSnapshot?.providerContractProfile?.name ?? "No contract profile"}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Provider work order #</p>
-              <p className="mt-2 text-sm font-semibold text-ink">{providerContext?.providerWorkOrderNumber ?? "Not captured"}</p>
-            </div>
-          </div>
-          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Provider reference</p>
-              <p className="mt-2 text-sm font-semibold text-ink">{providerContext?.providerReferenceNumber ?? "Not captured"}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">External account</p>
-              <p className="mt-2 text-sm font-semibold text-ink">{providerContext?.siteProviderAssignment?.externalAccountName ?? "Not captured"}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">External account #</p>
-              <p className="mt-2 text-sm font-semibold text-ink">{providerContext?.siteProviderAssignment?.externalAccountNumber ?? "Not captured"}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Location code</p>
-              <p className="mt-2 text-sm font-semibold text-ink">{providerContext?.siteProviderAssignment?.externalLocationCode ?? "Not captured"}</p>
-            </div>
-          </div>
-          {inspectionView.billingSummary?.billingResolutionSnapshot ? (
-            <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Billing resolution snapshot</p>
-              <p className="mt-2 text-sm text-slate-700">
-                Bill to {(inspectionView.billingSummary.billingResolutionSnapshot.payerProviderAccount?.name ?? inspectionView.billingSummary.billingResolutionSnapshot.payerCustomer?.name ?? "Unresolved payer")}
-                {" · "}
-                Pricing source {formatBillingPricingSourceLabel(inspectionView.billingSummary.billingResolutionSnapshot.pricingSource)}
-              </p>
-              <p className="mt-2 text-sm text-slate-500">
-                {inspectionView.billingSummary.billingResolutionSnapshot.resolutionReason ?? "Resolution reason will appear here once billing is generated."}
-              </p>
-            </div>
-          ) : null}
-        </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <StatusBadge
             label={formatInspectionClassificationLabel(inspection.inspectionClassification)}

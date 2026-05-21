@@ -4,8 +4,6 @@ import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import {
-  formatBillingPricingSourceLabel,
-  formatBillingResolutionModeLabel,
   getAdminBillingSummaryDetail,
   getTenantQuickBooksConnectionStatus
 } from "@testworx/lib/server/index";
@@ -59,10 +57,6 @@ function asRecord(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
-}
-
-function formatBillingType(value: "standard" | "third_party") {
-  return value === "third_party" ? "Third-party payer" : "Standard customer billing";
 }
 
 function formatGroupingMode(value: unknown) {
@@ -285,7 +279,6 @@ export default async function BillingSummaryDetailPage({
   const deliverySnapshot = asRecord(summary.deliverySnapshot);
   const referenceSnapshot = asRecord(summary.referenceSnapshot);
   const minimumTicketSnapshot = asRecord(pricingSnapshot?.minimumTicket);
-  const billingResolutionMetadata = summary.billingResolutionMetadata;
   const requiredAttachmentLabels = Array.isArray(attachmentSnapshot?.requiredDocumentLabels)
     ? attachmentSnapshot.requiredDocumentLabels.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
     : [];
@@ -541,37 +534,18 @@ export default async function BillingSummaryDetailPage({
         <div className="space-y-6">
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing context</p>
-            {billingResolutionMetadata?.blockingIssueCode === "provider_contract_expired" ? (
-              <div className="mt-4 rounded-[1.5rem] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-900">
-                This invoice is blocked because the snapped provider contract is expired. Update the contract or switch the work order to direct billing before invoicing.
-              </div>
-            ) : null}
-            {billingResolutionMetadata?.warnings?.length ? (
-              <div className="mt-4 rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
-                <p className="font-semibold text-amber-950">Billing warnings</p>
-                <div className="mt-2 space-y-2">
-                  {billingResolutionMetadata.warnings.map((warning) => (
-                    <p key={warning}>{warning}</p>
-                  ))}
-                </div>
-              </div>
-            ) : null}
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Routing</p>
-                <p className="mt-3 text-sm text-slate-600">Billing type</p>
-                <p className="text-base font-semibold text-ink">{formatBillingType(summary.billingType)}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Customer billing</p>
                 <p className="mt-3 text-sm text-slate-600">Serviced customer</p>
                 <p className="text-base font-semibold text-ink">{summary.customerName}</p>
                 <p className="mt-3 text-sm text-slate-600">Bill-to payer</p>
                 <p className="text-base font-semibold text-ink">{summary.billToName ?? summary.customerName}</p>
-                <p className="mt-3 text-sm text-slate-600">Contract profile</p>
-                <p className="text-base font-semibold text-ink">Not used</p>
                 <p className="mt-3 text-sm text-slate-600">Auto billing eligible</p>
                 <p className="text-base font-semibold text-ink">{routingSnapshot?.autoBillingEnabled ? "Yes, future-ready" : "No, manual review only"}</p>
               </div>
               <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Resolved outcome</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Invoice behavior</p>
                 <p className="mt-3 text-sm text-slate-600">Pricing mode</p>
                 <p className="text-base font-semibold text-ink">{formatPricingMode(pricingSnapshot?.mode)}</p>
                 <p className="mt-3 text-sm text-slate-600">Pricing source</p>
@@ -583,23 +557,6 @@ export default async function BillingSummaryDetailPage({
                   {formatDeliveryMethod(deliverySnapshot?.method)}
                   {deliverySnapshot?.holdForManualReview === true ? " / Hold for manual review" : ""}
                 </p>
-              </div>
-            </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Billing resolution snapshot</p>
-                <p className="mt-3 text-sm text-slate-600">Bill To</p>
-                <p className="text-base font-semibold text-ink">{summary.billingResolution?.payerCustomer?.name ?? summary.billToName ?? summary.customerName}</p>
-                <p className="mt-3 text-sm text-slate-600">Resolved mode</p>
-                <p className="text-base font-semibold text-ink">{summary.billingResolution ? formatBillingResolutionModeLabel(summary.billingResolution.resolvedMode) : "Not resolved yet"}</p>
-                <p className="mt-3 text-sm text-slate-600">Pricing source</p>
-                <p className="text-base font-semibold text-ink">{summary.billingResolution ? formatBillingPricingSourceLabel(summary.billingResolution.pricingSource) : "Pending resolution"}</p>
-                <p className="mt-3 text-sm text-slate-600">Contract used</p>
-                <p className="text-base font-semibold text-ink">Not used</p>
-                <p className="mt-3 text-sm text-slate-600">Resolution reason</p>
-                <p className="text-base font-semibold text-ink">{summary.billingResolution?.resolutionReason ?? "No resolution reason recorded yet."}</p>
-                <p className="mt-3 text-sm text-slate-600">Work-order override</p>
-                <p className="text-base font-semibold text-ink">{billingResolutionMetadata?.workOrderLevelOverride ? "Yes" : "No"}</p>
               </div>
             </div>
             <div className="mt-4 grid gap-4 md:grid-cols-2">

@@ -18,7 +18,7 @@ const features = [
   { title: "Inspections", description: "Run recurring, ad hoc, and due-now visits from one operational workspace.", icon: ClipboardList },
   { title: "Work Orders", description: "Turn quoted scope into active field work without rebuilding the job.", icon: Hammer },
   { title: "Reporting", description: "Deliver hosted reports and premium PDFs customers can review immediately.", icon: FileText },
-  { title: "Invoicing", description: "Handle direct billing, provider billing, and contract pricing in one flow.", icon: Receipt },
+  { title: "Invoicing", description: "Review charges, taxes, invoices, and QuickBooks sync in one flow.", icon: Receipt },
   { title: "Manuals", description: "Keep service docs and model references inside the technician workflow.", icon: BookOpen },
   { title: "Offline Field Access", description: "Keep inspections moving in weak-signal environments with safe sync behavior.", icon: MonitorSmartphone },
   { title: "Scheduling", description: "Coordinate assignment, claimable work, recurrence, and due dates cleanly.", icon: CalendarClock },

@@ -75,14 +75,14 @@ export function HeroSection() {
                       <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Operations overview</p>
                       <p className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">Live inspection, reporting, and billing workflow</p>
                       <p className="mt-2 max-w-[42rem] text-sm leading-6 text-slate-500">
-                        See assignments, report completion, and billing resolution in one operational surface built for daily fire protection workflows.
+                        See assignments, report completion, and invoice readiness in one operational surface built for daily fire protection workflows.
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:w-[520px]">
                       <SurfaceMetric label="Assigned today" tone="slate" value="24 visits" />
                       <SurfaceMetric label="Finalized" tone="blue" value="9 reports" />
                       <SurfaceMetric label="Ready to invoice" tone="emerald" value="14 jobs" />
-                      <SurfaceMetric label="Provider work" tone="slate" value="5 active" />
+                      <SurfaceMetric label="Needs pricing" tone="slate" value="5 jobs" />
                     </div>
                   </div>
                 </div>
@@ -215,25 +215,25 @@ export function HeroSection() {
                   <section className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-slate-950">Billing / Provider Work</p>
-                        <p className="mt-1 text-sm text-slate-500">Direct billing and provider-billed jobs in one queue.</p>
+                        <p className="text-sm font-semibold text-slate-950">Billing Review</p>
+                        <p className="mt-1 text-sm text-slate-500">Completed work, pricing checks, and invoice sync in one queue.</p>
                       </div>
                       <ReceiptText className="h-5 w-5 text-slate-400" />
                     </div>
                     <div className="mt-4 rounded-[22px] border border-slate-200 bg-white p-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-semibold text-slate-950">3rd Party Provider</p>
-                          <p className="mt-1 text-sm text-slate-500">Provider-billed work order CF-1001</p>
+                          <p className="text-sm font-semibold text-slate-950">Ready To Bill</p>
+                          <p className="mt-1 text-sm text-slate-500">Completed inspection ready for invoice review</p>
                         </div>
                         <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700">
-                          Contract
+                          Review
                         </span>
                       </div>
                       <div className="mt-4 space-y-3">
                         {[
-                          ["Bill to", "3rd Party Provider"],
-                          ["Pricing source", "Provider contract rate"],
+                          ["Bill to", "Customer account"],
+                          ["Pricing source", "Catalog pricing"],
                           ["Status", "Ready for invoice review"]
                         ].map(([label, value]) => (
                           <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
@@ -251,7 +251,7 @@ export function HeroSection() {
                       <div className="mt-4 space-y-3">
                         {[
                           ["Ready to invoice", "14"],
-                          ["Contract-provider jobs", "5"],
+                          ["Needs pricing", "5"],
                           ["Awaiting pricing review", "2"]
                         ].map(([label, value]) => (
                           <div key={label} className="flex items-center justify-between text-sm">
@@ -265,8 +265,8 @@ export function HeroSection() {
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Resolution detail</p>
                       <div className="mt-3 space-y-3">
                         {[
-                          ["Contract used", "3rd Party Provider Annual"],
-                          ["Grouping mode", "Per work order"],
+                          ["Tax snapshot", "Line-level"],
+                          ["Grouping mode", "Per inspection"],
                           ["Last sync", "12 minutes ago"]
                         ].map(([label, value]) => (
                           <div key={label} className="flex items-center justify-between text-sm">

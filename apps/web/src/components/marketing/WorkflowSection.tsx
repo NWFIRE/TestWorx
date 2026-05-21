@@ -21,7 +21,7 @@ const steps = [
   {
     step: "4",
     title: "Bill and close out",
-    body: "Resolve billing, sync invoicing, and close work with provider contracts and customer billing kept in line."
+    body: "Resolve billing, sync invoicing, and close work with customer charges and QuickBooks kept in line."
   }
 ];
 

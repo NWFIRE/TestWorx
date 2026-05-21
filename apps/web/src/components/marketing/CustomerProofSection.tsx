@@ -12,7 +12,7 @@ const proofCards = [
   },
   {
     title: "Billing without workarounds",
-    body: "Handle direct billing and provider-billed work from one operational system."
+    body: "Handle inspection billing, invoice review, and customer follow-through from one operational system."
   }
 ];
 

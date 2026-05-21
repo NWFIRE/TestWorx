@@ -5,7 +5,7 @@ import { SectionContainer } from "./shared/SectionContainer";
 const proofItems = [
   "Built for fire and life safety operations",
   "Hosted reports and premium PDFs",
-  "Provider billing and contract pricing",
+  "Direct billing and QuickBooks-ready invoices",
   "Offline-capable technician workflows"
 ];
 

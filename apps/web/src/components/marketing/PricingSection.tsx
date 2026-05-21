@@ -49,7 +49,7 @@ export function PricingSection() {
             ctaLabel="Book Demo"
             features={[
               "Everything in Pro",
-              "Provider billing and pricing complexity",
+              "Advanced invoice review and QuickBooks workflows",
               "Multi-team operational controls",
               "Implementation planning and tailored rollout",
               "Enterprise support options"
