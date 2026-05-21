@@ -59,14 +59,13 @@ export function SectionCard({
 export function PageHeader({
   eyebrow,
   title,
-  description,
   actions,
   className,
   contentWidth = "wide"
 }: {
   eyebrow?: string;
   title: string;
-  description: string;
+  description?: string;
   actions?: ReactNode;
   className?: string;
   contentWidth?: "default" | "wide" | "full";
@@ -94,7 +93,6 @@ export function PageHeader({
           <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-950 md:text-4xl">
             {title}
           </h1>
-          <p className="mt-3 text-sm leading-6 text-[color:var(--text-secondary)] md:text-base">{description}</p>
         </div>
         {actions ? <div className="flex flex-wrap items-center gap-3">{actions}</div> : null}
       </div>
@@ -124,20 +122,19 @@ export function WorkspaceSplit({
 export function KPIStatCard({
   label,
   value,
-  note,
   href,
   icon,
   tone = "slate"
 }: {
   label: string;
   value: string | number;
-  note: string;
+  note?: string;
   href?: string;
   icon?: ReactNode;
   tone?: Tone;
 }) {
   const content = (
-    <div className="flex h-full flex-col justify-between gap-4 rounded-[24px] border border-[color:rgb(203_215_230_/_0.92)] bg-[color:var(--surface-base)] p-4 shadow-[0_14px_34px_rgba(15,23,42,0.06)] lg:p-5">
+    <div className="flex h-full flex-col justify-between gap-3 rounded-[24px] border border-[color:rgb(203_215_230_/_0.92)] bg-[color:var(--surface-base)] p-4 shadow-[0_14px_34px_rgba(15,23,42,0.06)] lg:p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xs font-medium leading-5 text-[color:var(--text-secondary)] lg:text-sm">{label}</div>
@@ -149,7 +146,6 @@ export function KPIStatCard({
           <div className={cn("rounded-2xl border p-2.5", toneClasses[tone])}>{icon}</div>
         ) : null}
       </div>
-      <div className="text-xs leading-5 text-[color:var(--text-muted)] lg:text-sm">{note}</div>
     </div>
   );
 
@@ -169,7 +165,6 @@ export function KPIStatCard({
 
 export function FilterBar({
   title,
-  description,
   children,
   className
 }: {
@@ -185,7 +180,6 @@ export function FilterBar({
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">
             {title}
           </p>
-          {description ? <p className="mt-2 text-sm text-[color:var(--text-muted)]">{description}</p> : null}
         </div>
       ) : null}
       <div className="flex flex-wrap gap-3">{children}</div>
@@ -223,10 +217,7 @@ const workQueueItems = [
 
 export function WorkQueueNav({ activeKey }: { activeKey: "all" | "open" | "review" | "billing" | "flags" }) {
   return (
-    <FilterBar
-      description="Move directly into the live operational queue that matches the work you need to push forward."
-      title="Work queue"
-    >
+    <FilterBar title="Work queue">
       {workQueueItems.map((item) => (
         <FilterChipLink
           active={activeKey === item.key}
@@ -311,11 +302,10 @@ export function PriorityBadge({
 
 export function EmptyState({
   title,
-  description,
   className
 }: {
   title: string;
-  description: string;
+  description?: string;
   className?: string;
 }) {
   return (
@@ -326,7 +316,6 @@ export function EmptyState({
       )}
     >
       <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-      <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-[color:var(--text-muted)]">{description}</p>
     </div>
   );
 }

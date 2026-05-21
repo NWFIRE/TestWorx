@@ -408,9 +408,6 @@ export default async function AdminInspectionsPage({
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">
               Inspection Filters
             </p>
-            <p className="mt-2 hidden text-sm text-[color:var(--text-muted)] lg:block">
-              Search by customer, site, address, or inspection id and keep the queue tight for daily office work.
-            </p>
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,0.8fr))]">
             <div className="md:col-span-2 xl:col-span-3 2xl:col-span-1">
@@ -458,7 +455,7 @@ export default async function AdminInspectionsPage({
               Fast inspection management
             </h2>
           </div>
-          <p className="text-sm text-[color:var(--text-muted)]">
+          <p className="text-sm font-semibold text-[color:var(--text-secondary)]">
             {fastManagementInspections.length} inspection{fastManagementInspections.length === 1 ? "" : "s"}
           </p>
         </div>

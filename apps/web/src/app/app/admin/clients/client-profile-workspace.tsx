@@ -158,18 +158,16 @@ function QuickActionLink({
 
 function SummaryMetric({
   label,
-  value,
-  note
+  value
 }: {
   label: string;
   value: string;
-  note: string;
+  note?: string;
 }) {
   return (
     <div className="rounded-[24px] border border-[color:rgb(203_215_230_/_0.92)] bg-[color:rgb(248_250_252_/_0.96)] p-4">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">{label}</p>
       <p className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-slate-950">{value}</p>
-      <p className="mt-2 text-sm text-[color:var(--text-muted)]">{note}</p>
     </div>
   );
 }
@@ -216,18 +214,16 @@ function TabButton({
 
 function SectionHeader({
   title,
-  description,
   children
 }: {
   title: string;
-  description: string;
+  description?: string;
   children?: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">{title}</h2>
-        <p className="mt-2 text-sm text-[color:var(--text-muted)]">{description}</p>
       </div>
       {children ? <div className="flex flex-wrap items-center gap-3">{children}</div> : null}
     </div>

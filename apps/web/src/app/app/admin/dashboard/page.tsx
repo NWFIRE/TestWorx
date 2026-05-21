@@ -179,7 +179,6 @@ function calculateBillingPipeline(
 
 function InspectionListCard({
   title,
-  description,
   inspections,
   emptyText,
   ctaLabel,
@@ -188,7 +187,7 @@ function InspectionListCard({
   emptyTitle = "Nothing is queued here"
 }: {
   title: string;
-  description: string;
+  description?: string;
   inspections: DashboardInspection[];
   emptyText: string;
   ctaLabel: string;
@@ -202,7 +201,6 @@ function InspectionListCard({
         <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
           {title}
         </h3>
-        <p className="mt-1 text-sm text-[color:var(--text-secondary)]">{description}</p>
       </div>
 
       <div className="mt-5 space-y-3">

@@ -53,14 +53,13 @@ function formatBillingSummaryStatus(status: string) {
 
 function SummaryQueueSection({
   title,
-  description,
   emptyTitle,
   emptyText,
   summaries,
   ctaLabel
 }: {
   title: string;
-  description: string;
+  description?: string;
   emptyTitle: string;
   emptyText: string;
   summaries: AdminBillingSummary[];
@@ -71,9 +70,8 @@ function SummaryQueueSection({
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">{title}</h2>
-          <p className="mt-1 text-sm text-slate-500">{description}</p>
         </div>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm font-semibold text-slate-600">
           {summaries.length} {summaries.length === 1 ? "summary" : "summaries"}
         </p>
       </div>
