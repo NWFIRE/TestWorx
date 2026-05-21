@@ -40,6 +40,7 @@ export function InspectionReportTypeManagement(input: {
   inspectionId: string;
   reportTypes: ReportTypeOption[];
   tasks: ManagedReportTask[];
+  variant?: "standalone" | "embedded";
 }) {
   const router = useRouter();
   const [reportTypeQuery, setReportTypeQuery] = useState("");
@@ -72,8 +73,13 @@ export function InspectionReportTypeManagement(input: {
     return input.reportTypes.filter((reportType) => reportType.label.toLowerCase().includes(query));
   }, [input.reportTypes, reportTypeQuery]);
 
+  const shellClassName =
+    input.variant === "embedded"
+      ? "rounded-[1.5rem] border border-slate-200 bg-slate-50/60 p-5"
+      : "rounded-[2rem] bg-white p-6 shadow-panel";
+
   return (
-    <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+    <div className={shellClassName}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Inspection reports / report types</p>

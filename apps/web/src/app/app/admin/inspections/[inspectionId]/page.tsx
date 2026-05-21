@@ -497,6 +497,44 @@ export default async function EditInspectionPage({
                     }))
                   }}
                 />
+                <div className="mt-6 border-t border-slate-200 pt-6">
+                  <InspectionReportTypeManagement
+                    inspectionId={inspection.id}
+                    reportTypes={Object.entries(inspectionTypeRegistry).map(([value, definition]) => ({
+                      canAddMultiple: allowsMultipleInspectionTasks(value as InspectionType),
+                      value,
+                      label: definition.label
+                    }))}
+                    tasks={inspectionView.tasks.map((task: InspectionTask) => {
+                      const hasReportActivity = Boolean(
+                        task.report && (
+                          (task.report.autosaveVersion ?? 1) > 1 ||
+                          task.report.status === "finalized" ||
+                          task.report.correctionEvents.length > 0 ||
+                          task.report.finalizedAt ||
+                          task.report.correctionRequestedAt ||
+                          task.report.correctionResolvedAt
+                        )
+                      );
+                      return {
+                        id: task.id,
+                        inspectionType: task.inspectionType,
+                        label: inspectionTaskLabel(task),
+                        assignedTechnicianName: task.assignedTechnicianId
+                          ? dashboardData.technicians.find((technician) => technician.id === task.assignedTechnicianId)?.name ?? "Assigned"
+                          : "Unassigned",
+                        dueLabel: task.dueDate ? format(task.dueDate, "MMM d, yyyy") : task.dueMonth ?? "Not recorded",
+                        taskStatus: task.status,
+                        reportStatus: task.report?.status === "finalized" ? "Finalized" : task.report?.status === "submitted" ? "Ready for Review" : "Draft",
+                        schedulingStatus: task.schedulingStatus ?? "scheduled_now",
+                        isAddedTask: Boolean(task.addedByUserId),
+                        hasReportActivity,
+                        isFinalized: task.report?.status === "finalized"
+                      };
+                    })}
+                    variant="embedded"
+                  />
+                </div>
               </div>
             </details>
           </div>
@@ -642,43 +680,6 @@ export default async function EditInspectionPage({
             inspectionId={inspection.id}
             tenantStoragePrefix={sanitizePathSegment(session.user.tenantId)}
           />
-          ) : null}
-          {!isReviewMode ? (
-            <InspectionReportTypeManagement
-              inspectionId={inspection.id}
-              reportTypes={Object.entries(inspectionTypeRegistry).map(([value, definition]) => ({
-                canAddMultiple: allowsMultipleInspectionTasks(value as InspectionType),
-                value,
-                label: definition.label
-              }))}
-              tasks={inspectionView.tasks.map((task: InspectionTask) => {
-                const hasReportActivity = Boolean(
-                  task.report && (
-                    (task.report.autosaveVersion ?? 1) > 1 ||
-                    task.report.status === "finalized" ||
-                    task.report.correctionEvents.length > 0 ||
-                    task.report.finalizedAt ||
-                    task.report.correctionRequestedAt ||
-                    task.report.correctionResolvedAt
-                  )
-                );
-                return {
-                  id: task.id,
-                  inspectionType: task.inspectionType,
-                  label: inspectionTaskLabel(task),
-                  assignedTechnicianName: task.assignedTechnicianId
-                    ? dashboardData.technicians.find((technician) => technician.id === task.assignedTechnicianId)?.name ?? "Assigned"
-                    : "Unassigned",
-                  dueLabel: task.dueDate ? format(task.dueDate, "MMM d, yyyy") : task.dueMonth ?? "Not recorded",
-                  taskStatus: task.status,
-                  reportStatus: task.report?.status === "finalized" ? "Finalized" : task.report?.status === "submitted" ? "Ready for Review" : "Draft",
-                  schedulingStatus: task.schedulingStatus ?? "scheduled_now",
-                  isAddedTask: Boolean(task.addedByUserId),
-                  hasReportActivity,
-                  isFinalized: task.report?.status === "finalized"
-                };
-              })}
-            />
           ) : null}
           {!isReviewMode ? <InspectionPdfUploadCard attachments={attachmentView} inspectionId={inspection.id} tenantStoragePrefix={sanitizePathSegment(session.user.tenantId)} /> : null}
           {!isReviewMode ? <DeleteInspectionCard action={deleteInspectionAction} inspectionId={inspection.id} redirectTo={originPath} /> : null}
