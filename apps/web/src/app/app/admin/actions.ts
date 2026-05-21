@@ -30,6 +30,7 @@ import {
   parseCreateInspectionFormData,
   parseUpdateInspectionFormData,
   recordInspectionDuplicateOverride,
+  removeBillingSummaryItemGroup,
   sendQuickBooksInvoice,
   searchBillingSummaryItemCatalogMatches,
   syncBillingSummaryToQuickBooks,
@@ -947,6 +948,25 @@ export async function addBillingSummaryManualLineAction(formData: FormData) {
       error: error instanceof Error ? error.message : "Unable to add billing line item."
     };
   }
+}
+
+export async function removeBillingSummaryItemGroupAction(formData: FormData) {
+  const session = await auth();
+  const summaryId = String(formData.get("summaryId") ?? "");
+  const inspectionId = String(formData.get("inspectionId") ?? "");
+  const itemIds = formData.getAll("itemIds").map((value) => String(value)).filter(Boolean);
+
+  if (!session?.user?.tenantId || !summaryId || !inspectionId || itemIds.length === 0) {
+    return;
+  }
+
+  await removeBillingSummaryItemGroup(
+    { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+    { summaryId, itemIds }
+  );
+
+  revalidatePath("/app/admin/billing");
+  revalidatePath(`/app/admin/billing/${inspectionId}`);
 }
 
 export async function searchBillingSummaryItemCatalogMatchesAction(

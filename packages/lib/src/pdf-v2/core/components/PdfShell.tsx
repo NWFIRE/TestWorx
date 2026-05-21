@@ -10,8 +10,7 @@ export function PdfShell({ children, pageNumber, totalPages, footer, header, cla
       <div className="pdf-shell__body">{children}</div>
       {footer ?? (
         <footer className="pdf-footer">
-          <span>TradeWorx Report PDF v2</span>
-          {pageNumber ? <span>Page {pageNumber}{totalPages ? ` of ${totalPages}` : ""}</span> : null}
+          {pageNumber ? <span style={{ marginLeft: "auto" }}>Page {pageNumber}{totalPages ? ` of ${totalPages}` : ""}</span> : null}
         </footer>
       )}
     </section>

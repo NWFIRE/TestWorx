@@ -4044,6 +4044,83 @@ export async function updateBillingSummaryItemGroup(
   `;
 }
 
+export async function removeBillingSummaryItemGroup(
+  actor: ActorContext,
+  input: {
+    summaryId: string;
+    itemIds: string[];
+  }
+) {
+  const { parsedActor, summary } = await getAuthorizedBillingSummary(actor, input.summaryId);
+  if (summary.status === "invoiced") {
+    throw new Error("Invoiced billing summaries must be moved back to review before removing line items.");
+  }
+
+  const uniqueItemIds = [...new Set(input.itemIds.filter(Boolean))];
+  if (!uniqueItemIds.length) {
+    throw new Error("Billing item group not found.");
+  }
+
+  const groupedItems = summary.items.filter((item) => uniqueItemIds.includes(item.id));
+  if (groupedItems.length !== uniqueItemIds.length) {
+    throw new Error("Billing item group not found.");
+  }
+
+  const firstKey = buildBillingReviewGroupKey(groupedItems[0]!);
+  if (groupedItems.some((item) => buildBillingReviewGroupKey(item) !== firstKey)) {
+    throw new Error("Only identical billing items can be removed as a grouped row.");
+  }
+
+  const removedItemIds = new Set(uniqueItemIds);
+  const remainingItems = summary.items.filter((item) => !removedItemIds.has(item.id));
+  const minimumPricedSummary = await applyMinimumTicketPricingToSummaryItemsTx(prisma, {
+    tenantId: parsedActor.tenantId as string,
+    inspectionId: summary.inspectionId,
+    customerCompanyId: summary.customerCompanyId,
+    siteId: summary.siteId,
+    billingType: normalizeBillingType(summary.billingType),
+    pricingSnapshot: summary.pricingSnapshot,
+    inspectionClassification: summary.inspectionClassification,
+    items: remainingItems
+  });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.inspectionBillingSummary.update({
+      where: { id: summary.id },
+      data: {
+        items: minimumPricedSummary.items as unknown as Prisma.InputJsonValue,
+        subtotal: minimumPricedSummary.subtotal,
+        pricingSnapshot: minimumPricedSummary.pricingSnapshot as Prisma.InputJsonValue,
+        quickbooksSyncStatus: summary.quickbooksInvoiceId ? "not_synced" : summary.quickbooksSyncStatus ?? "not_synced",
+        quickbooksInvoiceId: null,
+        quickbooksInvoiceNumber: null,
+        quickbooksConnectionMode: null,
+        quickbooksCustomerId: null,
+        quickbooksSyncedAt: null,
+        quickbooksSyncError: null,
+        quickbooksSendStatus: "not_sent",
+        quickbooksSentAt: null,
+        quickbooksSendError: null
+      }
+    });
+
+    await tx.auditLog.create({
+      data: {
+        tenantId: parsedActor.tenantId as string,
+        actorUserId: parsedActor.userId,
+        action: "billing.item_group_removed",
+        entityType: "InspectionBillingSummary",
+        entityId: summary.id,
+        metadata: {
+          itemIds: uniqueItemIds,
+          itemDescription: groupedItems[0]?.description ?? null,
+          removedItemCount: groupedItems.length
+        }
+      }
+    });
+  });
+}
+
 export async function getBillingManualLineCatalogItems(actor: ActorContext) {
   const parsedActor = parseActor(actor);
   ensureAdmin(parsedActor);

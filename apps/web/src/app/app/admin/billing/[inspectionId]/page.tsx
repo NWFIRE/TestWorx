@@ -12,7 +12,7 @@ import { BillingSummaryStatusActions } from "../billing-summary-status-actions";
 import { BillingManualLineForm } from "../../billing-manual-line-form";
 import { BillingItemMatchPanel } from "../../billing-item-match-panel";
 import { AppPageShell, WorkspaceSplit } from "../../operations-ui";
-import { addBillingSummaryManualLineAction, clearBillingSummaryItemCatalogLinkAction, getBillingManualLineCatalogItems, linkBillingSummaryItemCatalogAction, searchBillingSummaryItemCatalogMatchesAction, sendQuickBooksInvoiceAction, syncBillingSummaryToQuickBooksAction, updateBillingSummaryItemGroupAction, updateBillingSummaryNotesAction, updateBillingSummaryStatusAction } from "../../actions";
+import { addBillingSummaryManualLineAction, clearBillingSummaryItemCatalogLinkAction, getBillingManualLineCatalogItems, linkBillingSummaryItemCatalogAction, removeBillingSummaryItemGroupAction, searchBillingSummaryItemCatalogMatchesAction, sendQuickBooksInvoiceAction, syncBillingSummaryToQuickBooksAction, updateBillingSummaryItemGroupAction, updateBillingSummaryNotesAction, updateBillingSummaryStatusAction } from "../../actions";
 
 type BillingSummaryDetail = NonNullable<Awaited<ReturnType<typeof getAdminBillingSummaryDetail>>>;
 type BillingSummaryLineItem = BillingSummaryDetail["reviewGroupedItems"][keyof BillingSummaryDetail["reviewGroupedItems"]][number] & {
@@ -512,9 +512,17 @@ export default async function BillingSummaryDetailPage({
                           <input className="h-4 w-4 rounded border-slate-300 text-slateblue" defaultChecked={item.taxable === true} disabled={isInvoiced} name="taxable" type="checkbox" />
                           Taxable
                         </label>
-                        <div className="flex items-end sm:col-span-2 xl:col-span-1">
+                        <div className="grid gap-2 sm:col-span-2 xl:col-span-1">
                           <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-50" disabled={isInvoiced} type="submit">
                             {isInvoiced ? "Locked" : "Save line"}
+                          </button>
+                          <button
+                            className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-rose-200 bg-white px-4 py-3 text-sm font-semibold text-rose-700 disabled:opacity-50"
+                            disabled={isInvoiced}
+                            formAction={removeBillingSummaryItemGroupAction}
+                            type="submit"
+                          >
+                            Remove line
                           </button>
                         </div>
                         <p className="sm:col-span-2 2xl:col-span-1 text-xs text-slate-500">
