@@ -73,12 +73,14 @@ function formatTechnicianWorkTiming(inspection: any) {
 
 function getInspectionDueMonthKey(inspection: any) {
   const dueMonth = (inspection.tasks ?? []).find((task: any) => typeof task.dueMonth === "string" && task.dueMonth)?.dueMonth;
+  const scheduledMonthKey = format(toDateValue(inspection.scheduledStart), "yyyy-MM");
   if (typeof dueMonth === "string" && /^\d{4}-\d{2}$/.test(dueMonth)) {
-    return dueMonth;
+    return dueMonth < scheduledMonthKey ? scheduledMonthKey : dueMonth;
   }
 
   const hardDueDate = getHardDueDate(inspection);
-  return format(hardDueDate ?? toDateValue(inspection.scheduledStart), "yyyy-MM");
+  const hardDueMonthKey = hardDueDate ? format(hardDueDate, "yyyy-MM") : null;
+  return hardDueMonthKey && hardDueMonthKey > scheduledMonthKey ? hardDueMonthKey : scheduledMonthKey;
 }
 
 function formatMonthTitle(monthKey: string) {

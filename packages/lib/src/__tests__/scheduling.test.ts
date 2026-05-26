@@ -693,6 +693,25 @@ describe("month defaults and past-due status", () => {
     ).toBe(false);
   });
 
+  it("does not let stale task due months mark a future scheduled inspection past due", () => {
+    const inspection = {
+      status: InspectionStatus.scheduled,
+      scheduledStart: new Date("2026-10-01T09:00:00.000Z"),
+      tasks: [
+        {
+          dueMonth: "2026-04",
+          dueDate: new Date("2026-04-01T00:00:00.000Z"),
+          schedulingStatus: "scheduled_now"
+        }
+      ],
+      now: new Date("2026-05-26T12:00:00.000Z")
+    };
+
+    expect(isInspectionPastDue(inspection)).toBe(false);
+    expect(getInspectionDisplayStatus(inspection)).toBe(InspectionStatus.scheduled);
+    expect(isInspectionVisibleToTechnicianForDueMonth(inspection, inspection.now)).toBe(false);
+  });
+
   it("activates technician visibility when the due month begins", () => {
     const inspection = {
       scheduledStart: new Date("2026-06-01T09:00:00.000Z"),

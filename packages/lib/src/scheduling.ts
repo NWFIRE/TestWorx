@@ -980,6 +980,7 @@ function getInspectionDuePeriod<T extends {
   schedulingStatus?: string | null;
   status?: InspectionStatus | string | null;
 }>(inspection: { scheduledStart?: Date | string | null; tasks?: T[] | null }) {
+  const scheduledPeriod = getDateDuePeriod(inspection.scheduledStart ?? null);
   const taskDuePeriods = (inspection.tasks ?? [])
     .filter((task) => task.status !== InspectionStatus.cancelled)
     .filter((task) => isCurrentVisitTaskSchedulingStatus(task.schedulingStatus ?? "scheduled_now"))
@@ -987,7 +988,13 @@ function getInspectionDuePeriod<T extends {
     .filter((period): period is string => Boolean(period))
     .sort();
 
-  return taskDuePeriods[0] ?? getDateDuePeriod(inspection.scheduledStart ?? null);
+  const taskDuePeriod = taskDuePeriods[0] ?? null;
+  if (taskDuePeriod && scheduledPeriod) {
+    // Stale task due months from prior visits should never make a future scheduled visit Past Due.
+    return taskDuePeriod < scheduledPeriod ? scheduledPeriod : taskDuePeriod;
+  }
+
+  return taskDuePeriod ?? scheduledPeriod;
 }
 
 export function isInspectionVisibleToTechnicianForDueMonth<T extends {
@@ -1004,6 +1011,7 @@ function getClaimableInspectionPeriodKey<T extends {
   dueDate?: Date | string | null;
   dueMonth?: string | null;
 }>(inspection: { scheduledStart?: Date | string | null; tasks?: T[] | null }) {
+  const scheduledPeriod = getDateDuePeriod(inspection.scheduledStart ?? null);
   const taskDuePeriods = (inspection.tasks ?? [])
     .flatMap((task) => [
       task.dueMonth?.trim() && /^\d{4}-\d{2}$/.test(task.dueMonth.trim()) ? task.dueMonth.trim() : null,
@@ -1012,10 +1020,11 @@ function getClaimableInspectionPeriodKey<T extends {
     .filter((period): period is string => Boolean(period));
 
   if (taskDuePeriods.length) {
-    return taskDuePeriods.sort()[0]!;
+    const taskDuePeriod = taskDuePeriods.sort()[0]!;
+    return scheduledPeriod && taskDuePeriod < scheduledPeriod ? scheduledPeriod : taskDuePeriod;
   }
 
-  return getDateDuePeriod(inspection.scheduledStart ?? null) ?? "unknown";
+  return scheduledPeriod ?? "unknown";
 }
 
 function getTaskTypeCounts<T extends { inspectionType: InspectionType | keyof typeof inspectionTypeRegistry }>(tasks: T[]) {

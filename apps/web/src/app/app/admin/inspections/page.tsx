@@ -96,6 +96,7 @@ function readDueMonthAnchor(value: unknown) {
 }
 
 function getFastManagementDueDate(inspection: AdminSchedulingInspection) {
+  const scheduledDate = readValidDate(inspection.scheduledStart);
   const currentTaskDueDates = inspection.tasks
     .flatMap((task) => [
       readValidDate(task.dueDate),
@@ -104,10 +105,11 @@ function getFastManagementDueDate(inspection: AdminSchedulingInspection) {
     .filter((date): date is Date => Boolean(date));
 
   if (currentTaskDueDates.length) {
-    return earliestDate(currentTaskDueDates);
+    const taskDueDate = earliestDate(currentTaskDueDates);
+    return scheduledDate && taskDueDate < scheduledDate ? scheduledDate : taskDueDate;
   }
 
-  return readValidDate(inspection.scheduledStart);
+  return scheduledDate;
 }
 
 function getInspectionDueMonthKey(inspection: AdminSchedulingInspection) {
