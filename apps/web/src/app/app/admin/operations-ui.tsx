@@ -14,11 +14,11 @@ function cn(...classes: Array<string | false | null | undefined>) {
 }
 
 const toneClasses: Record<Tone, string> = {
-  slate: "border-[color:var(--border-default)] bg-[color:var(--surface-muted)] text-slate-700",
+  slate: "border-slate-400 bg-slate-100 text-slate-900",
   blue: "badge-brand-primary",
-  emerald: "border-emerald-300 bg-emerald-50 text-emerald-800",
-  amber: "border-amber-300 bg-amber-50 text-amber-800",
-  rose: "border-rose-300 bg-rose-50 text-rose-800",
+  emerald: "border-emerald-500 bg-emerald-100 text-emerald-950",
+  amber: "border-amber-500 bg-amber-100 text-amber-950",
+  rose: "border-rose-500 bg-rose-100 text-rose-950",
   violet: "badge-brand-accent"
 };
 
@@ -47,7 +47,7 @@ export function SectionCard({
     <section
       id={id}
       className={cn(
-        "rounded-[28px] border border-[color:rgb(203_215_230_/_0.92)] bg-[color:var(--surface-base)] p-5 shadow-[0_16px_38px_rgba(15,23,42,0.06)] lg:p-6",
+        "enterprise-card rounded-[26px] p-5 lg:p-6",
         className
       )}
     >
@@ -86,11 +86,11 @@ export function PageHeader({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className={widthClass}>
           {eyebrow ? (
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--tenant-primary)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[var(--tenant-primary)]">
               {eyebrow}
             </p>
           ) : null}
-          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-950 md:text-4xl">
+          <h1 className="mt-2 text-3xl font-bold tracking-[-0.045em] text-ink md:text-4xl">
             {title}
           </h1>
         </div>
@@ -134,11 +134,11 @@ export function KPIStatCard({
   tone?: Tone;
 }) {
   const content = (
-    <div className="flex h-full flex-col justify-between gap-3 rounded-[24px] border border-[color:rgb(203_215_230_/_0.92)] bg-[color:var(--surface-base)] p-4 shadow-[0_14px_34px_rgba(15,23,42,0.06)] lg:p-5">
+    <div className="enterprise-card flex h-full flex-col justify-between gap-3 rounded-[22px] p-4 lg:p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs font-medium leading-5 text-[color:var(--text-secondary)] lg:text-sm">{label}</div>
-          <div className="mt-2 text-[28px] font-semibold tracking-[-0.05em] text-slate-950 lg:mt-3 lg:text-3xl lg:tracking-[-0.04em]">
+          <div className="text-xs font-bold leading-5 text-[color:var(--text-secondary)] lg:text-sm">{label}</div>
+          <div className="mt-2 text-[30px] font-bold tracking-[-0.055em] text-ink lg:mt-3 lg:text-3xl lg:tracking-[-0.045em]">
             {value}
           </div>
         </div>
@@ -155,7 +155,7 @@ export function KPIStatCard({
 
   return (
     <Link
-      className="pressable-surface block rounded-[24px] outline-none transition duration-200 hover:-translate-y-0.5 hover:[&_div]:border-slate-300 hover:[&_div]:shadow-[0_16px_40px_rgba(15,23,42,0.06)] focus-visible:[&_div]:ring-2 focus-visible:[&_div]:ring-[color:rgb(var(--tenant-primary-rgb)/0.2)]"
+      className="pressable-surface block rounded-[22px] outline-none transition duration-200 hover:-translate-y-0.5 hover:[&_div]:border-[color:var(--border-strong)] hover:[&_div]:shadow-[0_22px_48px_rgba(9,18,32,0.14)] focus-visible:[&_div]:ring-2 focus-visible:[&_div]:ring-[color:rgb(var(--tenant-primary-rgb)/0.24)]"
       href={href}
     >
       {content}
@@ -177,7 +177,7 @@ export function FilterBar({
     <SectionCard className={className}>
       {title ? (
         <div className="mb-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">
+          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">
             {title}
           </p>
         </div>
@@ -256,10 +256,10 @@ export function FilterChipLink({
   return (
     <Link
       className={cn(
-        "pressable pressable-row inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-semibold transition",
+        "pressable pressable-row inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-bold shadow-sm transition",
         active
           ? activeClass
-          : "border-[color:var(--border-default)] bg-[color:var(--surface-base)] text-[color:var(--text-secondary)] hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
+          : "border-[color:var(--border-default)] bg-[color:var(--surface-base)] text-[color:var(--text-secondary)] hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)] hover:text-ink"
       )}
       href={href}
     >
@@ -278,7 +278,7 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.18em]",
+        "inline-flex rounded-full border px-2.5 py-1 text-xs font-bold uppercase tracking-[0.18em] shadow-sm",
         toneClasses[tone]
       )}
     >
@@ -311,11 +311,11 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "rounded-[24px] border border-dashed border-[color:var(--border-default)] bg-[color:rgb(248_250_252_/_0.95)] px-5 py-8 text-center",
+        "rounded-[24px] border border-dashed border-[color:var(--border-strong)] bg-[color:var(--surface-subtle)] px-5 py-8 text-center",
         className
       )}
     >
-      <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+      <h3 className="text-lg font-bold text-ink">{title}</h3>
     </div>
   );
 }

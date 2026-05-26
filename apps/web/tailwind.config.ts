@@ -5,17 +5,18 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#0F172A",
+        ink: "#07111F",
         ember: "rgb(var(--tenant-accent-rgb) / <alpha-value>)",
-        mist: "#CBD5E1",
-        line: "rgb(var(--line-rgb, 203 215 230) / <alpha-value>)",
+        mist: "#B9C7D8",
+        line: "rgb(var(--line-rgb, 185 199 216) / <alpha-value>)",
         slateblue: "rgb(var(--tenant-primary-rgb) / <alpha-value>)",
-        paper: "#F3F6FB",
+        paper: "#E9EEF6",
         surface: "rgb(var(--surface-rgb, 255 255 255) / <alpha-value>)"
       },
       boxShadow: {
-        panel: "0 22px 48px rgba(15, 23, 42, 0.08)",
-        soft: "0 14px 34px rgba(15, 23, 42, 0.06)"
+        panel: "0 24px 54px rgba(9, 18, 32, 0.13)",
+        soft: "0 16px 36px rgba(9, 18, 32, 0.10)",
+        crisp: "0 1px 0 rgba(255,255,255,0.8) inset, 0 18px 42px rgba(9,18,32,0.11)"
       }
     }
   },

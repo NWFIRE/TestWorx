@@ -210,10 +210,10 @@ function NavItem({
     <Link
       aria-current={active ? "page" : undefined}
       aria-label={item.label}
-      className={`pressable pressable-row group relative flex min-h-[44px] min-w-0 items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-sm outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2 motion-reduce:transition-none before:absolute before:bottom-1.5 before:left-0 before:top-1.5 before:w-0.5 before:rounded-full before:opacity-0 ${
-        active
-          ? "bg-[var(--tenant-primary-soft)] text-slate-950 before:opacity-100 shadow-[inset_0_0_0_1px_var(--tenant-primary-border)]"
-          : "text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-base)] hover:text-slate-950"
+        className={`pressable pressable-row group relative flex min-h-[44px] min-w-0 items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-sm outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.38)] focus-visible:ring-offset-2 motion-reduce:transition-none before:absolute before:bottom-1.5 before:left-0 before:top-1.5 before:w-1 before:rounded-full before:opacity-0 ${
+          active
+          ? "bg-white text-ink before:opacity-100 shadow-[inset_0_0_0_1px_var(--tenant-primary-border),0_10px_24px_rgba(9,18,32,0.10)]"
+          : "text-[color:var(--text-muted)] hover:bg-white/90 hover:text-ink hover:shadow-[0_8px_18px_rgba(9,18,32,0.06)]"
       } ${tone.activeBar} ${collapsed ? "justify-center px-2" : ""} ${compact ? "min-h-[48px]" : ""}`}
       href={item.href}
       onClick={() => onNavigate?.(item.href)}
@@ -224,13 +224,13 @@ function NavItem({
     >
       <span
         aria-hidden="true"
-        className={`flex h-5 w-5 shrink-0 items-center justify-center ${active ? tone.activeIcon : "text-slate-500 group-hover:text-slate-800"}`}
+        className={`flex h-5 w-5 shrink-0 items-center justify-center ${active ? tone.activeIcon : "text-[color:var(--text-muted)] group-hover:text-ink"}`}
       >
         <NavIcon className="h-5 w-5" icon={item.icon} />
       </span>
       {!collapsed ? (
         <span className="min-w-0 flex-1">
-          <span className={`block truncate text-sm font-medium ${active ? "font-semibold text-slate-950" : ""}`}>{item.shortLabel}</span>
+          <span className={`block truncate text-sm ${active ? "font-bold text-ink" : "font-semibold"}`}>{item.shortLabel}</span>
         </span>
       ) : null}
     </Link>
@@ -244,7 +244,7 @@ function BrandBlock({
 }) {
   return (
     <div className={`flex min-w-0 items-center gap-3 overflow-hidden ${collapsed ? "justify-center" : ""}`}>
-      <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_6px_20px_rgba(15,23,42,0.05)]">
+      <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[color:var(--border-default)] bg-white shadow-[0_8px_22px_rgba(9,18,32,0.10)]">
         <Image
           alt="TradeWorx"
           className="object-contain p-1"
@@ -256,7 +256,7 @@ function BrandBlock({
       </div>
       {!collapsed ? (
         <div className="min-w-0 overflow-hidden">
-          <p className="truncate text-[13px] font-bold uppercase tracking-[0.26em] text-slate-800">TradeWorx</p>
+          <p className="truncate text-[13px] font-black uppercase tracking-[0.26em] text-ink">TradeWorx</p>
         </div>
       ) : null}
     </div>
@@ -269,7 +269,7 @@ function DesktopBackButton({ fallbackHref }: { fallbackHref?: string | null }) {
   return (
     <button
       aria-label="Go back"
-      className="pressable hidden h-8 items-center rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-500 shadow-[0_4px_12px_rgba(15,23,42,0.04)] transition hover:border-slate-300 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.28)] lg:inline-flex"
+      className="pressable hidden h-8 items-center rounded-lg border border-[color:var(--border-default)] bg-white px-2.5 text-xs font-bold text-[color:var(--text-secondary)] shadow-sm transition hover:border-[color:var(--border-strong)] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.28)] lg:inline-flex"
       onClick={() => smartBack()}
       type="button"
     >
@@ -348,13 +348,13 @@ function NavSection({
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <nav aria-label="Primary navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
         {!collapsed ? (
-          <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--text-tertiary)]">Workspace</p>
+          <p className="px-2 pb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--text-muted)]">Workspace</p>
         ) : null}
         <div className="space-y-4">
           {groupedNavItems.map(({ group, items }) => (
             <div className="space-y-1.5" key={group}>
               {!collapsed && groupedNavItems.length > 1 ? (
-                <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--text-tertiary)]">{group}</p>
+                <p className="px-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--text-muted)]">{group}</p>
               ) : null}
               {items.map((item) => (
                 <NavItem
@@ -721,7 +721,7 @@ export function AppShell({
       {navItems.length > 0 ? (
         <aside
           aria-label="Primary navigation"
-          className={`hidden overflow-hidden border-r border-[color:var(--border-default)] bg-[color:var(--sidebar-bg)] transition-[width] duration-200 motion-reduce:transition-none lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col ${
+          className={`hidden overflow-hidden border-r border-[color:var(--border-strong)] bg-[color:var(--sidebar-bg)] shadow-[4px_0_24px_rgba(9,18,32,0.06)] transition-[width] duration-200 motion-reduce:transition-none lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col ${
             sidebarCollapsed ? "lg:w-[72px]" : "lg:w-64"
           }`}
         >
@@ -731,7 +731,7 @@ export function AppShell({
               {!sidebarCollapsed ? (
                 <button
                   aria-label="Collapse sidebar"
-                  className="pressable pressable-icon inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[color:var(--text-muted)] outline-none transition-colors hover:bg-white hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
+                  className="pressable pressable-icon inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-transparent text-[color:var(--text-muted)] outline-none transition-colors hover:border-[color:var(--border-default)] hover:bg-white hover:text-ink focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
                   onClick={() => setSidebarCollapsed(true)}
                   type="button"
                 >
@@ -743,7 +743,7 @@ export function AppShell({
               <div className="mt-2 flex justify-center">
                 <button
                   aria-label="Expand sidebar"
-                  className="pressable pressable-icon inline-flex h-9 w-9 items-center justify-center rounded-lg text-[color:var(--text-muted)] outline-none transition-colors hover:bg-white hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
+                  className="pressable pressable-icon inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-[color:var(--text-muted)] outline-none transition-colors hover:border-[color:var(--border-default)] hover:bg-white hover:text-ink focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
                   onClick={() => setSidebarCollapsed(false)}
                   type="button"
                 >
@@ -775,7 +775,7 @@ export function AppShell({
           <aside
             aria-label="Primary navigation"
             aria-modal={drawerOpen}
-            className={`fixed inset-y-0 left-0 z-50 flex w-[min(320px,86vw)] flex-col overflow-hidden border-r border-[color:var(--border-default)] bg-[color:var(--sidebar-bg)] shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none lg:hidden ${
+            className={`fixed inset-y-0 left-0 z-50 flex w-[min(320px,86vw)] flex-col overflow-hidden border-r border-[color:var(--border-strong)] bg-[color:var(--sidebar-bg)] shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none lg:hidden ${
               drawerOpen ? "translate-x-0 visible" : "-translate-x-full invisible"
             }`}
             ref={drawerRef}
@@ -790,7 +790,7 @@ export function AppShell({
               <BrandBlock collapsed={false} />
               <button
                 aria-label="Close navigation"
-                className="pressable pressable-icon inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[color:var(--text-muted)] outline-none transition-colors hover:bg-white hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
+                className="pressable pressable-icon inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-transparent text-[color:var(--text-muted)] outline-none transition-colors hover:border-[color:var(--border-default)] hover:bg-white hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
                 onClick={closeDrawer}
                 type="button"
               >
@@ -814,7 +814,7 @@ export function AppShell({
         ref={shellContentRef}
         style={{ minHeight: "var(--app-height, 100dvh)" }}
       >
-        <header className="sticky top-0 z-30 border-b border-[color:var(--border-default)] bg-white/96 backdrop-blur">
+        <header className="sticky top-0 z-30 border-b border-[color:var(--border-strong)] bg-white/97 shadow-[0_8px_26px_rgba(9,18,32,0.07)] backdrop-blur">
           <div
             className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8"
             style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
@@ -827,7 +827,7 @@ export function AppShell({
                   {navItems.length > 0 ? (
                 <button
                   aria-label="Open navigation"
-                  className="pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-[color:var(--border-default)] bg-white px-3 text-sm font-semibold text-[color:var(--text-secondary)] outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2 lg:hidden"
+                  className="pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-[color:var(--border-default)] bg-white px-3 text-sm font-bold text-[color:var(--text-secondary)] shadow-sm outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2 lg:hidden"
                   onClick={() => setDrawerOpen(true)}
                   ref={menuButtonRef}
                   type="button"
@@ -837,18 +837,18 @@ export function AppShell({
                   ) : null}
                   <DesktopBackButton fallbackHref={desktopBackFallbackHref} />
                   <div className="min-w-0">
-                    <p className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--text-tertiary)]">Workspace</p>
-                    <h1 className="truncate text-lg font-semibold text-ink">{currentItem?.label ?? user.name ?? "Workspace"}</h1>
+                    <p className="truncate text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--text-muted)]">Workspace</p>
+                    <h1 className="truncate text-lg font-bold text-ink">{currentItem?.label ?? user.name ?? "Workspace"}</h1>
                   </div>
                 </div>
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="hidden min-w-0 text-right text-sm text-[color:var(--text-muted)] sm:block">
+                  <div className="hidden min-w-0 text-right text-sm font-semibold text-[color:var(--text-muted)] sm:block">
                     <p className="truncate">{user.email}</p>
                     <p className="truncate capitalize">{role.replaceAll("_", " ")}</p>
                   </div>
                   <button
                     aria-label="Refresh page"
-                    className="pressable hidden min-h-11 min-w-11 items-center justify-center rounded-xl border border-[color:var(--border-default)] bg-white px-3 text-sm font-medium text-[color:var(--text-secondary)] outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2 lg:inline-flex"
+                    className="pressable hidden min-h-11 min-w-11 items-center justify-center rounded-xl border border-[color:var(--border-default)] bg-white px-3 text-sm font-bold text-[color:var(--text-secondary)] shadow-sm outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2 lg:inline-flex"
                     disabled={isRefreshing}
                     onClick={handleRefresh}
                     title={isRefreshing ? "Refreshing..." : "Refresh page"}
@@ -857,7 +857,7 @@ export function AppShell({
                     <BrandLoader animated={isRefreshing} className={isRefreshing ? "opacity-100" : "opacity-85"} label={isRefreshing ? "Refreshing" : "Refresh page"} size="sm" tone="muted" />
                   </button>
                   <form action={signOutAction}>
-                    <button className="pressable min-h-11 rounded-xl border border-[color:var(--border-default)] bg-white px-4 py-2 text-sm font-medium text-[color:var(--text-secondary)] outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2" type="submit">
+                    <button className="pressable min-h-11 rounded-xl border border-[color:var(--border-default)] bg-white px-4 py-2 text-sm font-bold text-[color:var(--text-secondary)] shadow-sm outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2" type="submit">
                       Sign out
                     </button>
                   </form>

@@ -37,7 +37,7 @@ export default async function AppLayout({ children }: Readonly<{ children: React
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-paper">
       <AppShell
         allowances={session.user.allowances ?? null}
         role={session.user.role}
