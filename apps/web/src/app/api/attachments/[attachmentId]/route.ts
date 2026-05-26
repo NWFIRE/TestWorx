@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { getAuthorizedAttachmentDownload } from "@testworx/lib/server/index";
+import { getAuthorizedAttachmentDownload, isStoredFileReadError } from "@testworx/lib/server/index";
 
 function getStatusCode(error: unknown) {
   if (!(error instanceof Error)) {
@@ -18,6 +18,10 @@ function getStatusCode(error: unknown) {
 
   if (/do not have access/i.test(error.message)) {
     return 403;
+  }
+
+  if (isStoredFileReadError(error)) {
+    return 503;
   }
 
   return 400;

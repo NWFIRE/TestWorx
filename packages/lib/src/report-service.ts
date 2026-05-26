@@ -46,7 +46,8 @@ import {
   buildFileDownloadResponse,
   buildStoredFilePayload,
   decodeStoredFile,
-  deleteStoredFile
+  deleteStoredFile,
+  isStoredFileReadError
 } from "./storage";
 
 function parseActor(actor: ActorContext) {
@@ -1488,6 +1489,7 @@ async function replaceGeneratedReportPdfTx(
 
   return {
     generatedAttachment,
+    pdfBytes,
     priorGeneratedKeys: priorGeneratedAttachments.map((attachment: GeneratedPdfAttachmentRecord) => attachment.storageKey)
   };
 }
@@ -1964,6 +1966,72 @@ export async function regenerateFinalizedReportPdf(actor: ActorContext, input: {
   await Promise.all(priorGeneratedKeys.map((storageKey) => deleteStoredFile(storageKey)));
 
   return regenerated;
+}
+
+async function rebuildGeneratedReportPdfDownload(actor: ReturnType<typeof parseActor>, input: {
+  inspectionReportId: string;
+}) {
+  let priorGeneratedKeys: string[] = [];
+
+  const rebuilt = await prisma.$transaction(async (tx) => {
+    const report = await tx.inspectionReport.findFirst({
+      where: {
+        id: input.inspectionReportId,
+        tenantId: actor.tenantId as string
+      },
+      include: {
+        tenant: true,
+        inspection: {
+          include: {
+            site: true,
+            customerCompany: true
+          }
+        },
+        task: true,
+        technician: true,
+        attachments: true,
+        signatures: true,
+        deficiencies: true
+      }
+    });
+
+    if (!report) {
+      throw new Error("Report not found.");
+    }
+
+    if (report.status !== reportStatuses.finalized || !report.finalizedAt) {
+      throw new Error("Only finalized reports can be regenerated.");
+    }
+
+    const pdfResult = await replaceGeneratedReportPdfTx(tx, {
+      tenantId: actor.tenantId as string,
+      report: report as any
+    });
+    priorGeneratedKeys = pdfResult.priorGeneratedKeys;
+
+    await createAuditLog(tx, {
+      tenantId: actor.tenantId as string,
+      actorUserId: actor.userId,
+      action: "report.pdf_regenerated_after_storage_miss",
+      entityId: report.id,
+      metadata: {
+        inspectionId: report.inspectionId,
+        inspectionTaskId: report.inspectionTaskId,
+        generatedAttachmentId: pdfResult.generatedAttachment.id,
+        pdfVersion: "v2"
+      }
+    });
+
+    return {
+      fileName: pdfResult.generatedAttachment.fileName,
+      mimeType: pdfResult.generatedAttachment.mimeType,
+      bytes: pdfResult.pdfBytes
+    };
+  }, { timeout: 20_000 });
+
+  await Promise.allSettled(priorGeneratedKeys.map((storageKey) => deleteStoredFile(storageKey)));
+
+  return rebuilt;
 }
 
 const MAX_UPLOADED_PDF_BYTES = 50 * 1024 * 1024;
@@ -2480,11 +2548,27 @@ export async function getAuthorizedAttachmentDownload(actor: ActorContext, attac
   assertStorageKeyBelongsToTenant(attachment.storageKey, attachment.tenantId);
   assertStorageKeyCategory(attachment.storageKey, ["generated-pdf", "uploaded-pdf"]);
 
-  return buildFileDownloadResponse({
-    storageKey: attachment.storageKey,
-    fileName: attachment.fileName,
-    fallbackMimeType: attachment.mimeType
-  });
+  try {
+    return await buildFileDownloadResponse({
+      storageKey: attachment.storageKey,
+      fileName: attachment.fileName,
+      fallbackMimeType: attachment.mimeType
+    });
+  } catch (error) {
+    const canRebuildGeneratedPdf =
+      isStoredFileReadError(error) &&
+      attachment.kind === AttachmentKind.pdf &&
+      attachment.source === "generated" &&
+      Boolean(attachment.inspectionReportId);
+
+    if (!canRebuildGeneratedPdf) {
+      throw error;
+    }
+
+    return rebuildGeneratedReportPdfDownload(parsedActor, {
+      inspectionReportId: attachment.inspectionReportId as string
+    });
+  }
 }
 
 export async function getAdminInspectionPdfAttachments(actor: ActorContext, inspectionId: string) {

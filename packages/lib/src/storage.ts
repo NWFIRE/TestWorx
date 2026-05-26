@@ -29,6 +29,20 @@ type ReadStoredFileResult = {
   bytes: Uint8Array;
 };
 
+export class StoredFileReadError extends Error {
+  readonly storageKey: string;
+
+  constructor(storageKey: string, cause?: unknown) {
+    super("Stored file is temporarily unavailable.", { cause });
+    this.name = "StoredFileReadError";
+    this.storageKey = storageKey;
+  }
+}
+
+export function isStoredFileReadError(error: unknown): error is StoredFileReadError {
+  return error instanceof StoredFileReadError;
+}
+
 export const privateBlobStoreRequiredMessage =
   "TradeWorx requires a private Vercel Blob store for report media. Reconnect storage with private access before technicians save reports, signatures, or PDFs.";
 
@@ -210,11 +224,16 @@ export async function readStoredFile(storageKey: string): Promise<ReadStoredFile
         useCache: false
       });
     } catch (error) {
-      throw toStorageConfigurationError(error);
+      const normalized = toStorageConfigurationError(error);
+      if (normalized instanceof Error && normalized.message === privateBlobStoreRequiredMessage) {
+        throw normalized;
+      }
+
+      throw new StoredFileReadError(storageKey, normalized);
     }
 
     if (!result || result.statusCode !== 200 || !result.stream) {
-      throw new Error("Stored file could not be retrieved.");
+      throw new StoredFileReadError(storageKey);
     }
 
     const response = new Response(result.stream);
