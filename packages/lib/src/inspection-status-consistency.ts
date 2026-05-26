@@ -33,6 +33,46 @@ function isTaskClosed(task: {
   );
 }
 
+function readDuePeriod(value?: Date | string | null) {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === "string" && /^\d{4}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function isCurrentTaskForStatusRollup(
+  task: {
+    dueDate: Date | null;
+    dueMonth: string | null;
+    schedulingStatus: string | null;
+    status: InspectionStatus;
+  },
+  inspection: { scheduledStart: Date | null }
+) {
+  if (statusRollupTaskSchedulingStatuses.includes(task.schedulingStatus as (typeof statusRollupTaskSchedulingStatuses)[number])) {
+    return true;
+  }
+
+  if (task.schedulingStatus !== "scheduled_future") {
+    return false;
+  }
+
+  const inspectionDuePeriod = readDuePeriod(inspection.scheduledStart);
+  const taskDuePeriod = readDuePeriod(task.dueDate) ?? readDuePeriod(task.dueMonth);
+
+  return Boolean(inspectionDuePeriod && taskDuePeriod && inspectionDuePeriod === taskDuePeriod);
+}
+
 function resolveClosedInspectionStatus(input: {
   currentStatus?: InspectionStatus;
   billingStatus?: string | null;
@@ -77,6 +117,7 @@ export async function reconcileInspectionStatusTx(tx: TransactionClient, input: 
       id: true,
       status: true,
       isPriority: true,
+      scheduledStart: true,
       billingSummary: {
         select: {
           status: true,
@@ -86,13 +127,14 @@ export async function reconcileInspectionStatusTx(tx: TransactionClient, input: 
       },
       tasks: {
         where: {
-          status: { not: InspectionStatus.cancelled },
-          schedulingStatus: { in: [...statusRollupTaskSchedulingStatuses] }
+          status: { not: InspectionStatus.cancelled }
         },
         select: {
           id: true,
           status: true,
           schedulingStatus: true,
+          dueDate: true,
+          dueMonth: true,
           report: { select: { id: true, status: true, finalizedAt: true } }
         }
       }
@@ -113,9 +155,10 @@ export async function reconcileInspectionStatusTx(tx: TransactionClient, input: 
     };
   }
 
-  const closedTasks = inspection.tasks.filter(isTaskClosed);
-  const blockingTasks = inspection.tasks.filter((task) => !isTaskClosed(task));
-  const allCurrentTasksClosed = inspection.tasks.length > 0 && blockingTasks.length === 0;
+  const currentTasks = inspection.tasks.filter((task) => isCurrentTaskForStatusRollup(task, inspection));
+  const closedTasks = currentTasks.filter(isTaskClosed);
+  const blockingTasks = currentTasks.filter((task) => !isTaskClosed(task));
+  const allCurrentTasksClosed = currentTasks.length > 0 && blockingTasks.length === 0;
   const noCurrentTasksRemainOpen = blockingTasks.length === 0;
   const billingStatus = inspection.billingSummary?.status ?? null;
   const quickbooksInvoiceId = inspection.billingSummary?.quickbooksInvoiceId ?? null;
@@ -133,7 +176,7 @@ export async function reconcileInspectionStatusTx(tx: TransactionClient, input: 
         tenantId: input.tenantId,
         inspectionId: input.inspectionId,
         status: { notIn: [InspectionStatus.completed, InspectionStatus.invoiced, InspectionStatus.cancelled] },
-        schedulingStatus: { in: [...statusRollupTaskSchedulingStatuses] },
+        id: { in: currentTasks.map((task) => task.id) },
         OR: [
           { report: { is: { status: reportStatuses.finalized, finalizedAt: { not: null } } } },
           { id: { in: closedTasks.map((task) => task.id) } }
@@ -170,7 +213,7 @@ export async function reconcileInspectionStatusTx(tx: TransactionClient, input: 
       source: input.source,
       previousInspectionStatus: inspection.status,
       newInspectionStatus: nextStatus,
-      activeTaskCount: inspection.tasks.length,
+      activeTaskCount: currentTasks.length,
       closedTaskIds: closedTasks.map((task) => task.id),
       blockingTaskIds: blockingTasks.map((task) => task.id),
       billingStatus,
@@ -205,7 +248,7 @@ export async function repairInspectionStatusConsistencyTx(tx: TransactionClient,
         {
           tasks: {
             some: {
-              schedulingStatus: { in: [...statusRollupTaskSchedulingStatuses] },
+              status: { not: InspectionStatus.cancelled },
               report: { is: { status: reportStatuses.finalized, finalizedAt: { not: null } } }
             }
           }

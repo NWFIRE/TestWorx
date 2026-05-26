@@ -174,4 +174,44 @@ describe("inspection completion after report finalization", () => {
       data: expect.objectContaining({ status: InspectionStatus.completed })
     }));
   });
+
+  it("treats same-month scheduled future tasks as current work when reconciling finalized inspections", async () => {
+    const tx = buildTxMock();
+    const finalizedAt = new Date("2026-05-18T18:00:00.000Z");
+    tx.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      status: InspectionStatus.to_be_completed,
+      isPriority: false,
+      scheduledStart: new Date("2026-05-01T09:00:00.000Z"),
+      billingSummary: null,
+      tasks: [
+        {
+          id: "task_1",
+          status: InspectionStatus.to_be_completed,
+          schedulingStatus: "scheduled_future",
+          dueDate: null,
+          dueMonth: "2026-05",
+          report: { id: "report_1", status: "finalized", finalizedAt }
+        }
+      ]
+    });
+
+    const result = await resolveInspectionCompletionAfterTaskFinalizationTx({
+      tx: tx as never,
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1",
+      finalizedAt,
+      actorUserId: "tech_1",
+      source: "sync_finalize"
+    });
+
+    expect(result.completed).toBe(true);
+    expect(tx.inspectionTask.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: { in: ["task_1"] } }),
+      data: { status: InspectionStatus.completed }
+    }));
+    expect(tx.inspection.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: InspectionStatus.completed })
+    }));
+  });
 });
