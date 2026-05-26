@@ -3018,6 +3018,71 @@ describe("inspection billing persistence and admin review", () => {
     expect(executeRawText).toContain("\"id\":\"line_2\"");
   });
 
+  it("preserves taxable overrides when billing summaries are refreshed from extracted report items", () => {
+    const merged = mergeBillingItems(
+      [
+        {
+          id: "line_1",
+          tenantId: "tenant_1",
+          inspectionId: "inspection_1",
+          reportId: "report_1",
+          reportType: "kitchen_suppression",
+          category: "material",
+          code: "FUSIBLE_LINK_360",
+          description: "Fusible links used (360°F)",
+          quantity: 3,
+          unitPrice: 15,
+          amount: 45,
+          taxable: true,
+          taxableSource: "override",
+          quickBooksTaxableStatus: "taxable",
+          taxCodeId: "TAX",
+          taxRate: 0.0825,
+          taxAmount: 3.71,
+          lineTotal: 48.71,
+          linkedCatalogItemId: "catalog_link",
+          linkedCatalogItemName: "Fusible Link - 360°",
+          linkedQuickBooksItemId: "qb_link"
+        }
+      ],
+      [
+        {
+          id: "line_1",
+          tenantId: "tenant_1",
+          inspectionId: "inspection_1",
+          reportId: "report_1",
+          reportType: "kitchen_suppression",
+          category: "material",
+          code: "FUSIBLE_LINK_360",
+          description: "Fusible links used (360°F)",
+          quantity: 3,
+          unitPrice: 15,
+          amount: 45,
+          taxable: false,
+          taxableSource: "quickbooks",
+          quickBooksTaxableStatus: "non_taxable",
+          taxCodeId: "NON",
+          taxRate: 0,
+          linkedCatalogItemId: "catalog_link",
+          linkedCatalogItemName: "Fusible Link - 360°",
+          linkedQuickBooksItemId: "qb_link"
+        }
+      ]
+    );
+
+    expect(merged[0]).toEqual(expect.objectContaining({
+      taxable: true,
+      taxableSource: "override",
+      quickBooksTaxableStatus: "taxable",
+      taxCodeId: "TAX",
+      taxRate: 0.0825,
+      taxAmount: null,
+      lineTotal: null
+    }));
+    expect(calculateInvoiceTotalsFromItems(merged).taxTotal).toBe(3.71);
+    expect(calculateInvoiceTotalsFromItems(merged).totalDue).toBe(48.71);
+  });
+
   it("persists taxable overrides across every underlying item in a grouped billing row", async () => {
     prismaMock.$queryRaw
       .mockResolvedValueOnce([

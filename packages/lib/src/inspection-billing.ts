@@ -1521,9 +1521,23 @@ export function mergeBillingItems(existingItems: BillableItem[], nextItems: Bill
       ? existing.quantity
       : item.quantity;
     const unitPrice = existing?.unitPrice ?? item.unitPrice ?? null;
+    const taxableOverride = existing?.taxableSource === "override"
+      ? {
+          taxable: existing.taxable,
+          taxableSource: existing.taxableSource,
+          quickBooksTaxableStatus: existing.quickBooksTaxableStatus,
+          taxCodeId: existing.taxCodeId,
+          taxCategory: existing.taxCategory,
+          taxRate: existing.taxRate,
+          taxAmount: null,
+          lineTotal: null,
+          lineSubtotal: null
+        }
+      : {};
 
     return {
       ...item,
+      ...taxableOverride,
       quantity,
       unitPrice,
       amount: calculateAmount(quantity, unitPrice),
