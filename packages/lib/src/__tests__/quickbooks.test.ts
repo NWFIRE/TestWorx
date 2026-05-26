@@ -157,6 +157,7 @@ function buildBillingSummary(overrides?: Partial<{
   billToAccountId: string | null;
   billToName: string | null;
   deliverySnapshot: Record<string, unknown> | null;
+  isTaxExempt: boolean;
 }>) {
   return {
     id: "summary_1",
@@ -193,7 +194,8 @@ function buildBillingSummary(overrides?: Partial<{
       id: "customer_1",
       name: "Pinecrest Property Management",
       billingEmail: overrides?.billingEmail === undefined ? "billing@pinecrest.example" : overrides.billingEmail,
-      phone: "312-555-0110"
+      phone: "312-555-0110",
+      isTaxExempt: overrides?.isTaxExempt ?? false
     },
     site: {
       id: "site_1",
@@ -792,6 +794,40 @@ describe("quickbooks billing sync hardening", () => {
 
     const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
     expect(createInvoiceBody.Line?.[0]?.SalesItemLineDetail?.TaxCodeRef).toEqual({ value: "TAX" });
+  }, 10000);
+
+  it("updates linked QuickBooks customers when TradeWorx tax-exempt status changed", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: "qbo_customer_1" });
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
+    prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue({ taxable: true });
+    prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue(buildBillingSummary({ isTaxExempt: true }));
+    prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management", SyncToken: "4", Taxable: true } }))
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management", SyncToken: "5", Taxable: false } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({}));
+
+    const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
+
+    await syncBillingSummaryToQuickBooks(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    const customerUpdateBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body ?? "{}"));
+    expect(customerUpdateBody).toEqual(expect.objectContaining({
+      Id: "qbo_customer_1",
+      SyncToken: "4",
+      sparse: true,
+      Taxable: false
+    }));
+
+    const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    expect(createInvoiceBody.Line?.[0]?.SalesItemLineDetail?.TaxCodeRef).toEqual({ value: "NON" });
   }, 10000);
 
   it("maps legacy on-site labor billing lines that were created before labor codes existed", async () => {
@@ -2365,6 +2401,7 @@ describe("quickbooks billing sync hardening", () => {
       servicePostalCode: "60601",
       serviceCountry: "US",
       notes: "Collect certificate copy on site",
+      isTaxExempt: true,
       quickbooksCustomerId: null
     });
     prismaMock.site.findFirst.mockResolvedValue({
@@ -2414,6 +2451,7 @@ describe("quickbooks billing sync hardening", () => {
       PostalCode: "60601",
       Country: "US"
     }));
+    expect(createBody.Taxable).toBe(false);
     expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         action: "customer.quickbooks_synced",

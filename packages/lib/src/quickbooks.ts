@@ -231,6 +231,7 @@ type QuickBooksCustomerRecord = {
   customPaymentTermsDays: number | null;
   quickbooksPaymentTermName: string | null;
   quickbooksPaymentTermId: string | null;
+  isTaxExempt: boolean;
 };
 
 type QuickBooksCustomerSyncResult = {
@@ -1653,6 +1654,8 @@ async function normalizeQuickBooksCustomer(connection: QuickBooksTenantConnectio
   const billingAddress = readQuickBooksAddress(billAddr);
   const serviceAddress = readQuickBooksAddress(shipAddr);
   const paymentTerms = await resolveQuickBooksPaymentTerms(connection, customer);
+  const quickbooksTaxable = readQuickBooksBooleanField(customer, "Taxable");
+  const taxExemptionReasonId = readQuickBooksStringField(customer, "TaxExemptionReasonId");
 
   return {
     quickbooksCustomerId,
@@ -1683,7 +1686,8 @@ async function normalizeQuickBooksCustomer(connection: QuickBooksTenantConnectio
     customPaymentTermsLabel: paymentTerms.customPaymentTermsLabel,
     customPaymentTermsDays: paymentTerms.customPaymentTermsDays,
     quickbooksPaymentTermName: paymentTerms.quickbooksPaymentTermName,
-    quickbooksPaymentTermId: paymentTerms.quickbooksPaymentTermId
+    quickbooksPaymentTermId: paymentTerms.quickbooksPaymentTermId,
+    isTaxExempt: quickbooksTaxable === false || Boolean(taxExemptionReasonId)
   } satisfies QuickBooksCustomerRecord;
 }
 
@@ -2171,11 +2175,13 @@ function buildQuickBooksCustomerPayload(input: {
   serviceState?: string | null;
   servicePostalCode?: string | null;
   serviceCountry?: string | null;
+  isTaxExempt?: boolean | null;
   notes?: string | null;
 }) {
   return {
     DisplayName: input.customerName,
     CompanyName: input.customerName,
+    Taxable: input.isTaxExempt === true ? false : true,
     ...(input.billingEmail ? { PrimaryEmailAddr: { Address: input.billingEmail } } : {}),
     ...(input.phone ? { PrimaryPhone: { FreeFormNumber: input.phone } } : {}),
     ...(input.billingAddressLine1
@@ -2211,6 +2217,7 @@ async function resolveQuickBooksCustomer(connection: QuickBooksTenantConnection,
   customerName: string;
   billingEmail: string | null;
   phone: string | null;
+  isTaxExempt?: boolean | null;
   siteName: string;
   billingAddressLine1?: string | null;
   billingAddressLine2?: string | null;
@@ -2228,6 +2235,24 @@ async function resolveQuickBooksCustomer(connection: QuickBooksTenantConnection,
   if (customerRecord?.quickbooksCustomerId) {
     const existingCustomer = await fetchQuickBooksCustomerById(connection, customerRecord.quickbooksCustomerId).catch(() => null);
     if (existingCustomer?.quickbooksCustomerId) {
+      if (typeof summary.isTaxExempt === "boolean" && existingCustomer.isTaxExempt !== summary.isTaxExempt && existingCustomer.syncToken) {
+        const updated = await quickBooksApiRequest<{ Customer?: unknown }>(connection, {
+          path: "/customer",
+          method: "POST",
+          searchParams: new URLSearchParams({ operation: "update" }),
+          body: {
+            Id: existingCustomer.quickbooksCustomerId,
+            SyncToken: existingCustomer.syncToken,
+            sparse: true,
+            Taxable: summary.isTaxExempt ? false : true
+          },
+          entityType: "CustomerCompany",
+          entityId: summary.customerCompanyId
+        });
+        const normalized = await normalizeQuickBooksCustomer(connection, updated.Customer);
+        return normalized?.quickbooksCustomerId ?? existingCustomer.quickbooksCustomerId;
+      }
+
       return existingCustomer.quickbooksCustomerId;
     }
   }
@@ -2310,6 +2335,7 @@ async function resolveQuickBooksPayerAccount(connection: QuickBooksTenantConnect
       billingState: payer.billingState,
       billingPostalCode: payer.billingPostalCode,
       billingCountry: payer.billingCountry,
+      isTaxExempt: false,
       notes: payer.notes
     }),
     entityType: "BillingPayerAccount",
@@ -2335,6 +2361,7 @@ async function resolveQuickBooksInvoiceCustomer(connection: QuickBooksTenantConn
   billingEmail: string | null;
   phone: string | null;
   siteName: string;
+  isTaxExempt?: boolean | null;
   billingAddressLine1?: string | null;
   billingAddressLine2?: string | null;
   billingCity?: string | null;
@@ -2350,6 +2377,7 @@ async function resolveQuickBooksInvoiceCustomer(connection: QuickBooksTenantConn
       customerName: summary.customerName,
       billingEmail: summary.billingEmail,
       phone: summary.phone,
+      isTaxExempt: summary.isTaxExempt,
       siteName: summary.siteName,
       billingAddressLine1: summary.billingAddressLine1,
       billingAddressLine2: summary.billingAddressLine2,
@@ -2373,6 +2401,7 @@ async function resolveQuickBooksInvoiceCustomer(connection: QuickBooksTenantConn
       customerName: summary.customerName,
       billingEmail: summary.billingEmail,
       phone: summary.phone,
+      isTaxExempt: summary.isTaxExempt,
       siteName: summary.siteName,
       billingAddressLine1: summary.billingAddressLine1,
       billingAddressLine2: summary.billingAddressLine2,
@@ -2594,6 +2623,7 @@ export async function importQuickBooksCustomers(actor: ActorContext) {
           billingState: customer.billingState,
           billingPostalCode: customer.billingPostalCode,
           billingCountry: customer.billingCountry,
+          isTaxExempt: customer.isTaxExempt,
           paymentTermsCode: customer.paymentTermsCode,
           customPaymentTermsLabel: customer.customPaymentTermsLabel,
           customPaymentTermsDays: customer.customPaymentTermsDays
@@ -2641,6 +2671,7 @@ export async function importQuickBooksCustomers(actor: ActorContext) {
             billingState: customer.billingState,
             billingPostalCode: customer.billingPostalCode,
             billingCountry: customer.billingCountry,
+            isTaxExempt: customer.isTaxExempt,
             paymentTermsCode: customer.paymentTermsCode,
             customPaymentTermsLabel: customer.customPaymentTermsLabel,
             customPaymentTermsDays: customer.customPaymentTermsDays,
@@ -2746,6 +2777,7 @@ export async function syncTradeWorxCustomerCompanyToQuickBooks(actor: ActorConte
       servicePostalCode: true,
       serviceCountry: true,
       notes: true,
+      isTaxExempt: true,
       quickbooksCustomerId: true
     }
   });
@@ -2788,6 +2820,7 @@ export async function syncTradeWorxCustomerCompanyToQuickBooks(actor: ActorConte
       serviceState: customer.serviceState ?? primarySite?.state ?? null,
       servicePostalCode: customer.servicePostalCode ?? primarySite?.postalCode ?? null,
       serviceCountry: customer.serviceCountry ?? null,
+      isTaxExempt: customer.isTaxExempt,
       notes: customer.notes ?? null
     });
     const existingCustomer = customer.quickbooksCustomerId
@@ -4626,6 +4659,7 @@ export async function syncBillingSummaryToQuickBooks(
           customerName: summary.customerCompany.name,
           billingEmail: summary.customerCompany.billingEmail,
           phone: summary.customerCompany.phone,
+          isTaxExempt: summary.customerCompany.isTaxExempt,
           siteName: getCustomerFacingSiteLabel(summary.site.name) ?? summary.customerCompany.name,
           billingAddressLine1: summary.customerCompany.billingAddressLine1 ?? summary.customerCompany.serviceAddressLine1 ?? summary.site.addressLine1,
           billingAddressLine2: summary.customerCompany.billingAddressLine2 ?? summary.customerCompany.serviceAddressLine2 ?? summary.site.addressLine2,
@@ -5297,6 +5331,7 @@ export async function createDirectQuickBooksInvoice(
       customerName,
       billingEmail: selectedCustomer?.billingEmail ?? (parsedInput.walkInCustomerEmail?.trim() || null),
       phone: selectedCustomer?.phone ?? (parsedInput.walkInCustomerPhone?.trim() || null),
+      isTaxExempt: selectedCustomer?.isTaxExempt ?? false,
       siteName: parsedInput.siteLabel?.trim() || selectedCustomer?.name || customerName,
       billingAddressLine1: selectedCustomer?.billingAddressLine1 ?? selectedCustomer?.serviceAddressLine1 ?? null,
       billingAddressLine2: selectedCustomer?.billingAddressLine2 ?? selectedCustomer?.serviceAddressLine2 ?? null,
