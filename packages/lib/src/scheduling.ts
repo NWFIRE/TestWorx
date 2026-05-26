@@ -1961,7 +1961,7 @@ export async function deleteInspection(actor: ActorContext, inspectionId: string
   }
 
   const blockedReason = inspection.amendments.length > 0 || inspection.replacementAmendments.length > 0
-    ? "This inspection is linked to visit history and cannot be deleted."
+    ? "This inspection is linked to amendment history and cannot be deleted."
     : hasRiskyInspectionAccountingState({
         billingStatus: inspection.billingSummary?.status,
         quickbooksInvoiceId: inspection.billingSummary?.quickbooksInvoiceId,
@@ -3892,7 +3892,7 @@ export async function createInspectionAmendment(actor: ActorContext, inspectionI
     });
 
     if (priorAmendment) {
-      throw new Error("This visit already has a newer linked visit. Update that newer visit instead.");
+      throw new Error("This visit already has an amendment/newer linked visit. Update that newer visit instead.");
     }
 
     const reportActivityCount = await getInspectionReportActivityCount(tx, tenantId, inspectionId);

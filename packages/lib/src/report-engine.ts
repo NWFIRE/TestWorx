@@ -1566,9 +1566,13 @@ export function validateFinalizationDraft(draft: ReportDraft, assets: ReportAsse
   const issues = collectFinalizationValidationIssues(draft, assets);
   if (issues.length > 0) {
     const blockingIssues = issues.filter((issue) => issue.severity === "blocking");
-    const issueCount = blockingIssues.length || issues.length;
-    const firstIssue = (blockingIssues[0] ?? issues[0])?.message;
-    throw new Error(issueCount === 1 && firstIssue
+    const actionableIssues = (blockingIssues.length > 0 ? blockingIssues : issues).filter(
+      (issue) => issue.itemId !== "signatures" && issue.itemId !== "tag-status:tagStatus"
+    );
+    const issueCount = actionableIssues.length || blockingIssues.length || issues.length;
+    const firstIssue = actionableIssues[0]?.message ?? blockingIssues[0]?.message ?? issues[0]?.message;
+
+    throw new Error((issueCount === 1 || firstIssue?.startsWith("Add at least one ")) && firstIssue
       ? firstIssue
       : `${issueCount} items need attention before finalizing.`);
   }

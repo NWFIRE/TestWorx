@@ -394,7 +394,7 @@ export function resolveReportTemplate(input: ReportTemplateResolutionContext): R
     && !inspectionTypesWithoutSharedTagStatus.has(input.inspectionType)
     && !reportTemplateHasTagStatus(template);
   const sections = shouldAddSharedTagStatus
-    ? [sharedTagStatusSection, ...template.sections]
+    ? [...template.sections, sharedTagStatusSection]
     : template.sections;
 
   return {
