@@ -1534,9 +1534,19 @@ export function mergeBillingItems(existingItems: BillableItem[], nextItems: Bill
           lineSubtotal: null
         }
       : {};
+    const manualCatalogLink = existing?.linkedCatalogItemId && existing.linkedMatchMethod === "manual"
+      ? {
+          linkedCatalogItemId: existing.linkedCatalogItemId,
+          linkedCatalogItemName: existing.linkedCatalogItemName,
+          linkedQuickBooksItemId: existing.linkedQuickBooksItemId,
+          linkedMatchMethod: existing.linkedMatchMethod,
+          linkedMatchConfidence: existing.linkedMatchConfidence
+        }
+      : {};
 
     return {
       ...item,
+      ...manualCatalogLink,
       ...taxableOverride,
       quantity,
       unitPrice,

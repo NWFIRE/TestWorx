@@ -3083,6 +3083,61 @@ describe("inspection billing persistence and admin review", () => {
     expect(calculateInvoiceTotalsFromItems(merged).totalDue).toBe(48.71);
   });
 
+  it("preserves manual catalog matches when billing summaries are refreshed from extracted report items", () => {
+    const merged = mergeBillingItems(
+      [
+        {
+          id: "line_1",
+          tenantId: "tenant_1",
+          inspectionId: "inspection_1",
+          reportId: "report_1",
+          reportType: "fire_alarm",
+          category: "labor",
+          code: "ON_SITE_LABOR",
+          description: "On-site labor",
+          quantity: 2,
+          unitPrice: 115,
+          amount: 230,
+          linkedCatalogItemId: "catalog_fire_alarm_labor",
+          linkedCatalogItemName: "Fire Alarm Labor",
+          linkedQuickBooksItemId: "qb_fire_alarm_labor",
+          linkedMatchMethod: "manual",
+          linkedMatchConfidence: 1,
+          taxable: false
+        }
+      ],
+      [
+        {
+          id: "line_1",
+          tenantId: "tenant_1",
+          inspectionId: "inspection_1",
+          reportId: "report_1",
+          reportType: "fire_alarm",
+          category: "labor",
+          code: "ON_SITE_LABOR",
+          description: "On-site labor",
+          quantity: 2,
+          unitPrice: 115,
+          amount: 230,
+          linkedCatalogItemId: null,
+          linkedCatalogItemName: null,
+          linkedQuickBooksItemId: null,
+          linkedMatchMethod: null,
+          linkedMatchConfidence: null,
+          taxable: false
+        }
+      ]
+    );
+
+    expect(merged[0]).toEqual(expect.objectContaining({
+      linkedCatalogItemId: "catalog_fire_alarm_labor",
+      linkedCatalogItemName: "Fire Alarm Labor",
+      linkedQuickBooksItemId: "qb_fire_alarm_labor",
+      linkedMatchMethod: "manual",
+      linkedMatchConfidence: 1
+    }));
+  });
+
   it("persists taxable overrides across every underlying item in a grouped billing row", async () => {
     prismaMock.$queryRaw
       .mockResolvedValueOnce([
