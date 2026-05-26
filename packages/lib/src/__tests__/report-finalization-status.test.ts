@@ -9,12 +9,14 @@ vi.mock("../inspection-archive", () => ({
   syncInspectionArchiveStateTx: syncInspectionArchiveStateTxMock
 }));
 
+import { repairInspectionStatusConsistencyTx } from "../inspection-status-consistency";
 import { resolveInspectionCompletionAfterTaskFinalizationTx } from "../report-service";
 
 function buildTxMock() {
   return {
     inspection: {
       findFirst: vi.fn(),
+      findMany: vi.fn(),
       update: vi.fn()
     },
     inspectionTask: {
@@ -212,6 +214,95 @@ describe("inspection completion after report finalization", () => {
     }));
     expect(tx.inspection.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: InspectionStatus.completed })
+    }));
+  });
+});
+
+describe("inspection status consistency repair", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("cancels stale active duplicates when a matching completed archived inspection exists", async () => {
+    const tx = buildTxMock();
+    tx.inspection.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "active_duplicate",
+          customerCompanyId: "customer_1",
+          siteId: "site_1",
+          status: InspectionStatus.to_be_completed,
+          scheduledStart: new Date("2026-05-01T14:00:00.000Z"),
+          tasks: [
+            {
+              id: "task_active",
+              inspectionType: "fire_extinguisher",
+              dueDate: null,
+              dueMonth: "2026-05",
+              schedulingStatus: "scheduled_now",
+              status: InspectionStatus.to_be_completed
+            }
+          ]
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "archived_complete",
+          status: InspectionStatus.completed,
+          scheduledStart: new Date("2026-05-01T14:00:00.000Z"),
+          completedAt: new Date("2026-05-10T18:00:00.000Z"),
+          archivedAt: new Date("2026-05-10T18:00:00.000Z"),
+          tasks: [
+            {
+              inspectionType: "fire_extinguisher",
+              dueDate: null,
+              dueMonth: "2026-05",
+              schedulingStatus: "completed",
+              status: InspectionStatus.completed
+            }
+          ]
+        }
+      ]);
+
+    const result = await repairInspectionStatusConsistencyTx(tx as never, {
+      tenantId: "tenant_1",
+      actorUserId: "admin_1"
+    });
+
+    expect(result.duplicateRepairs).toEqual([
+      expect.objectContaining({
+        inspectionId: "active_duplicate",
+        matchedArchivedInspectionId: "archived_complete",
+        nextStatus: InspectionStatus.cancelled,
+        duePeriod: "2026-05"
+      })
+    ]);
+    expect(tx.inspectionTask.updateMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: "tenant_1",
+        inspectionId: "active_duplicate",
+        id: { in: ["task_active"] },
+        status: { not: InspectionStatus.cancelled }
+      },
+      data: { status: InspectionStatus.cancelled }
+    });
+    expect(tx.inspection.update).toHaveBeenCalledWith({
+      where: { id: "active_duplicate" },
+      data: expect.objectContaining({
+        status: InspectionStatus.cancelled,
+        isPriority: false
+      })
+    });
+    expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        action: "inspection.duplicate_active_visit_cancelled",
+        entityId: "active_duplicate",
+        metadata: expect.objectContaining({
+          matchedArchivedInspectionId: "archived_complete",
+          taskTypeSignature: "fire_extinguisher"
+        })
+      })
     }));
   });
 });

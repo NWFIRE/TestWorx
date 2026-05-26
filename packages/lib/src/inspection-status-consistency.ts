@@ -50,14 +50,58 @@ function readDuePeriod(value?: Date | string | null) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+function getInspectionDuePeriod(input: {
+  scheduledStart?: Date | string | null;
+  tasks?: Array<{
+    dueDate?: Date | string | null;
+    dueMonth?: string | null;
+    schedulingStatus?: string | null;
+    status?: InspectionStatus | string | null;
+  }> | null;
+}) {
+  const taskDuePeriods = (input.tasks ?? [])
+    .filter((task) => task.status !== InspectionStatus.cancelled)
+    .filter((task) => isCurrentTaskForStatusRollup({
+      dueDate: task.dueDate ?? null,
+      dueMonth: task.dueMonth ?? null,
+      schedulingStatus: task.schedulingStatus ?? "scheduled_now",
+      status: task.status as InspectionStatus
+    }, { scheduledStart: input.scheduledStart ?? null }))
+    .map((task) => readDuePeriod(task.dueMonth) ?? readDuePeriod(task.dueDate))
+    .filter((period): period is string => Boolean(period))
+    .sort();
+
+  return taskDuePeriods[0] ?? readDuePeriod(input.scheduledStart ?? null);
+}
+
+function buildTaskTypeSignature(tasks: Array<{
+  inspectionType: string;
+  status?: InspectionStatus | string | null;
+  dueDate?: Date | string | null;
+  dueMonth?: string | null;
+  schedulingStatus?: string | null;
+}>, inspection: { scheduledStart?: Date | string | null }) {
+  return tasks
+    .filter((task) => task.status !== InspectionStatus.cancelled)
+    .filter((task) => isCurrentTaskForStatusRollup({
+      dueDate: task.dueDate ?? null,
+      dueMonth: task.dueMonth ?? null,
+      schedulingStatus: task.schedulingStatus ?? "scheduled_now",
+      status: task.status as InspectionStatus
+    }, { scheduledStart: inspection.scheduledStart ?? null }))
+    .map((task) => task.inspectionType)
+    .sort()
+    .join("|");
+}
+
 function isCurrentTaskForStatusRollup(
   task: {
-    dueDate: Date | null;
+    dueDate: Date | string | null;
     dueMonth: string | null;
     schedulingStatus: string | null;
     status: InspectionStatus;
   },
-  inspection: { scheduledStart: Date | null }
+  inspection: { scheduledStart: Date | string | null }
 ) {
   if (statusRollupTaskSchedulingStatuses.includes(task.schedulingStatus as (typeof statusRollupTaskSchedulingStatuses)[number])) {
     return true;
@@ -268,9 +312,146 @@ export async function repairInspectionStatusConsistencyTx(tx: TransactionClient,
     }));
   }
 
+  const activeDuplicateCandidates = await tx.inspection.findMany({
+    where: {
+      tenantId: input.tenantId,
+      status: { in: [InspectionStatus.to_be_completed, InspectionStatus.scheduled] },
+      archivedAt: null,
+      billingSummary: {
+        is: null
+      },
+      tasks: {
+        some: {
+          status: { not: InspectionStatus.cancelled }
+        }
+      },
+      reports: {
+        none: {
+          status: reportStatuses.finalized,
+          finalizedAt: { not: null }
+        }
+      }
+    },
+    select: {
+      id: true,
+      customerCompanyId: true,
+      siteId: true,
+      status: true,
+      scheduledStart: true,
+      tasks: {
+        select: {
+          id: true,
+          inspectionType: true,
+          dueDate: true,
+          dueMonth: true,
+          schedulingStatus: true,
+          status: true
+        }
+      }
+    }
+  });
+
+  const duplicateRepairs = [];
+  for (const candidate of activeDuplicateCandidates) {
+    const duePeriod = getInspectionDuePeriod(candidate);
+    const taskTypeSignature = buildTaskTypeSignature(candidate.tasks, candidate);
+    if (!duePeriod || !taskTypeSignature) {
+      continue;
+    }
+    const duePeriodStart = new Date(`${duePeriod}-01T00:00:00.000Z`);
+    const duePeriodEnd = new Date(Date.UTC(duePeriodStart.getUTCFullYear(), duePeriodStart.getUTCMonth() + 1, 1));
+
+    const matchingArchivedInspections = await tx.inspection.findMany({
+      where: {
+        tenantId: input.tenantId,
+        id: { not: candidate.id },
+        customerCompanyId: candidate.customerCompanyId,
+        siteId: candidate.siteId,
+        status: { in: [InspectionStatus.completed, InspectionStatus.invoiced] },
+        archivedAt: { not: null },
+        OR: [
+          { scheduledStart: { gte: duePeriodStart, lt: duePeriodEnd } },
+          { tasks: { some: { dueMonth: duePeriod } } }
+        ]
+      },
+      select: {
+        id: true,
+        status: true,
+        scheduledStart: true,
+        completedAt: true,
+        archivedAt: true,
+        tasks: {
+          select: {
+            inspectionType: true,
+            dueDate: true,
+            dueMonth: true,
+            schedulingStatus: true,
+            status: true
+          }
+        }
+      }
+    });
+
+    const matchingArchivedInspection = matchingArchivedInspections.find((archived) =>
+      getInspectionDuePeriod(archived) === duePeriod &&
+      buildTaskTypeSignature(archived.tasks, archived) === taskTypeSignature
+    );
+    if (!matchingArchivedInspection) {
+      continue;
+    }
+
+    const duplicateTaskIds = candidate.tasks
+      .filter((task) => task.status !== InspectionStatus.cancelled)
+      .map((task) => task.id);
+
+    await tx.inspectionTask.updateMany({
+      where: {
+        tenantId: input.tenantId,
+        inspectionId: candidate.id,
+        id: { in: duplicateTaskIds },
+        status: { not: InspectionStatus.cancelled }
+      },
+      data: { status: InspectionStatus.cancelled }
+    });
+    await tx.inspection.update({
+      where: { id: candidate.id },
+      data: {
+        status: InspectionStatus.cancelled,
+        isPriority: false,
+        priorityClearedAt: new Date()
+      }
+    });
+    await createInspectionStatusAuditLog(tx, {
+      tenantId: input.tenantId,
+      actorUserId: input.actorUserId,
+      inspectionId: candidate.id,
+      action: "inspection.duplicate_active_visit_cancelled",
+      metadata: {
+        previousInspectionStatus: candidate.status,
+        newInspectionStatus: InspectionStatus.cancelled,
+        matchedArchivedInspectionId: matchingArchivedInspection.id,
+        matchedArchivedInspectionStatus: matchingArchivedInspection.status,
+        duePeriod,
+        taskTypeSignature,
+        cancelledTaskIds: duplicateTaskIds,
+        source: "repair"
+      }
+    });
+
+    duplicateRepairs.push({
+      inspectionId: candidate.id,
+      matchedArchivedInspectionId: matchingArchivedInspection.id,
+      previousStatus: candidate.status,
+      nextStatus: InspectionStatus.cancelled,
+      duePeriod,
+      taskTypeSignature
+    });
+  }
+
   return {
-    scanned: candidates.length,
-    changed: results.filter((result) => result.changed).length,
-    results
+    scanned: candidates.length + activeDuplicateCandidates.length,
+    changed: results.filter((result) => result.changed).length + duplicateRepairs.length,
+    results,
+    duplicateRepairs
   };
 }
