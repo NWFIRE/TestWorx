@@ -305,6 +305,85 @@ describe("technician dashboard inspection access", () => {
     expect(prismaMock.inspection.findMany.mock.calls[1]?.[0]).not.toHaveProperty("take");
   });
 
+  it("hides stale active inspections when current report tasks are already finalized", async () => {
+    const activeInspection = {
+      id: "inspection_active",
+      tenantId: "tenant_1",
+      status: InspectionStatus.to_be_completed,
+      inspectionClassification: "standard",
+      isPriority: false,
+      scheduledStart: new Date("2026-05-01T09:00:00.000Z"),
+      assignedTechnicianId: null,
+      site: {
+        id: "site_1",
+        name: "Active Site",
+        addressLine1: "100 Main St",
+        addressLine2: null,
+        city: "Enid",
+        state: "OK",
+        postalCode: "73701"
+      },
+      customerCompany: {
+        id: "customer_1",
+        name: "Active Customer",
+        serviceAddressLine1: null,
+        serviceAddressLine2: null,
+        serviceCity: null,
+        serviceState: null,
+        servicePostalCode: null,
+        billingAddressLine1: null,
+        billingAddressLine2: null,
+        billingCity: null,
+        billingState: null,
+        billingPostalCode: null
+      },
+      assignedTechnician: null,
+      technicianAssignments: [],
+      convertedFromQuotes: [],
+      tasks: [
+        {
+          id: "task_active",
+          inspectionType: "fire_extinguisher",
+          assignedTechnicianId: null,
+          schedulingStatus: "scheduled_now",
+          status: InspectionStatus.to_be_completed,
+          dueDate: null,
+          dueMonth: "2026-05",
+          recurrence: null,
+          report: null,
+          assignedTechnician: null
+        }
+      ]
+    };
+    const staleCompletedInspection = {
+      ...activeInspection,
+      id: "inspection_stale_completed",
+      customerCompany: { ...activeInspection.customerCompany, id: "customer_2", name: "Stale Completed Customer" },
+      tasks: [
+        {
+          ...activeInspection.tasks[0],
+          id: "task_stale_completed",
+          status: InspectionStatus.completed,
+          report: { status: "finalized", finalizedAt: new Date("2026-05-18T17:00:00.000Z") }
+        }
+      ]
+    };
+
+    prismaMock.inspection.findMany
+      .mockResolvedValueOnce([activeInspection, staleCompletedInspection])
+      .mockResolvedValueOnce([activeInspection, staleCompletedInspection]);
+
+    const result = await getAdminSchedulingQueueData({
+      userId: "admin_1",
+      role: "office_admin",
+      tenantId: "tenant_1"
+    });
+
+    expect(result.inspections.map((inspection) => inspection.id)).toEqual(["inspection_active"]);
+    expect(result.counts.open).toBe(1);
+    expect(result.counts.sharedQueue).toBe(1);
+  });
+
   it("shows unassigned claimable inspections in the shared queue for technicians", async () => {
     prismaMock.inspection.findMany
       .mockResolvedValueOnce([])
@@ -357,6 +436,62 @@ describe("technician dashboard inspection access", () => {
     }));
     expect(result.unassigned).toHaveLength(1);
     expect(result.unassigned[0]?.id).toBe("inspection_shared");
+  });
+
+  it("hides stale finalized inspections from technician assigned and shared queues", async () => {
+    const finalizedTask = {
+      id: "task_finalized",
+      tenantId: "tenant_1",
+      inspectionId: "inspection_stale",
+      inspectionType: "fire_extinguisher",
+      customDisplayLabel: null,
+      addedByUserId: null,
+      assignedTechnicianId: null,
+      dueMonth: "2026-05",
+      dueDate: null,
+      schedulingStatus: "scheduled_now",
+      notes: null,
+      status: InspectionStatus.completed,
+      sortOrder: 0,
+      createdAt: new Date("2026-05-01T09:00:00.000Z"),
+      updatedAt: new Date("2026-05-18T17:00:00.000Z"),
+      recurrence: null,
+      report: { status: "finalized", finalizedAt: new Date("2026-05-18T17:00:00.000Z") },
+      assignedTechnician: null
+    };
+    const staleAssigned = {
+      id: "inspection_stale_assigned",
+      tenantId: "tenant_1",
+      status: InspectionStatus.to_be_completed,
+      inspectionClassification: "standard",
+      isPriority: false,
+      scheduledStart: new Date("2026-05-01T09:00:00.000Z"),
+      site: { id: "site_1", name: "Stale Assigned Site" },
+      customerCompany: { id: "customer_1", name: "Stale Assigned Customer" },
+      assignedTechnician: { id: "tech_1", name: "Alex Turner" },
+      technicianAssignments: [],
+      closeoutRequest: null,
+      convertedFromQuotes: [],
+      tasks: [{ ...finalizedTask, id: "task_stale_assigned", assignedTechnicianId: "tech_1" }],
+      attachments: [],
+      documents: []
+    };
+    const staleClaimable = {
+      ...staleAssigned,
+      id: "inspection_stale_claimable",
+      assignedTechnician: null,
+      tasks: [{ ...finalizedTask, id: "task_stale_claimable", assignedTechnicianId: null }]
+    };
+
+    prismaMock.inspection.findMany
+      .mockResolvedValueOnce([staleAssigned])
+      .mockResolvedValueOnce([staleClaimable])
+      .mockResolvedValueOnce([]);
+
+    const result = await getTechnicianDashboardData({ userId: "tech_1", role: "technician", tenantId: "tenant_1" });
+
+    expect(result.assigned).toEqual([]);
+    expect(result.unassigned).toEqual([]);
   });
 
   it("deduplicates claimable inspections while preserving multi-report task summaries", async () => {

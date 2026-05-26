@@ -48,7 +48,17 @@ describe("admin dashboard data", () => {
           customerCompany: { name: "Pinecrest" },
           assignedTechnician: null,
           technicianAssignments: [],
-          tasks: [],
+          tasks: [
+            {
+              inspectionType: "fire_extinguisher",
+              status: "scheduled",
+              schedulingStatus: "scheduled_now",
+              dueDate: null,
+              dueMonth: "2026-03",
+              report: null,
+              recurrence: null
+            }
+          ],
           amendments: [],
           replacementAmendments: []
         }
@@ -67,10 +77,59 @@ describe("admin dashboard data", () => {
           amendments: [],
           replacementAmendments: []
         }
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "inspection_unassigned_1",
+          status: "scheduled",
+          scheduledStart: new Date("2026-03-20T09:00:00.000Z"),
+          convertedFromQuotes: [],
+          tasks: [
+            {
+              inspectionType: "fire_extinguisher",
+              status: "scheduled",
+              schedulingStatus: "scheduled_now",
+              dueDate: null,
+              dueMonth: "2026-03",
+              report: null
+            }
+          ]
+        },
+        {
+          id: "inspection_unassigned_2",
+          status: "to_be_completed",
+          scheduledStart: new Date("2026-03-21T09:00:00.000Z"),
+          convertedFromQuotes: [],
+          tasks: [
+            {
+              inspectionType: "fire_extinguisher",
+              status: "to_be_completed",
+              schedulingStatus: "scheduled_now",
+              dueDate: null,
+              dueMonth: "2026-03",
+              report: null
+            }
+          ]
+        },
+        {
+          id: "inspection_unassigned_3",
+          status: "in_progress",
+          scheduledStart: new Date("2026-03-22T09:00:00.000Z"),
+          convertedFromQuotes: [],
+          tasks: [
+            {
+              inspectionType: "fire_extinguisher",
+              status: "in_progress",
+              schedulingStatus: "scheduled_now",
+              dueDate: null,
+              dueMonth: "2026-03",
+              report: null
+            }
+          ]
+        }
       ]);
     prismaMock.site.count.mockResolvedValue(8);
     prismaMock.inspection.count
-      .mockResolvedValueOnce(3)
       .mockResolvedValueOnce(24)
       .mockResolvedValueOnce(11);
     prismaMock.inspectionReport.groupBy.mockResolvedValue([]);

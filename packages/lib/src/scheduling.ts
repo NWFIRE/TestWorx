@@ -934,6 +934,42 @@ function getClaimableInspectionVisibleTasks<T extends {
   return inspection.tasks.filter((task) => task.status !== InspectionStatus.cancelled && isCurrentVisitTaskForInspection(task, inspection));
 }
 
+type QueueVisibilityTask = {
+  dueDate?: Date | string | null;
+  dueMonth?: string | null;
+  schedulingStatus?: string | null;
+  status?: InspectionStatus | string | null;
+  report?: { status?: string | null; finalizedAt?: Date | string | null } | null;
+};
+
+function isQueueTaskClosed(task: QueueVisibilityTask) {
+  return (
+    task.status === InspectionStatus.completed ||
+    task.status === InspectionStatus.invoiced ||
+    Boolean(task.report?.status === reportStatuses.finalized && task.report.finalizedAt)
+  );
+}
+
+function hasIncompleteCurrentVisitWork<T extends QueueVisibilityTask>(
+  inspection: { status?: InspectionStatus | string | null; tasks: T[]; convertedFromQuotes?: unknown[] | null; scheduledStart?: Date | string | null }
+) {
+  if (!inspection.status || !isActiveOperationalInspectionStatus(inspection.status as InspectionStatus)) {
+    return true;
+  }
+
+  const currentTasks = getClaimableInspectionVisibleTasks(inspection);
+  return currentTasks.length > 0 && currentTasks.some((task) => !isQueueTaskClosed(task));
+}
+
+function filterActiveQueueVisibility<T extends {
+  status?: InspectionStatus | string | null;
+  tasks: QueueVisibilityTask[];
+  convertedFromQuotes?: unknown[] | null;
+  scheduledStart?: Date | string | null;
+}>(inspections: T[]) {
+  return inspections.filter((inspection) => hasIncompleteCurrentVisitWork(inspection));
+}
+
 function isSharedQueueTaskSet<T extends { assignedTechnicianId?: string | null }>(tasks: T[]) {
   return tasks.length > 0 && tasks.every((task) => !task.assignedTechnicianId);
 }
@@ -4413,7 +4449,7 @@ export async function getAdminDashboardData(actor: ActorContext) {
 
   const tenantId = parsedActor.tenantId as string;
 
-  const [tenant, customers, sites, technicians, activeInspections, completedInspections, siteCount, unassignedInspections, totalInspections, completedInspectionCount] = await Promise.all([
+  const [tenant, customers, sites, technicians, activeInspections, completedInspections, siteCount, unassignedInspectionCandidates, totalInspections, completedInspectionCount] = await Promise.all([
     prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { timezone: true }
@@ -4432,7 +4468,7 @@ export async function getAdminDashboardData(actor: ActorContext) {
         customerCompany: true,
         assignedTechnician: true,
         technicianAssignments: { include: { technician: true } },
-        tasks: { include: { recurrence: true } },
+        tasks: { include: { recurrence: true, report: true } },
         amendments: {
           select: {
             id: true,
@@ -4479,19 +4515,38 @@ export async function getAdminDashboardData(actor: ActorContext) {
       take: 20
     }),
     prisma.site.count({ where: { tenantId } }),
-    prisma.inspection.count({
+    prisma.inspection.findMany({
       where: {
         tenantId,
         claimable: true,
         status: { in: [...claimableInspectionStatuses] },
         AND: [activeInspectionQueueConsistencyFilter()]
+      },
+      select: {
+        id: true,
+        status: true,
+        scheduledStart: true,
+        convertedFromQuotes: { select: { id: true }, take: 1 },
+        tasks: {
+          select: {
+            dueDate: true,
+            dueMonth: true,
+            schedulingStatus: true,
+            status: true,
+            report: { select: { status: true, finalizedAt: true } }
+          }
+        }
       }
     }),
     prisma.inspection.count({ where: { tenantId } }),
     prisma.inspection.count({ where: { tenantId, status: { in: [...completedOperationalInspectionStatuses] } } })
   ]);
 
-  const inspections = [...activeInspections, ...completedInspections];
+  const activeQueueInspections = filterActiveQueueVisibility(activeInspections);
+  const unassignedInspections = Array.isArray(unassignedInspectionCandidates)
+    ? filterActiveQueueVisibility(unassignedInspectionCandidates).length
+    : Number(unassignedInspectionCandidates ?? 0);
+  const inspections = [...activeQueueInspections, ...completedInspections];
   const reportActivityCounts = await getInspectionReportActivityCountMap(tenantId, inspections.map((inspection) => inspection.id));
 
   function mapInspectionForDashboard<
@@ -4545,8 +4600,8 @@ export async function getAdminDashboardData(actor: ActorContext) {
       .filter((site) => getCustomerFacingSiteLabel(site.name))
       .map((site) => ({ id: site.id, name: site.name, city: site.city, customerCompanyId: site.customerCompanyId })),
     technicians: technicians.map((technician) => ({ id: technician.id, name: technician.name })),
-    inspections: activeInspections.map(mapInspectionForDashboard),
-    activeInspections: activeInspections.map(mapInspectionForDashboard),
+    inspections: activeQueueInspections.map(mapInspectionForDashboard),
+    activeInspections: activeQueueInspections.map(mapInspectionForDashboard),
     completedInspections: completedInspections.map(mapInspectionForDashboard),
     summary: {
       upcomingInspections: totalInspections,
@@ -5211,7 +5266,8 @@ export async function getAdminSchedulingQueueData(
               dueMonth: true,
               inspectionType: true,
               schedulingStatus: true,
-              status: true
+              status: true,
+              report: { select: { status: true, finalizedAt: true } }
             }
           }
         }
@@ -5261,6 +5317,8 @@ export async function getAdminSchedulingQueueData(
     ...inspection,
     tasks: inspection.tasks.filter((task) => isCurrentVisitTaskForInspection(task, inspection))
   })).filter((inspection) => inspection.tasks.length > 0);
+  const visibleMapped = filterActiveQueueVisibility(mapped);
+  const visibleCountRows = filterActiveQueueVisibility(countRows);
 
   const technicianOptions = await prisma.user.findMany({
     where: {
@@ -5288,22 +5346,22 @@ export async function getAdminSchedulingQueueData(
       label: technician.name
     })),
     counts: {
-      toBeCompleted: mapped.filter((inspection) => inspection.status === InspectionStatus.to_be_completed).length,
-      scheduled: mapped.filter((inspection) => inspection.status === InspectionStatus.scheduled).length,
-      inProgress: mapped.filter((inspection) => inspection.status === InspectionStatus.in_progress).length,
-      completed: countRows.filter((inspection) => inspection.status === InspectionStatus.completed).length,
-      invoiced: countRows.filter((inspection) => inspection.status === InspectionStatus.invoiced).length,
-      cancelled: countRows.filter((inspection) => inspection.status === InspectionStatus.cancelled).length,
-      followUpRequired: countRows.filter((inspection) => inspection.status === InspectionStatus.follow_up_required).length,
-      open: countRows.filter((inspection) => isActiveOperationalInspectionStatus(inspection.status)).length,
-      priority: countRows.filter((inspection) => inspection.isPriority).length,
-      sharedQueue: countRows.filter((inspection) =>
+      toBeCompleted: visibleMapped.filter((inspection) => inspection.status === InspectionStatus.to_be_completed).length,
+      scheduled: visibleMapped.filter((inspection) => inspection.status === InspectionStatus.scheduled).length,
+      inProgress: visibleMapped.filter((inspection) => inspection.status === InspectionStatus.in_progress).length,
+      completed: visibleCountRows.filter((inspection) => inspection.status === InspectionStatus.completed).length,
+      invoiced: visibleCountRows.filter((inspection) => inspection.status === InspectionStatus.invoiced).length,
+      cancelled: visibleCountRows.filter((inspection) => inspection.status === InspectionStatus.cancelled).length,
+      followUpRequired: visibleCountRows.filter((inspection) => inspection.status === InspectionStatus.follow_up_required).length,
+      open: visibleCountRows.filter((inspection) => isActiveOperationalInspectionStatus(inspection.status)).length,
+      priority: visibleCountRows.filter((inspection) => inspection.isPriority).length,
+      sharedQueue: visibleCountRows.filter((inspection) =>
         !inspection.assignedTechnicianId &&
         inspection.technicianAssignments.length === 0 &&
         inspection.tasks.every((task) => !task.assignedTechnicianId)
       ).length
     },
-    inspections: mapped
+    inspections: visibleMapped
   };
 }
 
@@ -5930,6 +5988,7 @@ export async function resolveClaimableInspectionsForTechnician(actor: ActorConte
       return { inspection, currentTasks };
     })
     .filter(({ inspection }) => isInspectionVisibleToTechnicianForDueMonth(inspection, now))
+    .filter(({ currentTasks }) => currentTasks.some((task) => !isQueueTaskClosed(task)))
     .filter(({ currentTasks }) => isSharedQueueTaskSet(currentTasks))
     .filter(({ currentTasks }) =>
       isTechnicianEligibleForReportTypesFromRows({
@@ -6094,6 +6153,7 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
       tasks: withInspectionTaskDisplayLabels(filterTasksForTechnician(inspection.tasks, parsedActor.userId, inspection))
     }))
     .filter((inspection) => inspection.tasks.length > 0)
+    .filter((inspection) => hasIncompleteCurrentVisitWork(inspection))
     .filter((inspection) => isInspectionVisibleToTechnicianForDueMonth(inspection, now));
   const monthAssigned = assignedQueue.filter((inspection) => inspection.scheduledStart >= monthStart && inspection.scheduledStart <= monthEnd);
   const assignedWithDisplay = assignedQueue.map((inspection) => ({
