@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { format } from "date-fns";
-import { useMemo, type KeyboardEvent, type MouseEvent } from "react";
+import { useMemo, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { LiveUrlSearchInput } from "@/app/live-url-search-input";
@@ -17,6 +17,12 @@ import { PriorityInspectionBadge } from "./priority-inspection-badge";
 import { toDateValue } from "./date-value";
 
 type WorkFilter = "today" | "upcoming" | "overdue" | "open" | "claimable";
+type TechnicianMonthGroup = {
+  key: string;
+  title: string;
+  inspections: any[];
+  defaultOpen: boolean;
+};
 
 function firstOpenTask(inspection: any) {
   return inspection.tasks.find((task: any) => task.report?.status !== "finalized" && isTechnicianActionableSchedulingStatus(task.schedulingStatus))
@@ -65,6 +71,54 @@ function formatTechnicianWorkTiming(inspection: any) {
   return `Due ${format(toDateValue(inspection.scheduledStart), "MMMM yyyy")}`;
 }
 
+function getInspectionDueMonthKey(inspection: any) {
+  const dueMonth = (inspection.tasks ?? []).find((task: any) => typeof task.dueMonth === "string" && task.dueMonth)?.dueMonth;
+  if (typeof dueMonth === "string" && /^\d{4}-\d{2}$/.test(dueMonth)) {
+    return dueMonth;
+  }
+
+  const hardDueDate = getHardDueDate(inspection);
+  return format(hardDueDate ?? toDateValue(inspection.scheduledStart), "yyyy-MM");
+}
+
+function formatMonthTitle(monthKey: string) {
+  return format(toDateValue(`${monthKey}-01T00:00:00`), "MMMM yyyy");
+}
+
+function groupTechnicianInspectionsByMonth(inspections: any[], query: string): TechnicianMonthGroup[] {
+  const currentMonthKey = format(new Date(), "yyyy-MM");
+  const groups = new Map<string, any[]>();
+
+  for (const inspection of inspections) {
+    const dueMonthKey = getInspectionDueMonthKey(inspection);
+    if (dueMonthKey > currentMonthKey) {
+      continue;
+    }
+
+    const groupKey = inspection.displayStatus === "past_due" || dueMonthKey < currentMonthKey
+      ? "past_due"
+      : dueMonthKey;
+    groups.set(groupKey, [...(groups.get(groupKey) ?? []), inspection]);
+  }
+
+  return [...groups.entries()]
+    .sort(([left], [right]) => {
+      if (left === "past_due") {
+        return -1;
+      }
+      if (right === "past_due") {
+        return 1;
+      }
+      return left.localeCompare(right);
+    })
+    .map(([key, groupInspections]) => ({
+      key,
+      title: key === "past_due" ? "Past Due" : formatMonthTitle(key),
+      inspections: groupInspections,
+      defaultOpen: Boolean(query) || key === "past_due" || key === currentMonthKey
+    }));
+}
+
 function shouldIgnoreCardNavigation(target: EventTarget | null) {
   return target instanceof HTMLElement && Boolean(target.closest("a, button, input, select, textarea, label"));
 }
@@ -110,6 +164,51 @@ function passiveInspectionCardClassName(inspection: any) {
   return inspection.isPriority
     ? "rounded-[1.75rem] border border-amber-300 bg-amber-50/70 p-4 shadow-[0_16px_38px_rgba(217,119,6,0.12)]"
     : "rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]";
+}
+
+function TechnicianMonthAccordion({
+  groups,
+  emptyText,
+  renderInspection
+}: {
+  groups: TechnicianMonthGroup[];
+  emptyText: string;
+  renderInspection: (inspection: any) => ReactNode;
+}) {
+  if (groups.length === 0) {
+    return (
+      <div className="rounded-[1.75rem] border border-dashed border-slate-200 bg-white p-5 text-sm text-slate-500">
+        {emptyText}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {groups.map((group) => (
+        <details
+          className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.05)]"
+          key={group.key}
+          open={group.defaultOpen}
+        >
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-slate-50 px-4 py-3 [&::-webkit-details-marker]:hidden">
+            <div>
+              <h3 className="text-base font-semibold text-slate-950">{group.title}</h3>
+              <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                {group.inspections.length} inspection{group.inspections.length === 1 ? "" : "s"}
+              </p>
+            </div>
+            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+              Open / Close
+            </span>
+          </summary>
+          <div className="space-y-3 border-t border-slate-100 bg-slate-50/40 p-3">
+            {group.inspections.map(renderInspection)}
+          </div>
+        </details>
+      ))}
+    </div>
+  );
 }
 
 export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
@@ -177,6 +276,8 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
       open: []
     };
   }, [dashboard, filter, query]);
+  const assignedMonthGroups = useMemo(() => groupTechnicianInspectionsByMonth(filtered.assigned, query), [filtered.assigned, query]);
+  const claimableMonthGroups = useMemo(() => groupTechnicianInspectionsByMonth(filtered.claimable, query), [filtered.claimable, query]);
 
   if (!snapshot) {
     return <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 text-sm text-slate-500">Loading work queue…</div>;
@@ -250,97 +351,10 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
 
       {filter === "open" ? (
         <section className="space-y-3">
-          {filtered.assigned.length > 0 ? filtered.assigned.map((inspection: any) => {
-            const href = inspectionHref(inspection);
-            return (
-              <article
-                aria-label={`${inspection.isPriority ? "Priority inspection. " : ""}Open ${inspection.primaryTitle}`}
-                className={inspectionCardClassName(inspection)}
-                key={inspection.id}
-                onClick={(event) => openInspectionFromCard(href, event)}
-                onKeyDown={(event) => openInspectionFromKeyboard(href, event)}
-                role={href ? "link" : undefined}
-                tabIndex={href ? 0 : undefined}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    {inspection.isPriority ? <div className="mb-2"><PriorityInspectionBadge compact /></div> : null}
-                    <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
-                    {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
-                    {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}
-                  </div>
-                  <span className="rounded-full border border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary-soft)] px-3 py-1 text-xs font-semibold text-[var(--tenant-primary)]">
-                    Open
-                  </span>
-                </div>
-                <p className="mt-3 text-sm text-slate-600">
-                  {formatTechnicianWorkTiming(inspection)}
-                </p>
-                <DispatchNotesCard className="mt-4" compact notes={inspection.notes} />
-                <div className="mt-4">
-                  <InspectionCustomerContactCard
-                    compact
-                    contactName={inspection.customerCompany?.contactName}
-                    email={inspection.customerCompany?.billingEmail}
-                    phone={inspection.customerCompany?.phone}
-                    serviceAddress={inspection.locationLabel}
-                  />
-                </div>
-                {hasAttachedPdfs(inspection) ? (
-                  <div className="mt-4">
-                    <MobileInspectionPdfAccessCard
-                      attachments={inspection.attachments}
-                      documents={inspection.documents}
-                      inspectionId={inspection.id}
-                    />
-                  </div>
-                ) : null}
-              </article>
-            );
-          }) : (
-            <div className="rounded-[1.75rem] border border-dashed border-slate-200 bg-white p-5 text-sm text-slate-500">
-              No open assigned work matches this filter.
-            </div>
-          )}
-        </section>
-      ) : filter === "claimable" ? (
-        <section className="space-y-3">
-          {filtered.claimable.length > 0 ? filtered.claimable.map((inspection: any) => (
-            <article className={passiveInspectionCardClassName(inspection)} key={inspection.id}>
-              {inspection.isPriority ? <div className="mb-2"><PriorityInspectionBadge compact /></div> : null}
-              <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
-              {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
-              {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}
-              <p className="mt-3 text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
-              <DispatchNotesCard className="mt-4" compact notes={inspection.notes} />
-              <div className="mt-4">
-                <InspectionCustomerContactCard
-                  compact
-                  contactName={inspection.customerCompany?.contactName}
-                  email={inspection.customerCompany?.billingEmail}
-                  phone={inspection.customerCompany?.phone}
-                  serviceAddress={inspection.locationLabel}
-                />
-              </div>
-              <div className="mt-4">
-                <ClaimButton inspectionId={inspection.id} />
-              </div>
-            </article>
-          )) : (
-            <div className="rounded-[1.75rem] border border-dashed border-slate-200 bg-white p-5 text-sm text-slate-500">
-              No claimable work matches this filter.
-            </div>
-          )}
-        </section>
-      ) : (
-        <div className="space-y-5">
-          <section className="space-y-3">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Assigned</p>
-              <h2 className="mt-1 text-xl font-semibold text-slate-950">Your field queue</h2>
-            </div>
-            {filtered.assigned.length > 0 ? filtered.assigned.map((inspection: any) => {
-              const action = firstOpenTask(inspection);
+          <TechnicianMonthAccordion
+            emptyText="No open assigned work matches this filter."
+            groups={assignedMonthGroups}
+            renderInspection={(inspection: any) => {
               const href = inspectionHref(inspection);
               return (
                 <article
@@ -355,15 +369,17 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       {inspection.isPriority ? <div className="mb-2"><PriorityInspectionBadge compact /></div> : null}
-                      <p className="truncate text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
+                      <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
                       {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
                       {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}
                     </div>
-                    <span className="inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                      {formatTechnicianWorkTiming(inspection)}
+                    <span className="rounded-full border border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary-soft)] px-3 py-1 text-xs font-semibold text-[var(--tenant-primary)]">
+                      Open
                     </span>
                   </div>
-                  <p className="mt-3 text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
+                  <p className="mt-3 text-sm text-slate-600">
+                    {formatTechnicianWorkTiming(inspection)}
+                  </p>
                   <DispatchNotesCard className="mt-4" compact notes={inspection.notes} />
                   <div className="mt-4">
                     <InspectionCustomerContactCard
@@ -383,33 +399,17 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                       />
                     </div>
                   ) : null}
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    {action ? (
-                      <Link className="flex min-h-12 items-center justify-center rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)]" href={`/app/tech/reports/${inspection.id}/${action.id}`}>
-                        {action.report?.status === "draft" || action.report?.status === "submitted" ? "Resume inspection" : "Start inspection"}
-                      </Link>
-                    ) : null}
-                    {href ? (
-                      <Link className="flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700" href={href}>
-                        Open inspection
-                      </Link>
-                    ) : null}
-                  </div>
                 </article>
               );
-            }) : (
-              <div className="rounded-[1.75rem] border border-dashed border-slate-200 bg-white p-5 text-sm text-slate-500">
-                No assigned work matches this filter.
-              </div>
-            )}
-          </section>
-
-          <section className="space-y-3">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Claimable</p>
-              <h2 className="mt-1 text-xl font-semibold text-slate-950">Shared queue</h2>
-            </div>
-            {filtered.claimable.length > 0 ? filtered.claimable.map((inspection: any) => (
+            }}
+          />
+        </section>
+      ) : filter === "claimable" ? (
+        <section className="space-y-3">
+          <TechnicianMonthAccordion
+            emptyText="No claimable work matches this filter."
+            groups={claimableMonthGroups}
+            renderInspection={(inspection: any) => (
               <article className={passiveInspectionCardClassName(inspection)} key={inspection.id}>
                 {inspection.isPriority ? <div className="mb-2"><PriorityInspectionBadge compact /></div> : null}
                 <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
@@ -430,11 +430,112 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                   <ClaimButton inspectionId={inspection.id} />
                 </div>
               </article>
-            )) : (
-              <div className="rounded-[1.75rem] border border-dashed border-slate-200 bg-white p-5 text-sm text-slate-500">
-                No claimable work matches this filter.
-              </div>
             )}
+          />
+        </section>
+      ) : (
+        <div className="space-y-5">
+          <section className="space-y-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Assigned</p>
+              <h2 className="mt-1 text-xl font-semibold text-slate-950">Your field queue</h2>
+            </div>
+            <TechnicianMonthAccordion
+              emptyText="No assigned work matches this filter."
+              groups={assignedMonthGroups}
+              renderInspection={(inspection: any) => {
+                const action = firstOpenTask(inspection);
+                const href = inspectionHref(inspection);
+                return (
+                  <article
+                    aria-label={`${inspection.isPriority ? "Priority inspection. " : ""}Open ${inspection.primaryTitle}`}
+                    className={inspectionCardClassName(inspection)}
+                    key={inspection.id}
+                    onClick={(event) => openInspectionFromCard(href, event)}
+                    onKeyDown={(event) => openInspectionFromKeyboard(href, event)}
+                    role={href ? "link" : undefined}
+                    tabIndex={href ? 0 : undefined}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        {inspection.isPriority ? <div className="mb-2"><PriorityInspectionBadge compact /></div> : null}
+                        <p className="truncate text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
+                        {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
+                        {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}
+                      </div>
+                      <span className="inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                        {formatTechnicianWorkTiming(inspection)}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
+                    <DispatchNotesCard className="mt-4" compact notes={inspection.notes} />
+                    <div className="mt-4">
+                      <InspectionCustomerContactCard
+                        compact
+                        contactName={inspection.customerCompany?.contactName}
+                        email={inspection.customerCompany?.billingEmail}
+                        phone={inspection.customerCompany?.phone}
+                        serviceAddress={inspection.locationLabel}
+                      />
+                    </div>
+                    {hasAttachedPdfs(inspection) ? (
+                      <div className="mt-4">
+                        <MobileInspectionPdfAccessCard
+                          attachments={inspection.attachments}
+                          documents={inspection.documents}
+                          inspectionId={inspection.id}
+                        />
+                      </div>
+                    ) : null}
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      {action ? (
+                        <Link className="flex min-h-12 items-center justify-center rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)]" href={`/app/tech/reports/${inspection.id}/${action.id}`}>
+                          {action.report?.status === "draft" || action.report?.status === "submitted" ? "Resume inspection" : "Start inspection"}
+                        </Link>
+                      ) : null}
+                      {href ? (
+                        <Link className="flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700" href={href}>
+                          Open inspection
+                        </Link>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              }}
+            />
+          </section>
+
+          <section className="space-y-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Claimable</p>
+              <h2 className="mt-1 text-xl font-semibold text-slate-950">Shared queue</h2>
+            </div>
+            <TechnicianMonthAccordion
+              emptyText="No claimable work matches this filter."
+              groups={claimableMonthGroups}
+              renderInspection={(inspection: any) => (
+                <article className={passiveInspectionCardClassName(inspection)} key={inspection.id}>
+                  {inspection.isPriority ? <div className="mb-2"><PriorityInspectionBadge compact /></div> : null}
+                  <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
+                  {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
+                  {inspection.locationLabel ? <p className="mt-1 text-sm leading-5 text-slate-600">{inspection.locationLabel}</p> : null}
+                  <p className="mt-3 text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
+                  <DispatchNotesCard className="mt-4" compact notes={inspection.notes} />
+                  <div className="mt-4">
+                    <InspectionCustomerContactCard
+                      compact
+                      contactName={inspection.customerCompany?.contactName}
+                      email={inspection.customerCompany?.billingEmail}
+                      phone={inspection.customerCompany?.phone}
+                      serviceAddress={inspection.locationLabel}
+                    />
+                  </div>
+                  <div className="mt-4">
+                    <ClaimButton inspectionId={inspection.id} />
+                  </div>
+                </article>
+              )}
+            />
           </section>
         </div>
       )}

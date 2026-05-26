@@ -69,6 +69,12 @@ const inspectionSearchHistoryStatuses = [
 ];
 
 type AdminSchedulingInspection = Awaited<ReturnType<typeof getAdminSchedulingQueueData>>["inspections"][number];
+type InspectionMonthGroup = {
+  key: string;
+  title: string;
+  inspections: AdminSchedulingInspection[];
+  defaultOpen: boolean;
+};
 
 function earliestDate(dates: Date[]) {
   return dates.reduce((earliest, current) => current.getTime() < earliest.getTime() ? current : earliest);
@@ -102,6 +108,45 @@ function getFastManagementDueDate(inspection: AdminSchedulingInspection) {
   }
 
   return readValidDate(inspection.scheduledStart);
+}
+
+function getInspectionDueMonthKey(inspection: AdminSchedulingInspection) {
+  const dueDate = getFastManagementDueDate(inspection);
+  return dueDate ? format(dueDate, "yyyy-MM") : format(inspection.scheduledStart, "yyyy-MM");
+}
+
+function formatMonthGroupTitle(monthKey: string) {
+  return format(new Date(`${monthKey}-01T00:00:00`), "MMMM yyyy");
+}
+
+function groupInspectionsByDueMonth(inspections: AdminSchedulingInspection[], input: { query?: string }) {
+  const currentMonthKey = format(new Date(), "yyyy-MM");
+  const groups = new Map<string, AdminSchedulingInspection[]>();
+
+  for (const inspection of inspections) {
+    const monthKey = getInspectionDueMonthKey(inspection);
+    const groupKey = monthKey < currentMonthKey && !terminalInspectionStatusesForFastManagement.has(inspection.status)
+      ? "past_due"
+      : monthKey;
+    groups.set(groupKey, [...(groups.get(groupKey) ?? []), inspection]);
+  }
+
+  return [...groups.entries()]
+    .sort(([left], [right]) => {
+      if (left === "past_due") {
+        return -1;
+      }
+      if (right === "past_due") {
+        return 1;
+      }
+      return left.localeCompare(right);
+    })
+    .map(([key, groupInspections]) => ({
+      key,
+      title: key === "past_due" ? "Past Due" : formatMonthGroupTitle(key),
+      inspections: groupInspections,
+      defaultOpen: Boolean(input.query) || key === "past_due" || key === currentMonthKey
+    } satisfies InspectionMonthGroup));
 }
 
 function isInFastManagementWindow(inspection: AdminSchedulingInspection, windowEnd: Date) {
@@ -329,6 +374,7 @@ export default async function AdminInspectionsPage({
       isInFastManagementWindow(inspection, fastManagementWindowEnd)
     )
   );
+  const fastManagementMonthGroups = groupInspectionsByDueMonth(fastManagementInspections, { query });
   const fastManagementCounts = {
     open: fastManagementInspections.filter((inspection) =>
       activeOperationalInspectionStatuses.includes(inspection.status as (typeof activeOperationalInspectionStatuses)[number])
@@ -456,7 +502,7 @@ export default async function AdminInspectionsPage({
             </h2>
           </div>
           <p className="text-sm font-semibold text-[color:var(--text-secondary)]">
-            {fastManagementInspections.length} inspection{fastManagementInspections.length === 1 ? "" : "s"}
+            {fastManagementInspections.length} inspection{fastManagementInspections.length === 1 ? "" : "s"} across {fastManagementMonthGroups.length} month{fastManagementMonthGroups.length === 1 ? "" : "s"}
           </p>
         </div>
 
@@ -468,104 +514,124 @@ export default async function AdminInspectionsPage({
             />
           </div>
         ) : (
-          <div className="mt-5 overflow-hidden rounded-[24px] border border-[color:rgb(203_215_230_/_0.92)] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
-            <div className="hidden bg-[color:rgb(248_250_252_/_0.98)] px-5 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)] lg:grid lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_0.7fr_0.7fr_0.7fr_0.9fr_0.9fr_0.6fr] lg:gap-4">
-              <span>Customer</span>
-              <span>Location</span>
-              <span>Type</span>
-              <span>Status</span>
-              <span>Priority</span>
-              <span>Scheduled Date</span>
-              <span>Technician</span>
-              <span>Actions</span>
-            </div>
-
-            <div className="divide-y divide-[color:rgb(220_229_240_/_0.9)]">
-              {fastManagementInspections.map((inspection) => {
-                const nextDue = pickEarliestNextDueAt(
-                  inspection.tasks.map((task) => task.recurrence?.nextDueAt)
-                );
-                const scheduledLabel = format(inspection.scheduledStart, "MMM d, yyyy h:mm a");
-                const customerLabel = inspection.customerLabel ?? inspection.customerCompany.name;
-                const resolvedLocationLabel = inspection.isGenericSite
-                  ? inspection.locationLabel
-                  : [
-                      inspection.locationLabel,
-                      inspection.site.addressLine1,
-                      inspection.site.city
-                    ]
-                      .filter(Boolean)
-                      .join(" - ");
-
-                return (
-                  <div
-                    key={inspection.id}
-                    className="grid gap-3 px-5 py-4 transition hover:bg-[color:rgb(248_250_252_/_0.96)] lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_0.7fr_0.7fr_0.7fr_0.9fr_0.9fr_0.6fr] lg:items-center lg:gap-4"
-                  >
-                    <div className="min-w-0">
-                      <Link
-                        className="block truncate text-sm font-semibold text-slate-950 hover:text-slateblue"
-                        href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`}
-                      >
-                        {customerLabel}
-                      </Link>
-                      {resolvedLocationLabel && resolvedLocationLabel !== customerLabel ? (
-                        <p className="mt-1 text-sm text-[color:var(--text-secondary)] lg:hidden">
-                          {resolvedLocationLabel}
-                        </p>
-                      ) : null}
-                      <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
-                        {formatInspectionTaskSummary(inspection.tasks) || "Inspection workflow"}
-                      </p>
-                    </div>
-
-                    <div className="min-w-0">
-                      <p className="truncate text-sm text-[color:var(--text-secondary)]">
-                        {resolvedLocationLabel && resolvedLocationLabel !== customerLabel ? resolvedLocationLabel : "Customer account"}
-                      </p>
-                      <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
-                        Next due: {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}
-                      </p>
-                    </div>
-
-                    <div className="text-sm text-slate-700">
-                      <StatusBadge
-                        label={formatInspectionClassificationLabel(inspection.inspectionClassification)}
-                        tone={getInspectionClassificationTone(inspection.inspectionClassification)}
-                      />
-                    </div>
-
-                    <div className="text-sm text-slate-700">
-                      <StatusBadge
-                        label={formatInspectionStatusLabel(inspection.displayStatus as Parameters<typeof formatInspectionStatusLabel>[0])}
-                        tone={getInspectionStatusTone(inspection.displayStatus as Parameters<typeof getInspectionStatusTone>[0])}
-                      />
-                    </div>
-
-                    <div className="text-sm text-slate-700">
-                      {inspection.isPriority ? <PriorityBadge /> : <span className="text-sm text-[color:var(--text-tertiary)]">Normal</span>}
-                    </div>
-
-                    <div className="text-sm text-slate-700">
-                      {scheduledLabel}
-                    </div>
-
-                    <div className="text-sm text-slate-700">
-                      {inspection.assignedTechnicianNames.join(", ") || "Shared queue"}
-                    </div>
-
-                    <div className="flex justify-start lg:justify-end">
-                      <Link
-                        className="inline-flex min-h-10 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
-                        href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`}
-                      >
-                        Open
-                      </Link>
-                    </div>
+          <div className="mt-5 space-y-3">
+            {fastManagementMonthGroups.map((group) => (
+              <details
+                className="overflow-hidden rounded-[24px] border border-[color:rgb(203_215_230_/_0.92)] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.04)]"
+                key={group.key}
+                open={group.defaultOpen}
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-[color:rgb(248_250_252_/_0.98)] px-5 py-4 text-left transition hover:bg-slate-100 [&::-webkit-details-marker]:hidden">
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-950">{group.title}</h3>
+                    <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">
+                      {group.inspections.length} inspection{group.inspections.length === 1 ? "" : "s"}
+                    </p>
                   </div>
-                );
-              })}
-            </div>
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                    Open / Close
+                  </span>
+                </summary>
+
+                <div className="hidden border-t border-[color:rgb(220_229_240_/_0.9)] bg-[color:rgb(248_250_252_/_0.7)] px-5 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)] lg:grid lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_0.7fr_0.7fr_0.7fr_0.9fr_0.9fr_0.6fr] lg:gap-4">
+                  <span>Customer</span>
+                  <span>Location</span>
+                  <span>Type</span>
+                  <span>Status</span>
+                  <span>Priority</span>
+                  <span>Scheduled Date</span>
+                  <span>Technician</span>
+                  <span>Actions</span>
+                </div>
+
+                <div className="divide-y divide-[color:rgb(220_229_240_/_0.9)]">
+                  {group.inspections.map((inspection) => {
+                    const nextDue = pickEarliestNextDueAt(
+                      inspection.tasks.map((task) => task.recurrence?.nextDueAt)
+                    );
+                    const scheduledLabel = format(inspection.scheduledStart, "MMM d, yyyy h:mm a");
+                    const customerLabel = inspection.customerLabel ?? inspection.customerCompany.name;
+                    const resolvedLocationLabel = inspection.isGenericSite
+                      ? inspection.locationLabel
+                      : [
+                          inspection.locationLabel,
+                          inspection.site.addressLine1,
+                          inspection.site.city
+                        ]
+                          .filter(Boolean)
+                          .join(" - ");
+
+                    return (
+                      <div
+                        key={inspection.id}
+                        className="grid gap-3 px-5 py-4 transition hover:bg-[color:rgb(248_250_252_/_0.96)] lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_0.7fr_0.7fr_0.7fr_0.9fr_0.9fr_0.6fr] lg:items-center lg:gap-4"
+                      >
+                        <div className="min-w-0">
+                          <Link
+                            className="block truncate text-sm font-semibold text-slate-950 hover:text-slateblue"
+                            href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`}
+                          >
+                            {customerLabel}
+                          </Link>
+                          {resolvedLocationLabel && resolvedLocationLabel !== customerLabel ? (
+                            <p className="mt-1 text-sm text-[color:var(--text-secondary)] lg:hidden">
+                              {resolvedLocationLabel}
+                            </p>
+                          ) : null}
+                          <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
+                            {formatInspectionTaskSummary(inspection.tasks) || "Inspection workflow"}
+                          </p>
+                        </div>
+
+                        <div className="min-w-0">
+                          <p className="truncate text-sm text-[color:var(--text-secondary)]">
+                            {resolvedLocationLabel && resolvedLocationLabel !== customerLabel ? resolvedLocationLabel : "Customer account"}
+                          </p>
+                          <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
+                            Next due: {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}
+                          </p>
+                        </div>
+
+                        <div className="text-sm text-slate-700">
+                          <StatusBadge
+                            label={formatInspectionClassificationLabel(inspection.inspectionClassification)}
+                            tone={getInspectionClassificationTone(inspection.inspectionClassification)}
+                          />
+                        </div>
+
+                        <div className="text-sm text-slate-700">
+                          <StatusBadge
+                            label={formatInspectionStatusLabel(inspection.displayStatus as Parameters<typeof formatInspectionStatusLabel>[0])}
+                            tone={getInspectionStatusTone(inspection.displayStatus as Parameters<typeof getInspectionStatusTone>[0])}
+                          />
+                        </div>
+
+                        <div className="text-sm text-slate-700">
+                          {inspection.isPriority ? <PriorityBadge /> : <span className="text-sm text-[color:var(--text-tertiary)]">Normal</span>}
+                        </div>
+
+                        <div className="text-sm text-slate-700">
+                          {scheduledLabel}
+                        </div>
+
+                        <div className="text-sm text-slate-700">
+                          {inspection.assignedTechnicianNames.join(", ") || "Shared queue"}
+                        </div>
+
+                        <div className="flex justify-start lg:justify-end">
+                          <Link
+                            className="inline-flex min-h-10 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
+                            href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`}
+                          >
+                            Open
+                          </Link>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            ))}
           </div>
         )}
       </SectionCard>

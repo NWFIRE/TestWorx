@@ -64,6 +64,7 @@ export default async function UpcomingInspectionsPage({
       monthsAhead: 11
     }
   );
+  const currentMonthKey = format(new Date(), "yyyy-MM");
 
   return (
     <AppPageShell density="wide">
@@ -122,107 +123,115 @@ export default async function UpcomingInspectionsPage({
         <div className="space-y-6">
           {data.months.map((month) => (
             <SectionCard className="scroll-mt-24" key={month.monthKey} id={`planning-month-${month.monthKey}`}>
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                    Planning month
-                  </p>
-                  <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-                    {month.monthLabel}
-                  </h2>
-                  <p className="mt-2 text-sm text-slate-500">
-                    {month.inspectionCount} inspection{month.inspectionCount === 1 ? "" : "s"} scheduled, {month.unassignedCount} unassigned, {month.priorityCount} priority.
-                  </p>
+              <details open={month.monthKey === currentMonthKey || month.monthKey === data.startMonth}>
+                <summary className="flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                      Planning month
+                    </p>
+                    <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                      {month.monthLabel}
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-500">
+                      {month.inspectionCount} inspection{month.inspectionCount === 1 ? "" : "s"} scheduled, {month.unassignedCount} unassigned, {month.priorityCount} priority.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                    Open / Close
+                  </span>
+                </summary>
+
+                <div className="mt-5 flex justify-start">
+                  <Link
+                    className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white"
+                    href={`/app/admin/inspections?create=1&month=${month.monthKey}`}
+                  >
+                    Add inspection to {month.monthLabel}
+                  </Link>
                 </div>
-                <Link
-                  className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white"
-                  href={`/app/admin/inspections?create=1&month=${month.monthKey}`}
-                >
-                  Add inspection to {month.monthLabel}
-                </Link>
-              </div>
 
-              <div className="mt-5 space-y-4">
-                {month.inspections.length === 0 ? (
-                  <EmptyState
-                    title={`Nothing scheduled for ${month.monthLabel}`}
-                    description="Use the scheduling panel to add inspections directly into this month."
-                  />
-                ) : (
-                  month.inspections.map((inspection) => {
-                    const nextDue = pickEarliestNextDueAt(
-                      inspection.tasks.map((task) => task.recurrence?.nextDueAt)
-                    );
+                <div className="mt-5 space-y-4">
+                  {month.inspections.length === 0 ? (
+                    <EmptyState
+                      title={`Nothing scheduled for ${month.monthLabel}`}
+                      description="Use the scheduling panel to add inspections directly into this month."
+                    />
+                  ) : (
+                    month.inspections.map((inspection) => {
+                      const nextDue = pickEarliestNextDueAt(
+                        inspection.tasks.map((task) => task.recurrence?.nextDueAt)
+                      );
 
-                    return (
-                      <div
-                        key={inspection.id}
-                        className="rounded-[24px] border border-slate-200/80 bg-slate-50/70 p-5 transition hover:border-slate-300 hover:bg-white"
-                      >
-                        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                          <div className="space-y-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-lg font-semibold text-slate-950">
-                                {inspection.primaryTitle ?? inspection.site.name}
+                      return (
+                        <div
+                          key={inspection.id}
+                          className="rounded-[24px] border border-slate-200/80 bg-slate-50/70 p-5 transition hover:border-slate-300 hover:bg-white"
+                        >
+                          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                            <div className="space-y-3">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-lg font-semibold text-slate-950">
+                                  {inspection.primaryTitle ?? inspection.site.name}
+                                </p>
+                                <StatusBadge
+                                  label={formatInspectionClassificationLabel(inspection.inspectionClassification)}
+                                  tone={getInspectionClassificationTone(inspection.inspectionClassification)}
+                                />
+                                {inspection.isPriority ? <PriorityBadge /> : null}
+                                <StatusBadge
+                                  label={formatInspectionStatusLabel(
+                                    inspection.displayStatus as Parameters<typeof formatInspectionStatusLabel>[0]
+                                  )}
+                                  tone={getInspectionStatusTone(
+                                    inspection.displayStatus as Parameters<typeof getInspectionStatusTone>[0]
+                                  )}
+                                />
+                              </div>
+                              <p className="text-sm text-slate-500">
+                                {[inspection.secondaryTitle, format(inspection.scheduledStart, "EEE, MMM d, yyyy h:mm a")].filter(Boolean).join(" - ")}
                               </p>
-                              <StatusBadge
-                                label={formatInspectionClassificationLabel(inspection.inspectionClassification)}
-                                tone={getInspectionClassificationTone(inspection.inspectionClassification)}
-                              />
-                              {inspection.isPriority ? <PriorityBadge /> : null}
-                              <StatusBadge
-                                label={formatInspectionStatusLabel(
-                                  inspection.displayStatus as Parameters<typeof formatInspectionStatusLabel>[0]
-                                )}
-                                tone={getInspectionStatusTone(
-                                  inspection.displayStatus as Parameters<typeof getInspectionStatusTone>[0]
-                                )}
-                              />
-                            </div>
-                            <p className="text-sm text-slate-500">
-                              {[inspection.secondaryTitle, format(inspection.scheduledStart, "EEE, MMM d, yyyy h:mm a")].filter(Boolean).join(" - ")}
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              {inspection.tasks.map((task) => (
-                                <span
-                                  key={task.id}
-                                  className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600"
-                                >
-                                  {taskDisplayLabel(task)} - {task.assignedTechnician?.name ?? "Unassigned"} - {taskDueLabel(task)}
-                                </span>
-                              ))}
-                            </div>
-                            <div className="grid gap-3 md:grid-cols-3">
-                              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-                                <p>Customer: {inspection.customerCompany.name}</p>
-                                {getCustomerFacingSiteLabel(inspection.site.name) ? (
-                                  <p className="mt-1">Site: {getCustomerFacingSiteLabel(inspection.site.name)}</p>
-                                ) : null}
+                              <div className="flex flex-wrap gap-2">
+                                {inspection.tasks.map((task) => (
+                                  <span
+                                    key={task.id}
+                                    className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600"
+                                  >
+                                    {taskDisplayLabel(task)} - {task.assignedTechnician?.name ?? "Unassigned"} - {taskDueLabel(task)}
+                                  </span>
+                                ))}
                               </div>
-                              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-                                <p>Assigned: {inspection.assignedTechnicianNames.join(", ") || "Shared queue"}</p>
-                                <p className="mt-1">Claimable: {inspection.claimable ? "Yes" : "No"}</p>
-                              </div>
-                              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-                                <p>Reports: {inspection.tasks.length}</p>
-                                <p className="mt-1">Next due: {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}</p>
+                              <div className="grid gap-3 md:grid-cols-3">
+                                <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                                  <p>Customer: {inspection.customerCompany.name}</p>
+                                  {getCustomerFacingSiteLabel(inspection.site.name) ? (
+                                    <p className="mt-1">Site: {getCustomerFacingSiteLabel(inspection.site.name)}</p>
+                                  ) : null}
+                                </div>
+                                <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                                  <p>Assigned: {inspection.assignedTechnicianNames.join(", ") || "Shared queue"}</p>
+                                  <p className="mt-1">Claimable: {inspection.claimable ? "Yes" : "No"}</p>
+                                </div>
+                                <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                                  <p>Reports: {inspection.tasks.length}</p>
+                                  <p className="mt-1">Next due: {nextDue ? format(new Date(nextDue), "MMM d, yyyy") : "One-time"}</p>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <div className="flex min-w-56 flex-col gap-3">
-                            <Link
-                              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                              href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(`/app/admin/upcoming-inspections?month=${data.startMonth}`)}`}
-                            >
-                              Open inspection
-                            </Link>
+                            <div className="flex min-w-56 flex-col gap-3">
+                              <Link
+                                className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                                href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(`/app/admin/upcoming-inspections?month=${data.startMonth}`)}`}
+                              >
+                                Open inspection
+                              </Link>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+                      );
+                    })
+                  )}
+                </div>
+              </details>
             </SectionCard>
           ))}
         </div>
