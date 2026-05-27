@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import type { SetStateAction } from "react";
+import type { ReactNode, SetStateAction } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -33,6 +33,17 @@ import type { LocalWorkOrderLineItemRecord } from "./offline/offline-types";
 import { useMobileReportDraftController } from "./use-mobile-report-draft-controller";
 
 type SmartTab = "overview" | "checklist" | "issues" | "photos" | "review";
+type WorkOrderStepId = "overview" | "work" | "labor" | "photos" | "deficiencies" | "review" | "finalize";
+
+const workOrderSteps: Array<{ id: WorkOrderStepId; label: string }> = [
+  { id: "overview", label: "Overview" },
+  { id: "work", label: "Work Performed" },
+  { id: "labor", label: "Labor & Materials" },
+  { id: "photos", label: "Photos" },
+  { id: "deficiencies", label: "Deficiencies" },
+  { id: "review", label: "Review" },
+  { id: "finalize", label: "Signatures" }
+];
 
 const smartTabs: Array<{ id: SmartTab; label: string }> = [
   { id: "overview", label: "Overview" },
@@ -229,54 +240,20 @@ export function MobileSmartReportScreen({
 
   if (isWorkOrder) {
     return (
-      <MobileInspectionShell
-        activeSectionId=""
-        currentSectionLabel={null}
-        customerContactName={data.customerContactName}
-        customerEmail={data.customerEmail}
-        customerName={data.customerName}
-        customerPhone={data.customerPhone}
-        dispatchNotes={data.dispatchNotes}
-        serviceAddress={data.serviceAddress}
-        onSelectReport={handleReportSelect}
-        onSelectSection={() => undefined}
-        progressLabel={progressLabel}
-        progressPercent={progress.percent}
-        reportMode="edit"
-        reportStatus={progress.reportStatus}
-        saveState={controller.saveState}
-        sections={[]}
-        siteName={data.siteName}
-        stickyFooter={(
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-slate-900">{controller.saveState}</p>
-              <p className="text-xs text-slate-500">{validationIssues.length > 0 ? `${validationIssues.length} item${validationIssues.length === 1 ? "" : "s"} need attention` : "Ready when signatures are complete"}</p>
-            </div>
-            <button
-              className="min-h-12 rounded-2xl bg-[var(--tenant-primary)] px-5 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)] disabled:opacity-50"
-              disabled={isReadOnly || controller.finalizeInFlight || controller.saveState === "Finalizing" || controller.saveState === "Finalize queued"}
-              onClick={handleFinalize}
-              type="button"
-            >
-              Finalize Work Order
-            </button>
-          </div>
-        )}
-        title={data.inspectionTypeLabel}
-        workspace={data.inspectionWorkspace}
-      >
-        <WorkOrderSinglePage
-          controller={controller}
-          data={data}
-          expandedRows={expandedRows}
-          finalizeQueued={finalizeQueued}
-          isReadOnly={isReadOnly}
-          onFinalize={handleFinalize}
-          setExpandedRows={setExpandedRows}
-          validationIssues={validationIssues}
-        />
-      </MobileInspectionShell>
+      <WorkOrderGuidedWorkflow
+        controller={controller}
+        data={data}
+        expandedRows={expandedRows}
+        finalizeQueued={finalizeQueued}
+        initialStep={mode === "review" ? "review" : "overview"}
+        isReadOnly={isReadOnly}
+        onExit={() => router.back()}
+        onFinalize={handleFinalize}
+        preview={preview}
+        progress={progress}
+        setExpandedRows={setExpandedRows}
+        validationIssues={validationIssues}
+      />
     );
   }
 
@@ -435,29 +412,162 @@ function findTemplateSection(data: TechnicianReportEditorData, sectionId: string
   return data.template.sections.find((section) => section.id === sectionId) ?? null;
 }
 
-function WorkOrderSinglePage({
+function WorkOrderGuidedWorkflow({
   data,
   controller,
+  progress,
+  preview,
   validationIssues,
   expandedRows,
   setExpandedRows,
   isReadOnly,
   finalizeQueued,
+  initialStep,
+  onExit,
   onFinalize
 }: {
   data: TechnicianReportEditorData;
   controller: ReturnType<typeof useMobileReportDraftController>;
+  progress: ReturnType<typeof buildMobileInspectionProgressSummary>;
+  preview: ReturnType<typeof buildReportPreview>;
   validationIssues: ReturnType<typeof collectFinalizationValidationIssues>;
   expandedRows: Record<string, string | null>;
   setExpandedRows: (value: SetStateAction<Record<string, string | null>>) => void;
   isReadOnly: boolean;
   finalizeQueued: boolean;
+  initialStep: WorkOrderStepId;
+  onExit: () => void;
   onFinalize: () => void;
 }) {
   const blockers = validationIssues.filter((issue) => issue.severity === "blocking");
+  const initialStepIndex = Math.max(0, workOrderSteps.findIndex((step) => step.id === initialStep));
+  const [activeStepIndex, setActiveStepIndex] = useState(initialStepIndex);
+  const [maxUnlockedStepIndex, setMaxUnlockedStepIndex] = useState(initialStepIndex);
+  const activeStep = workOrderSteps[activeStepIndex] ?? workOrderSteps[0]!;
+  const completedStepIds = new Set(workOrderSteps.slice(0, Math.max(activeStepIndex, maxUnlockedStepIndex)).map((step) => step.id));
+  const stepProgress = `${activeStepIndex + 1} of ${workOrderSteps.length}`;
+
+  function goToStep(index: number) {
+    const safeIndex = Math.min(Math.max(index, 0), workOrderSteps.length - 1);
+    if (safeIndex > maxUnlockedStepIndex + 1) {
+      return;
+    }
+    setActiveStepIndex(safeIndex);
+    setMaxUnlockedStepIndex((current) => Math.max(current, safeIndex));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function goNext() {
+    goToStep(activeStepIndex + 1);
+  }
+
+  function goBack() {
+    goToStep(activeStepIndex - 1);
+  }
 
   return (
-    <div className="space-y-4">
+    <div
+      className="min-h-screen bg-slate-50"
+      style={{ paddingBottom: "var(--mobile-report-bottom-clearance, calc(var(--mobile-tab-bar-offset, 5.5rem) + 2rem))" }}
+    >
+      <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-3 shadow-[0_10px_28px_rgba(15,23,42,0.08)] backdrop-blur md:px-6">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+          <button
+            className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm"
+            onClick={onExit}
+            type="button"
+          >
+            Back
+          </button>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="truncate text-base font-semibold tracking-[-0.02em] text-slate-950 md:text-xl">{data.siteName ?? data.customerName ?? "Work Order"}</h1>
+              <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-blue-800">Work Order</span>
+              <span className="rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-800">{progress.reportStatus}</span>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
+              <span>Step {stepProgress}</span>
+              <span className="text-slate-300">/</span>
+              <span>{activeStep.label}</span>
+              <span className="text-slate-300">/</span>
+              <span>{controller.saveState}</span>
+            </div>
+          </div>
+          <div className="hidden min-w-32 text-right md:block">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Progress</p>
+            <p className="mt-1 text-sm font-semibold text-slate-950">{stepProgress}</p>
+          </div>
+        </div>
+        <div className="mx-auto mt-3 max-w-6xl md:hidden">
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {workOrderSteps.map((step, index) => {
+              const isActive = index === activeStepIndex;
+              const isUnlocked = index <= maxUnlockedStepIndex + 1;
+              const isCompleted = completedStepIds.has(step.id);
+              return (
+                <button
+                  className={`min-h-10 shrink-0 rounded-full border px-3 text-xs font-bold transition ${
+                    isActive
+                      ? "border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary)] text-[var(--tenant-primary-contrast)]"
+                      : isCompleted
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : "border-slate-200 bg-white text-slate-700"
+                  } disabled:cursor-not-allowed disabled:opacity-50`}
+                  disabled={!isUnlocked}
+                  key={step.id}
+                  onClick={() => goToStep(index)}
+                  type="button"
+                >
+                  {isCompleted ? "✓ " : `${index + 1} `}
+                  {step.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto grid max-w-6xl gap-5 px-4 py-5 md:grid-cols-[16rem_minmax(0,1fr)] md:px-6">
+        <aside className="hidden md:block">
+          <div className="sticky top-24 rounded-2xl border border-slate-200 bg-white p-3 shadow-panel">
+            <p className="px-3 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Work order flow</p>
+            <div className="space-y-1">
+              {workOrderSteps.map((step, index) => {
+                const isActive = index === activeStepIndex;
+                const isUnlocked = index <= maxUnlockedStepIndex + 1;
+                const isCompleted = completedStepIds.has(step.id);
+                return (
+                  <button
+                    className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold transition ${
+                      isActive
+                        ? "bg-slate-950 text-white shadow-[0_12px_26px_rgba(15,23,42,0.16)]"
+                        : isCompleted
+                          ? "text-emerald-800 hover:bg-emerald-50"
+                          : "text-slate-700 hover:bg-slate-100"
+                    } disabled:cursor-not-allowed disabled:opacity-45`}
+                    disabled={!isUnlocked}
+                    key={step.id}
+                    onClick={() => goToStep(index)}
+                    type="button"
+                  >
+                    <span className={`grid size-7 place-items-center rounded-full text-xs font-bold ${
+                      isActive
+                        ? "bg-white text-slate-950"
+                        : isCompleted
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-slate-100 text-slate-700"
+                    }`}>
+                      {isCompleted ? "✓" : index + 1}
+                    </span>
+                    <span>{step.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </aside>
+
+        <main className="min-w-0 space-y-4">
       {controller.errorMessage ? (
         <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{controller.errorMessage}</p>
       ) : null}
@@ -470,26 +580,256 @@ function WorkOrderSinglePage({
         </div>
       ) : null}
 
-      <WorkOrderSummarySection controller={controller} data={data} disabled={isReadOnly} />
-      <WorkOrderLaborHoursSection controller={controller} data={data} disabled={isReadOnly} />
-      <WorkOrderProductsAndServicesCard data={data} disabled={isReadOnly} variant="parts" />
-      <WorkOrderPhotosSection
-        controller={controller}
-        data={data}
-        disabled={isReadOnly}
-        expandedRows={expandedRows}
-        setExpandedRows={setExpandedRows}
-      />
+          {activeStep.id === "overview" ? (
+            <WorkOrderOverviewStep data={data} onNext={goNext} progress={progress} />
+          ) : null}
 
-      <section className="space-y-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-panel">
+          {activeStep.id === "work" ? (
+            <WorkOrderStepFrame
+              canGoBack={activeStepIndex > 0}
+              onBack={goBack}
+              onNext={goNext}
+              title="Work Performed"
+            >
+              <WorkOrderSummarySection controller={controller} data={data} disabled={isReadOnly} />
+            </WorkOrderStepFrame>
+          ) : null}
+
+          {activeStep.id === "labor" ? (
+            <WorkOrderStepFrame
+              canGoBack={activeStepIndex > 0}
+              onBack={goBack}
+              onNext={goNext}
+              title="Labor & Materials"
+            >
+              <WorkOrderLaborHoursSection controller={controller} data={data} disabled={isReadOnly} />
+              <WorkOrderProductsAndServicesCard data={data} disabled={isReadOnly} variant="parts" />
+            </WorkOrderStepFrame>
+          ) : null}
+
+          {activeStep.id === "photos" ? (
+            <WorkOrderStepFrame
+              canGoBack={activeStepIndex > 0}
+              onBack={goBack}
+              onNext={goNext}
+              title="Photos"
+            >
+              <WorkOrderPhotosSection
+                controller={controller}
+                data={data}
+                disabled={isReadOnly}
+                expandedRows={expandedRows}
+                setExpandedRows={setExpandedRows}
+              />
+            </WorkOrderStepFrame>
+          ) : null}
+
+          {activeStep.id === "deficiencies" ? (
+            <WorkOrderStepFrame
+              canGoBack={activeStepIndex > 0}
+              onBack={goBack}
+              onNext={goNext}
+              title="Deficiencies"
+            >
+              <IssuesTab data={data} draft={controller.draft} preview={preview} validationIssues={validationIssues} />
+            </WorkOrderStepFrame>
+          ) : null}
+
+          {activeStep.id === "review" ? (
+            <WorkOrderStepFrame
+              canGoBack={activeStepIndex > 0}
+              nextLabel="Continue to Signatures"
+              onBack={goBack}
+              onNext={goNext}
+              title="Review"
+            >
+              <WorkOrderReviewSummary controller={controller} data={data} preview={preview} validationIssues={validationIssues} />
+            </WorkOrderStepFrame>
+          ) : null}
+
+          {activeStep.id === "finalize" ? (
+            <WorkOrderFinalizeStep
+              blockers={blockers}
+              controller={controller}
+              data={data}
+              isReadOnly={isReadOnly}
+              onBack={goBack}
+              onFinalize={onFinalize}
+            />
+          ) : null}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function WorkOrderStepFrame({
+  title,
+  children,
+  canGoBack,
+  nextLabel = "Continue",
+  onBack,
+  onNext
+}: {
+  title: string;
+  children: ReactNode;
+  canGoBack: boolean;
+  nextLabel?: string;
+  onBack: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-panel">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Current step</p>
+        <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">{title}</h2>
+      </div>
+      <div className="space-y-4">{children}</div>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <button
+          className="min-h-12 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm disabled:opacity-40"
+          disabled={!canGoBack}
+          onClick={onBack}
+          type="button"
+        >
+          Back
+        </button>
+        <button
+          className="min-h-12 rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(15,23,42,0.18)]"
+          onClick={onNext}
+          type="button"
+        >
+          {nextLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function WorkOrderOverviewStep({
+  data,
+  progress,
+  onNext
+}: {
+  data: TechnicianReportEditorData;
+  progress: ReturnType<typeof buildMobileInspectionProgressSummary>;
+  onNext: () => void;
+}) {
+  const rows = [
+    ["Customer", data.customerName ?? "Not captured"],
+    ["Location", data.siteName ?? data.serviceAddress ?? "Not captured"],
+    ["Address", data.serviceAddress ?? "Not captured"],
+    ["Scheduled", "Current visit"],
+    ["Report", data.inspectionTypeLabel],
+    ["Status", progress.reportStatus]
+  ];
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
+      <div className="border-b border-slate-200 bg-slate-950 px-5 py-5 text-white">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-200">Work order</p>
+        <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em]">{data.siteName ?? data.customerName ?? "Work Order"}</h2>
+      </div>
+      <div className="grid gap-3 p-5 sm:grid-cols-2">
+        {rows.map(([label, value]) => (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" key={label}>
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">{label}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-950">{value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="border-t border-slate-200 px-5 py-4">
+        <button
+          className="min-h-12 w-full rounded-2xl bg-[var(--tenant-primary)] px-6 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)] shadow-[0_16px_34px_rgb(var(--tenant-primary-rgb)/0.18)]"
+          onClick={onNext}
+          type="button"
+        >
+          Start Work Order
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function WorkOrderReviewSummary({
+  data,
+  controller,
+  preview,
+  validationIssues
+}: {
+  data: TechnicianReportEditorData;
+  controller: ReturnType<typeof useMobileReportDraftController>;
+  preview: ReturnType<typeof buildReportPreview>;
+  validationIssues: ReturnType<typeof collectFinalizationValidationIssues>;
+}) {
+  const workSection = controller.draft.sections["work-performed"];
+  const workFields = (workSection?.fields ?? {}) as Record<string, ReportPrimitiveValue>;
+  const workPerformed = displayValue(workFields.descriptionOfWork) || "No work summary entered yet.";
+  const laborHours = displayValue(workFields.jobsiteHours) || "Not selected";
+  const lineItems = data.workOrderLineItems ?? [];
+  const billableTotal = lineItems
+    .filter((line) => line.billableStatus === "billable")
+    .reduce((sum, line) => sum + Number(line.totalPrice ?? line.quantity * (line.unitPrice ?? 0)), 0);
+  const blockers = validationIssues.filter((issue) => issue.severity === "blocking");
+
+  return (
+    <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+      <div className="grid gap-3 sm:grid-cols-4">
+        {[
+          ["Labor hours", laborHours],
+          ["Line items", String(lineItems.length)],
+          ["Photos", String(preview.attachmentCount)],
+          ["Billable", `$${billableTotal.toFixed(2)}`]
+        ].map(([label, value]) => (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" key={label}>
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">{label}</p>
+            <p className="mt-1 text-lg font-semibold text-slate-950">{value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Work summary</p>
+        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">{workPerformed}</p>
+      </div>
+      {blockers.length > 0 ? (
+        <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-950">Required before finalizing</p>
+          {blockers.map((issue) => (
+            <p className="text-sm text-amber-800" key={`${issue.label}:${issue.message}`}>{issue.message}</p>
+          ))}
+        </div>
+      ) : (
+        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">Review looks ready for signatures.</p>
+      )}
+    </section>
+  );
+}
+
+function WorkOrderFinalizeStep({
+  data,
+  controller,
+  blockers,
+  isReadOnly,
+  onBack,
+  onFinalize
+}: {
+  data: TechnicianReportEditorData;
+  controller: ReturnType<typeof useMobileReportDraftController>;
+  blockers: ReturnType<typeof collectFinalizationValidationIssues>;
+  isReadOnly: boolean;
+  onBack: () => void;
+  onFinalize: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Signatures</p>
-          <h3 className="mt-2 text-xl font-semibold text-slate-950">Customer and technician sign-off</h3>
-          <p className="mt-2 text-sm leading-6 text-slate-500">Capture the obvious final approval after the work, parts, labor, and photos are complete.</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Final step</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Signatures & Finalize</h2>
         </div>
         {blockers.length > 0 ? (
-          <div className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-sm font-semibold text-amber-900">Before finalizing</p>
+          <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm font-semibold text-amber-950">Before finalizing</p>
             {blockers.map((issue) => (
               <p className="text-sm leading-6 text-amber-800" key={`${issue.label}:${issue.message}`}>{issue.message}</p>
             ))}
@@ -513,15 +853,24 @@ function WorkOrderSinglePage({
             value={resolveStoredMediaSrc(data.reportId, controller.draft.signatures.customer?.imageDataUrl) ?? controller.draft.signatures.customer?.imageDataUrl}
           />
         </div>
+      </section>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
         <button
-          className="min-h-12 w-full rounded-2xl bg-[var(--tenant-primary)] px-5 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)] disabled:opacity-50"
+          className="min-h-12 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm"
+          onClick={onBack}
+          type="button"
+        >
+          Back
+        </button>
+        <button
+          className="min-h-12 rounded-2xl bg-[var(--tenant-primary)] px-6 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)] shadow-[0_16px_34px_rgb(var(--tenant-primary-rgb)/0.18)] disabled:opacity-50"
           disabled={isReadOnly || blockers.length > 0 || controller.finalizeInFlight || controller.saveState === "Finalizing" || controller.saveState === "Finalize queued"}
           onClick={onFinalize}
           type="button"
         >
           {blockers.length > 0 ? "Resolve Required Items" : "Finalize Work Order"}
         </button>
-      </section>
+      </div>
     </div>
   );
 }
