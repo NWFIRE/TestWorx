@@ -1461,8 +1461,25 @@ async function extractBillableItemsFromWorkOrderLineItemsTx(tx: TransactionClien
       laborTotal?: number | null;
       laborBillingLineId?: string | null;
     };
-    const quantity = line.quantity > 0 ? line.quantity : 1;
-    const unitPrice = line.unitPrice ?? line.catalogItem?.unitPrice ?? 0;
+    const isLaborLine = line.itemType === "labor";
+    const laborHours = typeof laborLine.laborHours === "number" && Number.isFinite(laborLine.laborHours) && laborLine.laborHours > 0
+      ? laborLine.laborHours
+      : null;
+    const laborRate = typeof laborLine.laborRate === "number" && Number.isFinite(laborLine.laborRate)
+      ? laborLine.laborRate
+      : null;
+    const laborTotal = typeof laborLine.laborTotal === "number" && Number.isFinite(laborLine.laborTotal)
+      ? laborLine.laborTotal
+      : null;
+    const quantity = isLaborLine
+      ? laborHours ?? (line.quantity > 0 ? line.quantity : 0)
+      : line.quantity > 0 ? line.quantity : 1;
+    const unitPrice = isLaborLine
+      ? laborRate ?? line.unitPrice ?? line.catalogItem?.unitPrice ?? 0
+      : line.unitPrice ?? line.catalogItem?.unitPrice ?? 0;
+    const amount = isLaborLine && laborTotal !== null
+      ? roundMoney(laborTotal)
+      : calculateAmount(quantity, unitPrice);
     return {
       id: `work-order-line:${line.id}`,
       tenantId: input.tenantId,
@@ -1479,17 +1496,17 @@ async function extractBillableItemsFromWorkOrderLineItemsTx(tx: TransactionClien
           : undefined,
       description: line.description?.trim() || line.name,
       quantity,
-      unit: line.itemType === "labor" ? "hour" : "each",
+      unit: isLaborLine ? "hour" : "each",
       unitPrice,
-      amount: calculateAmount(quantity, unitPrice),
+      amount,
       metadata: {
         workOrderLineItemId: line.id,
         catalogItemId: line.catalogItemId,
         laborTypeId: typeof laborLine.laborTypeId === "string" ? laborLine.laborTypeId : null,
         laborTypeName: typeof laborLine.laborTypeName === "string" ? laborLine.laborTypeName : null,
-        laborHours: typeof laborLine.laborHours === "number" ? laborLine.laborHours : null,
-        laborRate: typeof laborLine.laborRate === "number" ? laborLine.laborRate : null,
-        laborTotal: typeof laborLine.laborTotal === "number" ? laborLine.laborTotal : null,
+        laborHours,
+        laborRate,
+        laborTotal,
         laborBillingLineId: typeof laborLine.laborBillingLineId === "string" ? laborLine.laborBillingLineId : null,
         source: line.source,
         billableStatus: line.billableStatus,

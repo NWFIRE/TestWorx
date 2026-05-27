@@ -1719,6 +1719,7 @@ describe("inspection billing persistence and admin review", () => {
         quickBooksItemId: "qb_labor_fire_alarm",
         laborTypeId: "labor_type_fire_alarm",
         laborTypeName: "Fire Alarm",
+        laborHours: 2,
         laborRate: 125,
         laborTotal: 250,
         invoicedAt: null,
@@ -1759,8 +1760,97 @@ describe("inspection billing persistence and admin review", () => {
     expect(laborLine?.metadata).toEqual(expect.objectContaining({
       laborTypeId: "labor_type_fire_alarm",
       laborTypeName: "Fire Alarm",
+      laborHours: 2,
       laborRate: 125,
-      laborTotal: 250
+      laborTotal: 250,
+      sourceQuantity: 2
+    }));
+  });
+
+  it("uses work order labor hour snapshots when generic quantity and price fields are stale", async () => {
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      sourceType: "direct",
+      inspectionClassification: null,
+      customerCompany: {
+        id: "customer_1",
+        name: "Pinecrest Property Management",
+        quickbooksCustomerId: "qb_customer_1",
+        billingEmail: null
+      },
+      providerContextRecord: null
+    });
+    txMock.tenant.findUnique.mockResolvedValue({
+      defaultServiceFeeCode: "SERVICE_FEE",
+      defaultServiceFeeUnitPrice: 0
+    });
+    txMock.site.findFirst.mockResolvedValue({ city: "Enid", state: "OK" });
+    txMock.serviceFeeRule.findMany.mockResolvedValue([]);
+    txMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
+    txMock.workOrderLineItem.findMany.mockResolvedValue([
+      {
+        id: "labor_line_snapshot",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        catalogItemId: "catalog_labor_1",
+        itemType: "labor",
+        name: "Kitchen Suppression Labor",
+        description: "Kitchen suppression labor",
+        quantity: 1,
+        unitPrice: null,
+        totalPrice: null,
+        taxable: false,
+        billableStatus: "billable",
+        technicianNotes: null,
+        source: "technician_selected",
+        quickBooksItemId: "qb_labor_kitchen",
+        laborTypeId: "labor_type_kitchen",
+        laborTypeName: "Kitchen Suppression",
+        laborHours: 2.5,
+        laborRate: 125,
+        laborTotal: 312.5,
+        invoicedAt: null,
+        catalogItem: {
+          id: "catalog_labor_1",
+          name: "Kitchen Suppression Labor",
+          quickbooksItemId: "qb_labor_kitchen",
+          taxable: false,
+          unitPrice: null,
+          rawJson: { SalesTaxCodeRef: { value: "NON" } }
+        }
+      }
+    ]);
+
+    txMock.$queryRaw
+      .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1", inspectionClassification: "standard" }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const summary = await syncInspectionBillingSummaryTx(txMock as never, {
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1"
+    });
+
+    const laborLine = summary?.items.find((item) => item.metadata?.workOrderLineItemId === "labor_line_snapshot");
+    expect(laborLine).toEqual(expect.objectContaining({
+      reportType: "work_order",
+      category: "labor",
+      quantity: 2.5,
+      unit: "hour",
+      unitPrice: 125,
+      amount: 312.5,
+      linkedCatalogItemId: "catalog_labor_1",
+      linkedQuickBooksItemId: "qb_labor_kitchen"
+    }));
+    expect(laborLine?.metadata).toEqual(expect.objectContaining({
+      laborTypeId: "labor_type_kitchen",
+      laborTypeName: "Kitchen Suppression",
+      laborHours: 2.5,
+      laborRate: 125,
+      laborTotal: 312.5,
+      sourceQuantity: 2.5
     }));
   });
 
