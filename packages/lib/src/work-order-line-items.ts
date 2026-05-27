@@ -98,6 +98,25 @@ async function ensureDefaultLaborTypes(tenantId: string) {
       }
     })
   )));
+
+  const activeCount = await prisma.workOrderLaborType.count({
+    where: {
+      tenantId,
+      active: true
+    }
+  });
+
+  if (activeCount === 0) {
+    await prisma.workOrderLaborType.updateMany({
+      where: {
+        tenantId,
+        code: { in: DEFAULT_WORK_ORDER_LABOR_TYPES.map((laborType) => laborType.code) }
+      },
+      data: {
+        active: true
+      }
+    });
+  }
 }
 
 async function getAuthorizedWorkOrderInspection(actor: ActorContext, inspectionId: string) {
