@@ -2,9 +2,10 @@ import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getInspectionDisplayLabels, getInspectionReportDraft } from "@testworx/lib/server/index";
+import { getInspectionDisplayLabels, getInspectionReportDraft, getWorkOrderCatalogItems, getWorkOrderLaborTypes, getWorkOrderLineItems, isDueAtTimeOfServiceCustomer } from "@testworx/lib/server/index";
 
 import { ReportEditor } from "../../../../tech/report-editor";
+import { MobileSmartReportScreen } from "../../../../tech/mobile-smart-report-screen";
 import { buildAcceptanceTestViewModel } from "../../../../../reports/acceptance-test/buildAcceptanceTestViewModel";
 import { AcceptanceReportEditView } from "../../../../../reports/acceptance-test/pages/AcceptanceReportEditView";
 
@@ -45,42 +46,82 @@ export default async function AdminReportCorrectionPage({ params }: { params: Pr
   const finalizedAtDate = report.finalizedAt ? new Date(report.finalizedAt) : null;
   const inspectionDisplay = getInspectionDisplayLabels({
     siteName: report.inspection.site.name,
-    customerName: report.inspection.customerCompany.name
+    customerName: report.inspection.customerCompany.name,
+    siteAddressLine1: report.inspection.site.addressLine1,
+    siteAddressLine2: report.inspection.site.addressLine2,
+    siteCity: report.inspection.site.city,
+    siteState: report.inspection.site.state,
+    sitePostalCode: report.inspection.site.postalCode,
+    customerServiceAddressLine1: report.inspection.customerCompany.serviceAddressLine1,
+    customerServiceAddressLine2: report.inspection.customerCompany.serviceAddressLine2,
+    customerServiceCity: report.inspection.customerCompany.serviceCity,
+    customerServiceState: report.inspection.customerCompany.serviceState,
+    customerServicePostalCode: report.inspection.customerCompany.servicePostalCode,
+    customerBillingAddressLine1: report.inspection.customerCompany.billingAddressLine1,
+    customerBillingAddressLine2: report.inspection.customerCompany.billingAddressLine2,
+    customerBillingCity: report.inspection.customerCompany.billingCity,
+    customerBillingState: report.inspection.customerCompany.billingState,
+    customerBillingPostalCode: report.inspection.customerCompany.billingPostalCode
   });
+  const isWorkOrderReport = report.task.inspectionType === "work_order";
+  const [workOrderCatalogItems, workOrderLineItems, workOrderLaborTypes] = isWorkOrderReport
+    ? await Promise.all([
+        getWorkOrderCatalogItems({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId),
+        getWorkOrderLineItems({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId),
+        getWorkOrderLaborTypes({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId)
+      ])
+    : [[], [], []];
+  const editorData = {
+    reportId: report.id,
+    reportStatus: adminOverrideForFinalized ? "draft" as const : report.status,
+    reportUpdatedAt: report.updatedAt,
+    finalizedAt: report.finalizedAt,
+    correctionNotice,
+    canEdit: report.permissions.canEdit || adminOverrideForFinalized,
+    canFinalize: report.permissions.canFinalize || adminOverrideForFinalized,
+    inspectionTypeLabel: report.task.displayLabel ?? report.template.label,
+    defaultInspectionTypeLabel: report.template.label,
+    customInspectionTypeLabel: report.task.customDisplayLabel ?? null,
+    siteName: inspectionDisplay.primaryTitle,
+    customerName: inspectionDisplay.secondaryTitle || report.inspection.customerCompany.name,
+    serviceAddress: inspectionDisplay.locationLabel,
+    customerContactName: report.inspection.customerCompany.contactName ?? null,
+    customerPhone: report.inspection.customerCompany.phone ?? null,
+    customerEmail: report.inspection.customerCompany.billingEmail ?? null,
+    scheduledDateLabel: format(report.inspection.scheduledStart, "MMM d, yyyy h:mm a"),
+    isPriority: report.inspection.isPriority,
+    inspectionWorkspace: {
+      inspectionId,
+      totalTaskCount: 1,
+      currentTaskIndex: 1,
+      relatedTasks: [
+        {
+          id: taskId,
+          displayLabel: report.task.displayLabel ?? report.template.label,
+          reportStatus: adminOverrideForFinalized ? "draft" as const : report.status,
+          isCurrent: true
+        }
+      ]
+    },
+    dispatchNotes: report.inspection.notes,
+    paymentCollectionNotice: isDueAtTimeOfServiceCustomer(report.inspection.customerCompany)
+      ? "Payment due at time of service. Collect payment before leaving the site."
+      : null,
+    workOrderCatalogItems,
+    workOrderLineItems,
+    workOrderLaborTypes,
+    template: report.template,
+    draft: report.draft
+  };
   const editor = (
     <ReportEditor
-      data={{
-        reportId: report.id,
-        reportStatus: adminOverrideForFinalized ? "draft" : report.status,
-        reportUpdatedAt: report.updatedAt,
-        finalizedAt: report.finalizedAt,
-        correctionNotice,
-        canEdit: report.permissions.canEdit || adminOverrideForFinalized,
-        canFinalize: report.permissions.canFinalize || adminOverrideForFinalized,
-        inspectionTypeLabel: report.task.displayLabel ?? report.template.label,
-        defaultInspectionTypeLabel: report.template.label,
-        customInspectionTypeLabel: report.task.customDisplayLabel ?? null,
-        siteName: inspectionDisplay.primaryTitle,
-        customerName: inspectionDisplay.secondaryTitle || report.inspection.customerCompany.name,
-        scheduledDateLabel: format(report.inspection.scheduledStart, "MMM d, yyyy h:mm a"),
-        inspectionWorkspace: {
-          inspectionId,
-          totalTaskCount: 1,
-          currentTaskIndex: 1,
-          relatedTasks: [
-            {
-              id: taskId,
-              displayLabel: report.task.displayLabel ?? report.template.label,
-              reportStatus: adminOverrideForFinalized ? "draft" : report.status,
-              isCurrent: true
-            }
-          ]
-        },
-        template: report.template,
-        draft: report.draft
-      }}
+      data={editorData}
     />
   );
+
+  if (isWorkOrderReport) {
+    return <MobileSmartReportScreen data={editorData} inspectionId={inspectionId} mode="edit" taskId={taskId} />;
+  }
 
   if (report.task.inspectionType === "wet_chemical_acceptance_test") {
     const model = buildAcceptanceTestViewModel({
