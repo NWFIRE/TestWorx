@@ -18,9 +18,7 @@ import {
 import {
   mapOptionTone,
   MobileChecklistItem,
-  MobileInspectionShell,
   MobileRepeatableRows,
-  MobileReviewScreen,
   MobileSectionCard,
   MobileSectionList
 } from "./mobile-inspection-framework";
@@ -32,25 +30,16 @@ import { queueWorkOrderLaborLineItemUpsert, queueWorkOrderLineItemDelete, queueW
 import type { LocalWorkOrderLineItemRecord } from "./offline/offline-types";
 import { useMobileReportDraftController } from "./use-mobile-report-draft-controller";
 
-type SmartTab = "overview" | "checklist" | "issues" | "photos" | "review";
-type WorkOrderStepId = "overview" | "work" | "labor" | "photos" | "deficiencies" | "review" | "finalize";
+type GuidedReportStepId = "overview" | "details" | "labor" | "photos" | "deficiencies" | "review" | "finalize";
 
-const workOrderSteps: Array<{ id: WorkOrderStepId; label: string }> = [
+const guidedReportSteps: Array<{ id: GuidedReportStepId; label: string }> = [
   { id: "overview", label: "Overview" },
-  { id: "work", label: "Work Performed" },
+  { id: "details", label: "Inspection Details" },
   { id: "labor", label: "Labor & Materials" },
   { id: "photos", label: "Photos" },
   { id: "deficiencies", label: "Deficiencies" },
   { id: "review", label: "Review" },
   { id: "finalize", label: "Signatures" }
-];
-
-const smartTabs: Array<{ id: SmartTab; label: string }> = [
-  { id: "overview", label: "Overview" },
-  { id: "checklist", label: "Checklist" },
-  { id: "issues", label: "Issues" },
-  { id: "photos", label: "Photos" },
-  { id: "review", label: "Review" }
 ];
 
 const negativeValues = new Set(["fail", "deficiency", "damaged", "attention", "poor", "low", "high", "needs_repair", "no"]);
@@ -190,7 +179,6 @@ export function MobileSmartReportScreen({
 }) {
   const router = useRouter();
   const controller = useMobileReportDraftController({ data, inspectionId, taskId });
-  const [activeTab, setActiveTab] = useState<SmartTab>(mode === "review" ? "review" : "overview");
   const [finalizeQueued, setFinalizeQueued] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, string | null>>({});
@@ -202,26 +190,7 @@ export function MobileSmartReportScreen({
   const preview = useMemo(() => buildReportPreview(controller.draft), [controller.draft]);
   const validationIssues = useMemo(() => collectFinalizationValidationIssues(controller.draft), [controller.draft]);
   const isReadOnly = !data.canEdit || data.reportStatus === "finalized" || controller.saveState === "Finalized";
-  const activeSectionId = controller.draft.activeSectionId ?? data.template.sections[0]?.id ?? "";
-  const activeSection = data.template.sections.find((section) => section.id === activeSectionId) ?? data.template.sections[0];
   const isWorkOrder = data.template.label.toLowerCase() === "work order";
-  const progressLabel = progress.completedCount !== null && progress.totalCount !== null && progress.totalCount > 0
-    ? `${progress.completedCount} of ${progress.totalCount} complete`
-    : null;
-
-  async function handleReportSelect(nextTaskId: string, nextMode: "edit" | "review" = activeTab === "review" ? "review" : "edit") {
-    await controller.persistCurrentDraftLocally();
-    const href = nextMode === "review"
-      ? `/app/tech/reports/${encodeURIComponent(inspectionId)}/${encodeURIComponent(nextTaskId)}/review`
-      : `/app/tech/reports/${encodeURIComponent(inspectionId)}/${encodeURIComponent(nextTaskId)}`;
-    router.push(href);
-  }
-
-  function handleSectionSelect(sectionId: string) {
-    controller.selectSection(sectionId);
-    setActiveTab("checklist");
-    setOpenSections((current) => ({ ...current, [sectionId]: true }));
-  }
 
   async function handleFinalize() {
     const result = await controller.finalizeReport();
@@ -238,173 +207,24 @@ export function MobileSmartReportScreen({
     );
   }
 
-  if (isWorkOrder) {
-    return (
-      <WorkOrderGuidedWorkflow
-        controller={controller}
-        data={data}
-        expandedRows={expandedRows}
-        finalizeQueued={finalizeQueued}
-        initialStep={mode === "review" ? "review" : "overview"}
-        isReadOnly={isReadOnly}
-        onExit={() => router.back()}
-        onFinalize={handleFinalize}
-        preview={preview}
-        progress={progress}
-        setExpandedRows={setExpandedRows}
-        validationIssues={validationIssues}
-      />
-    );
-  }
-
   return (
-    <MobileInspectionShell
-      activeSectionId={activeSectionId}
-      currentSectionLabel={activeSection?.label ?? null}
-      customerContactName={data.customerContactName}
-      customerEmail={data.customerEmail}
-      customerName={data.customerName}
-      customerPhone={data.customerPhone}
-      dispatchNotes={data.dispatchNotes}
-      serviceAddress={data.serviceAddress}
-      onSelectReport={handleReportSelect}
-      onSelectSection={handleSectionSelect}
-      progressLabel={progressLabel}
-      progressPercent={progress.percent}
-      reportMode={activeTab === "review" ? "review" : "edit"}
-      reportStatus={progress.reportStatus}
-      saveState={controller.saveState}
-      sections={progress.sections}
-      siteName={data.siteName}
-      stickyFooter={(
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">{controller.saveState}</p>
-            <p className="text-xs text-slate-500">{validationIssues.length > 0 ? `${validationIssues.length} item${validationIssues.length === 1 ? "" : "s"} need attention` : "Ready when signatures are complete"}</p>
-          </div>
-          <button
-            className="min-h-12 rounded-2xl bg-[var(--tenant-primary)] px-5 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)] disabled:opacity-50"
-            disabled={isReadOnly}
-            onClick={() => setActiveTab("review")}
-            type="button"
-          >
-            Review & Complete
-          </button>
-        </div>
-      )}
-      title={data.inspectionTypeLabel}
-      workspace={data.inspectionWorkspace}
-    >
-      <div className="sticky top-0 z-10 -mx-4 bg-slate-50/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
-        <div className="grid grid-cols-5 gap-2 rounded-[1.35rem] border border-slate-200 bg-white p-1 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
-          {smartTabs.map((tab) => (
-            <button
-              key={tab.id}
-              className={`min-h-11 rounded-[1rem] px-2 text-xs font-semibold transition ${
-                activeTab === tab.id
-                  ? "bg-[var(--tenant-primary)] text-[var(--tenant-primary-contrast)]"
-                  : "text-slate-600"
-              }`}
-              onClick={() => setActiveTab(tab.id)}
-              type="button"
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {controller.errorMessage ? (
-        <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{controller.errorMessage}</p>
-      ) : null}
-      {controller.finalizeErrorMessage ? (
-        <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{controller.finalizeErrorMessage}</p>
-      ) : null}
-      {finalizeQueued ? (
-        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-          Finalization is saved on this device. TradeWorx will upload it automatically when service is available.
-        </div>
-      ) : null}
-
-      {activeTab === "overview" ? (
-        <OverviewTab data={data} preview={preview} progress={progress} />
-      ) : null}
-
-      {activeTab === "checklist" ? (
-        <ChecklistTab
-          controller={controller}
-          data={data}
-          expandedRows={expandedRows}
-          isReadOnly={isReadOnly}
-          openSections={openSections}
-          progress={progress}
-          setExpandedRows={setExpandedRows}
-          setOpenSections={setOpenSections}
-        />
-      ) : null}
-
-      {activeTab === "issues" ? (
-        <IssuesTab data={data} draft={controller.draft} preview={preview} validationIssues={validationIssues} />
-      ) : null}
-
-      {activeTab === "photos" ? (
-        <PhotosTab data={data} draft={controller.draft} />
-      ) : null}
-
-      {activeTab === "review" ? (
-        <ReviewTab
-          controller={controller}
-          data={data}
-          isReadOnly={isReadOnly}
-          onFinalize={handleFinalize}
-          preview={preview}
-          progress={progress}
-          validationIssues={validationIssues}
-        />
-      ) : null}
-    </MobileInspectionShell>
-  );
-}
-
-function OverviewTab({
-  data,
-  progress,
-  preview
-}: {
-  data: TechnicianReportEditorData;
-  progress: ReturnType<typeof buildMobileInspectionProgressSummary>;
-  preview: ReturnType<typeof buildReportPreview>;
-}) {
-  return (
-    <div className="space-y-4">
-      <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-panel">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Report overview</p>
-        <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">{data.inspectionTypeLabel}</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-500">{data.template.description}</p>
-      </section>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {[
-          ["Status", progress.reportStatus],
-          ["Progress", progress.percent !== null ? `${progress.percent}%` : "Not started"],
-          ["Issues", String(preview.deficiencyCount + preview.manualDeficiencyCount)],
-          ["Photos", String(preview.attachmentCount)]
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4 shadow-panel">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
-            <p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-950">{value}</p>
-          </div>
-        ))}
-      </div>
-      {data.draft.context.priorReportSummary ? (
-        <section className="rounded-[1.75rem] border border-blue-100 bg-blue-50/70 p-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700">Prior context</p>
-          <p className="mt-2 text-sm leading-6 text-blue-950">{data.draft.context.priorReportSummary}</p>
-        </section>
-      ) : null}
-      {data.template.label.toLowerCase().includes("work order") ? (
-        <WorkOrderProductsAndServicesCard data={data} disabled={!data.canEdit || data.reportStatus === "finalized"} />
-      ) : null}
-    </div>
+    <GuidedReportWorkflow
+      controller={controller}
+      data={data}
+      expandedRows={expandedRows}
+      finalizeQueued={finalizeQueued}
+      initialStep={mode === "review" ? "review" : "overview"}
+      isReadOnly={isReadOnly}
+      isWorkOrder={isWorkOrder}
+      onExit={() => router.back()}
+      onFinalize={handleFinalize}
+      openSections={openSections}
+      preview={preview}
+      progress={progress}
+      setExpandedRows={setExpandedRows}
+      setOpenSections={setOpenSections}
+      validationIssues={validationIssues}
+    />
   );
 }
 
@@ -412,7 +232,7 @@ function findTemplateSection(data: TechnicianReportEditorData, sectionId: string
   return data.template.sections.find((section) => section.id === sectionId) ?? null;
 }
 
-function WorkOrderGuidedWorkflow({
+function GuidedReportWorkflow({
   data,
   controller,
   progress,
@@ -423,6 +243,9 @@ function WorkOrderGuidedWorkflow({
   isReadOnly,
   finalizeQueued,
   initialStep,
+  isWorkOrder,
+  openSections,
+  setOpenSections,
   onExit,
   onFinalize
 }: {
@@ -435,20 +258,23 @@ function WorkOrderGuidedWorkflow({
   setExpandedRows: (value: SetStateAction<Record<string, string | null>>) => void;
   isReadOnly: boolean;
   finalizeQueued: boolean;
-  initialStep: WorkOrderStepId;
+  initialStep: GuidedReportStepId;
+  isWorkOrder: boolean;
+  openSections: Record<string, boolean>;
+  setOpenSections: (value: SetStateAction<Record<string, boolean>>) => void;
   onExit: () => void;
   onFinalize: () => void;
 }) {
   const blockers = validationIssues.filter((issue) => issue.severity === "blocking");
-  const initialStepIndex = Math.max(0, workOrderSteps.findIndex((step) => step.id === initialStep));
+  const initialStepIndex = Math.max(0, guidedReportSteps.findIndex((step) => step.id === initialStep));
   const [activeStepIndex, setActiveStepIndex] = useState(initialStepIndex);
   const [maxUnlockedStepIndex, setMaxUnlockedStepIndex] = useState(initialStepIndex);
-  const activeStep = workOrderSteps[activeStepIndex] ?? workOrderSteps[0]!;
-  const completedStepIds = new Set(workOrderSteps.slice(0, Math.max(activeStepIndex, maxUnlockedStepIndex)).map((step) => step.id));
-  const stepProgress = `${activeStepIndex + 1} of ${workOrderSteps.length}`;
+  const activeStep = guidedReportSteps[activeStepIndex] ?? guidedReportSteps[0]!;
+  const completedStepIds = new Set(guidedReportSteps.slice(0, Math.max(activeStepIndex, maxUnlockedStepIndex)).map((step) => step.id));
+  const stepProgress = `${activeStepIndex + 1} of ${guidedReportSteps.length}`;
 
   function goToStep(index: number) {
-    const safeIndex = Math.min(Math.max(index, 0), workOrderSteps.length - 1);
+    const safeIndex = Math.min(Math.max(index, 0), guidedReportSteps.length - 1);
     if (safeIndex > maxUnlockedStepIndex + 1) {
       return;
     }
@@ -500,7 +326,7 @@ function WorkOrderGuidedWorkflow({
         </div>
         <div className="mx-auto mt-3 max-w-6xl md:hidden">
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {workOrderSteps.map((step, index) => {
+            {guidedReportSteps.map((step, index) => {
               const isActive = index === activeStepIndex;
               const isUnlocked = index <= maxUnlockedStepIndex + 1;
               const isCompleted = completedStepIds.has(step.id);
@@ -532,7 +358,7 @@ function WorkOrderGuidedWorkflow({
           <div className="sticky top-24 rounded-2xl border border-slate-200 bg-white p-3 shadow-panel">
             <p className="px-3 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Work order flow</p>
             <div className="space-y-1">
-              {workOrderSteps.map((step, index) => {
+              {guidedReportSteps.map((step, index) => {
                 const isActive = index === activeStepIndex;
                 const isUnlocked = index <= maxUnlockedStepIndex + 1;
                 const isCompleted = completedStepIds.has(step.id);
@@ -581,17 +407,30 @@ function WorkOrderGuidedWorkflow({
       ) : null}
 
           {activeStep.id === "overview" ? (
-            <WorkOrderOverviewStep data={data} onNext={goNext} progress={progress} />
+            <GuidedReportOverviewStep data={data} isWorkOrder={isWorkOrder} onNext={goNext} progress={progress} />
           ) : null}
 
-          {activeStep.id === "work" ? (
+          {activeStep.id === "details" ? (
             <WorkOrderStepFrame
               canGoBack={activeStepIndex > 0}
               onBack={goBack}
               onNext={goNext}
-              title="Work Performed"
+              title={isWorkOrder ? "Work Performed" : "Inspection Details"}
             >
-              <WorkOrderSummarySection controller={controller} data={data} disabled={isReadOnly} />
+              {isWorkOrder ? (
+                <WorkOrderSummarySection controller={controller} data={data} disabled={isReadOnly} />
+              ) : (
+                <ChecklistTab
+                  controller={controller}
+                  data={data}
+                  expandedRows={expandedRows}
+                  isReadOnly={isReadOnly}
+                  openSections={openSections}
+                  progress={progress}
+                  setExpandedRows={setExpandedRows}
+                  setOpenSections={setOpenSections}
+                />
+              )}
             </WorkOrderStepFrame>
           ) : null}
 
@@ -602,8 +441,14 @@ function WorkOrderGuidedWorkflow({
               onNext={goNext}
               title="Labor & Materials"
             >
-              <WorkOrderLaborHoursSection controller={controller} data={data} disabled={isReadOnly} />
-              <WorkOrderProductsAndServicesCard data={data} disabled={isReadOnly} variant="parts" />
+              {isWorkOrder ? (
+                <>
+                  <WorkOrderLaborHoursSection controller={controller} data={data} disabled={isReadOnly} />
+                  <WorkOrderProductsAndServicesCard data={data} disabled={isReadOnly} variant="parts" />
+                </>
+              ) : (
+                <GuidedReportLaborMaterialsStep data={data} preview={preview} />
+              )}
             </WorkOrderStepFrame>
           ) : null}
 
@@ -614,13 +459,17 @@ function WorkOrderGuidedWorkflow({
               onNext={goNext}
               title="Photos"
             >
-              <WorkOrderPhotosSection
-                controller={controller}
-                data={data}
-                disabled={isReadOnly}
-                expandedRows={expandedRows}
-                setExpandedRows={setExpandedRows}
-              />
+              {isWorkOrder ? (
+                <WorkOrderPhotosSection
+                  controller={controller}
+                  data={data}
+                  disabled={isReadOnly}
+                  expandedRows={expandedRows}
+                  setExpandedRows={setExpandedRows}
+                />
+              ) : (
+                <PhotosTab data={data} draft={controller.draft} />
+              )}
             </WorkOrderStepFrame>
           ) : null}
 
@@ -643,12 +492,12 @@ function WorkOrderGuidedWorkflow({
               onNext={goNext}
               title="Review"
             >
-              <WorkOrderReviewSummary controller={controller} data={data} preview={preview} validationIssues={validationIssues} />
+              <GuidedReportReviewSummary controller={controller} data={data} preview={preview} progress={progress} validationIssues={validationIssues} />
             </WorkOrderStepFrame>
           ) : null}
 
           {activeStep.id === "finalize" ? (
-            <WorkOrderFinalizeStep
+            <GuidedReportFinalizeStep
               blockers={blockers}
               controller={controller}
               data={data}
@@ -706,13 +555,15 @@ function WorkOrderStepFrame({
   );
 }
 
-function WorkOrderOverviewStep({
+function GuidedReportOverviewStep({
   data,
   progress,
+  isWorkOrder,
   onNext
 }: {
   data: TechnicianReportEditorData;
   progress: ReturnType<typeof buildMobileInspectionProgressSummary>;
+  isWorkOrder: boolean;
   onNext: () => void;
 }) {
   const rows = [
@@ -727,7 +578,7 @@ function WorkOrderOverviewStep({
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
       <div className="border-b border-slate-200 bg-slate-950 px-5 py-5 text-white">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-200">Work order</p>
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-200">{isWorkOrder ? "Work order" : "Technician report"}</p>
         <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em]">{data.siteName ?? data.customerName ?? "Work Order"}</h2>
       </div>
       <div className="grid gap-3 p-5 sm:grid-cols-2">
@@ -744,21 +595,55 @@ function WorkOrderOverviewStep({
           onClick={onNext}
           type="button"
         >
-          Start Work Order
+          {isWorkOrder ? "Start Work Order" : "Start Report"}
         </button>
       </div>
     </section>
   );
 }
 
-function WorkOrderReviewSummary({
+function GuidedReportLaborMaterialsStep({
+  data,
+  preview
+}: {
+  data: TechnicianReportEditorData;
+  preview: ReturnType<typeof buildReportPreview>;
+}) {
+  return (
+    <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-panel">
+      <div>
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Labor & Materials</p>
+        <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Captured from report details</h2>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {[
+          ["Report", data.inspectionTypeLabel],
+          ["Photos", String(preview.attachmentCount)],
+          ["Deficiencies", String(preview.deficiencyCount + preview.manualDeficiencyCount)]
+        ].map(([label, value]) => (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" key={label}>
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">{label}</p>
+            <p className="mt-1 text-lg font-semibold text-slate-950">{value}</p>
+          </div>
+        ))}
+      </div>
+      <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
+        Labor, materials, parts, and service charges for this report are generated from the completed inspection details and existing billing rules. Use the inspection details step for report-specific quantities, failed items, notes, and service activity.
+      </p>
+    </section>
+  );
+}
+
+function GuidedReportReviewSummary({
   data,
   controller,
+  progress,
   preview,
   validationIssues
 }: {
   data: TechnicianReportEditorData;
   controller: ReturnType<typeof useMobileReportDraftController>;
+  progress: ReturnType<typeof buildMobileInspectionProgressSummary>;
   preview: ReturnType<typeof buildReportPreview>;
   validationIssues: ReturnType<typeof collectFinalizationValidationIssues>;
 }) {
@@ -777,9 +662,9 @@ function WorkOrderReviewSummary({
       <div className="grid gap-3 sm:grid-cols-4">
         {[
           ["Labor hours", laborHours],
-          ["Line items", String(lineItems.length)],
+          ["Checklist", progress.percent !== null ? `${progress.percent}%` : "Not started"],
           ["Photos", String(preview.attachmentCount)],
-          ["Billable", `$${billableTotal.toFixed(2)}`]
+          ["Billable", lineItems.length > 0 ? `$${billableTotal.toFixed(2)}` : "Rules-based"]
         ].map(([label, value]) => (
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" key={label}>
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">{label}</p>
@@ -805,7 +690,7 @@ function WorkOrderReviewSummary({
   );
 }
 
-function WorkOrderFinalizeStep({
+function GuidedReportFinalizeStep({
   data,
   controller,
   blockers,
@@ -1832,70 +1717,5 @@ function PhotosTab({
         </div>
       )}
     </section>
-  );
-}
-
-function ReviewTab({
-  data,
-  controller,
-  progress,
-  preview,
-  validationIssues,
-  isReadOnly,
-  onFinalize
-}: {
-  data: TechnicianReportEditorData;
-  controller: ReturnType<typeof useMobileReportDraftController>;
-  progress: ReturnType<typeof buildMobileInspectionProgressSummary>;
-  preview: ReturnType<typeof buildReportPreview>;
-  validationIssues: ReturnType<typeof collectFinalizationValidationIssues>;
-  isReadOnly: boolean;
-  onFinalize: () => void;
-}) {
-  const blockers = validationIssues.filter((issue) => issue.severity === "blocking").map((issue) => issue.message);
-  const warnings = validationIssues.filter((issue) => issue.severity === "warning").map((issue) => issue.message);
-
-  return (
-    <MobileReviewScreen
-      blockingIssues={blockers}
-      footer={(
-        <button
-          className="min-h-12 w-full rounded-2xl bg-[var(--tenant-primary)] px-5 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)] disabled:opacity-50"
-          disabled={isReadOnly || blockers.length > 0 || controller.finalizeInFlight || controller.saveState === "Finalizing" || controller.saveState === "Finalize queued"}
-          onClick={() => onFinalize()}
-          type="button"
-        >
-          {blockers.length > 0 ? "Resolve Required Items" : "Finalize Report"}
-        </button>
-      )}
-      saveState={controller.saveState}
-      summaryCards={[
-        { label: "Completion", value: progress.percent !== null ? `${progress.percent}%` : "Not started" },
-        { label: "Issues", value: String(preview.deficiencyCount + preview.manualDeficiencyCount) },
-        { label: "Photos", value: String(preview.attachmentCount) },
-        { label: "Signatures", value: `${(controller.draft.signatures.technician?.imageDataUrl ? 1 : 0) + (controller.draft.signatures.customer?.imageDataUrl ? 1 : 0)}/2` }
-      ]}
-      title={data.inspectionTypeLabel}
-      warnings={warnings}
-    >
-      <div className="grid gap-4 lg:grid-cols-2">
-        <SignaturePad
-          disabled={isReadOnly}
-          label="Technician signature"
-          onChange={(value) => controller.updateSignature("technician", controller.draft.signatures.technician?.signerName ?? "", value)}
-          onSignerNameChange={(value) => controller.updateSignerName("technician", value)}
-          signerName={controller.draft.signatures.technician?.signerName ?? ""}
-          value={resolveStoredMediaSrc(data.reportId, controller.draft.signatures.technician?.imageDataUrl) ?? controller.draft.signatures.technician?.imageDataUrl}
-        />
-        <SignaturePad
-          disabled={isReadOnly}
-          label="Customer signature"
-          onChange={(value) => controller.updateSignature("customer", controller.draft.signatures.customer?.signerName ?? "", value)}
-          onSignerNameChange={(value) => controller.updateSignerName("customer", value)}
-          signerName={controller.draft.signatures.customer?.signerName ?? ""}
-          value={resolveStoredMediaSrc(data.reportId, controller.draft.signatures.customer?.imageDataUrl) ?? controller.draft.signatures.customer?.imageDataUrl}
-        />
-      </div>
-    </MobileReviewScreen>
   );
 }

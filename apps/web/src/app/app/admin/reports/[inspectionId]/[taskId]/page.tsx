@@ -4,7 +4,6 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getInspectionDisplayLabels, getInspectionReportDraft, getWorkOrderCatalogItems, getWorkOrderLaborTypes, getWorkOrderLineItems, isDueAtTimeOfServiceCustomer } from "@testworx/lib/server/index";
 
-import { ReportEditor } from "../../../../tech/report-editor";
 import { MobileSmartReportScreen } from "../../../../tech/mobile-smart-report-screen";
 import { buildAcceptanceTestViewModel } from "../../../../../reports/acceptance-test/buildAcceptanceTestViewModel";
 import { AcceptanceReportEditView } from "../../../../../reports/acceptance-test/pages/AcceptanceReportEditView";
@@ -114,14 +113,8 @@ export default async function AdminReportCorrectionPage({ params }: { params: Pr
     draft: report.draft
   };
   const editor = (
-    <ReportEditor
-      data={editorData}
-    />
+    <MobileSmartReportScreen data={editorData} inspectionId={inspectionId} mode="edit" taskId={taskId} />
   );
-
-  if (isWorkOrderReport) {
-    return <MobileSmartReportScreen data={editorData} inspectionId={inspectionId} mode="edit" taskId={taskId} />;
-  }
 
   if (report.task.inspectionType === "wet_chemical_acceptance_test") {
     const model = buildAcceptanceTestViewModel({
