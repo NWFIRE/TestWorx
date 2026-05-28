@@ -24,6 +24,7 @@ import {
 } from "./mobile-inspection-framework";
 import type { TechnicianReportEditorData } from "./report-editor";
 import { SearchSelect, type SearchSelectOption } from "@/app/search-select";
+import { AddReportTypeControl } from "./add-report-type-control";
 import { SignaturePad } from "./signature-pad";
 import { deleteLocalWorkOrderLineItem, listLocalWorkOrderLineItems, putLocalWorkOrderLineItem, subscribeToOfflineChanges } from "./offline/offline-db";
 import { queueWorkOrderLaborLineItemUpsert, queueWorkOrderLineItemDelete, queueWorkOrderLineItemUpsert } from "./offline/offline-sync";
@@ -199,6 +200,15 @@ export function MobileSmartReportScreen({
     }
   }
 
+  async function handleReportSelect(nextTaskId: string) {
+    if (nextTaskId === taskId) {
+      return;
+    }
+
+    await controller.persistCurrentDraftLocally();
+    router.push(`/app/tech/reports/${inspectionId}/${nextTaskId}`);
+  }
+
   if (!controller.hydrated) {
     return (
       <div className="rounded-[2rem] border border-slate-200 bg-white px-5 py-8 text-sm text-slate-500 shadow-panel">
@@ -218,6 +228,7 @@ export function MobileSmartReportScreen({
       isWorkOrder={isWorkOrder}
       onExit={() => router.back()}
       onFinalize={handleFinalize}
+      onSelectReport={handleReportSelect}
       openSections={openSections}
       preview={preview}
       progress={progress}
@@ -247,7 +258,8 @@ function GuidedReportWorkflow({
   openSections,
   setOpenSections,
   onExit,
-  onFinalize
+  onFinalize,
+  onSelectReport
 }: {
   data: TechnicianReportEditorData;
   controller: ReturnType<typeof useMobileReportDraftController>;
@@ -264,6 +276,7 @@ function GuidedReportWorkflow({
   setOpenSections: (value: SetStateAction<Record<string, boolean>>) => void;
   onExit: () => void;
   onFinalize: () => void;
+  onSelectReport: (taskId: string) => void;
 }) {
   const blockers = validationIssues.filter((issue) => issue.severity === "blocking");
   const initialStepIndex = Math.max(0, guidedReportSteps.findIndex((step) => step.id === initialStep));
@@ -308,7 +321,7 @@ function GuidedReportWorkflow({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="truncate text-base font-semibold tracking-[-0.02em] text-slate-950 md:text-xl">{data.siteName ?? data.customerName ?? "Work Order"}</h1>
-              <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-blue-800">Work Order</span>
+              <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-blue-800">{data.inspectionTypeLabel}</span>
               <span className="rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-800">{progress.reportStatus}</span>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
@@ -319,11 +332,25 @@ function GuidedReportWorkflow({
               <span>{controller.saveState}</span>
             </div>
           </div>
-          <div className="hidden min-w-32 text-right md:block">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Progress</p>
-            <p className="mt-1 text-sm font-semibold text-slate-950">{stepProgress}</p>
+          <div className="flex shrink-0 items-center gap-2">
+            <AddReportTypeControl
+              existingReports={data.inspectionWorkspace.relatedTasks.map((task) => ({
+                id: task.id,
+                displayLabel: task.displayLabel
+              }))}
+              inspectionId={data.inspectionWorkspace.inspectionId}
+            />
+            <div className="hidden min-w-24 text-right md:block">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Progress</p>
+              <p className="mt-1 text-sm font-semibold text-slate-950">{stepProgress}</p>
+            </div>
           </div>
         </div>
+        <GuidedReportSwitcher
+          currentTaskId={data.inspectionWorkspace.relatedTasks.find((task) => task.isCurrent)?.id ?? null}
+          onSelectReport={onSelectReport}
+          tasks={data.inspectionWorkspace.relatedTasks}
+        />
         <div className="mx-auto mt-3 max-w-6xl md:hidden">
           <div className="flex gap-2 overflow-x-auto pb-1">
             {guidedReportSteps.map((step, index) => {
@@ -508,6 +535,44 @@ function GuidedReportWorkflow({
           ) : null}
         </main>
       </div>
+    </div>
+  );
+}
+
+function GuidedReportSwitcher({
+  tasks,
+  currentTaskId,
+  onSelectReport
+}: {
+  tasks: TechnicianReportEditorData["inspectionWorkspace"]["relatedTasks"];
+  currentTaskId: string | null;
+  onSelectReport: (taskId: string) => void;
+}) {
+  if (tasks.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mx-auto mt-3 flex max-w-6xl gap-2 overflow-x-auto pb-1">
+      {tasks.map((task, index) => {
+        const isCurrent = task.id === currentTaskId || task.isCurrent;
+        const statusLabel = task.reportStatus === "finalized" ? "Finalized" : task.reportStatus === "submitted" ? "Ready" : "Draft";
+        return (
+          <button
+            className={`min-h-11 shrink-0 rounded-2xl border px-3 py-2 text-left text-xs font-bold transition ${
+              isCurrent
+                ? "border-slate-950 bg-slate-950 text-white shadow-sm"
+                : "border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50"
+            }`}
+            key={task.id}
+            onClick={() => onSelectReport(task.id)}
+            type="button"
+          >
+            <span className="block max-w-48 truncate">{task.displayLabel}</span>
+            <span className={isCurrent ? "text-slate-300" : "text-slate-500"}>Report {index + 1} - {statusLabel}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -3381,15 +3381,6 @@ export async function addInspectionTask(actor: ActorContext, input: {
       throw new Error("Report types can only be added to active inspections.");
     }
 
-    const existingActiveTask = inspection.tasks.find((task) =>
-      task.inspectionType === inspectionType &&
-      task.status !== InspectionStatus.cancelled &&
-      isCurrentVisitTaskSchedulingStatus(task.schedulingStatus ?? "scheduled_now")
-    );
-    if (existingActiveTask && !allowsMultipleInspectionTasks(inspectionType)) {
-      throw new Error(`${formatInspectionTaskTypeLabel(inspectionType)} is already added to this inspection.`);
-    }
-
     const nextSortOrder = inspection.tasks.length > 0
       ? Math.max(...inspection.tasks.map((task) => task.sortOrder)) + 1
       : 0;

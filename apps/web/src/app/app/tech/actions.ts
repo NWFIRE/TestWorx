@@ -15,6 +15,7 @@ import {
 } from "@testworx/lib/server/index";
 
 type ActionResult = { ok: boolean; error: string | null };
+type AddInspectionTaskActionResult = ActionResult & { taskId?: string | null };
 type FormActionResult = { error: string | null; success: string | null };
 type InspectionStatus = typeof editableInspectionStatuses[number];
 type InspectionType = keyof typeof inspectionTypeRegistry;
@@ -59,14 +60,14 @@ export async function updateInspectionStatusAction(inspectionId: string, status:
   }
 }
 
-export async function addInspectionTaskAction(inspectionId: string, inspectionType: InspectionType): Promise<ActionResult> {
+export async function addInspectionTaskAction(inspectionId: string, inspectionType: InspectionType): Promise<AddInspectionTaskActionResult> {
   const session = await auth();
   if (!session?.user?.tenantId) {
-    return { ok: false, error: "Your session has expired. Please sign in again." };
+    return { ok: false, error: "Your session has expired. Please sign in again.", taskId: null };
   }
 
   try {
-    await addInspectionTask(
+    const task = await addInspectionTask(
       { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
       { inspectionId, inspectionType }
     );
@@ -77,9 +78,10 @@ export async function addInspectionTaskAction(inspectionId: string, inspectionTy
     revalidatePath("/app/admin/inspections");
     revalidatePath("/app/admin/dashboard");
     revalidatePath(`/app/admin/inspections/${inspectionId}`);
-    return { ok: true, error: null };
+    revalidatePath(`/app/tech/reports/${inspectionId}/${task.id}`);
+    return { ok: true, error: null, taskId: task.id };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Unable to add this report type." };
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to add this report type.", taskId: null };
   }
 }
 

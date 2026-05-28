@@ -175,6 +175,40 @@ describe("inspection task addition", () => {
     });
   });
 
+  it("allows duplicate same-type report instances on the same inspection", async () => {
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      tenantId: "tenant_1",
+      assignedTechnicianId: "tech_1",
+      technicianAssignments: [{ technicianId: "tech_1" }],
+      tasks: [
+        {
+          inspectionType: "fire_extinguisher",
+          schedulingStatus: "scheduled_now",
+          sortOrder: 0,
+          status: InspectionStatus.in_progress
+        }
+      ],
+      scheduledStart: new Date("2026-03-18T09:00:00.000Z"),
+      status: InspectionStatus.in_progress
+    });
+
+    await addInspectionTask(
+      { userId: "tech_1", role: "technician", tenantId: "tenant_1" },
+      { inspectionId: "inspection_1", inspectionType: "fire_extinguisher" }
+    );
+
+    expect(txMock.inspectionTask.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        inspectionType: "fire_extinguisher",
+        addedByUserId: "tech_1",
+        sortOrder: 1
+      })
+    });
+  });
+
   it("blocks technicians who are not assigned to the inspection", async () => {
     txMock.inspection.findFirst.mockResolvedValue({
       id: "inspection_1",
