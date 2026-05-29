@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { format } from "date-fns";
+import { addMonths, format } from "date-fns";
 import { useMemo, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -89,13 +89,11 @@ function formatMonthTitle(monthKey: string) {
 
 function groupTechnicianInspectionsByMonth(inspections: any[], query: string): TechnicianMonthGroup[] {
   const currentMonthKey = format(new Date(), "yyyy-MM");
+  const nextMonthKey = format(addMonths(new Date(), 1), "yyyy-MM");
   const groups = new Map<string, any[]>();
 
   for (const inspection of inspections) {
     const dueMonthKey = getInspectionDueMonthKey(inspection);
-    if (dueMonthKey > currentMonthKey) {
-      continue;
-    }
 
     const groupKey = inspection.displayStatus === "past_due" || dueMonthKey < currentMonthKey
       ? "past_due"
@@ -117,7 +115,7 @@ function groupTechnicianInspectionsByMonth(inspections: any[], query: string): T
       key,
       title: key === "past_due" ? "Past Due" : formatMonthTitle(key),
       inspections: groupInspections,
-      defaultOpen: Boolean(query) || key === "past_due" || key === currentMonthKey
+      defaultOpen: Boolean(query) || key === "past_due" || key === currentMonthKey || key === nextMonthKey
     }));
 }
 
