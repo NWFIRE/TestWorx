@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 import { useConfirmDialog } from "../confirm-dialog";
 
@@ -27,13 +28,14 @@ export function DeleteInspectionCard({
   const [state, formAction, pending] = useActionState(action, initialState);
   const formRef = useRef<HTMLFormElement | null>(null);
   const confirmedSubmitRef = useRef(false);
+  const router = useRouter();
   const { confirm, dialog } = useConfirmDialog();
 
   useEffect(() => {
     if (state.success) {
-      window.location.replace(state.redirectTo || "/app/admin?inspection=deleted");
+      router.replace(state.redirectTo || "/app/admin/inspections?inspection=deleted");
     }
-  }, [state.redirectTo, state.success]);
+  }, [router, state.redirectTo, state.success]);
 
   return (
     <form

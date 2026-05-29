@@ -82,7 +82,7 @@ function extractBillingResolutionBlockMessage(detail: Awaited<ReturnType<typeof 
 }
 
 function resolveInspectionDeleteRedirectTarget(input: string | null | undefined) {
-  const fallback = "/app/admin/dashboard?inspection=deleted";
+  const fallback = "/app/admin/inspections?inspection=deleted";
   const candidate = (input ?? "").trim();
   if (!candidate.startsWith("/app/")) {
     return fallback;

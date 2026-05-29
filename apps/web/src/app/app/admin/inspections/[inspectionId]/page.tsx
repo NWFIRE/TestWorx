@@ -120,6 +120,10 @@ function resolveInspectionMode(value: string | undefined) {
   return value === "review" ? "review" : "workspace";
 }
 
+function appendInspectionNotice(path: string, notice: string) {
+  return `${path}${path.includes("?") ? "&" : "?"}inspection=${encodeURIComponent(notice)}`;
+}
+
 function sanitizePathSegment(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "file";
 }
@@ -150,7 +154,7 @@ export default async function EditInspectionPage({
   ]);
 
   if (!inspection) {
-    redirect("/app/admin/dashboard");
+    redirect(appendInspectionNotice(originPath, "not-found"));
   }
 
   const [attachments, documents] = await Promise.all([
