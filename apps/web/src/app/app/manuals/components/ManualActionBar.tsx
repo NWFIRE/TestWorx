@@ -9,7 +9,7 @@ export function ManualActionBar({
   return (
     <section className="rounded-[24px] border border-[color:rgb(203_215_230_/_0.92)] bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
       <div className="flex flex-wrap gap-3">
-        <a className="rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-white" href={`/api/manuals/${manual.id}/file?disposition=inline`} target="_blank">
+        <a className="rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-white" href={`/api/manuals/${manual.id}/file?disposition=inline`}>
           View document
         </a>
         <a className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700" href={`/api/manuals/${manual.id}/file?disposition=attachment`}>

@@ -36,11 +36,11 @@ export default async function CustomerQuoteDetailPage({
         contentWidth="full"
         actions={
           <>
-            <a className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" href={`/api/quotes/${quote.id}/pdf`} target="_blank">
+            <a className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" href={`/api/quotes/${quote.id}/pdf`}>
               Download PDF
             </a>
             {quote.hostedQuoteUrl ? (
-              <a className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" href={quote.hostedQuoteUrl} rel="noreferrer" target="_blank">
+              <a className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110" href={quote.hostedQuoteUrl}>
                 Open hosted quote
               </a>
             ) : null}

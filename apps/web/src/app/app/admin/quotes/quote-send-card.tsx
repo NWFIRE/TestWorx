@@ -118,7 +118,7 @@ export function QuoteSendCard(props: QuoteSendCardProps) {
           <p className="break-all text-sm text-slate-600">{state.hostedQuoteUrl}</p>
           <div className="flex flex-wrap gap-3">
             <CopyQuoteLinkButton href={state.hostedQuoteUrl} />
-            <a className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" href={state.hostedQuoteUrl} rel="noreferrer" target="_blank">
+            <a className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" href={state.hostedQuoteUrl}>
               Open hosted quote
             </a>
           </div>

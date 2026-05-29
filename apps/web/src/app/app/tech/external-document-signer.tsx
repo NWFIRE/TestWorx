@@ -483,8 +483,6 @@ export function ExternalDocumentSigner({
               <a
                 className="inline-flex rounded-2xl border border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary-soft)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary)]"
                 href={originalPdfUrl}
-                rel="noreferrer"
-                target="_blank"
               >
                 Open original PDF
               </a>
@@ -492,8 +490,6 @@ export function ExternalDocumentSigner({
                 <a
                   className="inline-flex rounded-2xl border border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary-soft)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary)]"
                   href={savedVariantHref}
-                  rel="noreferrer"
-                  target="_blank"
                 >
                   {savedVariantLabel}
                 </a>

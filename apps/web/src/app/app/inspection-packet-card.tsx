@@ -80,8 +80,6 @@ export function InspectionPacketCard({
                       <a
                         className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
                         href={document.viewPath}
-                        rel="noreferrer"
-                        target="_blank"
                       >
                         {document.viewLabel ?? "View PDF"}
                       </a>

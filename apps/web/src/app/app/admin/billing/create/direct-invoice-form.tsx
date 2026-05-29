@@ -514,8 +514,6 @@ export function DirectInvoiceForm({
             <a
               className="pressable mt-5 inline-flex min-h-11 items-center justify-center rounded-2xl border border-emerald-300 bg-white px-4 py-3 text-sm font-semibold text-emerald-800"
               href={createdInvoice.invoiceUrl}
-              rel="noreferrer"
-              target="_blank"
             >
               Open in QuickBooks
             </a>

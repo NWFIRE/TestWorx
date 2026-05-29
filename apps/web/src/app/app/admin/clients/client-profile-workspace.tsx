@@ -853,7 +853,7 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
                         {invoice.lineItemSummary.length > 0 ? invoice.lineItemSummary.join(", ") : sanitizeText(invoice.memo, "No summary")}
                       </td>
                       <td className="py-4">
-                        <Link className="font-semibold text-slateblue" href={invoice.invoiceUrl} target="_blank">
+                        <Link className="font-semibold text-slateblue" href={invoice.invoiceUrl}>
                           Open invoice
                         </Link>
                       </td>

@@ -196,7 +196,7 @@ export default async function HostedQuotePage({
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
                     {companyContact ? <span>{companyContact}</span> : null}
                     {branding.website ? (
-                      <Link className="font-medium" href={branding.website} target="_blank">
+                      <Link className="font-medium" href={branding.website}>
                         {branding.website.replace(/^https?:\/\//, "")}
                       </Link>
                     ) : null}
@@ -315,8 +315,6 @@ export default async function HostedQuotePage({
                     <a
                       className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                       href={`/api/quotes/access/${token}/pdf`}
-                      rel="noreferrer"
-                      target="_blank"
                     >
                       Download PDF
                     </a>
@@ -383,7 +381,7 @@ export default async function HostedQuotePage({
                         {branding.email ? <p>{branding.email}</p> : null}
                         {branding.phone ? <p>{branding.phone}</p> : null}
                         {branding.website ? (
-                          <Link className="font-semibold" href={branding.website} style={{ color: primaryColor }} target="_blank">
+                          <Link className="font-semibold" href={branding.website} style={{ color: primaryColor }}>
                             {branding.website.replace(/^https?:\/\//, "")}
                           </Link>
                         ) : null}

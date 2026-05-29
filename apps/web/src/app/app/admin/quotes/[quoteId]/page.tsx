@@ -83,7 +83,6 @@ export default async function QuoteDetailPage({
             <a
               className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               href={`/api/quotes/${detail.id}/pdf`}
-              target="_blank"
             >
               Download PDF
             </a>

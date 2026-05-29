@@ -293,7 +293,7 @@ export function BillingSummaryStatusActions({
       </div>
 
       {openQuickBooksUrl ? (
-        <a className="pressable mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={openQuickBooksUrl} rel="noreferrer" target="_blank">
+        <a className="pressable mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={openQuickBooksUrl}>
           Open in QuickBooks
         </a>
       ) : null}
