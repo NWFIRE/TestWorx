@@ -65,7 +65,7 @@ const DEFAULT_WORK_ORDER_LABOR_TYPES = [
   { code: "fire_alarm", name: "Fire Alarm", sortOrder: 10 },
   { code: "kitchen_suppression", name: "Kitchen Suppression", sortOrder: 20 },
   { code: "fire_sprinkler", name: "Fire Sprinkler", sortOrder: 30 },
-  { code: "fire_extinguishers", name: "Fire Extinguishers", sortOrder: 40 },
+  { code: "fire_extinguishers", name: "Fire Extinguisher", sortOrder: 40 },
   { code: "emergency_light", name: "Emergency Light", sortOrder: 50 },
   { code: "industrial_dry_chemical", name: "Industrial Dry Chemical", sortOrder: 60 },
   { code: "backflow", name: "Backflow", sortOrder: 70 },
@@ -86,7 +86,11 @@ async function ensureDefaultLaborTypes(tenantId: string) {
           code: laborType.code
         }
       },
-      update: {},
+      update: {
+        name: laborType.name,
+        sortOrder: laborType.sortOrder,
+        active: true
+      },
       create: {
         tenantId,
         code: laborType.code,

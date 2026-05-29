@@ -169,4 +169,52 @@ describe("work order catalog selection", () => {
       })
     ]);
   });
+
+  it("keeps default labor types active whenever work orders load labor settings", async () => {
+    prismaMock.workOrderLaborType.findMany.mockResolvedValue([]);
+
+    await getWorkOrderLaborTypes(
+      { userId: "tech_1", role: "technician", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    expect(prismaMock.workOrderLaborType.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        tenantId_code: {
+          tenantId: "tenant_1",
+          code: "fire_alarm"
+        }
+      },
+      update: {
+        name: "Fire Alarm",
+        sortOrder: 10,
+        active: true
+      },
+      create: expect.objectContaining({
+        tenantId: "tenant_1",
+        code: "fire_alarm",
+        name: "Fire Alarm",
+        active: true
+      })
+    }));
+    expect(prismaMock.workOrderLaborType.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        tenantId_code: {
+          tenantId: "tenant_1",
+          code: "fire_extinguishers"
+        }
+      },
+      update: {
+        name: "Fire Extinguisher",
+        sortOrder: 40,
+        active: true
+      },
+      create: expect.objectContaining({
+        tenantId: "tenant_1",
+        code: "fire_extinguishers",
+        name: "Fire Extinguisher",
+        active: true
+      })
+    }));
+  });
 });
