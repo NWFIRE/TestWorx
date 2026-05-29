@@ -805,12 +805,13 @@ export function InspectionSchedulerForm({
             name="inspectionMonth"
             onChange={(event) => {
               const nextMonth = event.target.value;
+              const previousMonth = inspectionMonth;
               setInspectionMonth(nextMonth);
               if (!startManuallyEdited) {
                 setScheduledStart((current) => defaultScheduledStartForMonth(nextMonth, current));
               }
               setServiceLines((current) =>
-                current.map((line) => (line.dueMonth ? line : { ...line, dueMonth: nextMonth }))
+                current.map((line) => (!line.dueMonth || line.dueMonth === previousMonth ? { ...line, dueMonth: nextMonth } : line))
               );
             }}
             required
