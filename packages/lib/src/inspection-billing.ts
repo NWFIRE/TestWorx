@@ -619,18 +619,42 @@ function readCatalogTaxCodeRef(rawJson: Prisma.JsonValue | null | undefined) {
   return readCatalogRawString(rawJson, ["SalesTaxCode", "TaxCodeRef"]);
 }
 
+function isNonInventoryTaxableItemType(itemType: string | null | undefined) {
+  const normalized = itemType?.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  if (normalized === "inventory") {
+    return false;
+  }
+
+  return normalized === "noninventory" ||
+    normalized === "non_inventory" ||
+    normalized === "service" ||
+    normalized === "labor" ||
+    normalized === "fee" ||
+    normalized.includes("noninventory") ||
+    normalized.includes("service") ||
+    normalized.includes("labor") ||
+    normalized.includes("fee");
+}
+
 function buildCatalogTaxSnapshot(catalogItem: {
   quickbooksItemId?: string | null;
+  itemType?: string | null;
   taxable: boolean;
   rawJson?: Prisma.JsonValue | null;
 }) {
+  const taxable = isNonInventoryTaxableItemType(catalogItem.itemType) ? true : catalogItem.taxable;
+
   return {
-    taxable: catalogItem.taxable,
+    taxable,
     taxableSource: catalogItem.quickbooksItemId ? "quickbooks" as const : "manual" as const,
     quickBooksTaxableStatus: catalogItem.quickbooksItemId
-      ? (catalogItem.taxable ? "taxable" as const : "non_taxable" as const)
+      ? (taxable ? "taxable" as const : "non_taxable" as const)
       : null,
-    quickBooksTaxCodeRef: readCatalogTaxCodeRef(catalogItem.rawJson) ?? null
+    quickBooksTaxCodeRef: taxable ? DEFAULT_QUICKBOOKS_TAX_CODE_ID : readCatalogTaxCodeRef(catalogItem.rawJson) ?? null
   };
 }
 
@@ -1444,6 +1468,7 @@ async function extractBillableItemsFromWorkOrderLineItemsTx(tx: TransactionClien
           name: true,
           quickbooksItemId: true,
           taxable: true,
+          itemType: true,
           unitPrice: true,
           rawJson: true
         }
@@ -1520,6 +1545,7 @@ async function extractBillableItemsFromWorkOrderLineItemsTx(tx: TransactionClien
       linkedMatchConfidence: 1,
       ...buildCatalogTaxSnapshot({
         quickbooksItemId: line.catalogItem?.quickbooksItemId ?? line.quickBooksItemId,
+        itemType: line.catalogItem?.itemType ?? line.itemType,
         taxable: line.taxable,
         rawJson: line.catalogItem?.rawJson ?? null
       })

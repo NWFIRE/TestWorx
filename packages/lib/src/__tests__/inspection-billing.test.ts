@@ -1669,7 +1669,7 @@ describe("inspection billing persistence and admin review", () => {
       amount: 15.4,
       linkedCatalogItemId: "catalog_service_annual",
       linkedQuickBooksItemId: "qb_service_annual",
-      taxable: false
+      taxable: true
     }));
     expect(serviceLine?.metadata).toEqual(expect.objectContaining({
       source: "technician_selected",
@@ -1755,7 +1755,7 @@ describe("inspection billing persistence and admin review", () => {
       amount: 250,
       linkedCatalogItemId: "catalog_labor_1",
       linkedQuickBooksItemId: "qb_labor_fire_alarm",
-      taxable: false
+      taxable: true
     }));
     expect(laborLine?.metadata).toEqual(expect.objectContaining({
       laborTypeId: "labor_type_fire_alarm",
@@ -3193,7 +3193,7 @@ describe("inspection billing persistence and admin review", () => {
           linkedQuickBooksItemId: "qb_fire_alarm_labor",
           linkedMatchMethod: "manual",
           linkedMatchConfidence: 1,
-          taxable: false
+          taxable: true
         }
       ],
       [
@@ -3933,7 +3933,7 @@ describe("inspection billing persistence and admin review", () => {
           amount: 230,
           linkedCatalogItemId: "catalog_labor",
           linkedQuickBooksItemId: "qb_labor",
-          taxable: false
+          taxable: true
         })
       ])
     );

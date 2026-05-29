@@ -274,7 +274,7 @@ export const quickBooksCatalogItemInputSchema = z.object({
   sku: z.string().trim().max(100).optional().transform((value) => value || undefined),
   itemType: z.enum(["Service", "NonInventory"]).default("Service"),
   unitPrice: z.number().finite().nonnegative().nullable(),
-  taxable: z.boolean().default(false),
+  taxable: z.boolean().default(true),
   active: z.boolean().default(true)
 });
 
@@ -1720,7 +1720,7 @@ function normalizeQuickBooksCatalogItem(item: unknown) {
     ? ((item as Record<string, unknown>).IncomeAccountRef as Record<string, unknown> | undefined)
     : undefined;
   const salesTaxCode = readQuickBooksSalesTaxCodeRef(item);
-  const taxable = isQuickBooksTaxableCode(salesTaxCode);
+  const taxable = itemType !== "Inventory" || isQuickBooksTaxableCode(salesTaxCode);
 
   return {
     quickbooksItemId,

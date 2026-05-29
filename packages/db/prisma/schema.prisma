@@ -1634,7 +1634,7 @@ model QuickBooksCatalogItem {
   sku                String?
   itemType           String
   active             Boolean  @default(true)
-  taxable            Boolean  @default(false)
+  taxable            Boolean  @default(true)
   unitPrice          Float?
   incomeAccountId    String?
   incomeAccountName  String?
@@ -1661,7 +1661,7 @@ model WorkOrderLaborType {
   code               String
   description        String?
   rate               Float    @default(0)
-  taxable            Boolean  @default(false)
+  taxable            Boolean  @default(true)
   active             Boolean  @default(true)
   quickBooksItemId   String?
   catalogItemId      String?

@@ -1279,7 +1279,7 @@ describe("quickbooks billing sync hardening", () => {
         }),
         expect.objectContaining({
           quickbooksItemId: "qbo_item_2",
-          taxable: false
+          taxable: true
         })
       ])
     });
