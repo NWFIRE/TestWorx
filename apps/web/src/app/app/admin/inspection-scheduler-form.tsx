@@ -389,14 +389,31 @@ export function InspectionSchedulerForm({
   );
 
   const updateServiceLine = (lineId: string, patch: Partial<ServiceLineDraft>) => {
-    setServiceLines((current) =>
-      current.map((line) => (line.id === lineId ? { ...line, ...patch } : line))
-    );
+    setServiceLines((current) => {
+      const lineIndex = current.findIndex((line) => line.id === lineId);
+      const updated = current.map((line) => (line.id === lineId ? { ...line, ...patch } : line));
+
+      if (lineIndex !== 0 || !Object.prototype.hasOwnProperty.call(patch, "assignedTechnicianId") || !patch.assignedTechnicianId) {
+        return updated;
+      }
+
+      return updated.map((line, index) =>
+        index > 0 && !line.assignedTechnicianId
+          ? { ...line, assignedTechnicianId: patch.assignedTechnicianId ?? "" }
+          : line
+      );
+    });
   };
 
   const addServiceLine = () => {
     const nextLine = createServiceLineDraft(inspectionMonth);
-    setServiceLines((current) => [...current, nextLine]);
+    setServiceLines((current) => [
+      ...current,
+      {
+        ...nextLine,
+        assignedTechnicianId: current[0]?.assignedTechnicianId ?? ""
+      }
+    ]);
     setNewestServiceLineId(nextLine.id);
   };
 
