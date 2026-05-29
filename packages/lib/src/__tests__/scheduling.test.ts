@@ -712,13 +712,29 @@ describe("month defaults and past-due status", () => {
     expect(isInspectionVisibleToTechnicianForDueMonth(inspection, inspection.now)).toBe(false);
   });
 
-  it("activates technician visibility when the due month begins", () => {
+  it("lets technicians see inspections due in the following month", () => {
     const inspection = {
       scheduledStart: new Date("2026-06-01T09:00:00.000Z"),
       tasks: [
         {
           dueMonth: "2026-06",
           dueDate: new Date("2026-06-01T09:00:00.000Z"),
+          schedulingStatus: "scheduled_now"
+        }
+      ]
+    };
+
+    expect(isInspectionVisibleToTechnicianForDueMonth(inspection, new Date(2026, 4, 19, 12))).toBe(true);
+    expect(isInspectionVisibleToTechnicianForDueMonth(inspection, new Date(2026, 5, 1, 12))).toBe(true);
+  });
+
+  it("keeps inspections beyond the following month hidden from technicians", () => {
+    const inspection = {
+      scheduledStart: new Date("2026-07-01T09:00:00.000Z"),
+      tasks: [
+        {
+          dueMonth: "2026-07",
+          dueDate: new Date("2026-07-01T09:00:00.000Z"),
           schedulingStatus: "scheduled_now"
         }
       ]

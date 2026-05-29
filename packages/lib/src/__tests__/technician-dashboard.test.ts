@@ -124,7 +124,7 @@ describe("technician dashboard inspection access", () => {
     expect(result.assigned[0]?.attachments).toHaveLength(1);
   });
 
-  it("hides assigned future-month inspections from technician active work until the due month starts", async () => {
+  it("shows assigned following-month inspections while keeping them out of current-month buckets", async () => {
     prismaMock.inspection.findMany
       .mockResolvedValueOnce([
         {
@@ -162,7 +162,8 @@ describe("technician dashboard inspection access", () => {
 
     const result = await getTechnicianDashboardData({ userId: "tech_1", role: "technician", tenantId: "tenant_1" });
 
-    expect(result.assigned).toHaveLength(0);
+    expect(result.assigned).toHaveLength(1);
+    expect(result.assigned[0]?.id).toBe("inspection_future_assigned");
     expect(result.thisMonth).toHaveLength(0);
     expect(result.today).toHaveLength(0);
   });
@@ -430,7 +431,7 @@ describe("technician dashboard inspection access", () => {
         OR: expect.arrayContaining([
           { scheduledStart: { lte: expect.any(Date) } },
           { tasks: { some: { dueDate: { lte: expect.any(Date) } } } },
-          { tasks: { some: { dueMonth: { lte: "2026-05" } } } }
+          { tasks: { some: { dueMonth: { lte: "2026-06" } } } }
         ])
       })
     }));
@@ -771,7 +772,7 @@ describe("technician dashboard inspection access", () => {
     expect(result.unassigned).toHaveLength(0);
   });
 
-  it("hides future-month claimable inspections until their due month becomes active", async () => {
+  it("shows following-month claimable inspections in the mobile shared queue", async () => {
     const scheduledStart = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
     const dueMonth = `${scheduledStart.getFullYear()}-${String(scheduledStart.getMonth() + 1).padStart(2, "0")}`;
 
@@ -808,7 +809,8 @@ describe("technician dashboard inspection access", () => {
 
     const result = await getTechnicianDashboardData({ userId: "tech_2", role: "technician", tenantId: "tenant_1" });
 
-    expect(result.unassigned).toHaveLength(0);
+    expect(result.unassigned).toHaveLength(1);
+    expect(result.unassigned[0]?.id).toBe("inspection_future_shared");
   });
 
   it("excludes far-future claimable inspections from the mobile shared queue", async () => {

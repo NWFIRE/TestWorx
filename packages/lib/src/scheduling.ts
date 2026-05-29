@@ -1004,7 +1004,8 @@ export function isInspectionVisibleToTechnicianForDueMonth<T extends {
   status?: InspectionStatus | string | null;
 }>(inspection: { scheduledStart?: Date | string | null; tasks?: T[] | null }, now = new Date()) {
   const duePeriod = getInspectionDuePeriod(inspection);
-  return duePeriod ? duePeriod <= format(now, "yyyy-MM") : true;
+  const latestVisiblePeriod = format(addMonths(now, 1), "yyyy-MM");
+  return duePeriod ? duePeriod <= latestVisiblePeriod : true;
 }
 
 function getClaimableInspectionPeriodKey<T extends {
@@ -5950,8 +5951,8 @@ export async function resolveClaimableInspectionsForTechnician(actor: ActorConte
 
   const tenantId = parsedActor.tenantId as string;
   const now = new Date();
-  const activeDueMonthEnd = endOfMonth(now);
-  const activeDueMonth = format(now, "yyyy-MM");
+  const visibleDueMonthEnd = endOfMonth(addMonths(now, 1));
+  const latestVisibleDueMonth = format(addMonths(now, 1), "yyyy-MM");
   const rawInspections = await prisma.inspection.findMany({
     where: {
       tenantId,
@@ -5959,9 +5960,9 @@ export async function resolveClaimableInspectionsForTechnician(actor: ActorConte
       status: { in: [...claimableInspectionStatuses] },
       AND: [activeInspectionQueueConsistencyFilter()],
       OR: [
-        { scheduledStart: { lte: activeDueMonthEnd } },
-        { tasks: { some: { dueDate: { lte: activeDueMonthEnd } } } },
-        { tasks: { some: { dueMonth: { lte: activeDueMonth } } } }
+        { scheduledStart: { lte: visibleDueMonthEnd } },
+        { tasks: { some: { dueDate: { lte: visibleDueMonthEnd } } } },
+        { tasks: { some: { dueMonth: { lte: latestVisibleDueMonth } } } }
       ]
     },
     include: {
