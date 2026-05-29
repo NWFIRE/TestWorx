@@ -461,7 +461,7 @@ export default async function AdminInspectionsPage({
         />
       </section>
 
-      <SectionCard className="2xl:sticky 2xl:top-4 2xl:z-10">
+      <SectionCard>
         <div className="flex flex-col gap-3 lg:gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">
