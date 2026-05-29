@@ -100,7 +100,11 @@ function formatBillingSummaryStatusLabel(status: string) {
 }
 
 function formatEditableQuantity(quantity: number) {
-  return quantity > 0 ? String(Math.round(quantity)) : "";
+  if (quantity <= 0) {
+    return "";
+  }
+
+  return Number.isInteger(quantity) ? String(quantity) : String(Number(quantity.toFixed(2)));
 }
 
 function formatMoney(value: number | null | undefined) {
@@ -502,7 +506,7 @@ export default async function BillingSummaryDetailPage({
                         ))}
                         <label className="text-sm text-slate-600">
                           Quantity
-                          <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={formatEditableQuantity(item.quantity)} disabled={isInvoiced} inputMode="numeric" min="1" name="quantity" placeholder="1" step="1" type="number" />
+                          <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={formatEditableQuantity(item.quantity)} disabled={isInvoiced} inputMode="decimal" min="0.01" name="quantity" placeholder="1" step="0.01" type="number" />
                         </label>
                         <label className="text-sm text-slate-600">
                           Unit price

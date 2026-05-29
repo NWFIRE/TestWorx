@@ -35,12 +35,16 @@ function buildCatalogSecondaryLabel(item: CatalogItem) {
 }
 
 function formatQuantityInputValue(quantity: number) {
-  return quantity > 0 ? String(Math.trunc(quantity)) : "";
+  if (quantity <= 0) {
+    return "";
+  }
+
+  return Number.isInteger(quantity) ? String(quantity) : String(Number(quantity.toFixed(2)));
 }
 
 function parseQuantityInputValue(value: string) {
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? Math.max(1, Math.trunc(parsed)) : 1;
+  return Number.isFinite(parsed) ? Math.max(0.01, Number(parsed.toFixed(2))) : 1;
 }
 
 export function BillingManualLineForm({
@@ -149,12 +153,12 @@ export function BillingManualLineForm({
           <input
             className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3 disabled:bg-slate-50"
             disabled={disabled}
-            inputMode="numeric"
-            min="1"
+            inputMode="decimal"
+            min="0.01"
             name="quantity"
             onChange={(event) => setQuantity(parseQuantityInputValue(event.target.value))}
             placeholder="1"
-            step="1"
+            step="0.01"
             type="number"
             value={formatQuantityInputValue(quantity)}
           />

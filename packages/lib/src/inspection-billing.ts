@@ -4230,7 +4230,7 @@ export async function addBillingSummaryManualLine(actor: ActorContext, input: {
     throw new Error("Select an active product or service before adding a manual billing line.");
   }
 
-  const quantity = Number.isFinite(input.quantity) ? Math.max(1, Math.trunc(input.quantity)) : 1;
+  const quantity = Number.isFinite(input.quantity) ? Math.max(0.01, Number(input.quantity.toFixed(2))) : 1;
   const unitPrice = typeof input.unitPrice === "number" && Number.isFinite(input.unitPrice)
     ? input.unitPrice
     : catalogItem.unitPrice ?? 0;

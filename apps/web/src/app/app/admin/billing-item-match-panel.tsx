@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { SearchSelect, type SearchSelectOption } from "@/app/search-select";
 
@@ -109,6 +109,7 @@ export function BillingItemMatchPanel({
   });
   const [linkState, linkFormAction] = useActionState(linkAction, initialActionState);
   const [clearState, clearFormAction] = useActionState(clearAction, initialActionState);
+  const [, startActionTransition] = useTransition();
   const [searchQuery, setSearchQuery] = useState(itemDescription);
   const searchDebounceRef = useRef<number | null>(null);
 
@@ -128,8 +129,10 @@ export function BillingItemMatchPanel({
     formData.set("searchNonce", String(Date.now()));
     formData.set("query", query || itemDescription);
     formData.set("page", "1");
-    searchFormAction(formData);
-  }, [itemDescription, itemId, itemIds, searchFormAction, summaryId]);
+    startActionTransition(() => {
+      searchFormAction(formData);
+    });
+  }, [itemDescription, itemId, itemIds, searchFormAction, startActionTransition, summaryId]);
 
   useEffect(() => {
     if (!open) {
@@ -183,7 +186,9 @@ export function BillingItemMatchPanel({
     formData.set("catalogItemId", catalogItemId);
     formData.set("alias", itemDescription);
     formData.set("saveMapping", "on");
-    linkFormAction(formData);
+    startActionTransition(() => {
+      linkFormAction(formData);
+    });
   }
 
   return (

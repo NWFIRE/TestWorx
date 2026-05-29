@@ -960,10 +960,22 @@ export async function removeBillingSummaryItemGroupAction(formData: FormData) {
     return;
   }
 
-  await removeBillingSummaryItemGroup(
-    { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-    { summaryId, itemIds }
-  );
+  try {
+    await removeBillingSummaryItemGroup(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      { summaryId, itemIds }
+    );
+  } catch (error) {
+    if (!(error instanceof Error) || !/Billing item group not found/i.test(error.message)) {
+      throw error;
+    }
+
+    console.warn("Billing line remove ignored stale item group", {
+      summaryId,
+      inspectionId,
+      itemIds
+    });
+  }
 
   revalidatePath("/app/admin/billing");
   revalidatePath(`/app/admin/billing/${inspectionId}`);
