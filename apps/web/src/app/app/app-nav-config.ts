@@ -159,6 +159,18 @@ const adminNavItems: AppNavItem[] = [
     group: "Operations"
   },
   {
+    href: "/app/admin/timesheets",
+    label: "Timesheets",
+    shortLabel: "Timesheets",
+    abbreviation: "TS",
+    icon: "calendar",
+    description: "Clock entries, weekly totals, and admin corrections",
+    tone: "blue",
+    group: "Operations",
+    matchMode: "exact",
+    matchPrefixes: ["/app/admin/timesheets"]
+  },
+  {
     href: "/app/admin/settings",
     label: "Settings / Service Fees",
     shortLabel: "Settings",
@@ -233,6 +245,18 @@ const navByRole: Record<string, AppNavItem[]> = {
       group: "Operations",
       matchMode: "exact",
       matchPrefixes: ["/app/manuals"]
+    },
+    {
+      href: "/app/tech/timesheets",
+      label: "Timesheets",
+      shortLabel: "Timesheets",
+      abbreviation: "TS",
+      icon: "calendar",
+      description: "Clock in, clock out, and weekly time",
+      tone: "blue",
+      group: "Operations",
+      matchMode: "exact",
+      matchPrefixes: ["/app/tech/timesheets"]
     },
     {
       href: "/app/tech/profile",

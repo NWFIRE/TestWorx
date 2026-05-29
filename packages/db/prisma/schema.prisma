@@ -282,6 +282,12 @@ enum WorkOrderLineSource {
   contract_rule
 }
 
+enum TimeEntryStatus {
+  open
+  closed
+  corrected
+}
+
 enum QuoteStatus {
   draft
   ready_to_send
@@ -420,6 +426,7 @@ model Tenant {
   billingSummaries          InspectionBillingSummary[]
   workOrderLineItems        WorkOrderLineItem[]
   workOrderLaborTypes       WorkOrderLaborType[]
+  timeEntries               TimeEntry[]
   invoiceSequences          TenantInvoiceSequence[]
   inspectionDocuments       InspectionDocument[]
   auditLogs                 AuditLog[]
@@ -501,6 +508,8 @@ model User {
   approvedCustomerIntakeRequests CustomerIntakeRequest[] @relation("CustomerIntakeApprovedBy")
   reportTypeEligibilities TechnicianReportTypeEligibility[]
   addedWorkOrderLineItems WorkOrderLineItem[] @relation("WorkOrderLineItemAddedBy")
+  timeEntries            TimeEntry[]          @relation("TimeEntryEmployee")
+  correctedTimeEntries   TimeEntry[]          @relation("TimeEntryCorrectedBy")
 }
 
 model CustomerIntakeRequest {
@@ -1675,6 +1684,31 @@ model WorkOrderLaborType {
   @@unique([tenantId, code])
   @@index([tenantId, active])
   @@index([tenantId, catalogItemId])
+}
+
+model TimeEntry {
+  id                    String          @id @default(cuid())
+  tenantId              String
+  employeeId            String
+  clockInAt             DateTime
+  clockOutAt            DateTime?
+  grossMinutes          Int             @default(0)
+  lunchDeductionMinutes Int             @default(30)
+  netMinutes            Int             @default(0)
+  status                TimeEntryStatus @default(open)
+  notes                 String?
+  correctionReason      String?
+  correctedByUserId     String?
+  correctedAt           DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  tenant                Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee              User            @relation("TimeEntryEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  correctedBy           User?           @relation("TimeEntryCorrectedBy", fields: [correctedByUserId], references: [id])
+
+  @@index([tenantId, employeeId, clockInAt])
+  @@index([tenantId, status])
+  @@index([tenantId, clockInAt])
 }
 
 model QuickBooksItemMap {

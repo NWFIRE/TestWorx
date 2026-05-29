@@ -43,6 +43,7 @@ export * from "./scheduling";
 export * from "./service-fees";
 export * from "./storage";
 export * from "./third-party-billing";
+export * from "./timesheets";
 export * from "./work-order-line-items";
 
 type TeamManagementModule = typeof import("./team-management");

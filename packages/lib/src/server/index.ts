@@ -50,6 +50,7 @@ export * from "../storage";
 export * from "../technician-notifications";
 export * from "../third-party-billing";
 export * from "../timezone";
+export * from "../timesheets";
 export * from "../work-order-line-items";
 
 type TeamManagementModule = typeof import("../team-management");
