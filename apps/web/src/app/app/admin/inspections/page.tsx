@@ -32,6 +32,7 @@ import {
   StatusBadge
 } from "../operations-ui";
 import { InspectionCreatePanel } from "./inspection-create-panel";
+import { CreateInspectionTrigger } from "./create-inspection-trigger";
 
 const statusOptions = [
   { value: "", label: "All statuses" },
@@ -399,24 +400,20 @@ export default async function AdminInspectionsPage({
     sharedQueue: fastManagementInspections.filter((inspection) => inspection.assignedTechnicianNames.length === 0).length,
     completed: fastManagementInspections.filter((inspection) => inspection.status === "completed").length
   };
+  const createInspectionHref = buildInspectionsHref({
+    statuses: requestedStatuses.length ? requestedStatuses : undefined,
+    classifications: requestedClassifications,
+    priority: requestedPriority,
+    query,
+    technicianId,
+    create: true
+  });
 
   return (
     <AppPageShell density="wide">
       <PageHeader
         actions={
-          <Link
-            className="inline-flex min-h-12 items-center rounded-2xl bg-slateblue px-5 text-sm font-semibold text-white shadow-[0_12px_24px_rgb(var(--tenant-primary-rgb)_/_0.2)] transition duration-150 hover:brightness-110 active:scale-[0.99]"
-            href={buildInspectionsHref({
-              statuses: requestedStatuses.length ? requestedStatuses : undefined,
-              classifications: requestedClassifications,
-              priority: requestedPriority,
-              query,
-              technicianId,
-              create: true
-            })}
-          >
-            + Create Inspection
-          </Link>
+          <CreateInspectionTrigger href={createInspectionHref} />
         }
         description="Create new inspections, filter active work fast, and open each visit into a focused operational command center."
         eyebrow="Inspections"

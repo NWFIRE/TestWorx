@@ -9,6 +9,7 @@ import {
   type InspectionSchedulerFormInitialValues,
   InspectionSchedulerForm
 } from "../inspection-scheduler-form";
+import { openInspectionCreateEventName } from "./create-inspection-trigger";
 
 export function InspectionCreatePanel({
   customers,
@@ -34,6 +35,15 @@ export function InspectionCreatePanel({
     setOpen(initialOpen);
   }, [initialOpen]);
 
+  useEffect(() => {
+    function handleOpenCreatePanel() {
+      setOpen(true);
+    }
+
+    window.addEventListener(openInspectionCreateEventName, handleOpenCreatePanel);
+    return () => window.removeEventListener(openInspectionCreateEventName, handleOpenCreatePanel);
+  }, []);
+
   function updateCreateQueryParam(nextOpen: boolean) {
     const params = new URLSearchParams(searchParams.toString());
     if (nextOpen) {
@@ -51,7 +61,7 @@ export function InspectionCreatePanel({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 scroll-mt-6" id="inspection-create-panel">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
