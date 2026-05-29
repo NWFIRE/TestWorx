@@ -9,6 +9,7 @@ export type SearchSelectOption = {
   badge?: string | null;
   href?: string | null;
   disabled?: boolean;
+  keywords?: string | null;
 };
 
 export function SearchSelect({
@@ -78,7 +79,7 @@ export function SearchSelect({
     }
 
     return options
-      .filter((option) => [option.label, option.secondaryLabel, option.badge]
+      .filter((option) => [option.label, option.secondaryLabel, option.badge, option.keywords]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
@@ -172,7 +173,7 @@ export function SearchSelect({
               return;
             }
 
-            if (event.key === "Enter" && open) {
+            if (event.key === "Enter" && open && !allowCustomValue) {
               const option = filteredOptions[activeIndex];
               if (option) {
                 event.preventDefault();
@@ -183,6 +184,7 @@ export function SearchSelect({
 
             if (event.key === "Enter") {
               event.preventDefault();
+              setOpen(false);
               onQueryCommit?.(query);
             }
           }}

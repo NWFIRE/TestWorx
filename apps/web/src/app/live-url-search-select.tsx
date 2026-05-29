@@ -59,6 +59,7 @@ export function LiveUrlSearchSelect({
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(initialValue);
   const [isFocused, setIsFocused] = useState(false);
+  const [isNavigatingToResult, setIsNavigatingToResult] = useState(false);
   const [pending, startTransition] = useTransition();
   const searchDebounceRef = useRef<number | null>(null);
   const lastAppliedValueRef = useRef(initialValue.trim());
@@ -70,13 +71,13 @@ export function LiveUrlSearchSelect({
     const previousAppliedValue = lastAppliedValueRef.current;
     lastAppliedValueRef.current = nextAppliedValue;
 
-    if (isFocused && query.trim() !== previousAppliedValue) {
+    if (isNavigatingToResult || (isFocused && query.trim() !== previousAppliedValue)) {
       return;
     }
 
     const timeout = window.setTimeout(() => setQuery(initialValue), 0);
     return () => window.clearTimeout(timeout);
-  }, [initialValue, isFocused, query]);
+  }, [initialValue, isFocused, isNavigatingToResult, query]);
 
   const applyQuery = useCallback((nextQuery: string) => {
     const trimmedValue = nextQuery.trim();
@@ -144,6 +145,7 @@ export function LiveUrlSearchSelect({
             window.clearTimeout(searchDebounceRef.current);
             searchDebounceRef.current = null;
           }
+          setIsNavigatingToResult(true);
           setQuery(option.label);
           router.push(option.href);
           return;

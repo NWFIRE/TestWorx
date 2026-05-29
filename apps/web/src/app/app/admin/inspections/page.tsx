@@ -246,22 +246,36 @@ function buildInspectionSearchOption(inspection: AdminSchedulingInspection, curr
   const reportSummary = formatInspectionTaskSummary(inspection.tasks);
   const technicianSummary = inspection.assignedTechnicianNames.join(", ") || "Shared queue";
   const historyStatusLabel = getInspectionSearchBadge(inspection);
+  const scheduledLabel = format(inspection.scheduledStart, "MMM d, yyyy h:mm a");
+  const referenceLabel = `Ref ${inspection.id.slice(0, 8)}`;
+  const secondaryParts = [
+    locationLabel,
+    scheduledLabel,
+    historyStatusLabel !== "Inspection" ? historyStatusLabel : null,
+    reportSummary,
+    technicianSummary,
+    referenceLabel
+  ].filter(Boolean);
 
   return {
     value: inspection.id,
-    label: customerLabel,
-    secondaryLabel: [
+    label: `${customerLabel} - ${scheduledLabel}`,
+    secondaryLabel: secondaryParts.join(" | "),
+    badge: historyStatusLabel,
+    href: `/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`,
+    keywords: [
+      customerLabel,
       locationLabel,
-      format(inspection.scheduledStart, "MMM d, yyyy h:mm a"),
-      historyStatusLabel !== "Inspection" ? historyStatusLabel : null,
+      inspection.site.addressLine1,
+      inspection.site.city,
+      scheduledLabel,
       reportSummary,
       technicianSummary,
-      `Ref ${inspection.id.slice(0, 8)}`
+      referenceLabel,
+      inspection.id
     ]
       .filter(Boolean)
-      .join(" | "),
-    badge: historyStatusLabel,
-    href: `/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`
+      .join(" ")
   };
 }
 
