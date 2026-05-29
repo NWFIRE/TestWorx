@@ -1527,7 +1527,13 @@ describe("inspection billing persistence and admin review", () => {
       quantity: 2,
       unitPrice: 115,
       amount: 230,
-      linkedCatalogItemId: "catalog_labor"
+      linkedCatalogItemId: "catalog_labor",
+      taxable: true,
+      quickBooksTaxableStatus: "taxable"
+    }));
+    expect(laborLine?.metadata?.invoiceLineSnapshot).toEqual(expect.objectContaining({
+      taxable: true,
+      effectiveTaxable: true
     }));
     expect(summary?.subtotal).toBe(230);
   });

@@ -3203,10 +3203,11 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
       }
 
       const resolvedUnitPrice = item.unitPrice ?? currentMatch.unitPrice ?? null;
-      const taxSnapshot = typeof item.taxable === "boolean"
+      const taxSnapshot = item.taxableSource === "override"
         ? {}
         : buildCatalogTaxSnapshot({
             quickbooksItemId: currentMatch.quickbooksItemId,
+            itemType: currentMatch.itemType,
             taxable: currentMatch.taxable,
             rawJson: null
           });
