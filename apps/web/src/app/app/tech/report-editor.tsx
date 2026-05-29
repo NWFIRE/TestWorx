@@ -293,6 +293,21 @@ function ReportSelectControl({
   placeholder?: string;
 }) {
   const selectedOption = options.find((option) => option.value === value) ?? null;
+  const optionClassName = (optionValue: string, isActive: boolean) => {
+    if (optionValue === "green") {
+      return isActive ? "border-emerald-300 bg-emerald-600 text-white" : "border-emerald-200 bg-emerald-50 text-emerald-800";
+    }
+    if (optionValue === "yellow") {
+      return isActive ? "border-amber-300 bg-amber-500 text-white" : "border-amber-200 bg-amber-50 text-amber-800";
+    }
+    if (optionValue === "red") {
+      return isActive ? "border-rose-300 bg-rose-600 text-white" : "border-rose-200 bg-rose-50 text-rose-800";
+    }
+
+    return isActive
+      ? "border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary)] text-[var(--tenant-primary-contrast)]"
+      : "border-slate-200 bg-white text-slate-600";
+  };
 
   return (
     <div className="space-y-3">
@@ -306,11 +321,7 @@ function ReportSelectControl({
             return (
               <button
                 key={option.value}
-                className={`min-h-12 rounded-2xl border px-4 py-3 text-sm font-semibold uppercase tracking-[0.12em] transition ${
-                  isActive
-                    ? "border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary)] text-[var(--tenant-primary-contrast)]"
-                    : "border-slate-200 bg-white text-slate-600"
-                } disabled:opacity-50`}
+                className={`min-h-12 rounded-2xl border px-4 py-3 text-sm font-semibold uppercase tracking-[0.12em] transition ${optionClassName(option.value, isActive)} disabled:opacity-50`}
                 disabled={disabled}
                 onClick={() => onChange(option.value)}
                 type="button"
@@ -685,7 +696,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
     updateDraft((currentDraft) => {
       const currentSection = sectionState(sectionId, currentDraft);
       const currentRows = Array.isArray(currentSection.fields?.[field.id]) ? currentSection.fields?.[field.id] as Array<Record<string, ReportPrimitiveValue>> : [];
-      const nextRow = buildRepeaterRowDefaults(data.template, sectionId, field.id, currentRows.length);
+      const nextRow = buildRepeaterRowDefaults(data.template, sectionId, field.id, currentRows.length, currentSection.fields);
 
       return {
         ...currentDraft,

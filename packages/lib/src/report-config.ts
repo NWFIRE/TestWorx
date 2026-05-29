@@ -1691,6 +1691,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
             description: "Add each protected hood system for this inspection.",
             type: "repeater",
             addLabel: "Add Hood",
+            carryForwardPriorRows: true,
             validation: [{ type: "minRows", value: 1, message: "Add at least one hood before finalizing." }],
             rowFields: [
               {
@@ -1746,6 +1747,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
             description: "Add each appliance protected under the listed hoods.",
             type: "repeater",
             addLabel: "Add Appliance",
+            carryForwardPriorRows: true,
             validation: [{ type: "minRows", value: 1, message: "Add at least one appliance row before finalizing." }],
             rowFields: [
               {
@@ -1827,7 +1829,7 @@ export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefini
       },
       {
         id: "tank-and-service",
-        label: "Agent tank and service",
+        label: "Links, Caps, Cartridges, Etc.",
         description: "Track service materials used and related maintenance notes.",
         fields: [
           {

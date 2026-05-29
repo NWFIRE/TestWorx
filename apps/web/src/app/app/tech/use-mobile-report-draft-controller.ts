@@ -418,7 +418,7 @@ export function useMobileReportDraftController({
       const currentRows = Array.isArray(currentSection.fields?.[field.id])
         ? currentSection.fields[field.id] as unknown as Array<Record<string, ReportPrimitiveValue>>
         : [];
-      const nextRow = buildRepeaterRowDefaults(data.template, sectionId, field.id, currentRows.length);
+      const nextRow = buildRepeaterRowDefaults(data.template, sectionId, field.id, currentRows.length, currentSection.fields);
 
       return {
         ...currentDraft,

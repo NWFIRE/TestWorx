@@ -390,7 +390,96 @@ const carryForwardDraftSchema = z.object({
 
 function parseOptionalDraft(input: unknown) {
   const parsed = input ? carryForwardDraftSchema.safeParse(input) : null;
-  return parsed?.success ? parsed.data : null;
+  return parsed?.success ? migrateLegacyKitchenSuppressionDraft(parsed.data) : null;
+}
+
+function firstPrimitive(...values: unknown[]) {
+  return values.map(asPrimitiveValue).find((value) => !isEmptyValue(value));
+}
+
+function legacyKitchenHoodName(row: Record<string, unknown>, index: number) {
+  return String(firstPrimitive(row.hoodName, row.protectedArea, row.location, row.assetTag) ?? `Hood ${index + 1}`);
+}
+
+function asRepeaterRows(value: unknown) {
+  return Array.isArray(value) ? value.filter(isRecord) as Array<Record<string, ReportPrimitiveValue>> : [];
+}
+
+function migrateLegacyKitchenSuppressionDraft(draft: z.infer<typeof carryForwardDraftSchema>) {
+  const applianceCoverage = draft.sections?.["appliance-coverage"];
+  const protectedSystems = applianceCoverage?.fields?.protectedSystems;
+  if (!Array.isArray(protectedSystems)) {
+    return draft;
+  }
+
+  const legacyRows = protectedSystems.filter(isRecord);
+  if (legacyRows.length === 0) {
+    return draft;
+  }
+
+  const firstSystem = legacyRows[0] ?? {};
+  const existingSystemDetails = draft.sections?.["system-details"];
+  const existingCoverageFields = applianceCoverage?.fields ?? {};
+  const hoodsAlreadyMapped = Array.isArray(existingCoverageFields.hoods) && existingCoverageFields.hoods.length > 0;
+  const appliancesAlreadyMapped = Array.isArray(existingCoverageFields.hoodAppliances) && existingCoverageFields.hoodAppliances.length > 0;
+
+  const mappedHoods: Array<Record<string, ReportPrimitiveValue>> = hoodsAlreadyMapped
+    ? asRepeaterRows(existingCoverageFields.hoods)
+    : legacyRows.map((row, index) => ({
+        hoodName: legacyKitchenHoodName(row, index),
+        hoodSize: firstPrimitive(row.hoodSize, row.size) ?? "",
+        ductSize: firstPrimitive(row.ductSize) ?? "",
+        ductQuantity: firstPrimitive(row.ductQuantity) ?? "",
+        ductNozzleQuantity: firstPrimitive(row.ductNozzleQuantity) ?? "",
+        ductNozzleType: firstPrimitive(row.ductNozzleType) ?? ""
+      }));
+
+  const mappedAppliances: Array<Record<string, ReportPrimitiveValue>> = appliancesAlreadyMapped
+    ? asRepeaterRows(existingCoverageFields.hoodAppliances)
+    : legacyRows.flatMap((row, index) => {
+        const applianceCount = firstPrimitive(row.applianceCount, row.coveredAppliances);
+        return isEmptyValue(applianceCount)
+          ? []
+          : [{
+              hoodName: legacyKitchenHoodName(row, index),
+              appliance: `${applianceCount} appliance${Number(applianceCount) === 1 ? "" : "s"} recorded`,
+              size: "",
+              applianceNozzleQuantity: "",
+              applianceNozzleType: ""
+            }];
+      });
+
+  return {
+    ...draft,
+    sections: {
+      ...(draft.sections ?? {}),
+      "system-details": {
+        status: existingSystemDetails?.status ?? applianceCoverage?.status ?? "pending",
+        notes: existingSystemDetails?.notes ?? "",
+        fields: {
+          ...(existingSystemDetails?.fields ?? {}),
+          systemSizeGallons: firstPrimitive(existingSystemDetails?.fields?.systemSizeGallons, firstSystem.systemSizeGallons, firstSystem.systemSize) ?? "",
+          numberOfCylinders: firstPrimitive(existingSystemDetails?.fields?.numberOfCylinders, firstSystem.numberOfCylinders, firstSystem.cylinderCount) ?? "",
+          ul300Compliant: firstPrimitive(existingSystemDetails?.fields?.ul300Compliant, firstSystem.ul300Compliant) ?? false,
+          systemLocation: firstPrimitive(existingSystemDetails?.fields?.systemLocation, firstSystem.location) ?? "",
+          areaProtected: firstPrimitive(existingSystemDetails?.fields?.areaProtected, firstSystem.protectedArea) ?? "",
+          manufacturer: firstPrimitive(existingSystemDetails?.fields?.manufacturer, firstSystem.manufacturer) ?? "",
+          model: firstPrimitive(existingSystemDetails?.fields?.model, firstSystem.model) ?? "",
+          cylinderDates: firstPrimitive(existingSystemDetails?.fields?.cylinderDates, firstSystem.cylinderDates) ?? "",
+          lastCylinderHydroDate: firstPrimitive(existingSystemDetails?.fields?.lastCylinderHydroDate, firstSystem.lastCylinderHydroDate) ?? ""
+        }
+      },
+      "appliance-coverage": {
+        status: applianceCoverage?.status ?? "pending",
+        notes: applianceCoverage?.notes ?? "",
+        fields: {
+          ...existingCoverageFields,
+          hoods: mappedHoods,
+          hoodAppliances: mappedAppliances
+        }
+      }
+    }
+  };
 }
 
 function normalizePrimitiveField(field: Exclude<ReportFieldDefinition, { type: "repeater" }>, value: unknown): ReportPrimitiveValue {
@@ -924,7 +1013,8 @@ export function buildRepeaterRowDefaults(
   template: ReportTemplateDefinition,
   sectionId: string,
   repeaterFieldId: string,
-  existingRowCount = 0
+  existingRowCount = 0,
+  currentSectionFields?: Record<string, unknown>
 ) {
   const section = template.sections.find((item) => item.id === sectionId);
   const repeaterField = section?.fields.find((field) => field.id === repeaterFieldId);
@@ -945,6 +1035,18 @@ export function buildRepeaterRowDefaults(
   defaults[INTERNAL_REPEATER_ROW_ID] = createRepeaterRowId();
   defaults.visitStatus = "new";
   defaults.billableStatus = "billable_new";
+
+  if (sectionId === "appliance-coverage" && repeaterFieldId === "hoodAppliances" && isEmptyValue(defaults.hoodName)) {
+    const hoods = Array.isArray(currentSectionFields?.hoods)
+      ? currentSectionFields.hoods.filter(isRecord)
+      : [];
+    const lastHoodName = [...hoods].reverse()
+      .map((row) => asPrimitiveValue(row.hoodName))
+      .find((value) => typeof value === "string" && value.trim().length > 0);
+    if (lastHoodName) {
+      defaults.hoodName = lastHoodName;
+    }
+  }
 
   return applyRepeaterRowEnhancements(repeaterField.rowFields, defaults) as Record<string, ReportPrimitiveValue>;
 }

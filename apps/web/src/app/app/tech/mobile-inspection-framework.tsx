@@ -312,7 +312,7 @@ export function MobileChecklistItem({
   title: string;
   description?: string | null;
   value: string;
-  options: Array<{ label: string; value: string; tone?: "positive" | "negative" | "neutral" }>;
+  options: Array<{ label: string; value: string; tone?: "positive" | "warning" | "negative" | "neutral" }>;
   onSelect: (value: string) => void;
   note?: string;
   onNoteChange?: (value: string) => void;
@@ -338,6 +338,8 @@ export function MobileChecklistItem({
           const active = option.value === value;
           const toneClass = option.tone === "positive"
             ? active ? "border-emerald-300 bg-emerald-600 text-white" : "border-slate-200 bg-white text-slate-700"
+            : option.tone === "warning"
+              ? active ? "border-amber-300 bg-amber-500 text-white" : "border-slate-200 bg-white text-slate-700"
             : option.tone === "negative"
               ? active ? "border-rose-300 bg-rose-600 text-white" : "border-slate-200 bg-white text-slate-700"
               : active ? "border-slate-300 bg-slate-700 text-white" : "border-slate-200 bg-white text-slate-700";
@@ -634,12 +636,15 @@ function formatSectionStatus(status: MobileInspectionSectionStatus) {
   return "Not Started";
 }
 
-export function mapOptionTone(value: ReportPrimitiveValue | undefined): "positive" | "negative" | "neutral" {
+export function mapOptionTone(value: ReportPrimitiveValue | undefined): "positive" | "warning" | "negative" | "neutral" {
   const normalized = String(value ?? "").toLowerCase();
-  if (["pass", "yes", "good", "normal", "stable", "current", "compliant"].includes(normalized)) {
+  if (["pass", "yes", "good", "normal", "stable", "current", "compliant", "green"].includes(normalized)) {
     return "positive";
   }
-  if (["fail", "no", "deficiency", "damaged", "attention", "poor", "low", "high", "needs_repair"].includes(normalized)) {
+  if (["yellow", "attention", "deficiency", "needs_repair"].includes(normalized)) {
+    return "warning";
+  }
+  if (["fail", "no", "red", "damaged", "poor", "low", "high"].includes(normalized)) {
     return "negative";
   }
   return "neutral";

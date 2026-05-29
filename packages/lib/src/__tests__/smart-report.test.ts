@@ -721,9 +721,16 @@ describe("smart report foundations", () => {
     const template = resolveReportTemplate({ inspectionType: "kitchen_suppression", assets: [] });
     const firstHood = buildRepeaterRowDefaults(template, "appliance-coverage", "hoods", 0);
     const secondHood = buildRepeaterRowDefaults(template, "appliance-coverage", "hoods", 1);
+    const applianceUnderSecondHood = buildRepeaterRowDefaults(template, "appliance-coverage", "hoodAppliances", 0, {
+      hoods: [
+        { hoodName: "Hood 1" },
+        { hoodName: "Hood 2" }
+      ]
+    });
 
     expect(firstHood.hoodName).toBe("Hood 1");
     expect(secondHood.hoodName).toBe("Hood 2");
+    expect(applianceUnderSecondHood.hoodName).toBe("Hood 2");
   });
 
   it("applies bulk result actions to repeater rows and preserves the changes through normalization", () => {
@@ -2526,8 +2533,9 @@ describe("smart report foundations", () => {
     expect(draft.sections["system-details"]?.fields.systemLocation).toBe("Ground floor commercial kitchen");
     expect(draft.sections["system-details"]?.fields.areaProtected).toBe("Line cook hood");
     expect(draft.sections["system-details"]?.fields.manufacturer).toBe("Ansul");
-    expect(draft.sections["appliance-coverage"]?.fields.hoods).toEqual([]);
-    expect(draft.sections["appliance-coverage"]?.fields.hoodAppliances).toEqual([]);
+    expect((draft.sections["appliance-coverage"]?.fields.hoods as Array<Record<string, unknown>>)[0]?.hoodName).toBe("Hood 1");
+    expect((draft.sections["appliance-coverage"]?.fields.hoodAppliances as Array<Record<string, unknown>>)[0]?.hoodName).toBe("Hood 1");
+    expect((draft.sections["appliance-coverage"]?.fields.hoodAppliances as Array<Record<string, unknown>>)[0]?.appliance).toBe("Fryer");
     expect(draft.sections["system-checklist"]?.fields.allAppliancesProtected).toBe("yes");
     expect(draft.sections["system-checklist"]?.fields.ductPlenumProtected).toBe("na");
     expect(draft.sections["system-checklist"]?.fields.hoodCleanedPerNFPA96).toBe("na");
@@ -2756,8 +2764,10 @@ describe("smart report foundations", () => {
     });
 
     expect(draft.sections["system-details"]).toBeDefined();
-    expect(draft.sections["appliance-coverage"]?.fields.hoods).toEqual([]);
-    expect(draft.sections["appliance-coverage"]?.fields.hoodAppliances).toEqual([]);
+    expect((draft.sections["appliance-coverage"]?.fields.hoods as Array<Record<string, unknown>>)[0]?.hoodName).toBe("Line cook hood");
+    expect((draft.sections["appliance-coverage"]?.fields.hoodAppliances as Array<Record<string, unknown>>)[0]?.hoodName).toBe("Line cook hood");
+    expect((draft.sections["appliance-coverage"]?.fields.hoodAppliances as Array<Record<string, unknown>>)[0]?.appliance).toBe("4 appliances recorded");
+    expect(draft.sections["system-details"]?.fields.systemLocation).toBe("Ground floor commercial kitchen");
     expect(draft.sections["appliance-coverage"]?.fields.coverageNotes).toBe("Legacy coverage notes");
     expect(draft.sections["system-checklist"]?.fields.allAppliancesProtected).toBe("na");
     expect(draft.sections["actuation-and-fuel"]).toBeUndefined();
