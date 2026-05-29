@@ -298,6 +298,7 @@ export function InspectionSchedulerForm({
   const externalDocumentsInputRef = useRef<HTMLInputElement>(null);
   const duplicateResolutionInputRef = useRef<HTMLInputElement>(null);
   const duplicateExistingInspectionInputRef = useRef<HTMLInputElement>(null);
+  const duplicateModalRef = useRef<HTMLDivElement | null>(null);
   const lastErrorRef = useRef<string | null>(null);
   const lastSuccessRef = useRef<string | null>(null);
   const lastAppliedInitialValuesRef = useRef<string>(serializeInitialValues(initialValues));
@@ -596,13 +597,37 @@ export function InspectionSchedulerForm({
       return;
     }
 
-    const onKeyDown = (event: KeyboardEvent) => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusTimeout = window.setTimeout(() => duplicateModalRef.current?.querySelector<HTMLElement>("button, input, select, textarea, [href]")?.focus(), 20);
+
+    function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setDuplicateWarningDismissed(true);
       }
-    };
+      if (event.key === "Tab") {
+        const focusable = duplicateModalRef.current?.querySelectorAll<HTMLElement>("button, input, select, textarea, [href], [tabindex]:not([tabindex='-1'])");
+        if (!focusable?.length) {
+          return;
+        }
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }
+    }
+
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.clearTimeout(focusTimeout);
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [duplicateWarning]);
 
   return (
@@ -1079,8 +1104,18 @@ export function InspectionSchedulerForm({
         </div>
       ) : null}
       {duplicateWarning ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 px-3 py-4 backdrop-blur-sm sm:items-center sm:px-6" role="dialog" aria-modal="true" aria-labelledby="duplicate-inspection-title">
-          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[2rem] border border-white/70 bg-white p-5 shadow-2xl sm:p-6">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-3 py-4 backdrop-blur-sm sm:px-6"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setDuplicateWarningDismissed(true);
+            }
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="duplicate-inspection-title"
+        >
+          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[2rem] border border-white/70 bg-white p-5 shadow-2xl sm:p-6" ref={duplicateModalRef}>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-600">Duplicate protection</p>

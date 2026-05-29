@@ -41,6 +41,7 @@ function variantClasses(variant: ConfirmDialogVariant) {
 export function useConfirmDialog() {
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
   const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
+  const dialogPanelRef = useRef<HTMLDivElement | null>(null);
 
   const close = useCallback((confirmed: boolean) => {
     setPendingConfirmation((current) => {
@@ -71,6 +72,24 @@ export function useConfirmDialog() {
         event.preventDefault();
         close(true);
       }
+      if (event.key === "Tab") {
+        const focusable = dialogPanelRef.current?.querySelectorAll<HTMLElement>(
+          "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
+        );
+        if (!focusable?.length) {
+          return;
+        }
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }
     };
 
     window.addEventListener("keydown", onKeyDown);
@@ -93,7 +112,7 @@ export function useConfirmDialog() {
       }}
       role="dialog"
     >
-      <div className="w-full max-w-lg rounded-[2rem] border border-white/80 bg-white p-5 shadow-[0_24px_80px_rgba(15,23,42,0.24)] animate-in zoom-in-95 slide-in-from-bottom-3 duration-200 sm:p-6">
+      <div className="max-h-[calc(100vh-3rem)] w-full max-w-lg overflow-y-auto rounded-[2rem] border border-white/80 bg-white p-5 shadow-[0_24px_80px_rgba(15,23,42,0.24)] animate-in zoom-in-95 duration-200 sm:p-6" ref={dialogPanelRef}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <span className={`inline-flex rounded-full border px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.18em] ${variantClasses(pendingConfirmation.variant ?? "default").badge}`}>

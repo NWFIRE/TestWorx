@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 
-type ToastTone = "success" | "error" | "info";
+type ToastTone = "success" | "warning" | "error" | "info";
 
 type ToastInput = {
   title: string;
@@ -24,12 +24,14 @@ function cn(...classes: Array<string | false | null | undefined>) {
 
 const toneClasses: Record<ToastTone, string> = {
   success: "border-emerald-200 bg-white text-slate-900 shadow-[0_18px_44px_rgba(5,150,105,0.12)]",
+  warning: "border-amber-200 bg-white text-slate-900 shadow-[0_18px_44px_rgba(245,158,11,0.12)]",
   error: "border-rose-200 bg-white text-slate-900 shadow-[0_18px_44px_rgba(225,29,72,0.12)]",
   info: "border-slate-200 bg-white text-slate-900 shadow-[0_18px_44px_rgba(15,23,42,0.12)]"
 };
 
 const accentClasses: Record<ToastTone, string> = {
   success: "bg-emerald-500",
+  warning: "bg-amber-500",
   error: "bg-rose-500",
   info: "bg-[var(--tenant-primary)]"
 };

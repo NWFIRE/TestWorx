@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { inspectionTypeRegistry } from "@testworx/lib";
@@ -50,6 +50,7 @@ export function AddReportTypeControl({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [addedReport, setAddedReport] = useState<{ taskId: string; label: string } | null>(null);
   const [isPending, startTransition] = useTransition();
+  const modalPanelRef = useRef<HTMLDivElement | null>(null);
 
   const normalizedExistingLabels = useMemo(
     () => existingReports.map((report) => report.displayLabel.trim().toLowerCase()),
@@ -71,14 +72,37 @@ export function AddReportTypeControl({
       return;
     }
 
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusTimeout = window.setTimeout(() => modalPanelRef.current?.querySelector<HTMLElement>("input, button")?.focus(), 20);
+
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setIsOpen(false);
       }
+      if (event.key === "Tab") {
+        const focusable = modalPanelRef.current?.querySelectorAll<HTMLElement>("button, input, select, textarea, [href], [tabindex]:not([tabindex='-1'])");
+        if (!focusable?.length) {
+          return;
+        }
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }
     }
 
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.clearTimeout(focusTimeout);
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [isOpen]);
 
   function resetAndOpen() {
@@ -118,12 +142,22 @@ export function AddReportTypeControl({
       </button>
 
       {isOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 px-3 py-4 backdrop-blur-sm sm:items-center">
-          <div className="max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.35)]">
+        <div
+          aria-labelledby="add-report-title"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-3 py-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setIsOpen(false);
+            }
+          }}
+          role="dialog"
+        >
+          <div className="max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.35)]" ref={modalPanelRef}>
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-5 sm:px-6">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-700">Current visit</p>
-                <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Add Report to This Inspection</h2>
+                <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950" id="add-report-title">Add Report to This Inspection</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">Choose the additional report needed for this visit.</p>
               </div>
               <button
