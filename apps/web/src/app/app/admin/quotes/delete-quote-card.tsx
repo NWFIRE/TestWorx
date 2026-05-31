@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 import { useConfirmDialog } from "../../confirm-dialog";
 
@@ -24,6 +25,7 @@ export function DeleteQuoteCard({
   redirectTo?: string | null;
   disabled?: boolean;
 }) {
+  const router = useRouter();
   const [state, formAction, pending] = useActionState(action, initialState);
   const formRef = useRef<HTMLFormElement | null>(null);
   const confirmedSubmitRef = useRef(false);
@@ -31,9 +33,9 @@ export function DeleteQuoteCard({
 
   useEffect(() => {
     if (state.success && state.redirectTo) {
-      window.location.replace(state.redirectTo);
+      router.replace(state.redirectTo);
     }
-  }, [state.redirectTo, state.success]);
+  }, [router, state.redirectTo, state.success]);
 
   return (
     <form

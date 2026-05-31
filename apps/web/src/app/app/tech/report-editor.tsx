@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { applyRepeaterBulkAction, applyRepeaterRowSmartUpdate, applySectionFieldSmartUpdate, buildRepeaterRowDefaults, buildReportPreview, describeRepeaterRowLabel, duplicateRepeaterRows, getReportPhotoValidationError, isFieldVisible, prepareReportPhotoForDraft, reportPhotoPreparationConfig, shouldAutosaveDraft } from "@testworx/lib";
@@ -391,6 +392,7 @@ function ReportBooleanControl({
 }
 
 export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
+  const router = useRouter();
   const [draft, setDraft] = useState<ReportDraft>(data.draft);
   const [taskDisplayLabel, setTaskDisplayLabel] = useState(data.customInspectionTypeLabel ?? "");
   const [activeSectionId, setActiveSectionId] = useState<string>(data.draft.activeSectionId ?? data.template.sections[0]?.id ?? "");
@@ -998,7 +1000,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
 
     if (localRecordRef.current?.pendingFinalize) {
       setSaveState(buildReportSaveState(localRecordRef.current, data.reportStatus));
-      window.location.assign("/app/tech/inspections?finalize=queued");
+      router.push("/app/tech/inspections?finalize=queued");
       return;
     }
 
@@ -1035,7 +1037,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
       setSaveState("Finalize queued");
       setDirty(false);
 
-      window.location.assign("/app/tech/inspections?finalize=queued");
+      router.push("/app/tech/inspections?finalize=queued");
     } catch (error) {
       setFinalizeErrorMessage(toTechnicianFacingSaveMessage(error instanceof Error ? error.message : null, "finalize"));
     } finally {
