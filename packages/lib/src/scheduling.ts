@@ -117,7 +117,8 @@ export const upcomingServiceScheduleTransactionOptions = {
 } as const;
 export const upcomingServiceScheduleGenerationLimits = {
   serviceSchedulesBackfilledPerRequest: 100,
-  inspectionGroupsGeneratedPerRequest: 10
+  inspectionGroupsGeneratedPerRequest: 10,
+  serviceSchedulesAdvancedPerRequest: 100
 } as const;
 export const terminalInspectionStatuses = [
   InspectionStatus.completed,
@@ -4660,15 +4661,12 @@ function serviceScheduleExactDueKey(input: {
   ].join("\u001f");
 }
 
-async function ensureServiceSchedulesForCompletedRecurringTasksTx(
-  tx: Prisma.TransactionClient,
-  input: {
-    tenantId: string;
-    rangeStart: Date;
-    rangeEnd: Date;
-  }
-) {
-  const completedRecurringTasks = await tx.inspectionTask.findMany({
+async function ensureServiceSchedulesForCompletedRecurringTasks(input: {
+  tenantId: string;
+  rangeStart: Date;
+  rangeEnd: Date;
+}) {
+  const completedRecurringTasks = await prisma.inspectionTask.findMany({
     where: {
       tenantId: input.tenantId,
       serviceScheduleId: null,
@@ -4716,7 +4714,7 @@ async function ensureServiceSchedulesForCompletedRecurringTasksTx(
     return 0;
   }
 
-  const existingSchedules = await tx.serviceSchedule.findMany({
+  const existingSchedules = await prisma.serviceSchedule.findMany({
     where: {
       tenantId: input.tenantId,
       isActive: true,
@@ -4772,7 +4770,22 @@ async function ensureServiceSchedulesForCompletedRecurringTasksTx(
     }
 
     const dueMonth = format(nextDueDate, "yyyy-MM");
-    await tx.serviceSchedule.create({
+    const existingSchedule = await prisma.serviceSchedule.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        customerCompanyId: task.inspection.customerCompanyId,
+        siteId: task.inspection.siteId,
+        reportType: task.inspectionType,
+        cadence: frequency,
+        nextDueDate
+      },
+      select: { id: true }
+    });
+    if (existingSchedule) {
+      continue;
+    }
+
+    await prisma.serviceSchedule.create({
       data: {
         tenantId: input.tenantId,
         customerCompanyId: task.inspection.customerCompanyId,
@@ -4792,16 +4805,13 @@ async function ensureServiceSchedulesForCompletedRecurringTasksTx(
   return createdCount;
 }
 
-async function generateMissingInspectionsFromServiceSchedulesTx(
-  tx: Prisma.TransactionClient,
-  input: {
-    tenantId: string;
-    actorUserId: string;
-    rangeStart: Date;
-    rangeEnd: Date;
-  }
-) {
-  const schedules = await tx.serviceSchedule.findMany({
+async function generateMissingInspectionsFromServiceSchedules(input: {
+  tenantId: string;
+  actorUserId: string;
+  rangeStart: Date;
+  rangeEnd: Date;
+}) {
+  const schedules = await prisma.serviceSchedule.findMany({
     where: {
       tenantId: input.tenantId,
       isActive: true,
@@ -4828,7 +4838,7 @@ async function generateMissingInspectionsFromServiceSchedulesTx(
     return 0;
   }
 
-  const existingTasks = await tx.inspectionTask.findMany({
+  const existingTasks = await prisma.inspectionTask.findMany({
     where: {
       tenantId: input.tenantId,
       OR: [
@@ -4930,75 +4940,81 @@ async function generateMissingInspectionsFromServiceSchedulesTx(
       continue;
     }
 
-    const inspection = await tx.inspection.create({
-      data: {
-        tenantId: input.tenantId,
-        customerCompanyId: firstSchedule.customerCompanyId,
-        siteId: firstSchedule.siteId,
-        assignedTechnicianId: null,
-        createdByUserId: input.actorUserId,
-        scheduledStart,
-        scheduledEnd: null,
-        status: InspectionStatus.to_be_completed,
-        notes: null,
-        claimable: true
-      }
-    });
-
-    await snapshotProviderAssignmentForInspectionTx(tx, {
-      tenantId: input.tenantId,
-      inspectionId: inspection.id,
-      siteId: firstSchedule.siteId,
-      scheduledStart
-    });
-
-    await syncInspectionTechnicianAssignments(tx, inspection.id, input.tenantId, []);
-    await writeInspectionTasks(
-      tx,
-      inspection.id,
-      input.tenantId,
-      scheduledStart,
-      scheduledStart,
-      group.map((schedule) => {
-        const dueDate = schedule.nextDueDate ?? scheduledStart;
-        return {
-          inspectionType: schedule.reportType,
-          serviceScheduleId: schedule.id,
-          frequency: schedule.cadence,
+    await prisma.$transaction(async (tx) => {
+      const inspection = await tx.inspection.create({
+        data: {
+          tenantId: input.tenantId,
+          customerCompanyId: firstSchedule.customerCompanyId,
+          siteId: firstSchedule.siteId,
           assignedTechnicianId: null,
-          dueMonth: format(dueDate, "yyyy-MM"),
-          dueDate,
-          schedulingStatus: "scheduled_now",
-          recurrenceSeriesId: schedule.id,
-          recurrenceAnchorScheduledStart: dueDate,
-          recurrenceNextDueAt: nextDueFrom(dueDate, schedule.cadence)
-        };
-      })
-    );
+          createdByUserId: input.actorUserId,
+          scheduledStart,
+          scheduledEnd: null,
+          status: InspectionStatus.to_be_completed,
+          notes: null,
+          claimable: true
+        }
+      });
 
-    await createAuditLog(tx, {
-      tenantId: input.tenantId,
-      actorUserId: input.actorUserId,
-      action: "inspection.service_schedule_generated",
-      entityId: inspection.id,
-      metadata: {
-        serviceScheduleIds: group.map((schedule) => schedule.id),
-        scheduledStart: scheduledStart.toISOString()
-      }
-    });
+      await snapshotProviderAssignmentForInspectionTx(tx, {
+        tenantId: input.tenantId,
+        inspectionId: inspection.id,
+        siteId: firstSchedule.siteId,
+        scheduledStart
+      });
+
+      await syncInspectionTechnicianAssignments(tx, inspection.id, input.tenantId, []);
+      await writeInspectionTasks(
+        tx,
+        inspection.id,
+        input.tenantId,
+        scheduledStart,
+        scheduledStart,
+        group.map((schedule) => {
+          const dueDate = schedule.nextDueDate ?? scheduledStart;
+          return {
+            inspectionType: schedule.reportType,
+            serviceScheduleId: schedule.id,
+            frequency: schedule.cadence,
+            assignedTechnicianId: null,
+            dueMonth: format(dueDate, "yyyy-MM"),
+            dueDate,
+            schedulingStatus: "scheduled_now",
+            recurrenceSeriesId: schedule.id,
+            recurrenceAnchorScheduledStart: dueDate,
+            recurrenceNextDueAt: nextDueFrom(dueDate, schedule.cadence)
+          };
+        })
+      );
+
+      await createAuditLog(tx, {
+        tenantId: input.tenantId,
+        actorUserId: input.actorUserId,
+        action: "inspection.service_schedule_generated",
+        entityId: inspection.id,
+        metadata: {
+          serviceScheduleIds: group.map((schedule) => schedule.id),
+          scheduledStart: scheduledStart.toISOString()
+        }
+      });
+    }, upcomingServiceScheduleTransactionOptions);
     createdInspectionCount += 1;
     for (const schedule of group) {
       scheduleIdsToAdvance.add(schedule.id);
     }
   }
 
+  let advancedScheduleCount = 0;
   for (const schedule of dueSchedules) {
+    if (advancedScheduleCount >= upcomingServiceScheduleGenerationLimits.serviceSchedulesAdvancedPerRequest) {
+      break;
+    }
     if (!scheduleIdsToAdvance.has(schedule.id) || !schedule.nextDueDate) {
       continue;
     }
 
     const followingDueDate = nextDueFrom(schedule.nextDueDate, schedule.cadence);
-    await tx.serviceSchedule.update({
+    await prisma.serviceSchedule.update({
       where: { id: schedule.id },
       data: {
         nextDueDate: followingDueDate,
@@ -5006,6 +5022,7 @@ async function generateMissingInspectionsFromServiceSchedulesTx(
         dueDayOrWindow: followingDueDate ? format(followingDueDate, "yyyy-MM-dd") : null
       }
     });
+    advancedScheduleCount += 1;
   }
 
   return createdInspectionCount;
@@ -5017,22 +5034,20 @@ async function ensureUpcomingServiceScheduleInspections(input: {
   rangeStart: Date;
   rangeEnd: Date;
 }) {
-  return prisma.$transaction(async (tx) => {
-    if (!await hasServiceScheduleInfrastructure(tx)) {
-      return {
-        serviceSchedulesBackfilled: 0,
-        inspectionsGenerated: 0
-      };
-    }
-
-    const serviceSchedulesBackfilled = await ensureServiceSchedulesForCompletedRecurringTasksTx(tx, input);
-    const inspectionsGenerated = await generateMissingInspectionsFromServiceSchedulesTx(tx, input);
-
+  if (!await hasServiceScheduleInfrastructure(prisma)) {
     return {
-      serviceSchedulesBackfilled,
-      inspectionsGenerated
+      serviceSchedulesBackfilled: 0,
+      inspectionsGenerated: 0
     };
-  }, upcomingServiceScheduleTransactionOptions);
+  }
+
+  const serviceSchedulesBackfilled = await ensureServiceSchedulesForCompletedRecurringTasks(input);
+  const inspectionsGenerated = await generateMissingInspectionsFromServiceSchedules(input);
+
+  return {
+    serviceSchedulesBackfilled,
+    inspectionsGenerated
+  };
 }
 
 export async function getAdminUpcomingInspectionsData(

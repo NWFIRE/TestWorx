@@ -61,6 +61,8 @@ describe("schedule creation parsing", () => {
     expect(upcomingServiceScheduleGenerationLimits.serviceSchedulesBackfilledPerRequest).toBeLessThanOrEqual(250);
     expect(upcomingServiceScheduleGenerationLimits.inspectionGroupsGeneratedPerRequest).toBeGreaterThan(0);
     expect(upcomingServiceScheduleGenerationLimits.inspectionGroupsGeneratedPerRequest).toBeLessThanOrEqual(25);
+    expect(upcomingServiceScheduleGenerationLimits.serviceSchedulesAdvancedPerRequest).toBeGreaterThan(0);
+    expect(upcomingServiceScheduleGenerationLimits.serviceSchedulesAdvancedPerRequest).toBeLessThanOrEqual(250);
   });
 
   it("marks multi-system report types as eligible for duplicate tasks", () => {
