@@ -20,7 +20,8 @@ import {
   nextDueFrom,
   parseCreateInspectionFormData,
   pickEarliestNextDueAt,
-  scheduleInspectionSchema
+  scheduleInspectionSchema,
+  upcomingServiceScheduleTransactionOptions
 } from "../scheduling";
 
 function setCurrentVisitServiceLine(formData: FormData, overrides?: Partial<{
@@ -49,6 +50,11 @@ function setCurrentVisitServiceLine(formData: FormData, overrides?: Partial<{
 }
 
 describe("schedule creation parsing", () => {
+  it("keeps upcoming service schedule generation out of Prisma's 5s default transaction timeout", () => {
+    expect(upcomingServiceScheduleTransactionOptions.timeout).toBeGreaterThan(5000);
+    expect(upcomingServiceScheduleTransactionOptions.maxWait).toBeGreaterThanOrEqual(5000);
+  });
+
   it("marks multi-system report types as eligible for duplicate tasks", () => {
     expect(allowsMultipleInspectionTasks("kitchen_suppression")).toBe(true);
     expect(allowsMultipleInspectionTasks("fire_alarm")).toBe(true);

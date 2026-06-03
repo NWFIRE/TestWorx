@@ -111,6 +111,10 @@ export const completedOperationalInspectionStatuses = [
   InspectionStatus.completed,
   InspectionStatus.invoiced
 ] as const;
+export const upcomingServiceScheduleTransactionOptions = {
+  maxWait: 10000,
+  timeout: 30000
+} as const;
 export const terminalInspectionStatuses = [
   InspectionStatus.completed,
   InspectionStatus.invoiced,
@@ -5020,7 +5024,7 @@ async function ensureUpcomingServiceScheduleInspections(input: {
       serviceSchedulesBackfilled,
       inspectionsGenerated
     };
-  });
+  }, upcomingServiceScheduleTransactionOptions);
 }
 
 export async function getAdminUpcomingInspectionsData(
