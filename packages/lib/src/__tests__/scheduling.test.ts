@@ -21,6 +21,7 @@ import {
   parseCreateInspectionFormData,
   pickEarliestNextDueAt,
   scheduleInspectionSchema,
+  upcomingServiceScheduleGenerationLimits,
   upcomingServiceScheduleTransactionOptions
 } from "../scheduling";
 
@@ -53,6 +54,13 @@ describe("schedule creation parsing", () => {
   it("keeps upcoming service schedule generation out of Prisma's 5s default transaction timeout", () => {
     expect(upcomingServiceScheduleTransactionOptions.timeout).toBeGreaterThan(5000);
     expect(upcomingServiceScheduleTransactionOptions.maxWait).toBeGreaterThanOrEqual(5000);
+  });
+
+  it("caps recurring inspection generation during upcoming page loads", () => {
+    expect(upcomingServiceScheduleGenerationLimits.serviceSchedulesBackfilledPerRequest).toBeGreaterThan(0);
+    expect(upcomingServiceScheduleGenerationLimits.serviceSchedulesBackfilledPerRequest).toBeLessThanOrEqual(250);
+    expect(upcomingServiceScheduleGenerationLimits.inspectionGroupsGeneratedPerRequest).toBeGreaterThan(0);
+    expect(upcomingServiceScheduleGenerationLimits.inspectionGroupsGeneratedPerRequest).toBeLessThanOrEqual(25);
   });
 
   it("marks multi-system report types as eligible for duplicate tasks", () => {

@@ -115,6 +115,10 @@ export const upcomingServiceScheduleTransactionOptions = {
   maxWait: 10000,
   timeout: 30000
 } as const;
+export const upcomingServiceScheduleGenerationLimits = {
+  serviceSchedulesBackfilledPerRequest: 100,
+  inspectionGroupsGeneratedPerRequest: 10
+} as const;
 export const terminalInspectionStatuses = [
   InspectionStatus.completed,
   InspectionStatus.invoiced,
@@ -2260,34 +2264,32 @@ async function writeInspectionTasks(
   scheduledStart: Date,
   tasks: ScheduledInspectionTaskInput[]
 ) {
-  await Promise.all(
-    tasks.map((task, index) =>
-      createInspectionTaskWithReport({
-        tx,
-        tenantId,
-        inspectionId,
-        inspectionType: task.inspectionType,
-        serviceScheduleId: task.serviceScheduleId ?? null,
-        frequency: task.frequency,
-        scheduledStart,
-        taskStatus: InspectionStatus.to_be_completed,
-        technicianId: task.assignedTechnicianId ?? null,
-        addedByUserId: null,
-        sortOrder: index,
-        dueMonth: normalizeTaskDueMonth({
-          dueMonth: task.dueMonth,
-          dueDate: task.dueDate ?? null,
-          fallbackMonth: format(inspectionScheduledStart, "yyyy-MM")
-        }),
+  for (const [index, task] of tasks.entries()) {
+    await createInspectionTaskWithReport({
+      tx,
+      tenantId,
+      inspectionId,
+      inspectionType: task.inspectionType,
+      serviceScheduleId: task.serviceScheduleId ?? null,
+      frequency: task.frequency,
+      scheduledStart,
+      taskStatus: InspectionStatus.to_be_completed,
+      technicianId: task.assignedTechnicianId ?? null,
+      addedByUserId: null,
+      sortOrder: index,
+      dueMonth: normalizeTaskDueMonth({
+        dueMonth: task.dueMonth,
         dueDate: task.dueDate ?? null,
-        schedulingStatus: task.schedulingStatus,
-        notes: task.notes,
-        recurrenceSeriesId: task.recurrenceSeriesId,
-        recurrenceAnchorScheduledStart: task.recurrenceAnchorScheduledStart,
-        recurrenceNextDueAt: task.recurrenceNextDueAt
-      })
-    )
-  );
+        fallbackMonth: format(inspectionScheduledStart, "yyyy-MM")
+      }),
+      dueDate: task.dueDate ?? null,
+      schedulingStatus: task.schedulingStatus,
+      notes: task.notes,
+      recurrenceSeriesId: task.recurrenceSeriesId,
+      recurrenceAnchorScheduledStart: task.recurrenceAnchorScheduledStart,
+      recurrenceNextDueAt: task.recurrenceNextDueAt
+    });
+  }
 }
 
 async function createInspectionTaskWithReport(input: {
@@ -4749,7 +4751,7 @@ async function ensureServiceSchedulesForCompletedRecurringTasksTx(
   }
 
   let createdCount = 0;
-  for (const task of candidateTasks) {
+  for (const task of candidateTasks.slice(0, upcomingServiceScheduleGenerationLimits.serviceSchedulesBackfilledPerRequest)) {
     const nextDueDate = task.recurrence?.nextDueAt;
     const frequency = task.recurrence?.frequency;
     if (!nextDueDate || !frequency || frequency === RecurrenceFrequency.ONCE) {
@@ -4902,7 +4904,6 @@ async function generateMissingInspectionsFromServiceSchedulesTx(
     }
 
     schedulesToCreate.push(schedule);
-    scheduleIdsToAdvance.add(schedule.id);
   }
 
   const groupedSchedules = new Map<string, typeof schedulesToCreate>();
@@ -4918,7 +4919,11 @@ async function generateMissingInspectionsFromServiceSchedulesTx(
   }
 
   let createdInspectionCount = 0;
-  for (const group of groupedSchedules.values()) {
+  const groupsToCreate = Array.from(groupedSchedules.values()).slice(
+    0,
+    upcomingServiceScheduleGenerationLimits.inspectionGroupsGeneratedPerRequest
+  );
+  for (const group of groupsToCreate) {
     const firstSchedule = group[0];
     const scheduledStart = firstSchedule?.nextDueDate;
     if (!firstSchedule || !scheduledStart) {
@@ -4982,6 +4987,9 @@ async function generateMissingInspectionsFromServiceSchedulesTx(
       }
     });
     createdInspectionCount += 1;
+    for (const schedule of group) {
+      scheduleIdsToAdvance.add(schedule.id);
+    }
   }
 
   for (const schedule of dueSchedules) {
