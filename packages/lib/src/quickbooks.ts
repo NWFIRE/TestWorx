@@ -2178,10 +2178,11 @@ function buildQuickBooksCustomerPayload(input: {
   isTaxExempt?: boolean | null;
   notes?: string | null;
 }) {
+  const taxFields = buildQuickBooksCustomerTaxFields(input.isTaxExempt);
   return {
     DisplayName: input.customerName,
     CompanyName: input.customerName,
-    Taxable: input.isTaxExempt === true ? false : true,
+    ...taxFields,
     ...(input.billingEmail ? { PrimaryEmailAddr: { Address: input.billingEmail } } : {}),
     ...(input.phone ? { PrimaryPhone: { FreeFormNumber: input.phone } } : {}),
     ...(input.billingAddressLine1
@@ -2210,6 +2211,17 @@ function buildQuickBooksCustomerPayload(input: {
       : {}),
     ...((input.notes || input.siteName) ? { Notes: input.notes ?? `Created by TradeWorx for ${input.siteName}` } : {})
   };
+}
+
+function buildQuickBooksCustomerTaxFields(isTaxExempt?: boolean | null) {
+  return isTaxExempt === true
+    ? {
+        Taxable: false,
+        TaxExemptionReasonId: "1"
+      }
+    : {
+        Taxable: true
+      };
 }
 
 async function resolveQuickBooksCustomer(connection: QuickBooksTenantConnection, summary: {
@@ -2244,7 +2256,7 @@ async function resolveQuickBooksCustomer(connection: QuickBooksTenantConnection,
             Id: existingCustomer.quickbooksCustomerId,
             SyncToken: existingCustomer.syncToken,
             sparse: true,
-            Taxable: summary.isTaxExempt ? false : true
+            ...buildQuickBooksCustomerTaxFields(summary.isTaxExempt)
           },
           entityType: "CustomerCompany",
           entityId: summary.customerCompanyId

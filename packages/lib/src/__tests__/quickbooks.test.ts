@@ -823,7 +823,8 @@ describe("quickbooks billing sync hardening", () => {
       Id: "qbo_customer_1",
       SyncToken: "4",
       sparse: true,
-      Taxable: false
+      Taxable: false,
+      TaxExemptionReasonId: "1"
     }));
 
     const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
@@ -2452,6 +2453,7 @@ describe("quickbooks billing sync hardening", () => {
       Country: "US"
     }));
     expect(createBody.Taxable).toBe(false);
+    expect(createBody.TaxExemptionReasonId).toBe("1");
     expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         action: "customer.quickbooks_synced",
