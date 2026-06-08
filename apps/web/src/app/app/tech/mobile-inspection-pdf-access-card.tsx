@@ -98,6 +98,8 @@ export function MobileInspectionPdfAccessCard({
               <a
                 className="flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-center text-sm font-semibold text-slate-700"
                 href={`/api/inspection-documents/${document.id}?variant=preferred&disposition=inline`}
+                rel="noopener noreferrer"
+                target="_blank"
               >
                 Preview
               </a>
@@ -119,6 +121,8 @@ export function MobileInspectionPdfAccessCard({
             <a
               className="mt-3 flex min-h-11 items-center justify-center rounded-2xl bg-[var(--tenant-primary)] px-3 py-2 text-center text-sm font-semibold text-[var(--tenant-primary-contrast)]"
               href={`/api/attachments/${attachment.id}?disposition=inline`}
+              rel="noopener noreferrer"
+              target="_blank"
             >
               Open PDF
             </a>

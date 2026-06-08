@@ -192,16 +192,31 @@ export function InspectionExternalDocumentsCard({
                 {document.signedAt ? ` | Signed ${new Date(document.signedAt).toLocaleString()}` : ""}
               </p>
               <div className="flex flex-wrap gap-3">
-                <a className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={`/api/inspection-documents/${document.id}?variant=original`}>
+                <a
+                  className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
+                  href={`/api/inspection-documents/${document.id}?variant=original`}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
                   View original
                 </a>
                 {document.annotatedStorageKey ? (
-                  <a className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={`/api/inspection-documents/${document.id}?variant=annotated`}>
+                  <a
+                    className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
+                    href={`/api/inspection-documents/${document.id}?variant=annotated`}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
                     View annotated
                   </a>
                 ) : null}
                 {document.signedStorageKey ? (
-                  <a className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={`/api/inspection-documents/${document.id}?variant=signed`}>
+                  <a
+                    className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
+                    href={`/api/inspection-documents/${document.id}?variant=signed`}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
                     View signed
                   </a>
                 ) : null}

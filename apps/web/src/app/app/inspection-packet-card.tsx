@@ -62,6 +62,7 @@ export function InspectionPacketCard({
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{groupLabel}</p>
               <div className="space-y-3">
                 {groupDocuments.map((document) => (
+                  /* Hosted report pages are app routes; PDF files should open separately so closing the viewer does not close TradeWorx. */
                   <div
                     key={`${document.source}-${document.id}`}
                     className="flex flex-col gap-3 rounded-[1.5rem] border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50/70 md:flex-row md:items-center md:justify-between"
@@ -80,6 +81,8 @@ export function InspectionPacketCard({
                       <a
                         className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
                         href={document.viewPath}
+                        rel={document.category === "hosted_report" ? undefined : "noopener noreferrer"}
+                        target={document.category === "hosted_report" ? undefined : "_blank"}
                       >
                         {document.viewLabel ?? "View PDF"}
                       </a>
