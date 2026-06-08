@@ -120,10 +120,6 @@ export const upcomingServiceScheduleGenerationLimits = {
   inspectionGroupsGeneratedPerRequest: 10,
   serviceSchedulesAdvancedPerRequest: 100
 } as const;
-const queueStatusRepairTransactionOptions = {
-  maxWait: 500,
-  timeout: 5000
-} as const;
 export const terminalInspectionStatuses = [
   InspectionStatus.completed,
   InspectionStatus.invoiced,
@@ -3348,21 +3344,6 @@ export async function repairInspectionStatusConsistency(actor: ActorContext) {
   }));
 }
 
-async function runQueueStatusRepairBestEffort(input: {
-  tenantId: string;
-  actorUserId: string;
-}) {
-  try {
-    await prisma.$transaction((tx) => repairInspectionStatusConsistencyTx(tx, input), queueStatusRepairTransactionOptions);
-  } catch (error) {
-    console.warn("Inspection queue status repair skipped during page load", {
-      tenantId: input.tenantId,
-      code: error instanceof Prisma.PrismaClientKnownRequestError ? error.code : null,
-      message: error instanceof Error ? error.message : String(error)
-    });
-  }
-}
-
 export async function addInspectionTask(actor: ActorContext, input: {
   inspectionId: string;
   inspectionType: keyof typeof inspectionTypeRegistry;
@@ -5264,13 +5245,6 @@ export async function getAdminSchedulingQueueData(
     shouldApplyActiveConsistencyFilter ? activeInspectionQueueConsistencyFilter() : null,
     dueWindowFilter
   ].filter((filter): filter is Prisma.InspectionWhereInput => Boolean(filter));
-
-  if (shouldApplyActiveConsistencyFilter) {
-    await runQueueStatusRepairBestEffort({
-      tenantId,
-      actorUserId: parsedActor.userId
-    });
-  }
 
   const queueWhere: Prisma.InspectionWhereInput = {
     tenantId,
