@@ -345,19 +345,25 @@ export default async function AdminInspectionsPage({
       query,
       technicianId,
       dueWindowEnd: fastManagementWindowEnd,
-      limit: null
+      limit: null,
+      includeCounts: false,
+      includeTechnicians: false
     }),
     getAdminSchedulingQueueData(actor, {
       statuses: effectiveStatuses,
       classifications: requestedClassifications,
       priority: requestedPriority,
       query: "",
-      technicianId
+      technicianId,
+      includeCounts: false,
+      includeTechnicians: false
     }),
     query
       ? getAdminSchedulingQueueData(actor, {
           statuses: inspectionSearchHistoryStatuses,
-          query
+          query,
+          includeCounts: false,
+          includeTechnicians: false
         })
       : Promise.resolve(null),
     getAdminDashboardData(actor)

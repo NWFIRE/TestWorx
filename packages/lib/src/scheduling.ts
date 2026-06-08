@@ -5174,6 +5174,8 @@ export async function getAdminSchedulingQueueData(
     technicianId?: string | null;
     dueWindowEnd?: Date | string | null;
     limit?: number | null;
+    includeCounts?: boolean;
+    includeTechnicians?: boolean;
   }
 ) {
   const parsedActor = parseActor(actor);
@@ -5195,6 +5197,8 @@ export async function getAdminSchedulingQueueData(
   const dueWindowEnd = requestedDueWindowEnd && !Number.isNaN(requestedDueWindowEnd.getTime())
     ? requestedDueWindowEnd
     : null;
+  const includeCounts = input?.includeCounts ?? true;
+  const includeTechnicians = input?.includeTechnicians ?? true;
   const dueWindowEndMonth = dueWindowEnd ? format(dueWindowEnd, "yyyy-MM") : null;
   const limit = input?.limit === null ? null : typeof input?.limit === "number" ? Math.max(1, input.limit) : 40;
   const statusFilter = requestedStatuses.length
@@ -5256,7 +5260,7 @@ export async function getAdminSchedulingQueueData(
     ...(technicianFilter ? technicianFilter : {})
   };
 
-  const inspections = await prisma.inspection.findMany({
+  const inspectionsQuery = prisma.inspection.findMany({
     where: queueWhere,
     include: {
       site: true,
@@ -5269,31 +5273,51 @@ export async function getAdminSchedulingQueueData(
     orderBy: [{ scheduledStart: "asc" }],
     ...(limit ? { take: limit } : {})
   });
-  const countInspections = limit
-    ? await prisma.inspection.findMany({
-        where: queueWhere,
-        select: {
-          id: true,
-          status: true,
-          isPriority: true,
-          scheduledStart: true,
-          assignedTechnicianId: true,
-          convertedFromQuotes: { select: { id: true }, take: 1 },
-          technicianAssignments: { select: { id: true } },
-          tasks: {
-            select: {
-              assignedTechnicianId: true,
-              dueDate: true,
-              dueMonth: true,
-              inspectionType: true,
-              schedulingStatus: true,
-              status: true,
-              report: { select: { status: true, finalizedAt: true } }
-            }
+  const countInspectionsQuery = includeCounts && limit
+    ? prisma.inspection.findMany({
+      where: queueWhere,
+      select: {
+        id: true,
+        status: true,
+        isPriority: true,
+        scheduledStart: true,
+        assignedTechnicianId: true,
+        convertedFromQuotes: { select: { id: true }, take: 1 },
+        technicianAssignments: { select: { id: true } },
+        tasks: {
+          select: {
+            assignedTechnicianId: true,
+            dueDate: true,
+            dueMonth: true,
+            inspectionType: true,
+            schedulingStatus: true,
+            status: true,
+            report: { select: { status: true, finalizedAt: true } }
           }
         }
-      })
-    : inspections;
+      }
+    })
+    : Promise.resolve(null);
+  const technicianOptionsQuery = includeTechnicians
+    ? prisma.user.findMany({
+      where: {
+        tenantId,
+        role: "technician",
+        isActive: true
+      },
+      select: {
+        id: true,
+        name: true
+      },
+      orderBy: [{ name: "asc" }]
+    })
+    : Promise.resolve([]);
+  const [inspections, countInspectionsResult, technicianOptions] = await Promise.all([
+    inspectionsQuery,
+    countInspectionsQuery,
+    technicianOptionsQuery
+  ]);
+  const countInspections = countInspectionsResult ?? inspections;
 
   const mapped = inspections.map((inspection) => {
     const currentTasks = withInspectionTaskDisplayLabels(
@@ -5340,19 +5364,6 @@ export async function getAdminSchedulingQueueData(
   })).filter((inspection) => inspection.tasks.length > 0);
   const visibleMapped = filterActiveQueueVisibility(mapped);
   const visibleCountRows = filterActiveQueueVisibility(countRows);
-
-  const technicianOptions = await prisma.user.findMany({
-    where: {
-      tenantId,
-      role: "technician",
-      isActive: true
-    },
-    select: {
-      id: true,
-      name: true
-    },
-    orderBy: [{ name: "asc" }]
-  });
 
   return {
     filters: {

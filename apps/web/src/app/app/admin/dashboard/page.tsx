@@ -278,7 +278,9 @@ export default async function AdminDashboardPage({
     getAdminSchedulingQueueData(actor, {
       statuses: [...activeOperationalInspectionStatuses],
       dueWindowEnd: fastManagementWindowEnd,
-      limit: null
+      limit: null,
+      includeCounts: false,
+      includeTechnicians: false
     }),
     getAdminBillingSummaries(actor),
     getAdminDeficiencyDashboardData(
