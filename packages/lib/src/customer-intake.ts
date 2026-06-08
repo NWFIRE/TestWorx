@@ -19,6 +19,7 @@ import { sendCustomerIntakeRequestEmail, sendCustomerIntakeSubmittedEmail } from
 import { resolveTenantBranding } from "./branding";
 import { getServerEnv } from "./env";
 import { assertTenantContext } from "./permissions";
+import { getTenantQuickBooksConnectionStatus, syncTradeWorxCustomerCompanyToQuickBooks } from "./quickbooks";
 import { buildFileDownloadResponse, buildStoredFilePayload } from "./storage";
 
 const customerIntakeTokenBytes = 32;
@@ -382,6 +383,32 @@ async function createCustomerRecordsFromIntake(input: {
 
     return { customerId: customer.id, siteId: site.id, workOrderId };
   });
+}
+
+async function syncIntakeCustomerToQuickBooksIfConnected(input: {
+  tenantId: string;
+  actorUserId: string;
+  customerId: string;
+}) {
+  try {
+    const actor = {
+      tenantId: input.tenantId,
+      userId: input.actorUserId,
+      role: "office_admin"
+    };
+    const status = await getTenantQuickBooksConnectionStatus(actor);
+    if (!status.connection.connected) {
+      return { quickBooksSynced: false, quickBooksSyncError: null };
+    }
+
+    await syncTradeWorxCustomerCompanyToQuickBooks(actor, input.customerId);
+    return { quickBooksSynced: true, quickBooksSyncError: null };
+  } catch (error) {
+    return {
+      quickBooksSynced: false,
+      quickBooksSyncError: error instanceof Error ? error.message : "QuickBooks customer sync failed."
+    };
+  }
 }
 
 export async function createCustomerIntakeRequest(actor: ActorContext, input: z.infer<typeof customerIntakeSendSchema>) {
@@ -757,13 +784,23 @@ export async function approveCustomerIntakeRequest(actor: ActorContext, input: {
     throw new Error("Possible duplicate customer records were found. Review the warnings and confirm approval before creating a new customer.");
   }
 
-  return createCustomerRecordsFromIntake({
+  const created = await createCustomerRecordsFromIntake({
     tenantId,
     actorUserId: parsedActor.userId,
     intakeId: request.id,
     data: submittedData,
     createWorkOrderDraft: input.createWorkOrderDraft ?? false
   });
+  const syncResult = await syncIntakeCustomerToQuickBooksIfConnected({
+    tenantId,
+    actorUserId: parsedActor.userId,
+    customerId: created.customerId
+  });
+
+  return {
+    ...created,
+    ...syncResult
+  };
 }
 
 export async function rejectCustomerIntakeRequest(actor: ActorContext, intakeRequestId: string) {

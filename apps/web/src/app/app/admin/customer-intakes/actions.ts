@@ -137,10 +137,16 @@ export async function approveCustomerIntakeAction(formData: FormData) {
     revalidatePath("/app/admin/customer-intakes");
     revalidatePath("/app/admin/clients");
     revalidatePath("/app/admin/inspections");
+    const baseNotice = result.workOrderId
+      ? "Customer, site, and work order draft created."
+      : "Customer and service site created.";
+    const quickBooksNotice = result.quickBooksSynced
+      ? " QuickBooks customer sync completed."
+      : result.quickBooksSyncError
+        ? ` QuickBooks sync needs attention: ${result.quickBooksSyncError}`
+        : "";
     redirect(detailHref(intakeRequestId, {
-      notice: result.workOrderId
-        ? "Customer, site, and work order draft created."
-        : "Customer and service site created."
+      notice: `${baseNotice}${quickBooksNotice}`
     }));
   } catch (error) {
     if (isRedirectError(error)) {
