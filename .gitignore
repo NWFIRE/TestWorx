@@ -10,5 +10,7 @@ apps/web/.next
 apps/web/node_modules
 packages/*/dist
 package-lock.json
+test-results
+crawl-results/playwright-report
 
 .vercel
