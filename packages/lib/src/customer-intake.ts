@@ -71,6 +71,14 @@ function nullableTrimmed(max: number) {
     .transform((value) => value || null);
 }
 
+function nullableEmail(message: string) {
+  return z
+    .union([z.string(), z.null(), z.undefined()])
+    .transform((value) => (typeof value === "string" ? value.trim() : ""))
+    .pipe(z.string().email(message).or(z.literal("")))
+    .transform((value) => value || null);
+}
+
 export const customerIntakeSendSchema = z.object({
   recipientEmail: z.string().trim().email("Enter a valid recipient email."),
   recipientName: nullableTrimmed(160),
@@ -99,7 +107,7 @@ export const customerIntakeSubmissionSchema = z.object({
   sitePostalCode: z.string().trim().min(1, "Service site ZIP/postal code is required.").max(40),
   siteContactName: nullableTrimmed(160),
   siteContactPhone: nullableTrimmed(60),
-  siteContactEmail: z.string().trim().email("Enter a valid site contact email.").or(z.literal("")).optional().transform((value) => value || null),
+  siteContactEmail: nullableEmail("Enter a valid site contact email."),
   requestedServiceType: z.string().trim().min(1, "Requested service type is required.").max(160),
   systemTypes: z.array(z.enum(serviceSystemTypes)).min(1, "Select at least one system type."),
   preferredServiceDate: nullableTrimmed(80),

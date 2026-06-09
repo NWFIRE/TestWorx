@@ -57,6 +57,29 @@ describe("customer intake validation", () => {
     expect(parsed.success).toBe(false);
   });
 
+  it("accepts null for optional site contact email on saved intake payloads", () => {
+    const parsed = customerIntakeSubmissionSchema.parse({
+      companyName: "Axis Energy",
+      primaryContactName: "Alex Rivera",
+      primaryContactEmail: "alex@axis.test",
+      primaryContactPhone: "405-555-0100",
+      billingEmail: "ap@axis.test",
+      billingAddressLine1: "100 Market St",
+      billingCity: "Oklahoma City",
+      billingState: "OK",
+      billingPostalCode: "73102",
+      siteAddressLine1: "200 Service Rd",
+      siteCity: "Oklahoma City",
+      siteState: "OK",
+      sitePostalCode: "73103",
+      siteContactEmail: null,
+      requestedServiceType: "Repair",
+      systemTypes: ["fire_alarm"]
+    });
+
+    expect(parsed.siteContactEmail).toBeNull();
+  });
+
   it("normalizes optional send-form fields to null", () => {
     const parsed = customerIntakeSendSchema.parse({
       recipientEmail: "customer@example.com",
