@@ -1384,7 +1384,7 @@ export function MobileChecklistReportScreen({
                           </div>
                           <label className="inline-flex min-h-11 cursor-pointer items-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700">
                             {photoCount > 0 ? "Replace photo" : "Add photo"}
-                            <input accept="image/*" className="hidden" onChange={(event) => { void updateChecklistItemPhoto(item, event.target.files); event.target.value = ""; }} type="file" />
+                            <input accept="image/*" capture="environment" className="hidden" onChange={(event) => { void updateChecklistItemPhoto(item, event.target.files); event.target.value = ""; }} type="file" />
                           </label>
                         </div>
                       ) : null}

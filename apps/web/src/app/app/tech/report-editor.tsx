@@ -1340,7 +1340,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
                                       <div className="flex flex-wrap gap-2">
                                         <label className="inline-flex min-h-11 cursor-pointer items-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-ink">
                                           {row[rowField.id] ? "Replace photo" : "Add photo"}
-                                          <input accept="image/*" className="hidden" disabled={isFieldDisabled(data.canEdit, data.reportStatus, rowField)} onChange={(event) => { void updateRepeaterRowPhoto(activeSection.id, field, rowIndex, rowField.id, event.target.files); event.target.value = ""; }} type="file" />
+                                          <input accept="image/*" capture="environment" className="hidden" disabled={isFieldDisabled(data.canEdit, data.reportStatus, rowField)} onChange={(event) => { void updateRepeaterRowPhoto(activeSection.id, field, rowIndex, rowField.id, event.target.files); event.target.value = ""; }} type="file" />
                                         </label>
                                         {row[rowField.id] ? (
                                           <button className="min-h-11 rounded-2xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700 disabled:opacity-50" disabled={isFieldDisabled(data.canEdit, data.reportStatus, rowField)} onClick={() => updateRepeaterRowField(activeSection.id, field, rowIndex, rowField.id, "")} type="button">
@@ -1385,7 +1385,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
                                       <div className="flex flex-wrap gap-2">
                                         <label className="inline-flex min-h-11 cursor-pointer items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-ink">
                                           {row[deficiencyPhotoField.id] ? "Replace deficiency photo" : "Add deficiency photo"}
-                                          <input accept="image/*" className="hidden" disabled={isFieldDisabled(data.canEdit, data.reportStatus, deficiencyPhotoField)} onChange={(event) => { void updateRepeaterRowPhoto(activeSection.id, field, rowIndex, deficiencyPhotoField.id, event.target.files); event.target.value = ""; }} type="file" />
+                                          <input accept="image/*" capture="environment" className="hidden" disabled={isFieldDisabled(data.canEdit, data.reportStatus, deficiencyPhotoField)} onChange={(event) => { void updateRepeaterRowPhoto(activeSection.id, field, rowIndex, deficiencyPhotoField.id, event.target.files); event.target.value = ""; }} type="file" />
                                         </label>
                                         {row[deficiencyPhotoField.id] ? (
                                           <button className="min-h-11 rounded-2xl border border-rose-200 bg-white px-4 py-3 text-sm font-semibold text-rose-700 disabled:opacity-50" disabled={isFieldDisabled(data.canEdit, data.reportStatus, deficiencyPhotoField)} onClick={() => updateRepeaterRowField(activeSection.id, field, rowIndex, deficiencyPhotoField.id, "")} type="button">
@@ -1425,7 +1425,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
                       <div className="flex flex-wrap gap-2">
                         <label className="inline-flex min-h-11 cursor-pointer items-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-ink">
                           {draft.sections[activeSection.id]?.fields?.[field.id] ? "Replace photo" : "Add photo"}
-                          <input accept="image/*" className="hidden" disabled={isFieldDisabled(data.canEdit, data.reportStatus, field)} onChange={(event) => { void updateSectionPhotoField(activeSection.id, field.id, event.target.files); event.target.value = ""; }} type="file" />
+                          <input accept="image/*" capture="environment" className="hidden" disabled={isFieldDisabled(data.canEdit, data.reportStatus, field)} onChange={(event) => { void updateSectionPhotoField(activeSection.id, field.id, event.target.files); event.target.value = ""; }} type="file" />
                         </label>
                         {draft.sections[activeSection.id]?.fields?.[field.id] ? (
                           <button className="min-h-11 rounded-2xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700 disabled:opacity-50" disabled={isFieldDisabled(data.canEdit, data.reportStatus, field)} onClick={() => updateSectionField(activeSection.id, field.id, "")} type="button">
@@ -1507,7 +1507,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
               </div>
               <label className="inline-flex min-h-12 cursor-pointer items-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-ink">
                 Add photos
-                <input accept="image/*" className="hidden" disabled={!data.canEdit || data.reportStatus === "finalized"} multiple onChange={(event) => { void handleFilesSelected(event.target.files); event.target.value = ""; }} type="file" />
+                <input accept="image/*" capture="environment" className="hidden" disabled={!data.canEdit || data.reportStatus === "finalized"} multiple onChange={(event) => { void handleFilesSelected(event.target.files); event.target.value = ""; }} type="file" />
               </label>
             </div>
             <div className="mt-4 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">

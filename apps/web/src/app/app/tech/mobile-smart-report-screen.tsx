@@ -495,7 +495,7 @@ function GuidedReportWorkflow({
                   setExpandedRows={setExpandedRows}
                 />
               ) : (
-                <PhotosTab data={data} draft={controller.draft} />
+                <PhotosTab controller={controller} data={data} disabled={isReadOnly} draft={controller.draft} />
               )}
             </WorkOrderStepFrame>
           ) : null}
@@ -1059,7 +1059,7 @@ function WorkOrderPhotosSection({
   const section = findTemplateSection(data, "work-order-photos");
   const photoRepeater = section?.fields.find((field): field is Extract<ReportFieldDefinition, { type: "repeater" }> => field.type === "repeater");
   if (!section || !photoRepeater) {
-    return <PhotosTab data={data} draft={controller.draft} />;
+    return <PhotosTab controller={controller} data={data} disabled={disabled} draft={controller.draft} />;
   }
 
   const sectionState = controller.draft.sections[section.id] ?? { status: "pending", notes: "", fields: {} };
@@ -1625,7 +1625,7 @@ function FieldControl({
           </div>
           <label className="inline-flex min-h-11 cursor-pointer items-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">
             {src ? "Replace" : "Add photo"}
-            <input accept="image/*" className="hidden" disabled={disabled} onChange={(event) => { onPhotoChange(event.target.files); event.target.value = ""; }} type="file" />
+            <input accept="image/*" capture="environment" className="hidden" disabled={disabled} onChange={(event) => { onPhotoChange(event.target.files); event.target.value = ""; }} type="file" />
           </label>
         </div>
         {src ? <Image alt={field.label} className="mt-3 aspect-[4/3] w-full rounded-2xl object-cover" height={280} src={src} unoptimized width={420} /> : null}
@@ -1732,10 +1732,14 @@ function IssuesTab({
 }
 
 function PhotosTab({
+  controller,
   data,
+  disabled,
   draft
 }: {
+  controller: ReturnType<typeof useMobileReportDraftController>;
   data: TechnicianReportEditorData;
+  disabled: boolean;
   draft: TechnicianReportEditorData["draft"];
 }) {
   const photos = [
@@ -1743,19 +1747,20 @@ function PhotosTab({
       id: attachment.id,
       label: attachment.fileName,
       src: resolveStoredMediaSrc(data.reportId, attachment.storageKey) ?? attachment.storageKey,
-      context: "Report photo"
+      context: "Report photo",
+      removable: true
     })),
     ...data.template.sections.flatMap((section) => {
       const fields = draft.sections[section.id]?.fields as Record<string, ReportPrimitiveValue> | undefined;
       return section.fields.flatMap((field) => {
         if (field.type === "photo" && displayValue(fields?.[field.id])) {
-          return [{ id: `${section.id}:${field.id}`, label: field.label, src: resolveStoredMediaSrc(data.reportId, displayValue(fields?.[field.id])) ?? displayValue(fields?.[field.id]), context: section.label }];
+          return [{ id: `${section.id}:${field.id}`, label: field.label, src: resolveStoredMediaSrc(data.reportId, displayValue(fields?.[field.id])) ?? displayValue(fields?.[field.id]), context: section.label, removable: false }];
         }
         if (field.type === "repeater") {
           const rows = Array.isArray(fields?.[field.id]) ? fields?.[field.id] as unknown as Array<Record<string, ReportPrimitiveValue>> : [];
           return rows.flatMap((row, rowIndex) => {
             const src = firstPhotoValue(row, field.rowFields);
-            return src ? [{ id: `${section.id}:${field.id}:${rowIndex}`, label: rowTitle(row, rowIndex), src: resolveStoredMediaSrc(data.reportId, src) ?? src, context: section.label }] : [];
+            return src ? [{ id: `${section.id}:${field.id}:${rowIndex}`, label: rowTitle(row, rowIndex), src: resolveStoredMediaSrc(data.reportId, src) ?? src, context: section.label, removable: false }] : [];
           });
         }
         return [];
@@ -1765,7 +1770,26 @@ function PhotosTab({
 
   return (
     <section className="space-y-3 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-panel">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Photos</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Photos</p>
+        </div>
+        <label className={`inline-flex min-h-11 items-center justify-center rounded-2xl bg-[var(--tenant-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
+          Take / Add Photos
+          <input
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            disabled={disabled}
+            multiple
+            onChange={(event) => {
+              void controller.addReportAttachments(event.target.files);
+              event.target.value = "";
+            }}
+            type="file"
+          />
+        </label>
+      </div>
       {photos.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">No photos attached yet.</p>
       ) : (
@@ -1773,9 +1797,21 @@ function PhotosTab({
           {photos.map((photo) => (
             <div key={photo.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
               <Image alt={photo.label} className="aspect-[4/3] w-full object-cover" height={260} src={photo.src} unoptimized width={360} />
-              <div className="px-4 py-3">
-                <p className="text-sm font-semibold text-slate-950">{photo.label}</p>
-                <p className="mt-1 text-xs text-slate-500">{photo.context}</p>
+              <div className="flex items-start justify-between gap-3 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-950">{photo.label}</p>
+                  <p className="mt-1 text-xs text-slate-500">{photo.context}</p>
+                </div>
+                {photo.removable ? (
+                  <button
+                    className="rounded-xl border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={disabled}
+                    onClick={() => controller.removeReportAttachment(photo.id)}
+                    type="button"
+                  >
+                    Remove
+                  </button>
+                ) : null}
               </div>
             </div>
           ))}

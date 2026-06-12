@@ -19,6 +19,8 @@ import { getLocalReportDraft, putLocalReportDraft, subscribeToOfflineChanges } f
 import { initializeLocalReportRecord, queueReportDraftSync, queueReportFinalizeSync, startTechnicianSyncEngine } from "./offline/offline-sync";
 import type { LocalReportDraftRecord } from "./offline/offline-types";
 
+const MAX_CLIENT_ATTACHMENT_COUNT = 16;
+
 function buildReportSaveState(record: LocalReportDraftRecord | null, reportStatus: TechnicianReportEditorData["reportStatus"]) {
   if (!record) {
     return reportStatus === "finalized" ? "Finalized" : "Saved";
@@ -515,6 +517,57 @@ export function useMobileReportDraftController({
     }
   }, [data.canEdit, data.reportStatus, updateRepeaterRowField]);
 
+  const addReportAttachments = useCallback(async (files: FileList | null) => {
+    if (!files?.length || !data.canEdit || data.reportStatus === "finalized") {
+      return;
+    }
+
+    if (draftRef.current.attachments.length + files.length > MAX_CLIENT_ATTACHMENT_COUNT) {
+      setErrorMessage(`A report can include up to ${MAX_CLIENT_ATTACHMENT_COUNT} photos.`);
+      return;
+    }
+
+    const fileList = Array.from(files);
+    for (const file of fileList) {
+      const validationError = getReportPhotoValidationError(file);
+      if (validationError) {
+        setErrorMessage(validationError);
+        return;
+      }
+    }
+
+    try {
+      const attachments = await Promise.all(fileList.map(async (file) => {
+        const prepared = await prepareReportPhotoForDraft(file);
+        return {
+          id: crypto.randomUUID(),
+          fileName: file.name,
+          mimeType: prepared.mimeType,
+          storageKey: prepared.dataUrl
+        };
+      }));
+
+      setErrorMessage(null);
+      void applyDraftMutation((currentDraft) => ({
+        ...currentDraft,
+        attachments: [...currentDraft.attachments, ...attachments]
+      }), { immediateQueue: true });
+    } catch (error) {
+      setErrorMessage(toTechnicianFacingSaveMessage(error instanceof Error ? error.message : null, "save"));
+    }
+  }, [applyDraftMutation, data.canEdit, data.reportStatus]);
+
+  const removeReportAttachment = useCallback((attachmentId: string) => {
+    if (!data.canEdit || data.reportStatus === "finalized") {
+      return;
+    }
+
+    void applyDraftMutation((currentDraft) => ({
+      ...currentDraft,
+      attachments: currentDraft.attachments.filter((attachment) => attachment.id !== attachmentId)
+    }), { immediateQueue: true });
+  }, [applyDraftMutation, data.canEdit, data.reportStatus]);
+
   const selectSection = useCallback((sectionId: string) => {
     void applyDraftMutation((currentDraft) => ({
       ...currentDraft,
@@ -625,6 +678,8 @@ export function useMobileReportDraftController({
     removeRepeaterRow,
     updateSectionPhotoField,
     updateRepeaterRowPhoto,
+    addReportAttachments,
+    removeReportAttachment,
     selectSection,
     updateSignature,
     updateSignerName,

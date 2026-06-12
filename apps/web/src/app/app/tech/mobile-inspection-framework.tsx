@@ -439,7 +439,7 @@ export function MobileFailurePanel({
             </div>
             <label className="inline-flex min-h-11 cursor-pointer items-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700">
               {photoSrc ? "Replace photo" : "Add photo"}
-              <input accept="image/*" className="hidden" disabled={disabled} onChange={(event) => { onPhotoChange(event.target.files); event.target.value = ""; }} type="file" />
+              <input accept="image/*" capture="environment" className="hidden" disabled={disabled} onChange={(event) => { onPhotoChange(event.target.files); event.target.value = ""; }} type="file" />
             </label>
           </div>
           {photoSrc ? (
