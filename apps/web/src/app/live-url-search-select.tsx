@@ -144,6 +144,20 @@ export function LiveUrlSearchSelect({
     setQuery(nextQuery);
   }
 
+  function clearQuery() {
+    if (navigatingToResultRef.current) {
+      return;
+    }
+
+    if (searchDebounceRef.current !== null) {
+      window.clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
+
+    setQuery("");
+    applyQuery("");
+  }
+
   return (
     <SearchSelect
       allowCustomValue
@@ -170,6 +184,7 @@ export function LiveUrlSearchSelect({
         }
       }}
       onCustomValueChange={updateQuery}
+      onClear={clearQuery}
       onInputBlur={() => setIsFocused(false)}
       onInputFocus={() => setIsFocused(true)}
       onQueryCommit={(nextQuery) => applyQuery(nextQuery)}

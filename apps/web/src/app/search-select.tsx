@@ -31,6 +31,7 @@ export function SearchSelect({
   customValue = "",
   onCustomValueChange,
   onQueryCommit,
+  onClear,
   onInputFocus,
   onInputBlur
 }: {
@@ -52,6 +53,7 @@ export function SearchSelect({
   customValue?: string;
   onCustomValueChange?: (value: string) => void;
   onQueryCommit?: (query: string) => void;
+  onClear?: () => void;
   onInputFocus?: () => void;
   onInputBlur?: () => void;
 }) {
@@ -114,6 +116,7 @@ export function SearchSelect({
     onCustomValueChange?.("");
     setQueryOverride({ text: "", value: "", customValue: "" });
     onQueryChange?.("");
+    onClear?.();
     setOpen(false);
   }
 
