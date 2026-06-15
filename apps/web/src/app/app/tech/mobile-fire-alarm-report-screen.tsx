@@ -56,10 +56,36 @@ const monitoringInfoFieldIds = [
 
 const summaryEditableFieldIds = [
   "fireAlarmSystemStatus",
-  "laborHours",
   "inspectorNotes",
   "recommendedRepairs",
   "followUpRequired"
+] as const;
+
+const fireAlarmLaborHourOptions = [
+  "0.5",
+  "1",
+  "1.5",
+  "2",
+  "2.5",
+  "3",
+  "3.5",
+  "4",
+  "4.5",
+  "5",
+  "5.5",
+  "6",
+  "6.5",
+  "7",
+  "7.5",
+  "8",
+  "8.5",
+  "9",
+  "9.5",
+  "10",
+  "10.5",
+  "11",
+  "11.5",
+  "12"
 ] as const;
 
 function resolveStoredMediaSrc(reportId: string, storageKey: string | null | undefined) {
@@ -605,6 +631,8 @@ export function MobileFireAlarmReportScreen({
         sections={progress.sections}
       />
 
+      <FireAlarmLaborHoursSection controller={controller} isReadOnly={isReadOnly} summarySection={summarySection} />
+
       <FireAlarmReportPhotosSection controller={controller} data={data} disabled={isReadOnly} />
 
       {(controller.errorMessage || controller.finalizeErrorMessage) ? (
@@ -613,6 +641,62 @@ export function MobileFireAlarmReportScreen({
         </p>
       ) : null}
     </MobileInspectionShell>
+  );
+}
+
+function FireAlarmLaborHoursSection({
+  controller,
+  isReadOnly,
+  summarySection
+}: {
+  controller: ReturnType<typeof useMobileReportDraftController>;
+  isReadOnly: boolean;
+  summarySection: TechnicianReportEditorData["template"]["sections"][number];
+}) {
+  const laborField = summarySection.fields.find((field): field is Exclude<ReportFieldDefinition, { type: "repeater" }> => field.type !== "repeater" && field.id === "laborHours");
+  if (!laborField) {
+    return null;
+  }
+
+  const value = getPrimitiveFieldValue(controller.draft, summarySection.id, laborField.id);
+  const normalizedValue = value === null || value === undefined ? "" : String(value);
+  const laborOptions = normalizedValue && !fireAlarmLaborHourOptions.includes(normalizedValue as typeof fireAlarmLaborHourOptions[number])
+    ? [normalizedValue, ...fireAlarmLaborHourOptions]
+    : [...fireAlarmLaborHourOptions];
+
+  return (
+    <section className="space-y-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-panel">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Labor</p>
+          <h3 className="mt-2 text-xl font-semibold text-slate-950">Fire alarm labor hours</h3>
+        </div>
+        {Number(normalizedValue) > 0 ? (
+          <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">
+            Auto billing
+          </span>
+        ) : null}
+      </div>
+      <label className="block text-sm font-semibold text-slate-900">
+        Labor Hours
+        <select
+          className="mt-3 min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-950 outline-none focus:border-[var(--tenant-primary)] focus:ring-4 focus:ring-[rgb(var(--tenant-primary-rgb)/0.12)] disabled:bg-slate-100"
+          disabled={isReadOnly}
+          onChange={(event) => controller.updateSectionField(summarySection.id, laborField.id, event.target.value === "" ? "" : Number(event.target.value))}
+          value={normalizedValue}
+        >
+          <option value="">Select labor hours</option>
+          {laborOptions.map((hours) => (
+            <option key={hours} value={hours}>{hours} hours</option>
+          ))}
+        </select>
+      </label>
+      {Number(normalizedValue) > 0 ? (
+        <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
+          {normalizedValue} labor hour{normalizedValue === "1" ? "" : "s"} will flow into ready-to-bill as on-site labor when this report is finalized.
+        </p>
+      ) : null}
+    </section>
   );
 }
 
