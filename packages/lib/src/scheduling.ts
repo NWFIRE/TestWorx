@@ -4251,6 +4251,13 @@ export async function getInspectionForEdit(actor: ActorContext, inspectionId: st
           recurrence: true,
           report: {
             include: {
+              _count: {
+                select: {
+                  attachments: true,
+                  signatures: true,
+                  deficiencies: true
+                }
+              },
               correctionRequestedBy: { select: { id: true, name: true } },
               correctionResolvedBy: { select: { id: true, name: true } },
               correctionEvents: {

@@ -24,9 +24,9 @@ export function AdminReportDeleteButton(input: {
         onClick={async () => {
           const confirmed = await confirm({
             eyebrow: "Report type",
-            title: `Remove ${input.taskLabel}?`,
-            description: "This removes the report from the current inspection only when no technician work has been recorded.",
-            confirmLabel: "Remove report",
+            title: `Delete ${input.taskLabel}?`,
+            description: "This deletes the report type from the current inspection only when no technician work has been recorded.",
+            confirmLabel: "Delete report type",
             cancelLabel: "Cancel",
             variant: "danger"
           });
@@ -37,7 +37,7 @@ export function AdminReportDeleteButton(input: {
           startTransition(async () => {
             setMessage(null);
             const result = await removeInspectionTaskAdminAction(input.inspectionId, input.inspectionTaskId);
-            setMessage(result.ok ? "Report removed." : result.error ?? "Unable to remove this report.");
+            setMessage(result.ok ? "Report type deleted." : result.error ?? "Unable to delete this report type.");
             if (result.ok) {
               router.refresh();
             }
@@ -45,10 +45,10 @@ export function AdminReportDeleteButton(input: {
         }}
         type="button"
       >
-        {pending ? "Removing..." : "Remove report"}
+        {pending ? "Deleting..." : "Delete report type"}
       </button>
       {dialog}
-      {message ? <p className={`text-xs ${message === "Report removed." ? "text-emerald-600" : "text-rose-600"}`}>{message}</p> : null}
+      {message ? <p className={`text-xs ${message === "Report type deleted." ? "text-emerald-600" : "text-rose-600"}`}>{message}</p> : null}
     </div>
   );
 }

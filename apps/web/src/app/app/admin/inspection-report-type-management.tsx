@@ -198,7 +198,7 @@ export function InspectionReportTypeManagement(input: {
                   <p className="mt-1 text-sm text-slate-500">Due: {task.dueLabel}</p>
                   {task.hasReportActivity ? (
                     <p className="mt-2 text-sm text-amber-700">
-                      Work exists for this report. It will be preserved if this report is marked not needed.
+                      Work exists for this report. Delete is locked; mark it Not Needed to remove it from active work while preserving history.
                     </p>
                   ) : null}
                 </div>
@@ -224,7 +224,7 @@ export function InspectionReportTypeManagement(input: {
                             title: task.isFinalized ? `Void ${task.label}?` : `Mark ${task.label} as Not Needed?`,
                             description: task.isFinalized
                               ? "This finalized report cannot be deleted. It will be voided with the provided reason and preserved in audit history."
-                              : "This report will be removed from active technician work while preserving its work history.",
+                              : "This report has work activity, so it cannot be deleted. It will be removed from active technician work while preserving history.",
                             confirmLabel: task.isFinalized ? "Void report" : "Mark Not Needed",
                             cancelLabel: "Cancel",
                             variant: "warning"
@@ -256,10 +256,10 @@ export function InspectionReportTypeManagement(input: {
                       disabled={isPending}
                       onClick={async () => {
                         const confirmed = await confirm({
-                          eyebrow: "Remove report type",
-                          title: `Remove ${task.label}?`,
-                          description: "No technician work has been recorded for this report, so it can be removed from the current inspection.",
-                          confirmLabel: "Remove",
+                          eyebrow: "Delete report type",
+                          title: `Delete ${task.label}?`,
+                          description: "No technician work has been recorded for this report type, so it can be deleted from the current inspection.",
+                          confirmLabel: "Delete report type",
                           cancelLabel: "Cancel",
                           variant: "danger"
                         });
@@ -272,7 +272,7 @@ export function InspectionReportTypeManagement(input: {
                           const result = await removeInspectionTaskAdminAction(input.inspectionId, task.id);
                           setActionTaskId(null);
                           if (result.ok) {
-                            setMessage({ tone: "success", text: "Report type removed from this inspection." });
+                            setMessage({ tone: "success", text: "Report type deleted from this inspection." });
                             router.refresh();
                             return;
                           }
@@ -281,7 +281,7 @@ export function InspectionReportTypeManagement(input: {
                       }}
                       type="button"
                     >
-                      {isPending && actionTaskId === task.id ? "Removing..." : "Remove"}
+                      {isPending && actionTaskId === task.id ? "Deleting..." : "Delete report type"}
                     </button>
                   )}
                 </div>

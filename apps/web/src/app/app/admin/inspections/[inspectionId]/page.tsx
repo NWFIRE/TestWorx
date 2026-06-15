@@ -197,6 +197,11 @@ export default async function EditInspectionPage({
           createdAt: Date;
           actedBy: { id: string; name: string };
         }>;
+        _count?: {
+          attachments: number;
+          signatures: number;
+          deficiencies: number;
+        };
       } | null;
     }>;
     hasStartedWork?: boolean;
@@ -517,7 +522,10 @@ export default async function EditInspectionPage({
                           task.report.correctionEvents.length > 0 ||
                           task.report.finalizedAt ||
                           task.report.correctionRequestedAt ||
-                          task.report.correctionResolvedAt
+                          task.report.correctionResolvedAt ||
+                          (task.report._count?.attachments ?? 0) > 0 ||
+                          (task.report._count?.signatures ?? 0) > 0 ||
+                          (task.report._count?.deficiencies ?? 0) > 0
                         )
                       );
                       return {
