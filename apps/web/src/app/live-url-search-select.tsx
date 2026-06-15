@@ -63,6 +63,7 @@ export function LiveUrlSearchSelect({
   const [pending, startTransition] = useTransition();
   const searchDebounceRef = useRef<number | null>(null);
   const lastAppliedValueRef = useRef(initialValue.trim());
+  const navigatingToResultRef = useRef(false);
   const hasSelectedOption = options.some((option) => option.value === query);
   const resetPageKeyList = resetPageKeys.join("\u001f");
 
@@ -80,6 +81,10 @@ export function LiveUrlSearchSelect({
   }, [initialValue, isFocused, isNavigatingToResult, query]);
 
   const applyQuery = useCallback((nextQuery: string) => {
+    if (navigatingToResultRef.current) {
+      return;
+    }
+
     const trimmedValue = nextQuery.trim();
     if (trimmedValue === lastAppliedValueRef.current) {
       return;
@@ -104,6 +109,10 @@ export function LiveUrlSearchSelect({
   }, [paramKey, pathname, resetPageKeyList, router, searchParams]);
 
   useEffect(() => {
+    if (navigatingToResultRef.current) {
+      return;
+    }
+
     const trimmedValue = query.trim();
     if (trimmedValue === lastAppliedValueRef.current) {
       return;
@@ -128,6 +137,10 @@ export function LiveUrlSearchSelect({
   }, [applyQuery, query]);
 
   function updateQuery(nextQuery: string) {
+    if (navigatingToResultRef.current) {
+      return;
+    }
+
     setQuery(nextQuery);
   }
 
@@ -145,6 +158,7 @@ export function LiveUrlSearchSelect({
             window.clearTimeout(searchDebounceRef.current);
             searchDebounceRef.current = null;
           }
+          navigatingToResultRef.current = true;
           setIsNavigatingToResult(true);
           setQuery(option.label);
           router.push(option.href);
