@@ -193,6 +193,14 @@ export async function syncInspectionArchiveStateTx(
 
 const archivePageSize = 20;
 
+function compareArchiveText(left: string | null | undefined, right: string | null | undefined) {
+  return (left ?? "").localeCompare(right ?? "", undefined, { sensitivity: "base", numeric: true });
+}
+
+function compareArchiveDate(left: Date | null | undefined, right: Date | null | undefined) {
+  return (left?.getTime() ?? Number.POSITIVE_INFINITY) - (right?.getTime() ?? Number.POSITIVE_INFINITY);
+}
+
 function buildArchiveTextSearch(query: string): Prisma.InspectionWhereInput | undefined {
   const trimmed = query.trim();
   if (!trimmed) {
@@ -331,7 +339,16 @@ export async function getAdminInspectionArchiveData(
   const [rows, totalCount, customers, sites, technicians] = await Promise.all([
     prisma.inspection.findMany({
       where,
-      orderBy: [{ completedAt: "desc" }, { updatedAt: "desc" }],
+      orderBy: [
+        { archiveCustomerName: "asc" },
+        { customerCompany: { name: "asc" } },
+        { archiveSiteName: "asc" },
+        { site: { name: "asc" } },
+        { completedAt: "asc" },
+        { archivedAt: "asc" },
+        { updatedAt: "asc" },
+        { id: "asc" }
+      ],
       skip: (page - 1) * archivePageSize,
       take: archivePageSize,
       include: {
@@ -430,7 +447,12 @@ export async function getAdminInspectionArchiveData(
       hasReport: row.archiveHasReport,
       reportCount: row.reports.length,
       quoteNumber: row.convertedFromQuotes[0]?.quoteNumber ?? null
-    }))
+    })).sort((left, right) =>
+      compareArchiveText(left.customerName, right.customerName) ||
+      compareArchiveText(left.siteName, right.siteName) ||
+      compareArchiveDate(left.completedAt, right.completedAt) ||
+      compareArchiveText(left.id, right.id)
+    )
   };
 }
 

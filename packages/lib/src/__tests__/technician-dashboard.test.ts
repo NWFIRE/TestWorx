@@ -306,6 +306,88 @@ describe("technician dashboard inspection access", () => {
     expect(prismaMock.inspection.findMany.mock.calls[1]?.[0]).not.toHaveProperty("take");
   });
 
+  it("sorts admin inspection rows alphabetically and then by earliest scheduled date", async () => {
+    const buildInspection = (
+      id: string,
+      customerName: string,
+      siteName: string,
+      scheduledStart: Date
+    ) => ({
+      id,
+      tenantId: "tenant_1",
+      status: InspectionStatus.to_be_completed,
+      inspectionClassification: "standard",
+      isPriority: false,
+      scheduledStart,
+      assignedTechnicianId: null,
+      site: {
+        id: `${id}_site`,
+        name: siteName,
+        addressLine1: "100 Main St",
+        addressLine2: null,
+        city: "Enid",
+        state: "OK",
+        postalCode: "73701"
+      },
+      customerCompany: {
+        id: `${id}_customer`,
+        name: customerName,
+        serviceAddressLine1: null,
+        serviceAddressLine2: null,
+        serviceCity: null,
+        serviceState: null,
+        servicePostalCode: null,
+        billingAddressLine1: null,
+        billingAddressLine2: null,
+        billingCity: null,
+        billingState: null,
+        billingPostalCode: null
+      },
+      assignedTechnician: null,
+      technicianAssignments: [],
+      convertedFromQuotes: [],
+      tasks: [
+        {
+          id: `${id}_task`,
+          inspectionType: "fire_extinguisher",
+          assignedTechnicianId: null,
+          schedulingStatus: "scheduled_now",
+          status: InspectionStatus.to_be_completed,
+          dueDate: null,
+          dueMonth: "2026-05",
+          recurrence: null,
+          report: null,
+          assignedTechnician: null
+        }
+      ]
+    });
+
+    const unsortedRows = [
+      buildInspection("z_late", "Zenith Fire", "Main", new Date("2026-05-01T09:00:00.000Z")),
+      buildInspection("a_late", "Acme Fire", "Main", new Date("2026-05-20T09:00:00.000Z")),
+      buildInspection("a_early", "Acme Fire", "Main", new Date("2026-05-01T09:00:00.000Z"))
+    ];
+    prismaMock.inspection.findMany
+      .mockResolvedValueOnce(unsortedRows)
+      .mockResolvedValueOnce(unsortedRows);
+
+    const result = await getAdminSchedulingQueueData({
+      userId: "admin_1",
+      role: "office_admin",
+      tenantId: "tenant_1"
+    });
+
+    expect(prismaMock.inspection.findMany.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      orderBy: [
+        { customerCompany: { name: "asc" } },
+        { site: { name: "asc" } },
+        { scheduledStart: "asc" },
+        { id: "asc" }
+      ]
+    }));
+    expect(result.inspections.map((inspection) => inspection.id)).toEqual(["a_early", "a_late", "z_late"]);
+  });
+
   it("hides stale active inspections when current report tasks are already finalized", async () => {
     const activeInspection = {
       id: "inspection_active",

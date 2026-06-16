@@ -3607,7 +3607,7 @@ export async function getAdminBillingSummaries(actor: ActorContext) {
     INNER JOIN "Site" site ON site."id" = s."siteId"
     LEFT JOIN "User" tech ON tech."id" = i."assignedTechnicianId"
     WHERE s."tenantId" = ${tenantId}
-    ORDER BY i."scheduledStart" DESC
+    ORDER BY c."name" ASC, site."name" ASC, i."scheduledStart" ASC, s."id" ASC
   `) as BillingSummaryListRow[];
 
   const displayRows = (
@@ -3627,7 +3627,12 @@ export async function getAdminBillingSummaries(actor: ActorContext) {
       reportTypes,
       metrics: buildSummaryMetrics(items)
     };
-  });
+  }).sort((left, right) =>
+    left.customerName.localeCompare(right.customerName, undefined, { sensitivity: "base", numeric: true }) ||
+    left.siteName.localeCompare(right.siteName, undefined, { sensitivity: "base", numeric: true }) ||
+    left.inspectionDate.getTime() - right.inspectionDate.getTime() ||
+    left.id.localeCompare(right.id)
+  );
 }
 
 export async function getAdminBillingSummaryDetail(actor: ActorContext, inspectionId: string) {

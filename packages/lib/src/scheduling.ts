@@ -1113,6 +1113,16 @@ function dedupeInspectionsById<T extends { id: string }>(inspections: T[]) {
   });
 }
 
+function compareTextAscending(left: string | null | undefined, right: string | null | undefined) {
+  return (left ?? "").localeCompare(right ?? "", undefined, { sensitivity: "base", numeric: true });
+}
+
+function compareDateAscending(left: Date | string | null | undefined, right: Date | string | null | undefined) {
+  const leftTime = left ? new Date(left).getTime() : Number.POSITIVE_INFINITY;
+  const rightTime = right ? new Date(right).getTime() : Number.POSITIVE_INFINITY;
+  return (Number.isNaN(leftTime) ? Number.POSITIVE_INFINITY : leftTime) - (Number.isNaN(rightTime) ? Number.POSITIVE_INFINITY : rightTime);
+}
+
 function mapRecurringTaskDefinitions(input: {
   existingTasks: Array<{
     id: string;
@@ -5347,7 +5357,7 @@ export async function getAdminSchedulingQueueData(
       convertedFromQuotes: { select: { id: true }, take: 1 },
       tasks: { include: { recurrence: true, report: true, assignedTechnician: true } }
     },
-    orderBy: [{ scheduledStart: "asc" }],
+    orderBy: [{ customerCompany: { name: "asc" } }, { site: { name: "asc" } }, { scheduledStart: "asc" }, { id: "asc" }],
     ...(limit ? { take: limit } : {})
   });
   const countInspectionsQuery = includeCounts && limit
@@ -5439,7 +5449,12 @@ export async function getAdminSchedulingQueueData(
     ...inspection,
     tasks: inspection.tasks.filter((task) => isCurrentVisitTaskForInspection(task, inspection))
   })).filter((inspection) => inspection.tasks.length > 0);
-  const visibleMapped = filterActiveQueueVisibility(mapped);
+  const visibleMapped = filterActiveQueueVisibility(mapped).sort((left, right) =>
+    compareTextAscending(left.customerCompany.name, right.customerCompany.name) ||
+    compareTextAscending(left.site.name, right.site.name) ||
+    compareDateAscending(left.scheduledStart, right.scheduledStart) ||
+    compareTextAscending(left.id, right.id)
+  );
   const visibleCountRows = filterActiveQueueVisibility(countRows);
 
   return {

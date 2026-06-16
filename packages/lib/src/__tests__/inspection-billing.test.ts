@@ -2698,6 +2698,59 @@ describe("inspection billing persistence and admin review", () => {
     expect(summaries[0]?.invoiceTotals.totalDue).toBe(248.98);
   });
 
+  it("sorts billing summaries alphabetically and then by earliest inspection date", async () => {
+    const buildSummaryRow = (
+      id: string,
+      customerName: string,
+      inspectionDate: Date
+    ) => ({
+      id,
+      inspectionId: `${id}_inspection`,
+      customerCompanyId: `${id}_customer`,
+      customerName,
+      customerIsTaxExempt: false,
+      siteId: `${id}_site`,
+      siteName: "Main",
+      inspectionDate,
+      inspectionClassification: "standard",
+      technicianName: null,
+      status: "invoiced",
+      billingType: "standard",
+      billToAccountId: null,
+      billToName: null,
+      contractProfileId: null,
+      contractProfileName: null,
+      routingSnapshot: null,
+      pricingSnapshot: null,
+      groupingSnapshot: null,
+      attachmentSnapshot: null,
+      deliverySnapshot: null,
+      referenceSnapshot: null,
+      quickbooksSyncStatus: "synced",
+      quickbooksInvoiceId: null,
+      quickbooksInvoiceNumber: null,
+      quickbooksConnectionMode: null,
+      quickbooksSyncedAt: null,
+      quickbooksSendStatus: "not_sent",
+      quickbooksSentAt: null,
+      quickbooksSyncError: null,
+      quickbooksSendError: null,
+      subtotal: 0,
+      notes: null,
+      items: []
+    });
+
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      buildSummaryRow("summary_z", "Zenith Fire", new Date("2026-05-01T09:00:00.000Z")),
+      buildSummaryRow("summary_a_late", "Acme Fire", new Date("2026-05-20T09:00:00.000Z")),
+      buildSummaryRow("summary_a_early", "Acme Fire", new Date("2026-05-01T09:00:00.000Z"))
+    ]);
+
+    const summaries = await getAdminBillingSummaries({ userId: "office_1", role: "office_admin", tenantId: "tenant_1" });
+
+    expect(summaries.map((summary) => summary.id)).toEqual(["summary_a_early", "summary_a_late", "summary_z"]);
+  });
+
   it("locks invoiced billing summaries from note and line edits", async () => {
     prismaMock.$queryRaw
       .mockResolvedValueOnce([

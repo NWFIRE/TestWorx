@@ -72,8 +72,19 @@ describe("inspection archive", () => {
     expect(result.inspections[0]?.customerName).toBe("Summit Tower");
     expect(result.inspections[0]?.inspectionTypeLabels).toEqual(["Kitchen suppression"]);
     expect(result.inspections[0]?.divisions).toEqual(["kitchen_suppression"]);
-    expect(prismaMock.inspection.findMany).toHaveBeenCalled();
-  });
+    expect(prismaMock.inspection.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      orderBy: [
+        { archiveCustomerName: "asc" },
+        { customerCompany: { name: "asc" } },
+        { archiveSiteName: "asc" },
+        { site: { name: "asc" } },
+        { completedAt: "asc" },
+        { archivedAt: "asc" },
+        { updatedAt: "asc" },
+        { id: "asc" }
+      ]
+    }));
+  }, 10000);
 
   it("uses a distinct archive badge tone for invoiced results", async () => {
     const { getArchiveResultStatusTone } = await import("../inspection-archive");
