@@ -68,6 +68,39 @@ describe("generic inspection site helper", () => {
     });
   });
 
+  it("creates a reusable PO-labeled site for inspections that do not have a physical customer site", async () => {
+    prismaMock.customerCompany.findFirst.mockResolvedValue({
+      id: "customer_1",
+      name: "NW Fire"
+    });
+    prismaMock.site.findFirst.mockResolvedValue(null);
+    prismaMock.site.create.mockResolvedValue({
+      id: "site_po_33774"
+    });
+
+    const { ensurePurchaseOrderInspectionSite } = await import("../scheduling");
+
+    const result = await ensurePurchaseOrderInspectionSite(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "customer_1",
+      "33774"
+    );
+
+    expect(result).toEqual({ id: "site_po_33774" });
+    expect(prismaMock.site.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: "tenant_1",
+        customerCompanyId: "customer_1",
+        name: "PO: 33774",
+        addressLine1: "No fixed service address",
+        city: "Unknown",
+        state: "Unknown",
+        postalCode: "Unknown"
+      }),
+      select: { id: true }
+    });
+  });
+
   it("creates a one-time site for the selected customer", async () => {
     prismaMock.customerCompany.findFirst.mockResolvedValue({
       id: "customer_1",

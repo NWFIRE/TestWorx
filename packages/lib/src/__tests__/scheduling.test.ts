@@ -19,6 +19,7 @@ import {
   isTechnicianEligibleForReportTypesFromRows,
   nextDueFrom,
   parseCreateInspectionFormData,
+  purchaseOrderInspectionSiteOptionValue,
   pickEarliestNextDueAt,
   scheduleInspectionSchema,
   upcomingServiceScheduleGenerationLimits,
@@ -106,6 +107,22 @@ describe("schedule creation parsing", () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.siteId).toBe(genericInspectionSiteOptionValue);
+    }
+  });
+
+  it("accepts the PO location option before the admin action resolves it to a safe generic site", () => {
+    const formData = new FormData();
+    formData.set("customerCompanyId", "customer_1");
+    formData.set("siteId", purchaseOrderInspectionSiteOptionValue);
+    formData.set("purchaseOrderNumber", "PO-33774");
+    formData.set("scheduledStart", "2026-03-15T09:00:00.000Z");
+    setCurrentVisitServiceLine(formData);
+
+    const result = parseCreateInspectionFormData(formData);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.siteId).toBe(purchaseOrderInspectionSiteOptionValue);
     }
   });
 

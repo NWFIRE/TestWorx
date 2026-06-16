@@ -29,6 +29,8 @@ export const inspectionTaskSchedulingStatuses = [
 export const genericInspectionSiteOptionValue = "__generic_site__";
 export const genericInspectionSiteName = "General / No Fixed Site";
 export const noFixedInspectionSiteLabel = "No site needed";
+export const purchaseOrderInspectionSiteOptionValue = "__purchase_order_site__";
+export const purchaseOrderInspectionSiteLabel = "Use PO instead of site";
 export const customInspectionSiteOptionValue = "__custom_site__";
 export const customInspectionSiteName = "Create one-time site";
 

@@ -22,6 +22,7 @@ import {
   createOneTimeInspectionSite,
   customInspectionSiteOptionValue,
   ensureGenericInspectionSite,
+  ensurePurchaseOrderInspectionSite,
   genericInspectionSiteOptionValue,
   getAdminBillingSummaryDetail,
   getBillingManualLineCatalogItems,
@@ -29,6 +30,7 @@ import {
   uploadInspectionDocument,
   parseCreateInspectionFormData,
   parseUpdateInspectionFormData,
+  purchaseOrderInspectionSiteOptionValue,
   recordInspectionDuplicateOverride,
   removeBillingSummaryItemGroup,
   sendQuickBooksInvoice,
@@ -97,9 +99,29 @@ function resolveInspectionDeleteRedirectTarget(input: string | null | undefined)
     : `${candidate}?inspection=deleted`;
 }
 
+function mergePurchaseOrderIntoInspectionNotes(notes: string | null | undefined, purchaseOrderNumber: string) {
+  const cleanedNotes = (notes ?? "").trim();
+  const cleanedPurchaseOrderNumber = purchaseOrderNumber.trim();
+  const purchaseOrderLine = `PO: ${cleanedPurchaseOrderNumber}`;
+
+  if (!cleanedNotes) {
+    return purchaseOrderLine;
+  }
+
+  const noteLines = cleanedNotes.split(/\r?\n/);
+  const existingPurchaseOrderIndex = noteLines.findIndex((line) => /^PO\s*:/i.test(line.trim()));
+  if (existingPurchaseOrderIndex >= 0) {
+    noteLines[existingPurchaseOrderIndex] = purchaseOrderLine;
+    return noteLines.join("\n").trim();
+  }
+
+  return `${purchaseOrderLine}\n${cleanedNotes}`;
+}
+
 async function resolveInspectionSiteSelection<T extends {
   customerCompanyId: string;
   siteId: string;
+  notes?: string | null;
 }>(
   actor: {
     userId: string;
@@ -109,7 +131,11 @@ async function resolveInspectionSiteSelection<T extends {
   input: T,
   formData?: FormData
 ): Promise<T> {
-  if (input.siteId !== genericInspectionSiteOptionValue && input.siteId !== customInspectionSiteOptionValue) {
+  if (
+    input.siteId !== genericInspectionSiteOptionValue &&
+    input.siteId !== customInspectionSiteOptionValue &&
+    input.siteId !== purchaseOrderInspectionSiteOptionValue
+  ) {
     return input;
   }
 
@@ -141,6 +167,17 @@ async function resolveInspectionSiteSelection<T extends {
     return {
       ...input,
       siteId: customSite.id
+    };
+  }
+
+  if (input.siteId === purchaseOrderInspectionSiteOptionValue) {
+    const purchaseOrderNumber = String(formData?.get("purchaseOrderNumber") ?? "").trim();
+    const purchaseOrderSite = await ensurePurchaseOrderInspectionSite(actor, input.customerCompanyId, purchaseOrderNumber);
+
+    return {
+      ...input,
+      siteId: purchaseOrderSite.id,
+      notes: mergePurchaseOrderIntoInspectionNotes(input.notes, purchaseOrderNumber)
     };
   }
 

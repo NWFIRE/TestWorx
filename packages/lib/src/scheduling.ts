@@ -130,6 +130,8 @@ export const genericInspectionSiteOptionValue = "__generic_site__";
 export const genericInspectionSiteName = "General / No Fixed Site";
 export const customInspectionSiteOptionValue = "__custom_site__";
 export const customInspectionSiteName = "Create one-time site";
+export const purchaseOrderInspectionSiteOptionValue = "__purchase_order_site__";
+export const purchaseOrderInspectionSiteLabel = "Use PO instead of site";
 const genericInspectionSiteAddressLine1 = "No fixed service address";
 const genericInspectionSiteCity = "Unknown";
 const genericInspectionSiteState = "Unknown";
@@ -154,6 +156,10 @@ const nonDisplayableAddressParts = new Set([
   "–",
   "—"
 ]);
+
+export function formatPurchaseOrderInspectionSiteName(purchaseOrderNumber: string) {
+  return `PO: ${purchaseOrderNumber.trim()}`;
+}
 export const inspectionStatusLabels: Record<InspectionStatus | "past_due", string> = {
   to_be_completed: "To Be Completed",
   scheduled: "To Be Completed",
@@ -1845,6 +1851,70 @@ export async function ensureGenericInspectionSite(
       state: genericInspectionSiteState,
       postalCode: genericInspectionSitePostalCode,
       notes: `Created automatically for customer ${customerCompany.name} when scheduling without a specific site.`
+    },
+    select: {
+      id: true
+    }
+  });
+}
+
+export async function ensurePurchaseOrderInspectionSite(
+  actor: ActorContext,
+  customerCompanyId: string,
+  purchaseOrderNumber: string
+) {
+  const parsed = parseActor(actor);
+  if (!["tenant_admin", "office_admin", "platform_admin"].includes(parsed.role)) {
+    throw new Error("Only administrators can create PO inspection sites.");
+  }
+
+  const tenantId = parsed.tenantId as string;
+  const normalizedPurchaseOrderNumber = purchaseOrderNumber.trim();
+  if (!normalizedPurchaseOrderNumber) {
+    throw new Error("Enter the PO number before creating the inspection.");
+  }
+
+  const customerCompany = await prisma.customerCompany.findFirst({
+    where: {
+      id: customerCompanyId,
+      tenantId
+    },
+    select: {
+      id: true,
+      name: true
+    }
+  });
+
+  if (!customerCompany) {
+    throw new Error("Customer not found.");
+  }
+
+  const siteName = formatPurchaseOrderInspectionSiteName(normalizedPurchaseOrderNumber);
+  const existingSite = await prisma.site.findFirst({
+    where: {
+      tenantId,
+      customerCompanyId: customerCompany.id,
+      name: siteName
+    },
+    select: {
+      id: true
+    }
+  });
+
+  if (existingSite) {
+    return existingSite;
+  }
+
+  return prisma.site.create({
+    data: {
+      tenantId,
+      customerCompanyId: customerCompany.id,
+      name: siteName,
+      addressLine1: genericInspectionSiteAddressLine1,
+      city: genericInspectionSiteCity,
+      state: genericInspectionSiteState,
+      postalCode: genericInspectionSitePostalCode,
+      notes: `Created automatically for customer ${customerCompany.name} when scheduling inspection work against PO ${normalizedPurchaseOrderNumber}.`
     },
     select: {
       id: true

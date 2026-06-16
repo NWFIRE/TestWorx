@@ -19,7 +19,9 @@ import {
   inspectionTaskSchedulingStatuses,
   inspectionTypeRegistry,
   isUserFacingSiteLabel,
-  noFixedInspectionSiteLabel
+  noFixedInspectionSiteLabel,
+  purchaseOrderInspectionSiteLabel,
+  purchaseOrderInspectionSiteOptionValue
 } from "@testworx/lib";
 
 import { SearchSelect, type SearchSelectOption } from "@/app/search-select";
@@ -168,6 +170,11 @@ function serializeInitialValues(initialValues?: InspectionSchedulerFormInitialVa
       notes: task.notes ?? null
     }))
   });
+}
+
+function extractPurchaseOrderNumber(notes: string | null | undefined) {
+  const match = (notes ?? "").match(/(?:^|\n)\s*PO\s*:\s*([^\n]+)/i);
+  return match?.[1]?.trim() ?? "";
 }
 
 function formatDuplicateDateTime(value: string | null) {
@@ -326,6 +333,7 @@ export function InspectionSchedulerForm({
   const [scheduledEnd, setScheduledEnd] = useState(initialValues?.scheduledEnd ?? "");
   const [status, setStatus] = useState<EditableInspectionStatus>(initialValues?.status ?? "to_be_completed");
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
+  const [purchaseOrderNumber, setPurchaseOrderNumber] = useState(() => extractPurchaseOrderNumber(initialValues?.notes));
   const [startManuallyEdited, setStartManuallyEdited] = useState(Boolean(initialValues?.scheduledStart));
   const [serviceLines, setServiceLines] = useState<ServiceLineDraft[]>(() => buildInitialServiceLines(initialValues));
   const [newestServiceLineId, setNewestServiceLineId] = useState<string | null>(null);
@@ -359,6 +367,7 @@ export function InspectionSchedulerForm({
 
     return [
       { value: genericInspectionSiteOptionValue, label: noFixedInspectionSiteLabel, secondaryLabel: "Use the customer account for this inspection" },
+      { value: purchaseOrderInspectionSiteOptionValue, label: purchaseOrderInspectionSiteLabel, secondaryLabel: "Track this visit by purchase order" },
       ...(allowCustomOneTimeSite
         ? [{ value: customInspectionSiteOptionValue, label: customInspectionSiteName, secondaryLabel: "Create a one-time site for this inspection" }]
         : []),
@@ -372,10 +381,12 @@ export function InspectionSchedulerForm({
   const resolvedSiteId =
     filteredSites.some((site) => site.id === selectedSiteId) ||
     selectedSiteId === genericInspectionSiteOptionValue ||
+    selectedSiteId === purchaseOrderInspectionSiteOptionValue ||
     selectedSiteId === customInspectionSiteOptionValue
       ? selectedSiteId
       : "";
   const customSiteSelected = resolvedSiteId === customInspectionSiteOptionValue;
+  const purchaseOrderSiteSelected = resolvedSiteId === purchaseOrderInspectionSiteOptionValue;
   const serviceLinesJson = JSON.stringify(
     serviceLines.map((line) => ({
       inspectionType: line.inspectionType,
@@ -434,6 +445,7 @@ export function InspectionSchedulerForm({
     setScheduledEnd("");
     setStatus("to_be_completed");
     setNotes("");
+    setPurchaseOrderNumber("");
     setStartManuallyEdited(false);
     setServiceLines([createServiceLineDraft(defaultMonth)]);
     setExternalDocumentFiles([]);
@@ -469,6 +481,7 @@ export function InspectionSchedulerForm({
     setScheduledEnd(initialValues.scheduledEnd ?? "");
     setStatus(initialValues.status ?? "to_be_completed");
     setNotes(initialValues.notes ?? "");
+    setPurchaseOrderNumber(extractPurchaseOrderNumber(initialValues.notes));
     setStartManuallyEdited(Boolean(initialValues.scheduledStart));
     setServiceLines(buildInitialServiceLines(initialValues));
     setShowProtectedSaveConfirm(false);
@@ -738,7 +751,7 @@ export function InspectionSchedulerForm({
             disabled={selectedCustomerId === ""}
             disabledPlaceholder="Select a customer first"
             id="siteId"
-            label="Site"
+            label="Site or PO"
             name="siteId"
             onChange={(nextSiteId) => setSelectedSiteId(nextSiteId)}
             options={siteOptions}
@@ -748,6 +761,20 @@ export function InspectionSchedulerForm({
           />
         </div>
       </div>
+      {purchaseOrderSiteSelected ? (
+        <div className="min-w-0 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4 sm:rounded-[1.5rem]">
+          <label className="mb-2 block text-sm font-semibold text-slate-700" htmlFor="purchaseOrderNumber">PO number</label>
+          <input
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-slate-900 outline-none transition-colors focus:border-slateblue/50"
+            id="purchaseOrderNumber"
+            name="purchaseOrderNumber"
+            onChange={(event) => setPurchaseOrderNumber(event.target.value)}
+            placeholder="Enter customer PO"
+            required={purchaseOrderSiteSelected}
+            value={purchaseOrderNumber}
+          />
+        </div>
+      ) : null}
       {customSiteSelected ? (
         <div className="min-w-0 space-y-4 rounded-[1.25rem] border border-slate-200 p-4 sm:rounded-[1.5rem]">
           <div>
