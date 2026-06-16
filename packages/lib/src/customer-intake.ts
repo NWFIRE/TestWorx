@@ -118,6 +118,8 @@ export const customerIntakeSubmissionSchema = z.object({
 
 export type CustomerIntakeSubmission = z.infer<typeof customerIntakeSubmissionSchema>;
 
+export const customerIntakeAdminAdjustmentSchema = customerIntakeSubmissionSchema;
+
 type IntakeFileInput = {
   name: string;
   type: string;
@@ -617,6 +619,59 @@ export async function getCustomerIntakeReview(actor: ActorContext, intakeRequest
   const submittedData = request.submittedDataJson ? toSubmittedData(request.submittedDataJson) : null;
   const duplicateWarnings = submittedData ? await findDuplicateWarnings(tenantId, submittedData) : [];
   return { request, submittedData, duplicateWarnings };
+}
+
+export async function updateCustomerIntakeSubmittedData(actor: ActorContext, input: {
+  intakeRequestId: string;
+  submittedData: unknown;
+}) {
+  const parsedActor = parseActor(actor);
+  ensureOfficeActor(parsedActor);
+  const tenantId = parsedActor.tenantId as string;
+  const submittedData = customerIntakeAdminAdjustmentSchema.parse(input.submittedData);
+  const request = await prisma.customerIntakeRequest.findFirst({
+    where: {
+      id: input.intakeRequestId,
+      organizationId: tenantId
+    },
+    select: {
+      id: true,
+      status: true,
+      submittedDataJson: true
+    }
+  });
+
+  if (!request || request.status !== CustomerIntakeStatus.submitted || !request.submittedDataJson) {
+    throw new Error("Only submitted intake requests can be adjusted before approval.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.customerIntakeRequest.update({
+      where: { id: request.id },
+      data: {
+        submittedDataJson: submittedData as Prisma.InputJsonValue
+      }
+    });
+
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        actorUserId: parsedActor.userId,
+        action: "customer_intake.adjusted",
+        entityType: "CustomerIntakeRequest",
+        entityId: request.id,
+        metadata: {
+          previousData: request.submittedDataJson,
+          adjustedData: submittedData
+        } as Prisma.InputJsonValue
+      }
+    });
+  });
+
+  return {
+    intakeRequestId: request.id,
+    submittedData
+  };
 }
 
 export async function getPublicCustomerIntakeRequest(token: string) {

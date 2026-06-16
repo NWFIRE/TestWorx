@@ -8,10 +8,12 @@ import { auth } from "@/auth";
 import {
   approveCustomerIntakeRequest,
   createCustomerIntakeRequest,
+  customerIntakeAdminAdjustmentSchema,
   customerIntakeSendSchema,
   rejectCustomerIntakeRequest,
   reopenCustomerIntakeRequest,
-  resendCustomerIntakeRequest
+  resendCustomerIntakeRequest,
+  updateCustomerIntakeSubmittedData
 } from "@testworx/lib/server/index";
 
 type OfficeSession = {
@@ -154,6 +156,69 @@ export async function approveCustomerIntakeAction(formData: FormData) {
     }
     redirect(detailHref(intakeRequestId, {
       error: error instanceof Error ? error.message : "Unable to approve intake."
+    }));
+  }
+}
+
+export async function updateCustomerIntakeSubmittedDataAction(formData: FormData) {
+  const session = requireOfficeSession(await auth());
+  const intakeRequestId = String(formData.get("intakeRequestId") ?? "").trim();
+  if (!intakeRequestId) {
+    redirect("/app/admin/customer-intakes");
+  }
+
+  const systemTypes = formData.getAll("systemTypes").map((value) => String(value)).filter(Boolean);
+  const parsed = customerIntakeAdminAdjustmentSchema.safeParse({
+    companyName: String(formData.get("companyName") ?? ""),
+    companyWebsite: String(formData.get("companyWebsite") ?? ""),
+    primaryContactName: String(formData.get("primaryContactName") ?? ""),
+    primaryContactEmail: String(formData.get("primaryContactEmail") ?? ""),
+    primaryContactPhone: String(formData.get("primaryContactPhone") ?? ""),
+    billingContactName: String(formData.get("billingContactName") ?? ""),
+    billingEmail: String(formData.get("billingEmail") ?? ""),
+    billingPhone: String(formData.get("billingPhone") ?? ""),
+    billingAddressLine1: String(formData.get("billingAddressLine1") ?? ""),
+    billingAddressLine2: String(formData.get("billingAddressLine2") ?? ""),
+    billingCity: String(formData.get("billingCity") ?? ""),
+    billingState: String(formData.get("billingState") ?? ""),
+    billingPostalCode: String(formData.get("billingPostalCode") ?? ""),
+    siteName: String(formData.get("siteName") ?? ""),
+    siteAddressLine1: String(formData.get("siteAddressLine1") ?? ""),
+    siteAddressLine2: String(formData.get("siteAddressLine2") ?? ""),
+    siteCity: String(formData.get("siteCity") ?? ""),
+    siteState: String(formData.get("siteState") ?? ""),
+    sitePostalCode: String(formData.get("sitePostalCode") ?? ""),
+    siteContactName: String(formData.get("siteContactName") ?? ""),
+    siteContactPhone: String(formData.get("siteContactPhone") ?? ""),
+    siteContactEmail: String(formData.get("siteContactEmail") ?? ""),
+    requestedServiceType: String(formData.get("requestedServiceType") ?? ""),
+    systemTypes,
+    preferredServiceDate: String(formData.get("preferredServiceDate") ?? ""),
+    preferredTimeWindow: String(formData.get("preferredTimeWindow") ?? ""),
+    preferredServiceWindow: String(formData.get("preferredServiceWindow") ?? ""),
+    serviceNotes: String(formData.get("serviceNotes") ?? "")
+  });
+
+  if (!parsed.success) {
+    redirect(detailHref(intakeRequestId, {
+      error: parsed.error.issues[0]?.message ?? "Unable to save intake adjustments."
+    }));
+  }
+
+  try {
+    await updateCustomerIntakeSubmittedData(actorFromSession(session), {
+      intakeRequestId,
+      submittedData: parsed.data
+    });
+    revalidatePath("/app/admin/customer-intakes");
+    revalidatePath(`/app/admin/customer-intakes/${intakeRequestId}`);
+    redirect(detailHref(intakeRequestId, { notice: "Customer intake adjustments saved." }));
+  } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+    redirect(detailHref(intakeRequestId, {
+      error: error instanceof Error ? error.message : "Unable to save intake adjustments."
     }));
   }
 }

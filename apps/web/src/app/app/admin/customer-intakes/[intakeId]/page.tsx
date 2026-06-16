@@ -5,7 +5,13 @@ import { auth } from "@/auth";
 import { getCustomerIntakeReview, serviceSystemTypeLabels } from "@testworx/lib/server/index";
 
 import { AppPageShell, PageHeader, SectionCard, StatusBadge } from "../../operations-ui";
-import { approveCustomerIntakeAction, rejectCustomerIntakeAction, reopenCustomerIntakeAction, resendCustomerIntakeFormAction } from "../actions";
+import {
+  approveCustomerIntakeAction,
+  rejectCustomerIntakeAction,
+  reopenCustomerIntakeAction,
+  resendCustomerIntakeFormAction,
+  updateCustomerIntakeSubmittedDataAction
+} from "../actions";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -60,6 +66,54 @@ function DetailField({
       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">{label}</p>
       <p className="mt-2 text-sm leading-6 text-slate-800">{value?.trim() || "Not provided"}</p>
     </div>
+  );
+}
+
+function AdjustmentField({
+  label,
+  name,
+  value,
+  required,
+  type = "text"
+}: {
+  label: string;
+  name: string;
+  value: string | null | undefined;
+  required?: boolean;
+  type?: "email" | "tel" | "text" | "url";
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-semibold text-slate-700">{label}</span>
+      <input
+        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[var(--tenant-primary)]"
+        defaultValue={value ?? ""}
+        name={name}
+        required={required}
+        type={type}
+      />
+    </label>
+  );
+}
+
+function AdjustmentTextarea({
+  label,
+  name,
+  value
+}: {
+  label: string;
+  name: string;
+  value: string | null | undefined;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-semibold text-slate-700">{label}</span>
+      <textarea
+        className="min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[var(--tenant-primary)]"
+        defaultValue={value ?? ""}
+        name={name}
+      />
+    </label>
   );
 }
 
@@ -121,6 +175,81 @@ export default async function CustomerIntakeDetailPage({
               </div>
             ))}
           </div>
+        </SectionCard>
+      ) : null}
+
+      {request.status === "submitted" && submittedData ? (
+        <SectionCard>
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">Admin adjustments</p>
+              <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">Correct intake details before approval</h2>
+            </div>
+          </div>
+          <form action={updateCustomerIntakeSubmittedDataAction} className="mt-5 space-y-6">
+            <input name="intakeRequestId" type="hidden" value={request.id} />
+            <div className="grid gap-4 md:grid-cols-2">
+              <AdjustmentField label="Company name" name="companyName" required value={submittedData.companyName} />
+              <AdjustmentField label="Company website" name="companyWebsite" type="url" value={submittedData.companyWebsite} />
+              <AdjustmentField label="Primary contact" name="primaryContactName" required value={submittedData.primaryContactName} />
+              <AdjustmentField label="Primary email" name="primaryContactEmail" required type="email" value={submittedData.primaryContactEmail} />
+              <AdjustmentField label="Primary phone" name="primaryContactPhone" required type="tel" value={submittedData.primaryContactPhone} />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <AdjustmentField label="Billing contact" name="billingContactName" value={submittedData.billingContactName} />
+              <AdjustmentField label="Billing email" name="billingEmail" required type="email" value={submittedData.billingEmail} />
+              <AdjustmentField label="Billing phone" name="billingPhone" type="tel" value={submittedData.billingPhone} />
+              <AdjustmentField label="Billing address line 1" name="billingAddressLine1" required value={submittedData.billingAddressLine1} />
+              <AdjustmentField label="Billing address line 2" name="billingAddressLine2" value={submittedData.billingAddressLine2} />
+              <AdjustmentField label="Billing city" name="billingCity" required value={submittedData.billingCity} />
+              <AdjustmentField label="Billing state" name="billingState" required value={submittedData.billingState} />
+              <AdjustmentField label="Billing ZIP/postal code" name="billingPostalCode" required value={submittedData.billingPostalCode} />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <AdjustmentField label="Site name / identifier" name="siteName" value={submittedData.siteName} />
+              <AdjustmentField label="Site address line 1" name="siteAddressLine1" required value={submittedData.siteAddressLine1} />
+              <AdjustmentField label="Site address line 2" name="siteAddressLine2" value={submittedData.siteAddressLine2} />
+              <AdjustmentField label="Site city" name="siteCity" required value={submittedData.siteCity} />
+              <AdjustmentField label="Site state" name="siteState" required value={submittedData.siteState} />
+              <AdjustmentField label="Site ZIP/postal code" name="sitePostalCode" required value={submittedData.sitePostalCode} />
+              <AdjustmentField label="Site contact" name="siteContactName" value={submittedData.siteContactName} />
+              <AdjustmentField label="Site phone" name="siteContactPhone" type="tel" value={submittedData.siteContactPhone} />
+              <AdjustmentField label="Site email" name="siteContactEmail" type="email" value={submittedData.siteContactEmail} />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <AdjustmentField label="Requested service type" name="requestedServiceType" required value={submittedData.requestedServiceType} />
+              <AdjustmentField label="Preferred service date" name="preferredServiceDate" value={submittedData.preferredServiceDate} />
+              <AdjustmentField label="Preferred time window" name="preferredTimeWindow" value={submittedData.preferredTimeWindow} />
+              <AdjustmentField label="Preferred service window" name="preferredServiceWindow" value={submittedData.preferredServiceWindow} />
+            </div>
+
+            <div>
+              <p className="mb-3 text-sm font-semibold text-slate-700">System types</p>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {Object.entries(serviceSystemTypeLabels).map(([value, label]) => (
+                  <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700" key={value}>
+                    <input
+                      className="h-4 w-4"
+                      defaultChecked={submittedData.systemTypes.includes(value as (typeof submittedData.systemTypes)[number])}
+                      name="systemTypes"
+                      type="checkbox"
+                      value={value}
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <AdjustmentTextarea label="Service notes" name="serviceNotes" value={submittedData.serviceNotes} />
+
+            <button className="btn-brand-primary min-h-12 rounded-2xl px-5 text-sm font-semibold" type="submit">
+              Save Intake Adjustments
+            </button>
+          </form>
         </SectionCard>
       ) : null}
 

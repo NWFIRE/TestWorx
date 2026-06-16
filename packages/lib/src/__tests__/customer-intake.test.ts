@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { customerIntakeSendSchema, customerIntakeSubmissionSchema } from "../customer-intake";
+import { customerIntakeAdminAdjustmentSchema, customerIntakeSendSchema, customerIntakeSubmissionSchema } from "../customer-intake";
 
 describe("customer intake validation", () => {
   it("accepts a complete customer intake submission", () => {
@@ -89,5 +89,30 @@ describe("customer intake validation", () => {
 
     expect(parsed.recipientName).toBeNull();
     expect(parsed.optionalMessage).toBeNull();
+  });
+
+  it("allows admins to clarify duplicate customer names before approval", () => {
+    const parsed = customerIntakeAdminAdjustmentSchema.parse({
+      companyName: "Commercial Fire LLC - Sprouts #809",
+      primaryContactName: "Alex Rivera",
+      primaryContactEmail: "alex@commercial-fire.test",
+      primaryContactPhone: "405-555-0100",
+      billingEmail: "ap@commercial-fire.test",
+      billingAddressLine1: "100 Market St",
+      billingCity: "Oklahoma City",
+      billingState: "OK",
+      billingPostalCode: "73102",
+      siteName: "Sprouts Farmers Market #809",
+      siteAddressLine1: "200 Service Rd",
+      siteCity: "Oklahoma City",
+      siteState: "OK",
+      sitePostalCode: "73103",
+      requestedServiceType: "Kitchen suppression inspection",
+      systemTypes: ["kitchen_suppression"],
+      serviceNotes: "Admin added site identifier before approval."
+    });
+
+    expect(parsed.companyName).toBe("Commercial Fire LLC - Sprouts #809");
+    expect(parsed.siteName).toBe("Sprouts Farmers Market #809");
   });
 });
