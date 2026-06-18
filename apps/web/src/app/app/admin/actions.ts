@@ -667,25 +667,29 @@ export async function uploadInspectionExternalDocumentAction(_: { error: string 
   const requiresSignature = formData.get("requiresSignature") === "on";
   const customerVisible = formData.get("customerVisible") === "on";
   const label = String(formData.get("label") ?? "").trim();
-  const file = formData.get("document");
+  const files = formData
+    .getAll("document")
+    .filter((entry): entry is File => entry instanceof File && entry.size > 0);
 
-  if (!session?.user?.tenantId || !inspectionId || !(file instanceof File) || file.size === 0) {
-    return { error: "Select a PDF to upload.", success: null };
+  if (!session?.user?.tenantId || !inspectionId || files.length === 0) {
+    return { error: "Select at least one PDF to upload.", success: null };
   }
 
   try {
-    await uploadInspectionDocument(
-      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-      {
-        inspectionId,
-        fileName: file.name,
-        mimeType: file.type || "application/pdf",
-        bytes: new Uint8Array(await file.arrayBuffer()),
-        label: label || null,
-        requiresSignature,
-        customerVisible
-      }
-    );
+    for (const file of files) {
+      await uploadInspectionDocument(
+        { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+        {
+          inspectionId,
+          fileName: file.name,
+          mimeType: file.type || "application/pdf",
+          bytes: new Uint8Array(await file.arrayBuffer()),
+          label: files.length === 1 ? label || null : null,
+          requiresSignature,
+          customerVisible
+        }
+      );
+    }
 
     revalidatePath(`/app/admin/inspections/${inspectionId}`);
     revalidatePath("/app/admin");
@@ -693,7 +697,9 @@ export async function uploadInspectionExternalDocumentAction(_: { error: string 
     revalidatePath("/app/customer");
     return {
       error: null,
-      success: `${file.name} attached to the inspection.`
+      success: files.length === 1
+        ? `${files[0]!.name} attached to the inspection.`
+        : `${files.length} PDFs attached to the inspection.`
     };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unable to upload inspection document.", success: null };

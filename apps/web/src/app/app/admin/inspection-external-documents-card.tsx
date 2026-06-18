@@ -68,32 +68,43 @@ export function InspectionExternalDocumentsCard({
 
     const form = event.currentTarget;
     const formData = new FormData(form);
-    const file = formData.get("document");
-    if (!(file instanceof File) || file.size === 0) {
-      setError("Select a PDF to upload.");
+    const files = formData.getAll("document").filter((entry): entry is File => entry instanceof File && entry.size > 0);
+    if (files.length === 0) {
+      setError("Select at least one PDF to upload.");
       return;
     }
-    if (!isPdfFile(file)) {
-      setError(`${file.name} is not a PDF. Upload PDF files only.`);
+    const nonPdfFile = files.find((file) => !isPdfFile(file));
+    if (nonPdfFile) {
+      setError(`${nonPdfFile.name} is not a PDF. Upload PDF files only.`);
       return;
     }
-    if (file.size > MAX_INSPECTION_DOCUMENT_UPLOAD_BYTES) {
-      setError(`${file.name} is ${formatFileSize(file.size)}. Upload PDFs up to ${MAX_INSPECTION_DOCUMENT_UPLOAD_LABEL}, or compress/split the file and try again.`);
+    const oversizedFile = files.find((file) => file.size > MAX_INSPECTION_DOCUMENT_UPLOAD_BYTES);
+    if (oversizedFile) {
+      setError(`${oversizedFile.name} is ${formatFileSize(oversizedFile.size)}. Upload PDFs up to ${MAX_INSPECTION_DOCUMENT_UPLOAD_LABEL}, or compress/split the file and try again.`);
       return;
     }
 
     startUploadTransition(() => {
       void (async () => {
         try {
-          const safeName = file.name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "inspection-document.pdf";
-          const uploaded = await upload(
-            `${tenantStoragePrefix}/inspection-document-original/${inspectionId}-${Date.now()}-${safeName}`,
-            file,
-            {
-              access: "private",
-              handleUploadUrl: `/api/inspections/${inspectionId}/documents/blob`
-            }
-          );
+          const uploadStartedAt = Date.now();
+          const uploadResults = await Promise.all(files.map(async (file, index) => {
+            const safeName = file.name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "inspection-document.pdf";
+            const uploaded = await upload(
+              `${tenantStoragePrefix}/inspection-document-original/${inspectionId}-${uploadStartedAt}-${index}-${safeName}`,
+              file,
+              {
+                access: "private",
+                handleUploadUrl: `/api/inspections/${inspectionId}/documents/blob`
+              }
+            );
+
+            return {
+              pathname: uploaded.pathname,
+              fileName: file.name,
+              mimeType: file.type || uploaded.contentType || "application/pdf"
+            };
+          }));
 
           const metadataFormData = new FormData();
           const label = String(formData.get("label") ?? "").trim();
@@ -106,9 +117,11 @@ export function InspectionExternalDocumentsCard({
           if (formData.get("customerVisible") === "on") {
             metadataFormData.set("customerVisible", "on");
           }
-          metadataFormData.set("uploadedBlobPathname", uploaded.pathname);
-          metadataFormData.set("uploadedFileName", file.name);
-          metadataFormData.set("uploadedMimeType", file.type || uploaded.contentType || "application/pdf");
+          for (const uploaded of uploadResults) {
+            metadataFormData.append("uploadedBlobPathname", uploaded.pathname);
+            metadataFormData.append("uploadedFileName", uploaded.fileName);
+            metadataFormData.append("uploadedMimeType", uploaded.mimeType);
+          }
 
           const response = await fetch(`/api/inspections/${inspectionId}/documents/upload`, {
             method: "POST",
@@ -129,7 +142,7 @@ export function InspectionExternalDocumentsCard({
             throw new Error(payload.error ?? "Unable to upload PDF.");
           }
 
-          setSuccess(payload.success ?? `${file.name} uploaded.`);
+          setSuccess(payload.success ?? (files.length === 1 ? `${files[0]!.name} uploaded.` : `${files.length} PDFs uploaded.`));
           router.refresh();
           form.reset();
         } catch (submitError) {
@@ -150,12 +163,12 @@ export function InspectionExternalDocumentsCard({
         <input name="inspectionId" type="hidden" value={inspectionId} />
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="label">Document label</label>
-          <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="label" name="label" placeholder="Customer service ticket, building form, etc." />
+          <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="label" name="label" placeholder="Used when uploading a single PDF" />
         </div>
         <div>
-          <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="document">Upload PDF</label>
-          <input accept="application/pdf" className="block w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" id="document" name="document" type="file" />
-          <p className="mt-2 text-xs text-slate-500">Maximum {MAX_INSPECTION_DOCUMENT_UPLOAD_LABEL} per PDF.</p>
+          <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="document">Upload PDF files</label>
+          <input accept="application/pdf" className="block w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" id="document" multiple name="document" type="file" />
+          <p className="mt-2 text-xs text-slate-500">You can select and upload multiple PDFs at once. Maximum {MAX_INSPECTION_DOCUMENT_UPLOAD_LABEL} per PDF.</p>
         </div>
         <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
           <input className="h-5 w-5 rounded border-slate-300" defaultChecked name="requiresSignature" type="checkbox" />
@@ -168,7 +181,7 @@ export function InspectionExternalDocumentsCard({
         {error ? <p className="text-sm text-rose-600">{error}</p> : null}
         {success ? <p className="text-sm text-emerald-600">{success}</p> : null}
         <button className="w-full rounded-2xl bg-slateblue px-5 py-3 text-sm font-semibold text-white disabled:opacity-60" disabled={isUploading} type="submit">
-          {isUploading ? "Uploading document..." : "Attach external PDF"}
+          {isUploading ? "Uploading PDFs..." : "Attach external PDFs"}
         </button>
       </form>
       <div className="space-y-3">
