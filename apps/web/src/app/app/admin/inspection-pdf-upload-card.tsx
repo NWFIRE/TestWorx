@@ -15,6 +15,10 @@ function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function sanitizePathSegment(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "file";
+}
+
 function normalizeUploadError(error: unknown) {
   const message = error instanceof Error ? error.message : "";
   if (/file is too large|file length cannot be greater|maximumSizeInBytes/i.test(message)) {
@@ -63,10 +67,14 @@ export function InspectionPdfUploadCard({
     startUploadTransition(() => {
       void (async () => {
         try {
-          const uploadResults = await Promise.all(files.map(async (file) => {
+          const uploadStartedAt = Date.now();
+          const safeInspectionId = sanitizePathSegment(inspectionId);
+          const uploadResults = [];
+
+          for (const [index, file] of files.entries()) {
             const safeName = file.name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "inspection.pdf";
             const uploaded = await upload(
-              `${tenantStoragePrefix}/uploaded-pdf/${inspectionId}-${Date.now()}-${safeName}`,
+              `${tenantStoragePrefix}/uploaded-pdf/${safeInspectionId}-${uploadStartedAt}-${index}-${safeName}`,
               file,
               {
                 access: "private",
@@ -74,12 +82,12 @@ export function InspectionPdfUploadCard({
               }
             );
 
-            return {
+            uploadResults.push({
               pathname: uploaded.pathname,
               fileName: file.name,
               mimeType: file.type || uploaded.contentType || "application/pdf"
-            };
-          }));
+            });
+          }
 
           const metadataFormData = new FormData();
           if (formData.get("customerVisible") === "on") {
