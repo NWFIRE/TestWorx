@@ -68,7 +68,7 @@ export function InspectionReportCorrectionsCard({
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Completed report corrections</p>
         <h3 className="mt-2 text-2xl font-semibold text-ink">Report correction controls</h3>
-        <p className="mt-2 text-sm text-slate-500">Reopen completed reports for correction, or regenerate their stored PDF when you need older visits reissued through the current v2 document engine.</p>
+        <p className="mt-2 text-sm text-slate-500">Reopen completed reports for correction, or regenerate their stored PDF when customer/site details or report formatting need to be refreshed.</p>
       </div>
       {state.error ? <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{state.error}</p> : null}
       {state.success ? <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{state.success}</p> : null}
@@ -168,7 +168,7 @@ export function InspectionReportCorrectionsCard({
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-ink">Regenerate customer PDF</p>
-                        <p className="mt-1 text-sm text-slate-500">Replace the stored generated PDF with a fresh v2 version without reopening the report.</p>
+                        <p className="mt-1 text-sm text-slate-500">Replace the stored generated PDF with the latest customer and site information without reopening the report.</p>
                       </div>
                       <button
                         className="inline-flex rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-ink disabled:opacity-60"

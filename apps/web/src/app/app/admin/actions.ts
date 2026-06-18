@@ -766,7 +766,7 @@ export async function regenerateCompletedReportPdfAction(_: { error: string | nu
 
     return {
       error: null,
-      success: "Report PDF regenerated with the current v2 renderer."
+      success: "Report PDF regenerated with the latest customer, site, and report formatting details."
     };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Unable to regenerate the report PDF.", success: null };

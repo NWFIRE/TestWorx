@@ -1380,6 +1380,123 @@ function buildGeneratedPdfName(report: { inspection: { customerCompany: { name: 
   ].filter(Boolean).join("-");
 }
 
+type ReportCustomerContextSource = {
+  inspection: {
+    scheduledStart?: Date | string | null;
+    site: {
+      name: string;
+      addressLine1?: string | null;
+      addressLine2?: string | null;
+      city?: string | null;
+      state?: string | null;
+      postalCode?: string | null;
+    };
+    customerCompany: {
+      name: string;
+      contactName?: string | null;
+      phone?: string | null;
+      billingEmail?: string | null;
+      serviceAddressLine1?: string | null;
+      serviceAddressLine2?: string | null;
+      serviceCity?: string | null;
+      serviceState?: string | null;
+      servicePostalCode?: string | null;
+      billingAddressLine1?: string | null;
+      billingAddressLine2?: string | null;
+      billingCity?: string | null;
+      billingState?: string | null;
+      billingPostalCode?: string | null;
+    };
+  };
+};
+
+function buildCurrentReportCustomerContext(report: ReportCustomerContextSource) {
+  const customerName = report.inspection.customerCompany.name;
+  const siteName = getCustomerFacingSiteLabel(report.inspection.site.name) ?? customerName;
+  const serviceAddress = formatCustomerFacingInspectionAddress({
+    siteName: report.inspection.site.name,
+    siteAddressLine1: report.inspection.site.addressLine1,
+    siteAddressLine2: report.inspection.site.addressLine2,
+    siteCity: report.inspection.site.city,
+    siteState: report.inspection.site.state,
+    sitePostalCode: report.inspection.site.postalCode,
+    customerServiceAddressLine1: report.inspection.customerCompany.serviceAddressLine1,
+    customerServiceAddressLine2: report.inspection.customerCompany.serviceAddressLine2,
+    customerServiceCity: report.inspection.customerCompany.serviceCity,
+    customerServiceState: report.inspection.customerCompany.serviceState,
+    customerServicePostalCode: report.inspection.customerCompany.servicePostalCode,
+    customerBillingAddressLine1: report.inspection.customerCompany.billingAddressLine1,
+    customerBillingAddressLine2: report.inspection.customerCompany.billingAddressLine2,
+    customerBillingCity: report.inspection.customerCompany.billingCity,
+    customerBillingState: report.inspection.customerCompany.billingState,
+    customerBillingPostalCode: report.inspection.customerCompany.billingPostalCode
+  });
+
+  return {
+    customerName,
+    siteName,
+    serviceAddress,
+    scheduledDate: report.inspection.scheduledStart instanceof Date
+      ? report.inspection.scheduledStart.toISOString()
+      : typeof report.inspection.scheduledStart === "string"
+        ? report.inspection.scheduledStart
+        : ""
+  };
+}
+
+export function refreshReportDraftCustomerContextForRegeneration(
+  draft: ReportDraft,
+  report: ReportCustomerContextSource
+): ReportDraft {
+  const currentContext = buildCurrentReportCustomerContext(report);
+  const identityFieldValues: Record<string, ReportPrimitiveValue> = {
+    customerName: currentContext.customerName,
+    facilityName: currentContext.customerName,
+    facilityCustomer: currentContext.customerName,
+    summaryCustomerFacility: currentContext.customerName,
+    siteName: currentContext.siteName,
+    site: currentContext.siteName,
+    siteAddress: currentContext.serviceAddress,
+    serviceAddress: currentContext.serviceAddress,
+    facilityAddress: currentContext.serviceAddress,
+    customerAddress: currentContext.serviceAddress,
+    summaryFacilityAddress: currentContext.serviceAddress
+  };
+
+  return reportDraftSchema.parse({
+    ...draft,
+    context: {
+      ...draft.context,
+      customerName: currentContext.customerName,
+      siteName: currentContext.siteName,
+      scheduledDate: currentContext.scheduledDate || draft.context.scheduledDate
+    },
+    sections: Object.fromEntries(
+      Object.entries(draft.sections).map(([sectionId, section]) => {
+        const nextFields = { ...section.fields };
+        let changed = false;
+
+        for (const [fieldId, value] of Object.entries(identityFieldValues)) {
+          if (Object.prototype.hasOwnProperty.call(nextFields, fieldId) && nextFields[fieldId] !== value) {
+            nextFields[fieldId] = value;
+            changed = true;
+          }
+        }
+
+        return [
+          sectionId,
+          changed
+            ? {
+                ...section,
+                fields: nextFields
+              }
+            : section
+        ];
+      })
+    )
+  });
+}
+
 type GeneratedPdfAttachmentRecord = {
   kind: AttachmentKind;
   source: string;
@@ -1398,7 +1515,10 @@ async function replaceGeneratedReportPdfTx(
   }
 ) {
   const { generateInspectionReportPdf } = await import("./pdf-report");
-  const draft = reportDraftSchema.parse(input.report.contentJson ?? {});
+  const draft = refreshReportDraftCustomerContextForRegeneration(
+    reportDraftSchema.parse(input.report.contentJson ?? {}),
+    input.report
+  );
   const priorGeneratedAttachments = input.report.attachments.filter(
     (attachment: GeneratedPdfAttachmentRecord) => attachment.kind === AttachmentKind.pdf && attachment.source === "generated"
   );
