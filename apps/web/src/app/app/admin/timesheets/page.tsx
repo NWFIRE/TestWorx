@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 import { formatTimesheetHours, getAdminTimesheetWorkspace } from "@testworx/lib/server/index";
 
 import { AppPageShell, FilterBar, KPIStatCard, PageHeader, SectionCard, StatusBadge } from "../operations-ui";
-import { correctTimeEntryAction } from "../../timesheets/actions";
+import { correctTimeEntryAction, createAdminTimeEntryAction } from "../../timesheets/actions";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -31,6 +31,12 @@ function toDateTimeLocal(value: Date | null) {
   }
   const pad = (input: number) => input.toString().padStart(2, "0");
   return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
+}
+
+function toDateTimeLocalAt(value: Date, hours: number, minutes = 0) {
+  const date = new Date(value);
+  date.setHours(hours, minutes, 0, 0);
+  return toDateTimeLocal(date);
 }
 
 export default async function AdminTimesheetsPage({
@@ -185,6 +191,35 @@ export default async function AdminTimesheetsPage({
                         ))}
                       </div>
                     ) : null}
+                    <div className="bg-slate-50 px-4 pb-4">
+                      <details className="rounded-2xl border border-dashed border-slate-300 bg-white p-4">
+                        <summary className="cursor-pointer text-sm font-bold text-slate-800">
+                          Add time entry for {summary.employee.name} on {row.label}
+                        </summary>
+                        <form action={createAdminTimeEntryAction} className="mt-4 grid gap-3 lg:grid-cols-2">
+                          <input name="employeeId" type="hidden" value={summary.employee.id} />
+                          <label>
+                            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Clock in</span>
+                            <input className="min-h-11 w-full rounded-2xl border border-slate-200 px-3 text-sm font-semibold" defaultValue={toDateTimeLocalAt(row.date, 8)} name="clockInAt" required type="datetime-local" />
+                          </label>
+                          <label>
+                            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Clock out</span>
+                            <input className="min-h-11 w-full rounded-2xl border border-slate-200 px-3 text-sm font-semibold" defaultValue={toDateTimeLocalAt(row.date, 17)} name="clockOutAt" required type="datetime-local" />
+                          </label>
+                          <label className="lg:col-span-2">
+                            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Notes</span>
+                            <input className="min-h-11 w-full rounded-2xl border border-slate-200 px-3 text-sm font-semibold" name="notes" placeholder="Optional payroll note" type="text" />
+                          </label>
+                          <label className="lg:col-span-2">
+                            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Adjustment reason</span>
+                            <input className="min-h-11 w-full rounded-2xl border border-slate-200 px-3 text-sm font-semibold" name="correctionReason" placeholder="Example: Employee forgot to clock in from signed service ticket." required type="text" />
+                          </label>
+                          <button className="min-h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 hover:bg-slate-50 lg:col-span-2" type="submit">
+                            Add time entry
+                          </button>
+                        </form>
+                      </details>
+                    </div>
                   </div>
                 ))}
               </div>

@@ -22,6 +22,17 @@ const correctionSchema = z.object({
   path: ["clockOutAt"]
 });
 
+const adminCreateEntrySchema = z.object({
+  employeeId: z.string().trim().min(1),
+  clockInAt: z.coerce.date(),
+  clockOutAt: z.coerce.date(),
+  notes: z.string().trim().max(1000).optional().nullable(),
+  correctionReason: z.string().trim().min(1).max(1000)
+}).refine((input) => input.clockOutAt >= input.clockInAt, {
+  message: "Clock-out must be after clock-in.",
+  path: ["clockOutAt"]
+});
+
 export type TimesheetEntrySummary = {
   id: string;
   clockInAt: Date;
@@ -447,4 +458,52 @@ export async function correctTimeEntry(actor: ActorContext, input: unknown) {
     ...totals
   });
   return updatedEntry;
+}
+
+export async function createAdminTimeEntry(actor: ActorContext, input: unknown) {
+  const parsedActor = parseActor(actor);
+  ensureAdmin(parsedActor);
+  const tenantId = requireTenantId(parsedActor);
+  const parsedInput = adminCreateEntrySchema.parse(input);
+  const employee = await prisma.user.findFirst({
+    where: {
+      id: parsedInput.employeeId,
+      tenantId,
+      isActive: true,
+      role: { in: ["tenant_admin", "office_admin", "technician"] }
+    },
+    select: { id: true }
+  });
+
+  if (!employee) {
+    throw new Error("Employee not found.");
+  }
+
+  const totals = calculateTimeEntryMinutes(parsedInput.clockInAt, parsedInput.clockOutAt, DEFAULT_LUNCH_DEDUCTION_MINUTES);
+  const createdEntry = await prisma.timeEntry.create({
+    data: {
+      tenantId,
+      employeeId: employee.id,
+      clockInAt: parsedInput.clockInAt,
+      clockOutAt: parsedInput.clockOutAt,
+      grossMinutes: totals.grossMinutes,
+      lunchDeductionMinutes: totals.lunchDeductionMinutes,
+      netMinutes: totals.netMinutes,
+      status: "corrected",
+      notes: parsedInput.notes ?? null,
+      correctionReason: parsedInput.correctionReason,
+      correctedByUserId: parsedActor.userId,
+      correctedAt: new Date()
+    }
+  });
+
+  await writeTimesheetAuditLog(parsedActor, "time_entry.admin_created", createdEntry.id, {
+    employeeId: employee.id,
+    clockInAt: parsedInput.clockInAt.toISOString(),
+    clockOutAt: parsedInput.clockOutAt.toISOString(),
+    correctionReason: parsedInput.correctionReason,
+    ...totals
+  });
+
+  return createdEntry;
 }

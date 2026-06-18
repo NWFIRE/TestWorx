@@ -12,6 +12,7 @@ const { prismaMock } = vi.hoisted(() => ({
       findMany: vi.fn()
     },
     user: {
+      findFirst: vi.fn(),
       findMany: vi.fn()
     },
     auditLog: {
@@ -29,6 +30,7 @@ import {
   clockInEmployee,
   clockOutEmployee,
   correctTimeEntry,
+  createAdminTimeEntry,
   getAdminTimesheetWorkspace,
   getEmployeeTimesheet
 } from "../timesheets";
@@ -179,6 +181,49 @@ describe("timesheets", () => {
       data: expect.objectContaining({
         action: "time_entry.corrected",
         entityId: "entry_1"
+      })
+    }));
+  });
+
+  it("lets admins add missing employee time entries with calculated totals and audit history", async () => {
+    const clockInAt = new Date("2026-05-04T13:00:00Z");
+    const clockOutAt = new Date("2026-05-04T22:00:00Z");
+    prismaMock.user.findFirst.mockResolvedValue({ id: "tech_1" });
+    prismaMock.timeEntry.create.mockResolvedValue({ id: "entry_manual" });
+
+    await createAdminTimeEntry(adminActor, {
+      employeeId: "tech_1",
+      clockInAt,
+      clockOutAt,
+      notes: "Added from signed service ticket.",
+      correctionReason: "Employee forgot to clock in."
+    });
+
+    expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "tech_1",
+        tenantId: "tenant_1",
+        isActive: true,
+        role: { in: ["tenant_admin", "office_admin", "technician"] }
+      },
+      select: { id: true }
+    });
+    expect(prismaMock.timeEntry.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: "tenant_1",
+        employeeId: "tech_1",
+        grossMinutes: 540,
+        lunchDeductionMinutes: 30,
+        netMinutes: 510,
+        status: "corrected",
+        correctedByUserId: "admin_1",
+        correctionReason: "Employee forgot to clock in."
+      })
+    });
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        action: "time_entry.admin_created",
+        entityId: "entry_manual"
       })
     }));
   });

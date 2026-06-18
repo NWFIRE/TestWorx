@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { clockInEmployee, clockOutEmployee, correctTimeEntry } from "@testworx/lib/server/index";
+import { clockInEmployee, clockOutEmployee, correctTimeEntry, createAdminTimeEntry } from "@testworx/lib/server/index";
 import type { ActorContext } from "@testworx/types";
 
 async function getActor(): Promise<ActorContext> {
@@ -38,6 +38,19 @@ export async function correctTimeEntryAction(formData: FormData) {
   const actor = await getActor();
   await correctTimeEntry(actor, {
     timeEntryId: String(formData.get("timeEntryId") ?? ""),
+    clockInAt: String(formData.get("clockInAt") ?? ""),
+    clockOutAt: String(formData.get("clockOutAt") ?? ""),
+    notes: String(formData.get("notes") ?? ""),
+    correctionReason: String(formData.get("correctionReason") ?? "")
+  });
+  revalidatePath("/app/admin/timesheets");
+  revalidatePath("/app/tech/timesheets");
+}
+
+export async function createAdminTimeEntryAction(formData: FormData) {
+  const actor = await getActor();
+  await createAdminTimeEntry(actor, {
+    employeeId: String(formData.get("employeeId") ?? ""),
     clockInAt: String(formData.get("clockInAt") ?? ""),
     clockOutAt: String(formData.get("clockOutAt") ?? ""),
     notes: String(formData.get("notes") ?? ""),
