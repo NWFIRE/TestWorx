@@ -198,7 +198,7 @@ export function InspectionReportTypeManagement(input: {
                   <p className="mt-1 text-sm text-slate-500">Due: {task.dueLabel}</p>
                   {task.hasReportActivity ? (
                     <p className="mt-2 text-sm text-amber-700">
-                      Work exists for this report. Delete is locked; mark it Not Needed to remove it from active work while preserving history.
+                      Work exists for this report. Admins can delete it when it was added by mistake, or mark it Not Needed to preserve the work history.
                     </p>
                   ) : null}
                 </div>
@@ -248,6 +248,38 @@ export function InspectionReportTypeManagement(input: {
                         type="button"
                       >
                         {isPending && actionTaskId === task.id ? "Saving..." : task.isFinalized ? "Void with reason" : "Mark Not Needed"}
+                      </button>
+                      <button
+                        className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
+                        disabled={isPending}
+                        onClick={async () => {
+                          const confirmed = await confirm({
+                            eyebrow: "Delete report type",
+                            title: `Delete ${task.label}?`,
+                            description: "This permanently removes this report type from the current inspection, including any draft work, photos, signatures, deficiencies, and report data tied to it.",
+                            confirmLabel: "Delete report type",
+                            cancelLabel: "Cancel",
+                            variant: "danger"
+                          });
+                          if (!confirmed) {
+                            return;
+                          }
+                          startTransition(async () => {
+                            setActionTaskId(task.id);
+                            setMessage(null);
+                            const result = await removeInspectionTaskAdminAction(input.inspectionId, task.id);
+                            setActionTaskId(null);
+                            if (result.ok) {
+                              setMessage({ tone: "success", text: "Report type deleted from this inspection." });
+                              router.refresh();
+                              return;
+                            }
+                            setMessage({ tone: "error", text: result.error ?? "Unable to remove this report type." });
+                          });
+                        }}
+                        type="button"
+                      >
+                        {isPending && actionTaskId === task.id ? "Deleting..." : "Delete report type"}
                       </button>
                     </>
                   ) : (

@@ -3626,7 +3626,9 @@ export async function removeInspectionTask(actor: ActorContext, input: {
         })
       : 0;
 
-    if (reportActivityCount > 0) {
+    const canDeleteWorkedReport = ["tenant_admin", "office_admin", "platform_admin"].includes(parsedActor.role);
+
+    if (reportActivityCount > 0 && !canDeleteWorkedReport) {
       throw new Error("This report type already has report activity. Mark it Not Needed instead so the work history is preserved.");
     }
 
@@ -3715,7 +3717,9 @@ export async function removeInspectionTask(actor: ActorContext, input: {
         inspectionTaskId: task.id,
         inspectionType: task.inspectionType,
         removedByUserId: parsedActor.userId,
-        reason: input.reason?.trim() || null
+        reason: input.reason?.trim() || null,
+        deletedReportActivityCount: reportActivityCount,
+        deletedWorkedReport: reportActivityCount > 0
       }
     });
 

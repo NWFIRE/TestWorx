@@ -25,7 +25,7 @@ export function AdminReportDeleteButton(input: {
           const confirmed = await confirm({
             eyebrow: "Report type",
             title: `Delete ${input.taskLabel}?`,
-            description: "This deletes the report type from the current inspection only when no technician work has been recorded.",
+            description: "This permanently removes this report type from the current inspection, including any draft work, photos, signatures, deficiencies, and report data tied to it.",
             confirmLabel: "Delete report type",
             cancelLabel: "Cancel",
             variant: "danger"

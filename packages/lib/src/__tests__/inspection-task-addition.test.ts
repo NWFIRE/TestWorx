@@ -405,7 +405,7 @@ describe("inspection task addition", () => {
     expect(txMock.inspectionTask.delete).not.toHaveBeenCalled();
   });
 
-  it("blocks office admins from deleting a report after work has started", async () => {
+  it("allows office admins to delete a report after work has started", async () => {
     txMock.inspection.findFirst.mockResolvedValue({
       id: "inspection_1",
       tenantId: "tenant_1",
@@ -429,12 +429,35 @@ describe("inspection task addition", () => {
     txMock.inspectionTask.findMany.mockResolvedValue([]);
     txMock.inspectionReport.count.mockResolvedValue(3);
 
-    await expect(removeInspectionTask(
+    const removedTask = await removeInspectionTask(
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
       { inspectionId: "inspection_1", inspectionTaskId: "task_existing", force: true }
-    )).rejects.toThrow(/already has report activity/i);
+    );
 
-    expect(txMock.inspectionReport.delete).not.toHaveBeenCalled();
-    expect(txMock.inspectionTask.delete).not.toHaveBeenCalled();
+    expect(txMock.attachment.deleteMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: "tenant_1",
+        inspectionReportId: "report_existing"
+      }
+    });
+    expect(txMock.signature.deleteMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: "tenant_1",
+        inspectionReportId: "report_existing"
+      }
+    });
+    expect(txMock.deficiency.deleteMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: "tenant_1",
+        inspectionReportId: "report_existing"
+      }
+    });
+    expect(txMock.inspectionReport.delete).toHaveBeenCalledWith({
+      where: { id: "report_existing" }
+    });
+    expect(txMock.inspectionTask.delete).toHaveBeenCalledWith({
+      where: { id: "task_existing" }
+    });
+    expect(removedTask).toEqual({ id: "task_existing" });
   });
 });
