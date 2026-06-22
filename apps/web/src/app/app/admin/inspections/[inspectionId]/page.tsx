@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import {
   buildInspectionPacketDocuments,
-  editableInspectionStatuses,
   formatInspectionCloseoutRequestStatusLabel,
   formatInspectionCloseoutRequestTypeLabel,
   formatInspectionClassificationLabel,
@@ -67,40 +66,12 @@ function formatLifecycleLabel(lifecycle: string) {
   }
 }
 
-function formatAuditAction(action: string) {
-  if (action === "inspection.amendment_created") {
-    return "new visit created";
-  }
-
-  if (action === "inspection.amendment_replacement_created") {
-    return "updated visit linked";
-  }
-
-  return action.replaceAll(".", " ").replaceAll("_", " ");
-}
-
-function asMetadataRecord(value: unknown) {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
-}
-
 function toDateTimeLocal(value: Date | null) {
   if (!value) {
     return "";
   }
 
   return format(value, "yyyy-MM-dd'T'HH:mm");
-}
-
-function formatStatusFromAuditValue(value: unknown) {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  if (!editableInspectionStatuses.includes(value as (typeof editableInspectionStatuses)[number]) && value !== "past_due") {
-    return null;
-  }
-
-  return formatInspectionStatusLabel(value as Parameters<typeof formatInspectionStatusLabel>[0]);
 }
 
 function inspectionTaskLabel(task: { inspectionType: string; customDisplayLabel?: string | null }) {
@@ -286,25 +257,10 @@ export default async function EditInspectionPage({
   });
   type InspectionTask = typeof inspectionView.tasks[number];
   type CorrectionEvent = NonNullable<NonNullable<InspectionTask["report"]>["correctionEvents"]>[number];
-  type AuditTrailEntry = { id: string; action: string; createdAt: Date; metadata: unknown; actor?: { id: string; name: string } | null };
-  type InspectionDeficiency = NonNullable<typeof inspectionView.deficiencies>[number];
-  const auditTrailEntries = (inspectionView.auditTrail ?? []) as AuditTrailEntry[];
   const inspectionDisplay = getInspectionDisplayLabels({
     siteName: inspectionView.site.name,
     customerName: inspectionView.customerCompany.name
   });
-  const originalInspectionDisplay = inspectionView.originalAmendment
-    ? getInspectionDisplayLabels({
-        siteName: inspectionView.originalAmendment.inspection.site.name,
-        customerName: inspectionView.originalAmendment.inspection.customerCompany.name
-      })
-    : null;
-  const replacementInspectionDisplay = inspectionView.outgoingAmendment
-    ? getInspectionDisplayLabels({
-        siteName: inspectionView.outgoingAmendment.replacementInspection.site.name,
-        customerName: inspectionView.outgoingAmendment.replacementInspection.customerCompany.name
-      })
-    : null;
   return (
     <section className="space-y-6">
       <div className="rounded-[2rem] border border-[color:rgb(203_215_230_/_0.92)] bg-white p-6 shadow-panel">
@@ -338,45 +294,6 @@ export default async function EditInspectionPage({
             <p className="mt-2">Technicians should collect payment on site for this customer and confirm collection before closing the visit.</p>
           </div>
         ) : null}
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <div className="rounded-2xl border border-[color:var(--border-default)] bg-[color:rgb(248_250_252_/_0.96)] p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">Visit history</p>
-            {inspectionView.originalAmendment ? (
-              <>
-                <p className="mt-2 text-sm text-slate-700">This is the updated visit linked to an earlier original visit.</p>
-                <Link className="mt-3 inline-flex text-sm font-semibold text-slateblue" href={`/app/admin/inspections/${inspectionView.originalAmendment.inspection.id}?from=${encodeURIComponent(originPath)}`}>
-                  Open original visit
-                </Link>
-              </>
-            ) : inspectionView.outgoingAmendment ? (
-              <>
-                <p className="mt-2 text-sm text-slate-700">This original visit now has a newer linked visit.</p>
-                <Link className="mt-3 inline-flex text-sm font-semibold text-slateblue" href={`/app/admin/inspections/${inspectionView.outgoingAmendment.replacementInspection.id}?from=${encodeURIComponent(originPath)}`}>
-                  Open updated visit
-                </Link>
-              </>
-            ) : (
-              <p className="mt-2 text-sm text-slate-700">This visit is currently the active original visit.</p>
-            )}
-          </div>
-          <div className="rounded-2xl border border-[color:var(--border-default)] bg-[color:rgb(248_250_252_/_0.96)] p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">Visit note</p>
-            <p className="mt-2 text-sm text-[color:var(--text-secondary)]">
-              {inspectionView.originalAmendment?.reason ?? inspectionView.outgoingAmendment?.reason ?? "No linked visit note has been recorded for this inspection yet."}
-            </p>
-          </div>
-        </div>
-        <div className="mt-4 rounded-2xl border border-[color:var(--border-default)] bg-[color:rgb(248_250_252_/_0.98)] p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">Deficiencies found</p>
-              <p className="mt-2 text-sm text-[color:var(--text-secondary)]">{inspectionView.deficiencyCount ?? 0} persisted deficiency record{(inspectionView.deficiencyCount ?? 0) === 1 ? "" : "s"} linked to this inspection.</p>
-            </div>
-            <Link className="inline-flex rounded-2xl border border-[color:var(--border-default)] bg-white px-4 py-3 text-sm font-semibold text-slateblue" href="/app/deficiencies">
-              Open deficiency center
-            </Link>
-          </div>
-        </div>
         {inspectionView.closeoutRequest ? (
           <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
             <div className="flex flex-wrap items-center gap-2">
@@ -644,43 +561,6 @@ export default async function EditInspectionPage({
               </div>
             </div>
           ) : null}
-          <div className="rounded-[2rem] bg-white p-6 shadow-panel">
-            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Visit history</p>
-            <div className="mt-4 space-y-4">
-              <div className="rounded-2xl border border-slate-200 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Current visit</p>
-                <p className="mt-2 text-sm font-semibold text-ink">{inspectionDisplay.primaryTitle}</p>
-                <p className="mt-1 text-sm text-slate-500">
-                  {inspectionDisplay.secondaryTitle ? `${inspectionDisplay.secondaryTitle} | ` : ""}{format(inspectionView.scheduledStart, "MMM d, yyyy h:mm a")}
-                </p>
-                <p className="mt-1 text-sm text-slate-500">Technicians: {(inspectionView.assignedTechnicianNames ?? []).length ? (inspectionView.assignedTechnicianNames ?? []).join(", ") : "Unassigned"}</p>
-              </div>
-              {inspectionView.originalAmendment ? (
-                <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-800">Original visit</p>
-                  <p className="mt-2 text-sm text-blue-900">{inspectionView.originalAmendment.reason}</p>
-                  <p className="mt-2 text-sm text-blue-800">
-                    {originalInspectionDisplay?.primaryTitle} {originalInspectionDisplay?.secondaryTitle ? `| ${originalInspectionDisplay.secondaryTitle}` : ""} on {format(inspectionView.originalAmendment.inspection.scheduledStart, "MMM d, yyyy h:mm a")}
-                  </p>
-                  <Link className="mt-3 inline-flex text-sm font-semibold text-slateblue" href={`/app/admin/inspections/${inspectionView.originalAmendment.inspection.id}?from=${encodeURIComponent(originPath)}`}>
-                    Open original visit
-                  </Link>
-                </div>
-              ) : null}
-              {inspectionView.outgoingAmendment ? (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-900">Updated visit</p>
-                  <p className="mt-2 text-sm text-amber-900">{inspectionView.outgoingAmendment.reason}</p>
-                  <p className="mt-2 text-sm text-amber-800">
-                    {replacementInspectionDisplay?.primaryTitle} {replacementInspectionDisplay?.secondaryTitle ? `| ${replacementInspectionDisplay.secondaryTitle}` : ""} on {format(inspectionView.outgoingAmendment.replacementInspection.scheduledStart, "MMM d, yyyy h:mm a")}
-                  </p>
-                  <Link className="mt-3 inline-flex text-sm font-semibold text-slateblue" href={`/app/admin/inspections/${inspectionView.outgoingAmendment.replacementInspection.id}?from=${encodeURIComponent(originPath)}`}>
-                    Open updated visit
-                  </Link>
-                </div>
-              ) : null}
-            </div>
-          </div>
           {!isReviewMode ? (
           <InspectionExternalDocumentsCard
             documents={externalDocumentView.map((document) => ({
@@ -695,66 +575,6 @@ export default async function EditInspectionPage({
           ) : null}
           {!isReviewMode ? <InspectionPdfUploadCard attachments={attachmentView} inspectionId={inspection.id} tenantStoragePrefix={sanitizePathSegment(session.user.tenantId)} /> : null}
           {!isReviewMode ? <DeleteInspectionCard action={deleteInspectionAction} inspectionId={inspection.id} redirectTo={originPath} /> : null}
-          <div className="rounded-[2rem] bg-white p-6 shadow-panel">
-            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Audit trail</p>
-            <div className="mt-4 space-y-3">
-              {auditTrailEntries.length ? auditTrailEntries.map((entry) => {
-                const metadata = asMetadataRecord(entry.metadata);
-                return (
-                <div key={entry.id} className="rounded-2xl border border-slate-200 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">{formatAuditAction(entry.action)}</p>
-                    <p className="text-xs text-slate-400">{format(entry.createdAt, "MMM d, yyyy h:mm a")}</p>
-                  </div>
-                  {entry.actor?.name ? <p className="mt-2 text-sm text-slate-700">By {entry.actor.name}</p> : null}
-                  {metadata && "previousStatus" in metadata && "nextStatus" in metadata && formatStatusFromAuditValue(metadata.previousStatus) && formatStatusFromAuditValue(metadata.nextStatus) ? (
-                    <p className="mt-2 text-sm text-slate-700">
-                      Status changed from {formatStatusFromAuditValue(metadata.previousStatus)} to {formatStatusFromAuditValue(metadata.nextStatus)}.
-                    </p>
-                  ) : null}
-                  {metadata && "previousClassification" in metadata && "nextClassification" in metadata ? (
-                    <p className="mt-2 text-sm text-slate-700">
-                      Inspection classification changed from {formatInspectionClassificationLabel(String(metadata.previousClassification) as Parameters<typeof formatInspectionClassificationLabel>[0])} to {formatInspectionClassificationLabel(String(metadata.nextClassification) as Parameters<typeof formatInspectionClassificationLabel>[0])}.
-                    </p>
-                  ) : null}
-                  {entry.action === "inspection.classification_set" && metadata && "inspectionClassification" in metadata ? (
-                    <p className="mt-2 text-sm text-slate-700">
-                      Inspection classification set to {formatInspectionClassificationLabel(String(metadata.inspectionClassification) as Parameters<typeof formatInspectionClassificationLabel>[0])}.
-                    </p>
-                  ) : null}
-                  {metadata && "previousPriority" in metadata && "nextPriority" in metadata ? (
-                    <p className="mt-2 text-sm text-slate-700">
-                      Priority changed from {Boolean(metadata.previousPriority) ? "On" : "Off"} to {Boolean(metadata.nextPriority) ? "On" : "Off"}.
-                    </p>
-                  ) : null}
-                  {entry.action === "inspection.priority_enabled" ? (
-                    <p className="mt-2 text-sm text-slate-700">Priority enabled for this inspection.</p>
-                  ) : null}
-                  {metadata && "reason" in metadata ? <p className="mt-2 text-sm text-slate-700">{String(metadata.reason ?? "")}</p> : null}
-                  {metadata && "note" in metadata && String(metadata.note ?? "").trim() ? <p className="mt-2 text-sm text-slate-700">{String(metadata.note ?? "")}</p> : null}
-                  {metadata && "replacementInspectionId" in metadata ? (
-                    <p className="mt-2 text-sm text-slate-500">Updated visit id: {String(metadata.replacementInspectionId ?? "")}</p>
-                  ) : null}
-                </div>
-              );}) : <p className="text-sm text-slate-500">No audit entries are recorded for this inspection yet.</p>}
-            </div>
-          </div>
-          <div className="rounded-[2rem] bg-white p-6 shadow-panel">
-            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Deficiency records</p>
-            <div className="mt-4 space-y-3">
-              {(inspectionView.deficiencies ?? []).length ? (inspectionView.deficiencies ?? []).map((deficiency: InspectionDeficiency) => (
-                <div key={deficiency.id} className="rounded-2xl border border-slate-200 p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-ink">{deficiency.title}</p>
-                    <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">{deficiency.severity}</span>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700">{deficiency.status}</span>
-                  </div>
-                  <p className="mt-2 text-sm text-slate-700">{deficiency.description}</p>
-                  <p className="mt-2 text-xs text-slate-400">{String((deficiency as { section?: string }).section ?? "manual").replaceAll("-", " ")}{(deficiency as { location?: string | null }).location ? ` | ${(deficiency as { location?: string | null }).location}` : ""}</p>
-                </div>
-              )) : <p className="text-sm text-slate-500">No persisted deficiencies are linked to this inspection yet.</p>}
-            </div>
-          </div>
         </div>
       </WorkspaceSplit>
     </section>
