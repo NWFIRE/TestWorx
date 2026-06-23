@@ -78,8 +78,7 @@ describe("inspection completion after report finalization", () => {
     expect(syncInspectionArchiveStateTxMock).toHaveBeenCalledWith(tx, expect.objectContaining({
       tenantId: "tenant_1",
       inspectionId: "inspection_1",
-      completedAtOverride: finalizedAt,
-      archivedAtOverride: finalizedAt
+      completedAtOverride: finalizedAt
     }));
     expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({

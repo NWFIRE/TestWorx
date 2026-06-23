@@ -148,12 +148,16 @@ export async function syncInspectionArchiveStateTx(
     throw new Error("Inspection not found.");
   }
 
-  const isArchived = inspection.status === InspectionStatus.completed || inspection.status === InspectionStatus.invoiced;
+  const isCompleted = inspection.status === InspectionStatus.completed || inspection.status === InspectionStatus.invoiced;
+  const isArchived = inspection.status === InspectionStatus.invoiced;
   if (!isArchived) {
+    const completedAt = isCompleted
+      ? input.completedAtOverride ?? inspection.completedAt ?? new Date()
+      : null;
     await tx.inspection.update({
       where: { id: inspection.id },
       data: {
-        completedAt: null,
+        completedAt,
         archivedAt: null,
         archiveCustomerName: null,
         archiveSiteName: null,
@@ -332,6 +336,7 @@ export async function getAdminInspectionArchiveData(
 
   const where: Prisma.InspectionWhereInput = {
     tenantId,
+    status: InspectionStatus.invoiced,
     archivedAt: { not: null },
     ...(andFilters.length ? { AND: andFilters } : {})
   };
@@ -479,7 +484,7 @@ export async function getAdminInspectionArchiveDetail(actor: ActorContext, inspe
 
   const tenantId = parsedActor.tenantId as string;
   const inspection = await prisma.inspection.findFirst({
-    where: { id: inspectionId, tenantId, archivedAt: { not: null } },
+    where: { id: inspectionId, tenantId, status: InspectionStatus.invoiced, archivedAt: { not: null } },
     include: {
       customerCompany: true,
       site: true,

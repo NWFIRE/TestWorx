@@ -3233,10 +3233,10 @@ export async function updateInspectionStatus(
     await syncInspectionArchiveStateTx(tx, {
       tenantId,
       inspectionId,
-      completedAtOverride: status === InspectionStatus.completed
+      completedAtOverride: status === InspectionStatus.completed || status === InspectionStatus.invoiced
         ? inspection.completedAt ?? new Date()
         : null,
-      archivedAtOverride: status === InspectionStatus.completed || status === InspectionStatus.invoiced
+      archivedAtOverride: status === InspectionStatus.invoiced
         ? inspection.archivedAt ?? inspection.completedAt ?? new Date()
         : null
     });
@@ -3354,8 +3354,7 @@ export async function completeInspectionWithCloseoutRequest(
     await syncInspectionArchiveStateTx(tx, {
       tenantId,
       inspectionId,
-      completedAtOverride: inspection.completedAt ?? new Date(),
-      archivedAtOverride: inspection.archivedAt ?? inspection.completedAt ?? new Date()
+      completedAtOverride: inspection.completedAt ?? new Date()
     });
 
     let closeoutRequestId: string | null = null;

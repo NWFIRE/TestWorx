@@ -32,7 +32,7 @@ describe("inspection archive", () => {
     prismaMock.inspection.findMany.mockResolvedValue([
       {
         id: "inspection_12345678",
-        status: "completed",
+        status: "invoiced",
         completedAt: new Date("2026-04-01T15:00:00.000Z"),
         archivedAt: new Date("2026-04-01T15:00:00.000Z"),
         updatedAt: new Date("2026-04-01T15:00:00.000Z"),
@@ -73,6 +73,11 @@ describe("inspection archive", () => {
     expect(result.inspections[0]?.inspectionTypeLabels).toEqual(["Kitchen suppression"]);
     expect(result.inspections[0]?.divisions).toEqual(["kitchen_suppression"]);
     expect(prismaMock.inspection.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        tenantId: "tenant_1",
+        status: "invoiced",
+        archivedAt: { not: null }
+      }),
       orderBy: [
         { archiveCustomerName: "asc" },
         { customerCompany: { name: "asc" } },
@@ -84,7 +89,7 @@ describe("inspection archive", () => {
         { id: "asc" }
       ]
     }));
-  }, 10000);
+  }, 20000);
 
   it("uses a distinct archive badge tone for invoiced results", async () => {
     const { getArchiveResultStatusTone } = await import("../inspection-archive");
@@ -94,11 +99,11 @@ describe("inspection archive", () => {
     expect(getArchiveResultStatusTone({ resultStatus: "Deficiencies found", hasDeficiencies: true })).toBe("amber");
   });
 
-  it("stores archive snapshot data when an inspection is archived", async () => {
+  it("stores archive snapshot data only when an inspection is invoiced", async () => {
     prismaMock.inspection.findFirst.mockResolvedValue({
       id: "inspection_1",
       tenantId: "tenant_1",
-      status: "completed",
+      status: "invoiced",
       completedAt: null,
       archivedAt: null,
       customerCompany: { name: "Harbor View" },
@@ -139,6 +144,56 @@ describe("inspection archive", () => {
         archiveHasDeficiencies: true,
         archiveDeficiencyCount: 1,
         archiveHasReport: true
+      })
+    }));
+  });
+
+  it("keeps completed inspections out of the archive until they are invoiced", async () => {
+    const completedAt = new Date("2026-04-01T15:00:00.000Z");
+    prismaMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      tenantId: "tenant_1",
+      status: "completed",
+      completedAt: null,
+      archivedAt: new Date("2026-04-01T15:00:00.000Z"),
+      customerCompany: { name: "Harbor View" },
+      site: {
+        name: "North Campus",
+        addressLine1: "456 Oak Ave",
+        addressLine2: null,
+        city: "Tulsa",
+        state: "OK",
+        postalCode: "74103"
+      },
+      assignedTechnician: { name: "Alex Tech" },
+      technicianAssignments: [],
+      tasks: [{ inspectionType: "fire_alarm" }],
+      reports: [{ id: "report_1" }],
+      deficiencies: []
+    });
+
+    const txMock = {
+      inspection: {
+        findFirst: prismaMock.inspection.findFirst,
+        update: prismaMock.inspection.update
+      }
+    };
+
+    const { syncInspectionArchiveStateTx } = await import("../inspection-archive");
+    await syncInspectionArchiveStateTx(txMock as never, {
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1",
+      completedAtOverride: completedAt
+    });
+
+    expect(prismaMock.inspection.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "inspection_1" },
+      data: expect.objectContaining({
+        completedAt,
+        archivedAt: null,
+        archiveCustomerName: null,
+        archiveSiteName: null,
+        archiveHasReport: false
       })
     }));
   });

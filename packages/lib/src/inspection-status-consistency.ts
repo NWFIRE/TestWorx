@@ -243,8 +243,7 @@ export async function reconcileInspectionStatusTx(tx: TransactionClient, input: 
     await syncInspectionArchiveStateTx(tx, {
       tenantId: input.tenantId,
       inspectionId: input.inspectionId,
-      completedAtOverride: completedAt,
-      archivedAtOverride: completedAt
+      completedAtOverride: completedAt
     });
   }
 

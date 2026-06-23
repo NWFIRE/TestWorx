@@ -280,7 +280,7 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
       reportLink: inspection.tasks[0] ? `/app/admin/reports/${inspection.id}/${inspection.tasks[0].id}` : null,
       inspectionLink: `/app/admin/inspections/${inspection.id}`,
       archiveLink:
-        inspection.status === InspectionStatus.completed || inspection.status === InspectionStatus.invoiced
+        inspection.status === InspectionStatus.invoiced
           ? `/app/admin/archive/${inspection.id}`
           : null
     }));

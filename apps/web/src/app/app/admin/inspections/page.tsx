@@ -222,7 +222,7 @@ function uniqueSearchOptions(options: SearchSelectOption[]) {
 }
 
 function getInspectionSearchBadge(inspection: AdminSchedulingInspection) {
-  if (inspection.archivedAt) {
+  if (inspection.status === "invoiced" && inspection.archivedAt) {
     return "Archived";
   }
 
