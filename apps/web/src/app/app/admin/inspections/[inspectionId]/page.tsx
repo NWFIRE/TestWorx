@@ -33,8 +33,9 @@ import { InspectionReportCorrectionsCard } from "../../inspection-report-correct
 import { InspectionReportTypeManagement } from "../../inspection-report-type-management";
 import { InspectionSchedulerForm } from "../../inspection-scheduler-form";
 import { InspectionStatusUpdateCard } from "../../inspection-status-update-card";
-import { PriorityBadge, StatusBadge, WorkspaceSplit } from "../../operations-ui";
+import { PriorityBadge, StatusBadge } from "../../operations-ui";
 import { InspectionPacketCard } from "../../../inspection-packet-card";
+import { InspectionDetailTabs } from "./inspection-detail-tabs";
 
 type InspectionType = Parameters<typeof getDefaultInspectionRecurrenceFrequency>[0];
 type RecurrenceFrequency = ReturnType<typeof getDefaultInspectionRecurrenceFrequency>;
@@ -261,169 +262,271 @@ export default async function EditInspectionPage({
     siteName: inspectionView.site.name,
     customerName: inspectionView.customerCompany.name
   });
+  const primaryTask = inspectionView.tasks[0] ?? null;
+  const primaryReportHref = primaryTask ? `/app/admin/reports/${inspection.id}/${primaryTask.id}` : null;
+  const primaryActionLabel = primaryTask
+    ? primaryTask.report?.status === "finalized"
+      ? "Open Report"
+      : primaryTask.report
+        ? "Continue Report"
+        : "Start Report"
+    : "No Reports";
+  const technicianLabel = (inspectionView.assignedTechnicianNames ?? []).length
+    ? (inspectionView.assignedTechnicianNames ?? []).join(", ")
+    : "Shared queue";
+  const inspectionTypeLabel = inspectionView.tasks.length
+    ? inspectionView.tasks.map((task: InspectionTask) => inspectionTaskLabel(task)).join(", ")
+    : "No report types";
+  const statusLabel = formatInspectionStatusLabel((inspectionView.displayStatus ?? inspection.status) as Parameters<typeof formatInspectionStatusLabel>[0]);
+  const statusTone = getInspectionStatusTone((inspectionView.displayStatus ?? inspection.status) as Parameters<typeof getInspectionStatusTone>[0]);
   return (
-    <section className="space-y-6">
+    <section className="space-y-5">
       <div className="rounded-[2rem] border border-[color:rgb(203_215_230_/_0.92)] bg-white p-6 shadow-panel">
-        <p className="text-sm uppercase tracking-[0.25em] text-[color:var(--text-secondary)]">
-          {isReviewMode ? "Inspection action command center" : "Inspection command center"}
-        </p>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h2 className="text-3xl font-semibold text-ink">{inspectionDisplay.primaryTitle}</h2>
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${lifecycleBadgeStyles[inspectionView.lifecycle ?? "original"]}`}>
-            {formatLifecycleLabel(inspectionView.lifecycle ?? "original")}
-          </span>
-          <Link className="inline-flex rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slateblue" href="/app/admin/amendments">
-            Needs attention
-          </Link>
-          {isReviewMode ? (
-            <Link className="inline-flex rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slateblue" href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(originPath)}`}>
-              Open full inspection workspace
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge label={statusLabel} tone={statusTone} />
+              <StatusBadge
+                label={formatInspectionClassificationLabel(inspection.inspectionClassification)}
+                tone={getInspectionClassificationTone(inspection.inspectionClassification)}
+              />
+              {inspection.isPriority ? <PriorityBadge /> : null}
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${lifecycleBadgeStyles[inspectionView.lifecycle ?? "original"]}`}>
+                {formatLifecycleLabel(inspectionView.lifecycle ?? "original")}
+              </span>
+            </div>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink">{inspectionDisplay.primaryTitle}</h2>
+            <p className="mt-2 max-w-4xl text-base text-slate-600">
+              {[inspectionTypeLabel, inspectionDisplay.secondaryTitle, format(inspection.scheduledStart, "MMM d, yyyy h:mm a"), technicianLabel].filter(Boolean).join(" · ")}
+            </p>
+          </div>
+          {primaryReportHref ? (
+            <Link
+              className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+              href={primaryReportHref}
+            >
+              {primaryActionLabel}
             </Link>
-          ) : null}
+          ) : (
+            <button className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-slate-200 px-5 py-3 text-sm font-semibold text-slate-500" disabled type="button">
+              {primaryActionLabel}
+            </button>
+          )}
         </div>
-        <p className="mt-3 text-[color:var(--text-secondary)]">
-          {inspectionDisplay.secondaryTitle ? `${inspectionDisplay.secondaryTitle} | ` : ""}
-          {isReviewMode
-            ? "Check action state, report completion, signatures, documents, and technician-requested next steps from one focused operational workspace."
-            : "Coordinate assignment, status, recurrence mix, scheduling details, and customer-facing outputs for this visit from one focused workspace."}
-        </p>
-        {inspectionView.hasStartedWork ? <p className="mt-3 text-sm text-amber-700">This visit already has work recorded. Changes here will create a new visit so the original stays in history.</p> : null}
         {isDueAtTimeOfServiceCustomer(inspection.customerCompany) ? (
-          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
-            <p className="font-semibold uppercase tracking-[0.16em]">Payment due at time of service</p>
-            <p className="mt-2">Technicians should collect payment on site for this customer and confirm collection before closing the visit.</p>
+          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+            Payment is due at time of service for this customer.
           </div>
         ) : null}
-        {inspectionView.closeoutRequest ? (
-          <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-900">Technician next-step request</p>
-              <StatusBadge
-                label={formatInspectionCloseoutRequestStatusLabel(inspectionView.closeoutRequest.status)}
-                tone={inspectionView.closeoutRequest.status === "approved" ? "emerald" : inspectionView.closeoutRequest.status === "dismissed" ? "slate" : "blue"}
-              />
-            </div>
-            <p className="mt-2 text-sm font-semibold text-blue-950">
-              {formatInspectionCloseoutRequestTypeLabel(inspectionView.closeoutRequest.requestType)}
-            </p>
-            <p className="mt-1 text-sm text-blue-900">{inspectionView.closeoutRequest.note}</p>
-            <p className="mt-2 text-xs text-blue-800">
-              Requested by {inspectionView.closeoutRequest.requestedBy?.name ?? "Technician"} on {format(inspectionView.closeoutRequest.createdAt, "MMM d, yyyy h:mm a")}
-            </p>
-            {inspectionView.closeoutRequest.status === "pending" ? (
-              <div className="mt-4">
-                <InspectionCloseoutRequestActions inspectionId={inspection.id} canApprove />
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-4">
+        {primaryReportHref ? (
+          <Link className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue shadow-sm transition hover:border-slate-300 hover:bg-slate-50" href={primaryReportHref}>
+            Open report
+          </Link>
+        ) : null}
+        <Link className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue shadow-sm transition hover:border-slate-300 hover:bg-slate-50" href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(originPath)}#documents`}>
+          Upload document
+        </Link>
+        <Link className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue shadow-sm transition hover:border-slate-300 hover:bg-slate-50" href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(originPath)}#scheduling`}>
+          Assign technician
+        </Link>
+        <Link className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue shadow-sm transition hover:border-slate-300 hover:bg-slate-50" href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(originPath)}#scheduling`}>
+          Change schedule
+        </Link>
+      </div>
+
+      <InspectionDetailTabs
+        overview={
+          <div className="grid gap-5 lg:grid-cols-[1.4fr_0.9fr]">
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Status</p>
+                  <p className="mt-2 text-lg font-semibold text-slate-950">{statusLabel}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Assigned to</p>
+                  <p className="mt-2 text-lg font-semibold text-slate-950">{technicianLabel}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Due</p>
+                  <p className="mt-2 text-lg font-semibold text-slate-950">{format(inspection.scheduledStart, "MMM d, yyyy")}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">Reports</p>
+                  <p className="mt-2 text-lg font-semibold text-slate-950">{inspectionView.tasks.length}</p>
+                </div>
               </div>
-            ) : inspectionView.closeoutRequest.createdInspection ? (
-              <Link
-                className="mt-4 inline-flex text-sm font-semibold text-slateblue"
-                href={`/app/admin/inspections/${inspectionView.closeoutRequest.createdInspection.id}?from=${encodeURIComponent(originPath)}`}
-              >
-                Open created inspection
-              </Link>
+              <div className="rounded-2xl border border-slate-200 p-5">
+                <h3 className="text-lg font-semibold text-slate-950">What needs to happen next</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  {primaryTask
+                    ? `${primaryActionLabel} for ${inspectionTaskLabel(primaryTask)}.`
+                    : "Add a report type before this inspection can move forward."}
+                </p>
+                {inspection.notes ? <p className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">{inspection.notes}</p> : null}
+              </div>
+            </div>
+            <div className="space-y-3">
+              {inspectionView.tasks.map((task: InspectionTask) => (
+                <div className="rounded-2xl border border-slate-200 p-4" key={task.id}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-950">{inspectionTaskLabel(task)}</p>
+                      <p className="mt-1 text-sm text-slate-500">{task.report?.status ? task.report.status.replaceAll("_", " ") : "Not started"}</p>
+                    </div>
+                    <Link className="text-sm font-semibold text-slateblue" href={`/app/admin/reports/${inspection.id}/${task.id}`}>
+                      Open
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        }
+        report={
+          <div className="space-y-5">
+            <div className="grid gap-3">
+              {inspectionView.tasks.map((task: InspectionTask) => (
+                <div key={task.id} className="rounded-2xl border border-slate-200 p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <p className="text-base font-semibold text-ink">{inspectionTaskLabel(task)}</p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {task.report?.finalizedAt
+                          ? `Finalized ${format(task.report.finalizedAt, "MMM d, yyyy h:mm a")}`
+                          : task.report
+                            ? `Current report status: ${task.report.status.replaceAll("_", " ")}`
+                            : "No report started yet."}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue" href={`/app/admin/reports/${inspection.id}/${task.id}`}>
+                        {task.report?.status === "finalized" ? "Open admin editor" : "Open report"}
+                      </Link>
+                      <AdminReportDeleteButton inspectionId={inspection.id} inspectionTaskId={task.id} taskLabel={inspectionTaskLabel(task)} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {!isReviewMode ? (
+              <details className="rounded-2xl border border-slate-200 p-5">
+                <summary className="cursor-pointer text-base font-semibold text-slate-950">Admin tools</summary>
+                <div className="mt-5 border-t border-slate-200 pt-5">
+                  <InspectionReportCorrectionsCard
+                    action={reopenCompletedReportAction}
+                    inspectionId={inspection.id}
+                    regenerateAction={regenerateCompletedReportPdfAction}
+                    reports={inspectionView.tasks.map((task: InspectionTask) => ({
+                      taskId: task.id,
+                      inspectionType: task.inspectionType,
+                      displayLabel: inspectionTaskLabel(task),
+                      report: task.report ? {
+                        id: task.report.id,
+                        status: task.report.status,
+                        finalizedAt: task.report.finalizedAt?.toISOString() ?? null,
+                        correctionState: task.report.correctionState,
+                        correctionReason: task.report.correctionReason,
+                        correctionRequestedAt: task.report.correctionRequestedAt?.toISOString() ?? null,
+                        correctionResolvedAt: task.report.correctionResolvedAt?.toISOString() ?? null,
+                        correctionRequestedBy: task.report.correctionRequestedBy,
+                        correctionResolvedBy: task.report.correctionResolvedBy,
+                        correctionEvents: task.report.correctionEvents.map((event: CorrectionEvent) => ({
+                          ...event,
+                          createdAt: event.createdAt.toISOString()
+                        }))
+                      } : null
+                    }))}
+                  />
+                </div>
+              </details>
             ) : null}
           </div>
-        ) : null}
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <StatusBadge
-            label={formatInspectionClassificationLabel(inspection.inspectionClassification)}
-            tone={getInspectionClassificationTone(inspection.inspectionClassification)}
-          />
-          {inspection.isPriority ? <PriorityBadge /> : null}
-          <StatusBadge
-            label={formatInspectionStatusLabel((inspectionView.displayStatus ?? inspection.status) as Parameters<typeof formatInspectionStatusLabel>[0])}
-            tone={getInspectionStatusTone((inspectionView.displayStatus ?? inspection.status) as Parameters<typeof getInspectionStatusTone>[0])}
-          />
-          <p className="text-sm text-[color:var(--text-muted)]">
-            Current inspection status for scheduling, review, billing, and follow-up queues.
-          </p>
-        </div>
-      </div>
-      <WorkspaceSplit variant={isReviewMode ? "balanced" : "content-heavy"}>
-        {!isReviewMode ? (
-          <div className="space-y-6">
-            <InspectionStatusUpdateCard
-              action={updateInspectionStatusAdminAction}
-              currentStatus={inspection.status}
-              inspectionId={inspection.id}
-              key={`${inspection.id}:${inspection.status}:${isReviewMode ? "review" : "workspace"}`}
+        }
+        documents={
+          <div className="space-y-5" id="documents">
+            <InspectionPacketCard
+              description="Generated reports, uploaded customer PDFs, and internal attachments for this inspection."
+              documents={packetDocuments}
+              emptyDescription="No generated reports, uploaded PDFs, or inspection attachments are available yet."
+              emptyTitle="No documents yet"
+              showCustomerVisibility
             />
-            <InspectionReportCorrectionsCard
-              action={reopenCompletedReportAction}
-              inspectionId={inspection.id}
-              regenerateAction={regenerateCompletedReportPdfAction}
-              reports={inspectionView.tasks.map((task: InspectionTask) => ({
-                taskId: task.id,
-                inspectionType: task.inspectionType,
-                displayLabel: inspectionTaskLabel(task),
-                report: task.report ? {
-                  id: task.report.id,
-                  status: task.report.status,
-                  finalizedAt: task.report.finalizedAt?.toISOString() ?? null,
-                  correctionState: task.report.correctionState,
-                  correctionReason: task.report.correctionReason,
-                  correctionRequestedAt: task.report.correctionRequestedAt?.toISOString() ?? null,
-                  correctionResolvedAt: task.report.correctionResolvedAt?.toISOString() ?? null,
-                  correctionRequestedBy: task.report.correctionRequestedBy,
-                  correctionResolvedBy: task.report.correctionResolvedBy,
-                  correctionEvents: task.report.correctionEvents.map((event: CorrectionEvent) => ({
-                    ...event,
-                    createdAt: event.createdAt.toISOString()
-                  }))
-                } : null
-              }))}
-            />
-            <details className="group rounded-[2rem] bg-white p-6 shadow-panel">
-              <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Visit details</p>
-                  <h3 className="mt-2 text-2xl font-semibold text-ink">Update schedule, scope, and assignments</h3>
-                  <p className="mt-2 text-sm text-slate-500">
-                    Open this section when you need to change the visit itself. Core correction tools stay above for faster day-to-day admin work.
-                  </p>
-                </div>
-                <span className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition group-open:rotate-180">
-                  <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 20 20">
-                    <path d="m5 7.5 5 5 5-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-                  </svg>
-                </span>
-              </summary>
-              <div className="mt-5 border-t border-slate-200 pt-5">
-                <InspectionSchedulerForm
-                  action={inspectionView.hasStartedWork ? amendInspectionAction : updateInspectionAction}
-                  title="Edit visit"
-                  submitLabel="Save changes"
-                  banner={inspectionView.hasStartedWork ? `This visit already has ${inspectionView.reportActivityCount ?? 0} work marker${(inspectionView.reportActivityCount ?? 0) === 1 ? "" : "s"}. Saving here will create a new visit and leave the original visit unchanged.` : undefined}
-                  workflowNote={inspectionView.hasStartedWork
-                    ? "The original visit and its report history stay intact. The new visit carries these updates forward for dispatch."
-                    : "Use this form for normal visit edits. Once field work begins, the system protects the original visit and creates a new one when needed."}
-                  customers={dashboardData.customers}
-                  sites={dashboardData.sites}
-                  technicians={dashboardData.technicians}
-                  protectedSaveMode={Boolean(inspectionView.hasStartedWork)}
-                  initialValues={{
-                    inspectionId: inspection.id,
-                    customerCompanyId: inspection.customerCompanyId,
-                    siteId: inspection.siteId,
-                    inspectionClassification: inspection.inspectionClassification,
-                    isPriority: inspection.isPriority,
-                    inspectionMonth: format(inspection.scheduledStart, "yyyy-MM"),
-                    scheduledStart: toDateTimeLocal(inspection.scheduledStart),
-                    scheduledEnd: toDateTimeLocal(inspection.scheduledEnd),
-                    status: inspection.status,
-                    notes: inspection.notes ?? "",
-                    tasks: inspectionView.tasks.map((task: InspectionTask) => ({
-                      inspectionType: task.inspectionType,
-                      frequency: task.recurrence?.frequency ?? getDefaultInspectionRecurrenceFrequency(task.inspectionType),
-                      assignedTechnicianId: task.assignedTechnicianId ?? inspection.assignedTechnicianId ?? "",
-                      dueMonth: task.dueMonth ?? format(inspection.scheduledStart, "yyyy-MM"),
-                      dueDate: task.dueDate ? format(task.dueDate, "yyyy-MM-dd") : "",
-                      schedulingStatus: (task.schedulingStatus as SchedulingStatus | null) ?? "scheduled_now",
-                      notes: task.notes ?? ""
-                    }))
-                  }}
+            {!isReviewMode ? (
+              <div className="grid gap-5 xl:grid-cols-2">
+                <InspectionExternalDocumentsCard
+                  documents={externalDocumentView.map((document) => ({
+                    ...document,
+                    uploadedAt: document.uploadedAt.toISOString(),
+                    annotatedAt: document.annotatedAt?.toISOString() ?? null,
+                    signedAt: document.signedAt?.toISOString() ?? null
+                  }))}
+                  inspectionId={inspection.id}
+                  tenantStoragePrefix={sanitizePathSegment(session.user.tenantId)}
                 />
-                <div className="mt-6 border-t border-slate-200 pt-6">
+                <InspectionPdfUploadCard attachments={attachmentView} inspectionId={inspection.id} tenantStoragePrefix={sanitizePathSegment(session.user.tenantId)} />
+              </div>
+            ) : null}
+          </div>
+        }
+        scheduling={
+          <div className="space-y-5" id="scheduling">
+            <div className="rounded-2xl border border-slate-200 p-5">
+              <div className="grid gap-3 md:grid-cols-3">
+                <div>
+                  <p className="text-sm text-slate-500">Status</p>
+                  <p className="mt-1 font-semibold text-slate-950">{statusLabel}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-500">Assigned to</p>
+                  <p className="mt-1 font-semibold text-slate-950">{technicianLabel}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-500">Scheduled</p>
+                  <p className="mt-1 font-semibold text-slate-950">{format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}</p>
+                </div>
+              </div>
+            </div>
+            {!isReviewMode ? (
+              <details className="rounded-2xl border border-slate-200 p-5">
+                <summary className="cursor-pointer text-base font-semibold text-slate-950">Admin tools</summary>
+                <div className="mt-5 space-y-5 border-t border-slate-200 pt-5">
+                  <InspectionStatusUpdateCard action={updateInspectionStatusAdminAction} currentStatus={inspection.status} inspectionId={inspection.id} key={`${inspection.id}:${inspection.status}:status`} />
+                  <InspectionSchedulerForm
+                    action={inspectionView.hasStartedWork ? amendInspectionAction : updateInspectionAction}
+                    title="Edit visit"
+                    submitLabel="Save changes"
+                    banner={inspectionView.hasStartedWork ? `This visit already has ${inspectionView.reportActivityCount ?? 0} work marker${(inspectionView.reportActivityCount ?? 0) === 1 ? "" : "s"}. Saving here will create a new visit and leave the original visit unchanged.` : undefined}
+                    workflowNote={inspectionView.hasStartedWork ? "The original visit and its report history stay intact. The new visit carries these updates forward for dispatch." : "Use this form for normal visit edits. Once field work begins, the system protects the original visit and creates a new one when needed."}
+                    customers={dashboardData.customers}
+                    sites={dashboardData.sites}
+                    technicians={dashboardData.technicians}
+                    protectedSaveMode={Boolean(inspectionView.hasStartedWork)}
+                    initialValues={{
+                      inspectionId: inspection.id,
+                      customerCompanyId: inspection.customerCompanyId,
+                      siteId: inspection.siteId,
+                      inspectionClassification: inspection.inspectionClassification,
+                      isPriority: inspection.isPriority,
+                      inspectionMonth: format(inspection.scheduledStart, "yyyy-MM"),
+                      scheduledStart: toDateTimeLocal(inspection.scheduledStart),
+                      scheduledEnd: toDateTimeLocal(inspection.scheduledEnd),
+                      status: inspection.status,
+                      notes: inspection.notes ?? "",
+                      tasks: inspectionView.tasks.map((task: InspectionTask) => ({
+                        inspectionType: task.inspectionType,
+                        frequency: task.recurrence?.frequency ?? getDefaultInspectionRecurrenceFrequency(task.inspectionType),
+                        assignedTechnicianId: task.assignedTechnicianId ?? inspection.assignedTechnicianId ?? "",
+                        dueMonth: task.dueMonth ?? format(inspection.scheduledStart, "yyyy-MM"),
+                        dueDate: task.dueDate ? format(task.dueDate, "yyyy-MM-dd") : "",
+                        schedulingStatus: (task.schedulingStatus as SchedulingStatus | null) ?? "scheduled_now",
+                        notes: task.notes ?? ""
+                      }))
+                    }}
+                  />
                   <InspectionReportTypeManagement
                     inspectionId={inspection.id}
                     reportTypes={Object.entries(inspectionTypeRegistry).map(([value, definition]) => ({
@@ -432,26 +535,12 @@ export default async function EditInspectionPage({
                       label: definition.label
                     }))}
                     tasks={inspectionView.tasks.map((task: InspectionTask) => {
-                      const hasReportActivity = Boolean(
-                        task.report && (
-                          (task.report.autosaveVersion ?? 1) > 1 ||
-                          task.report.status === "finalized" ||
-                          task.report.correctionEvents.length > 0 ||
-                          task.report.finalizedAt ||
-                          task.report.correctionRequestedAt ||
-                          task.report.correctionResolvedAt ||
-                          (task.report._count?.attachments ?? 0) > 0 ||
-                          (task.report._count?.signatures ?? 0) > 0 ||
-                          (task.report._count?.deficiencies ?? 0) > 0
-                        )
-                      );
+                      const hasReportActivity = Boolean(task.report && ((task.report.autosaveVersion ?? 1) > 1 || task.report.status === "finalized" || task.report.correctionEvents.length > 0 || task.report.finalizedAt || task.report.correctionRequestedAt || task.report.correctionResolvedAt || (task.report._count?.attachments ?? 0) > 0 || (task.report._count?.signatures ?? 0) > 0 || (task.report._count?.deficiencies ?? 0) > 0));
                       return {
                         id: task.id,
                         inspectionType: task.inspectionType,
                         label: inspectionTaskLabel(task),
-                        assignedTechnicianName: task.assignedTechnicianId
-                          ? dashboardData.technicians.find((technician) => technician.id === task.assignedTechnicianId)?.name ?? "Assigned"
-                          : "Unassigned",
+                        assignedTechnicianName: task.assignedTechnicianId ? dashboardData.technicians.find((technician) => technician.id === task.assignedTechnicianId)?.name ?? "Assigned" : "Unassigned",
                         dueLabel: task.dueDate ? format(task.dueDate, "MMM d, yyyy") : task.dueMonth ?? "Not recorded",
                         taskStatus: task.status,
                         reportStatus: task.report?.status === "finalized" ? "Finalized" : task.report?.status === "submitted" ? "Ready for Review" : "Draft",
@@ -464,119 +553,39 @@ export default async function EditInspectionPage({
                     variant="embedded"
                   />
                 </div>
-              </div>
-            </details>
+              </details>
+            ) : null}
           </div>
-        ) : (
-          <div className="space-y-6">
-            <div className="rounded-[2rem] bg-white p-6 shadow-panel">
-              <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Review summary</p>
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <div className="rounded-2xl border border-slate-200 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Report completion</p>
-                  <p className="mt-2 text-sm font-semibold text-ink">{inspectionView.reviewSummary?.reportCompletionLabel ?? "0/0 finalized"}</p>
-                  <p className="mt-1 text-sm text-slate-500">{inspectionView.reviewSummary?.missingReports ?? 0} report task{(inspectionView.reviewSummary?.missingReports ?? 0) === 1 ? "" : "s"} still not finalized.</p>
+        }
+        activity={
+          <div className="space-y-5">
+            {inspectionView.closeoutRequest ? (
+              <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold text-blue-950">{formatInspectionCloseoutRequestTypeLabel(inspectionView.closeoutRequest.requestType)}</p>
+                  <StatusBadge label={formatInspectionCloseoutRequestStatusLabel(inspectionView.closeoutRequest.status)} tone={inspectionView.closeoutRequest.status === "approved" ? "emerald" : inspectionView.closeoutRequest.status === "dismissed" ? "slate" : "blue"} />
                 </div>
-                <div className="rounded-2xl border border-slate-200 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Signatures and documents</p>
-                  <p className="mt-2 text-sm font-semibold text-ink">{inspectionView.reviewSummary?.pendingSignatureDocuments ? `${inspectionView.reviewSummary.pendingSignatureDocuments} document(s) pending signature` : "All signature documents complete"}</p>
-                  <p className="mt-1 text-sm text-slate-500">Packet docs: {inspectionView.reviewSummary?.documentCount ?? 0} | Attachments: {inspectionView.reviewSummary?.attachmentCount ?? 0}</p>
+                <p className="mt-2 text-sm text-blue-900">{inspectionView.closeoutRequest.note}</p>
+                <p className="mt-2 text-xs text-blue-800">Requested by {inspectionView.closeoutRequest.requestedBy?.name ?? "Technician"} on {format(inspectionView.closeoutRequest.createdAt, "MMM d, yyyy h:mm a")}</p>
+                {inspectionView.closeoutRequest.status === "pending" ? <div className="mt-4"><InspectionCloseoutRequestActions inspectionId={inspection.id} canApprove /></div> : null}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-slate-200 p-5">
+                <p className="text-base font-semibold text-slate-950">No pending activity</p>
+                <p className="mt-1 text-sm text-slate-500">Status changes, correction requests, and technician next-step requests will appear here when action is needed.</p>
+              </div>
+            )}
+            {!isReviewMode ? (
+              <details className="rounded-2xl border border-rose-100 p-5">
+                <summary className="cursor-pointer text-base font-semibold text-rose-700">Danger zone</summary>
+                <div className="mt-5 border-t border-rose-100 pt-5">
+                  <DeleteInspectionCard action={deleteInspectionAction} inspectionId={inspection.id} redirectTo={originPath} />
                 </div>
-              </div>
-            </div>
-            <div className="rounded-[2rem] bg-white p-6 shadow-panel">
-              <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Report task completion</p>
-              <div className="mt-4 space-y-3">
-                {inspectionView.tasks.map((task: InspectionTask) => (
-                  <div key={task.id} className="rounded-2xl border border-slate-200 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-ink">{inspectionTaskLabel(task)}</p>
-                      <StatusBadge
-                        label={task.report?.status === "finalized" ? "Finalized" : "Draft"}
-                        tone={task.report?.status === "finalized" ? "emerald" : "amber"}
-                      />
-                    </div>
-                    <p className="mt-2 text-sm text-slate-500">
-                      {task.report?.finalizedAt ? `Finalized ${format(task.report.finalizedAt, "MMM d, yyyy h:mm a")}` : "This report still needs finalization."}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
+              </details>
+            ) : null}
           </div>
-        )}
-        <div className="space-y-6">
-          <InspectionPacketCard
-            description={
-              inspection.status === "completed" || inspection.status === "invoiced" || inspection.status === "follow_up_required"
-                ? "Access hosted reports and every document tied to this completed visit from one inspection packet view."
-                : "Access hosted reports now, and use this packet as the primary document handoff area once the visit is completed."
-            }
-            documents={packetDocuments}
-            emptyDescription={
-              inspection.status === "completed" || inspection.status === "invoiced" || inspection.status === "follow_up_required"
-                ? "No hosted reports or packet documents are attached to this completed inspection yet."
-                : "No hosted reports or packet documents are available for this inspection yet."
-            }
-            emptyTitle={
-              inspection.status === "completed" || inspection.status === "invoiced" || inspection.status === "follow_up_required"
-                ? "No inspection packet documents yet"
-                : "Inspection packet not ready"
-            }
-            showCustomerVisibility
-          />
-          {isReviewMode ? (
-            <div className="rounded-[2rem] bg-white p-6 shadow-panel">
-              <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Report access and admin controls</p>
-              <div className="mt-4 space-y-3">
-                {inspectionView.tasks.map((task: InspectionTask) => (
-                  <div key={task.id} className="rounded-2xl border border-slate-200 p-4">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-ink">{inspectionTaskLabel(task)}</p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {task.report?.finalizedAt
-                            ? `Finalized ${format(task.report.finalizedAt, "MMM d, yyyy h:mm a")}`
-                            : task.report
-                              ? `Current report status: ${task.report.status.replaceAll("_", " ")}`
-                              : "No report started yet."}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Link
-                          className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue"
-                          href={`/app/admin/reports/${inspection.id}/${task.id}`}
-                        >
-                          {task.report?.status === "finalized" ? "Open admin editor" : "Open report"}
-                        </Link>
-                        <AdminReportDeleteButton
-                          inspectionId={inspection.id}
-                          inspectionTaskId={task.id}
-                          taskLabel={inspectionTaskLabel(task)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          {!isReviewMode ? (
-          <InspectionExternalDocumentsCard
-            documents={externalDocumentView.map((document) => ({
-              ...document,
-              uploadedAt: document.uploadedAt.toISOString(),
-              annotatedAt: document.annotatedAt?.toISOString() ?? null,
-              signedAt: document.signedAt?.toISOString() ?? null
-            }))}
-            inspectionId={inspection.id}
-            tenantStoragePrefix={sanitizePathSegment(session.user.tenantId)}
-          />
-          ) : null}
-          {!isReviewMode ? <InspectionPdfUploadCard attachments={attachmentView} inspectionId={inspection.id} tenantStoragePrefix={sanitizePathSegment(session.user.tenantId)} /> : null}
-          {!isReviewMode ? <DeleteInspectionCard action={deleteInspectionAction} inspectionId={inspection.id} redirectTo={originPath} /> : null}
-        </div>
-      </WorkspaceSplit>
+        }
+      />
     </section>
   );
 }
