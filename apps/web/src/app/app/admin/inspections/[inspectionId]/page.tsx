@@ -359,15 +359,6 @@ export default async function EditInspectionPage({
                   <p className="mt-2 text-lg font-semibold text-slate-950">{inspectionView.tasks.length}</p>
                 </div>
               </div>
-              <div className="rounded-2xl border border-slate-200 p-5">
-                <h3 className="text-lg font-semibold text-slate-950">What needs to happen next</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  {primaryTask
-                    ? `${primaryActionLabel} for ${inspectionTaskLabel(primaryTask)}.`
-                    : "Add a report type before this inspection can move forward."}
-                </p>
-                {inspection.notes ? <p className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">{inspection.notes}</p> : null}
-              </div>
             </div>
             <div className="space-y-3">
               {inspectionView.tasks.map((task: InspectionTask) => (
