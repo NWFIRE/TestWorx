@@ -414,6 +414,13 @@ export default async function AdminInspectionsPage({
     technicianId,
     create: true
   });
+  const hasActiveInspectionFilters = Boolean(
+    queueData.filters.query ||
+      queueData.filters.statuses.length ||
+      queueData.filters.classifications.length ||
+      queueData.filters.priority !== "all" ||
+      queueData.filters.technicianId
+  );
 
   return (
     <AppPageShell density="wide">
@@ -468,13 +475,17 @@ export default async function AdminInspectionsPage({
       </section>
 
       <SectionCard>
-        <div className="flex flex-col gap-3 lg:gap-4">
-          <div>
+        <details className="group" open={hasActiveInspectionFilters}>
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-2xl outline-none transition focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.24)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">
               Inspection Filters
             </p>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,0.8fr))]">
+            <span className="inline-flex min-h-10 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] transition group-open:bg-[color:var(--surface-subtle)]">
+              <span className="group-open:hidden">Show</span>
+              <span className="hidden group-open:inline">Hide</span>
+            </span>
+          </summary>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,0.8fr))]">
             <div className="md:col-span-2 xl:col-span-3 2xl:col-span-1">
               <LiveUrlSearchSelect
                 emptyText="No matching customers, locations, or inspections found"
@@ -493,11 +504,7 @@ export default async function AdminInspectionsPage({
               value={queueData.filters.technicianId}
             />
           </div>
-          {(queueData.filters.query ||
-            queueData.filters.statuses.length ||
-            queueData.filters.classifications.length ||
-            queueData.filters.priority !== "all" ||
-            queueData.filters.technicianId) ? (
+          {hasActiveInspectionFilters ? (
             <div className="flex justify-end">
               <Link
                 className="inline-flex min-h-10 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
@@ -507,7 +514,7 @@ export default async function AdminInspectionsPage({
               </Link>
             </div>
           ) : null}
-        </div>
+        </details>
       </SectionCard>
 
       <SectionCard>

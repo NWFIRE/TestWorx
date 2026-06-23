@@ -63,6 +63,7 @@ export default async function AdminReportsQueuePage({
   const month = typeof params.month === "string" ? params.month : undefined;
   const query = typeof params.q === "string" ? params.q.trim() : "";
   const currentPath = buildReadyToBillHref({ month, query });
+  const hasActiveQueueFilters = Boolean(month || query);
 
   const data = await getAdminReportReviewQueueData(
     {
@@ -134,6 +135,7 @@ export default async function AdminReportsQueuePage({
       </section>
 
       <FilterBar
+        defaultOpen={hasActiveQueueFilters}
         description="Search for a customer or inspection, then switch months only when you need older finalized, non-invoiced work."
         title="Queue filters"
       >

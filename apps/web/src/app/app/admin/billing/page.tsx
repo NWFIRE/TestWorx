@@ -231,6 +231,7 @@ export default async function AdminBillingPage({
       </section>
 
       <FilterBar
+        defaultOpen={selectedStatus !== "all"}
         description="Ready To Bill shows summaries that still need billing action. Use Invoiced for completed invoice history."
         title="Queue filters"
       >

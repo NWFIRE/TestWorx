@@ -166,23 +166,39 @@ export function KPIStatCard({
 export function FilterBar({
   title,
   children,
-  className
+  className,
+  defaultOpen = false
 }: {
   title?: string;
   description?: string;
   children: ReactNode;
   className?: string;
+  defaultOpen?: boolean;
 }) {
+  if (!title) {
+    return (
+      <SectionCard className={className}>
+        <div className="flex flex-wrap gap-3">{children}</div>
+      </SectionCard>
+    );
+  }
+
   return (
     <SectionCard className={className}>
-      {title ? (
-        <div className="mb-4">
+      <details className="group" open={defaultOpen}>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-2xl outline-none transition focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.24)]">
           <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">
             {title}
           </p>
+          <span className="inline-flex min-h-10 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] transition group-open:bg-[color:var(--surface-subtle)]">
+            <span className="group-open:hidden">Show</span>
+            <span className="hidden group-open:inline">Hide</span>
+          </span>
+        </summary>
+        <div className="mt-4 flex flex-wrap gap-3">
+          {children}
         </div>
-      ) : null}
-      <div className="flex flex-wrap gap-3">{children}</div>
+      </details>
     </SectionCard>
   );
 }
@@ -217,7 +233,7 @@ const workQueueItems = [
 
 export function WorkQueueNav({ activeKey }: { activeKey: "all" | "open" | "review" | "billing" | "flags" }) {
   return (
-    <FilterBar title="Work queue">
+    <FilterBar defaultOpen title="Work queue">
       {workQueueItems.map((item) => (
         <FilterChipLink
           active={activeKey === item.key}

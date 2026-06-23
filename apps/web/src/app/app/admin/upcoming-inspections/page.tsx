@@ -113,6 +113,7 @@ export default async function UpcomingInspectionsPage({
       </section>
 
       <FilterBar
+        defaultOpen={Boolean(selectedMonth)}
         title="Planning window"
         description="Jump the planning form and board to a specific starting month without losing the surrounding month-by-month view."
       >

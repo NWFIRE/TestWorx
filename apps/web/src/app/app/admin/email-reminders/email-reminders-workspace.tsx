@@ -239,6 +239,12 @@ export function EmailRemindersWorkspace({
       </section>
 
       <FilterBar
+        defaultOpen={Boolean(
+          data.filters.query ||
+            data.filters.hasValidEmail !== "all" ||
+            data.filters.inspectionType ||
+            data.filters.division
+        )}
         description="Search customers, refine the current list, and prepare a branded email without leaving the workspace."
         title="Recipient filters"
       >

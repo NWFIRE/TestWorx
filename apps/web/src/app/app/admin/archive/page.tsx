@@ -108,6 +108,18 @@ export default async function InspectionArchivePage({
     completedFrom: data.filters.completedFrom,
     completedTo: data.filters.completedTo
   };
+  const hasActiveArchiveFilters = Boolean(
+    data.filters.query ||
+      data.filters.customerId ||
+      data.filters.siteId ||
+      data.filters.division ||
+      data.filters.inspectionType ||
+      data.filters.technicianId ||
+      data.filters.hasDeficiencies !== "all" ||
+      data.filters.hasReport !== "all" ||
+      data.filters.completedFrom ||
+      data.filters.completedTo
+  );
 
   return (
     <AppPageShell density="wide">
@@ -146,13 +158,15 @@ export default async function InspectionArchivePage({
       </section>
 
       <SectionCard>
-        <div className="flex flex-col gap-4">
-          <div>
+        <details className="group" open={hasActiveArchiveFilters}>
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-2xl outline-none transition focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.24)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Archive filters</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Historical lookup</h2>
-            <p className="mt-2 text-sm text-slate-500">Type to search, narrow by customer or technician, and refine by completion date without leaving the archive view.</p>
-          </div>
-          <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-4">
+            <span className="inline-flex min-h-10 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] transition group-open:bg-[color:var(--surface-subtle)]">
+              <span className="group-open:hidden">Show</span>
+              <span className="hidden group-open:inline">Hide</span>
+            </span>
+          </summary>
+          <div className="mt-4 grid gap-3 lg:grid-cols-2 2xl:grid-cols-4">
             <LiveUrlSearchInput
               debounceMs={450}
               initialValue={data.filters.query}
@@ -229,7 +243,7 @@ export default async function InspectionArchivePage({
               Clear filters
             </Link>
           </div>
-        </div>
+        </details>
       </SectionCard>
 
       <SectionCard>
@@ -237,7 +251,6 @@ export default async function InspectionArchivePage({
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Archive results</p>
             <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Completed inspection history</h2>
-            <p className="mt-2 text-sm text-slate-500">Open any archived inspection to review the snapshot, documents, report packet, and related quote/billing context.</p>
           </div>
           <p className="text-sm text-slate-500">
             Page {data.pagination.page} of {data.pagination.totalPages} • {data.pagination.totalCount} inspection{data.pagination.totalCount === 1 ? "" : "s"}

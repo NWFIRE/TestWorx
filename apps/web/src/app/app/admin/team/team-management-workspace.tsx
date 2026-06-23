@@ -884,6 +884,7 @@ export function TeamManagementWorkspace({
       />
 
       <FilterBar
+        defaultOpen={Boolean(filters.query || filters.status !== "all" || filters.role !== "all")}
         description="Use lightweight workspace filters while keeping internal team and customer portal access clearly separated."
         title="Filters"
       >

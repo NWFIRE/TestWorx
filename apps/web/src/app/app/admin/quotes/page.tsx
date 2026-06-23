@@ -108,6 +108,7 @@ export default async function QuotesPage({
   const selectedStatus = statusOptions.some((option) => option.value === params.status) ? params.status ?? "all" : "all";
   const selectedSync = syncOptions.some((option) => option.value === params.syncStatus) ? params.syncStatus ?? "all" : "all";
   const query = typeof params.query === "string" ? params.query : "";
+  const hasActiveQuoteFilters = Boolean(query || selectedStatus !== "all" || selectedSync !== "all");
 
   const actor = {
     userId: session.user.id,
@@ -190,7 +191,7 @@ export default async function QuotesPage({
         <KPIStatCard label="Sync issues" note="Quotes that still need a QuickBooks fix before sync succeeds." tone="rose" value={quotes.filter((quote) => quote.syncStatus === "sync_error").length} />
       </section>
 
-      <FilterBar title="Quote filters" description="Filter by lifecycle, QuickBooks state, and customer context.">
+      <FilterBar defaultOpen={hasActiveQuoteFilters} title="Quote filters" description="Filter by lifecycle, QuickBooks state, and customer context.">
         {statusOptions.map((option) => (
           <FilterChipLink
             active={selectedStatus === option.value}

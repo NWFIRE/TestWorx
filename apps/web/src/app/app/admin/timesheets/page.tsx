@@ -89,7 +89,7 @@ export default async function AdminTimesheetsPage({
         <KPIStatCard label="Net payable hours" value={formatTimesheetHours(workspace.totals.netMinutes)} tone="emerald" />
       </div>
 
-      <FilterBar title="Timesheet filters">
+      <FilterBar defaultOpen={Boolean(workspace.filters.employeeId)} title="Timesheet filters">
         <form className="flex w-full flex-wrap gap-3" action="/app/admin/timesheets">
           <label className="min-w-[12rem] flex-1">
             <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Week of</span>

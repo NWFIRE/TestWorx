@@ -126,6 +126,7 @@ export default async function AdminAmendmentsPage({
       </section>
 
       <FilterBar
+        defaultOpen={selectedFilter !== "all"}
         description="Filter action-required records and linked visit history without treating closed invoices as active review work."
         title="Action filters"
       >
