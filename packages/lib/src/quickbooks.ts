@@ -1023,7 +1023,8 @@ function getQuickBooksRuleLabelForBillingCode(billingCode: string) {
   const ruleKeys: Record<string, string> = {
     "KS-INSPECTION": "Standard Hood Inspection",
     "KS-INSPECTION-GUARDIAN/DENLAR": "Guardian Denlar Hood Inspection",
-    "KS-INSPECTION-CAPTIVEAIRE": "CaptiveAire Hood Inspection"
+    "KS-INSPECTION-CAPTIVEAIRE": "CaptiveAire Hood Inspection",
+    "FIRE_ALARM_INSPECTION_LABOR": "Fire Alarm Inspection Labor"
   };
 
   return ruleKeys[normalizedCode] ?? null;

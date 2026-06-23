@@ -693,7 +693,7 @@ function FireAlarmLaborHoursSection({
       </label>
       {Number(normalizedValue) > 0 ? (
         <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
-          {normalizedValue} labor hour{normalizedValue === "1" ? "" : "s"} will flow into ready-to-bill as on-site labor when this report is finalized.
+          {normalizedValue} labor hour{normalizedValue === "1" ? "" : "s"} will flow into ready-to-bill as Fire Alarm inspection labor when this report is finalized.
         </p>
       ) : null}
     </section>

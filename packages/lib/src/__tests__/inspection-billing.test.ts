@@ -636,7 +636,7 @@ describe("inspection billing extraction", () => {
     expect(items[0]?.metadata?.billingManufacturer).toBe("Ansul");
   });
 
-  it("extracts on-site labor from fire alarm only", () => {
+  it("extracts inspection labor from fire alarm reports", () => {
     const items = extractBillableItemsFromDraft({
       tenantId: "tenant_1",
       inspectionId: "inspection_1",
@@ -646,7 +646,7 @@ describe("inspection billing extraction", () => {
     });
 
     expect(items.map((item) => [item.category, item.description, item.quantity, item.code])).toEqual([
-      ["labor", "On-site labor", 3.5, "ON_SITE_LABOR"]
+      ["labor", "Fire Alarm Inspection Labor", 3.5, "FIRE_ALARM_INSPECTION_LABOR"]
     ]);
   });
 
@@ -1488,7 +1488,7 @@ describe("inspection billing persistence and admin review", () => {
     });
     txMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
     prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue({
-      sourceKey: "laborHours:ON_SITE_LABOR",
+      sourceKey: "labor|fire_alarm|system-summary|laborHours|fire alarm inspection labor|fire alarm inspection labor",
       catalogItemId: "catalog_labor",
       confidence: 1,
       matchMethod: "source_mapping",
