@@ -25,10 +25,12 @@ const { prismaMock, txMock } = vi.hoisted(() => {
     inspectionTask: {
       create: vi.fn(),
       findMany: vi.fn(),
+      update: vi.fn(),
       updateMany: vi.fn()
     },
     inspectionRecurrence: {
-      create: vi.fn()
+      create: vi.fn(),
+      update: vi.fn()
     },
     inspectionAmendment: {
       findFirst: vi.fn(),
@@ -71,7 +73,7 @@ vi.mock("@testworx/db", () => ({
   prisma: prismaMock
 }));
 
-import { createInspectionAmendment, nextDueFrom, updateInspectionStatus } from "../scheduling";
+import { createInspectionAmendment, nextDueFrom, updateInspection, updateInspectionStatus } from "../scheduling";
 
 describe("inspection recurrence rollover", () => {
   beforeEach(() => {
@@ -88,9 +90,11 @@ describe("inspection recurrence rollover", () => {
     txMock.inspection.create.mockResolvedValue({ id: "replacement_1" });
     txMock.inspection.update.mockResolvedValue({ id: "inspection_1", status: InspectionStatus.completed });
     txMock.inspectionTask.create.mockResolvedValue({ id: "task_new" });
+    txMock.inspectionTask.update.mockResolvedValue({ id: "task_1" });
     txMock.inspectionTask.findMany.mockResolvedValue([]);
     txMock.inspectionTask.updateMany.mockResolvedValue({ count: 0 });
     txMock.inspectionRecurrence.create.mockResolvedValue({ id: "recurrence_new" });
+    txMock.inspectionRecurrence.update.mockResolvedValue({ id: "recurrence_1" });
     txMock.inspectionReport.create.mockResolvedValue({ id: "report_new" });
     txMock.inspectionAmendment.findFirst.mockResolvedValue(null);
     txMock.inspectionAmendment.create.mockResolvedValue({ id: "amendment_1" });
@@ -101,6 +105,80 @@ describe("inspection recurrence rollover", () => {
     txMock.serviceSiteProviderAssignment.findFirst.mockResolvedValue(null);
     txMock.auditLog.create.mockResolvedValue({ id: "audit_1" });
     txMock.inspection.findUniqueOrThrow.mockResolvedValue({ id: "replacement_1", status: "scheduled" });
+  });
+
+  it("updates started inspections in place without creating a replacement visit", async () => {
+    const originalScheduledStart = new Date("2026-03-13T09:00:00.000Z");
+    const nextScheduledStart = new Date("2026-03-20T09:00:00.000Z");
+    const preservedNextDueAt = new Date("2027-03-13T09:00:00.000Z");
+
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      assignedTechnicianId: "tech_1",
+      status: InspectionStatus.in_progress,
+      scheduledStart: originalScheduledStart,
+      scheduledEnd: new Date("2026-03-13T10:00:00.000Z"),
+      notes: "Original visit",
+      tasks: [{
+        id: "task_1",
+        inspectionType: "fire_alarm",
+        status: InspectionStatus.in_progress,
+        recurrence: {
+          id: "recurrence_1",
+          frequency: RecurrenceFrequency.ANNUAL,
+          seriesId: "series_1",
+          anchorScheduledStart: originalScheduledStart,
+          nextDueAt: preservedNextDueAt
+        }
+      }],
+      technicianAssignments: [{ technicianId: "tech_1", technician: { id: "tech_1", name: "Taylor Tech" } }]
+    });
+    txMock.inspectionReport.count.mockResolvedValue(2);
+    txMock.inspection.findUniqueOrThrow.mockResolvedValue({ id: "inspection_1", status: InspectionStatus.scheduled });
+
+    const updated = await updateInspection(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1",
+      {
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        scheduledStart: nextScheduledStart,
+        scheduledEnd: new Date("2026-03-20T10:30:00.000Z"),
+        assignedTechnicianIds: ["tech_1"],
+        status: InspectionStatus.scheduled,
+        notes: "Updated existing visit.",
+        tasks: [
+          { inspectionType: "fire_alarm", frequency: RecurrenceFrequency.ANNUAL }
+        ]
+      }
+    );
+
+    expect(updated).toEqual({ id: "inspection_1", status: InspectionStatus.scheduled });
+    expect(txMock.inspection.create).not.toHaveBeenCalled();
+    expect(txMock.inspectionAmendment.create).not.toHaveBeenCalled();
+    expect(txMock.inspection.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "inspection_1" },
+      data: expect.objectContaining({
+        scheduledStart: nextScheduledStart,
+        notes: "Updated existing visit."
+      })
+    }));
+    expect(txMock.inspectionTask.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "task_1" },
+      data: expect.objectContaining({
+        schedulingStatus: "scheduled_now",
+        sortOrder: 0
+      })
+    }));
+    expect(txMock.inspectionRecurrence.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "recurrence_1" },
+      data: expect.objectContaining({
+        frequency: RecurrenceFrequency.ANNUAL,
+        anchorScheduledStart: nextScheduledStart
+      })
+    }));
   });
 
   it("preserves the original next due date when a started inspection is amended", async () => {

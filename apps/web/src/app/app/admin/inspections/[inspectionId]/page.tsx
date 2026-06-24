@@ -23,7 +23,7 @@ import {
   isDueAtTimeOfServiceCustomer
 } from "@testworx/lib/server/index";
 
-import { amendInspectionAction, deleteInspectionAction, regenerateCompletedReportPdfAction, reopenCompletedReportAction, updateInspectionAction, updateInspectionStatusAdminAction } from "../../actions";
+import { deleteInspectionAction, regenerateCompletedReportPdfAction, reopenCompletedReportAction, updateInspectionAction, updateInspectionStatusAdminAction } from "../../actions";
 import { AdminReportDeleteButton } from "../../admin-report-delete-button";
 import { DeleteInspectionCard } from "../../delete-inspection-card";
 import { InspectionExternalDocumentsCard } from "../../inspection-external-documents-card";
@@ -487,15 +487,15 @@ export default async function EditInspectionPage({
                 <div className="mt-5 space-y-5 border-t border-slate-200 pt-5">
                   <InspectionStatusUpdateCard action={updateInspectionStatusAdminAction} currentStatus={inspection.status} inspectionId={inspection.id} key={`${inspection.id}:${inspection.status}:status`} />
                   <InspectionSchedulerForm
-                    action={inspectionView.hasStartedWork ? amendInspectionAction : updateInspectionAction}
+                    action={updateInspectionAction}
                     title="Edit visit"
                     submitLabel="Save changes"
-                    banner={inspectionView.hasStartedWork ? `This visit already has ${inspectionView.reportActivityCount ?? 0} work marker${(inspectionView.reportActivityCount ?? 0) === 1 ? "" : "s"}. Saving here will create a new visit and leave the original visit unchanged.` : undefined}
-                    workflowNote={inspectionView.hasStartedWork ? "The original visit and its report history stay intact. The new visit carries these updates forward for dispatch." : "Use this form for normal visit edits. Once field work begins, the system protects the original visit and creates a new one when needed."}
+                    banner={inspectionView.hasStartedWork ? `This visit already has ${inspectionView.reportActivityCount ?? 0} work marker${(inspectionView.reportActivityCount ?? 0) === 1 ? "" : "s"}. Saving here will update this existing visit and preserve recorded report work.` : undefined}
+                    workflowNote={inspectionView.hasStartedWork ? "Use this form to edit the existing visit. Report history, photos, signatures, and deficiencies are preserved." : "Use this form for normal visit edits."}
                     customers={dashboardData.customers}
                     sites={dashboardData.sites}
                     technicians={dashboardData.technicians}
-                    protectedSaveMode={Boolean(inspectionView.hasStartedWork)}
+                    protectedSaveMode={false}
                     initialValues={{
                       inspectionId: inspection.id,
                       customerCompanyId: inspection.customerCompanyId,
