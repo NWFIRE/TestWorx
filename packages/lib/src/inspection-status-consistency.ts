@@ -29,7 +29,7 @@ function isTaskClosed(task: {
   return (
     task.status === InspectionStatus.completed ||
     task.status === InspectionStatus.invoiced ||
-    (task.report?.status === reportStatuses.finalized && Boolean(task.report.finalizedAt))
+    task.report?.status === reportStatuses.finalized
   );
 }
 
@@ -222,7 +222,7 @@ export async function reconcileInspectionStatusTx(tx: TransactionClient, input: 
         status: { notIn: [InspectionStatus.completed, InspectionStatus.invoiced, InspectionStatus.cancelled] },
         id: { in: currentTasks.map((task) => task.id) },
         OR: [
-          { report: { is: { status: reportStatuses.finalized, finalizedAt: { not: null } } } },
+          { report: { is: { status: reportStatuses.finalized } } },
           { id: { in: closedTasks.map((task) => task.id) } }
         ]
       },
@@ -292,7 +292,7 @@ export async function repairInspectionStatusConsistencyTx(tx: TransactionClient,
           tasks: {
             some: {
               status: { not: InspectionStatus.cancelled },
-              report: { is: { status: reportStatuses.finalized, finalizedAt: { not: null } } }
+              report: { is: { status: reportStatuses.finalized } }
             }
           }
         }
@@ -326,8 +326,7 @@ export async function repairInspectionStatusConsistencyTx(tx: TransactionClient,
       },
       reports: {
         none: {
-          status: reportStatuses.finalized,
-          finalizedAt: { not: null }
+          status: reportStatuses.finalized
         }
       }
     },

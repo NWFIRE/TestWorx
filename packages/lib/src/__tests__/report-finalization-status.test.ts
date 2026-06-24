@@ -176,6 +176,48 @@ describe("inspection completion after report finalization", () => {
     }));
   });
 
+  it("repairs stale parent status when a finalized report is missing finalizedAt", async () => {
+    const tx = buildTxMock();
+    const reconciledAt = new Date("2026-05-08T14:00:00.000Z");
+    tx.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      status: InspectionStatus.to_be_completed,
+      isPriority: false,
+      billingSummary: null,
+      tasks: [
+        {
+          id: "task_1",
+          status: InspectionStatus.to_be_completed,
+          schedulingStatus: "scheduled_now",
+          report: { id: "report_1", status: "finalized", finalizedAt: null }
+        }
+      ]
+    });
+
+    const result = await resolveInspectionCompletionAfterTaskFinalizationTx({
+      tx: tx as never,
+      tenantId: "tenant_1",
+      inspectionId: "inspection_1",
+      finalizedAt: reconciledAt,
+      actorUserId: "admin_1",
+      source: "repair"
+    });
+
+    expect(result.completed).toBe(true);
+    expect(tx.inspectionTask.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        OR: expect.arrayContaining([
+          { report: { is: { status: "finalized" } } }
+        ])
+      }),
+      data: { status: InspectionStatus.completed }
+    }));
+    expect(tx.inspection.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "inspection_1" },
+      data: expect.objectContaining({ status: InspectionStatus.completed })
+    }));
+  });
+
   it("treats same-month scheduled future tasks as current work when reconciling finalized inspections", async () => {
     const tx = buildTxMock();
     const finalizedAt = new Date("2026-05-18T18:00:00.000Z");

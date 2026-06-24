@@ -961,7 +961,7 @@ function isQueueTaskClosed(task: QueueVisibilityTask) {
   return (
     task.status === InspectionStatus.completed ||
     task.status === InspectionStatus.invoiced ||
-    Boolean(task.report?.status === reportStatuses.finalized && task.report.finalizedAt)
+    task.report?.status === reportStatuses.finalized
   );
 }
 
@@ -5622,6 +5622,24 @@ export async function getAdminSchedulingQueueData(
       })
     };
   }).filter((inspection) => inspection.tasks.length > 0);
+
+  const staleClosedActiveInspectionIds = mapped
+    .filter((inspection) => isActiveOperationalInspectionStatus(inspection.status))
+    .filter((inspection) => !hasIncompleteCurrentVisitWork(inspection))
+    .map((inspection) => inspection.id);
+
+  if (staleClosedActiveInspectionIds.length > 0) {
+    await Promise.all(
+      staleClosedActiveInspectionIds.map((inspectionId) =>
+        prisma.$transaction((tx) => reconcileInspectionStatusTx(tx, {
+          tenantId,
+          inspectionId,
+          actorUserId: parsedActor.userId,
+          source: "repair"
+        }))
+      )
+    );
+  }
 
   const countRows = countInspections.map((inspection) => ({
     ...inspection,
