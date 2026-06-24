@@ -202,9 +202,10 @@ export default async function EditInspectionPage({
     amendments?: Array<{ id: string; reason: string; type: string; createdAt: Date; replacementInspection: { id: string; scheduledStart: Date; site: { name: string }; customerCompany: { name: string }; assignedTechnician: { name: string } | null } }>;
     closeoutRequest?: {
       id: string;
-      requestType: "new_inspection" | "follow_up_inspection";
+      requestType: "new_inspection" | "follow_up_inspection" | "customer_refused" | "wrong_due_month";
       status: "pending" | "approved" | "dismissed";
       note: string;
+      requestedDueMonth?: string | null;
       createdAt: Date;
       approvedAt: Date | null;
       dismissedAt: Date | null;
@@ -557,8 +558,11 @@ export default async function EditInspectionPage({
                   <StatusBadge label={formatInspectionCloseoutRequestStatusLabel(inspectionView.closeoutRequest.status)} tone={inspectionView.closeoutRequest.status === "approved" ? "emerald" : inspectionView.closeoutRequest.status === "dismissed" ? "slate" : "blue"} />
                 </div>
                 <p className="mt-2 text-sm text-blue-900">{inspectionView.closeoutRequest.note}</p>
+                {inspectionView.closeoutRequest.requestedDueMonth ? (
+                  <p className="mt-2 text-sm font-semibold text-blue-950">Requested due month: {inspectionView.closeoutRequest.requestedDueMonth}</p>
+                ) : null}
                 <p className="mt-2 text-xs text-blue-800">Requested by {inspectionView.closeoutRequest.requestedBy?.name ?? "Technician"} on {format(inspectionView.closeoutRequest.createdAt, "MMM d, yyyy h:mm a")}</p>
-                {inspectionView.closeoutRequest.status === "pending" ? <div className="mt-4"><InspectionCloseoutRequestActions inspectionId={inspection.id} canApprove /></div> : null}
+                {inspectionView.closeoutRequest.status === "pending" ? <div className="mt-4"><InspectionCloseoutRequestActions inspectionId={inspection.id} canApprove requestType={inspectionView.closeoutRequest.requestType} /></div> : null}
               </div>
             ) : (
               <div className="rounded-2xl border border-slate-200 p-5">

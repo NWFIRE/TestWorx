@@ -456,7 +456,9 @@ export async function approveInspectionCloseoutRequestAction(inspectionId: strin
     revalidatePath("/app/admin");
     revalidatePath("/app/admin/amendments");
     revalidatePath(`/app/admin/inspections/${inspectionId}`);
-    revalidatePath(`/app/admin/inspections/${createdInspection.id}`);
+    if (createdInspection?.id) {
+      revalidatePath(`/app/admin/inspections/${createdInspection.id}`);
+    }
     revalidatePath("/app/tech");
 
     return { ok: true, error: null };

@@ -48,7 +48,8 @@ vi.mock("@testworx/db", () => ({
 import {
   approveInspectionCloseoutRequest,
   completeInspectionWithCloseoutRequest,
-  dismissInspectionCloseoutRequest
+  dismissInspectionCloseoutRequest,
+  submitTechnicianInspectionFieldUpdate
 } from "../scheduling";
 
 describe("inspection closeout requests", () => {
@@ -77,7 +78,7 @@ describe("inspection closeout requests", () => {
   });
 
   it("completes an inspection and records a pending follow-up request", async () => {
-    prismaMock.inspection.findFirst.mockResolvedValue({
+    const inspectionRecord = {
       id: "inspection_1",
       tenantId: "tenant_1",
       customerCompanyId: "customer_1",
@@ -90,8 +91,17 @@ describe("inspection closeout requests", () => {
       notes: "Visit in progress",
       claimable: false,
       technicianAssignments: [{ technicianId: "tech_1" }],
-      tasks: []
-    });
+      tasks: [],
+      customerCompany: { name: "Customer" },
+      site: { name: "Site", addressLine1: "1 Main", addressLine2: null, city: "Enid", state: "OK", postalCode: "73701" },
+      assignedTechnician: { name: "Tech" },
+      reports: [],
+      deficiencies: [],
+      completedAt: null,
+      archivedAt: null
+    };
+    prismaMock.inspection.findFirst.mockResolvedValue(inspectionRecord);
+    txMock.inspection.findFirst.mockResolvedValue(inspectionRecord);
 
     await completeInspectionWithCloseoutRequest(
       { userId: "tech_1", role: "technician", tenantId: "tenant_1" },
@@ -172,6 +182,136 @@ describe("inspection closeout requests", () => {
       data: expect.objectContaining({
         status: InspectionCloseoutRequestStatus.approved,
         createdInspectionId: "inspection_2"
+      })
+    });
+  });
+
+  it("lets a technician flag customer refusal without completing reports", async () => {
+    prismaMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      assignedTechnicianId: "tech_1",
+      createdByUserId: "office_1",
+      status: InspectionStatus.to_be_completed,
+      scheduledStart: new Date("2026-04-08T09:00:00.000Z"),
+      scheduledEnd: new Date("2026-04-08T10:00:00.000Z"),
+      notes: "Scheduled visit",
+      claimable: false,
+      technicianAssignments: [{ technicianId: "tech_1" }]
+    });
+
+    await submitTechnicianInspectionFieldUpdate(
+      { userId: "tech_1", role: "technician", tenantId: "tenant_1" },
+      "inspection_1",
+      {
+        requestType: "customer_refused",
+        note: "Customer refused service after we arrived."
+      }
+    );
+
+    expect(txMock.inspectionCloseoutRequest.upsert).toHaveBeenCalledWith({
+      where: { inspectionId: "inspection_1" },
+      update: expect.objectContaining({
+        requestType: "customer_refused",
+        note: "Customer refused service after we arrived.",
+        requestedDueMonth: null,
+        status: InspectionCloseoutRequestStatus.pending
+      }),
+      create: expect.objectContaining({
+        inspectionId: "inspection_1",
+        requestType: "customer_refused",
+        requestedDueMonth: null
+      }),
+      include: expect.any(Object)
+    });
+    expect(txMock.inspection.update).toHaveBeenCalledWith({
+      where: { id: "inspection_1" },
+      data: { status: InspectionStatus.follow_up_required }
+    });
+  });
+
+  it("records the technician-requested due month for office review", async () => {
+    prismaMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      assignedTechnicianId: "tech_1",
+      createdByUserId: "office_1",
+      status: InspectionStatus.in_progress,
+      scheduledStart: new Date("2026-04-08T09:00:00.000Z"),
+      scheduledEnd: new Date("2026-04-08T10:00:00.000Z"),
+      notes: "Scheduled visit",
+      claimable: false,
+      technicianAssignments: [{ technicianId: "tech_1" }]
+    });
+
+    await submitTechnicianInspectionFieldUpdate(
+      { userId: "tech_1", role: "technician", tenantId: "tenant_1" },
+      "inspection_1",
+      {
+        requestType: "wrong_due_month",
+        requestedDueMonth: "2026-07",
+        note: "Customer said their annual due month moved to July."
+      }
+    );
+
+    expect(txMock.inspectionCloseoutRequest.upsert).toHaveBeenCalledWith({
+      where: { inspectionId: "inspection_1" },
+      update: expect.objectContaining({
+        requestType: "wrong_due_month",
+        requestedDueMonth: "2026-07",
+        status: InspectionCloseoutRequestStatus.pending
+      }),
+      create: expect.objectContaining({
+        inspectionId: "inspection_1",
+        requestType: "wrong_due_month",
+        requestedDueMonth: "2026-07"
+      }),
+      include: expect.any(Object)
+    });
+    expect(txMock.inspection.update).toHaveBeenCalledWith({
+      where: { id: "inspection_1" },
+      data: { status: InspectionStatus.follow_up_required }
+    });
+  });
+
+  it("approves a field update without creating a new inspection", async () => {
+    txMock.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1",
+      tenantId: "tenant_1",
+      customerCompanyId: "customer_1",
+      siteId: "site_1",
+      assignedTechnicianId: "tech_1",
+      createdByUserId: "office_1",
+      status: InspectionStatus.follow_up_required,
+      scheduledStart: new Date("2026-04-08T09:00:00.000Z"),
+      scheduledEnd: new Date("2026-04-08T10:00:00.000Z"),
+      notes: "Needs office review",
+      claimable: false,
+      tasks: [],
+      closeoutRequest: {
+        id: "closeout_1",
+        requestType: "wrong_due_month",
+        note: "Technician reported this inspection belongs in 2026-07.",
+        requestedDueMonth: "2026-07",
+        status: InspectionCloseoutRequestStatus.pending
+      }
+    });
+
+    await approveInspectionCloseoutRequest(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    expect(txMock.inspection.create).not.toHaveBeenCalled();
+    expect(txMock.inspectionCloseoutRequest.update).toHaveBeenCalledWith({
+      where: { inspectionId: "inspection_1" },
+      data: expect.objectContaining({
+        status: InspectionCloseoutRequestStatus.approved,
+        approvedByUserId: "office_1"
       })
     });
   });

@@ -11,6 +11,7 @@ import {
   inspectionTypeRegistry,
   removeInspectionTask,
   signInspectionDocument,
+  submitTechnicianInspectionFieldUpdate,
   updateInspectionStatus
 } from "@testworx/lib/server/index";
 
@@ -111,6 +112,35 @@ export async function completeInspectionWithCloseoutRequestAction(
     return { ok: true, error: null };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unable to complete this inspection." };
+  }
+}
+
+export async function submitInspectionFieldUpdateAction(
+  inspectionId: string,
+  input: { requestType: "customer_refused"; note: string } | { requestType: "wrong_due_month"; requestedDueMonth: string; note?: string }
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.tenantId || session.user.role !== "technician") {
+    return { ok: false, error: "Your session no longer has technician access. Please sign in again." };
+  }
+
+  try {
+    await submitTechnicianInspectionFieldUpdate(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      inspectionId,
+      input
+    );
+    revalidatePath("/app/tech");
+    revalidatePath("/app/tech/inspections");
+    revalidatePath("/app/tech/work");
+    revalidatePath("/app/admin");
+    revalidatePath("/app/admin/inspections");
+    revalidatePath("/app/admin/dashboard");
+    revalidatePath("/app/admin/amendments");
+    revalidatePath(`/app/admin/inspections/${inspectionId}`);
+    return { ok: true, error: null };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to send this field update." };
   }
 }
 

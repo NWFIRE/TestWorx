@@ -10,6 +10,7 @@ import {
 import { AddReportTypeControl } from "./add-report-type-control";
 import { DispatchNotesCard } from "./dispatch-notes-card";
 import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
+import { InspectionFieldUpdateCard } from "./inspection-field-update-card";
 import { PriorityInspectionBadge } from "./priority-inspection-badge";
 
 type InspectionWorkspaceData = {
@@ -212,9 +213,12 @@ export function MobileInspectionWorkspaceShell({
       ) : null}
 
       {currentMode === "edit" ? (
-        <div className="mt-4">
-          <AddReportTypeControl inspectionId={workspace.inspectionId} />
-        </div>
+        <>
+          <InspectionFieldUpdateCard inspectionId={workspace.inspectionId} />
+          <div className="mt-4">
+            <AddReportTypeControl inspectionId={workspace.inspectionId} />
+          </div>
+        </>
       ) : null}
     </section>
   );

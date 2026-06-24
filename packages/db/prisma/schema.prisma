@@ -135,6 +135,8 @@ enum InspectionAmendmentType {
 enum InspectionCloseoutRequestType {
   new_inspection
   follow_up_inspection
+  customer_refused
+  wrong_due_month
 }
 
 enum InspectionCloseoutRequestStatus {
@@ -1866,6 +1868,7 @@ model InspectionCloseoutRequest {
   requestedByUserId   String
   requestType         InspectionCloseoutRequestType
   note                String
+  requestedDueMonth   String?
   status              InspectionCloseoutRequestStatus @default(pending)
   createdInspectionId String?
   approvedByUserId    String?

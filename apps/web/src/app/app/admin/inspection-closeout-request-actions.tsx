@@ -5,10 +5,21 @@ import { useState, useTransition } from "react";
 
 import { approveInspectionCloseoutRequestAction, dismissInspectionCloseoutRequestAction } from "./actions";
 
-export function InspectionCloseoutRequestActions({ inspectionId, canApprove }: { inspectionId: string; canApprove: boolean }) {
+type RequestType = "new_inspection" | "follow_up_inspection" | "customer_refused" | "wrong_due_month";
+
+export function InspectionCloseoutRequestActions({
+  inspectionId,
+  canApprove,
+  requestType
+}: {
+  inspectionId: string;
+  canApprove: boolean;
+  requestType?: RequestType;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const createsInspection = requestType === "new_inspection" || requestType === "follow_up_inspection";
 
   return (
     <div className="space-y-3">
@@ -26,7 +37,7 @@ export function InspectionCloseoutRequestActions({ inspectionId, canApprove }: {
             })}
             type="button"
           >
-            {pending ? "Saving..." : "Approve and create inspection"}
+            {pending ? "Saving..." : createsInspection ? "Approve and create inspection" : "Mark reviewed"}
           </button>
         ) : null}
         <button

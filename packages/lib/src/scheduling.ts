@@ -86,7 +86,7 @@ const inspectionTaskSchedulingStatusSchema = z.enum(inspectionTaskSchedulingStat
 export const adminInspectionLifecycleValues = ["original", "amended", "replacement", "superseded"] as const;
 export type AdminInspectionLifecycle = (typeof adminInspectionLifecycleValues)[number];
 const adminInspectionLifecycleFilterSchema = z.enum(["all", ...adminInspectionLifecycleValues]);
-export const inspectionCloseoutRequestTypes = ["new_inspection", "follow_up_inspection"] as const;
+export const inspectionCloseoutRequestTypes = ["new_inspection", "follow_up_inspection", "customer_refused", "wrong_due_month"] as const;
 export type InspectionCloseoutRequestTypeValue = (typeof inspectionCloseoutRequestTypes)[number];
 const inspectionCloseoutRequestTypeSchema = z.enum(inspectionCloseoutRequestTypes);
 export const inspectionCloseoutRequestStatuses = ["pending", "approved", "dismissed"] as const;
@@ -178,7 +178,9 @@ export const inspectionClassificationLabels: Record<InspectionClassificationValu
 };
 export const inspectionCloseoutRequestTypeLabels: Record<InspectionCloseoutRequestTypeValue, string> = {
   new_inspection: "New inspection",
-  follow_up_inspection: "Follow-up inspection"
+  follow_up_inspection: "Follow-up inspection",
+  customer_refused: "Customer refused inspection",
+  wrong_due_month: "Wrong due month"
 };
 export const inspectionCloseoutRequestStatusLabels: Record<InspectionCloseoutRequestStatusValue, string> = {
   pending: "Pending",
@@ -193,6 +195,18 @@ const inspectionCloseoutRequestSchema = z.discriminatedUnion("requestType", [
   z.object({
     requestType: inspectionCloseoutRequestTypeSchema,
     note: z.string().trim().min(5, "Add a short note so office staff knows what to schedule next.").max(2000)
+  })
+]);
+
+const technicianFieldUpdateRequestSchema = z.discriminatedUnion("requestType", [
+  z.object({
+    requestType: z.literal("customer_refused"),
+    note: z.string().trim().min(5, "Add a short note about the refusal.").max(2000)
+  }),
+  z.object({
+    requestType: z.literal("wrong_due_month"),
+    requestedDueMonth: z.string().trim().regex(/^\d{4}-\d{2}$/, "Choose the correct due month."),
+    note: z.string().trim().max(2000).optional()
   })
 ]);
 
@@ -2794,11 +2808,13 @@ async function createAuditLog(tx: Prisma.TransactionClient, input: {
 function serializeCloseoutRequestMetadata(input: {
   requestType: InspectionCloseoutRequestType | InspectionCloseoutRequestTypeValue;
   note: string;
+  requestedDueMonth?: string | null;
   createdInspectionId?: string | null;
 }) {
   return {
     requestType: input.requestType,
     note: input.note,
+    requestedDueMonth: input.requestedDueMonth ?? null,
     createdInspectionId: input.createdInspectionId ?? null
   };
 }
@@ -2811,6 +2827,7 @@ async function createInspectionCloseoutRequestTx(
     requestedByUserId: string;
     requestType: InspectionCloseoutRequestTypeValue;
     note: string;
+    requestedDueMonth?: string | null;
   }
 ) {
   const closeoutRequest = await tx.inspectionCloseoutRequest.upsert({
@@ -2819,6 +2836,7 @@ async function createInspectionCloseoutRequestTx(
       requestedByUserId: input.requestedByUserId,
       requestType: input.requestType,
       note: input.note,
+      requestedDueMonth: input.requestedDueMonth ?? null,
       status: InspectionCloseoutRequestStatus.pending,
       createdInspectionId: null,
       approvedByUserId: null,
@@ -2831,7 +2849,8 @@ async function createInspectionCloseoutRequestTx(
       inspectionId: input.inspectionId,
       requestedByUserId: input.requestedByUserId,
       requestType: input.requestType,
-      note: input.note
+      note: input.note,
+      requestedDueMonth: input.requestedDueMonth ?? null
     },
     include: {
       requestedBy: { select: { id: true, name: true } }
@@ -2845,7 +2864,8 @@ async function createInspectionCloseoutRequestTx(
     entityId: input.inspectionId,
     metadata: serializeCloseoutRequestMetadata({
       requestType: input.requestType,
-      note: input.note
+      note: input.note,
+      requestedDueMonth: input.requestedDueMonth ?? null
     })
   });
 
@@ -3583,6 +3603,83 @@ export async function completeInspectionWithCloseoutRequest(
     }
 
     return updated;
+  });
+}
+
+export async function submitTechnicianInspectionFieldUpdate(
+  actor: ActorContext,
+  inspectionId: string,
+  input: z.infer<typeof technicianFieldUpdateRequestSchema>
+) {
+  const parsedActor = parseActor(actor);
+  const tenantId = parsedActor.tenantId as string;
+  if (parsedActor.role !== "technician") {
+    throw new Error("Only technicians can submit field updates from the mobile workflow.");
+  }
+
+  const parsedRequest = technicianFieldUpdateRequestSchema.parse(input);
+  const inspection = await prisma.inspection.findFirst({
+    where: { id: inspectionId, tenantId },
+    include: {
+      technicianAssignments: { select: { technicianId: true } }
+    }
+  });
+
+  if (!inspection) {
+    throw new Error("Inspection not found.");
+  }
+
+  const canSubmitFieldUpdate = isTechnicianAssignedToInspection({
+    userId: parsedActor.userId,
+    assignedTechnicianId: inspection.assignedTechnicianId,
+    technicianAssignments: readTechnicianAssignments(inspection)
+  }) || (inspection.claimable && !inspection.assignedTechnicianId && readTechnicianAssignments(inspection).length === 0);
+
+  if (!canSubmitFieldUpdate) {
+    throw new Error("You do not have access to update this inspection.");
+  }
+
+  const requestedDueMonth = parsedRequest.requestType === "wrong_due_month" ? parsedRequest.requestedDueMonth : null;
+  const note = parsedRequest.requestType === "customer_refused"
+    ? parsedRequest.note
+    : [
+        `Technician reported this inspection belongs in ${requestedDueMonth}.`,
+        parsedRequest.note?.trim() ? parsedRequest.note.trim() : null
+      ].filter(Boolean).join("\n\n");
+
+  return prisma.$transaction(async (tx) => {
+    const closeoutRequest = await createInspectionCloseoutRequestTx(tx, {
+      tenantId,
+      inspectionId,
+      requestedByUserId: parsedActor.userId,
+      requestType: parsedRequest.requestType,
+      note,
+      requestedDueMonth
+    });
+
+    const shouldMoveToOfficeAttention = !terminalInspectionStatuses.some((status) => status === inspection.status);
+    if (shouldMoveToOfficeAttention && inspection.status !== InspectionStatus.follow_up_required) {
+      await tx.inspection.update({
+        where: { id: inspectionId },
+        data: { status: InspectionStatus.follow_up_required }
+      });
+    }
+
+    await createAuditLog(tx, {
+      tenantId,
+      actorUserId: parsedActor.userId,
+      action: "inspection.field_update_submitted",
+      entityId: inspectionId,
+      metadata: {
+        previousStatus: inspection.status,
+        status: shouldMoveToOfficeAttention ? InspectionStatus.follow_up_required : inspection.status,
+        requestType: parsedRequest.requestType,
+        note,
+        requestedDueMonth
+      }
+    });
+
+    return closeoutRequest;
   });
 }
 
@@ -4349,6 +4446,33 @@ export async function approveInspectionCloseoutRequest(actor: ActorContext, insp
     }
 
     const closeoutRequest = inspection.closeoutRequest;
+    const createsInspection = closeoutRequest.requestType === InspectionCloseoutRequestType.new_inspection ||
+      closeoutRequest.requestType === InspectionCloseoutRequestType.follow_up_inspection;
+
+    if (!createsInspection) {
+      await tx.inspectionCloseoutRequest.update({
+        where: { inspectionId: inspection.id },
+        data: {
+          status: InspectionCloseoutRequestStatus.approved,
+          approvedByUserId: parsedActor.userId,
+          approvedAt: new Date()
+        }
+      });
+
+      await createAuditLog(tx, {
+        tenantId,
+        actorUserId: parsedActor.userId,
+        action: "inspection.field_update_approved",
+        entityId: inspection.id,
+        metadata: serializeCloseoutRequestMetadata({
+          requestType: closeoutRequest.requestType,
+          note: closeoutRequest.note,
+          requestedDueMonth: closeoutRequest.requestedDueMonth
+        })
+      });
+
+      return null;
+    }
 
     const createdInspection = await tx.inspection.create({
       data: {
@@ -4428,6 +4552,7 @@ export async function approveInspectionCloseoutRequest(actor: ActorContext, insp
       metadata: serializeCloseoutRequestMetadata({
         requestType: closeoutRequest.requestType,
         note: closeoutRequest.note,
+        requestedDueMonth: closeoutRequest.requestedDueMonth,
         createdInspectionId: createdInspection.id
       })
     });
@@ -4485,7 +4610,8 @@ export async function dismissInspectionCloseoutRequest(actor: ActorContext, insp
       entityId: inspectionId,
       metadata: serializeCloseoutRequestMetadata({
         requestType: closeoutRequest.requestType,
-        note: closeoutRequest.note
+        note: closeoutRequest.note,
+        requestedDueMonth: closeoutRequest.requestedDueMonth
       })
     });
 

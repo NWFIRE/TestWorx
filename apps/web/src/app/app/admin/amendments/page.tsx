@@ -230,6 +230,11 @@ export default async function AdminAmendmentsPage({
                             {formatInspectionCloseoutRequestTypeLabel(inspection.closeoutRequest.requestType)}
                           </p>
                           <p className="mt-1 text-sm text-blue-900">{inspection.closeoutRequest.note}</p>
+                          {inspection.closeoutRequest.requestedDueMonth ? (
+                            <p className="mt-2 text-sm font-semibold text-blue-950">
+                              Requested due month: {inspection.closeoutRequest.requestedDueMonth}
+                            </p>
+                          ) : null}
                           <p className="mt-2 text-xs text-blue-800">
                             Requested by {inspection.closeoutRequest.requestedBy?.name ?? "Technician"} on {format(inspection.closeoutRequest.createdAt, "MMM d, yyyy h:mm a")}
                           </p>
