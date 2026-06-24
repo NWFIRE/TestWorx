@@ -326,15 +326,15 @@ export default async function EditInspectionPage({
             Open report
           </Link>
         ) : null}
-        <Link className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue shadow-sm transition hover:border-slate-300 hover:bg-slate-50" href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(originPath)}#documents`}>
+        <a className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue shadow-sm transition hover:border-slate-300 hover:bg-slate-50" href="#documents">
           Upload document
-        </Link>
-        <Link className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue shadow-sm transition hover:border-slate-300 hover:bg-slate-50" href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(originPath)}#scheduling`}>
+        </a>
+        <a className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue shadow-sm transition hover:border-slate-300 hover:bg-slate-50" href="#scheduling">
           Assign technician
-        </Link>
-        <Link className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue shadow-sm transition hover:border-slate-300 hover:bg-slate-50" href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(originPath)}#scheduling`}>
+        </a>
+        <a className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue shadow-sm transition hover:border-slate-300 hover:bg-slate-50" href="#scheduling">
           Change schedule
-        </Link>
+        </a>
       </div>
 
       <InspectionDetailTabs
