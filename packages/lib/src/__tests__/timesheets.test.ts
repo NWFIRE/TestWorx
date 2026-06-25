@@ -145,6 +145,47 @@ describe("timesheets", () => {
     expect(timesheet.totals.netMinutes).toBe(450);
   });
 
+  it("keeps weekday labels aligned with the selected calendar week", async () => {
+    prismaMock.timeEntry.findFirst.mockResolvedValue(null);
+    prismaMock.timeEntry.findMany.mockResolvedValue([]);
+
+    const timesheet = await getEmployeeTimesheet(technicianActor, "2026-06-15");
+
+    expect(timesheet.rows[0].label).toBe("Monday • Jun 15, 2026");
+    expect(timesheet.rows[1].label).toBe("Tuesday • Jun 16, 2026");
+    expect(timesheet.rows[6].label).toBe("Sunday • Jun 21, 2026");
+  });
+
+  it("normalizes existing impossible multi-day entries for weekly display", async () => {
+    prismaMock.timeEntry.findFirst.mockResolvedValue(null);
+    prismaMock.timeEntry.findMany.mockResolvedValue([
+      {
+        id: "entry_bad_span",
+        clockInAt: new Date("2026-06-16T13:45:00Z"),
+        clockOutAt: new Date("2026-06-21T14:12:00Z"),
+        grossMinutes: 7227,
+        lunchDeductionMinutes: 30,
+        netMinutes: 7197,
+        status: "corrected",
+        notes: null
+      }
+    ]);
+
+    const timesheet = await getEmployeeTimesheet(technicianActor, "2026-06-15");
+
+    expect(timesheet.rows[1]).toEqual(expect.objectContaining({
+      label: "Tuesday • Jun 16, 2026",
+      grossMinutes: 27,
+      lunchDeductionMinutes: 27,
+      netMinutes: 0
+    }));
+    expect(timesheet.rows[1].entries[0]).toEqual(expect.objectContaining({
+      grossMinutes: 27,
+      lunchDeductionMinutes: 27,
+      netMinutes: 0
+    }));
+  });
+
   it("lets admins correct entries with an audit trail", async () => {
     const previousClockInAt = new Date("2026-05-04T14:00:00Z");
     const clockInAt = new Date("2026-05-04T13:00:00Z");
@@ -183,6 +224,17 @@ describe("timesheets", () => {
         entityId: "entry_1"
       })
     }));
+  });
+
+  it("rejects admin corrections longer than 24 hours", async () => {
+    await expect(correctTimeEntry(adminActor, {
+      timeEntryId: "entry_1",
+      clockInAt: new Date("2026-06-16T13:45:00Z"),
+      clockOutAt: new Date("2026-06-21T14:12:00Z"),
+      notes: "",
+      correctionReason: "Bad manual correction."
+    })).rejects.toThrow("Time entries cannot exceed 24 hours");
+    expect(prismaMock.timeEntry.update).not.toHaveBeenCalled();
   });
 
   it("lets admins add missing employee time entries with calculated totals and audit history", async () => {

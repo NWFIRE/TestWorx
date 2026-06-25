@@ -14,8 +14,9 @@ function readParam(params: SearchParams, key: string) {
 }
 
 function buildWeekHref(weekStartInput: string, offsetDays: number) {
-  const date = new Date(`${weekStartInput}T00:00:00`);
-  date.setDate(date.getDate() + offsetDays);
+  const [year = 1970, month = 1, day = 1] = weekStartInput.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+  date.setUTCDate(date.getUTCDate() + offsetDays);
   const value = date.toISOString().slice(0, 10);
   return `/app/tech/timesheets?week=${value}`;
 }

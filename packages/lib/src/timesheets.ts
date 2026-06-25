@@ -1,13 +1,14 @@
-import { addDays, endOfDay, format, startOfDay, startOfWeek } from "date-fns";
+import { addDays, differenceInCalendarDays, endOfDay, format, startOfDay, startOfWeek } from "date-fns";
 import { prisma, type Prisma } from "@testworx/db";
 import { z } from "zod";
 
 import type { ActorContext } from "@testworx/types";
 import { actorContextSchema } from "@testworx/types";
 import { assertTenantContext } from "./permissions";
-import { DEFAULT_TENANT_TIMEZONE, formatTenantDate, formatTenantDateTime, normalizeTenantTimezone } from "./timezone";
+import { DEFAULT_TENANT_TIMEZONE, formatTenantDateTime, normalizeTenantTimezone } from "./timezone";
 
 const DEFAULT_LUNCH_DEDUCTION_MINUTES = 30;
+const MAX_TIME_ENTRY_MINUTES = 24 * 60;
 const adminRoles = new Set(["tenant_admin", "office_admin", "platform_admin"]);
 const internalRoles = new Set(["tenant_admin", "office_admin", "platform_admin", "technician"]);
 
@@ -20,6 +21,9 @@ const correctionSchema = z.object({
 }).refine((input) => input.clockOutAt >= input.clockInAt, {
   message: "Clock-out must be after clock-in.",
   path: ["clockOutAt"]
+}).refine((input) => calculateRawGrossMinutes(input.clockInAt, input.clockOutAt) <= MAX_TIME_ENTRY_MINUTES, {
+  message: "Time entries cannot exceed 24 hours. Create separate daily entries for longer work spans.",
+  path: ["clockOutAt"]
 });
 
 const adminCreateEntrySchema = z.object({
@@ -30,6 +34,9 @@ const adminCreateEntrySchema = z.object({
   correctionReason: z.string().trim().min(1).max(1000)
 }).refine((input) => input.clockOutAt >= input.clockInAt, {
   message: "Clock-out must be after clock-in.",
+  path: ["clockOutAt"]
+}).refine((input) => calculateRawGrossMinutes(input.clockInAt, input.clockOutAt) <= MAX_TIME_ENTRY_MINUTES, {
+  message: "Time entries cannot exceed 24 hours. Create separate daily entries for longer work spans.",
   path: ["clockOutAt"]
 });
 
@@ -65,6 +72,10 @@ export type TimesheetTotals = {
   netMinutes: number;
 };
 
+function calculateRawGrossMinutes(clockInAt: Date, clockOutAt: Date) {
+  return Math.max(0, Math.round((clockOutAt.getTime() - clockInAt.getTime()) / 60000));
+}
+
 function parseActor(actor: ActorContext) {
   const parsed = actorContextSchema.parse(actor);
   assertTenantContext(parsed.role, parsed.tenantId);
@@ -92,7 +103,7 @@ export function calculateTimeEntryMinutes(
   clockOutAt: Date,
   lunchDeductionMinutes = DEFAULT_LUNCH_DEDUCTION_MINUTES
 ) {
-  const grossMinutes = Math.max(0, Math.round((clockOutAt.getTime() - clockInAt.getTime()) / 60000));
+  const grossMinutes = calculateRawGrossMinutes(clockInAt, clockOutAt);
   const appliedLunchDeductionMinutes = grossMinutes > 0 ? Math.min(lunchDeductionMinutes, grossMinutes) : 0;
   return {
     grossMinutes,
@@ -101,8 +112,37 @@ export function calculateTimeEntryMinutes(
   };
 }
 
+function parseDateKey(value?: Date | string | null) {
+  if (value instanceof Date) {
+    return format(value, "yyyy-MM-dd");
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    const dateOnlyMatch = /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})/.exec(trimmed);
+    if (dateOnlyMatch?.groups) {
+      return `${dateOnlyMatch.groups.year}-${dateOnlyMatch.groups.month}-${dateOnlyMatch.groups.day}`;
+    }
+  }
+  return format(new Date(), "yyyy-MM-dd");
+}
+
+function dateKeyToDate(dateKey: string) {
+  const [year = 1970, month = 1, day = 1] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+}
+
+function addDaysToDateKey(dateKey: string, amount: number) {
+  return format(addDays(dateKeyToDate(dateKey), amount), "yyyy-MM-dd");
+}
+
+function formatDateKeyLabel(dateKey: string) {
+  const date = dateKeyToDate(dateKey);
+  return `${format(date, "EEEE")} • ${format(date, "MMM d, yyyy")}`;
+}
+
 function getWeekStart(value?: Date | string | null) {
-  const parsed = value instanceof Date ? value : value ? new Date(`${value}T00:00:00`) : new Date();
+  const parsedDateKey = parseDateKey(value);
+  const parsed = dateKeyToDate(parsedDateKey);
   const safeDate = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
   return startOfWeek(safeDate, { weekStartsOn: 1 });
 }
@@ -122,6 +162,49 @@ function formatTime(value: Date | null | undefined, timezone: string) {
     minute: "2-digit",
     timeZone: timezone
   }).format(value);
+}
+
+function normalizeEntryForDisplay(entry: {
+  clockInAt: Date;
+  clockOutAt: Date | null;
+  grossMinutes: number;
+  lunchDeductionMinutes: number;
+  netMinutes: number;
+}) {
+  if (!entry.clockOutAt || entry.grossMinutes <= MAX_TIME_ENTRY_MINUTES) {
+    return {
+      grossMinutes: entry.grossMinutes,
+      lunchDeductionMinutes: entry.lunchDeductionMinutes,
+      netMinutes: entry.netMinutes
+    };
+  }
+
+  const calendarDaySpan = differenceInCalendarDays(entry.clockOutAt, entry.clockInAt);
+  if (calendarDaySpan <= 0) {
+    return {
+      grossMinutes: entry.grossMinutes,
+      lunchDeductionMinutes: entry.lunchDeductionMinutes,
+      netMinutes: entry.netMinutes
+    };
+  }
+
+  const sameDayClockOut = new Date(entry.clockInAt);
+  sameDayClockOut.setUTCHours(
+    entry.clockOutAt.getUTCHours(),
+    entry.clockOutAt.getUTCMinutes(),
+    entry.clockOutAt.getUTCSeconds(),
+    entry.clockOutAt.getUTCMilliseconds()
+  );
+
+  if (sameDayClockOut < entry.clockInAt) {
+    return {
+      grossMinutes: entry.grossMinutes,
+      lunchDeductionMinutes: entry.lunchDeductionMinutes,
+      netMinutes: entry.netMinutes
+    };
+  }
+
+  return calculateTimeEntryMinutes(entry.clockInAt, sameDayClockOut, DEFAULT_LUNCH_DEDUCTION_MINUTES);
 }
 
 function minutesToHours(minutes: number) {
@@ -168,15 +251,16 @@ function serializeEntry(entry: {
   status: string;
   notes: string | null;
 }, timezone: string): TimesheetEntrySummary {
+  const normalizedTotals = normalizeEntryForDisplay(entry);
   return {
     id: entry.id,
     clockInAt: entry.clockInAt,
     clockOutAt: entry.clockOutAt,
     clockInLabel: formatTime(entry.clockInAt, timezone),
     clockOutLabel: formatTime(entry.clockOutAt, timezone),
-    grossMinutes: entry.grossMinutes,
-    lunchDeductionMinutes: entry.lunchDeductionMinutes,
-    netMinutes: entry.netMinutes,
+    grossMinutes: normalizedTotals.grossMinutes,
+    lunchDeductionMinutes: normalizedTotals.lunchDeductionMinutes,
+    netMinutes: normalizedTotals.netMinutes,
     status: entry.status,
     notes: entry.notes
   };
@@ -196,14 +280,17 @@ function buildWeekRows(
   }>,
   timezone: string
 ) {
+  const weekStartKey = format(weekStart, "yyyy-MM-dd");
   return Array.from({ length: 7 }, (_, index) => {
-    const date = addDays(weekStart, index);
+    const dateKey = addDaysToDateKey(weekStartKey, index);
+    const date = dateKeyToDate(dateKey);
     const dateStart = startOfDay(date);
     const dateEnd = endOfDay(date);
     const dayEntries = entries
       .filter((entry) => entry.clockInAt >= dateStart && entry.clockInAt <= dateEnd)
       .sort((first, second) => first.clockInAt.getTime() - second.clockInAt.getTime());
-    const grossMinutes = dayEntries.reduce((total, entry) => total + entry.grossMinutes, 0);
+    const serializedEntries = dayEntries.map((entry) => serializeEntry(entry, timezone));
+    const grossMinutes = serializedEntries.reduce((total, entry) => total + entry.grossMinutes, 0);
     const lunchDeductionMinutes = grossMinutes > 0 ? Math.min(DEFAULT_LUNCH_DEDUCTION_MINUTES, grossMinutes) : 0;
     const netMinutes = Math.max(0, grossMinutes - lunchDeductionMinutes);
     const firstClockIn = dayEntries[0]?.clockInAt ?? null;
@@ -211,15 +298,15 @@ function buildWeekRows(
 
     return {
       date,
-      dateKey: format(date, "yyyy-MM-dd"),
-      label: `${format(date, "EEEE")} • ${formatTenantDate(date, timezone)}`,
+      dateKey,
+      label: formatDateKeyLabel(dateKey),
       clockInLabel: formatTime(firstClockIn, timezone),
       clockOutLabel: formatTime(lastClockOut, timezone),
       grossMinutes,
       lunchDeductionMinutes,
       netMinutes,
       notes: dayEntries.map((entry) => entry.notes).filter(Boolean).join("; "),
-      entries: dayEntries.map((entry) => serializeEntry(entry, timezone))
+      entries: serializedEntries
     } satisfies TimesheetDaySummary;
   });
 }
