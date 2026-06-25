@@ -6531,7 +6531,12 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
         assignedTechnician: true,
         technicianAssignments: { include: { technician: true } },
         closeoutRequest: {
-          include: {
+          select: {
+            id: true,
+            requestType: true,
+            status: true,
+            note: true,
+            createdAt: true,
             requestedBy: { select: { id: true, name: true } }
           }
         },
