@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { formatTimesheetHours, getAdminTimesheetWorkspace } from "@testworx/lib/server/index";
+import { formatTimesheetDateTimeLocal, formatTimesheetHours, getAdminTimesheetWorkspace } from "@testworx/lib/server/index";
 
 import { AppPageShell, FilterBar, KPIStatCard, PageHeader, SectionCard, StatusBadge } from "../operations-ui";
 import { correctTimeEntryAction, createAdminTimeEntryAction } from "../../timesheets/actions";
@@ -26,18 +26,8 @@ function buildWeekHref(weekStartInput: string, offsetDays: number, employeeId?: 
   return `/app/admin/timesheets?${params.toString()}`;
 }
 
-function toDateTimeLocal(value: Date | null) {
-  if (!value) {
-    return "";
-  }
-  const pad = (input: number) => input.toString().padStart(2, "0");
-  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
-}
-
-function toDateTimeLocalAt(value: Date, hours: number, minutes = 0) {
-  const date = new Date(value);
-  date.setHours(hours, minutes, 0, 0);
-  return toDateTimeLocal(date);
+function toDateTimeLocalAt(dateKey: string, hours: number, minutes = 0) {
+  return `${dateKey}T${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
 }
 
 export default async function AdminTimesheetsPage({
@@ -170,11 +160,11 @@ export default async function AdminTimesheetsPage({
                               <input name="timeEntryId" type="hidden" value={entry.id} />
                               <label>
                                 <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Clock in</span>
-                                <input className="min-h-11 w-full rounded-2xl border border-slate-200 px-3 text-sm font-semibold" defaultValue={toDateTimeLocal(entry.clockInAt)} name="clockInAt" type="datetime-local" />
+                                <input className="min-h-11 w-full rounded-2xl border border-slate-200 px-3 text-sm font-semibold" defaultValue={formatTimesheetDateTimeLocal(entry.clockInAt, workspace.timezone)} name="clockInAt" type="datetime-local" />
                               </label>
                               <label>
                                 <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Clock out</span>
-                                <input className="min-h-11 w-full rounded-2xl border border-slate-200 px-3 text-sm font-semibold" defaultValue={toDateTimeLocal(entry.clockOutAt)} name="clockOutAt" required type="datetime-local" />
+                                <input className="min-h-11 w-full rounded-2xl border border-slate-200 px-3 text-sm font-semibold" defaultValue={formatTimesheetDateTimeLocal(entry.clockOutAt, workspace.timezone)} name="clockOutAt" required type="datetime-local" />
                               </label>
                               <label className="lg:col-span-2">
                                 <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Notes</span>
@@ -201,11 +191,11 @@ export default async function AdminTimesheetsPage({
                           <input name="employeeId" type="hidden" value={summary.employee.id} />
                           <label>
                             <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Clock in</span>
-                            <input className="min-h-11 w-full rounded-2xl border border-slate-200 px-3 text-sm font-semibold" defaultValue={toDateTimeLocalAt(row.date, 8)} name="clockInAt" required type="datetime-local" />
+                            <input className="min-h-11 w-full rounded-2xl border border-slate-200 px-3 text-sm font-semibold" defaultValue={toDateTimeLocalAt(row.dateKey, 8)} name="clockInAt" required type="datetime-local" />
                           </label>
                           <label>
                             <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Clock out</span>
-                            <input className="min-h-11 w-full rounded-2xl border border-slate-200 px-3 text-sm font-semibold" defaultValue={toDateTimeLocalAt(row.date, 17)} name="clockOutAt" required type="datetime-local" />
+                            <input className="min-h-11 w-full rounded-2xl border border-slate-200 px-3 text-sm font-semibold" defaultValue={toDateTimeLocalAt(row.dateKey, 17)} name="clockOutAt" required type="datetime-local" />
                           </label>
                           <label className="lg:col-span-2">
                             <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Notes</span>

@@ -31,6 +31,7 @@ import {
   clockOutEmployee,
   correctTimeEntry,
   createAdminTimeEntry,
+  formatTimesheetDateTimeLocal,
   getAdminTimesheetWorkspace,
   getEmployeeTimesheet
 } from "../timesheets";
@@ -56,6 +57,11 @@ describe("timesheets", () => {
       lunchDeductionMinutes: 20,
       netMinutes: 0
     });
+  });
+
+  it("formats edit field defaults in the tenant timezone", () => {
+    expect(formatTimesheetDateTimeLocal(new Date("2026-06-19T08:30:00Z"), "America/Chicago")).toBe("2026-06-19T03:30");
+    expect(formatTimesheetDateTimeLocal(new Date("2026-06-19T14:07:00Z"), "America/Chicago")).toBe("2026-06-19T09:07");
   });
 
   it("prevents duplicate active clock-ins", async () => {
@@ -224,6 +230,36 @@ describe("timesheets", () => {
         entityId: "entry_1"
       })
     }));
+  });
+
+  it("saves admin correction form values as tenant-local time", async () => {
+    prismaMock.timeEntry.findFirst.mockResolvedValue({
+      id: "entry_1",
+      tenantId: "tenant_1",
+      employeeId: "tech_1",
+      clockInAt: new Date("2026-06-19T08:30:00Z"),
+      clockOutAt: new Date("2026-06-19T14:07:00Z")
+    });
+    prismaMock.timeEntry.update.mockResolvedValue({ id: "entry_1" });
+
+    await correctTimeEntry(adminActor, {
+      timeEntryId: "entry_1",
+      clockInAt: "2026-06-19T08:30",
+      clockOutAt: "2026-06-19T14:07",
+      notes: "",
+      correctionReason: "Corrected from signed service ticket."
+    });
+
+    expect(prismaMock.timeEntry.update).toHaveBeenCalledWith({
+      where: { id: "entry_1" },
+      data: expect.objectContaining({
+        clockInAt: new Date("2026-06-19T13:30:00.000Z"),
+        clockOutAt: new Date("2026-06-19T19:07:00.000Z"),
+        grossMinutes: 337,
+        lunchDeductionMinutes: 30,
+        netMinutes: 307
+      })
+    });
   });
 
   it("rejects admin corrections longer than 24 hours", async () => {

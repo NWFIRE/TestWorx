@@ -14,30 +14,18 @@ const internalRoles = new Set(["tenant_admin", "office_admin", "platform_admin",
 
 const correctionSchema = z.object({
   timeEntryId: z.string().trim().min(1),
-  clockInAt: z.coerce.date(),
-  clockOutAt: z.coerce.date(),
+  clockInAt: z.union([z.date(), z.string().trim().min(1)]),
+  clockOutAt: z.union([z.date(), z.string().trim().min(1)]),
   notes: z.string().trim().max(1000).optional().nullable(),
   correctionReason: z.string().trim().min(1).max(1000)
-}).refine((input) => input.clockOutAt >= input.clockInAt, {
-  message: "Clock-out must be after clock-in.",
-  path: ["clockOutAt"]
-}).refine((input) => calculateRawGrossMinutes(input.clockInAt, input.clockOutAt) <= MAX_TIME_ENTRY_MINUTES, {
-  message: "Time entries cannot exceed 24 hours. Create separate daily entries for longer work spans.",
-  path: ["clockOutAt"]
 });
 
 const adminCreateEntrySchema = z.object({
   employeeId: z.string().trim().min(1),
-  clockInAt: z.coerce.date(),
-  clockOutAt: z.coerce.date(),
+  clockInAt: z.union([z.date(), z.string().trim().min(1)]),
+  clockOutAt: z.union([z.date(), z.string().trim().min(1)]),
   notes: z.string().trim().max(1000).optional().nullable(),
   correctionReason: z.string().trim().min(1).max(1000)
-}).refine((input) => input.clockOutAt >= input.clockInAt, {
-  message: "Clock-out must be after clock-in.",
-  path: ["clockOutAt"]
-}).refine((input) => calculateRawGrossMinutes(input.clockInAt, input.clockOutAt) <= MAX_TIME_ENTRY_MINUTES, {
-  message: "Time entries cannot exceed 24 hours. Create separate daily entries for longer work spans.",
-  path: ["clockOutAt"]
 });
 
 export type TimesheetEntrySummary = {
@@ -74,6 +62,67 @@ export type TimesheetTotals = {
 
 function calculateRawGrossMinutes(clockInAt: Date, clockOutAt: Date) {
   return Math.max(0, Math.round((clockOutAt.getTime() - clockInAt.getTime()) / 60000));
+}
+
+function dateTimePartsInTimezone(value: Date, timezone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(value);
+  const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return {
+    year: Number(lookup.year),
+    month: Number(lookup.month),
+    day: Number(lookup.day),
+    hour: Number(lookup.hour),
+    minute: Number(lookup.minute),
+    second: Number(lookup.second)
+  };
+}
+
+function timezoneOffsetMs(timezone: string, value: Date) {
+  const parts = dateTimePartsInTimezone(value, timezone);
+  const localAsUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  return localAsUtc - value.getTime();
+}
+
+function parseTenantDateTimeLocal(value: Date | string, timezone: string) {
+  if (value instanceof Date) {
+    return value;
+  }
+  const match = /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T(?<hour>\d{2}):(?<minute>\d{2})/.exec(value.trim());
+  if (!match?.groups) {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error("Invalid time entry date.");
+    }
+    return parsed;
+  }
+
+  const year = Number(match.groups.year);
+  const month = Number(match.groups.month);
+  const day = Number(match.groups.day);
+  const hour = Number(match.groups.hour);
+  const minute = Number(match.groups.minute);
+  const localAsUtc = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
+  let utc = new Date(localAsUtc - timezoneOffsetMs(timezone, new Date(localAsUtc)));
+  utc = new Date(localAsUtc - timezoneOffsetMs(timezone, utc));
+  return utc;
+}
+
+function validateTimesheetDateRange(clockInAt: Date, clockOutAt: Date) {
+  if (clockOutAt < clockInAt) {
+    throw new Error("Clock-out must be after clock-in.");
+  }
+  if (calculateRawGrossMinutes(clockInAt, clockOutAt) > MAX_TIME_ENTRY_MINUTES) {
+    throw new Error("Time entries cannot exceed 24 hours. Create separate daily entries for longer work spans.");
+  }
 }
 
 function parseActor(actor: ActorContext) {
@@ -162,6 +211,22 @@ function formatTime(value: Date | null | undefined, timezone: string) {
     minute: "2-digit",
     timeZone: timezone
   }).format(value);
+}
+
+function formatDateKeyInTimezone(value: Date, timezone: string) {
+  const parts = dateTimePartsInTimezone(value, timezone);
+  return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+
+export function formatTimesheetDateTimeLocal(value: Date | null | undefined, timezone: string) {
+  if (!value) {
+    return "";
+  }
+  const parts = dateTimePartsInTimezone(value, timezone);
+  return [
+    `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`,
+    `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`
+  ].join("T");
 }
 
 function normalizeEntryForDisplay(entry: {
@@ -284,10 +349,8 @@ function buildWeekRows(
   return Array.from({ length: 7 }, (_, index) => {
     const dateKey = addDaysToDateKey(weekStartKey, index);
     const date = dateKeyToDate(dateKey);
-    const dateStart = startOfDay(date);
-    const dateEnd = endOfDay(date);
     const dayEntries = entries
-      .filter((entry) => entry.clockInAt >= dateStart && entry.clockInAt <= dateEnd)
+      .filter((entry) => formatDateKeyInTimezone(entry.clockInAt, timezone) === dateKey)
       .sort((first, second) => first.clockInAt.getTime() - second.clockInAt.getTime());
     const serializedEntries = dayEntries.map((entry) => serializeEntry(entry, timezone));
     const grossMinutes = serializedEntries.reduce((total, entry) => total + entry.grossMinutes, 0);
@@ -406,8 +469,8 @@ export async function getEmployeeTimesheet(actor: ActorContext, week?: string | 
         tenantId,
         employeeId: parsedActor.userId,
         clockInAt: {
-          gte: range.start,
-          lte: range.end
+          gte: addDays(range.start, -1),
+          lte: addDays(range.end, 1)
         }
       },
       orderBy: { clockInAt: "asc" }
@@ -464,8 +527,8 @@ export async function getAdminTimesheetWorkspace(actor: ActorContext, input?: { 
           tenantId,
           employeeId: { in: employeeIds },
           clockInAt: {
-            gte: range.start,
-            lte: range.end
+            gte: addDays(range.start, -1),
+            lte: addDays(range.end, 1)
           }
         },
         orderBy: [{ employeeId: "asc" }, { clockInAt: "asc" }]
@@ -508,7 +571,11 @@ export async function correctTimeEntry(actor: ActorContext, input: unknown) {
   const parsedActor = parseActor(actor);
   ensureAdmin(parsedActor);
   const tenantId = requireTenantId(parsedActor);
+  const timezone = await getTenantTimezone(tenantId);
   const parsedInput = correctionSchema.parse(input);
+  const clockInAt = parseTenantDateTimeLocal(parsedInput.clockInAt, timezone);
+  const clockOutAt = parseTenantDateTimeLocal(parsedInput.clockOutAt, timezone);
+  validateTimesheetDateRange(clockInAt, clockOutAt);
   const existingEntry = await prisma.timeEntry.findFirst({
     where: {
       id: parsedInput.timeEntryId,
@@ -520,12 +587,12 @@ export async function correctTimeEntry(actor: ActorContext, input: unknown) {
     throw new Error("Time entry not found.");
   }
 
-  const totals = calculateTimeEntryMinutes(parsedInput.clockInAt, parsedInput.clockOutAt, DEFAULT_LUNCH_DEDUCTION_MINUTES);
+  const totals = calculateTimeEntryMinutes(clockInAt, clockOutAt, DEFAULT_LUNCH_DEDUCTION_MINUTES);
   const updatedEntry = await prisma.timeEntry.update({
     where: { id: existingEntry.id },
     data: {
-      clockInAt: parsedInput.clockInAt,
-      clockOutAt: parsedInput.clockOutAt,
+      clockInAt,
+      clockOutAt,
       grossMinutes: totals.grossMinutes,
       lunchDeductionMinutes: totals.lunchDeductionMinutes,
       netMinutes: totals.netMinutes,
@@ -539,8 +606,8 @@ export async function correctTimeEntry(actor: ActorContext, input: unknown) {
   await writeTimesheetAuditLog(parsedActor, "time_entry.corrected", updatedEntry.id, {
     previousClockInAt: existingEntry.clockInAt.toISOString(),
     previousClockOutAt: existingEntry.clockOutAt?.toISOString() ?? null,
-    clockInAt: parsedInput.clockInAt.toISOString(),
-    clockOutAt: parsedInput.clockOutAt.toISOString(),
+    clockInAt: clockInAt.toISOString(),
+    clockOutAt: clockOutAt.toISOString(),
     correctionReason: parsedInput.correctionReason,
     ...totals
   });
@@ -551,7 +618,11 @@ export async function createAdminTimeEntry(actor: ActorContext, input: unknown) 
   const parsedActor = parseActor(actor);
   ensureAdmin(parsedActor);
   const tenantId = requireTenantId(parsedActor);
+  const timezone = await getTenantTimezone(tenantId);
   const parsedInput = adminCreateEntrySchema.parse(input);
+  const clockInAt = parseTenantDateTimeLocal(parsedInput.clockInAt, timezone);
+  const clockOutAt = parseTenantDateTimeLocal(parsedInput.clockOutAt, timezone);
+  validateTimesheetDateRange(clockInAt, clockOutAt);
   const employee = await prisma.user.findFirst({
     where: {
       id: parsedInput.employeeId,
@@ -566,13 +637,13 @@ export async function createAdminTimeEntry(actor: ActorContext, input: unknown) 
     throw new Error("Employee not found.");
   }
 
-  const totals = calculateTimeEntryMinutes(parsedInput.clockInAt, parsedInput.clockOutAt, DEFAULT_LUNCH_DEDUCTION_MINUTES);
+  const totals = calculateTimeEntryMinutes(clockInAt, clockOutAt, DEFAULT_LUNCH_DEDUCTION_MINUTES);
   const createdEntry = await prisma.timeEntry.create({
     data: {
       tenantId,
       employeeId: employee.id,
-      clockInAt: parsedInput.clockInAt,
-      clockOutAt: parsedInput.clockOutAt,
+      clockInAt,
+      clockOutAt,
       grossMinutes: totals.grossMinutes,
       lunchDeductionMinutes: totals.lunchDeductionMinutes,
       netMinutes: totals.netMinutes,
@@ -586,8 +657,8 @@ export async function createAdminTimeEntry(actor: ActorContext, input: unknown) 
 
   await writeTimesheetAuditLog(parsedActor, "time_entry.admin_created", createdEntry.id, {
     employeeId: employee.id,
-    clockInAt: parsedInput.clockInAt.toISOString(),
-    clockOutAt: parsedInput.clockOutAt.toISOString(),
+    clockInAt: clockInAt.toISOString(),
+    clockOutAt: clockOutAt.toISOString(),
     correctionReason: parsedInput.correctionReason,
     ...totals
   });
