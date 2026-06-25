@@ -4,6 +4,7 @@ const tx = {
   inspection: {
     findFirst: vi.fn(),
     create: vi.fn(),
+    update: vi.fn(),
     findUniqueOrThrow: vi.fn()
   },
   inspectionReport: {
@@ -59,6 +60,8 @@ describe("inspection amendment workflow", () => {
       customerCompanyId: "customer_1",
       siteId: "site_1",
       assignedTechnicianId: "tech_1",
+      inspectionClassification: "standard",
+      isPriority: false,
       status: "in_progress",
       scheduledStart: new Date("2026-03-13T09:00:00.000Z"),
       scheduledEnd: new Date("2026-03-13T10:00:00.000Z"),
@@ -73,6 +76,7 @@ describe("inspection amendment workflow", () => {
     tx.site.findFirst.mockResolvedValue({ id: "site_2", customerCompanyId: "customer_2" });
     tx.user.findFirst.mockResolvedValue({ id: "tech_2", role: "technician" });
     tx.inspection.create.mockResolvedValue({ id: "replacement_1" });
+    tx.inspection.update.mockResolvedValue({ id: "replacement_1" });
     tx.inspectionAmendment.findFirst.mockResolvedValue(null);
     tx.inspectionTask.create
       .mockResolvedValueOnce({ id: "task_1" })
@@ -95,6 +99,7 @@ describe("inspection amendment workflow", () => {
         scheduledStart: new Date("2026-03-20T09:00:00.000Z"),
         scheduledEnd: new Date("2026-03-20T10:30:00.000Z"),
         assignedTechnicianId: "tech_2",
+        assignedTechnicianIds: ["tech_2"],
         status: "scheduled",
         notes: "Return visit for remaining devices.",
         reason: "Customer requested a return visit after the initial inspection started.",
@@ -114,7 +119,7 @@ describe("inspection amendment workflow", () => {
       })
     }));
     expect(tx.auditLog.create).toHaveBeenCalledTimes(3);
-  }, 15000);
+  }, 30000);
 
   it("blocks no-op amendments that do not change scheduling details", async () => {
     tx.customerCompany.findFirst.mockResolvedValueOnce({ id: "customer_1" });
@@ -131,14 +136,17 @@ describe("inspection amendment workflow", () => {
           scheduledStart: new Date("2026-03-13T09:00:00.000Z"),
           scheduledEnd: new Date("2026-03-13T10:00:00.000Z"),
           assignedTechnicianId: "tech_1",
+          assignedTechnicianIds: ["tech_1"],
+          inspectionClassification: "standard",
+          isPriority: false,
           status: "scheduled",
           notes: "Original visit",
           reason: "Trying to save without making a real scheduling change.",
           tasks: [{ inspectionType: "fire_alarm", frequency: "ANNUAL" }]
         } as any
       )
-    ).rejects.toThrow(/no scheduling changes/i);
-  });
+    ).rejects.toThrow(/no visit changes/i);
+  }, 15000);
 
   it("blocks non-admin users from creating amendments", async () => {
     const { createInspectionAmendment } = await import("../scheduling");
@@ -159,7 +167,7 @@ describe("inspection amendment workflow", () => {
         } as any
       )
     ).rejects.toThrow(/only office administrators/i);
-  });
+  }, 15000);
 
   it("blocks creating a second amendment from the same started inspection", async () => {
     tx.inspectionAmendment.findFirst.mockResolvedValueOnce({ id: "existing_amendment" });

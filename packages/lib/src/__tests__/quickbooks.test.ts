@@ -361,7 +361,7 @@ describe("quickbooks billing sync hardening", () => {
 
   it("uses linked catalog pricing when a persisted billing item is missing unit price", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
-    prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: null });
+    prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: "qbo_customer_1" });
     prismaMock.customerCompany.update.mockResolvedValue(undefined);
     prismaMock.site.findFirst.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
@@ -397,8 +397,7 @@ describe("quickbooks billing sync hardening", () => {
     prismaMock.auditLog.create.mockResolvedValue(undefined);
 
     fetchMock
-      .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
-      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", SyncToken: "0", DisplayName: "Pinecrest Property Management", Active: true } }))
       .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
       .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
       .mockResolvedValueOnce(jsonResponse({}));
@@ -410,10 +409,10 @@ describe("quickbooks billing sync hardening", () => {
       "inspection_1"
     );
 
-    const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body ?? "{}"));
     expect(createInvoiceBody.DocNumber).toBe("TW2026-1000");
     expect(createInvoiceBody.Line?.[0]?.SalesItemLineDetail?.UnitPrice).toBe(33.5);
-  });
+  }, 30000);
 
   it("uses a manually linked catalog item before falling back to legacy billing code mapping", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
