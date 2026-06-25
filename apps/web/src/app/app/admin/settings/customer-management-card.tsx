@@ -21,7 +21,61 @@ const LIVE_SEARCH_DEBOUNCE_MS = 400;
 type CustomerRecord = {
   id: string;
   name: string;
+  serviceAddressLine1?: string | null;
+  serviceAddressLine2?: string | null;
+  serviceCity?: string | null;
+  serviceState?: string | null;
+  servicePostalCode?: string | null;
+  serviceCountry?: string | null;
+  billingAddressLine1?: string | null;
+  billingAddressLine2?: string | null;
+  billingCity?: string | null;
+  billingState?: string | null;
+  billingPostalCode?: string | null;
+  billingCountry?: string | null;
 };
+
+function compactAddress(input: {
+  line1?: string | null;
+  line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+}) {
+  const street = [input.line1, input.line2].map((value) => value?.trim()).filter(Boolean).join(", ");
+  const cityStateZip = [
+    input.city?.trim(),
+    [input.state?.trim(), input.postalCode?.trim()].filter(Boolean).join(" ")
+  ].filter(Boolean).join(", ");
+
+  return [street, cityStateZip, input.country?.trim()].filter(Boolean).join(", ");
+}
+
+function formatCustomerRowAddress(customer: CustomerRecord) {
+  const serviceAddress = compactAddress({
+    line1: customer.serviceAddressLine1,
+    line2: customer.serviceAddressLine2,
+    city: customer.serviceCity,
+    state: customer.serviceState,
+    postalCode: customer.servicePostalCode,
+    country: customer.serviceCountry
+  });
+  if (serviceAddress) {
+    return serviceAddress;
+  }
+
+  const billingAddress = compactAddress({
+    line1: customer.billingAddressLine1,
+    line2: customer.billingAddressLine2,
+    city: customer.billingCity,
+    state: customer.billingState,
+    postalCode: customer.billingPostalCode,
+    country: customer.billingCountry
+  });
+
+  return billingAddress || "No customer address saved";
+}
 
 type CustomerProfileSeed = Partial<{
   name: string | null;
@@ -802,7 +856,7 @@ export function CustomerManagementCard({
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-lg font-semibold text-ink">{customer.name}</p>
-                  <p className="mt-1 text-sm text-slate-500">Open the profile to view contact details, locations, billing, and customer history.</p>
+                  <p className="mt-1 text-sm text-slate-500">{formatCustomerRowAddress(customer)}</p>
                 </div>
                 <button
                   className="pressable inline-flex min-h-10 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slateblue transition hover:border-slate-300 hover:bg-slate-50"

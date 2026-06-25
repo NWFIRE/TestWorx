@@ -65,7 +65,19 @@ const customerCompanySelect = {
 
 const customerCompanyDirectorySelect = {
   id: true,
-  name: true
+  name: true,
+  serviceAddressLine1: true,
+  serviceAddressLine2: true,
+  serviceCity: true,
+  serviceState: true,
+  servicePostalCode: true,
+  serviceCountry: true,
+  billingAddressLine1: true,
+  billingAddressLine2: true,
+  billingCity: true,
+  billingState: true,
+  billingPostalCode: true,
+  billingCountry: true
 } as const;
 
 type SelectedCustomerCompany = {
@@ -108,6 +120,18 @@ type SelectedCustomerCompany = {
 type SelectedCustomerCompanyDirectoryEntry = {
   id: string;
   name: string;
+  serviceAddressLine1: string | null;
+  serviceAddressLine2: string | null;
+  serviceCity: string | null;
+  serviceState: string | null;
+  servicePostalCode: string | null;
+  serviceCountry: string | null;
+  billingAddressLine1: string | null;
+  billingAddressLine2: string | null;
+  billingCity: string | null;
+  billingState: string | null;
+  billingPostalCode: string | null;
+  billingCountry: string | null;
 };
 
 function parseActor(actor: ActorContext) {
@@ -424,7 +448,17 @@ export async function getPaginatedTenantCustomerCompanySettings(
             { contactName: { contains: query, mode: "insensitive" as const } },
             { contactEmails: { contains: query, mode: "insensitive" as const } },
             { billingEmail: { contains: query, mode: "insensitive" as const } },
-            { phone: { contains: query, mode: "insensitive" as const } }
+            { phone: { contains: query, mode: "insensitive" as const } },
+            { serviceAddressLine1: { contains: query, mode: "insensitive" as const } },
+            { serviceAddressLine2: { contains: query, mode: "insensitive" as const } },
+            { serviceCity: { contains: query, mode: "insensitive" as const } },
+            { serviceState: { contains: query, mode: "insensitive" as const } },
+            { servicePostalCode: { contains: query, mode: "insensitive" as const } },
+            { billingAddressLine1: { contains: query, mode: "insensitive" as const } },
+            { billingAddressLine2: { contains: query, mode: "insensitive" as const } },
+            { billingCity: { contains: query, mode: "insensitive" as const } },
+            { billingState: { contains: query, mode: "insensitive" as const } },
+            { billingPostalCode: { contains: query, mode: "insensitive" as const } }
           ]
         }
       : {})
@@ -499,7 +533,17 @@ export async function getPaginatedTenantCustomerCompanyDirectory(
             { contactName: { contains: query, mode: "insensitive" as const } },
             { contactEmails: { contains: query, mode: "insensitive" as const } },
             { billingEmail: { contains: query, mode: "insensitive" as const } },
-            { phone: { contains: query, mode: "insensitive" as const } }
+            { phone: { contains: query, mode: "insensitive" as const } },
+            { serviceAddressLine1: { contains: query, mode: "insensitive" as const } },
+            { serviceAddressLine2: { contains: query, mode: "insensitive" as const } },
+            { serviceCity: { contains: query, mode: "insensitive" as const } },
+            { serviceState: { contains: query, mode: "insensitive" as const } },
+            { servicePostalCode: { contains: query, mode: "insensitive" as const } },
+            { billingAddressLine1: { contains: query, mode: "insensitive" as const } },
+            { billingAddressLine2: { contains: query, mode: "insensitive" as const } },
+            { billingCity: { contains: query, mode: "insensitive" as const } },
+            { billingState: { contains: query, mode: "insensitive" as const } },
+            { billingPostalCode: { contains: query, mode: "insensitive" as const } }
           ]
         }
       : {})

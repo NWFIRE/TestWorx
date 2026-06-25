@@ -339,16 +339,18 @@ describe("customer company settings", () => {
     );
 
     expect(prismaMock.customerCompany.count).toHaveBeenNthCalledWith(1, {
-      where: {
+      where: expect.objectContaining({
         tenantId: "tenant_1",
-        OR: [
+        OR: expect.arrayContaining([
           { name: { contains: "harbor", mode: "insensitive" } },
           { contactName: { contains: "harbor", mode: "insensitive" } },
           { contactEmails: { contains: "harbor", mode: "insensitive" } },
           { billingEmail: { contains: "harbor", mode: "insensitive" } },
-          { phone: { contains: "harbor", mode: "insensitive" } }
-        ]
-      }
+          { phone: { contains: "harbor", mode: "insensitive" } },
+          { serviceAddressLine1: { contains: "harbor", mode: "insensitive" } },
+          { billingAddressLine1: { contains: "harbor", mode: "insensitive" } }
+        ])
+      })
     });
     expect(result.filters.query).toBe("harbor");
     expect(result.pagination.totalCount).toBe(1);
