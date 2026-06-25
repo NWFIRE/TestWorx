@@ -20,6 +20,11 @@ async function getActor(): Promise<ActorContext> {
   };
 }
 
+function timesheetErrorRedirect(error: unknown): never {
+  const message = error instanceof Error ? error.message : "Timesheet update failed. Please review the entry and try again.";
+  redirect(`/app/admin/timesheets?timesheetError=${encodeURIComponent(message)}`);
+}
+
 export async function clockInAction() {
   const actor = await getActor();
   await clockInEmployee(actor);
@@ -36,26 +41,34 @@ export async function clockOutAction() {
 
 export async function correctTimeEntryAction(formData: FormData) {
   const actor = await getActor();
-  await correctTimeEntry(actor, {
-    timeEntryId: String(formData.get("timeEntryId") ?? ""),
-    clockInAt: String(formData.get("clockInAt") ?? ""),
-    clockOutAt: String(formData.get("clockOutAt") ?? ""),
-    notes: String(formData.get("notes") ?? ""),
-    correctionReason: String(formData.get("correctionReason") ?? "")
-  });
+  try {
+    await correctTimeEntry(actor, {
+      timeEntryId: String(formData.get("timeEntryId") ?? ""),
+      clockInAt: String(formData.get("clockInAt") ?? ""),
+      clockOutAt: String(formData.get("clockOutAt") ?? ""),
+      notes: String(formData.get("notes") ?? ""),
+      correctionReason: String(formData.get("correctionReason") ?? "")
+    });
+  } catch (error) {
+    timesheetErrorRedirect(error);
+  }
   revalidatePath("/app/admin/timesheets");
   revalidatePath("/app/tech/timesheets");
 }
 
 export async function createAdminTimeEntryAction(formData: FormData) {
   const actor = await getActor();
-  await createAdminTimeEntry(actor, {
-    employeeId: String(formData.get("employeeId") ?? ""),
-    clockInAt: String(formData.get("clockInAt") ?? ""),
-    clockOutAt: String(formData.get("clockOutAt") ?? ""),
-    notes: String(formData.get("notes") ?? ""),
-    correctionReason: String(formData.get("correctionReason") ?? "")
-  });
+  try {
+    await createAdminTimeEntry(actor, {
+      employeeId: String(formData.get("employeeId") ?? ""),
+      clockInAt: String(formData.get("clockInAt") ?? ""),
+      clockOutAt: String(formData.get("clockOutAt") ?? ""),
+      notes: String(formData.get("notes") ?? ""),
+      correctionReason: String(formData.get("correctionReason") ?? "")
+    });
+  } catch (error) {
+    timesheetErrorRedirect(error);
+  }
   revalidatePath("/app/admin/timesheets");
   revalidatePath("/app/tech/timesheets");
 }

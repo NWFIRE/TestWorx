@@ -56,6 +56,7 @@ export default async function AdminTimesheetsPage({
       employeeId: readParam(params, "employeeId")
     }
   );
+  const timesheetError = readParam(params, "timesheetError");
 
   return (
     <AppPageShell>
@@ -79,6 +80,12 @@ export default async function AdminTimesheetsPage({
         <KPIStatCard label="Lunch deductions" value={formatTimesheetHours(workspace.totals.lunchDeductionMinutes)} tone="amber" />
         <KPIStatCard label="Net payable hours" value={formatTimesheetHours(workspace.totals.netMinutes)} tone="emerald" />
       </div>
+
+      {timesheetError ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-950">
+          {timesheetError}
+        </div>
+      ) : null}
 
       <FilterBar defaultOpen={Boolean(workspace.filters.employeeId)} title="Timesheet filters">
         <form className="flex w-full flex-wrap gap-3" action="/app/admin/timesheets">

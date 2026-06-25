@@ -60,6 +60,10 @@ export type TimesheetTotals = {
   netMinutes: number;
 };
 
+type NormalizedTimeEntryDisplay = TimesheetTotals & {
+  clockOutAt: Date | null;
+};
+
 function calculateRawGrossMinutes(clockInAt: Date, clockOutAt: Date) {
   return Math.max(0, Math.round((clockOutAt.getTime() - clockInAt.getTime()) / 60000));
 }
@@ -114,6 +118,29 @@ function parseTenantDateTimeLocal(value: Date | string, timezone: string) {
   let utc = new Date(localAsUtc - timezoneOffsetMs(timezone, new Date(localAsUtc)));
   utc = new Date(localAsUtc - timezoneOffsetMs(timezone, utc));
   return utc;
+}
+
+function tenantDateTimePartsToUtc(
+  parts: { year: number; month: number; day: number; hour: number; minute: number; second?: number },
+  timezone: string
+) {
+  const localAsUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second ?? 0, 0);
+  let utc = new Date(localAsUtc - timezoneOffsetMs(timezone, new Date(localAsUtc)));
+  utc = new Date(localAsUtc - timezoneOffsetMs(timezone, utc));
+  return utc;
+}
+
+function combineTenantDateWithTenantTime(dateSource: Date, timeSource: Date, timezone: string) {
+  const dateParts = dateTimePartsInTimezone(dateSource, timezone);
+  const timeParts = dateTimePartsInTimezone(timeSource, timezone);
+  return tenantDateTimePartsToUtc({
+    year: dateParts.year,
+    month: dateParts.month,
+    day: dateParts.day,
+    hour: timeParts.hour,
+    minute: timeParts.minute,
+    second: timeParts.second
+  }, timezone);
 }
 
 function validateTimesheetDateRange(clockInAt: Date, clockOutAt: Date) {
@@ -235,12 +262,13 @@ function normalizeEntryForDisplay(entry: {
   grossMinutes: number;
   lunchDeductionMinutes: number;
   netMinutes: number;
-}) {
+}, timezone: string): NormalizedTimeEntryDisplay {
   if (!entry.clockOutAt || entry.grossMinutes <= MAX_TIME_ENTRY_MINUTES) {
     return {
       grossMinutes: entry.grossMinutes,
       lunchDeductionMinutes: entry.lunchDeductionMinutes,
-      netMinutes: entry.netMinutes
+      netMinutes: entry.netMinutes,
+      clockOutAt: entry.clockOutAt
     };
   }
 
@@ -249,27 +277,26 @@ function normalizeEntryForDisplay(entry: {
     return {
       grossMinutes: entry.grossMinutes,
       lunchDeductionMinutes: entry.lunchDeductionMinutes,
-      netMinutes: entry.netMinutes
+      netMinutes: entry.netMinutes,
+      clockOutAt: entry.clockOutAt
     };
   }
 
-  const sameDayClockOut = new Date(entry.clockInAt);
-  sameDayClockOut.setUTCHours(
-    entry.clockOutAt.getUTCHours(),
-    entry.clockOutAt.getUTCMinutes(),
-    entry.clockOutAt.getUTCSeconds(),
-    entry.clockOutAt.getUTCMilliseconds()
-  );
+  const sameDayClockOut = combineTenantDateWithTenantTime(entry.clockInAt, entry.clockOutAt, timezone);
 
   if (sameDayClockOut < entry.clockInAt) {
     return {
       grossMinutes: entry.grossMinutes,
       lunchDeductionMinutes: entry.lunchDeductionMinutes,
-      netMinutes: entry.netMinutes
+      netMinutes: entry.netMinutes,
+      clockOutAt: entry.clockOutAt
     };
   }
 
-  return calculateTimeEntryMinutes(entry.clockInAt, sameDayClockOut, DEFAULT_LUNCH_DEDUCTION_MINUTES);
+  return {
+    ...calculateTimeEntryMinutes(entry.clockInAt, sameDayClockOut, DEFAULT_LUNCH_DEDUCTION_MINUTES),
+    clockOutAt: sameDayClockOut
+  };
 }
 
 function minutesToHours(minutes: number) {
@@ -316,13 +343,13 @@ function serializeEntry(entry: {
   status: string;
   notes: string | null;
 }, timezone: string): TimesheetEntrySummary {
-  const normalizedTotals = normalizeEntryForDisplay(entry);
+  const normalizedTotals = normalizeEntryForDisplay(entry, timezone);
   return {
     id: entry.id,
     clockInAt: entry.clockInAt,
-    clockOutAt: entry.clockOutAt,
+    clockOutAt: normalizedTotals.clockOutAt,
     clockInLabel: formatTime(entry.clockInAt, timezone),
-    clockOutLabel: formatTime(entry.clockOutAt, timezone),
+    clockOutLabel: formatTime(normalizedTotals.clockOutAt, timezone),
     grossMinutes: normalizedTotals.grossMinutes,
     lunchDeductionMinutes: normalizedTotals.lunchDeductionMinutes,
     netMinutes: normalizedTotals.netMinutes,
@@ -357,7 +384,7 @@ function buildWeekRows(
     const lunchDeductionMinutes = grossMinutes > 0 ? Math.min(DEFAULT_LUNCH_DEDUCTION_MINUTES, grossMinutes) : 0;
     const netMinutes = Math.max(0, grossMinutes - lunchDeductionMinutes);
     const firstClockIn = dayEntries[0]?.clockInAt ?? null;
-    const lastClockOut = [...dayEntries].reverse().find((entry) => entry.clockOutAt)?.clockOutAt ?? null;
+    const lastClockOut = [...serializedEntries].reverse().find((entry) => entry.clockOutAt)?.clockOutAt ?? null;
 
     return {
       date,

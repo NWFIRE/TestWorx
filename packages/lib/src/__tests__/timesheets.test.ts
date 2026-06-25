@@ -186,6 +186,8 @@ describe("timesheets", () => {
       netMinutes: 0
     }));
     expect(timesheet.rows[1].entries[0]).toEqual(expect.objectContaining({
+      clockOutAt: new Date("2026-06-16T14:12:00.000Z"),
+      clockOutLabel: "9:12 AM",
       grossMinutes: 27,
       lunchDeductionMinutes: 27,
       netMinutes: 0
