@@ -378,23 +378,16 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
               One complete account workspace for operational history, billing visibility, site context, and customer communication.
             </p>
 
-            <div className="mt-6 grid gap-4 lg:grid-cols-2">
-              <div className="rounded-[24px] border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">Contact snapshot</p>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <DetailField label="Primary contact" value={data.customer.contactName ?? "No contact saved"} />
-                  <DetailField label="Phone" value={data.customer.phone ?? "No phone saved"} />
-                  <DetailField label="Contact emails" value={data.customer.contactEmails ?? "No contact emails saved"} />
-                  <DetailField label="Billing email" value={data.customer.billingEmail ?? "No billing email saved"} />
-                  <DetailField label="Payment terms" value={data.customer.paymentTermsLabel} />
-                </div>
-              </div>
-              <div className="rounded-[24px] border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">Address snapshot</p>
-                <div className="mt-4 grid gap-4">
-                  <DetailField label="Billing address" value={data.customer.billingAddress || "No billing address saved"} />
-                  <DetailField label="Primary service address" value={data.customer.serviceAddress || "No primary service address saved"} />
-                </div>
+            <div className="mt-6 rounded-[24px] border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">Customer snapshot</p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <DetailField label="Primary contact" value={data.customer.contactName ?? "No contact saved"} />
+                <DetailField label="Phone" value={data.customer.phone ?? "No phone saved"} />
+                <DetailField label="Contact emails" value={data.customer.contactEmails ?? "No contact emails saved"} />
+                <DetailField label="Billing email" value={data.customer.billingEmail ?? "No billing email saved"} />
+                <DetailField label="Payment terms" value={data.customer.paymentTermsLabel} />
+                <DetailField label="Billing address" value={data.customer.billingAddress || "No billing address saved"} />
+                <DetailField label="Primary service address" value={data.customer.serviceAddress || "No primary service address saved"} />
               </div>
             </div>
           </div>
