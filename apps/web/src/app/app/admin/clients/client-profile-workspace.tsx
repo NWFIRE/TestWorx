@@ -374,10 +374,6 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
             <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
               {data.customer.name}
             </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-[color:var(--text-secondary)]">
-              One complete account workspace for operational history, billing visibility, site context, and customer communication.
-            </p>
-
             <div className="mt-6 rounded-[24px] border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">Customer snapshot</p>
               <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
