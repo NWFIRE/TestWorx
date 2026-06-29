@@ -8,7 +8,6 @@ import { LiveUrlSelectFilter } from "@/app/live-url-select-filter";
 import {
   activeOperationalInspectionStatuses,
   filterSubsetDuplicateOperationalInspections,
-  formatInspectionTaskSummary,
   formatInspectionClassificationLabel,
   formatInspectionStatusLabel,
   getAdminDashboardData,
@@ -31,6 +30,7 @@ import {
   SectionCard,
   StatusBadge
 } from "../operations-ui";
+import { InspectionTypeInlineList } from "../../inspection-type-inline-list";
 import { InspectionCreatePanel } from "./inspection-create-panel";
 import { CreateInspectionTrigger } from "./create-inspection-trigger";
 
@@ -510,9 +510,13 @@ export default async function AdminInspectionsPage({
                               {resolvedLocationLabel}
                             </p>
                           ) : null}
-                          <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
-                            {formatInspectionTaskSummary(inspection.tasks) || "Inspection workflow"}
-                          </p>
+                          <InspectionTypeInlineList
+                            types={inspection.tasks.map((task) => ({
+                              id: task.id,
+                              key: task.inspectionType,
+                              label: task.displayLabel
+                            }))}
+                          />
                         </div>
 
                         <div className="min-w-0">
