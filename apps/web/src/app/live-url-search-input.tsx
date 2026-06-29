@@ -146,7 +146,8 @@ export function LiveUrlSearchInput({
           }
         }}
         placeholder={placeholder}
-        type="search"
+        role="searchbox"
+        type="text"
         value={query}
       />
       <div className="absolute inset-y-0 right-2 flex items-center gap-1">

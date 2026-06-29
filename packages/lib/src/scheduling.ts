@@ -4853,9 +4853,21 @@ export async function getAdminDashboardData(actor: ActorContext) {
       where: { id: tenantId },
       select: { timezone: true }
     }),
-    prisma.customerCompany.findMany({ where: { tenantId }, orderBy: { name: "asc" } }),
-    prisma.site.findMany({ where: { tenantId }, orderBy: { name: "asc" } }),
-    prisma.user.findMany({ where: { tenantId, role: "technician" }, orderBy: { name: "asc" } }),
+    prisma.customerCompany.findMany({
+      where: { tenantId },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" }
+    }),
+    prisma.site.findMany({
+      where: { tenantId },
+      select: { id: true, name: true, city: true, customerCompanyId: true },
+      orderBy: { name: "asc" }
+    }),
+    prisma.user.findMany({
+      where: { tenantId, role: "technician" },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" }
+    }),
     prisma.inspection.findMany({
       where: {
         tenantId,
@@ -4994,36 +5006,10 @@ export async function getAdminDashboardData(actor: ActorContext) {
 
   return {
     timezone: tenant?.timezone ?? "America/Chicago",
-    customers: customers.map((customer) => ({
-      id: customer.id,
-      name: customer.name,
-      contactName: customer.contactName,
-      contactEmails: customer.contactEmails,
-      billingEmail: customer.billingEmail,
-      phone: customer.phone,
-      serviceAddressLine1: customer.serviceAddressLine1,
-      serviceAddressLine2: customer.serviceAddressLine2,
-      serviceCity: customer.serviceCity,
-      serviceState: customer.serviceState,
-      servicePostalCode: customer.servicePostalCode,
-      billingAddressLine1: customer.billingAddressLine1,
-      billingAddressLine2: customer.billingAddressLine2,
-      billingCity: customer.billingCity,
-      billingState: customer.billingState,
-      billingPostalCode: customer.billingPostalCode
-    })),
+    customers: customers.map((customer) => ({ id: customer.id, name: customer.name })),
     sites: sites
       .filter((site) => getCustomerFacingSiteLabel(site.name))
-      .map((site) => ({
-        id: site.id,
-        name: site.name,
-        addressLine1: site.addressLine1,
-        addressLine2: site.addressLine2,
-        city: site.city,
-        state: site.state,
-        postalCode: site.postalCode,
-        customerCompanyId: site.customerCompanyId
-      })),
+      .map((site) => ({ id: site.id, name: site.name, city: site.city, customerCompanyId: site.customerCompanyId })),
     technicians: technicians.map((technician) => ({ id: technician.id, name: technician.name })),
     inspections: activeQueueInspections.map(mapInspectionForDashboard),
     activeInspections: activeQueueInspections.map(mapInspectionForDashboard),
@@ -5875,6 +5861,50 @@ export async function getAdminSchedulingQueueData(
       ).length
     },
     inspections: visibleMapped
+  };
+}
+
+export async function getAdminSchedulingFilterData(
+  actor: ActorContext,
+  input?: {
+    statuses?: string[] | InspectionFilterStatus[];
+    classifications?: string[] | InspectionClassificationValue[];
+    priority?: InspectionPriorityFilterValue;
+    query?: string | null;
+    technicianId?: string | null;
+  }
+) {
+  const parsedActor = parseActor(actor);
+  if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
+    throw new Error("Only tenant and office administrators can access the scheduling filters.");
+  }
+
+  const tenantId = parsedActor.tenantId as string;
+  const technicians = await prisma.user.findMany({
+    where: {
+      tenantId,
+      role: "technician",
+      isActive: true
+    },
+    select: {
+      id: true,
+      name: true
+    },
+    orderBy: [{ name: "asc" }]
+  });
+
+  return {
+    filters: {
+      statuses: normalizeInspectionStatusFilters(input?.statuses ?? []),
+      classifications: normalizeInspectionClassificationFilters(input?.classifications ?? []),
+      priority: normalizeInspectionPriorityFilter(input?.priority),
+      query: (input?.query ?? "").trim(),
+      technicianId: (input?.technicianId ?? "").trim()
+    },
+    technicians: technicians.map((technician) => ({
+      value: technician.id,
+      label: technician.name
+    }))
   };
 }
 

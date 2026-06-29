@@ -12,6 +12,7 @@ import {
   formatInspectionClassificationLabel,
   formatInspectionStatusLabel,
   getAdminDashboardData,
+  getAdminSchedulingFilterData,
   getAdminSchedulingQueueData,
   getInspectionClassificationTone,
   getInspectionStatusTone,
@@ -248,8 +249,8 @@ export default async function AdminInspectionsPage({
   };
 
   const fastManagementWindowEnd = endOfDay(addDays(startOfDay(new Date()), FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS));
-  const [queueData, fastQueueData, dashboardData] = await Promise.all([
-    getAdminSchedulingQueueData(actor, {
+  const [filterData, fastQueueData, dashboardData] = await Promise.all([
+    getAdminSchedulingFilterData(actor, {
       statuses: effectiveStatuses,
       classifications: requestedClassifications,
       priority: requestedPriority,
@@ -267,12 +268,12 @@ export default async function AdminInspectionsPage({
       includeCounts: false,
       includeTechnicians: false
     }),
-    getAdminDashboardData(actor)
+    createOpen ? getAdminDashboardData(actor) : Promise.resolve(null)
   ]);
-  const initialCustomerId = dashboardData.customers.some((customer) => customer.id === requestedCustomerId)
+  const initialCustomerId = dashboardData?.customers.some((customer) => customer.id === requestedCustomerId)
     ? requestedCustomerId
     : undefined;
-  const initialSiteId = dashboardData.sites.some(
+  const initialSiteId = dashboardData?.sites.some(
     (site) => site.id === requestedSiteId && (!initialCustomerId || site.customerCompanyId === initialCustomerId)
   )
     ? requestedSiteId
@@ -319,19 +320,21 @@ export default async function AdminInspectionsPage({
         title="Inspections"
       />
 
-      <InspectionCreatePanel
-        customers={dashboardData.customers}
-        initialOpen={createOpen}
-        initialValues={{
-          inspectionMonth: requestedMonth || undefined,
-          scheduledStart: requestedMonth ? `${requestedMonth}-01T09:00` : undefined,
-          customerCompanyId: initialCustomerId,
-          siteId: initialSiteId
-        }}
-        showTrigger={false}
-        sites={dashboardData.sites}
-        technicians={dashboardData.technicians}
-      />
+      {dashboardData ? (
+        <InspectionCreatePanel
+          customers={dashboardData.customers}
+          initialOpen={createOpen}
+          initialValues={{
+            inspectionMonth: requestedMonth || undefined,
+            scheduledStart: requestedMonth ? `${requestedMonth}-01T09:00` : undefined,
+            customerCompanyId: initialCustomerId,
+            siteId: initialSiteId
+          }}
+          showTrigger={false}
+          sites={dashboardData.sites}
+          technicians={dashboardData.technicians}
+        />
+      ) : null}
 
       <section className="grid gap-3 lg:grid-cols-4 lg:gap-4">
         <KPIStatCard
@@ -384,7 +387,7 @@ export default async function AdminInspectionsPage({
 
         <div className="mt-4">
           <LiveUrlSearchInput
-            initialValue={queueData.filters.query}
+            initialValue={filterData.filters.query}
             paramKey="q"
             placeholder="Search customer, location, address, city, reference, technician, type, priority, or status"
           />
@@ -399,25 +402,25 @@ export default async function AdminInspectionsPage({
             </span>
           </summary>
           <div className="mt-3 grid gap-3">
-            <LiveUrlSelectFilter options={statusOptions} paramKey="status" value={resolveStatusSelectValue(queueData.filters.statuses)} />
-            <LiveUrlSelectFilter options={typeOptions} paramKey="classification" value={resolveTypeSelectValue(queueData.filters.classifications)} />
-            <LiveUrlSelectFilter options={priorityOptions} paramKey="priority" value={queueData.filters.priority} />
+            <LiveUrlSelectFilter options={statusOptions} paramKey="status" value={resolveStatusSelectValue(filterData.filters.statuses)} />
+            <LiveUrlSelectFilter options={typeOptions} paramKey="classification" value={resolveTypeSelectValue(filterData.filters.classifications)} />
+            <LiveUrlSelectFilter options={priorityOptions} paramKey="priority" value={filterData.filters.priority} />
             <LiveUrlSelectFilter
-              options={[{ value: "", label: "All technicians" }, ...queueData.technicians]}
+              options={[{ value: "", label: "All technicians" }, ...filterData.technicians]}
               paramKey="technician"
-              value={queueData.filters.technicianId}
+              value={filterData.filters.technicianId}
             />
           </div>
         </details>
 
         <div className="mt-3 hidden gap-3 md:grid md:grid-cols-2 xl:grid-cols-4">
-          <LiveUrlSelectFilter options={statusOptions} paramKey="status" value={resolveStatusSelectValue(queueData.filters.statuses)} />
-          <LiveUrlSelectFilter options={typeOptions} paramKey="classification" value={resolveTypeSelectValue(queueData.filters.classifications)} />
-          <LiveUrlSelectFilter options={priorityOptions} paramKey="priority" value={queueData.filters.priority} />
+          <LiveUrlSelectFilter options={statusOptions} paramKey="status" value={resolveStatusSelectValue(filterData.filters.statuses)} />
+          <LiveUrlSelectFilter options={typeOptions} paramKey="classification" value={resolveTypeSelectValue(filterData.filters.classifications)} />
+          <LiveUrlSelectFilter options={priorityOptions} paramKey="priority" value={filterData.filters.priority} />
           <LiveUrlSelectFilter
-            options={[{ value: "", label: "All technicians" }, ...queueData.technicians]}
+            options={[{ value: "", label: "All technicians" }, ...filterData.technicians]}
             paramKey="technician"
-            value={queueData.filters.technicianId}
+            value={filterData.filters.technicianId}
           />
         </div>
       </SectionCard>
