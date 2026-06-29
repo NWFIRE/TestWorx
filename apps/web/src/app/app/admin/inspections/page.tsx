@@ -221,6 +221,10 @@ function uniqueSearchOptions(options: SearchSelectOption[]) {
   });
 }
 
+function joinSearchKeywords(values: Array<string | null | undefined>) {
+  return values.map((value) => value?.trim()).filter(Boolean).join(" ");
+}
+
 function getInspectionSearchBadge(inspection: AdminSchedulingInspection) {
   if (inspection.status === "invoiced" && inspection.archivedAt) {
     return "Archived";
@@ -376,18 +380,45 @@ export default async function AdminInspectionsPage({
   )
     ? requestedSiteId
     : undefined;
+  const customerNameById = new Map(dashboardData.customers.map((customer) => [customer.id, customer.name]));
   const inspectionSearchOptions = uniqueSearchOptions([
     ...dashboardData.customers.map((customer) => ({
       value: customer.name,
       label: customer.name,
       secondaryLabel: "Customer",
-      badge: "Customer"
+      badge: "Customer",
+      keywords: joinSearchKeywords([
+        customer.name,
+        customer.contactName,
+        customer.contactEmails,
+        customer.billingEmail,
+        customer.phone,
+        customer.serviceAddressLine1,
+        customer.serviceAddressLine2,
+        customer.serviceCity,
+        customer.serviceState,
+        customer.servicePostalCode,
+        customer.billingAddressLine1,
+        customer.billingAddressLine2,
+        customer.billingCity,
+        customer.billingState,
+        customer.billingPostalCode
+      ])
     })),
     ...dashboardData.sites.map((site) => ({
       value: site.name,
       label: site.name,
-      secondaryLabel: site.city || "Service location",
-      badge: "Location"
+      secondaryLabel: [site.city, site.state, customerNameById.get(site.customerCompanyId)].filter(Boolean).join(" | ") || "Service location",
+      badge: "Location",
+      keywords: joinSearchKeywords([
+        site.name,
+        site.addressLine1,
+        site.addressLine2,
+        site.city,
+        site.state,
+        site.postalCode,
+        customerNameById.get(site.customerCompanyId)
+      ])
     })),
     ...queueSearchData.inspections.map((inspection) => buildInspectionSearchOption(inspection, currentPath)),
     ...(historySearchData?.inspections ?? []).map((inspection) => buildInspectionSearchOption(inspection, currentPath))
@@ -557,8 +588,12 @@ export default async function AdminInspectionsPage({
         {fastManagementInspections.length === 0 ? (
           <div className="mt-5">
             <EmptyState
-              description="This list only shows past due work and inspections due in the next 60 days. Clear filters or use Upcoming for later inspections."
-              title="No past due or near-term inspections match this view"
+              description={hasActiveInspectionFilters
+                ? "Try another search or clear filters."
+                : "This list only shows past due work and inspections due in the next 60 days. Use Upcoming for later inspections."}
+              title={hasActiveInspectionFilters
+                ? "No inspections match these filters"
+                : "No past due or near-term inspections match this view"}
             />
           </div>
         ) : (

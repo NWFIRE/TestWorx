@@ -72,7 +72,16 @@ export function LiveUrlSearchSelect({
     const previousAppliedValue = lastAppliedValueRef.current;
     lastAppliedValueRef.current = nextAppliedValue;
 
-    if (isNavigatingToResult || (isFocused && query.trim() !== previousAppliedValue)) {
+    if (isNavigatingToResult) {
+      return;
+    }
+
+    if (!nextAppliedValue && previousAppliedValue && query.trim()) {
+      const timeout = window.setTimeout(() => setQuery(""), 0);
+      return () => window.clearTimeout(timeout);
+    }
+
+    if (isFocused && query.trim() !== previousAppliedValue) {
       return;
     }
 

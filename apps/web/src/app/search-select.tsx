@@ -12,6 +12,28 @@ export type SearchSelectOption = {
   keywords?: string | null;
 };
 
+function normalizeSearchText(value: string) {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function matchesSearchTokens(option: SearchSelectOption, query: string) {
+  const tokens = normalizeSearchText(query).split(" ").filter(Boolean);
+  if (!tokens.length) {
+    return true;
+  }
+
+  const haystack = normalizeSearchText([
+    option.label,
+    option.secondaryLabel,
+    option.badge,
+    option.keywords
+  ]
+    .filter(Boolean)
+    .join(" "));
+
+  return tokens.every((token) => haystack.includes(token));
+}
+
 export function SearchSelect({
   id,
   name,
@@ -75,18 +97,12 @@ export function SearchSelect({
       : selectedOption?.label ?? customValue ?? "";
 
   const filteredOptions = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery || selectedOption?.label === query) {
+    const normalizedQuery = normalizeSearchText(query);
+    if (!normalizedQuery || normalizeSearchText(selectedOption?.label ?? "") === normalizedQuery) {
       return options.slice(0, 20);
     }
 
-    return options
-      .filter((option) => [option.label, option.secondaryLabel, option.badge, option.keywords]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(normalizedQuery))
-      .slice(0, 20);
+    return options.filter((option) => matchesSearchTokens(option, normalizedQuery)).slice(0, 20);
   }, [options, query, selectedOption]);
 
   useEffect(() => {

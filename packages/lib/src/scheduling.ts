@@ -4994,10 +4994,36 @@ export async function getAdminDashboardData(actor: ActorContext) {
 
   return {
     timezone: tenant?.timezone ?? "America/Chicago",
-    customers: customers.map((customer) => ({ id: customer.id, name: customer.name })),
+    customers: customers.map((customer) => ({
+      id: customer.id,
+      name: customer.name,
+      contactName: customer.contactName,
+      contactEmails: customer.contactEmails,
+      billingEmail: customer.billingEmail,
+      phone: customer.phone,
+      serviceAddressLine1: customer.serviceAddressLine1,
+      serviceAddressLine2: customer.serviceAddressLine2,
+      serviceCity: customer.serviceCity,
+      serviceState: customer.serviceState,
+      servicePostalCode: customer.servicePostalCode,
+      billingAddressLine1: customer.billingAddressLine1,
+      billingAddressLine2: customer.billingAddressLine2,
+      billingCity: customer.billingCity,
+      billingState: customer.billingState,
+      billingPostalCode: customer.billingPostalCode
+    })),
     sites: sites
       .filter((site) => getCustomerFacingSiteLabel(site.name))
-      .map((site) => ({ id: site.id, name: site.name, city: site.city, customerCompanyId: site.customerCompanyId })),
+      .map((site) => ({
+        id: site.id,
+        name: site.name,
+        addressLine1: site.addressLine1,
+        addressLine2: site.addressLine2,
+        city: site.city,
+        state: site.state,
+        postalCode: site.postalCode,
+        customerCompanyId: site.customerCompanyId
+      })),
     technicians: technicians.map((technician) => ({ id: technician.id, name: technician.name })),
     inspections: activeQueueInspections.map(mapInspectionForDashboard),
     activeInspections: activeQueueInspections.map(mapInspectionForDashboard),
