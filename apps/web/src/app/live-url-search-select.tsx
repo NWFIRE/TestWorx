@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { SearchSelect, type SearchSelectOption } from "./search-select";
 
-const LIVE_SEARCH_DEBOUNCE_MS = 400;
+const LIVE_SEARCH_DEBOUNCE_MS = 250;
 
 function buildNextUrl({
   pathname,

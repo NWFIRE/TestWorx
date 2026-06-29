@@ -414,13 +414,14 @@ export default async function AdminInspectionsPage({
     technicianId,
     create: true
   });
-  const hasActiveInspectionFilters = Boolean(
-    queueData.filters.query ||
-      queueData.filters.statuses.length ||
-      queueData.filters.classifications.length ||
-      queueData.filters.priority !== "all" ||
-      queueData.filters.technicianId
-  );
+  const activeInspectionFilterCount = [
+    query,
+    requestedStatuses.length ? "status" : "",
+    requestedClassifications.length ? "type" : "",
+    requestedPriority !== "all" ? "priority" : "",
+    technicianId
+  ].filter(Boolean).length;
+  const hasActiveInspectionFilters = activeInspectionFilterCount > 0;
 
   return (
     <AppPageShell density="wide">
@@ -475,26 +476,46 @@ export default async function AdminInspectionsPage({
       </section>
 
       <SectionCard>
-        <details className="group" open={hasActiveInspectionFilters}>
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-2xl outline-none transition focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.24)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">
               Inspection Filters
             </p>
-            <span className="inline-flex min-h-10 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] transition group-open:bg-[color:var(--surface-subtle)]">
+            {hasActiveInspectionFilters ? (
+              <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
+                {activeInspectionFilterCount} active
+              </span>
+            ) : null}
+          </div>
+          {hasActiveInspectionFilters ? (
+            <Link
+              className="inline-flex min-h-9 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
+              href="/app/admin/inspections"
+            >
+              Clear filters
+            </Link>
+          ) : null}
+        </div>
+
+        <div className="mt-4">
+          <LiveUrlSearchSelect
+            emptyText="No inspections match this search"
+            initialValue={queueData.filters.query}
+            options={inspectionSearchOptions}
+            paramKey="q"
+            placeholder="Search customer, location, address, city, reference, or technician"
+          />
+        </div>
+
+        <details className="group mt-3 md:hidden" open={hasActiveInspectionFilters}>
+          <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-4 rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] outline-none transition hover:bg-[color:var(--surface-subtle)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.24)] md:hidden">
+            More filters
+            <span className="text-xs uppercase tracking-[0.16em]">
               <span className="group-open:hidden">Show</span>
               <span className="hidden group-open:inline">Hide</span>
             </span>
           </summary>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,0.8fr))]">
-            <div className="md:col-span-2 xl:col-span-3 2xl:col-span-1">
-              <LiveUrlSearchSelect
-                emptyText="No matching customers, locations, or inspections found"
-                initialValue={queueData.filters.query}
-                options={inspectionSearchOptions}
-                paramKey="q"
-                placeholder="Search customer, location, address, or inspection reference"
-              />
-            </div>
+          <div className="mt-3 grid gap-3">
             <LiveUrlSelectFilter options={statusOptions} paramKey="status" value={resolveStatusSelectValue(queueData.filters.statuses)} />
             <LiveUrlSelectFilter options={typeOptions} paramKey="classification" value={resolveTypeSelectValue(queueData.filters.classifications)} />
             <LiveUrlSelectFilter options={priorityOptions} paramKey="priority" value={queueData.filters.priority} />
@@ -504,17 +525,18 @@ export default async function AdminInspectionsPage({
               value={queueData.filters.technicianId}
             />
           </div>
-          {hasActiveInspectionFilters ? (
-            <div className="flex justify-end">
-              <Link
-                className="inline-flex min-h-10 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
-                href="/app/admin/inspections"
-              >
-                Clear filters
-              </Link>
-            </div>
-          ) : null}
         </details>
+
+        <div className="mt-3 hidden gap-3 md:grid md:grid-cols-2 xl:grid-cols-4">
+          <LiveUrlSelectFilter options={statusOptions} paramKey="status" value={resolveStatusSelectValue(queueData.filters.statuses)} />
+          <LiveUrlSelectFilter options={typeOptions} paramKey="classification" value={resolveTypeSelectValue(queueData.filters.classifications)} />
+          <LiveUrlSelectFilter options={priorityOptions} paramKey="priority" value={queueData.filters.priority} />
+          <LiveUrlSelectFilter
+            options={[{ value: "", label: "All technicians" }, ...queueData.technicians]}
+            paramKey="technician"
+            value={queueData.filters.technicianId}
+          />
+        </div>
       </SectionCard>
 
       <SectionCard>

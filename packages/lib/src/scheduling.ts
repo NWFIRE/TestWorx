@@ -5610,7 +5610,12 @@ export async function getAdminSchedulingQueueData(
           { site: { addressLine1: { contains: requestedQuery, mode: "insensitive" as const } } },
           { site: { addressLine2: { contains: requestedQuery, mode: "insensitive" as const } } },
           { site: { city: { contains: requestedQuery, mode: "insensitive" as const } } },
-          { site: { postalCode: { contains: requestedQuery, mode: "insensitive" as const } } }
+          { site: { state: { contains: requestedQuery, mode: "insensitive" as const } } },
+          { site: { postalCode: { contains: requestedQuery, mode: "insensitive" as const } } },
+          { assignedTechnician: { name: { contains: requestedQuery, mode: "insensitive" as const } } },
+          { technicianAssignments: { some: { technician: { name: { contains: requestedQuery, mode: "insensitive" as const } } } } },
+          { tasks: { some: { assignedTechnician: { name: { contains: requestedQuery, mode: "insensitive" as const } } } } },
+          { tasks: { some: { customDisplayLabel: { contains: requestedQuery, mode: "insensitive" as const } } } }
         ]
       }
     : undefined;
