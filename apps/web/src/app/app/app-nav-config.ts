@@ -5,7 +5,7 @@ export type AppNavItem = {
   label: string;
   shortLabel: string;
   abbreviation: string;
-  icon?: "calendar" | "branch" | "alert" | "invoice" | "settings" | "grid" | "clipboard" | "portal" | "team" | "mail" | "book";
+  icon?: "calendar" | "branch" | "alert" | "invoice" | "dollar" | "check" | "settings" | "grid" | "clipboard" | "portal" | "team" | "mail" | "book";
   description?: string;
   tone?: "blue" | "amber" | "emerald" | "violet" | "slate";
   group?: "Dashboard" | "Work" | "Billing" | "Customers" | "Operations" | "Settings" | "Portal";
@@ -123,7 +123,7 @@ const adminNavItems: AppNavItem[] = [
     label: "Billing",
     shortLabel: "Billing",
     abbreviation: "BL",
-    icon: "invoice",
+    icon: "dollar",
     description: "Ready To Bill work and invoiced history",
     tone: "emerald",
     group: "Billing"
@@ -143,7 +143,7 @@ const adminNavItems: AppNavItem[] = [
     label: "Inspection Archive",
     shortLabel: "Archive",
     abbreviation: "AR",
-    icon: "clipboard",
+    icon: "check",
     description: "Completed inspection history, reports, and documents",
     tone: "slate",
     group: "Work"

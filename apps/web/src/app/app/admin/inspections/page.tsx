@@ -364,65 +364,54 @@ export default async function AdminInspectionsPage({
       </section>
 
       <SectionCard>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">
-              Inspection Filters
-            </p>
-            {hasActiveInspectionFilters ? (
-              <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
-                {activeInspectionFilterCount} active
-              </span>
-            ) : null}
-          </div>
-          {hasActiveInspectionFilters ? (
-            <Link
-              className="inline-flex min-h-9 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
-              href="/app/admin/inspections"
-            >
-              Clear filters
-            </Link>
-          ) : null}
-        </div>
-
-        <div className="mt-4">
-          <LiveUrlSearchInput
-            initialValue={filterData.filters.query}
-            paramKey="q"
-            placeholder="Search customer, location, address, city, reference, technician, type, priority, or status"
-          />
-        </div>
-
-        <details className="group mt-3 md:hidden" open={hasActiveInspectionFilters}>
-          <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-4 rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] outline-none transition hover:bg-[color:var(--surface-subtle)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.24)] md:hidden">
-            More filters
-            <span className="text-xs uppercase tracking-[0.16em]">
+        <details className="group" open={hasActiveInspectionFilters}>
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 rounded-2xl outline-none transition focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.24)] [&::-webkit-details-marker]:hidden">
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">
+                Inspection Filters
+              </p>
+              {hasActiveInspectionFilters ? (
+                <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
+                  {activeInspectionFilterCount} active
+                </span>
+              ) : null}
+            </div>
+            <span className="inline-flex min-h-9 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] transition group-open:bg-[color:var(--surface-subtle)]">
               <span className="group-open:hidden">Show</span>
               <span className="hidden group-open:inline">Hide</span>
             </span>
           </summary>
-          <div className="mt-3 grid gap-3">
-            <LiveUrlSelectFilter options={statusOptions} paramKey="status" value={resolveStatusSelectValue(filterData.filters.statuses)} />
-            <LiveUrlSelectFilter options={typeOptions} paramKey="classification" value={resolveTypeSelectValue(filterData.filters.classifications)} />
-            <LiveUrlSelectFilter options={priorityOptions} paramKey="priority" value={filterData.filters.priority} />
-            <LiveUrlSelectFilter
-              options={[{ value: "", label: "All technicians" }, ...filterData.technicians]}
-              paramKey="technician"
-              value={filterData.filters.technicianId}
+
+          <div className="mt-4 space-y-3">
+            {hasActiveInspectionFilters ? (
+              <div className="flex justify-end">
+                <Link
+                  className="inline-flex min-h-9 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
+                  href="/app/admin/inspections"
+                >
+                  Clear filters
+                </Link>
+              </div>
+            ) : null}
+
+            <LiveUrlSearchInput
+              initialValue={filterData.filters.query}
+              paramKey="q"
+              placeholder="Search customer, location, address, city, reference, technician, type, priority, or status"
             />
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <LiveUrlSelectFilter options={statusOptions} paramKey="status" value={resolveStatusSelectValue(filterData.filters.statuses)} />
+              <LiveUrlSelectFilter options={typeOptions} paramKey="classification" value={resolveTypeSelectValue(filterData.filters.classifications)} />
+              <LiveUrlSelectFilter options={priorityOptions} paramKey="priority" value={filterData.filters.priority} />
+              <LiveUrlSelectFilter
+                options={[{ value: "", label: "All technicians" }, ...filterData.technicians]}
+                paramKey="technician"
+                value={filterData.filters.technicianId}
+              />
+            </div>
           </div>
         </details>
-
-        <div className="mt-3 hidden gap-3 md:grid md:grid-cols-2 xl:grid-cols-4">
-          <LiveUrlSelectFilter options={statusOptions} paramKey="status" value={resolveStatusSelectValue(filterData.filters.statuses)} />
-          <LiveUrlSelectFilter options={typeOptions} paramKey="classification" value={resolveTypeSelectValue(filterData.filters.classifications)} />
-          <LiveUrlSelectFilter options={priorityOptions} paramKey="priority" value={filterData.filters.priority} />
-          <LiveUrlSelectFilter
-            options={[{ value: "", label: "All technicians" }, ...filterData.technicians]}
-            paramKey="technician"
-            value={filterData.filters.technicianId}
-          />
-        </div>
       </SectionCard>
 
       <SectionCard>

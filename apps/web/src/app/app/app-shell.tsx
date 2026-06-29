@@ -105,6 +105,20 @@ function NavIcon({
           <path {...shared} d="M9 9h6M9 13h6M9 17h4" />
         </svg>
       );
+    case "dollar":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <path {...shared} d="M12 3v18" />
+          <path {...shared} d="M16.5 7.5A4.2 4.2 0 0 0 12.3 6H11a3 3 0 0 0 0 6h2a3 3 0 1 1 0 6h-1.4a4.6 4.6 0 0 1-4.1-2" />
+        </svg>
+      );
+    case "check":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <path {...shared} d="m5 12.5 4.2 4.2L19 7" />
+          <circle {...shared} cx="12" cy="12" r="9" />
+        </svg>
+      );
     case "settings":
       return (
         <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
