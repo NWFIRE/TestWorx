@@ -441,17 +441,17 @@ export default async function AdminInspectionsPage({
             />
           </div>
         ) : (
-          <div className="mt-5 space-y-3">
+          <div className="mt-5 space-y-5">
             {fastManagementMonthGroups.map((group) => (
               <details
-                className="overflow-hidden rounded-[24px] border border-[color:rgb(203_215_230_/_0.92)] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.04)]"
+                className="overflow-hidden rounded-[26px] border border-[color:rgb(196_209_226_/_0.96)] bg-white shadow-[0_16px_34px_rgba(15,23,42,0.05)]"
                 key={group.key}
                 open={group.defaultOpen}
               >
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-[color:rgb(248_250_252_/_0.98)] px-5 py-4 text-left transition hover:bg-slate-100 [&::-webkit-details-marker]:hidden">
+                <summary className="sticky top-0 z-[1] flex cursor-pointer list-none items-center justify-between gap-3 border-b border-[color:rgb(220_229_240_/_0.92)] bg-[color:rgb(245_248_252_/_0.98)] px-5 py-4 text-left transition hover:bg-slate-100 md:px-6 [&::-webkit-details-marker]:hidden">
                   <div>
                     <h3 className="text-base font-semibold text-slate-950">{group.title}</h3>
-                    <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)]">
+                    <p className="mt-1 text-xs font-semibold text-[color:var(--text-secondary)]">
                       {group.inspections.length} inspection{group.inspections.length === 1 ? "" : "s"}
                     </p>
                   </div>
@@ -460,7 +460,7 @@ export default async function AdminInspectionsPage({
                   </span>
                 </summary>
 
-                <div className="hidden border-t border-[color:rgb(220_229_240_/_0.9)] bg-[color:rgb(248_250_252_/_0.7)] px-5 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-secondary)] lg:grid lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_0.7fr_0.7fr_0.7fr_0.9fr_0.9fr_0.6fr] lg:gap-4">
+                <div className="hidden bg-[color:rgb(248_250_252_/_0.86)] px-5 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--text-secondary)] md:px-6 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1.35fr)_0.74fr_0.84fr_0.74fr_0.95fr_0.9fr_0.62fr] lg:gap-5">
                   <span>Customer</span>
                   <span>Location</span>
                   <span>Type</span>
@@ -471,8 +471,8 @@ export default async function AdminInspectionsPage({
                   <span>Actions</span>
                 </div>
 
-                <div className="divide-y divide-[color:rgb(220_229_240_/_0.9)]">
-                  {group.inspections.map((inspection) => {
+                <div className="space-y-2 bg-[color:rgb(248_250_252_/_0.45)] p-2 md:p-3">
+                  {group.inspections.map((inspection, index) => {
                     const nextDue = pickEarliestNextDueAt(
                       inspection.tasks.map((task) => task.recurrence?.nextDueAt)
                     );
@@ -491,12 +491,17 @@ export default async function AdminInspectionsPage({
                     return (
                       <div
                         key={inspection.id}
-                        className="grid gap-3 px-5 py-4 transition hover:bg-[color:rgb(248_250_252_/_0.96)] lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_0.7fr_0.7fr_0.7fr_0.9fr_0.9fr_0.6fr] lg:items-center lg:gap-4"
+                        className={`group/row grid gap-4 rounded-[20px] border px-4 py-4 transition duration-150 hover:-translate-y-px hover:border-[color:rgb(var(--tenant-primary-rgb)/0.28)] hover:bg-white hover:shadow-[0_14px_30px_rgba(15,23,42,0.08)] md:px-5 md:py-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1.35fr)_0.74fr_0.84fr_0.74fr_0.95fr_0.9fr_0.62fr] lg:items-center lg:gap-5 ${
+                          index % 2 === 0
+                            ? "border-[color:rgb(220_229_240_/_0.9)] bg-white"
+                            : "border-[color:rgb(225_232_242_/_0.88)] bg-[color:rgb(252_253_255_/_0.96)]"
+                        }`}
                       >
                         <div className="min-w-0">
                           <Link
-                            className="block truncate text-sm font-semibold text-slate-950 hover:text-slateblue"
+                            className="block truncate text-base font-semibold tracking-[-0.02em] text-slate-950 transition group-hover/row:text-slateblue"
                             href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`}
+                            title={customerLabel}
                           >
                             {customerLabel}
                           </Link>
@@ -511,7 +516,7 @@ export default async function AdminInspectionsPage({
                         </div>
 
                         <div className="min-w-0">
-                          <p className="truncate text-sm text-[color:var(--text-secondary)]">
+                          <p className="truncate text-sm font-medium text-[color:var(--text-secondary)]" title={resolvedLocationLabel && resolvedLocationLabel !== customerLabel ? resolvedLocationLabel : "Customer account"}>
                             {resolvedLocationLabel && resolvedLocationLabel !== customerLabel ? resolvedLocationLabel : "Customer account"}
                           </p>
                           <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
@@ -519,35 +524,35 @@ export default async function AdminInspectionsPage({
                           </p>
                         </div>
 
-                        <div className="text-sm text-slate-700">
+                        <div className="flex items-center text-sm text-slate-700">
                           <StatusBadge
                             label={formatInspectionClassificationLabel(inspection.inspectionClassification)}
                             tone={getInspectionClassificationTone(inspection.inspectionClassification)}
                           />
                         </div>
 
-                        <div className="text-sm text-slate-700">
+                        <div className="flex items-center text-sm text-slate-700">
                           <StatusBadge
                             label={formatInspectionStatusLabel(inspection.displayStatus as Parameters<typeof formatInspectionStatusLabel>[0])}
                             tone={getInspectionStatusTone(inspection.displayStatus as Parameters<typeof getInspectionStatusTone>[0])}
                           />
                         </div>
 
-                        <div className="text-sm text-slate-700">
+                        <div className="flex items-center text-sm text-slate-700">
                           {inspection.isPriority ? <PriorityBadge /> : <span className="text-sm text-[color:var(--text-tertiary)]">Normal</span>}
                         </div>
 
-                        <div className="text-sm text-slate-700">
+                        <div className="text-sm font-medium text-slate-700">
                           {scheduledLabel}
                         </div>
 
-                        <div className="text-sm text-slate-700">
+                        <div className="min-w-0 truncate text-sm font-medium text-slate-700" title={inspection.assignedTechnicianNames.join(", ") || "Shared queue"}>
                           {inspection.assignedTechnicianNames.join(", ") || "Shared queue"}
                         </div>
 
                         <div className="flex justify-start lg:justify-end">
                           <Link
-                            className="inline-flex min-h-10 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
+                            className="inline-flex min-h-10 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)] group-hover/row:border-[color:rgb(var(--tenant-primary-rgb)/0.34)]"
                             href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`}
                           >
                             Open
