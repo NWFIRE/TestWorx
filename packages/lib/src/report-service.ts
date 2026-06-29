@@ -50,6 +50,11 @@ import {
   isStoredFileReadError
 } from "./storage";
 
+const inspectionReportWorkStartStatuses: InspectionStatus[] = [
+  InspectionStatus.to_be_completed,
+  InspectionStatus.scheduled
+];
+
 function parseActor(actor: ActorContext) {
   const parsed = actorContextSchema.parse(actor);
   assertTenantContext(parsed.role, parsed.tenantId);
@@ -511,10 +516,15 @@ type AuthorizedEditableReport = {
 
 type PersistableReportRecord = NonNullable<Awaited<ReturnType<typeof prisma.inspectionReport.findFirst>>> & {
   inspection: {
+    id: string;
     siteId: string;
+    status: InspectionStatus;
   };
   task: {
+    id: string;
     inspectionType: InspectionType;
+    status?: InspectionStatus | null;
+    customDisplayLabel?: string | null;
   };
 };
 
@@ -692,6 +702,184 @@ function collectDraftStorageKeys(draft: ReportDraft) {
   }
 
   return storageKeys;
+}
+
+function stringifyForReportWorkComparison(value: unknown) {
+  return JSON.stringify(value);
+}
+
+function didReportDraftChange(input: {
+  report: PersistableReportRecord;
+  nextDraft: ReportDraft;
+  nextTaskDisplayLabel: string | null;
+}) {
+  const existingDraftResult = input.report.contentJson
+    ? reportDraftSchema.safeParse(input.report.contentJson)
+    : null;
+  const existingDraft = existingDraftResult?.success ? existingDraftResult.data : null;
+  const existingTaskDisplayLabel = input.report.task.customDisplayLabel?.trim() || null;
+
+  if (existingTaskDisplayLabel !== input.nextTaskDisplayLabel) {
+    return true;
+  }
+
+  if (!existingDraft) {
+    return hasTechnicianEnteredReportWork(input.nextDraft);
+  }
+
+  return stringifyForReportWorkComparison(existingDraft) !== stringifyForReportWorkComparison(input.nextDraft);
+}
+
+function getReportDefaultValue(field: { prefill?: Array<{ source: string; value?: unknown }> }) {
+  return field.prefill?.find((prefill) => prefill.source === "reportDefault")?.value;
+}
+
+function isEmptyReportWorkValue(value: unknown) {
+  return value === undefined ||
+    value === null ||
+    value === "" ||
+    value === false ||
+    value === 0 ||
+    (Array.isArray(value) && value.length === 0);
+}
+
+function isMeaningfulReportWorkField(input: {
+  field: {
+    id: string;
+    label?: string;
+    type: string;
+    readOnly?: boolean;
+    calculation?: unknown;
+    prefill?: Array<{ source: string; value?: unknown }>;
+  };
+  value: unknown;
+}) {
+  if (input.field.readOnly || input.field.calculation || isEmptyReportWorkValue(input.value)) {
+    return false;
+  }
+
+  const defaultValue = getReportDefaultValue(input.field);
+  if (defaultValue !== undefined && String(defaultValue) === String(input.value)) {
+    return false;
+  }
+
+  if (input.field.type === "photo") {
+    return true;
+  }
+
+  const searchable = `${input.field.id} ${input.field.label ?? ""}`.toLowerCase();
+  return /answer|check|condition|deficien|final|follow|hour|labor|note|photo|recommend|result|service|signature|status|test|verified|work/.test(searchable);
+}
+
+function hasTechnicianEnteredReportWork(draft: ReportDraft) {
+  if (
+    draft.overallNotes.trim().length > 0 ||
+    draft.deficiencies.length > 0 ||
+    draft.attachments.length > 0 ||
+    Object.values(draft.signatures).some((signature) => Boolean(signature?.signerName?.trim() && signature?.imageDataUrl))
+  ) {
+    return true;
+  }
+
+  const template = resolveReportTemplate({ inspectionType: draft.inspectionType as InspectionType });
+  for (const section of template.sections) {
+    const sectionState = draft.sections[section.id];
+    if (!sectionState) {
+      continue;
+    }
+
+    if (sectionState.notes.trim().length > 0 || sectionState.status !== "pending") {
+      return true;
+    }
+
+    for (const field of section.fields) {
+      const value = sectionState.fields[field.id];
+
+      if (field.type === "repeater") {
+        const rows = Array.isArray(value) ? value as Array<Record<string, unknown>> : [];
+        if (rows.some((row) => field.rowFields.some((rowField) => isMeaningfulReportWorkField({ field: rowField, value: row[rowField.id] })))) {
+          return true;
+        }
+        continue;
+      }
+
+      if (isMeaningfulReportWorkField({ field, value })) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function shouldStartInspectionFromReportWork(input: {
+  parsedActor: ReturnType<typeof parseActor>;
+  report: PersistableReportRecord;
+  nextDraft: ReportDraft;
+  nextTaskDisplayLabel: string | null;
+}) {
+  if (input.parsedActor.role !== "technician") {
+    return false;
+  }
+
+  if (!inspectionReportWorkStartStatuses.includes(input.report.inspection.status)) {
+    return false;
+  }
+
+  return didReportDraftChange({
+    report: input.report,
+    nextDraft: input.nextDraft,
+    nextTaskDisplayLabel: input.nextTaskDisplayLabel
+  }) && hasTechnicianEnteredReportWork(input.nextDraft);
+}
+
+async function markInspectionPendingForReportWorkTx(input: {
+  tx: Prisma.TransactionClient;
+  tenantId: string;
+  actorUserId: string;
+  inspectionId: string;
+  inspectionTaskId: string;
+  previousInspectionStatus: InspectionStatus;
+  previousTaskStatus?: InspectionStatus | null;
+  reportId: string;
+}) {
+  const inspectionUpdate = await input.tx.inspection.updateMany({
+    where: {
+      id: input.inspectionId,
+      tenantId: input.tenantId,
+      status: { in: inspectionReportWorkStartStatuses }
+    },
+    data: { status: InspectionStatus.in_progress }
+  });
+
+  const taskUpdate = await input.tx.inspectionTask.updateMany({
+    where: {
+      id: input.inspectionTaskId,
+      tenantId: input.tenantId,
+      status: { in: inspectionReportWorkStartStatuses }
+    },
+    data: { status: InspectionStatus.in_progress }
+  });
+
+  if (inspectionUpdate.count > 0 || taskUpdate.count > 0) {
+    await createAuditLog(input.tx, {
+      tenantId: input.tenantId,
+      actorUserId: input.actorUserId,
+      action: "inspection.work_started",
+      entityId: input.reportId,
+      metadata: {
+        inspectionId: input.inspectionId,
+        inspectionTaskId: input.inspectionTaskId,
+        previousInspectionStatus: input.previousInspectionStatus,
+        newInspectionStatus: InspectionStatus.in_progress,
+        previousTaskStatus: input.previousTaskStatus ?? null,
+        newTaskStatus: taskUpdate.count > 0 ? InspectionStatus.in_progress : input.previousTaskStatus ?? null,
+        source: "report_draft_save"
+      }
+    });
+  }
+
+  return inspectionUpdate.count > 0;
 }
 
 async function persistDraftFieldPhotos(input: { tenantId: string; draft: ReportDraft }) {
@@ -916,6 +1104,7 @@ async function persistReportDraftTransaction(input: {
   draft: ReportDraft;
   taskDisplayLabel?: string | null;
   nextStatus?: ReportStatus;
+  startInspectionFromReportWork?: boolean;
 }) {
   const tenantId = input.parsedActor.tenantId as string;
 
@@ -977,6 +1166,19 @@ async function persistReportDraftTransaction(input: {
         imageDataUrl: signature!.imageDataUrl,
         signedAt: new Date(signature!.signedAt)
       }))
+    });
+  }
+
+  if (input.startInspectionFromReportWork) {
+    await markInspectionPendingForReportWorkTx({
+      tx: input.tx,
+      tenantId,
+      actorUserId: input.parsedActor.userId,
+      inspectionId: input.report.inspectionId,
+      inspectionTaskId: input.report.inspectionTaskId,
+      previousInspectionStatus: input.report.inspection.status,
+      previousTaskStatus: input.report.task.status ?? null,
+      reportId: input.report.id
     });
   }
 
@@ -1353,6 +1555,12 @@ export async function saveReportDraft(actor: ActorContext, input: {
   });
   const parsedDraft = persisted.draft;
   const nextTaskDisplayLabel = input.taskDisplayLabel?.trim() || null;
+  const startInspectionFromReportWork = shouldStartInspectionFromReportWork({
+    parsedActor,
+    report,
+    nextDraft: parsedDraft,
+    nextTaskDisplayLabel
+  });
 
   const updatedReport = await prisma.$transaction((tx) =>
     persistReportDraftTransaction({
@@ -1361,13 +1569,14 @@ export async function saveReportDraft(actor: ActorContext, input: {
       report,
       draft: parsedDraft,
       taskDisplayLabel: nextTaskDisplayLabel,
-      nextStatus: reportStatuses.draft
+      nextStatus: reportStatuses.draft,
+      startInspectionFromReportWork
     })
   );
 
   await Promise.all(persisted.staleStorageKeys.map((storageKey) => deleteStoredFile(storageKey)));
 
-  return updatedReport;
+  return Object.assign(updatedReport, { inspectionStatusChanged: startInspectionFromReportWork });
 }
 
 function buildGeneratedPdfName(report: { inspection: { customerCompany: { name: string }; site: { name: string } }; task: { inspectionType: string } }) {

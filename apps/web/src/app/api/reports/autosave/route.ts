@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 
 import { auth } from "@/auth";
 import { isPrivateBlobStoreConfigurationError, saveReportDraft } from "@testworx/lib/server/index";
@@ -39,6 +40,17 @@ export async function POST(request: Request) {
       },
       body
     );
+
+    if (saved.inspectionStatusChanged) {
+      revalidatePath("/app/admin/inspections");
+      revalidatePath("/app/admin/dashboard");
+      revalidatePath("/app/tech");
+      revalidatePath("/app/tech/inspections");
+      revalidatePath("/app/tech/work");
+      if (saved.inspectionId) {
+        revalidatePath(`/app/admin/inspections/${saved.inspectionId}`);
+      }
+    }
 
     return NextResponse.json({ ok: true, autosaveVersion: saved.autosaveVersion, updatedAt: saved.updatedAt.toISOString() });
   } catch (error) {

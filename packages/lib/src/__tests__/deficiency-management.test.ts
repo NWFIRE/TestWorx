@@ -7,8 +7,12 @@ const { prismaMock, txMock, buildFileDownloadResponseMock } = vi.hoisted(() => {
       update: vi.fn(),
       findUniqueOrThrow: vi.fn()
     },
+    inspection: {
+      updateMany: vi.fn()
+    },
     inspectionTask: {
-      update: vi.fn()
+      update: vi.fn(),
+      updateMany: vi.fn()
     },
     attachment: {
       deleteMany: vi.fn(),
@@ -136,7 +140,9 @@ function buildEditableFireAlarmReport() {
     },
     task: {
       id: "task_1",
-      inspectionType: "fire_alarm"
+      inspectionType: "fire_alarm",
+      status: "in_progress",
+      customDisplayLabel: null
     }
   };
 }
@@ -169,7 +175,9 @@ describe("deficiency management", () => {
     prismaMock.inspectionReport.findFirst.mockResolvedValue(buildEditableFireAlarmReport());
     prismaMock.asset.findMany.mockResolvedValue(fireAlarmAssets);
     txMock.inspectionReport.update.mockResolvedValue(undefined);
+    txMock.inspection.updateMany.mockResolvedValue({ count: 0 });
     txMock.inspectionTask.update.mockResolvedValue(undefined);
+    txMock.inspectionTask.updateMany.mockResolvedValue({ count: 0 });
     txMock.attachment.deleteMany.mockResolvedValue(undefined);
     txMock.signature.deleteMany.mockResolvedValue(undefined);
     txMock.deficiency.findMany.mockResolvedValue([]);
@@ -181,6 +189,111 @@ describe("deficiency management", () => {
     txMock.auditLog.create.mockResolvedValue(undefined);
     txMock.inspectionReport.findUniqueOrThrow.mockResolvedValue({ id: "report_1", status: reportStatuses.draft });
     buildFileDownloadResponseMock.mockReturnValue({ ok: true, type: "photo-download" });
+  });
+
+  it("moves a technician-started inspection to in progress only after meaningful report work is saved", async () => {
+    const draft = buildFailingFireAlarmDraft();
+    prismaMock.inspectionReport.findFirst.mockResolvedValue({
+      ...buildEditableFireAlarmReport(),
+      inspection: {
+        ...buildEditableFireAlarmReport().inspection,
+        status: "to_be_completed"
+      },
+      task: {
+        ...buildEditableFireAlarmReport().task,
+        status: "to_be_completed"
+      }
+    });
+    txMock.inspection.updateMany.mockResolvedValue({ count: 1 });
+    txMock.inspectionTask.updateMany.mockResolvedValue({ count: 1 });
+
+    const saved = await saveReportDraft({ userId: "tech_1", role: "technician", tenantId: "tenant_1" }, {
+      inspectionReportId: "report_1",
+      contentJson: draft
+    });
+
+    expect(saved.inspectionStatusChanged).toBe(true);
+    expect(txMock.inspection.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "inspection_1",
+        tenantId: "tenant_1",
+        status: { in: ["to_be_completed", "scheduled"] }
+      },
+      data: { status: "in_progress" }
+    });
+    expect(txMock.inspectionTask.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "task_1",
+        tenantId: "tenant_1",
+        status: { in: ["to_be_completed", "scheduled"] }
+      },
+      data: { status: "in_progress" }
+    });
+    expect(txMock.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        action: "inspection.work_started",
+        metadata: expect.objectContaining({
+          previousInspectionStatus: "to_be_completed",
+          newInspectionStatus: "in_progress",
+          source: "report_draft_save"
+        })
+      })
+    }));
+  });
+
+  it("does not move inspections to in progress when an admin saves report data", async () => {
+    const draft = buildFailingFireAlarmDraft();
+    prismaMock.inspectionReport.findFirst.mockResolvedValue({
+      ...buildEditableFireAlarmReport(),
+      inspection: {
+        ...buildEditableFireAlarmReport().inspection,
+        status: "to_be_completed"
+      },
+      task: {
+        ...buildEditableFireAlarmReport().task,
+        status: "to_be_completed"
+      }
+    });
+
+    const saved = await saveReportDraft({ userId: "admin_1", role: "office_admin", tenantId: "tenant_1" }, {
+      inspectionReportId: "report_1",
+      contentJson: draft
+    });
+
+    expect(saved.inspectionStatusChanged).toBe(false);
+    expect(txMock.inspection.updateMany).not.toHaveBeenCalled();
+    expect(txMock.inspectionTask.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("does not move inspections to in progress for untouched default report data", async () => {
+    const draft = validateDraftForTemplate(buildInitialReportDraft({
+      inspectionType: "fire_alarm",
+      siteName: "Pinecrest Tower",
+      customerName: "Pinecrest Property Management",
+      scheduledDate: "2026-03-20T15:00:00.000Z",
+      assetCount: fireAlarmAssets.length,
+      assets: fireAlarmAssets
+    }), "fire_alarm", fireAlarmAssets);
+    prismaMock.inspectionReport.findFirst.mockResolvedValue({
+      ...buildEditableFireAlarmReport(),
+      inspection: {
+        ...buildEditableFireAlarmReport().inspection,
+        status: "to_be_completed"
+      },
+      task: {
+        ...buildEditableFireAlarmReport().task,
+        status: "to_be_completed"
+      }
+    });
+
+    const saved = await saveReportDraft({ userId: "tech_1", role: "technician", tenantId: "tenant_1" }, {
+      inspectionReportId: "report_1",
+      contentJson: draft
+    });
+
+    expect(saved.inspectionStatusChanged).toBe(false);
+    expect(txMock.inspection.updateMany).not.toHaveBeenCalled();
+    expect(txMock.inspectionTask.updateMany).not.toHaveBeenCalled();
   });
 
   it("creates a detected deficiency from a failed fire alarm row during autosave", async () => {
