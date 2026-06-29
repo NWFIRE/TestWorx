@@ -5627,6 +5627,38 @@ export async function getAdminSchedulingQueueData(
   const priorityFilter = requestedPriority === "all"
     ? undefined
     : requestedPriority === "priority";
+  const normalizedRequestedQuery = requestedQuery.toLowerCase();
+  const matchingInspectionTypes = requestedQuery
+    ? Object.keys(inspectionTypeRegistry).filter((type) =>
+        type.toLowerCase().includes(normalizedRequestedQuery) ||
+        type.replaceAll("_", " ").toLowerCase().includes(normalizedRequestedQuery) ||
+        inspectionTypeRegistry[type as keyof typeof inspectionTypeRegistry].label.toLowerCase().includes(normalizedRequestedQuery)
+      )
+    : [];
+  const matchingStatuses = requestedQuery
+    ? Object.entries(inspectionStatusLabels)
+        .filter(([status, label]) =>
+          status.toLowerCase().includes(normalizedRequestedQuery) ||
+          status.replaceAll("_", " ").toLowerCase().includes(normalizedRequestedQuery) ||
+          label.toLowerCase().includes(normalizedRequestedQuery)
+        )
+        .map(([status]) => status)
+        .filter((status): status is InspectionStatus => status !== "past_due")
+    : [];
+  const matchingClassifications = requestedQuery
+    ? Object.entries(inspectionClassificationLabels)
+        .filter(([classification, label]) =>
+          classification.toLowerCase().includes(normalizedRequestedQuery) ||
+          classification.replaceAll("_", " ").toLowerCase().includes(normalizedRequestedQuery) ||
+          label.toLowerCase().includes(normalizedRequestedQuery)
+        )
+        .map(([classification]) => classification as InspectionClassification)
+    : [];
+  const priorityQueryFilter = requestedQuery && ["priority", "urgent", "high"].some((term) => normalizedRequestedQuery.includes(term))
+    ? true
+    : requestedQuery && ["normal"].some((term) => normalizedRequestedQuery.includes(term))
+      ? false
+      : null;
   const searchFilter = requestedQuery
     ? {
         OR: [
@@ -5641,7 +5673,11 @@ export async function getAdminSchedulingQueueData(
           { assignedTechnician: { name: { contains: requestedQuery, mode: "insensitive" as const } } },
           { technicianAssignments: { some: { technician: { name: { contains: requestedQuery, mode: "insensitive" as const } } } } },
           { tasks: { some: { assignedTechnician: { name: { contains: requestedQuery, mode: "insensitive" as const } } } } },
-          { tasks: { some: { customDisplayLabel: { contains: requestedQuery, mode: "insensitive" as const } } } }
+          { tasks: { some: { customDisplayLabel: { contains: requestedQuery, mode: "insensitive" as const } } } },
+          ...(matchingInspectionTypes.length > 0 ? [{ tasks: { some: { inspectionType: { in: matchingInspectionTypes as InspectionType[] } } } }] : []),
+          ...(matchingStatuses.length > 0 ? [{ status: { in: matchingStatuses } }] : []),
+          ...(matchingClassifications.length > 0 ? [{ inspectionClassification: { in: matchingClassifications } }] : []),
+          ...(typeof priorityQueryFilter === "boolean" ? [{ isPriority: priorityQueryFilter }] : [])
         ]
       }
     : undefined;

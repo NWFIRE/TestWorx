@@ -3,9 +3,8 @@ import { addDays, endOfDay, format, startOfDay } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { LiveUrlSearchSelect } from "@/app/live-url-search-select";
+import { LiveUrlSearchInput } from "@/app/live-url-search-input";
 import { LiveUrlSelectFilter } from "@/app/live-url-select-filter";
-import type { SearchSelectOption } from "@/app/search-select";
 import {
   activeOperationalInspectionStatuses,
   filterSubsetDuplicateOperationalInspections,
@@ -59,15 +58,6 @@ const priorityOptions = [
 
 const FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS = 60;
 const terminalInspectionStatusesForFastManagement = new Set(["completed", "invoiced", "cancelled"]);
-const inspectionSearchHistoryStatuses = [
-  "to_be_completed",
-  "scheduled",
-  "in_progress",
-  "follow_up_required",
-  "completed",
-  "invoiced",
-  "cancelled"
-];
 
 type AdminSchedulingInspection = Awaited<ReturnType<typeof getAdminSchedulingQueueData>>["inspections"][number];
 type InspectionMonthGroup = {
@@ -209,81 +199,6 @@ function resolveTypeSelectValue(classifications: string[]) {
   return classifications.length === 1 ? classifications[0] ?? "" : "";
 }
 
-function uniqueSearchOptions(options: SearchSelectOption[]) {
-  const seen = new Set<string>();
-  return options.filter((option) => {
-    const valueKey = option.value.trim().toLowerCase();
-    if (!valueKey || seen.has(valueKey)) {
-      return false;
-    }
-    seen.add(valueKey);
-    return true;
-  });
-}
-
-function joinSearchKeywords(values: Array<string | null | undefined>) {
-  return values.map((value) => value?.trim()).filter(Boolean).join(" ");
-}
-
-function getInspectionSearchBadge(inspection: AdminSchedulingInspection) {
-  if (inspection.status === "invoiced" && inspection.archivedAt) {
-    return "Archived";
-  }
-
-  if (["completed", "invoiced", "cancelled"].includes(inspection.status)) {
-    return formatInspectionStatusLabel(inspection.status as Parameters<typeof formatInspectionStatusLabel>[0]);
-  }
-
-  return "Inspection";
-}
-
-function buildInspectionSearchOption(inspection: AdminSchedulingInspection, currentPath: string): SearchSelectOption {
-  const customerLabel = inspection.customerLabel ?? inspection.customerCompany.name;
-  const locationLabel = inspection.isGenericSite
-    ? inspection.locationLabel ?? null
-    : [
-        inspection.locationLabel,
-        inspection.site.addressLine1,
-        inspection.site.city
-      ]
-        .filter(Boolean)
-        .join(" - ");
-  const reportSummary = formatInspectionTaskSummary(inspection.tasks);
-  const technicianSummary = inspection.assignedTechnicianNames.join(", ") || "Shared queue";
-  const historyStatusLabel = getInspectionSearchBadge(inspection);
-  const scheduledLabel = format(inspection.scheduledStart, "MMM d, yyyy h:mm a");
-  const referenceLabel = `Ref ${inspection.id.slice(0, 8)}`;
-  const secondaryParts = [
-    locationLabel,
-    scheduledLabel,
-    historyStatusLabel !== "Inspection" ? historyStatusLabel : null,
-    reportSummary,
-    technicianSummary,
-    referenceLabel
-  ].filter(Boolean);
-
-  return {
-    value: inspection.id,
-    label: `${customerLabel} - ${scheduledLabel}`,
-    secondaryLabel: secondaryParts.join(" | "),
-    badge: historyStatusLabel,
-    href: `/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`,
-    keywords: [
-      customerLabel,
-      locationLabel,
-      inspection.site.addressLine1,
-      inspection.site.city,
-      scheduledLabel,
-      reportSummary,
-      technicianSummary,
-      referenceLabel,
-      inspection.id
-    ]
-      .filter(Boolean)
-      .join(" ")
-  };
-}
-
 export default async function AdminInspectionsPage({
   searchParams
 }: {
@@ -326,7 +241,6 @@ export default async function AdminInspectionsPage({
     query,
     technicianId
   });
-
   const actor = {
     userId: session.user.id,
     role: session.user.role,
@@ -334,7 +248,7 @@ export default async function AdminInspectionsPage({
   };
 
   const fastManagementWindowEnd = endOfDay(addDays(startOfDay(new Date()), FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS));
-  const [queueData, fastQueueData, queueSearchData, historySearchData, dashboardData] = await Promise.all([
+  const [queueData, fastQueueData, dashboardData] = await Promise.all([
     getAdminSchedulingQueueData(actor, {
       statuses: effectiveStatuses,
       classifications: requestedClassifications,
@@ -353,23 +267,6 @@ export default async function AdminInspectionsPage({
       includeCounts: false,
       includeTechnicians: false
     }),
-    getAdminSchedulingQueueData(actor, {
-      statuses: effectiveStatuses,
-      classifications: requestedClassifications,
-      priority: requestedPriority,
-      query: "",
-      technicianId,
-      includeCounts: false,
-      includeTechnicians: false
-    }),
-    query
-      ? getAdminSchedulingQueueData(actor, {
-          statuses: inspectionSearchHistoryStatuses,
-          query,
-          includeCounts: false,
-          includeTechnicians: false
-        })
-      : Promise.resolve(null),
     getAdminDashboardData(actor)
   ]);
   const initialCustomerId = dashboardData.customers.some((customer) => customer.id === requestedCustomerId)
@@ -380,49 +277,6 @@ export default async function AdminInspectionsPage({
   )
     ? requestedSiteId
     : undefined;
-  const customerNameById = new Map(dashboardData.customers.map((customer) => [customer.id, customer.name]));
-  const inspectionSearchOptions = uniqueSearchOptions([
-    ...dashboardData.customers.map((customer) => ({
-      value: customer.name,
-      label: customer.name,
-      secondaryLabel: "Customer",
-      badge: "Customer",
-      keywords: joinSearchKeywords([
-        customer.name,
-        customer.contactName,
-        customer.contactEmails,
-        customer.billingEmail,
-        customer.phone,
-        customer.serviceAddressLine1,
-        customer.serviceAddressLine2,
-        customer.serviceCity,
-        customer.serviceState,
-        customer.servicePostalCode,
-        customer.billingAddressLine1,
-        customer.billingAddressLine2,
-        customer.billingCity,
-        customer.billingState,
-        customer.billingPostalCode
-      ])
-    })),
-    ...dashboardData.sites.map((site) => ({
-      value: site.name,
-      label: site.name,
-      secondaryLabel: [site.city, site.state, customerNameById.get(site.customerCompanyId)].filter(Boolean).join(" | ") || "Service location",
-      badge: "Location",
-      keywords: joinSearchKeywords([
-        site.name,
-        site.addressLine1,
-        site.addressLine2,
-        site.city,
-        site.state,
-        site.postalCode,
-        customerNameById.get(site.customerCompanyId)
-      ])
-    })),
-    ...queueSearchData.inspections.map((inspection) => buildInspectionSearchOption(inspection, currentPath)),
-    ...(historySearchData?.inspections ?? []).map((inspection) => buildInspectionSearchOption(inspection, currentPath))
-  ]);
   const fastManagementInspections = filterSubsetDuplicateOperationalInspections(
     fastQueueData.inspections.filter((inspection) =>
       isInFastManagementWindow(inspection, fastManagementWindowEnd)
@@ -529,12 +383,10 @@ export default async function AdminInspectionsPage({
         </div>
 
         <div className="mt-4">
-          <LiveUrlSearchSelect
-            emptyText="No inspections match this search"
+          <LiveUrlSearchInput
             initialValue={queueData.filters.query}
-            options={inspectionSearchOptions}
             paramKey="q"
-            placeholder="Search customer, location, address, city, reference, or technician"
+            placeholder="Search customer, location, address, city, reference, technician, type, priority, or status"
           />
         </div>
 
@@ -581,7 +433,7 @@ export default async function AdminInspectionsPage({
             </h2>
           </div>
           <p className="text-sm font-semibold text-[color:var(--text-secondary)]">
-            {fastManagementInspections.length} inspection{fastManagementInspections.length === 1 ? "" : "s"} across {fastManagementMonthGroups.length} month{fastManagementMonthGroups.length === 1 ? "" : "s"}
+            {fastManagementInspections.length} inspection{fastManagementInspections.length === 1 ? "" : "s"} found across {fastManagementMonthGroups.length} month{fastManagementMonthGroups.length === 1 ? "" : "s"}
           </p>
         </div>
 
