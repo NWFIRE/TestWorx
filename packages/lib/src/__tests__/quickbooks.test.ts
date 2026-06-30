@@ -118,6 +118,22 @@ function quickBooksDuplicateDocNumberResponse(docNumber: string) {
   }, { status: 400 });
 }
 
+function quickBooksInvalidNumberNonResponse() {
+  return jsonResponse({
+    Fault: {
+      Error: [
+        {
+          Message: "Invalid Number",
+          Detail: "Invalid Number : NON",
+          code: "2020",
+          element: "TaxCodeRef"
+        }
+      ],
+      type: "ValidationFault"
+    }
+  }, { status: 400 });
+}
+
 function jsonResponseWithTid(body: unknown, intuitTid: string, init?: ResponseInit) {
   const headers = new Headers(init?.headers);
   headers.set("Content-Type", "application/json");
@@ -795,6 +811,65 @@ describe("quickbooks billing sync hardening", () => {
     expect(createInvoiceBody.Line?.[0]?.SalesItemLineDetail?.TaxCodeRef).toEqual({ value: "TAX" });
   }, 10000);
 
+  it("retries invoice sync without the NON line tax code when QuickBooks expects numeric tax codes", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: null });
+    prismaMock.customerCompany.update.mockResolvedValue(undefined);
+    prismaMock.site.findFirst.mockResolvedValue(null);
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
+    prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue({ taxable: false });
+    prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue({
+      ...buildBillingSummary(),
+      items: [
+        {
+          id: "item_1",
+          description: "Non-taxable service override",
+          quantity: 1,
+          unitPrice: 125,
+          amount: 125,
+          unit: "ea",
+          category: "service",
+          code: "FE-ANNUAL",
+          taxable: false,
+          taxableSource: "override",
+          quickBooksTaxableStatus: "non_taxable",
+          taxCodeId: "NON"
+        }
+      ]
+    });
+    prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ QueryResponse: {} }))
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1" } }))
+      .mockResolvedValueOnce(quickBooksInvalidNumberNonResponse())
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1001" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1001" } }))
+      .mockResolvedValueOnce(jsonResponse({}));
+
+    const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
+
+    await syncBillingSummaryToQuickBooks(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    const failedCreateBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    expect(failedCreateBody.Line?.[0]?.SalesItemLineDetail?.TaxCodeRef).toEqual({ value: "NON" });
+    const retryCreateBody = JSON.parse(String(fetchMock.mock.calls[3]?.[1]?.body ?? "{}"));
+    expect(retryCreateBody.Line?.[0]?.SalesItemLineDetail?.TaxCodeRef).toBeUndefined();
+    expect(prismaMock.inspectionBillingSummary.update).toHaveBeenCalledWith({
+      where: { id: "summary_1" },
+      data: expect.objectContaining({
+        status: "invoiced",
+        quickbooksSyncStatus: "synced",
+        quickbooksInvoiceId: "invoice_1",
+        quickbooksInvoiceNumber: "TW2026-1001",
+        quickbooksSyncError: null
+      })
+    });
+  }, 10000);
+
   it("updates linked QuickBooks customers when TradeWorx tax-exempt status changed", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
     prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: "qbo_customer_1" });
@@ -1435,6 +1510,81 @@ describe("quickbooks billing sync hardening", () => {
       quickbooksItemId: "qbo_item_9",
       active: false
     }));
+  });
+
+  it("retries non-taxable QuickBooks item updates without SalesTaxCodeRef when NON is rejected", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.quickBooksCatalogItem.findFirst
+      .mockResolvedValueOnce({
+        id: "catalog_1",
+        quickbooksItemId: "qbo_item_9",
+        itemType: "Service"
+      })
+      .mockResolvedValueOnce({
+        id: "catalog_1"
+      });
+    prismaMock.quickBooksCatalogItem.update.mockResolvedValue({
+      id: "catalog_1",
+      quickbooksItemId: "qbo_item_9",
+      name: "Annual inspection updated",
+      sku: "FE-ANNUAL",
+      itemType: "Service",
+      active: false,
+      taxable: false,
+      unitPrice: 110,
+      incomeAccountId: "income_1",
+      incomeAccountName: null,
+      rawJson: {},
+      importedAt: new Date()
+    });
+    prismaMock.auditLog.create.mockResolvedValue(undefined);
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({
+        Item: {
+          Id: "qbo_item_9",
+          Name: "Annual inspection",
+          Sku: "FE-ANNUAL",
+          Type: "Service",
+          Active: true,
+          SalesTaxCodeRef: { value: "TAX" },
+          UnitPrice: 95,
+          SyncToken: "2",
+          IncomeAccountRef: { value: "income_1" }
+        }
+      }))
+      .mockResolvedValueOnce(quickBooksInvalidNumberNonResponse())
+      .mockResolvedValueOnce(jsonResponse({
+        Item: {
+          Id: "qbo_item_9",
+          Name: "Annual inspection updated",
+          Sku: "FE-ANNUAL",
+          Type: "Service",
+          Active: false,
+          UnitPrice: 110,
+          IncomeAccountRef: { value: "income_1" }
+        }
+      }));
+
+    const { updateQuickBooksCatalogItem } = await import("../quickbooks");
+
+    await updateQuickBooksCatalogItem(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        catalogItemId: "catalog_1",
+        name: "Annual inspection updated",
+        sku: "FE-ANNUAL",
+        itemType: "Service",
+        unitPrice: 110,
+        taxable: false,
+        active: false
+      }
+    );
+
+    const failedUpdateBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body ?? "{}"));
+    expect(failedUpdateBody.SalesTaxCodeRef).toEqual({ value: "NON" });
+    const retryUpdateBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body ?? "{}"));
+    expect(retryUpdateBody.SalesTaxCodeRef).toBeUndefined();
   });
 
   it("creates a direct QuickBooks invoice from synced catalog items", async () => {

@@ -850,6 +850,16 @@ function isQuickBooksBusinessValidationFault(error: unknown) {
   );
 }
 
+function isQuickBooksInvalidNonTaxCodeFault(error: unknown) {
+  if (!(error instanceof QuickBooksRequestError)) {
+    return false;
+  }
+
+  const fault = readQuickBooksFault(error.rawBody);
+  const faultText = `${fault?.message ?? ""} ${fault?.detail ?? ""}`;
+  return /Invalid Number/i.test(faultText) && /\bNON\b/i.test(faultText);
+}
+
 function buildQuickBooksRemediationGuidance(error: QuickBooksRequestError) {
   const fault = readQuickBooksFault(error.rawBody);
   if (fault?.code === "-11622" || /Unexpected user error/i.test(`${fault?.message ?? ""} ${fault?.detail ?? ""}`)) {
@@ -3508,7 +3518,27 @@ function toQuickBooksInvoiceLine(input: {
   };
 }
 
-type QuickBooksInvoiceLinePayload = ReturnType<typeof toQuickBooksInvoiceLine>;
+type QuickBooksInvoiceLinePayloadBase = ReturnType<typeof toQuickBooksInvoiceLine>;
+type QuickBooksInvoiceLinePayload = Omit<QuickBooksInvoiceLinePayloadBase, "SalesItemLineDetail"> & {
+  SalesItemLineDetail: Omit<QuickBooksInvoiceLinePayloadBase["SalesItemLineDetail"], "TaxCodeRef"> & {
+    TaxCodeRef?: QuickBooksInvoiceLinePayloadBase["SalesItemLineDetail"]["TaxCodeRef"];
+  };
+};
+
+function omitNonTaxCodeRefsForQuickBooksRetry(lines: QuickBooksInvoiceLinePayload[]) {
+  return lines.map((line) => {
+    const taxCodeRef = line.SalesItemLineDetail.TaxCodeRef?.value;
+    if (taxCodeRef !== DEFAULT_QUICKBOOKS_NON_TAX_CODE_ID) {
+      return line;
+    }
+
+    const { TaxCodeRef: _taxCodeRef, ...detailWithoutTaxCode } = line.SalesItemLineDetail;
+    return {
+      ...line,
+      SalesItemLineDetail: detailWithoutTaxCode
+    };
+  });
+}
 
 function buildQuickBooksInvoiceLineGroupingKey(line: QuickBooksInvoiceLinePayload) {
   const detail = line.SalesItemLineDetail;
@@ -3517,7 +3547,7 @@ function buildQuickBooksInvoiceLineGroupingKey(line: QuickBooksInvoiceLinePayloa
     itemId: detail.ItemRef.value,
     itemName: detail.ItemRef.name ?? "",
     unitPrice: detail.UnitPrice,
-    taxCode: detail.TaxCodeRef.value
+    taxCode: detail.TaxCodeRef?.value ?? ""
   });
 }
 
@@ -3533,7 +3563,7 @@ function groupQuickBooksInvoiceLines(lines: QuickBooksInvoiceLinePayload[]) {
         SalesItemLineDetail: {
           ...line.SalesItemLineDetail,
           ItemRef: { ...line.SalesItemLineDetail.ItemRef },
-          TaxCodeRef: { ...line.SalesItemLineDetail.TaxCodeRef }
+          ...(line.SalesItemLineDetail.TaxCodeRef ? { TaxCodeRef: { ...line.SalesItemLineDetail.TaxCodeRef } } : {})
         }
       });
       continue;
@@ -4425,6 +4455,16 @@ function assertTradeWorxEditableQuickBooksItemType(itemType: string) {
   }
 }
 
+function buildQuickBooksCatalogItemTaxFields(taxable: boolean, options?: { omitNonTaxCodeRef?: boolean }) {
+  if (taxable) {
+    return { SalesTaxCodeRef: { value: DEFAULT_QUICKBOOKS_TAX_CODE_ID } };
+  }
+
+  return options?.omitNonTaxCodeRef
+    ? {}
+    : { SalesTaxCodeRef: { value: DEFAULT_QUICKBOOKS_NON_TAX_CODE_ID } };
+}
+
 export async function createQuickBooksCatalogItem(actor: ActorContext, input: z.infer<typeof quickBooksCatalogItemInputSchema>) {
   const parsedActor = parseActor(actor);
   if (!canManageQuickBooksSync(parsedActor.role)) {
@@ -4440,19 +4480,33 @@ export async function createQuickBooksCatalogItem(actor: ActorContext, input: z.
 
   try {
     const incomeAccountId = await resolveIncomeAccountId(tenant);
-    const created = await quickBooksApiRequest<{ Item?: unknown }>(tenant, {
-      path: "/item",
-      method: "POST",
-      body: {
-        Name: sanitizeItemName(parsedInput.name),
-        Type: parsedInput.itemType,
-        Active: parsedInput.active,
-        IncomeAccountRef: { value: incomeAccountId },
-        SalesTaxCodeRef: { value: parsedInput.taxable ? "TAX" : "NON" },
-        ...(parsedInput.sku ? { Sku: parsedInput.sku } : {}),
-        ...(parsedInput.unitPrice !== null ? { UnitPrice: parsedInput.unitPrice } : {})
-      }
+    const buildCreateBody = (options?: { omitNonTaxCodeRef?: boolean }) => ({
+      Name: sanitizeItemName(parsedInput.name),
+      Type: parsedInput.itemType,
+      Active: parsedInput.active,
+      IncomeAccountRef: { value: incomeAccountId },
+      ...buildQuickBooksCatalogItemTaxFields(parsedInput.taxable, options),
+      ...(parsedInput.sku ? { Sku: parsedInput.sku } : {}),
+      ...(parsedInput.unitPrice !== null ? { UnitPrice: parsedInput.unitPrice } : {})
     });
+    let created: { Item?: unknown };
+    try {
+      created = await quickBooksApiRequest<{ Item?: unknown }>(tenant, {
+        path: "/item",
+        method: "POST",
+        body: buildCreateBody()
+      });
+    } catch (error) {
+      if (parsedInput.taxable || !isQuickBooksInvalidNonTaxCodeFault(error)) {
+        throw error;
+      }
+
+      created = await quickBooksApiRequest<{ Item?: unknown }>(tenant, {
+        path: "/item",
+        method: "POST",
+        body: buildCreateBody({ omitNonTaxCodeRef: true })
+      });
+    }
 
     const localItem = await upsertTenantQuickBooksCatalogItem({
       tenantId: parsedActor.tenantId as string,
@@ -4547,23 +4601,38 @@ export async function updateQuickBooksCatalogItem(actor: ActorContext, input: z.
 
     assertTradeWorxEditableQuickBooksItemType(normalizedCurrentItem.itemType);
     const incomeAccountId = normalizedCurrentItem.incomeAccountId ?? await resolveIncomeAccountId(tenant);
-    const updated = await quickBooksApiRequest<{ Item?: unknown }>(tenant, {
-      path: "/item",
-      method: "POST",
-      searchParams: new URLSearchParams({ operation: "update" }),
-      body: {
-        Id: normalizedCurrentItem.quickbooksItemId,
-        SyncToken: syncToken,
-        sparse: true,
-        Name: sanitizeItemName(parsedInput.name),
-        Type: normalizedCurrentItem.itemType,
-        Active: parsedInput.active,
-        IncomeAccountRef: { value: incomeAccountId },
-        SalesTaxCodeRef: { value: parsedInput.taxable ? "TAX" : "NON" },
-        Sku: parsedInput.sku ?? "",
-        ...(parsedInput.unitPrice !== null ? { UnitPrice: parsedInput.unitPrice } : {})
-      }
+    const buildUpdateBody = (options?: { omitNonTaxCodeRef?: boolean }) => ({
+      Id: normalizedCurrentItem.quickbooksItemId,
+      SyncToken: syncToken,
+      sparse: true,
+      Name: sanitizeItemName(parsedInput.name),
+      Type: normalizedCurrentItem.itemType,
+      Active: parsedInput.active,
+      IncomeAccountRef: { value: incomeAccountId },
+      ...buildQuickBooksCatalogItemTaxFields(parsedInput.taxable, options),
+      Sku: parsedInput.sku ?? "",
+      ...(parsedInput.unitPrice !== null ? { UnitPrice: parsedInput.unitPrice } : {})
     });
+    let updated: { Item?: unknown };
+    try {
+      updated = await quickBooksApiRequest<{ Item?: unknown }>(tenant, {
+        path: "/item",
+        method: "POST",
+        searchParams: new URLSearchParams({ operation: "update" }),
+        body: buildUpdateBody()
+      });
+    } catch (error) {
+      if (parsedInput.taxable || !isQuickBooksInvalidNonTaxCodeFault(error)) {
+        throw error;
+      }
+
+      updated = await quickBooksApiRequest<{ Item?: unknown }>(tenant, {
+        path: "/item",
+        method: "POST",
+        searchParams: new URLSearchParams({ operation: "update" }),
+        body: buildUpdateBody({ omitNonTaxCodeRef: true })
+      });
+    }
 
     const updatedLocalItem = await upsertTenantQuickBooksCatalogItem({
       tenantId: parsedActor.tenantId as string,
@@ -4802,18 +4871,39 @@ export async function syncBillingSummaryToQuickBooks(
     }
     const invoiceTotals = calculateInvoiceTotalsFromItems(syncedItems, { taxExempt });
 
-    const { docNumber, invoiceResponse } = await createQuickBooksInvoiceWithTradeWorxNumber({
-      connection: tenant,
-      tenantId: parsedActor.tenantId as string,
-      preferredDocNumber: normalizedSummary.quickbooksInvoiceNumber,
-      body: {
-        CustomerRef: { value: customerId },
-        ...(sendToEmail ? { BillEmail: { Address: sendToEmail } } : {}),
-        PrivateNote: summary.notes ?? `Synced from TradeWorx inspection ${summary.inspectionId}`,
-        GlobalTaxCalculation: "TaxExcluded",
-        Line: groupQuickBooksInvoiceLines(invoiceLines)
+    const groupedInvoiceLines = groupQuickBooksInvoiceLines(invoiceLines);
+    const quickBooksInvoiceBody = {
+      CustomerRef: { value: customerId },
+      ...(sendToEmail ? { BillEmail: { Address: sendToEmail } } : {}),
+      PrivateNote: summary.notes ?? `Synced from TradeWorx inspection ${summary.inspectionId}`,
+      GlobalTaxCalculation: "TaxExcluded",
+      Line: groupedInvoiceLines
+    };
+    let createdInvoiceResult: Awaited<ReturnType<typeof createQuickBooksInvoiceWithTradeWorxNumber>>;
+    try {
+      createdInvoiceResult = await createQuickBooksInvoiceWithTradeWorxNumber({
+        connection: tenant,
+        tenantId: parsedActor.tenantId as string,
+        preferredDocNumber: normalizedSummary.quickbooksInvoiceNumber,
+        body: quickBooksInvoiceBody
+      });
+    } catch (error) {
+      if (!isQuickBooksInvalidNonTaxCodeFault(error)) {
+        throw error;
       }
-    });
+
+      createdInvoiceResult = await createQuickBooksInvoiceWithTradeWorxNumber({
+        connection: tenant,
+        tenantId: parsedActor.tenantId as string,
+        preferredDocNumber: normalizedSummary.quickbooksInvoiceNumber,
+        body: {
+          ...quickBooksInvoiceBody,
+          Line: omitNonTaxCodeRefsForQuickBooksRetry(groupedInvoiceLines)
+        }
+      });
+    }
+
+    const { docNumber, invoiceResponse } = createdInvoiceResult;
 
     const createdInvoice = normalizeQuickBooksInvoiceRecord(invoiceResponse.Invoice);
     const responseDocNumber = readQuickBooksDocNumber(invoiceResponse.Invoice);
@@ -5414,24 +5504,45 @@ export async function createDirectQuickBooksInvoice(
           quantity: line.SalesItemLineDetail.Qty,
           unitPrice: line.SalesItemLineDetail.UnitPrice,
           amount: line.Amount,
-          taxable: line.SalesItemLineDetail.TaxCodeRef.value === DEFAULT_QUICKBOOKS_TAX_CODE_ID,
-          taxCodeId: line.SalesItemLineDetail.TaxCodeRef.value
+          taxable: line.SalesItemLineDetail.TaxCodeRef?.value === DEFAULT_QUICKBOOKS_TAX_CODE_ID,
+          taxCodeId: line.SalesItemLineDetail.TaxCodeRef?.value ?? null
         }))
     ], { taxExempt: selectedCustomer?.isTaxExempt === true });
 
-    const { docNumber, invoiceResponse } = await createQuickBooksInvoiceWithTradeWorxNumber({
-      connection: tenant,
-      tenantId: parsedActor.tenantId as string,
-      issueDate,
-      body: {
-        CustomerRef: { value: customerId },
-        TxnDate: issueDate.toISOString().slice(0, 10),
-        ...(dueDate ? { DueDate: dueDate.toISOString().slice(0, 10) } : {}),
-        ...(parsedInput.memo?.trim() ? { CustomerMemo: { value: parsedInput.memo.trim() } } : {}),
-        GlobalTaxCalculation: "TaxExcluded",
-        Line: groupQuickBooksInvoiceLines(invoiceLines)
+    const groupedInvoiceLines = groupQuickBooksInvoiceLines(invoiceLines);
+    const quickBooksInvoiceBody = {
+      CustomerRef: { value: customerId },
+      TxnDate: issueDate.toISOString().slice(0, 10),
+      ...(dueDate ? { DueDate: dueDate.toISOString().slice(0, 10) } : {}),
+      ...(parsedInput.memo?.trim() ? { CustomerMemo: { value: parsedInput.memo.trim() } } : {}),
+      GlobalTaxCalculation: "TaxExcluded",
+      Line: groupedInvoiceLines
+    };
+    let createdInvoiceResult: Awaited<ReturnType<typeof createQuickBooksInvoiceWithTradeWorxNumber>>;
+    try {
+      createdInvoiceResult = await createQuickBooksInvoiceWithTradeWorxNumber({
+        connection: tenant,
+        tenantId: parsedActor.tenantId as string,
+        issueDate,
+        body: quickBooksInvoiceBody
+      });
+    } catch (error) {
+      if (!isQuickBooksInvalidNonTaxCodeFault(error)) {
+        throw error;
       }
-    });
+
+      createdInvoiceResult = await createQuickBooksInvoiceWithTradeWorxNumber({
+        connection: tenant,
+        tenantId: parsedActor.tenantId as string,
+        issueDate,
+        body: {
+          ...quickBooksInvoiceBody,
+          Line: omitNonTaxCodeRefsForQuickBooksRetry(groupedInvoiceLines)
+        }
+      });
+    }
+
+    const { docNumber, invoiceResponse } = createdInvoiceResult;
 
     const createdInvoice = normalizeQuickBooksInvoiceRecord(invoiceResponse.Invoice);
     const responseDocNumber = readQuickBooksDocNumber(invoiceResponse.Invoice);
