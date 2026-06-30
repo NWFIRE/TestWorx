@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { PDFDocument } from "pdf-lib";
 
-import { applyRepeaterBulkAction, applyRepeaterRowSmartUpdate, buildInitialReportDraft, buildRepeaterRowDefaults, buildReportPreview, describeRepeaterRowLabel, describeRepeaterValueLines, duplicateRepeaterRows, validateDraftForTemplate, validateFinalizationDraft } from "../report-engine";
+import { applyRepeaterBulkAction, applyRepeaterRowSmartUpdate, buildInitialReportDraft, buildRepeaterRowDefaults, buildReportPreview, collectFinalizationValidationIssues, describeRepeaterRowLabel, describeRepeaterValueLines, duplicateRepeaterRows, validateDraftForTemplate, validateFinalizationDraft } from "../report-engine";
 import { generateInspectionReportPdf } from "../pdf-report";
 import { buildDataUrlStorageKey } from "../storage";
 import { resolveReportTemplate } from "../report-config";
@@ -11,6 +11,46 @@ const tinyPngBytes = Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAA
 const tinyPngDataUrl = buildDataUrlStorageKey({ mimeType: "image/png", bytes: tinyPngBytes });
 
 describe("smart report foundations", () => {
+  it("ignores blank optional Joint Commission fire alarm testing rows during progress and finalization", () => {
+    const template = resolveReportTemplate({ inspectionType: "joint_commission_fire_alarm" });
+    const blankControlUnitRow = buildRepeaterRowDefaults(
+      template,
+      "fire-alarm-control-unit-testing",
+      "controlUnitTests"
+    );
+    const meaningfulControlUnitRow = {
+      ...blankControlUnitRow,
+      testItem: "panel_normal_condition"
+    };
+
+    const blankDraft = buildInitialReportDraft({
+      inspectionType: "joint_commission_fire_alarm",
+      siteName: "St. Mary's Center for Rehab",
+      customerName: "St. Mary's Center for Rehab",
+      scheduledDate: "2026-06-30T14:00:00.000Z"
+    });
+    blankDraft.sections["fire-alarm-control-unit-testing"]!.fields.controlUnitTests = [blankControlUnitRow];
+
+    const blankPreview = buildReportPreview(blankDraft);
+    const blankControlUnitSummary = blankPreview.sectionSummaries.find((section) => section.sectionId === "fire-alarm-control-unit-testing");
+    expect(blankControlUnitSummary?.totalRows).toBe(0);
+    expect(collectFinalizationValidationIssues(blankDraft).some((issue) => issue.label === "Result #1")).toBe(false);
+
+    const meaningfulDraft = buildInitialReportDraft({
+      inspectionType: "joint_commission_fire_alarm",
+      siteName: "St. Mary's Center for Rehab",
+      customerName: "St. Mary's Center for Rehab",
+      scheduledDate: "2026-06-30T14:00:00.000Z"
+    });
+    meaningfulDraft.sections["fire-alarm-control-unit-testing"]!.fields.controlUnitTests = [meaningfulControlUnitRow];
+
+    const meaningfulPreview = buildReportPreview(meaningfulDraft);
+    const meaningfulControlUnitSummary = meaningfulPreview.sectionSummaries.find((section) => section.sectionId === "fire-alarm-control-unit-testing");
+    expect(meaningfulControlUnitSummary?.totalRows).toBe(1);
+    expect(meaningfulControlUnitSummary?.completedRows).toBe(0);
+    expect(collectFinalizationValidationIssues(meaningfulDraft).some((issue) => issue.label === "Result #1")).toBe(true);
+  });
+
   it("falls back to numbered extinguisher labels when a duplicated row carries a duplicate action label", () => {
     expect(
       describeRepeaterRowLabel(

@@ -1210,6 +1210,32 @@ function countCompletedRows(rows: ReportRepeaterRow[], completionFieldIds: strin
   return rows.filter((row) => completionFieldIds.every((fieldId) => !isEmptyValue(row[fieldId]))).length;
 }
 
+function repeaterHasMinimumRowRequirement(field: Extract<ReportFieldDefinition, { type: "repeater" }>) {
+  return (field.validation ?? []).some((validation) => validation.type === "minRows" && validation.value > 0);
+}
+
+function rowHasMeaningfulRepeaterValue(field: Extract<ReportFieldDefinition, { type: "repeater" }>, row: ReportRepeaterRow) {
+  return field.rowFields.some((rowField) => {
+    if (rowField.hidden || !isFieldVisible(rowField, row)) {
+      return false;
+    }
+
+    return !isEmptyValue(row[rowField.id]);
+  });
+}
+
+function shouldIgnoreBlankOptionalRepeaterRow(field: Extract<ReportFieldDefinition, { type: "repeater" }>, row: ReportRepeaterRow) {
+  if (repeaterHasMinimumRowRequirement(field) || (field.seedRows?.length ?? 0) > 0) {
+    return false;
+  }
+
+  return !rowHasMeaningfulRepeaterValue(field, row);
+}
+
+function getActionableRepeaterRows(field: Extract<ReportFieldDefinition, { type: "repeater" }>, rows: ReportRepeaterRow[]) {
+  return rows.filter((row) => !shouldIgnoreBlankOptionalRepeaterRow(field, row));
+}
+
 function findDetectedDeficiencies(
   sectionId: string,
   sectionLabel: string,
@@ -1628,6 +1654,10 @@ export function collectFinalizationValidationIssues(draft: ReportDraft, assets: 
         }
 
         rows.forEach((row, rowIndex) => {
+          if (shouldIgnoreBlankOptionalRepeaterRow(field, row)) {
+            return;
+          }
+
           for (const rowField of field.rowFields) {
             issues.push(...collectFieldValidationIssues({
               sectionId: section.id,
@@ -1707,12 +1737,13 @@ export function buildReportPreview(draft: ReportDraft): ReportPreview {
       const rows = Array.isArray(sectionState?.fields?.[field.id])
         ? sectionState?.fields?.[field.id] as ReportRepeaterRow[]
         : [];
+      const actionableRows = getActionableRepeaterRows(field, rows);
       if (field.completionFieldIds && field.completionFieldIds.length > 0) {
-        totalRows += rows.length;
-        completedRows += countCompletedRows(rows, field.completionFieldIds);
+        totalRows += actionableRows.length;
+        completedRows += countCompletedRows(actionableRows, field.completionFieldIds);
       }
       if (getRepeaterDeficiencyFieldIds(field).length > 0) {
-        deficiencyCount += rows.filter((row) => rowHasDetectedDeficiency(row, field)).length;
+        deficiencyCount += actionableRows.filter((row) => rowHasDetectedDeficiency(row, field)).length;
       }
     }
 
@@ -1742,7 +1773,7 @@ export function buildReportPreview(draft: ReportDraft): ReportPreview {
       const rows = Array.isArray(sectionState?.fields?.[field.id])
         ? sectionState?.fields?.[field.id] as ReportRepeaterRow[]
         : [];
-      return findDetectedDeficiencies(section.id, section.label, field, rows);
+      return findDetectedDeficiencies(section.id, section.label, field, getActionableRepeaterRows(field, rows));
     });
   });
 
