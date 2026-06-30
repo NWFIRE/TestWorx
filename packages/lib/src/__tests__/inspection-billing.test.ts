@@ -20,7 +20,7 @@ const { prismaMock, txMock } = vi.hoisted(() => ({
     serviceFeeRule: { findMany: vi.fn() },
     minimumTicketRule: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     complianceReportingFeeRule: { findFirst: vi.fn(), findMany: vi.fn() },
-    billingItemCatalogMatch: { findUnique: vi.fn(), upsert: vi.fn() },
+    billingItemCatalogMatch: { findMany: vi.fn(), findUnique: vi.fn(), upsert: vi.fn() },
     quickBooksCatalogItem: { findFirst: vi.fn(), findMany: vi.fn() },
     quickBooksCatalogItemAlias: { findMany: vi.fn(), upsert: vi.fn() },
     workOrderLineItem: { findMany: vi.fn(), updateMany: vi.fn() },
@@ -561,6 +561,7 @@ describe("inspection billing extraction", () => {
     prismaMock.$queryRawUnsafe.mockResolvedValue([{ exists: true }]);
     txMock.workOrderLineItem.findMany.mockReset();
     prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue(null);
+    prismaMock.billingItemCatalogMatch.findMany.mockResolvedValue([]);
     prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
     prismaMock.quickBooksCatalogItemAlias.findMany.mockResolvedValue([]);
@@ -984,6 +985,7 @@ describe("inspection billing persistence and admin review", () => {
     prismaMock.$queryRawUnsafe.mockReset();
     prismaMock.$executeRaw.mockReset();
     prismaMock.billingItemCatalogMatch.findUnique.mockReset();
+    prismaMock.billingItemCatalogMatch.findMany.mockReset();
     prismaMock.quickBooksCatalogItem.findFirst.mockReset();
     prismaMock.quickBooksCatalogItem.findMany.mockReset();
     prismaMock.quickBooksCatalogItemAlias.findMany.mockReset();
@@ -1072,6 +1074,7 @@ describe("inspection billing persistence and admin review", () => {
     txMock.quickBooksCatalogItem.findFirst.mockResolvedValue(null);
     txMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
     prismaMock.billingItemCatalogMatch.findUnique.mockResolvedValue(null);
+    prismaMock.billingItemCatalogMatch.findMany.mockResolvedValue([]);
     prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
     prismaMock.quickBooksCatalogItemAlias.findMany.mockResolvedValue([]);
@@ -2626,7 +2629,7 @@ describe("inspection billing persistence and admin review", () => {
   });
 
   it("uses detail-page catalog pricing resolution for billing summary totals", async () => {
-    prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue({
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValueOnce([{
       id: "catalog_labor",
       quickbooksItemId: "qb_labor",
       name: "Fire Alarm - Annual Inspection",
@@ -2635,7 +2638,7 @@ describe("inspection billing persistence and admin review", () => {
       rawJson: null,
       unitPrice: 115,
       taxable: true
-    });
+    }]);
     prismaMock.$queryRaw.mockResolvedValueOnce([
       {
         id: "summary_1",
@@ -2696,6 +2699,64 @@ describe("inspection billing persistence and admin review", () => {
     expect(summaries[0]?.invoiceTotals.subtotalBeforeTax).toBe(230);
     expect(summaries[0]?.invoiceTotals.taxTotal).toBe(18.98);
     expect(summaries[0]?.invoiceTotals.totalDue).toBe(248.98);
+  });
+
+  it("does not refresh every open billing summary while loading the billing list", async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([
+      {
+        id: "summary_open",
+        inspectionId: "inspection_open",
+        customerCompanyId: "customer_1",
+        customerName: "Open Customer",
+        customerIsTaxExempt: false,
+        siteId: "site_1",
+        siteName: "Main",
+        inspectionDate: new Date("2026-04-15T16:30:00.000Z"),
+        inspectionClassification: "standard",
+        technicianName: null,
+        status: "draft",
+        billingType: "standard",
+        billToAccountId: null,
+        billToName: null,
+        contractProfileId: null,
+        contractProfileName: null,
+        routingSnapshot: null,
+        pricingSnapshot: null,
+        groupingSnapshot: null,
+        attachmentSnapshot: null,
+        deliverySnapshot: null,
+        referenceSnapshot: null,
+        quickbooksSyncStatus: "not_synced",
+        quickbooksInvoiceId: null,
+        quickbooksInvoiceNumber: null,
+        quickbooksConnectionMode: null,
+        quickbooksSyncedAt: null,
+        quickbooksSendStatus: "not_sent",
+        quickbooksSentAt: null,
+        quickbooksSyncError: null,
+        quickbooksSendError: null,
+        subtotal: 65,
+        notes: null,
+        items: [
+          {
+            id: "fee_line",
+            tenantId: "tenant_1",
+            inspectionId: "inspection_open",
+            reportId: "report_1",
+            reportType: "kitchen_suppression",
+            category: "fee",
+            description: "Inspection fee",
+            quantity: 1,
+            unitPrice: 65
+          }
+        ]
+      }
+    ]);
+
+    await getAdminBillingSummaries({ userId: "office_1", role: "office_admin", tenantId: "tenant_1" });
+
+    expect(prismaMock.inspectionBillingSummary.update).not.toHaveBeenCalled();
+    expect(prismaMock.inspection.findFirst).not.toHaveBeenCalled();
   });
 
   it("sorts billing summaries alphabetically and then by earliest inspection date", async () => {

@@ -2263,6 +2263,128 @@ async function buildBillingDisplayItems(tenantId: string, items: BillableItem[])
   );
 }
 
+function catalogRecordToSuggestion(input: {
+  catalogItem: Pick<CatalogCandidateRecord, "id" | "quickbooksItemId" | "name" | "sku" | "itemType" | "unitPrice" | "taxable"> & {
+    rawJson?: Prisma.JsonValue | null;
+  };
+  confidence: number;
+  matchMethod: BillingCatalogMatchMethod;
+  autoMatchEligible: boolean;
+}): BillingCatalogMatchSuggestion {
+  return {
+    catalogItemId: input.catalogItem.id,
+    quickbooksItemId: input.catalogItem.quickbooksItemId,
+    name: input.catalogItem.name,
+    sku: input.catalogItem.sku,
+    itemType: input.catalogItem.itemType,
+    description: readCatalogDescription(input.catalogItem.rawJson),
+    unitPrice: input.catalogItem.unitPrice,
+    taxable: input.catalogItem.taxable,
+    alias: null,
+    confidence: input.confidence,
+    matchMethod: input.matchMethod,
+    autoMatchEligible: input.autoMatchEligible
+  };
+}
+
+function buildBillingListDisplayItemsFromLookups(
+  items: BillableItem[],
+  lookups: {
+    linkedCatalogById: Map<string, CatalogCandidateRecord>;
+    storedMatchBySourceKey: Map<string, BillingItemCatalogMatchRecord>;
+  }
+) {
+  return items.map((item) => {
+    const linkedCatalogItem = item.linkedCatalogItemId ? lookups.linkedCatalogById.get(item.linkedCatalogItemId) : null;
+    const storedMatch = !linkedCatalogItem ? lookups.storedMatchBySourceKey.get(buildBillingItemSourceKey(item)) : null;
+    const currentCatalogMatch = linkedCatalogItem
+      ? catalogRecordToSuggestion({
+          catalogItem: linkedCatalogItem,
+          confidence: item.linkedMatchConfidence ?? 1,
+          matchMethod: (item.linkedMatchMethod as BillingCatalogMatchMethod | null) ?? "manual",
+          autoMatchEligible: false
+        })
+      : storedMatch
+        ? catalogRecordToSuggestion({
+            catalogItem: storedMatch.catalogItem,
+            confidence: storedMatch.confidence,
+            matchMethod: "source_mapping",
+            autoMatchEligible: true
+          })
+        : null;
+    const resolvedUnitPrice = item.unitPrice ?? currentCatalogMatch?.unitPrice ?? null;
+
+    return {
+      ...item,
+      unitPrice: resolvedUnitPrice,
+      amount: calculateAmount(item.quantity, resolvedUnitPrice),
+      currentCatalogMatch,
+      suggestedCatalogMatches: [] as BillingCatalogMatchSuggestion[]
+    };
+  });
+}
+
+async function buildBillingListRowsForDisplay(tenantId: string, rows: BillingSummaryListRow[]) {
+  const rowsWithItems = rows.map((row) => ({
+    row,
+    items: normalizeExistingItems((row as unknown as { items: unknown }).items)
+  }));
+  const allItems = rowsWithItems.flatMap(({ items }) => items);
+  const linkedCatalogItemIds = [...new Set(allItems.map((item) => item.linkedCatalogItemId).filter((value): value is string => Boolean(value)))];
+  const sourceKeys = [...new Set(allItems.filter((item) => !item.linkedCatalogItemId && !isRuleControlledFeeItem(item)).map(buildBillingItemSourceKey))];
+
+  const [linkedCatalogItems, storedMatches] = await Promise.all([
+    linkedCatalogItemIds.length > 0
+      ? prisma.quickBooksCatalogItem.findMany({
+          where: { tenantId, id: { in: linkedCatalogItemIds } },
+          select: {
+            id: true,
+            quickbooksItemId: true,
+            name: true,
+            sku: true,
+            itemType: true,
+            rawJson: true,
+            unitPrice: true,
+            taxable: true
+          }
+        }) as Promise<CatalogCandidateRecord[]>
+      : Promise.resolve([]),
+    sourceKeys.length > 0
+      ? prisma.billingItemCatalogMatch.findMany({
+          where: { tenantId, sourceKey: { in: sourceKeys } },
+          select: {
+            sourceKey: true,
+            catalogItemId: true,
+            confidence: true,
+            matchMethod: true,
+            catalogItem: {
+              select: {
+                id: true,
+                quickbooksItemId: true,
+                name: true,
+                sku: true,
+                itemType: true,
+                rawJson: true,
+                unitPrice: true,
+                taxable: true
+              }
+            }
+          }
+        }) as Promise<BillingItemCatalogMatchRecord[]>
+      : Promise.resolve([])
+  ]);
+
+  const lookups = {
+    linkedCatalogById: new Map(linkedCatalogItems.map((item) => [item.id, item])),
+    storedMatchBySourceKey: new Map(storedMatches.map((match) => [match.sourceKey, match]))
+  };
+
+  return rowsWithItems.map(({ row, items }) => ({
+    ...row,
+    items: buildBillingListDisplayItemsFromLookups(items, lookups)
+  }));
+}
+
 function subtotalForItems(items: BillableItem[]) {
   return calculateInvoiceTotalsFromItems(items).subtotalBeforeTax;
 }
@@ -3513,53 +3635,6 @@ async function applyMinimumTicketPricingToPersistedSummaryItems(
   });
 }
 
-async function refreshBillingSummaryListRowForDisplay(
-  tenantId: string,
-  row: BillingSummaryListRow
-): Promise<BillingSummaryListRow | null> {
-  const normalizedItems = normalizeExistingItems((row as unknown as { items: unknown }).items);
-  if (row.status === "invoiced") {
-    return {
-      ...row,
-      items: await buildBillingDisplayItems(tenantId, normalizedItems)
-    };
-  }
-
-  try {
-    const refreshed = await syncInspectionBillingSummaryTx(prisma as unknown as TransactionClient, {
-      tenantId,
-      inspectionId: row.inspectionId
-    });
-    if (!refreshed) {
-      return null;
-    }
-
-    return {
-      ...row,
-      status: refreshed.status,
-      billingType: refreshed.billingType,
-      billToAccountId: refreshed.billToAccountId,
-      billToName: refreshed.billToName,
-      contractProfileId: refreshed.contractProfileId,
-      contractProfileName: refreshed.contractProfileName,
-      routingSnapshot: refreshed.routingSnapshot,
-      pricingSnapshot: refreshed.pricingSnapshot,
-      groupingSnapshot: refreshed.groupingSnapshot,
-      attachmentSnapshot: refreshed.attachmentSnapshot,
-      deliverySnapshot: refreshed.deliverySnapshot,
-      referenceSnapshot: refreshed.referenceSnapshot,
-      subtotal: refreshed.subtotal,
-      notes: refreshed.notes,
-      items: await buildBillingDisplayItems(tenantId, refreshed.items)
-    };
-  } catch {
-    return {
-      ...row,
-      items: await buildBillingDisplayItems(tenantId, normalizedItems)
-    };
-  }
-}
-
 export async function getAdminBillingSummaries(actor: ActorContext) {
   const parsedActor = parseActor(actor);
   ensureAdmin(parsedActor);
@@ -3610,9 +3685,7 @@ export async function getAdminBillingSummaries(actor: ActorContext) {
     ORDER BY c."name" ASC, site."name" ASC, i."scheduledStart" ASC, s."id" ASC
   `) as BillingSummaryListRow[];
 
-  const displayRows = (
-    await Promise.all(rows.map((row) => refreshBillingSummaryListRowForDisplay(tenantId, row)))
-  ).filter((row): row is BillingSummaryListRow => Boolean(row));
+  const displayRows = await buildBillingListRowsForDisplay(tenantId, rows);
 
   return displayRows.map((row) => {
     const items = normalizeExistingItems(row.items);
