@@ -1531,12 +1531,13 @@ describe("inspection billing persistence and admin review", () => {
       unitPrice: 115,
       amount: 230,
       linkedCatalogItemId: "catalog_labor",
-      taxable: true,
-      quickBooksTaxableStatus: "taxable"
+      taxable: false,
+      quickBooksTaxableStatus: "non_taxable",
+      quickBooksTaxCodeRef: "NON"
     }));
     expect(laborLine?.metadata?.invoiceLineSnapshot).toEqual(expect.objectContaining({
-      taxable: true,
-      effectiveTaxable: true
+      taxable: false,
+      effectiveTaxable: false
     }));
     expect(summary?.subtotal).toBe(230);
   });
@@ -1649,8 +1650,10 @@ describe("inspection billing persistence and admin review", () => {
         catalogItem: {
           id: "catalog_service_annual",
           name: "Fire extinguisher annual inspection",
+          sku: "FE-INSPECTION",
           quickbooksItemId: "qb_service_annual",
           taxable: false,
+          itemType: "Service",
           unitPrice: 7.7,
           rawJson: { SalesTaxCodeRef: { value: "NON" } }
         }
@@ -1678,7 +1681,7 @@ describe("inspection billing persistence and admin review", () => {
       amount: 15.4,
       linkedCatalogItemId: "catalog_service_annual",
       linkedQuickBooksItemId: "qb_service_annual",
-      taxable: true
+      taxable: false
     }));
     expect(serviceLine?.metadata).toEqual(expect.objectContaining({
       source: "technician_selected",
@@ -3963,10 +3966,10 @@ describe("inspection billing persistence and admin review", () => {
     const updatedItems = Array.isArray(updateInput?.data?.items) ? updateInput.data.items : [];
     expect(updatedItems.find((item) => item.id === "line_1")).toEqual(
       expect.objectContaining({
-        taxable: true,
+        taxable: false,
         taxableSource: "quickbooks",
-        quickBooksTaxableStatus: "taxable",
-        quickBooksTaxCodeRef: "TAX"
+        quickBooksTaxableStatus: "non_taxable",
+        quickBooksTaxCodeRef: "NON"
       })
     );
     expect(prismaMock.billingItemCatalogMatch.upsert).toHaveBeenCalled();

@@ -30,6 +30,7 @@ import {
   calculateInvoiceLineSnapshot,
   calculateLineSubtotal,
   DEFAULT_OKLAHOMA_SALES_TAX_RATE,
+  DEFAULT_QUICKBOOKS_NON_TAX_CODE_ID,
   DEFAULT_QUICKBOOKS_TAX_CODE_ID,
   type InvoiceTotals,
   roundMoney,
@@ -640,13 +641,41 @@ function isNonInventoryTaxableItemType(itemType: string | null | undefined) {
     normalized.includes("fee");
 }
 
+function normalizeCatalogTaxText(value: string | null | undefined) {
+  return value?.trim().toLowerCase().replace(/[_-]+/g, " ") ?? "";
+}
+
+function isInspectionCatalogItem(input: {
+  name?: string | null;
+  sku?: string | null;
+  itemType?: string | null;
+  rawJson?: Prisma.JsonValue | null;
+}) {
+  const description = readCatalogDescription(input.rawJson);
+  const text = [
+    input.name,
+    input.sku,
+    input.itemType,
+    description
+  ].map(normalizeCatalogTaxText).filter(Boolean).join(" ");
+
+  return /\binspection(s)?\b/.test(text);
+}
+
 function buildCatalogTaxSnapshot(catalogItem: {
   quickbooksItemId?: string | null;
+  name?: string | null;
+  sku?: string | null;
   itemType?: string | null;
   taxable: boolean;
   rawJson?: Prisma.JsonValue | null;
 }) {
-  const taxable = isNonInventoryTaxableItemType(catalogItem.itemType) ? true : catalogItem.taxable;
+  const taxable = isInspectionCatalogItem(catalogItem)
+    ? false
+    : isNonInventoryTaxableItemType(catalogItem.itemType)
+      ? true
+      : catalogItem.taxable;
+  const catalogTaxCodeRef = readCatalogTaxCodeRef(catalogItem.rawJson);
 
   return {
     taxable,
@@ -654,7 +683,11 @@ function buildCatalogTaxSnapshot(catalogItem: {
     quickBooksTaxableStatus: catalogItem.quickbooksItemId
       ? (taxable ? "taxable" as const : "non_taxable" as const)
       : null,
-    quickBooksTaxCodeRef: taxable ? DEFAULT_QUICKBOOKS_TAX_CODE_ID : readCatalogTaxCodeRef(catalogItem.rawJson) ?? null
+    quickBooksTaxCodeRef: taxable
+      ? DEFAULT_QUICKBOOKS_TAX_CODE_ID
+      : catalogTaxCodeRef === DEFAULT_QUICKBOOKS_TAX_CODE_ID
+        ? DEFAULT_QUICKBOOKS_NON_TAX_CODE_ID
+        : catalogTaxCodeRef ?? DEFAULT_QUICKBOOKS_NON_TAX_CODE_ID
   };
 }
 
@@ -1466,6 +1499,7 @@ async function extractBillableItemsFromWorkOrderLineItemsTx(tx: TransactionClien
         select: {
           id: true,
           name: true,
+          sku: true,
           quickbooksItemId: true,
           taxable: true,
           itemType: true,
@@ -1545,6 +1579,8 @@ async function extractBillableItemsFromWorkOrderLineItemsTx(tx: TransactionClien
       linkedMatchConfidence: 1,
       ...buildCatalogTaxSnapshot({
         quickbooksItemId: line.catalogItem?.quickbooksItemId ?? line.quickBooksItemId,
+        name: line.catalogItem?.name ?? line.name,
+        sku: line.catalogItem?.sku ?? null,
         itemType: line.catalogItem?.itemType ?? line.itemType,
         taxable: line.taxable,
         rawJson: line.catalogItem?.rawJson ?? null
@@ -3329,6 +3365,8 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
         ? {}
         : buildCatalogTaxSnapshot({
             quickbooksItemId: currentMatch.quickbooksItemId,
+            name: currentMatch.name,
+            sku: currentMatch.sku,
             itemType: currentMatch.itemType,
             taxable: currentMatch.taxable,
             rawJson: null

@@ -1718,6 +1718,29 @@ function isQuickBooksTaxableCode(value: string | null | undefined) {
   return normalized === "TAX" || normalized === "TAXABLE";
 }
 
+function normalizeQuickBooksCatalogTaxText(value: string | null | undefined) {
+  return value?.trim().toLowerCase().replace(/[_-]+/g, " ") ?? "";
+}
+
+function isQuickBooksInspectionCatalogItem(item: unknown, input: {
+  name?: string | null;
+  sku?: string | null;
+  itemType?: string | null;
+}) {
+  const description = readQuickBooksStringField(item, "Description")
+    ?? readQuickBooksStringField(item, "SalesDesc")
+    ?? readQuickBooksStringField(item, "PurchaseDesc")
+    ?? readQuickBooksStringField(item, "FullyQualifiedName");
+  const text = [
+    input.name,
+    input.sku,
+    input.itemType,
+    description
+  ].map(normalizeQuickBooksCatalogTaxText).filter(Boolean).join(" ");
+
+  return /\binspection(s)?\b/.test(text);
+}
+
 function normalizeQuickBooksCatalogItem(item: unknown) {
   const quickbooksItemId = readQuickBooksStringField(item, "Id");
   const name = readQuickBooksStringField(item, "Name");
@@ -1731,12 +1754,15 @@ function normalizeQuickBooksCatalogItem(item: unknown) {
     ? ((item as Record<string, unknown>).IncomeAccountRef as Record<string, unknown> | undefined)
     : undefined;
   const salesTaxCode = readQuickBooksSalesTaxCodeRef(item);
-  const taxable = itemType !== "Inventory" || isQuickBooksTaxableCode(salesTaxCode);
+  const sku = readQuickBooksStringField(item, "Sku");
+  const taxable = isQuickBooksInspectionCatalogItem(item, { name, sku, itemType })
+    ? false
+    : itemType !== "Inventory" || isQuickBooksTaxableCode(salesTaxCode);
 
   return {
     quickbooksItemId,
     name,
-    sku: readQuickBooksStringField(item, "Sku"),
+    sku,
     itemType,
     active: readQuickBooksBooleanField(item, "Active") ?? true,
     taxable,
@@ -2471,11 +2497,25 @@ async function resolveMappedCatalogTaxable(input: {
       quickbooksItemId: input.quickbooksItemId
     },
     select: {
+      name: true,
+      sku: true,
+      itemType: true,
+      rawJson: true,
       taxable: true
     }
   });
 
-  return mappedCatalogItem?.taxable ?? false;
+  if (!mappedCatalogItem) {
+    return false;
+  }
+
+  return isQuickBooksInspectionCatalogItem(mappedCatalogItem.rawJson, {
+    name: mappedCatalogItem.name,
+    sku: mappedCatalogItem.sku,
+    itemType: mappedCatalogItem.itemType
+  })
+    ? false
+    : mappedCatalogItem.taxable;
 }
 
 async function buildDirectInvoiceAutomaticFeeLines(input: {
@@ -5418,6 +5458,9 @@ export async function createDirectQuickBooksInvoice(
       id: true,
       quickbooksItemId: true,
       name: true,
+      sku: true,
+      itemType: true,
+      rawJson: true,
       taxable: true
     }
   });
@@ -5451,15 +5494,23 @@ export async function createDirectQuickBooksInvoice(
         throw new Error("Selected product or service is no longer available.");
       }
 
+      const catalogTaxable = isQuickBooksInspectionCatalogItem(catalogItem.rawJson, {
+        name: catalogItem.name,
+        sku: catalogItem.sku,
+        itemType: catalogItem.itemType
+      })
+        ? false
+        : catalogItem.taxable;
+
       return {
         quantity: line.quantity,
         unitPrice: line.unitPrice,
         amount: roundMoney(line.quantity * line.unitPrice),
         description: line.description,
-        taxable: selectedCustomer?.isTaxExempt ? false : catalogItem.taxable,
+        taxable: selectedCustomer?.isTaxExempt ? false : catalogTaxable,
         taxCodeId: selectedCustomer?.isTaxExempt
           ? DEFAULT_QUICKBOOKS_NON_TAX_CODE_ID
-          : catalogItem.taxable
+          : catalogTaxable
             ? DEFAULT_QUICKBOOKS_TAX_CODE_ID
             : DEFAULT_QUICKBOOKS_NON_TAX_CODE_ID,
         qbItemId: catalogItem.quickbooksItemId,
