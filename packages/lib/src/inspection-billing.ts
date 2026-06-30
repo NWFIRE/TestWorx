@@ -645,7 +645,7 @@ function normalizeCatalogTaxText(value: string | null | undefined) {
   return value?.trim().toLowerCase().replace(/[_-]+/g, " ") ?? "";
 }
 
-function isInspectionCatalogItem(input: {
+function isDefaultNonTaxableCatalogItem(input: {
   name?: string | null;
   sku?: string | null;
   itemType?: string | null;
@@ -659,7 +659,21 @@ function isInspectionCatalogItem(input: {
     description
   ].map(normalizeCatalogTaxText).filter(Boolean).join(" ");
 
-  return /\binspection(s)?\b/.test(text);
+  return /\binspection(s)?\b|\bmaintenance\b/.test(text);
+}
+
+function resolveCatalogItemDefaultTaxable(input: {
+  name?: string | null;
+  sku?: string | null;
+  itemType?: string | null;
+  taxable: boolean;
+  rawJson?: Prisma.JsonValue | null;
+}) {
+  if (isDefaultNonTaxableCatalogItem(input)) {
+    return false;
+  }
+
+  return isNonInventoryTaxableItemType(input.itemType) ? true : input.taxable;
 }
 
 function buildCatalogTaxSnapshot(catalogItem: {
@@ -670,11 +684,7 @@ function buildCatalogTaxSnapshot(catalogItem: {
   taxable: boolean;
   rawJson?: Prisma.JsonValue | null;
 }) {
-  const taxable = isInspectionCatalogItem(catalogItem)
-    ? false
-    : isNonInventoryTaxableItemType(catalogItem.itemType)
-      ? true
-      : catalogItem.taxable;
+  const taxable = resolveCatalogItemDefaultTaxable(catalogItem);
   const catalogTaxCodeRef = readCatalogTaxCodeRef(catalogItem.rawJson);
 
   return {
@@ -2048,20 +2058,12 @@ async function buildBillingItemCatalogState(tenantId: string, item: BillableItem
 
     if (linkedItem) {
       return {
-        currentMatch: {
-          catalogItemId: linkedItem.id,
-          quickbooksItemId: linkedItem.quickbooksItemId,
-          name: linkedItem.name,
-          sku: linkedItem.sku,
-          itemType: linkedItem.itemType,
-          description: readCatalogDescription(linkedItem.rawJson),
-          unitPrice: linkedItem.unitPrice,
-          taxable: linkedItem.taxable,
-          alias: null,
+        currentMatch: catalogRecordToSuggestion({
+          catalogItem: linkedItem,
           confidence: item.linkedMatchConfidence ?? 1,
           matchMethod: (item.linkedMatchMethod as BillingCatalogMatchMethod | null) ?? "manual",
           autoMatchEligible: false
-        },
+        }),
         suggestedMatches: [] as BillingCatalogMatchSuggestion[]
       };
     }
@@ -2070,20 +2072,12 @@ async function buildBillingItemCatalogState(tenantId: string, item: BillableItem
   const storedMatch = await findStoredBillingItemCatalogMatch(tenantId, item);
   if (storedMatch) {
     return {
-      currentMatch: {
-        catalogItemId: storedMatch.catalogItem.id,
-        quickbooksItemId: storedMatch.catalogItem.quickbooksItemId,
-        name: storedMatch.catalogItem.name,
-        sku: storedMatch.catalogItem.sku,
-        itemType: storedMatch.catalogItem.itemType,
-        description: readCatalogDescription(storedMatch.catalogItem.rawJson),
-        unitPrice: storedMatch.catalogItem.unitPrice,
-        taxable: storedMatch.catalogItem.taxable,
-        alias: null,
+      currentMatch: catalogRecordToSuggestion({
+        catalogItem: storedMatch.catalogItem,
         confidence: storedMatch.confidence,
-        matchMethod: "source_mapping" as const,
+        matchMethod: "source_mapping",
         autoMatchEligible: true
-      },
+      }),
       suggestedMatches: [] as BillingCatalogMatchSuggestion[]
     };
   }
@@ -2091,20 +2085,12 @@ async function buildBillingItemCatalogState(tenantId: string, item: BillableItem
   const storedCodeMapping = await findStoredQuickBooksCodeMapping(tenantId, item);
   if (storedCodeMapping) {
     return {
-      currentMatch: {
-        catalogItemId: storedCodeMapping.catalogItem.id,
-        quickbooksItemId: storedCodeMapping.catalogItem.quickbooksItemId,
-        name: storedCodeMapping.catalogItem.name,
-        sku: storedCodeMapping.catalogItem.sku,
-        itemType: storedCodeMapping.catalogItem.itemType,
-        description: readCatalogDescription(storedCodeMapping.catalogItem.rawJson),
-        unitPrice: storedCodeMapping.catalogItem.unitPrice,
-        taxable: storedCodeMapping.catalogItem.taxable,
-        alias: null,
+      currentMatch: catalogRecordToSuggestion({
+        catalogItem: storedCodeMapping.catalogItem,
         confidence: 1,
-        matchMethod: storedCodeMapping.matchSource === "rule" ? "source_mapping" as const : "manual" as const,
+        matchMethod: storedCodeMapping.matchSource === "rule" ? "source_mapping" : "manual",
         autoMatchEligible: storedCodeMapping.matchSource === "rule"
-      },
+      }),
       suggestedMatches: [] as BillingCatalogMatchSuggestion[]
     };
   }
@@ -2307,6 +2293,7 @@ function catalogRecordToSuggestion(input: {
   matchMethod: BillingCatalogMatchMethod;
   autoMatchEligible: boolean;
 }): BillingCatalogMatchSuggestion {
+  const taxable = resolveCatalogItemDefaultTaxable(input.catalogItem);
   return {
     catalogItemId: input.catalogItem.id,
     quickbooksItemId: input.catalogItem.quickbooksItemId,
@@ -2315,7 +2302,7 @@ function catalogRecordToSuggestion(input: {
     itemType: input.catalogItem.itemType,
     description: readCatalogDescription(input.catalogItem.rawJson),
     unitPrice: input.catalogItem.unitPrice,
-    taxable: input.catalogItem.taxable,
+    taxable,
     alias: null,
     confidence: input.confidence,
     matchMethod: input.matchMethod,
@@ -4187,7 +4174,8 @@ export async function updateBillingSummaryItemGroup(
               taxable,
               taxableSource: "override" as const,
               quickBooksTaxableStatus: taxable ? "taxable" as const : "non_taxable" as const,
-              taxCodeId: taxable ? DEFAULT_QUICKBOOKS_TAX_CODE_ID : null,
+              quickBooksTaxCodeRef: taxable ? DEFAULT_QUICKBOOKS_TAX_CODE_ID : DEFAULT_QUICKBOOKS_NON_TAX_CODE_ID,
+              taxCodeId: taxable ? DEFAULT_QUICKBOOKS_TAX_CODE_ID : DEFAULT_QUICKBOOKS_NON_TAX_CODE_ID,
               taxCategory: taxable ? item.taxCategory ?? null : null,
               taxRate: taxable ? resolveTaxRateForOverride(item) : 0,
               taxAmount: null,
@@ -4335,7 +4323,7 @@ export async function getBillingManualLineCatalogItems(actor: ActorContext) {
     itemType: item.itemType,
     description: readCatalogDescription(item.rawJson),
     unitPrice: item.unitPrice,
-    taxable: item.taxable
+    taxable: resolveCatalogItemDefaultTaxable(item)
   })) satisfies BillingManualLineCatalogItem[];
 }
 

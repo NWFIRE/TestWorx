@@ -64,6 +64,7 @@ import {
   extractBillableItemsFromFinalizedReport,
   getAdminBillingSummaryDetail,
   getAdminBillingSummaries,
+  getBillingManualLineCatalogItems,
   groupBillableItems,
   groupBillingReviewItems,
   linkBillingSummaryItemCatalog,
@@ -3974,6 +3975,38 @@ describe("inspection billing persistence and admin review", () => {
     );
     expect(prismaMock.billingItemCatalogMatch.upsert).toHaveBeenCalled();
     expect(prismaMock.quickBooksCatalogItemAlias.upsert).toHaveBeenCalled();
+  });
+
+  it("shows maintenance catalog items as non-taxable by default for manual billing lines", async () => {
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([
+      {
+        id: "catalog_maintenance",
+        quickbooksItemId: "qb_maintenance",
+        name: "Quarterly Maintenance",
+        sku: "FA-MAINTENANCE",
+        itemType: "Service",
+        rawJson: {
+          Description: "Fire alarm maintenance",
+          SalesTaxCodeRef: { value: "TAX" }
+        },
+        unitPrice: 95,
+        taxable: true
+      }
+    ]);
+
+    const items = await getBillingManualLineCatalogItems({
+      userId: "office_1",
+      role: "office_admin",
+      tenantId: "tenant_1"
+    });
+
+    expect(items).toEqual([
+      expect.objectContaining({
+        id: "catalog_maintenance",
+        name: "Quarterly Maintenance",
+        taxable: false
+      })
+    ]);
   });
 
   it("adds an admin manual billing line from the products and services catalog", async () => {

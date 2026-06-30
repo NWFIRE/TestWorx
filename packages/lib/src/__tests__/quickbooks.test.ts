@@ -1320,7 +1320,7 @@ describe("quickbooks billing sync hardening", () => {
   it("imports QuickBooks products and services into the tenant catalog", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
     prismaMock.quickBooksCatalogItem.deleteMany.mockResolvedValue({ count: 0 });
-    prismaMock.quickBooksCatalogItem.createMany.mockResolvedValue({ count: 3 });
+    prismaMock.quickBooksCatalogItem.createMany.mockResolvedValue({ count: 4 });
     prismaMock.auditLog.create.mockResolvedValue(undefined);
     prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof prismaMock) => Promise<unknown>) => callback(prismaMock as never));
 
@@ -1329,7 +1329,8 @@ describe("quickbooks billing sync hardening", () => {
         Item: [
           { Id: "qbo_item_1", Name: "FE-ANNUAL", Sku: "FE-ANNUAL", Type: "Service", Active: true, SalesTaxCodeRef: { value: "TAX" }, UnitPrice: 25 },
           { Id: "qbo_item_2", Name: "Battery replacement", Sku: "EL-BATTERY", Type: "Service", Active: true, SalesTaxCodeRef: { value: "NON" }, UnitPrice: 18 },
-          { Id: "qbo_item_3", Name: "Fire Extinguisher Annual Inspection", Sku: "FE-INSPECTION", Type: "Service", Active: true, SalesTaxCodeRef: { value: "TAX" }, UnitPrice: 7.7 }
+          { Id: "qbo_item_3", Name: "Fire Extinguisher Annual Inspection", Sku: "FE-INSPECTION", Type: "Service", Active: true, SalesTaxCodeRef: { value: "TAX" }, UnitPrice: 7.7 },
+          { Id: "qbo_item_4", Name: "Quarterly Maintenance", Sku: "FA-MAINTENANCE", Type: "Service", Active: true, SalesTaxCodeRef: { value: "TAX" }, UnitPrice: 95 }
         ]
       }
     }));
@@ -1340,7 +1341,7 @@ describe("quickbooks billing sync hardening", () => {
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" }
     );
 
-    expect(result).toEqual({ importedItemCount: 3 });
+    expect(result).toEqual({ importedItemCount: 4 });
     expect(prismaMock.quickBooksCatalogItem.createMany).toHaveBeenCalledWith({
       data: expect.arrayContaining([
         expect.objectContaining({
@@ -1360,6 +1361,11 @@ describe("quickbooks billing sync hardening", () => {
         expect.objectContaining({
           quickbooksItemId: "qbo_item_3",
           name: "Fire Extinguisher Annual Inspection",
+          taxable: false
+        }),
+        expect.objectContaining({
+          quickbooksItemId: "qbo_item_4",
+          name: "Quarterly Maintenance",
           taxable: false
         })
       ])

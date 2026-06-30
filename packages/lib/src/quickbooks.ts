@@ -1722,7 +1722,7 @@ function normalizeQuickBooksCatalogTaxText(value: string | null | undefined) {
   return value?.trim().toLowerCase().replace(/[_-]+/g, " ") ?? "";
 }
 
-function isQuickBooksInspectionCatalogItem(item: unknown, input: {
+function isQuickBooksDefaultNonTaxableCatalogItem(item: unknown, input: {
   name?: string | null;
   sku?: string | null;
   itemType?: string | null;
@@ -1738,7 +1738,7 @@ function isQuickBooksInspectionCatalogItem(item: unknown, input: {
     description
   ].map(normalizeQuickBooksCatalogTaxText).filter(Boolean).join(" ");
 
-  return /\binspection(s)?\b/.test(text);
+  return /\binspection(s)?\b|\bmaintenance\b/.test(text);
 }
 
 function normalizeQuickBooksCatalogItem(item: unknown) {
@@ -1755,7 +1755,7 @@ function normalizeQuickBooksCatalogItem(item: unknown) {
     : undefined;
   const salesTaxCode = readQuickBooksSalesTaxCodeRef(item);
   const sku = readQuickBooksStringField(item, "Sku");
-  const taxable = isQuickBooksInspectionCatalogItem(item, { name, sku, itemType })
+  const taxable = isQuickBooksDefaultNonTaxableCatalogItem(item, { name, sku, itemType })
     ? false
     : itemType !== "Inventory" || isQuickBooksTaxableCode(salesTaxCode);
 
@@ -2509,7 +2509,7 @@ async function resolveMappedCatalogTaxable(input: {
     return false;
   }
 
-  return isQuickBooksInspectionCatalogItem(mappedCatalogItem.rawJson, {
+  return isQuickBooksDefaultNonTaxableCatalogItem(mappedCatalogItem.rawJson, {
     name: mappedCatalogItem.name,
     sku: mappedCatalogItem.sku,
     itemType: mappedCatalogItem.itemType
@@ -5494,7 +5494,7 @@ export async function createDirectQuickBooksInvoice(
         throw new Error("Selected product or service is no longer available.");
       }
 
-      const catalogTaxable = isQuickBooksInspectionCatalogItem(catalogItem.rawJson, {
+      const catalogTaxable = isQuickBooksDefaultNonTaxableCatalogItem(catalogItem.rawJson, {
         name: catalogItem.name,
         sku: catalogItem.sku,
         itemType: catalogItem.itemType
