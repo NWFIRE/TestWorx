@@ -70,6 +70,7 @@ export type TechnicianReportEditorData = {
   reportUpdatedAt: string;
   finalizedAt: string | null;
   correctionNotice?: string | null;
+  showDeviceSyncWarnings?: boolean;
   canEdit: boolean;
   canFinalize: boolean;
   inspectionTypeLabel: string;

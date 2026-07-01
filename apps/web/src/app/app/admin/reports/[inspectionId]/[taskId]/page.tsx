@@ -76,6 +76,7 @@ export default async function AdminReportCorrectionPage({ params }: { params: Pr
     reportUpdatedAt: report.updatedAt,
     finalizedAt: report.finalizedAt,
     correctionNotice,
+    showDeviceSyncWarnings: false,
     canEdit: report.permissions.canEdit || adminOverrideForFinalized,
     canFinalize: report.permissions.canFinalize || adminOverrideForFinalized,
     inspectionTypeLabel: report.task.displayLabel ?? report.template.label,

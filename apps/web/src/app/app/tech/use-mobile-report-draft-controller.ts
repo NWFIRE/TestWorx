@@ -168,6 +168,7 @@ export function useMobileReportDraftController({
   const fieldTimerRef = useRef<Map<string, number>>(new Map());
   const localInteractionStartedRef = useRef(false);
   const finalizeInFlightRef = useRef(false);
+  const showDeviceSyncWarnings = data.showDeviceSyncWarnings !== false;
 
   const clearPendingDraftSyncTimers = useCallback(() => {
     if (queueTimerRef.current) {
@@ -309,7 +310,7 @@ export function useMobileReportDraftController({
         setDraft(draftRef.current);
       }
       setSaveState(buildReportSaveState(localRecord, data.reportStatus));
-      if (localRecord.lastError) {
+      if (showDeviceSyncWarnings && localRecord.lastError) {
         setErrorMessage(toTechnicianFacingStoredSyncMessage(localRecord.lastError, localRecord.pendingFinalize ? "finalize" : "save"));
       }
       setHydrated(true);
@@ -329,7 +330,7 @@ export function useMobileReportDraftController({
           setDraft(draftRef.current);
         }
         setSaveState(buildReportSaveState(current, data.reportStatus));
-        if (current.lastError) {
+        if (showDeviceSyncWarnings && current.lastError) {
           setErrorMessage(toTechnicianFacingStoredSyncMessage(current.lastError, current.pendingFinalize ? "finalize" : "save"));
         } else {
           setErrorMessage(null);
@@ -347,7 +348,7 @@ export function useMobileReportDraftController({
       }
       activeFieldTimers.forEach((timerId) => window.clearTimeout(timerId));
     };
-  }, [data.customInspectionTypeLabel, data.draft, data.finalizedAt, data.reportId, data.reportStatus, data.reportUpdatedAt, inspectionId, taskId]);
+  }, [data.customInspectionTypeLabel, data.draft, data.finalizedAt, data.reportId, data.reportStatus, data.reportUpdatedAt, inspectionId, showDeviceSyncWarnings, taskId]);
 
   const updateSectionField = useCallback((sectionId: string, fieldId: string, value: ReportPrimitiveValue) => {
     void applyDraftMutation((currentDraft) => {
