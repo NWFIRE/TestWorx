@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import type { DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import { upload } from "@vercel/blob/client";
 
@@ -25,6 +26,10 @@ function isPdfFile(file: File) {
 
 function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fileSelectionKey(file: File) {
+  return `${file.name.toLowerCase()}-${file.size}-${file.lastModified}`;
 }
 
 function sanitizePathSegment(value: string) {
@@ -64,6 +69,72 @@ export function InspectionExternalDocumentsCard({
   const [isUploading, startUploadTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const dragDepth = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  function addSelectedFiles(nextFiles: File[]) {
+    setError(null);
+    setSuccess(null);
+
+    if (nextFiles.length === 0) {
+      return;
+    }
+
+    const nonPdfFile = nextFiles.find((file) => !isPdfFile(file));
+    if (nonPdfFile) {
+      setError(`${nonPdfFile.name} is not a PDF. Upload PDF files only.`);
+      return;
+    }
+
+    const oversizedFile = nextFiles.find((file) => file.size > MAX_INSPECTION_DOCUMENT_UPLOAD_BYTES);
+    if (oversizedFile) {
+      setError(`${oversizedFile.name} is ${formatFileSize(oversizedFile.size)}. Upload PDFs up to ${MAX_INSPECTION_DOCUMENT_UPLOAD_LABEL}, or compress/split the file and try again.`);
+      return;
+    }
+
+    setSelectedFiles((currentFiles) => {
+      const existingKeys = new Set(currentFiles.map(fileSelectionKey));
+      const uniqueFiles = nextFiles.filter((file) => !existingKeys.has(fileSelectionKey(file)));
+      if (uniqueFiles.length === 0) {
+        setError("Those PDFs are already selected.");
+        return currentFiles;
+      }
+      return [...currentFiles, ...uniqueFiles];
+    });
+  }
+
+  function handleDragEnter(event: DragEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepth.current += 1;
+    setIsDragActive(true);
+  }
+
+  function handleDragOver(event: DragEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "copy";
+    setIsDragActive(true);
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) {
+      setIsDragActive(false);
+    }
+  }
+
+  function handleDrop(event: DragEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepth.current = 0;
+    setIsDragActive(false);
+    addSelectedFiles(Array.from(event.dataTransfer.files));
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -72,7 +143,8 @@ export function InspectionExternalDocumentsCard({
 
     const form = event.currentTarget;
     const formData = new FormData(form);
-    const files = formData.getAll("document").filter((entry): entry is File => entry instanceof File && entry.size > 0);
+    const formFiles = formData.getAll("document").filter((entry): entry is File => entry instanceof File && entry.size > 0);
+    const files = selectedFiles.length > 0 ? selectedFiles : formFiles;
     if (files.length === 0) {
       setError("Select at least one PDF to upload.");
       return;
@@ -152,6 +224,10 @@ export function InspectionExternalDocumentsCard({
           setSuccess(payload.success ?? (files.length === 1 ? `${files[0]!.name} uploaded.` : `${files.length} PDFs uploaded.`));
           router.refresh();
           form.reset();
+          setSelectedFiles([]);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
         } catch (submitError) {
           setError(normalizeUploadError(submitError));
         }
@@ -174,8 +250,40 @@ export function InspectionExternalDocumentsCard({
         </div>
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="document">Upload PDF files</label>
-          <input accept="application/pdf" className="block w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" id="document" multiple name="document" type="file" />
-          <p className="mt-2 text-xs text-slate-500">You can select and upload multiple PDFs at once. Maximum {MAX_INSPECTION_DOCUMENT_UPLOAD_LABEL} per PDF.</p>
+          <button
+            aria-describedby="document-upload-help"
+            className={`flex w-full flex-col items-center justify-center rounded-2xl border border-dashed px-5 py-6 text-center transition ${
+              isDragActive
+                ? "border-slateblue bg-blue-50 text-slateblue"
+                : "border-slate-300 bg-slate-50/70 text-slate-600 hover:border-slateblue hover:bg-blue-50/60"
+            }`}
+            disabled={isUploading}
+            onClick={() => fileInputRef.current?.click()}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            type="button"
+          >
+            <span className="text-sm font-semibold text-ink">Drag and drop PDF files here, or click to browse.</span>
+            <span className="mt-1 text-xs text-slate-500">PDF only. Maximum {MAX_INSPECTION_DOCUMENT_UPLOAD_LABEL} per PDF.</span>
+            {selectedFiles.length > 0 ? (
+              <span className="mt-3 text-xs font-semibold text-slateblue">
+                {selectedFiles.length === 1 ? selectedFiles[0]!.name : `${selectedFiles.length} PDFs selected`}
+              </span>
+            ) : null}
+          </button>
+          <input
+            accept="application/pdf"
+            className="sr-only"
+            id="document"
+            multiple
+            name="document"
+            onChange={(event) => addSelectedFiles(Array.from(event.currentTarget.files ?? []))}
+            ref={fileInputRef}
+            type="file"
+          />
+          <p className="mt-2 text-xs text-slate-500" id="document-upload-help">You can select or drop multiple PDFs at once.</p>
         </div>
         <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
           <input className="h-5 w-5 rounded border-slate-300" defaultChecked name="requiresSignature" type="checkbox" />
