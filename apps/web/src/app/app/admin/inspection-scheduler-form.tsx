@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChangeEvent, ReactNode } from "react";
+import type { ChangeEvent, DragEvent, ReactNode } from "react";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CustomerOption, SiteOption, TechnicianOption } from "@testworx/types";
@@ -77,6 +77,8 @@ const serviceSchedulingOptions: InspectionTaskSchedulingStatus[] = [
   "completed",
   "deferred"
 ];
+const maxExternalDocumentUploadBytes = 50 * 1024 * 1024;
+const maxExternalDocumentUploadLabel = "50 MB";
 
 type InspectionTaskValue = {
   inspectionType: InspectionType;
@@ -142,6 +144,18 @@ function buildInitialServiceLines(initialValues?: InspectionSchedulerFormInitial
   }
 
   return [createServiceLineDraft(inspectionMonth)];
+}
+
+function isPdfFile(file: File) {
+  return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+}
+
+function formatFileSize(bytes: number) {
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fileSelectionKey(file: File) {
+  return `${file.name.toLowerCase()}-${file.size}-${file.lastModified}`;
 }
 
 function serializeInitialValues(initialValues?: InspectionSchedulerFormInitialValues) {
@@ -346,8 +360,11 @@ export function InspectionSchedulerForm({
   const [externalDocumentsRequireSignature, setExternalDocumentsRequireSignature] = useState(true);
   const [externalDocumentsCustomerVisible, setExternalDocumentsCustomerVisible] = useState(false);
   const [isUploadingExternalDocuments, setIsUploadingExternalDocuments] = useState(false);
+  const [externalDocumentsDragActive, setExternalDocumentsDragActive] = useState(false);
+  const [externalDocumentUploadError, setExternalDocumentUploadError] = useState<string | null>(null);
   const [submitLocked, setSubmitLocked] = useState(false);
   const serviceLineRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const externalDocumentsDragDepthRef = useRef(0);
   const initialValuesSignature = serializeInitialValues(initialValues);
   const filteredSites = useMemo(
     () => sites.filter((site) => isUserFacingSiteLabel(site.name) && (!selectedCustomerId || site.customerCompanyId === selectedCustomerId)),
@@ -416,6 +433,67 @@ export function InspectionSchedulerForm({
     });
   };
 
+  const addExternalDocumentFiles = (files: File[]) => {
+    setExternalDocumentUploadError(null);
+
+    if (files.length === 0) {
+      return;
+    }
+
+    const nonPdfFile = files.find((file) => !isPdfFile(file));
+    if (nonPdfFile) {
+      setExternalDocumentUploadError(`${nonPdfFile.name} is not a PDF. Upload PDF files only.`);
+      return;
+    }
+
+    const oversizedFile = files.find((file) => file.size > maxExternalDocumentUploadBytes);
+    if (oversizedFile) {
+      setExternalDocumentUploadError(`${oversizedFile.name} is ${formatFileSize(oversizedFile.size)}. Upload PDFs up to ${maxExternalDocumentUploadLabel}, or compress/split the file and try again.`);
+      return;
+    }
+
+    setExternalDocumentFiles((currentFiles) => {
+      const existingKeys = new Set(currentFiles.map(fileSelectionKey));
+      const uniqueFiles = files.filter((file) => !existingKeys.has(fileSelectionKey(file)));
+      if (uniqueFiles.length === 0) {
+        setExternalDocumentUploadError("Those PDFs are already selected.");
+        return currentFiles;
+      }
+      return [...currentFiles, ...uniqueFiles];
+    });
+  };
+
+  const handleExternalDocumentDragEnter = (event: DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    externalDocumentsDragDepthRef.current += 1;
+    setExternalDocumentsDragActive(true);
+  };
+
+  const handleExternalDocumentDragOver = (event: DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "copy";
+    setExternalDocumentsDragActive(true);
+  };
+
+  const handleExternalDocumentDragLeave = (event: DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    externalDocumentsDragDepthRef.current = Math.max(0, externalDocumentsDragDepthRef.current - 1);
+    if (externalDocumentsDragDepthRef.current === 0) {
+      setExternalDocumentsDragActive(false);
+    }
+  };
+
+  const handleExternalDocumentDrop = (event: DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    externalDocumentsDragDepthRef.current = 0;
+    setExternalDocumentsDragActive(false);
+    addExternalDocumentFiles(Array.from(event.dataTransfer.files));
+  };
+
   const addServiceLine = () => {
     const nextLine = createServiceLineDraft(inspectionMonth);
     setServiceLines((current) => [
@@ -452,6 +530,9 @@ export function InspectionSchedulerForm({
     setExternalDocumentLabel("");
     setExternalDocumentsRequireSignature(true);
     setExternalDocumentsCustomerVisible(false);
+    setExternalDocumentUploadError(null);
+    setExternalDocumentsDragActive(false);
+    externalDocumentsDragDepthRef.current = 0;
     if (externalDocumentsInputRef.current) {
       externalDocumentsInputRef.current.value = "";
     }
@@ -1104,16 +1185,40 @@ export function InspectionSchedulerForm({
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="externalDocuments">Upload PDF documents</label>
+            <button
+              aria-describedby="external-documents-help"
+              className={`flex w-full flex-col items-center justify-center rounded-2xl border border-dashed px-5 py-6 text-center transition ${
+                externalDocumentsDragActive
+                  ? "border-slateblue bg-blue-50 text-slateblue"
+                  : "border-slate-300 bg-slate-50/70 text-slate-600 hover:border-slateblue hover:bg-blue-50/60"
+              }`}
+              disabled={pending || submitLocked || isUploadingExternalDocuments}
+              onClick={() => externalDocumentsInputRef.current?.click()}
+              onDragEnter={handleExternalDocumentDragEnter}
+              onDragLeave={handleExternalDocumentDragLeave}
+              onDragOver={handleExternalDocumentDragOver}
+              onDrop={handleExternalDocumentDrop}
+              type="button"
+            >
+              <span className="text-sm font-semibold text-ink">Drag and drop PDF files here, or click to browse.</span>
+              <span className="mt-1 text-xs text-slate-500">PDF only. Maximum {maxExternalDocumentUploadLabel} per PDF.</span>
+              {externalDocumentFiles.length > 0 ? (
+                <span className="mt-3 text-xs font-semibold text-slateblue">
+                  {externalDocumentFiles.length === 1 ? externalDocumentFiles[0]!.name : `${externalDocumentFiles.length} PDFs selected`}
+                </span>
+              ) : null}
+            </button>
             <input
               accept="application/pdf"
-              className="block w-full rounded-2xl border border-slate-200 px-4 py-3.5 text-sm"
+              className="sr-only"
               id="externalDocuments"
               multiple
-              onChange={(event) => setExternalDocumentFiles(Array.from(event.target.files ?? []))}
+              onChange={(event) => addExternalDocumentFiles(Array.from(event.currentTarget.files ?? []))}
               ref={externalDocumentsInputRef}
               type="file"
             />
-            <p className="mt-2 text-sm leading-5 text-slate-500">You can attach one or more PDFs here. File names are used as the initial document identifiers.</p>
+            <p className="mt-2 text-sm leading-5 text-slate-500" id="external-documents-help">You can attach one or more PDFs here. File names are used as the initial document identifiers.</p>
+            {externalDocumentUploadError ? <p className="mt-2 text-sm text-rose-600">{externalDocumentUploadError}</p> : null}
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="externalDocumentLabel">Optional label</label>
