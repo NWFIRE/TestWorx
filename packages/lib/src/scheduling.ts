@@ -7,7 +7,8 @@ import {
   InspectionStatus,
   InspectionType,
   Prisma,
-  RecurrenceFrequency
+  RecurrenceFrequency,
+  UserRole
 } from "@prisma/client";
 import { prisma } from "@testworx/db";
 import { z } from "zod";
@@ -29,6 +30,7 @@ import {
 import { resolveInspectionLifecycleSummary } from "./inspection-lifecycle";
 
 const inspectionTypeEnum = z.enum(Object.keys(inspectionTypeRegistry) as [keyof typeof inspectionTypeRegistry, ...(keyof typeof inspectionTypeRegistry)[]]);
+const assignableInspectionUserRoles = [UserRole.technician, UserRole.office_admin] as const;
 export const multiSystemInspectionTypes = [
   InspectionType.kitchen_suppression,
   InspectionType.fire_alarm,
@@ -2202,10 +2204,10 @@ async function validateSchedulingReferences(tx: Prisma.TransactionClient, tenant
   });
   const assignedTechnicianQuery = uniqueAssignedTechnicianIds.length
     ? "findMany" in tx.user && typeof tx.user.findMany === "function"
-      ? tx.user.findMany({ where: { id: { in: uniqueAssignedTechnicianIds }, tenantId, role: "technician" } })
+      ? tx.user.findMany({ where: { id: { in: uniqueAssignedTechnicianIds }, tenantId, role: { in: [...assignableInspectionUserRoles] } } })
       : Promise.all(
           uniqueAssignedTechnicianIds.map((technicianId) =>
-            tx.user.findFirst({ where: { id: technicianId, tenantId, role: "technician" } })
+            tx.user.findFirst({ where: { id: technicianId, tenantId, role: { in: [...assignableInspectionUserRoles] } } })
           )
         ).then((records) => records.filter((record): record is NonNullable<typeof records[number]> => Boolean(record)))
     : Promise.resolve([]);
@@ -4864,7 +4866,7 @@ export async function getAdminDashboardData(actor: ActorContext) {
       orderBy: { name: "asc" }
     }),
     prisma.user.findMany({
-      where: { tenantId, role: "technician" },
+      where: { tenantId, role: { in: [...assignableInspectionUserRoles] } },
       select: { id: true, name: true },
       orderBy: { name: "asc" }
     }),
@@ -5480,7 +5482,7 @@ export async function getAdminUpcomingInspectionsData(
   const [customers, sites, technicians, inspections] = await Promise.all([
     prisma.customerCompany.findMany({ where: { tenantId }, orderBy: { name: "asc" } }),
     prisma.site.findMany({ where: { tenantId }, orderBy: { name: "asc" } }),
-    prisma.user.findMany({ where: { tenantId, role: "technician" }, orderBy: { name: "asc" } }),
+    prisma.user.findMany({ where: { tenantId, role: { in: [...assignableInspectionUserRoles] } }, orderBy: { name: "asc" } }),
     prisma.inspection.findMany({
       where: {
         tenantId,
@@ -5746,7 +5748,7 @@ export async function getAdminSchedulingQueueData(
     ? prisma.user.findMany({
       where: {
         tenantId,
-        role: "technician",
+        role: { in: [...assignableInspectionUserRoles] },
         isActive: true
       },
       select: {
@@ -5883,7 +5885,7 @@ export async function getAdminSchedulingFilterData(
   const technicians = await prisma.user.findMany({
     where: {
       tenantId,
-      role: "technician",
+      role: { in: [...assignableInspectionUserRoles] },
       isActive: true
     },
     select: {

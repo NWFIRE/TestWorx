@@ -72,6 +72,12 @@ describe("inspection archive", () => {
     expect(result.inspections[0]?.customerName).toBe("Summit Tower");
     expect(result.inspections[0]?.inspectionTypeLabels).toEqual(["Kitchen suppression"]);
     expect(result.inspections[0]?.divisions).toEqual(["kitchen_suppression"]);
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        tenantId: "tenant_1",
+        role: { in: ["technician", "office_admin"] }
+      })
+    }));
     expect(prismaMock.inspection.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         tenantId: "tenant_1",

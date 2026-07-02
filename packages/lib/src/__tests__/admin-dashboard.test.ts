@@ -145,5 +145,11 @@ describe("admin dashboard data", () => {
     expect(result.completedInspections).toHaveLength(1);
     expect(result.completedInspections[0]?.status).toBe("completed");
     expect(result.completedInspections[0]?.billingStatus).toBe("invoiced");
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        tenantId: "tenant_1",
+        role: { in: ["technician", "office_admin"] }
+      })
+    }));
   }, 15000);
 });

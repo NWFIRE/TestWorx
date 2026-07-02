@@ -1,4 +1,4 @@
-import { InspectionStatus, Prisma } from "@prisma/client";
+import { InspectionStatus, Prisma, UserRole } from "@prisma/client";
 import { prisma } from "@testworx/db";
 
 import type { ActorContext, InspectionType } from "@testworx/types";
@@ -9,6 +9,8 @@ import { assertTenantContext } from "./permissions";
 import { buildInspectionPacketDocuments } from "./report-service";
 import { inspectionTypeRegistry } from "./report-config";
 import { getCustomerFacingSiteLabel } from "./scheduling";
+
+const assignableInspectionUserRoles = [UserRole.technician, UserRole.office_admin] as const;
 
 function parseActor(actor: ActorContext) {
   const parsed = actorContextSchema.parse(actor);
@@ -369,7 +371,11 @@ export async function getAdminInspectionArchiveData(
     prisma.inspection.count({ where }),
     prisma.customerCompany.findMany({ where: { tenantId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.site.findMany({ where: { tenantId }, select: { id: true, name: true, city: true }, orderBy: { name: "asc" } }),
-    prisma.user.findMany({ where: { tenantId, role: "technician" }, select: { id: true, name: true }, orderBy: { name: "asc" } })
+    prisma.user.findMany({
+      where: { tenantId, role: { in: [...assignableInspectionUserRoles] } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" }
+    })
   ]);
 
   const divisionOptions = [
