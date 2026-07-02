@@ -6,11 +6,65 @@ type DroppedPdfResult = {
   downloadFailed: boolean;
 };
 
+type FileSystemFileEntryLike = {
+  isFile: boolean;
+  file: (successCallback: (file: File) => void, errorCallback?: (error: DOMException) => void) => void;
+};
+
+type DataTransferItemWithEntry = DataTransferItem & {
+  webkitGetAsEntry?: () => unknown;
+  getAsEntry?: () => unknown;
+};
+
 function getFileItems(dataTransfer: DataTransfer) {
   return Array.from(dataTransfer.items ?? [])
     .filter((item) => item.kind === "file")
     .map((item) => item.getAsFile())
     .filter((file): file is File => Boolean(file));
+}
+
+function getFileEntry(item: DataTransferItem): FileSystemFileEntryLike | null {
+  const entryItem = item as DataTransferItemWithEntry;
+  const entry = entryItem.webkitGetAsEntry?.() ?? entryItem.getAsEntry?.() ?? null;
+  return isFileEntryLike(entry) ? entry : null;
+}
+
+function isFileEntryLike(entry: unknown): entry is FileSystemFileEntryLike {
+  return Boolean(
+    entry &&
+      typeof entry === "object" &&
+      "isFile" in entry &&
+      "file" in entry &&
+      typeof (entry as { file?: unknown }).file === "function"
+  );
+}
+
+function readFileEntry(entry: FileSystemFileEntryLike) {
+  return new Promise<File | null>((resolve) => {
+    if (!entry.isFile) {
+      resolve(null);
+      return;
+    }
+
+    entry.file(
+      (file) => resolve(file),
+      () => resolve(null)
+    );
+  });
+}
+
+async function getFileEntries(dataTransfer: DataTransfer) {
+  const entries = Array.from(dataTransfer.items ?? [])
+    .filter((item) => item.kind === "file")
+    .map(getFileEntry)
+    .filter((entry): entry is FileSystemFileEntryLike => Boolean(entry));
+
+  if (entries.length === 0) {
+    return [];
+  }
+
+  const files = await Promise.all(entries.map(readFileEntry));
+  return files.filter((file): file is File => Boolean(file));
 }
 
 function getDataTransferFiles(dataTransfer: DataTransfer) {
@@ -142,6 +196,11 @@ export async function getDroppedPdfFiles(dataTransfer: DataTransfer): Promise<Dr
   const transferFiles = getDataTransferFiles(dataTransfer);
   if (transferFiles.length > 0) {
     return { files: transferFiles, unsupportedCloudReference: false, downloadFailed: false };
+  }
+
+  const entryFiles = await getFileEntries(dataTransfer);
+  if (entryFiles.length > 0) {
+    return { files: entryFiles, unsupportedCloudReference: false, downloadFailed: false };
   }
 
   const candidates = getCloudReferenceCandidates(dataTransfer);
