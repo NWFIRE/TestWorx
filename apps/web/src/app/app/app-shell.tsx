@@ -82,6 +82,13 @@ function NavIcon({
           <path {...shared} d="M16 3v4M8 3v4M3 10h18M8 14h3M8 18h6" />
         </svg>
       );
+    case "clock":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <circle {...shared} cx="12" cy="12" r="9" />
+          <path {...shared} d="M12 7.5V12l3 2" />
+        </svg>
+      );
     case "branch":
       return (
         <svg aria-hidden="true" className={className} viewBox="0 0 24 24">

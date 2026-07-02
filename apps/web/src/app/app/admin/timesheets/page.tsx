@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { formatTimesheetDateTimeLocal, formatTimesheetHours, getAdminTimesheetWorkspace } from "@testworx/lib/server/index";
 
-import { AppPageShell, FilterBar, KPIStatCard, PageHeader, SectionCard, StatusBadge } from "../operations-ui";
+import { AppPageShell, FilterBar, KPIStatCard, PageHeader, StatusBadge } from "../operations-ui";
 import { correctTimeEntryAction, createAdminTimeEntryAction } from "../../timesheets/actions";
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -121,17 +121,22 @@ export default async function AdminTimesheetsPage({
 
       <div className="space-y-5">
         {workspace.employeeSummaries.map((summary) => (
-          <SectionCard key={summary.employee.id}>
-            <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-2xl font-bold tracking-[-0.035em] text-ink">{summary.employee.name}</h2>
-                <p className="mt-1 text-sm font-semibold text-slate-600">{summary.employee.email}</p>
+          <details className="enterprise-card rounded-[26px] p-5 lg:p-6" key={summary.employee.id}>
+            <summary className="group flex cursor-pointer list-none flex-col gap-3 sm:flex-row sm:items-center sm:justify-between [&::-webkit-details-marker]:hidden">
+              <div className="flex items-start gap-3">
+                <span className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-black text-slate-700 transition group-open:rotate-90">
+                  ›
+                </span>
+                <div>
+                  <h2 className="text-2xl font-bold tracking-[-0.035em] text-ink">{summary.employee.name}</h2>
+                  <p className="mt-1 text-sm font-semibold text-slate-600">{summary.employee.email}</p>
+                </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 <StatusBadge label={summary.employee.role.replaceAll("_", " ")} tone="slate" />
                 <StatusBadge label={`${formatTimesheetHours(summary.totals.netMinutes)} net hrs`} tone="emerald" />
               </div>
-            </div>
+            </summary>
 
             <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
               <div className="hidden grid-cols-[1.4fr_0.8fr_0.8fr_0.7fr_0.7fr_0.7fr_1.4fr] bg-slate-100 px-4 py-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-600 lg:grid">
@@ -222,7 +227,7 @@ export default async function AdminTimesheetsPage({
                 ))}
               </div>
             </div>
-          </SectionCard>
+          </details>
         ))}
       </div>
     </AppPageShell>

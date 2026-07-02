@@ -5,7 +5,7 @@ export type AppNavItem = {
   label: string;
   shortLabel: string;
   abbreviation: string;
-  icon?: "calendar" | "branch" | "alert" | "invoice" | "dollar" | "check" | "settings" | "grid" | "clipboard" | "portal" | "team" | "mail" | "book";
+  icon?: "calendar" | "clock" | "branch" | "alert" | "invoice" | "dollar" | "check" | "settings" | "grid" | "clipboard" | "portal" | "team" | "mail" | "book";
   description?: string;
   tone?: "blue" | "amber" | "emerald" | "violet" | "slate";
   group?: "Dashboard" | "Work" | "Billing" | "Customers" | "Operations" | "Settings" | "Portal";
@@ -163,7 +163,7 @@ const adminNavItems: AppNavItem[] = [
     label: "Timesheets",
     shortLabel: "Timesheets",
     abbreviation: "TS",
-    icon: "calendar",
+    icon: "clock",
     description: "Clock entries, weekly totals, and admin corrections",
     tone: "blue",
     group: "Operations",
@@ -251,7 +251,7 @@ const navByRole: Record<string, AppNavItem[]> = {
       label: "Timesheets",
       shortLabel: "Timesheets",
       abbreviation: "TS",
-      icon: "calendar",
+      icon: "clock",
       description: "Clock in, clock out, and weekly time",
       tone: "blue",
       group: "Operations",
