@@ -26,6 +26,7 @@ import {
 
 import { SearchSelect, type SearchSelectOption } from "@/app/search-select";
 import { useToast } from "@/app/toast-provider";
+import { cloudReferenceDropMessage, getDroppedPdfFiles } from "./pdf-drop-utils";
 
 type InspectionType = keyof typeof inspectionTypeRegistry;
 type RecurrenceFrequency = "ONCE" | "MONTHLY" | "QUARTERLY" | "SEMI_ANNUAL" | "ANNUAL";
@@ -156,26 +157,6 @@ function formatFileSize(bytes: number) {
 
 function fileSelectionKey(file: File) {
   return `${file.name.toLowerCase()}-${file.size}-${file.lastModified}`;
-}
-
-function getDroppedFiles(dataTransfer: DataTransfer) {
-  const itemFiles = Array.from(dataTransfer.items ?? [])
-    .filter((item) => item.kind === "file")
-    .map((item) => item.getAsFile())
-    .filter((file): file is File => Boolean(file));
-
-  if (itemFiles.length > 0) {
-    return itemFiles;
-  }
-
-  return Array.from(dataTransfer.files ?? []);
-}
-
-function hasUnsupportedCloudReference(dataTransfer: DataTransfer) {
-  const types = Array.from(dataTransfer.types ?? []);
-  const hasFileIntent = types.includes("Files") || Array.from(dataTransfer.items ?? []).some((item) => item.kind === "file");
-  const hasLinkIntent = types.some((type) => type === "text/uri-list" || type === "text/plain" || type === "text/x-moz-url");
-  return hasFileIntent || hasLinkIntent;
 }
 
 function serializeInitialValues(initialValues?: InspectionSchedulerFormInitialValues) {
@@ -511,12 +492,15 @@ export function InspectionSchedulerForm({
     event.stopPropagation();
     externalDocumentsDragDepthRef.current = 0;
     setExternalDocumentsDragActive(false);
-    const files = getDroppedFiles(event.dataTransfer);
-    if (files.length === 0 && hasUnsupportedCloudReference(event.dataTransfer)) {
-      setExternalDocumentUploadError("That drop did not include an actual PDF file. If this is a Dropbox, OneDrive, or Google Drive file, make it available offline and try again.");
-      return;
-    }
-    addExternalDocumentFiles(files);
+    const { dataTransfer } = event;
+    void (async () => {
+      const result = await getDroppedPdfFiles(dataTransfer);
+      if (result.files.length === 0 && result.unsupportedCloudReference) {
+        setExternalDocumentUploadError(cloudReferenceDropMessage(result.downloadFailed));
+        return;
+      }
+      addExternalDocumentFiles(result.files);
+    })();
   };
 
   const addServiceLine = () => {

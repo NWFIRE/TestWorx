@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import type { DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import { upload } from "@vercel/blob/client";
+import { cloudReferenceDropMessage, getDroppedPdfFiles } from "./pdf-drop-utils";
 
 const MAX_INSPECTION_PDF_UPLOAD_BYTES = 50 * 1024 * 1024;
 const MAX_INSPECTION_PDF_UPLOAD_LABEL = "50 MB";
@@ -18,26 +19,6 @@ function formatFileSize(bytes: number) {
 
 function fileSelectionKey(file: File) {
   return `${file.name.toLowerCase()}-${file.size}-${file.lastModified}`;
-}
-
-function getDroppedFiles(dataTransfer: DataTransfer) {
-  const itemFiles = Array.from(dataTransfer.items ?? [])
-    .filter((item) => item.kind === "file")
-    .map((item) => item.getAsFile())
-    .filter((file): file is File => Boolean(file));
-
-  if (itemFiles.length > 0) {
-    return itemFiles;
-  }
-
-  return Array.from(dataTransfer.files ?? []);
-}
-
-function hasUnsupportedCloudReference(dataTransfer: DataTransfer) {
-  const types = Array.from(dataTransfer.types ?? []);
-  const hasFileIntent = types.includes("Files") || Array.from(dataTransfer.items ?? []).some((item) => item.kind === "file");
-  const hasLinkIntent = types.some((type) => type === "text/uri-list" || type === "text/plain" || type === "text/x-moz-url");
-  return hasFileIntent || hasLinkIntent;
 }
 
 function sanitizePathSegment(value: string) {
@@ -129,12 +110,15 @@ export function InspectionPdfUploadCard({
     event.stopPropagation();
     dragDepth.current = 0;
     setIsDragActive(false);
-    const files = getDroppedFiles(event.dataTransfer);
-    if (files.length === 0 && hasUnsupportedCloudReference(event.dataTransfer)) {
-      setError("That drop did not include an actual PDF file. If this is a Dropbox, OneDrive, or Google Drive file, make it available offline and try again.");
-      return;
-    }
-    addSelectedFiles(files);
+    const { dataTransfer } = event;
+    void (async () => {
+      const result = await getDroppedPdfFiles(dataTransfer);
+      if (result.files.length === 0 && result.unsupportedCloudReference) {
+        setError(cloudReferenceDropMessage(result.downloadFailed));
+        return;
+      }
+      addSelectedFiles(result.files);
+    })();
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
