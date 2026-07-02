@@ -32,6 +32,26 @@ function fileSelectionKey(file: File) {
   return `${file.name.toLowerCase()}-${file.size}-${file.lastModified}`;
 }
 
+function getDroppedFiles(dataTransfer: DataTransfer) {
+  const itemFiles = Array.from(dataTransfer.items ?? [])
+    .filter((item) => item.kind === "file")
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => Boolean(file));
+
+  if (itemFiles.length > 0) {
+    return itemFiles;
+  }
+
+  return Array.from(dataTransfer.files ?? []);
+}
+
+function hasUnsupportedCloudReference(dataTransfer: DataTransfer) {
+  const types = Array.from(dataTransfer.types ?? []);
+  const hasFileIntent = types.includes("Files") || Array.from(dataTransfer.items ?? []).some((item) => item.kind === "file");
+  const hasLinkIntent = types.some((type) => type === "text/uri-list" || type === "text/plain" || type === "text/x-moz-url");
+  return hasFileIntent || hasLinkIntent;
+}
+
 function sanitizePathSegment(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "file";
 }
@@ -133,7 +153,12 @@ export function InspectionExternalDocumentsCard({
     event.stopPropagation();
     dragDepth.current = 0;
     setIsDragActive(false);
-    addSelectedFiles(Array.from(event.dataTransfer.files));
+    const files = getDroppedFiles(event.dataTransfer);
+    if (files.length === 0 && hasUnsupportedCloudReference(event.dataTransfer)) {
+      setError("That drop did not include an actual PDF file. If this is a Dropbox, OneDrive, or Google Drive file, make it available offline and try again.");
+      return;
+    }
+    addSelectedFiles(files);
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
