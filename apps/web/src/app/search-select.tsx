@@ -91,6 +91,7 @@ export function SearchSelect({
   } | null>(null);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const shouldOpenOnFocusRef = useRef(false);
   const query =
     queryOverride && queryOverride.value === value && queryOverride.customValue === customValue
       ? queryOverride.text
@@ -168,9 +169,10 @@ export function SearchSelect({
           onChange={(event) => updateQuery(event.target.value)}
           onFocus={() => {
             onInputFocus?.();
-            if (!disabled) {
+            if (!disabled && shouldOpenOnFocusRef.current) {
               setOpen(true);
             }
+            shouldOpenOnFocusRef.current = false;
           }}
           onBlur={onInputBlur}
           onKeyDown={(event) => {
@@ -208,6 +210,12 @@ export function SearchSelect({
             }
           }}
           placeholder={disabled ? disabledPlaceholder ?? placeholder : placeholder}
+          onPointerDown={() => {
+            shouldOpenOnFocusRef.current = true;
+            if (document.activeElement === wrapperRef.current?.querySelector("input") && !disabled) {
+              setOpen(true);
+            }
+          }}
           required={required && !allowCustomValue}
           role="combobox"
           value={query}

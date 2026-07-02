@@ -1202,7 +1202,11 @@ export function InspectionSchedulerForm({
                   : "border-slate-300 bg-slate-50/70 text-slate-600 hover:border-slateblue hover:bg-blue-50/60"
               }`}
               disabled={pending || submitLocked || isUploadingExternalDocuments}
-              onClick={() => externalDocumentsInputRef.current?.click()}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                externalDocumentsInputRef.current?.click();
+              }}
               onDragEnter={handleExternalDocumentDragEnter}
               onDragLeave={handleExternalDocumentDragLeave}
               onDragOver={handleExternalDocumentDragOver}
