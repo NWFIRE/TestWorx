@@ -30,7 +30,7 @@ import {
 import { resolveInspectionLifecycleSummary } from "./inspection-lifecycle";
 
 const inspectionTypeEnum = z.enum(Object.keys(inspectionTypeRegistry) as [keyof typeof inspectionTypeRegistry, ...(keyof typeof inspectionTypeRegistry)[]]);
-const assignableInspectionUserRoles = [UserRole.technician, UserRole.office_admin] as const;
+const assignableInspectionUserRoles = [UserRole.technician, UserRole.office_admin, UserRole.tenant_admin] as const;
 export const multiSystemInspectionTypes = [
   InspectionType.kitchen_suppression,
   InspectionType.fire_alarm,

@@ -148,7 +148,7 @@ describe("admin dashboard data", () => {
     expect(prismaMock.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         tenantId: "tenant_1",
-        role: { in: ["technician", "office_admin"] }
+        role: { in: ["technician", "office_admin", "tenant_admin"] }
       })
     }));
   }, 15000);

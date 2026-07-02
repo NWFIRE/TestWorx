@@ -75,7 +75,7 @@ describe("inspection archive", () => {
     expect(prismaMock.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         tenantId: "tenant_1",
-        role: { in: ["technician", "office_admin"] }
+        role: { in: ["technician", "office_admin", "tenant_admin"] }
       })
     }));
     expect(prismaMock.inspection.findMany).toHaveBeenCalledWith(expect.objectContaining({

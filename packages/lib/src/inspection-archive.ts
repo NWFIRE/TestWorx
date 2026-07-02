@@ -10,7 +10,7 @@ import { buildInspectionPacketDocuments } from "./report-service";
 import { inspectionTypeRegistry } from "./report-config";
 import { getCustomerFacingSiteLabel } from "./scheduling";
 
-const assignableInspectionUserRoles = [UserRole.technician, UserRole.office_admin] as const;
+const assignableInspectionUserRoles = [UserRole.technician, UserRole.office_admin, UserRole.tenant_admin] as const;
 
 function parseActor(actor: ActorContext) {
   const parsed = actorContextSchema.parse(actor);
