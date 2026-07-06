@@ -10,8 +10,7 @@ import {
   filterSubsetDuplicateOperationalInspections,
   formatInspectionClassificationLabel,
   formatInspectionStatusLabel,
-  getAdminDashboardData,
-  getAdminSchedulingFilterData,
+  getAdminInspectionCreateOptions,
   getAdminSchedulingQueueData,
   getInspectionClassificationTone,
   getInspectionStatusTone,
@@ -249,14 +248,7 @@ export default async function AdminInspectionsPage({
   };
 
   const fastManagementWindowEnd = endOfDay(addDays(startOfDay(new Date()), FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS));
-  const [filterData, fastQueueData, dashboardData] = await Promise.all([
-    getAdminSchedulingFilterData(actor, {
-      statuses: effectiveStatuses,
-      classifications: requestedClassifications,
-      priority: requestedPriority,
-      query,
-      technicianId
-    }),
+  const [fastQueueData, createOptions] = await Promise.all([
     getAdminSchedulingQueueData(actor, {
       statuses: effectiveStatuses,
       classifications: requestedClassifications,
@@ -268,12 +260,25 @@ export default async function AdminInspectionsPage({
       includeCounts: false,
       includeTechnicians: false
     }),
-    createOpen ? getAdminDashboardData(actor) : Promise.resolve(null)
+    getAdminInspectionCreateOptions(actor)
   ]);
-  const initialCustomerId = dashboardData?.customers.some((customer) => customer.id === requestedCustomerId)
+  const filterData = {
+    filters: {
+      statuses: effectiveStatuses,
+      classifications: requestedClassifications,
+      priority: requestedPriority,
+      query,
+      technicianId
+    },
+    technicians: createOptions.technicians.map((technician) => ({
+      value: technician.id,
+      label: technician.name
+    }))
+  };
+  const initialCustomerId = createOptions?.customers.some((customer) => customer.id === requestedCustomerId)
     ? requestedCustomerId
     : undefined;
-  const initialSiteId = dashboardData?.sites.some(
+  const initialSiteId = createOptions?.sites.some(
     (site) => site.id === requestedSiteId && (!initialCustomerId || site.customerCompanyId === initialCustomerId)
   )
     ? requestedSiteId
@@ -320,21 +325,19 @@ export default async function AdminInspectionsPage({
         title="Inspections"
       />
 
-      {dashboardData ? (
-        <InspectionCreatePanel
-          customers={dashboardData.customers}
-          initialOpen={createOpen}
-          initialValues={{
-            inspectionMonth: requestedMonth || undefined,
-            scheduledStart: requestedMonth ? `${requestedMonth}-01T09:00` : undefined,
-            customerCompanyId: initialCustomerId,
-            siteId: initialSiteId
-          }}
-          showTrigger={false}
-          sites={dashboardData.sites}
-          technicians={dashboardData.technicians}
-        />
-      ) : null}
+      <InspectionCreatePanel
+        customers={createOptions.customers}
+        initialOpen={createOpen}
+        initialValues={{
+          inspectionMonth: requestedMonth || undefined,
+          scheduledStart: requestedMonth ? `${requestedMonth}-01T09:00` : undefined,
+          customerCompanyId: initialCustomerId,
+          siteId: initialSiteId
+        }}
+        showTrigger={false}
+        sites={createOptions.sites}
+        technicians={createOptions.technicians}
+      />
 
       <section className="grid gap-3 lg:grid-cols-4 lg:gap-4">
         <KPIStatCard

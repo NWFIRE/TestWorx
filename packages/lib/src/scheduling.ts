@@ -5025,6 +5025,44 @@ export async function getAdminDashboardData(actor: ActorContext) {
   };
 }
 
+export async function getAdminInspectionCreateOptions(actor: ActorContext) {
+  const parsedActor = parseActor(actor);
+  if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
+    throw new Error("Only tenant and office administrators can create inspections.");
+  }
+
+  const tenantId = parsedActor.tenantId as string;
+  const [customers, sites, technicians] = await Promise.all([
+    prisma.customerCompany.findMany({
+      where: { tenantId },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" }
+    }),
+    prisma.site.findMany({
+      where: { tenantId },
+      select: { id: true, name: true, city: true, customerCompanyId: true },
+      orderBy: { name: "asc" }
+    }),
+    prisma.user.findMany({
+      where: {
+        tenantId,
+        role: { in: [...assignableInspectionUserRoles] },
+        isActive: true
+      },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" }
+    })
+  ]);
+
+  return {
+    customers: customers.map((customer) => ({ id: customer.id, name: customer.name })),
+    sites: sites
+      .filter((site) => getCustomerFacingSiteLabel(site.name))
+      .map((site) => ({ id: site.id, name: site.name, city: site.city, customerCompanyId: site.customerCompanyId })),
+    technicians: technicians.map((technician) => ({ id: technician.id, name: technician.name }))
+  };
+}
+
 function resolvePlanningMonthStart(startMonth?: string | null) {
   if (startMonth && /^\d{4}-\d{2}$/.test(startMonth)) {
     const parsed = new Date(`${startMonth}-01T00:00:00`);
