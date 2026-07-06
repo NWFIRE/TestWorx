@@ -451,6 +451,39 @@ function buildKitchenServiceMaterialRows(input: PdfInput) {
   return rows;
 }
 
+function parseExtinguisherSizeAndType(value: unknown) {
+  const text = cleanCustomerFacingText(value);
+  if (!text) {
+    return { size: "", type: "" };
+  }
+
+  const match = text.match(/^(\d+(?:\.\d+)?\s*(?:lb|lbs|gal|gallon|gallons|l|liter|liters))\s+(.+)$/i);
+  if (!match) {
+    return { size: "", type: text };
+  }
+
+  return {
+    size: match[1]?.replace(/\blbs\b/i, "lb").trim() ?? "",
+    type: match[2]?.trim() ?? text
+  };
+}
+
+function mapExtinguisherInventoryRow(row: Record<string, unknown>) {
+  const resolvedExtinguisherType = row.extinguisherType === "other"
+    ? row.extinguisherTypeOther
+    : row.extinguisherTypeOther || row.extinguisherType;
+  const parsed = parseExtinguisherSizeAndType(resolvedExtinguisherType);
+  const explicitSize = cleanCustomerFacingText(row.size ?? row.extinguisherSize);
+  const explicitType = cleanCustomerFacingText(row.type);
+
+  return {
+    ...row,
+    size: explicitSize || parsed.size,
+    type: explicitType || parsed.type || cleanCustomerFacingText(resolvedExtinguisherType),
+    extinguisherType: cleanCustomerFacingText(resolvedExtinguisherType)
+  };
+}
+
 function buildDatasetRows(input: PdfInput, dataset: string): Array<Record<string, unknown>> {
   const [sectionId, fieldId] = dataset.split(".", 2);
   if (sectionId && fieldId) {
@@ -475,7 +508,9 @@ function buildDatasetRows(input: PdfInput, dataset: string): Array<Record<string
     case "fusibleLinksUsed":
       return buildKitchenServiceMaterialRows(input);
     case "extinguishers":
-      return Array.isArray(input.draft.sections.inventory?.fields.extinguishers) ? input.draft.sections.inventory?.fields.extinguishers as Array<Record<string, unknown>> : [];
+      return Array.isArray(input.draft.sections.inventory?.fields.extinguishers)
+        ? (input.draft.sections.inventory?.fields.extinguishers as Array<Record<string, unknown>>).map(mapExtinguisherInventoryRow)
+        : [];
     case "serviceActions": {
       const rows = Array.isArray(input.draft.sections.inventory?.fields.extinguishers) ? input.draft.sections.inventory?.fields.extinguishers as Array<Record<string, unknown>> : [];
       return rows

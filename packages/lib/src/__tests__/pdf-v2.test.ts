@@ -112,6 +112,68 @@ describe("pdf v2 report engine", () => {
     expect(model.primaryFacts.find((item) => item.label === "Inspection Status")?.value).not.toBe("In Progress");
   });
 
+  it("renders extinguisher size and type separately on fire extinguisher PDFs", () => {
+    const model = buildReportRenderModelV2({
+      ...createBaseInput(),
+      task: { inspectionType: "fire_extinguisher" },
+      draft: {
+        templateVersion: 1,
+        inspectionType: "fire_extinguisher",
+        overallNotes: "",
+        sectionOrder: ["inventory", "service"],
+        activeSectionId: "inventory",
+        sections: {
+          inventory: {
+            status: "pass",
+            notes: "",
+            fields: {
+              extinguishers: [
+                {
+                  location: "Lobby",
+                  manufacturer: "Amerex",
+                  serialNumber: "AMX-1",
+                  extinguisherType: "5 lb ABC",
+                  gaugeStatus: "pass",
+                  mountingSecure: "pass",
+                  servicePerformed: "Annual Inspection",
+                  notes: ""
+                },
+                {
+                  location: "Kitchen",
+                  manufacturer: "Ansul",
+                  serialNumber: "ANS-6L",
+                  extinguisherType: "6L Wet Chemical",
+                  gaugeStatus: "pass",
+                  mountingSecure: "pass",
+                  servicePerformed: "Annual Inspection",
+                  notes: ""
+                }
+              ],
+              unitsInspected: 2
+            }
+          },
+          service: { status: "pass", notes: "", fields: { followUpRecommended: false } }
+        },
+        deficiencies: [],
+        attachments: [],
+        signatures: {},
+        context: { siteName: "", customerName: "", scheduledDate: "", assetCount: 0, priorReportSummary: "" }
+      }
+    });
+
+    const extinguisherSection = model.sections.find((section) => section.key === "extinguishers");
+
+    expect(extinguisherSection?.renderer).toBe("table");
+    if (!extinguisherSection || extinguisherSection.renderer !== "table") {
+      throw new Error("Expected the fire extinguisher PDF to render an extinguisher table.");
+    }
+
+    expect(extinguisherSection.rows[0]?.size.text).toBe("5 lb");
+    expect(extinguisherSection.rows[0]?.type.text).toBe("ABC");
+    expect(extinguisherSection.rows[1]?.size.text).toBe("6L");
+    expect(extinguisherSection.rows[1]?.type.text).toBe("Wet Chemical");
+  });
+
   it("suppresses Unknown Unknown style leakage", () => {
     const model = buildReportRenderModelV2({
       ...createBaseInput(),
