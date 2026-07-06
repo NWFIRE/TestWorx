@@ -55,6 +55,8 @@ const inspectionReportWorkStartStatuses: InspectionStatus[] = [
   InspectionStatus.scheduled
 ];
 
+const FIRE_EXTINGUISHER_SIZE_TYPE_PDF_RENDERER_CUTOFF = new Date("2026-07-06T20:35:00.000Z");
+
 function parseActor(actor: ActorContext) {
   const parsed = actorContextSchema.parse(actor);
   assertTenantContext(parsed.role, parsed.tenantId);
@@ -2299,6 +2301,7 @@ export async function regenerateFinalizedReportPdf(actor: ActorContext, input: {
 
 async function rebuildGeneratedReportPdfDownload(actor: ReturnType<typeof parseActor>, input: {
   inspectionReportId: string;
+  auditAction?: string;
 }) {
   let priorGeneratedKeys: string[] = [];
 
@@ -2341,7 +2344,7 @@ async function rebuildGeneratedReportPdfDownload(actor: ReturnType<typeof parseA
     await createAuditLog(tx, {
       tenantId: actor.tenantId as string,
       actorUserId: actor.userId,
-      action: "report.pdf_regenerated_after_storage_miss",
+      action: input.auditAction ?? "report.pdf_regenerated_after_storage_miss",
       entityId: report.id,
       metadata: {
         inspectionId: report.inspectionId,
@@ -2361,6 +2364,28 @@ async function rebuildGeneratedReportPdfDownload(actor: ReturnType<typeof parseA
   await Promise.allSettled(priorGeneratedKeys.map((storageKey) => deleteStoredFile(storageKey)));
 
   return rebuilt;
+}
+
+function shouldRefreshGeneratedPdfForCurrentRenderer(input: {
+  attachment: {
+    kind: AttachmentKind;
+    source: string;
+    inspectionReportId: string | null;
+    createdAt: Date;
+  };
+  report: {
+    status: ReportStatus;
+    finalizedAt: Date | null;
+    task?: { inspectionType: InspectionType } | null;
+  } | null;
+}) {
+  return input.attachment.kind === AttachmentKind.pdf &&
+    input.attachment.source === "generated" &&
+    Boolean(input.attachment.inspectionReportId) &&
+    input.report?.status === reportStatuses.finalized &&
+    Boolean(input.report.finalizedAt) &&
+    input.report.task?.inspectionType === "fire_extinguisher" &&
+    input.attachment.createdAt < FIRE_EXTINGUISHER_SIZE_TYPE_PDF_RENDERER_CUTOFF;
 }
 
 const MAX_UPLOADED_PDF_BYTES = 50 * 1024 * 1024;
@@ -2844,7 +2869,10 @@ export async function getAuthorizedAttachmentDownload(actor: ActorContext, attac
   const relatedReport = attachment.inspectionReportId
     ? await prisma.inspectionReport.findFirst({
         where: { id: attachment.inspectionReportId },
-        include: { inspection: { include: { technicianAssignments: { select: { technicianId: true } } } } }
+        include: {
+          inspection: { include: { technicianAssignments: { select: { technicianId: true } } } },
+          task: { select: { inspectionType: true } }
+        }
       })
     : null;
   const relatedInspection = (attachment as any).inspectionId
@@ -2876,6 +2904,16 @@ export async function getAuthorizedAttachmentDownload(actor: ActorContext, attac
 
   assertStorageKeyBelongsToTenant(attachment.storageKey, attachment.tenantId);
   assertStorageKeyCategory(attachment.storageKey, ["generated-pdf", "uploaded-pdf"]);
+
+  if (shouldRefreshGeneratedPdfForCurrentRenderer({
+    attachment,
+    report: relatedReport
+  })) {
+    return rebuildGeneratedReportPdfDownload(parsedActor, {
+      inspectionReportId: attachment.inspectionReportId as string,
+      auditAction: "report.pdf_regenerated_for_current_renderer"
+    });
+  }
 
   try {
     return await buildFileDownloadResponse({
