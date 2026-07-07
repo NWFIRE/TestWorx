@@ -358,7 +358,7 @@ export function InspectionSchedulerForm({
   const [duplicateExistingInspectionId, setDuplicateExistingInspectionId] = useState("");
   const [externalDocumentFiles, setExternalDocumentFiles] = useState<File[]>([]);
   const [externalDocumentLabel, setExternalDocumentLabel] = useState("");
-  const [externalDocumentsRequireSignature, setExternalDocumentsRequireSignature] = useState(true);
+  const [externalDocumentsRequireSignature, setExternalDocumentsRequireSignature] = useState(false);
   const [externalDocumentsCustomerVisible, setExternalDocumentsCustomerVisible] = useState(false);
   const [isUploadingExternalDocuments, setIsUploadingExternalDocuments] = useState(false);
   const [externalDocumentsDragActive, setExternalDocumentsDragActive] = useState(false);
@@ -537,7 +537,7 @@ export function InspectionSchedulerForm({
     setServiceLines([createServiceLineDraft(defaultMonth)]);
     setExternalDocumentFiles([]);
     setExternalDocumentLabel("");
-    setExternalDocumentsRequireSignature(true);
+    setExternalDocumentsRequireSignature(false);
     setExternalDocumentsCustomerVisible(false);
     setExternalDocumentUploadError(null);
     setExternalDocumentsDragActive(false);
