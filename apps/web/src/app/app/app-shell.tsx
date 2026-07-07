@@ -22,6 +22,16 @@ const MOBILE_KEYBOARD_THRESHOLD = 120;
 const EXPANDED_SIDEBAR_BREAKPOINT = 1280;
 const SIMPLIFIED_WORKSPACE_NAV_ENABLED = process.env.NEXT_PUBLIC_SIMPLIFIED_WORKSPACE_NAV !== "0";
 
+function shouldProtectFocusedElementFromKeyboard() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+  const narrowViewport = window.matchMedia("(max-width: 1023px)").matches;
+  return coarsePointer || narrowViewport || Boolean(document.documentElement.dataset.keyboardOpen);
+}
+
 function isKeyboardFocusableElement(target: EventTarget | null): target is HTMLElement {
   return target instanceof HTMLElement && Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
 }
@@ -518,7 +528,7 @@ export function AppShell({
 
   const keepFocusedElementVisible = useCallback((target: HTMLElement) => {
     const container = contentRef.current;
-    if (!container || !isKeyboardFocusableElement(target)) {
+    if (!container || !isKeyboardFocusableElement(target) || !shouldProtectFocusedElementFromKeyboard()) {
       return;
     }
 
@@ -692,7 +702,7 @@ export function AppShell({
 
     const returnFocusTarget = menuButtonRef.current;
     const focusable = getFocusableElements(drawerRef.current);
-    focusable[0]?.focus();
+    focusable[0]?.focus({ preventScroll: true });
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -719,10 +729,10 @@ export function AppShell({
 
       if (event.shiftKey && activeElement === first) {
         event.preventDefault();
-        last.focus();
+        last.focus({ preventScroll: true });
       } else if (!event.shiftKey && activeElement === last) {
         event.preventDefault();
-        first.focus();
+        first.focus({ preventScroll: true });
       }
     };
 
@@ -730,7 +740,7 @@ export function AppShell({
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
-      returnFocusTarget?.focus();
+      returnFocusTarget?.focus({ preventScroll: true });
     };
   }, [drawerOpen]);
 

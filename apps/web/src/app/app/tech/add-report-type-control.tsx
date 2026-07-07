@@ -74,7 +74,7 @@ export function AddReportTypeControl({
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const focusTimeout = window.setTimeout(() => modalPanelRef.current?.querySelector<HTMLElement>("input, button")?.focus(), 20);
+    const focusTimeout = window.setTimeout(() => modalPanelRef.current?.querySelector<HTMLElement>("input, button")?.focus({ preventScroll: true }), 20);
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -89,10 +89,10 @@ export function AddReportTypeControl({
         const last = focusable[focusable.length - 1];
         if (event.shiftKey && document.activeElement === first) {
           event.preventDefault();
-          last?.focus();
+          last?.focus({ preventScroll: true });
         } else if (!event.shiftKey && document.activeElement === last) {
           event.preventDefault();
-          first?.focus();
+          first?.focus({ preventScroll: true });
         }
       }
     }
@@ -204,7 +204,6 @@ export function AddReportTypeControl({
               <label className="block">
                 <span className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Search report types</span>
                 <input
-                  autoFocus
                   className="mt-2 min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Fire alarm, extinguisher, work order..."

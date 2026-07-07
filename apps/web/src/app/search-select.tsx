@@ -225,7 +225,15 @@ export function SearchSelect({
             <button
               aria-label="Clear selection"
               className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-              onClick={clearSelection}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                clearSelection();
+              }}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
               type="button"
             >
               X

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChangeEvent, DragEvent, ReactNode } from "react";
+import type { ChangeEvent, DragEvent, MouseEvent, ReactNode } from "react";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CustomerOption, SiteOption, TechnicianOption } from "@testworx/types";
@@ -351,7 +351,6 @@ export function InspectionSchedulerForm({
   const [purchaseOrderNumber, setPurchaseOrderNumber] = useState(() => extractPurchaseOrderNumber(initialValues?.notes));
   const [startManuallyEdited, setStartManuallyEdited] = useState(Boolean(initialValues?.scheduledStart));
   const [serviceLines, setServiceLines] = useState<ServiceLineDraft[]>(() => buildInitialServiceLines(initialValues));
-  const [newestServiceLineId, setNewestServiceLineId] = useState<string | null>(null);
   const [showProtectedSaveConfirm, setShowProtectedSaveConfirm] = useState(false);
   const [duplicateWarningDismissed, setDuplicateWarningDismissed] = useState(false);
   const [duplicateInspectionResolution, setDuplicateInspectionResolution] = useState("");
@@ -364,7 +363,7 @@ export function InspectionSchedulerForm({
   const [externalDocumentsDragActive, setExternalDocumentsDragActive] = useState(false);
   const [externalDocumentUploadError, setExternalDocumentUploadError] = useState<string | null>(null);
   const [submitLocked, setSubmitLocked] = useState(false);
-  const serviceLineRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const externalDocumentsDropZoneRef = useRef<HTMLButtonElement | null>(null);
   const externalDocumentsDragDepthRef = useRef(0);
   const initialValuesSignature = serializeInitialValues(initialValues);
   const filteredSites = useMemo(
@@ -503,6 +502,15 @@ export function InspectionSchedulerForm({
     })();
   };
 
+  const openExternalDocumentsPicker = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    externalDocumentsInputRef.current?.click();
+    window.requestAnimationFrame(() => {
+      externalDocumentsDropZoneRef.current?.focus({ preventScroll: true });
+    });
+  };
+
   const addServiceLine = () => {
     const nextLine = createServiceLineDraft(inspectionMonth);
     setServiceLines((current) => [
@@ -512,7 +520,6 @@ export function InspectionSchedulerForm({
         assignedTechnicianId: current[0]?.assignedTechnicianId ?? ""
       }
     ]);
-    setNewestServiceLineId(nextLine.id);
   };
 
   const removeServiceLine = (lineId: string) => {
@@ -604,22 +611,6 @@ export function InspectionSchedulerForm({
       setDuplicateExistingInspectionId("");
     }
   }, [state.error, state.success, state.duplicateWarning]);
-
-  useEffect(() => {
-    if (!newestServiceLineId) {
-      return;
-    }
-
-    const nextFrame = requestAnimationFrame(() => {
-      serviceLineRefs.current[newestServiceLineId]?.scrollIntoView({
-        behavior: "smooth",
-        block: "start"
-      });
-      setNewestServiceLineId(null);
-    });
-
-    return () => cancelAnimationFrame(nextFrame);
-  }, [newestServiceLineId]);
 
   useEffect(() => {
     if (!toastResults || !state.error || lastErrorRef.current === state.error) {
@@ -719,7 +710,7 @@ export function InspectionSchedulerForm({
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const focusTimeout = window.setTimeout(() => duplicateModalRef.current?.querySelector<HTMLElement>("button, input, select, textarea, [href]")?.focus(), 20);
+    const focusTimeout = window.setTimeout(() => duplicateModalRef.current?.querySelector<HTMLElement>("button, input, select, textarea, [href]")?.focus({ preventScroll: true }), 20);
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -734,10 +725,10 @@ export function InspectionSchedulerForm({
         const last = focusable[focusable.length - 1];
         if (event.shiftKey && document.activeElement === first) {
           event.preventDefault();
-          last?.focus();
+          last?.focus({ preventScroll: true });
         } else if (!event.shiftKey && document.activeElement === last) {
           event.preventDefault();
-          first?.focus();
+          first?.focus({ preventScroll: true });
         }
       }
     }
@@ -1007,9 +998,6 @@ export function InspectionSchedulerForm({
               <div
                 key={line.id}
                 className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4"
-                ref={(node) => {
-                  serviceLineRefs.current[line.id] = node;
-                }}
               >
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
@@ -1193,24 +1181,22 @@ export function InspectionSchedulerForm({
             <p className="mt-1 text-sm leading-5 text-slate-500">Optional. Attach customer-provided PDFs while scheduling so they are ready for the field team on day one.</p>
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="externalDocuments">Upload PDF documents</label>
+            <p className="mb-2 block text-sm font-medium text-slate-600" id="externalDocumentsLabel">Upload PDF documents</p>
             <button
               aria-describedby="external-documents-help"
+              aria-labelledby="externalDocumentsLabel"
               className={`flex w-full flex-col items-center justify-center rounded-2xl border border-dashed px-5 py-6 text-center transition ${
                 externalDocumentsDragActive
                   ? "border-slateblue bg-blue-50 text-slateblue"
                   : "border-slate-300 bg-slate-50/70 text-slate-600 hover:border-slateblue hover:bg-blue-50/60"
               }`}
               disabled={pending || submitLocked || isUploadingExternalDocuments}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                externalDocumentsInputRef.current?.click();
-              }}
+              onClick={openExternalDocumentsPicker}
               onDragEnter={handleExternalDocumentDragEnter}
               onDragLeave={handleExternalDocumentDragLeave}
               onDragOver={handleExternalDocumentDragOver}
               onDrop={handleExternalDocumentDrop}
+              ref={externalDocumentsDropZoneRef}
               type="button"
             >
               <span className="text-sm font-semibold text-ink">Drag and drop PDF files here, or click to browse.</span>
@@ -1223,11 +1209,14 @@ export function InspectionSchedulerForm({
             </button>
             <input
               accept="application/pdf"
-              className="sr-only"
+              aria-hidden="true"
+              className="pointer-events-none absolute h-px w-px opacity-0"
               id="externalDocuments"
               multiple
               onChange={(event) => addExternalDocumentFiles(Array.from(event.currentTarget.files ?? []))}
+              onClick={(event) => event.stopPropagation()}
               ref={externalDocumentsInputRef}
+              tabIndex={-1}
               type="file"
             />
             <p className="mt-2 text-sm leading-5 text-slate-500" id="external-documents-help">You can attach one or more PDFs here. File names are used as the initial document identifiers.</p>

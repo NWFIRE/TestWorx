@@ -14,12 +14,6 @@ export function CreateInspectionTrigger({
   function openCreatePanel() {
     window.dispatchEvent(new CustomEvent(openInspectionCreateEventName));
     router.replace(href, { scroll: false });
-    requestAnimationFrame(() => {
-      document.getElementById("inspection-create-panel")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start"
-      });
-    });
   }
 
   return (

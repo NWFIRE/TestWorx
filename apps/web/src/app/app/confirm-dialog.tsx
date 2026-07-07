@@ -61,7 +61,7 @@ export function useConfirmDialog() {
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const focusTimeout = window.setTimeout(() => cancelButtonRef.current?.focus(), 20);
+    const focusTimeout = window.setTimeout(() => cancelButtonRef.current?.focus({ preventScroll: true }), 20);
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -84,10 +84,10 @@ export function useConfirmDialog() {
         const last = focusable[focusable.length - 1];
         if (event.shiftKey && document.activeElement === first) {
           event.preventDefault();
-          last?.focus();
+          last?.focus({ preventScroll: true });
         } else if (!event.shiftKey && document.activeElement === last) {
           event.preventDefault();
-          first?.focus();
+          first?.focus({ preventScroll: true });
         }
       }
     };
