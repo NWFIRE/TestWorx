@@ -6,6 +6,7 @@ import { isRedirectError } from "next/dist/client/components/redirect-error";
 import type { Session } from "next-auth";
 import { QuoteStatus } from "@prisma/client";
 import type { ActorContext } from "@testworx/types";
+import { ZodError } from "zod";
 
 import { auth } from "@/auth";
 import {
@@ -41,23 +42,6 @@ function normalizeOptionalString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeOptionalNumber(value: unknown) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return 0;
-    }
-    const parsed = Number(trimmed);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-
-  return 0;
-}
-
 function isBlankQuoteLineItem(value: unknown) {
   if (!value || typeof value !== "object") {
     return false;
@@ -67,21 +51,19 @@ function isBlankQuoteLineItem(value: unknown) {
   const hasMeaningfulText = [
     normalizeOptionalString(lineItem.internalCode),
     normalizeOptionalString(lineItem.title),
-    normalizeOptionalString(lineItem.description),
-    normalizeOptionalString(lineItem.inspectionType),
-    normalizeOptionalString(lineItem.category)
+    normalizeOptionalString(lineItem.description)
   ].some(Boolean);
 
-  if (hasMeaningfulText) {
-    return false;
+  return !hasMeaningfulText;
+}
+
+function formatQuoteActionError(error: unknown, fallback: string) {
+  if (error instanceof ZodError) {
+    const messages = Array.from(new Set(error.issues.map((issue) => issue.message).filter(Boolean)));
+    return messages[0] ?? fallback;
   }
 
-  return (
-    normalizeOptionalNumber(lineItem.quantity) === 1 &&
-    normalizeOptionalNumber(lineItem.unitPrice) === 0 &&
-    normalizeOptionalNumber(lineItem.discountAmount) === 0 &&
-    lineItem.taxable !== true
-  );
+  return error instanceof Error ? error.message : fallback;
 }
 
 function sanitizeLineItems(lineItems: unknown[]) {
@@ -169,7 +151,7 @@ export async function createQuoteAction(formData: FormData) {
     if (isRedirectError(error)) {
       throw error;
     }
-    redirect(`/app/admin/quotes/new?error=${encodeURIComponent(error instanceof Error ? error.message : "Unable to create quote.")}`);
+    redirect(`/app/admin/quotes/new?error=${encodeURIComponent(formatQuoteActionError(error, "Unable to create quote."))}`);
   }
 }
 
@@ -189,7 +171,7 @@ export async function updateQuoteAction(formData: FormData) {
     const detail = await getQuoteDetailForAction(actionSession, quoteId);
     return { ok: true, error: null, message: "Proposal updated", detail };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Unable to update quote.", message: null, detail: null };
+    return { ok: false, error: formatQuoteActionError(error, "Unable to update quote."), message: null, detail: null };
   }
 }
 
