@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
+import { ZodError } from "zod";
 
 import { auth } from "@/auth";
 import {
@@ -64,6 +65,46 @@ function asRecord(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
+}
+
+function normalizeOptionalString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function isBlankDirectInvoiceLineItem(value: unknown) {
+  const lineItem = asRecord(value);
+  if (!lineItem) {
+    return false;
+  }
+
+  return ![
+    normalizeOptionalString(lineItem.catalogItemId),
+    normalizeOptionalString(lineItem.description)
+  ].some(Boolean);
+}
+
+function sanitizeDirectInvoiceLineItems(lineItems: unknown[]) {
+  return lineItems
+    .filter((lineItem) => !isBlankDirectInvoiceLineItem(lineItem))
+    .map((lineItem) => {
+      const line = asRecord(lineItem) ?? {};
+      return {
+        catalogItemId: normalizeOptionalString(line.catalogItemId),
+        description: normalizeOptionalString(line.description),
+        quantity: typeof line.quantity === "number" ? line.quantity : Number(line.quantity ?? 0),
+        unitPrice: typeof line.unitPrice === "number" ? line.unitPrice : Number(line.unitPrice ?? 0),
+        taxable: line.taxable === true
+      };
+    });
+}
+
+function formatActionError(error: unknown, fallback: string) {
+  if (error instanceof ZodError) {
+    const messages = Array.from(new Set(error.issues.map((issue) => issue.message).filter(Boolean)));
+    return messages[0] ?? fallback;
+  }
+
+  return error instanceof Error ? error.message : fallback;
 }
 
 function extractBillingResolutionBlockMessage(detail: Awaited<ReturnType<typeof getAdminBillingSummaryDetail>>) {
@@ -1168,13 +1209,14 @@ export async function createDirectQuickBooksInvoiceAction(formData: FormData) {
     try {
       const lineItemsJson = String(formData.get("lineItemsJson") ?? "[]");
       const proposalType = String(formData.get("proposalType") ?? "").trim() || undefined;
-      const parsedLineItems = JSON.parse(lineItemsJson) as Array<{
+      const rawLineItems = JSON.parse(lineItemsJson) as Array<{
         catalogItemId: string;
         description: string;
         quantity: number;
-      unitPrice: number;
-      taxable: boolean;
-    }>;
+        unitPrice: number;
+        taxable: boolean;
+      }>;
+      const parsedLineItems = sanitizeDirectInvoiceLineItems(rawLineItems);
 
       const result = await createDirectQuickBooksInvoice(
         { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
@@ -1210,7 +1252,7 @@ export async function createDirectQuickBooksInvoiceAction(formData: FormData) {
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "Unable to create invoice.",
+      error: formatActionError(error, "Unable to create invoice."),
       message: null,
       invoice: null
     };
