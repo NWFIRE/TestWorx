@@ -227,7 +227,19 @@ export default async function EditInspectionPage({
       readyForOfficeReview: boolean;
     };
   };
-  const attachmentView = attachments as unknown as Array<{ id: string; fileName: string; source: "uploaded" | "generated"; customerVisible: boolean; createdAt: Date }>;
+  const attachmentView = attachments as unknown as Array<{
+    id: string;
+    fileName: string;
+    source: "uploaded" | "generated";
+    customerVisible: boolean;
+    createdAt: Date;
+    inspectionReportId?: string | null;
+  }>;
+  const generatedReportPdfByReportId = new Map(
+    attachmentView
+      .filter((attachment) => attachment.source === "generated" && attachment.inspectionReportId)
+      .map((attachment) => [attachment.inspectionReportId as string, attachment])
+  );
   const externalDocumentView = documents as unknown as Array<{
     id: string;
     fileName: string;
@@ -381,28 +393,53 @@ export default async function EditInspectionPage({
         report={
           <div className="space-y-5">
             <div className="grid gap-3">
-              {inspectionView.tasks.map((task: InspectionTask) => (
-                <div key={task.id} className="rounded-2xl border border-slate-200 p-4">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                      <p className="text-base font-semibold text-ink">{inspectionTaskLabel(task)}</p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {task.report?.finalizedAt
-                          ? `Finalized ${format(task.report.finalizedAt, "MMM d, yyyy h:mm a")}`
-                          : task.report
-                            ? `Current report status: ${task.report.status.replaceAll("_", " ")}`
-                            : "No report started yet."}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue" href={`/app/admin/reports/${inspection.id}/${task.id}`}>
-                        {task.report?.status === "finalized" ? "Open admin editor" : "Open report"}
-                      </Link>
-                      <AdminReportDeleteButton inspectionId={inspection.id} inspectionTaskId={task.id} taskLabel={inspectionTaskLabel(task)} />
+              {inspectionView.tasks.map((task: InspectionTask) => {
+                const generatedPdf = task.report?.id ? generatedReportPdfByReportId.get(task.report.id) : null;
+
+                return (
+                  <div key={task.id} className="rounded-2xl border border-slate-200 p-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <p className="text-base font-semibold text-ink">{inspectionTaskLabel(task)}</p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {task.report?.finalizedAt
+                            ? `Finalized ${format(task.report.finalizedAt, "MMM d, yyyy h:mm a")}`
+                            : task.report
+                              ? `Current report status: ${task.report.status.replaceAll("_", " ")}`
+                              : "No report started yet."}
+                        </p>
+                        {task.report?.status === "finalized" && !generatedPdf ? (
+                          <p className="mt-2 text-xs font-semibold text-amber-700">PDF not generated yet. Use Admin tools to regenerate this report PDF.</p>
+                        ) : null}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue" href={`/app/admin/reports/${inspection.id}/${task.id}`}>
+                          {task.report?.status === "finalized" ? "Open admin editor" : "Open report"}
+                        </Link>
+                        {generatedPdf ? (
+                          <>
+                            <a
+                              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue"
+                              href={`/api/attachments/${generatedPdf.id}?disposition=inline`}
+                              rel="noopener noreferrer"
+                              target="_blank"
+                            >
+                              View PDF
+                            </a>
+                            <a
+                              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue"
+                              href={`/api/attachments/${generatedPdf.id}`}
+                            >
+                              Download PDF
+                            </a>
+                          </>
+                        ) : null}
+                        <AdminReportDeleteButton inspectionId={inspection.id} inspectionTaskId={task.id} taskLabel={inspectionTaskLabel(task)} />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             {!isReviewMode ? (
               <details className="rounded-2xl border border-slate-200 p-5">
