@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { buildComplianceSection, buildReportPreview, describeRepeaterValueLines, getCustomerFacingSiteLabel, getCustomerReportDetail, isCustomerVisibleField, type ReportFieldDefinition } from "@testworx/lib/server/index";
+import { buildComplianceSection, buildReportPreview, describeRepeaterValueLines, formatTenantDate, formatTenantDateTime, getCustomerFacingSiteLabel, getCustomerReportDetail, isCustomerVisibleField, type ReportFieldDefinition } from "@testworx/lib/server/index";
 
 import { InspectionPacketCard } from "../../../inspection-packet-card";
 import { AppPageShell, PageHeader, SectionCard, StatusBadge, WorkspaceSplit } from "../../../admin/operations-ui";
@@ -105,6 +104,7 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
   }
 
   const reportView = detail.report as unknown as CustomerReportView;
+  const tenantTimezone = detail.report.inspection.tenant.timezone;
   const customerFacingSiteName = getCustomerFacingSiteLabel(reportView.inspection.site.name);
   const packetDocuments = (detail as typeof detail & {
     packetDocuments?: Array<{
@@ -137,7 +137,8 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
     const model = buildAcceptanceTestViewModel({
       tenant: {
         name: detail.report.inspection.tenant.name,
-        branding: detail.report.inspection.tenant.branding
+        branding: detail.report.inspection.tenant.branding,
+        timezone: tenantTimezone
       },
       customerCompany: detail.report.inspection.customerCompany,
       site: {
@@ -186,7 +187,7 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
             <StatusBadge label={model.report.result} tone={model.report.result === "Fail" ? "rose" : model.report.result === "Partial" ? "amber" : "emerald"} />
             <p className="text-sm text-slate-500">{reportView.inspection.customerCompany.name}</p>
             {customerFacingSiteName ? <p className="text-sm text-slate-500">{customerFacingSiteName}</p> : null}
-            <p className="text-sm text-slate-500">Completed {format(reportView.finalizedAt ?? reportView.updatedAt, "MMM d, yyyy h:mm a")}</p>
+            <p className="text-sm text-slate-500">Completed {formatTenantDateTime(reportView.finalizedAt ?? reportView.updatedAt, tenantTimezone)}</p>
           </div>
         </SectionCard>
         <ComplianceReferenceCard section={complianceSection} />
@@ -235,7 +236,7 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
           <StatusBadge label={formatHostedInspectionOutcome(preview.inspectionStatus)} tone={preview.inspectionStatus === "deficiencies_found" ? "amber" : "emerald"} />
           <p className="text-sm text-slate-500">{reportView.inspection.customerCompany.name}</p>
           {customerFacingSiteName ? <p className="text-sm text-slate-500">{customerFacingSiteName}</p> : null}
-          <p className="text-sm text-slate-500">Completed {format(reportView.finalizedAt ?? reportView.updatedAt, "MMM d, yyyy h:mm a")}</p>
+          <p className="text-sm text-slate-500">Completed {formatTenantDateTime(reportView.finalizedAt ?? reportView.updatedAt, tenantTimezone)}</p>
         </div>
       </SectionCard>
       <ComplianceReferenceCard section={complianceSection} />
@@ -247,8 +248,8 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
         </SectionCard>
         <SectionCard>
           <p className="text-sm text-slate-500">Scheduled visit</p>
-          <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">{format(reportView.inspection.scheduledStart, "MMM d, yyyy")}</p>
-          <p className="mt-1 text-sm text-slate-500">{format(reportView.inspection.scheduledStart, "h:mm a")}</p>
+          <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">{formatTenantDate(reportView.inspection.scheduledStart, tenantTimezone)}</p>
+          <p className="mt-1 text-sm text-slate-500">{formatTenantDateTime(reportView.inspection.scheduledStart, tenantTimezone)}</p>
         </SectionCard>
         <SectionCard>
           <p className="text-sm text-slate-500">Technician</p>

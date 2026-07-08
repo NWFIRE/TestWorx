@@ -1,19 +1,19 @@
-import { format } from "date-fns";
+import { formatTenantDate, formatTenantDateTime } from "../../../timezone";
 
-export function formatShortDate(value: unknown): string | undefined {
+export function formatShortDate(value: unknown, timezone?: string | null): string | undefined {
   const date = value instanceof Date ? value : typeof value === "string" || typeof value === "number" ? new Date(value) : null;
   if (!date || Number.isNaN(date.getTime())) {
     return undefined;
   }
 
-  return format(date, "MMM d, yyyy");
+  return formatTenantDate(date, timezone, "") || undefined;
 }
 
-export function formatDateTime(value: unknown): string | undefined {
+export function formatDateTime(value: unknown, timezone?: string | null): string | undefined {
   const date = value instanceof Date ? value : typeof value === "string" || typeof value === "number" ? new Date(value) : null;
   if (!date || Number.isNaN(date.getTime())) {
     return undefined;
   }
 
-  return format(date, "MMM d, yyyy, h:mm a");
+  return formatTenantDateTime(date, timezone, "") || undefined;
 }

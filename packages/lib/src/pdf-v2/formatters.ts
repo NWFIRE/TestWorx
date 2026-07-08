@@ -1,4 +1,5 @@
 import type { ReportPrimitiveValue } from "../report-config";
+import { formatTenantDate, formatTenantDateTime } from "../timezone";
 
 export const customerFacingFieldRules = {
   suppressValues: [null, undefined, "", "Unknown", "N/A", "--", "—"],
@@ -54,26 +55,12 @@ export function formatPdfAddress(input: {
   return address || input.fallback || "";
 }
 
-export function formatDate(value: Date | string | null | undefined) {
-  if (!value) {
-    return "";
-  }
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(date);
+export function formatDate(value: Date | string | null | undefined, timezone?: string | null) {
+  return formatTenantDate(value, timezone, "");
 }
 
-export function formatDateTime(value: Date | string | null | undefined) {
-  if (!value) {
-    return "";
-  }
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(date);
+export function formatDateTime(value: Date | string | null | undefined, timezone?: string | null) {
+  return formatTenantDateTime(value, timezone, "");
 }
 
 export function humanizeText(value: string) {

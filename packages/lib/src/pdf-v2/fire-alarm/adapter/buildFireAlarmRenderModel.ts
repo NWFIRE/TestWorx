@@ -120,6 +120,7 @@ function buildPhotoCaption(index: number) {
 
 export function buildFireAlarmRenderModel(rawReport: unknown): FireAlarmReportRenderModel {
   const input = asInput(rawReport);
+  const timezone = input.tenant.timezone;
   const draft = reportDraftSchema.parse(input.draft ?? {});
   const branding = resolveTenantBranding({ tenantName: input.tenant.name, branding: input.tenant.branding });
   const controlFields = readSection(draft, "control-panel");
@@ -133,7 +134,7 @@ export function buildFireAlarmRenderModel(rawReport: unknown): FireAlarmReportRe
     result: deriveResult(systemFields, deficiencyCount)
   });
   const result = status.result ?? "Pass";
-  const scheduledWindow = joinNonEmpty([formatDateTime(input.inspection.scheduledStart), input.inspection.scheduledEnd ? formatDateTime(input.inspection.scheduledEnd) : undefined], " to ");
+  const scheduledWindow = joinNonEmpty([formatDateTime(input.inspection.scheduledStart, timezone), input.inspection.scheduledEnd ? formatDateTime(input.inspection.scheduledEnd, timezone) : undefined], " to ");
   const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name);
   const customerContact = customerContactLine(input);
   const serviceAddress = cleanAddress(input);
@@ -143,8 +144,8 @@ export function buildFireAlarmRenderModel(rawReport: unknown): FireAlarmReportRe
     report: {
       title: "Fire Alarm Inspection and Testing Report",
       reportId: input.report.id,
-      inspectionDate: formatShortDate(input.inspection.scheduledStart) ?? "",
-      finalizedAt: formatDateTime(input.report.finalizedAt),
+      inspectionDate: formatShortDate(input.inspection.scheduledStart, timezone) ?? "",
+      finalizedAt: formatDateTime(input.report.finalizedAt, timezone),
       documentStatus: status.documentStatus,
       result,
       completionPercent: input.report.finalizedAt ? 100 : undefined,
@@ -171,8 +172,8 @@ export function buildFireAlarmRenderModel(rawReport: unknown): FireAlarmReportRe
       cleanAddress: serviceAddress,
       technicianName: cleanTitleLikeText(input.report.technicianName),
       billingContact: customerContact,
-      inspectionDate: formatShortDate(input.inspection.scheduledStart) ?? "",
-      completionTimestamp: formatDateTime(input.report.finalizedAt),
+      inspectionDate: formatShortDate(input.inspection.scheduledStart, timezone) ?? "",
+      completionTimestamp: formatDateTime(input.report.finalizedAt, timezone),
       scheduledWindow
     },
     page1Metadata: [
@@ -267,14 +268,14 @@ export function buildFireAlarmRenderModel(rawReport: unknown): FireAlarmReportRe
       technician: input.technicianSignature && cleanText(input.technicianSignature.imageDataUrl)
         ? {
             name: cleanTitleLikeText(input.technicianSignature.signerName) ?? "Technician",
-            signedAt: formatDateTime(input.technicianSignature.signedAt),
+            signedAt: formatDateTime(input.technicianSignature.signedAt, timezone),
             imageUrl: input.technicianSignature.imageDataUrl
           }
         : undefined,
       customer: input.customerSignature && cleanText(input.customerSignature.imageDataUrl)
         ? {
             name: cleanTitleLikeText(input.customerSignature.signerName) ?? "Customer",
-            signedAt: formatDateTime(input.customerSignature.signedAt),
+            signedAt: formatDateTime(input.customerSignature.signedAt, timezone),
             imageUrl: input.customerSignature.imageDataUrl
           }
         : undefined

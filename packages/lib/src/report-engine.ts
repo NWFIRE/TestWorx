@@ -1713,11 +1713,14 @@ export function validateFinalizationDraft(draft: ReportDraft, assets: ReportAsse
 }
 
 export function normalizeSignaturePayload(kind: SignatureKind, input: { signerName: string; imageDataUrl: string; signedAt?: string }) {
+  const parsedSignedAt = input.signedAt ? new Date(input.signedAt) : null;
   return {
     kind,
     signerName: input.signerName.trim(),
     imageDataUrl: input.imageDataUrl,
-    signedAt: input.signedAt ?? new Date().toISOString()
+    signedAt: parsedSignedAt && !Number.isNaN(parsedSignedAt.getTime())
+      ? parsedSignedAt.toISOString()
+      : new Date().toISOString()
   };
 }
 

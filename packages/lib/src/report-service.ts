@@ -1762,7 +1762,11 @@ async function replaceGeneratedReportPdfTx(
     customerBillingPostalCode: input.report.inspection.customerCompany.billingPostalCode
   });
   const pdfBytes = await generateInspectionReportPdf({
-    tenant: { name: input.report.tenant.name, branding: input.report.tenant.branding },
+    tenant: {
+      name: input.report.tenant.name,
+      branding: input.report.tenant.branding,
+      timezone: input.report.tenant.timezone
+    },
     customerCompany: input.report.inspection.customerCompany as any,
     site: {
       ...input.report.inspection.site,
@@ -2724,6 +2728,7 @@ export async function getCustomerInspectionPacketDetail(actor: ActorContext, ins
       reports: { some: { status: reportStatuses.finalized } }
     },
     include: {
+      tenant: { select: { timezone: true } },
       site: true,
       customerCompany: true,
       attachments: {

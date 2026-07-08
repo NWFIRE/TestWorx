@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { getCustomerFacingSiteLabel, getCustomerInspectionPacketDetail } from "@testworx/lib/server/index";
+import { formatTenantDateTime, getCustomerFacingSiteLabel, getCustomerInspectionPacketDetail } from "@testworx/lib/server/index";
 
 import { InspectionPacketCard } from "../../../inspection-packet-card";
 
@@ -32,6 +31,7 @@ export default async function CustomerInspectionPacketPage({
   }
 
   const customerFacingSiteName = getCustomerFacingSiteLabel(detail.inspection.site.name);
+  const tenantTimezone = detail.inspection.tenant.timezone;
 
   return (
     <section className="space-y-6">
@@ -41,7 +41,7 @@ export default async function CustomerInspectionPacketPage({
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Inspection packet</p>
             <h2 className="mt-2 text-3xl font-semibold text-ink">{customerFacingSiteName ?? detail.inspection.customerCompany.name}</h2>
             <p className="mt-3 text-slate-500">
-              {detail.inspection.customerCompany.name} | {format(detail.inspection.scheduledStart, "MMM d, yyyy h:mm a")}
+              {detail.inspection.customerCompany.name} | {formatTenantDateTime(detail.inspection.scheduledStart, tenantTimezone)}
             </p>
           </div>
         </div>
@@ -50,7 +50,7 @@ export default async function CustomerInspectionPacketPage({
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-3xl bg-white p-5 shadow-panel">
           <p className="text-sm text-slate-500">Scheduled visit</p>
-          <p className="mt-2 text-lg font-semibold text-ink">{format(detail.inspection.scheduledStart, "MMM d, yyyy h:mm a")}</p>
+          <p className="mt-2 text-lg font-semibold text-ink">{formatTenantDateTime(detail.inspection.scheduledStart, tenantTimezone)}</p>
         </div>
         <div className="rounded-3xl bg-white p-5 shadow-panel">
           <p className="text-sm text-slate-500">Completed reports</p>
@@ -81,7 +81,7 @@ export default async function CustomerInspectionPacketPage({
               <div>
                 <p className="font-semibold text-ink">{report.displayLabel}</p>
                 <p className="mt-1 text-sm text-slate-500">
-                  Finalized {format(report.finalizedAt ?? detail.inspection.scheduledStart, "MMM d, yyyy h:mm a")}
+                  Finalized {formatTenantDateTime(report.finalizedAt ?? detail.inspection.scheduledStart, tenantTimezone)}
                 </p>
               </div>
               <span className="text-sm font-semibold text-slateblue">View report details</span>

@@ -140,6 +140,7 @@ function readLicense(branding: unknown) {
 
 export function buildAcceptanceTestRenderModel(rawReport: unknown): AcceptanceTestRenderModel {
   const input = asInput(rawReport);
+  const timezone = input.tenant.timezone;
   const draft = reportDraftSchema.parse(input.draft ?? {});
   const propertyFields = readSection(draft, "property-information");
   const installerFields = readSection(draft, "installer-information");
@@ -191,7 +192,7 @@ export function buildAcceptanceTestRenderModel(rawReport: unknown): AcceptanceTe
       title: "Wet Chemical System Acceptance Test Report",
       standard: "NFPA 17A (2024 Edition)",
       result: overallResult,
-      completionDate: formatDateTime(input.report.finalizedAt),
+      completionDate: formatDateTime(input.report.finalizedAt, timezone),
       narrative: buildNarrative(overallResult, failed, incomplete),
       reportId: input.report.id,
       assignedTo: cleanText(input.report.assignedTo),
@@ -238,7 +239,7 @@ export function buildAcceptanceTestRenderModel(rawReport: unknown): AcceptanceTe
       hazardDescription: cleanText(systemFields?.hazardDescription),
       manufacturer: cleanText(systemFields?.manufacturer),
       model: cleanText(systemFields?.model),
-      dateLeftInService: formatShortDate(systemFields?.dateLeftInService)
+      dateLeftInService: formatShortDate(systemFields?.dateLeftInService, timezone)
     },
     tests,
     summary: {
@@ -255,7 +256,7 @@ export function buildAcceptanceTestRenderModel(rawReport: unknown): AcceptanceTe
         ? {
             name: cleanText(input.customerSignature.signerName) ?? "Authorized Agent",
             title: "Authorized Agent",
-            signedAt: formatDateTime(input.customerSignature.signedAt),
+            signedAt: formatDateTime(input.customerSignature.signedAt, timezone),
             imageUrl: input.customerSignature.imageDataUrl
           }
         : undefined,
@@ -263,7 +264,7 @@ export function buildAcceptanceTestRenderModel(rawReport: unknown): AcceptanceTe
         ? {
             name: cleanText(input.technicianSignature.signerName) ?? "Installing Contractor",
             title: "Installing Contractor",
-            signedAt: formatDateTime(input.technicianSignature.signedAt),
+            signedAt: formatDateTime(input.technicianSignature.signedAt, timezone),
             imageUrl: input.technicianSignature.imageDataUrl
           }
         : undefined

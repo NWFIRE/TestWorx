@@ -70,6 +70,7 @@ function buildCustomerContactLine(input: PdfInput) {
 }
 
 function mapSummaryFact(input: PdfInput, factKey: SummaryFactKey): RenderKeyValueRow {
+  const timezone = input.tenant.timezone;
   const customerFacingSiteName = getCustomerFacingSiteLabel(input.site.name);
   const siteAddress = buildServiceAddress(input);
   const status = mapCustomerFacingReportStatus({
@@ -84,9 +85,9 @@ function mapSummaryFact(input: PdfInput, factKey: SummaryFactKey): RenderKeyValu
     case "site":
       return { label: "Site", value: customerFacingSiteName ?? "" };
     case "inspectionDate":
-      return { label: "Inspection Date", value: formatDate(input.inspection.scheduledStart) };
+      return { label: "Inspection Date", value: formatDate(input.inspection.scheduledStart, timezone) };
     case "completionDate":
-      return { label: "Completion Date", value: formatDateTime(input.report.finalizedAt) };
+      return { label: "Completion Date", value: formatDateTime(input.report.finalizedAt, timezone) };
     case "technician":
       return { label: "Technician", value: input.report.technicianName ?? "" };
     case "billingContact":
@@ -97,8 +98,8 @@ function mapSummaryFact(input: PdfInput, factKey: SummaryFactKey): RenderKeyValu
       return {
         label: "Scheduled Window",
         value: input.inspection.scheduledEnd
-          ? `${formatDateTime(input.inspection.scheduledStart)} - ${formatDateTime(input.inspection.scheduledEnd)}`
-          : formatDateTime(input.inspection.scheduledStart)
+          ? `${formatDateTime(input.inspection.scheduledStart, timezone)} - ${formatDateTime(input.inspection.scheduledEnd, timezone)}`
+          : formatDateTime(input.inspection.scheduledStart, timezone)
       };
     case "inspectionStatus":
       return { label: "Inspection Status", value: status.inspectionStatus };
@@ -129,6 +130,7 @@ function mapOutcomeMetric(
   preview: ReturnType<typeof buildReportPreview>,
   key: SummaryMetricKey
 ): RenderMetricCard {
+  const timezone = input.tenant.timezone;
   const status = mapCustomerFacingReportStatus({
     isFinalized: Boolean(input.report.finalizedAt),
     isSigned: Boolean(input.technicianSignature || input.customerSignature),
@@ -157,7 +159,7 @@ function mapOutcomeMetric(
     case "completionPercent":
       return { label: "Completion", value: `${Math.round(preview.reportCompletion * 100)}%`, tone: preview.reportCompletion >= 1 ? "pass" : "warn" };
     case "serviceDate":
-      return { label: "Service Date", value: formatDate(input.inspection.scheduledStart), tone: "neutral" };
+      return { label: "Service Date", value: formatDate(input.inspection.scheduledStart, timezone), tone: "neutral" };
     case "followUpRequired": {
       const merged = buildSectionFieldIndex(input);
       const yes = merged.followUpRequired === true || cleanCustomerFacingText(merged.followUpRequired).toLowerCase() === "yes";
@@ -335,6 +337,7 @@ function buildPhotoSection(input: PdfInput, config: ReportTypeConfig): Extract<R
 }
 
 function buildSignatureSection(input: PdfInput, config: ReportTypeConfig): Extract<RenderSection, { renderer: "signatures" }> {
+  const timezone = input.tenant.timezone;
   return {
     key: "signatures",
     title: config.signatures?.title ?? "Signatures",
@@ -343,13 +346,13 @@ function buildSignatureSection(input: PdfInput, config: ReportTypeConfig): Extra
       {
         role: config.signatures?.roles[0] ?? "Technician",
         signerName: input.technicianSignature?.signerName ?? "",
-        signedAt: formatDateTime(input.technicianSignature?.signedAt),
+        signedAt: formatDateTime(input.technicianSignature?.signedAt, timezone),
         imageDataUrl: input.technicianSignature?.imageDataUrl ?? null
       },
       {
         role: config.signatures?.roles[1] ?? "Customer",
         signerName: input.customerSignature?.signerName ?? "",
-        signedAt: formatDateTime(input.customerSignature?.signedAt),
+        signedAt: formatDateTime(input.customerSignature?.signedAt, timezone),
         imageDataUrl: input.customerSignature?.imageDataUrl ?? null
       }
     ]
@@ -636,7 +639,7 @@ export function buildReportRenderModelV2(input: PdfInput): ReportRenderModelV2 {
     },
     header: {
       reportId: input.report.id,
-      serviceDate: formatDate(input.inspection.scheduledStart),
+      serviceDate: formatDate(input.inspection.scheduledStart, input.tenant.timezone),
       companyName,
       reportTitle: config.title,
       contactLine: joinPresentValues([branding.phone, branding.email, branding.website], "   "),
@@ -655,7 +658,7 @@ export function buildReportRenderModelV2(input: PdfInput): ReportRenderModelV2 {
       serviceAddress: buildServiceAddress(input),
       customerContact: buildCustomerContactLine(input),
       technician: input.report.technicianName ?? "",
-      serviceDate: formatDate(input.inspection.scheduledStart)
+      serviceDate: formatDate(input.inspection.scheduledStart, input.tenant.timezone)
     },
     compliance: {
       title: complianceSection.title,

@@ -27,6 +27,7 @@ import {
 } from "./report-pdf-config";
 import { formatCustomerFacingInspectionAddress, getCustomerFacingSiteLabel } from "./scheduling";
 import { decodeStoredFile } from "./storage";
+import { formatTenantDate, formatTenantDateTime } from "./timezone";
 import type { PdfInput } from "./pdf-v2";
 
 type PageState = {
@@ -203,28 +204,12 @@ function formatCustomerContactLine(input: PdfInput) {
   );
 }
 
-function formatDateTime(value: Date | string | null | undefined) {
-  if (!value) {
-    return "";
-  }
-
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(date);
+function formatDateTime(value: Date | string | null | undefined, timezone?: string | null) {
+  return formatTenantDateTime(value, timezone, "");
 }
 
-function formatDate(value: Date | string | null | undefined) {
-  if (!value) {
-    return "";
-  }
-
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(date);
+function formatDate(value: Date | string | null | undefined, timezone?: string | null) {
+  return formatTenantDate(value, timezone, "");
 }
 
 function humanizeText(value: string) {
@@ -494,7 +479,7 @@ function renderPremiumPageChrome(
   const reportTitle = getReportTitle(input);
   const metadataRows: KeyValueRow[] = [
     { label: "Report ID", value: input.report.id },
-    { label: "Service Date", value: formatDate(input.inspection.scheduledStart) },
+    { label: "Service Date", value: formatDate(input.inspection.scheduledStart, input.tenant.timezone) },
     { label: "Page", value: String(pageNumber) }
   ];
   const row1Top = headerTop - 8;
@@ -664,7 +649,7 @@ function renderPageChrome(
 
   const metaRows = [
     ["Report ID", input.report.id],
-    ["Inspection Date", formatDate(input.inspection.scheduledStart)],
+    ["Inspection Date", formatDate(input.inspection.scheduledStart, input.tenant.timezone)],
     ["Page", `${pageNumber}`]
   ] satisfies Array<[string, string]>;
 
@@ -864,7 +849,7 @@ function renderIdentityBand(
     facts.push({ label: "Technician", value: input.report.technicianName ?? "" });
   }
   if (pageOneConfig.identity.showServiceDate) {
-    facts.push({ label: "Service Date", value: formatDate(input.inspection.scheduledStart) });
+    facts.push({ label: "Service Date", value: formatDate(input.inspection.scheduledStart, input.tenant.timezone) });
   }
 
   const title = getReportTitle(input);
@@ -921,7 +906,7 @@ function buildSummaryMetricCard(metricKey: SummaryMetricKey, input: PdfInput, de
       return {
         label: "Document Status",
         value: getCustomerFacingReportState(input),
-        supportingText: input.report.finalizedAt ? withFallback(formatDateTime(input.report.finalizedAt), "Finalized") : "Awaiting finalization",
+        supportingText: input.report.finalizedAt ? withFallback(formatDateTime(input.report.finalizedAt, input.tenant.timezone), "Finalized") : "Awaiting finalization",
         tone: input.report.finalizedAt ? "pass" : "warn"
       };
     case "outcome":
@@ -958,7 +943,7 @@ function buildSummaryMetricCard(metricKey: SummaryMetricKey, input: PdfInput, de
     default:
       return {
         label: "Service Date",
-        value: withFallback(formatDate(input.inspection.scheduledStart), DEFAULT_EMPTY_COPY),
+        value: withFallback(formatDate(input.inspection.scheduledStart, input.tenant.timezone), DEFAULT_EMPTY_COPY),
         supportingText: input.report.technicianName ? `Technician ${input.report.technicianName}` : "Technician not assigned",
         tone: "neutral"
       };
@@ -1522,9 +1507,9 @@ function buildSummaryFacts(input: PdfInput, factKeys: SummaryFactKey[]): KeyValu
       case "site":
         return { label: "Site", value: customerFacingSiteName ?? "" };
       case "inspectionDate":
-        return { label: "Inspection Date", value: formatDate(input.inspection.scheduledStart) };
+        return { label: "Inspection Date", value: formatDate(input.inspection.scheduledStart, input.tenant.timezone) };
       case "completionDate":
-        return { label: "Completion Date", value: input.report.finalizedAt ? formatDateTime(input.report.finalizedAt) : "" };
+        return { label: "Completion Date", value: input.report.finalizedAt ? formatDateTime(input.report.finalizedAt, input.tenant.timezone) : "" };
       case "technician":
         return { label: "Technician", value: input.report.technicianName ?? "" };
       case "billingContact":
@@ -1535,8 +1520,8 @@ function buildSummaryFacts(input: PdfInput, factKeys: SummaryFactKey[]): KeyValu
         return {
           label: "Scheduled Window",
           value: input.inspection.scheduledEnd
-            ? `${formatDateTime(input.inspection.scheduledStart)} - ${formatDateTime(input.inspection.scheduledEnd)}`
-            : formatDateTime(input.inspection.scheduledStart)
+            ? `${formatDateTime(input.inspection.scheduledStart, input.tenant.timezone)} - ${formatDateTime(input.inspection.scheduledEnd, input.tenant.timezone)}`
+            : formatDateTime(input.inspection.scheduledStart, input.tenant.timezone)
         };
       case "inspectionStatus":
         return { label: "Inspection Status", value: getDisplayInspectionStatus(input) };
@@ -1597,7 +1582,7 @@ function renderWorkOrderSummaryStrip(
     getDraftSectionFieldValue(input, "work-performed", "jobsiteHours"),
     getDraftSectionFieldValue(input, "work-performed", "jobsiteHoursCustom")
   );
-  const scheduledDate = formatDate(input.inspection.scheduledStart);
+  const scheduledDate = formatDate(input.inspection.scheduledStart, input.tenant.timezone);
   const cards = [
     { label: "Work Date", value: scheduledDate, tone: "neutral" as const },
     { label: "Labor Hours", value: jobsiteHours, tone: "neutral" as const }
@@ -1702,8 +1687,8 @@ async function renderWorkOrderReport(
     { label: "Site address", value: customerFacingSiteAddress },
     { label: "Customer contact", value: formatCustomerContactLine(input) },
     { label: "Technician", value: input.report.technicianName ?? "" },
-    { label: "Work date", value: formatDate(input.inspection.scheduledStart) },
-    { label: "Completion date", value: input.report.finalizedAt ? formatDateTime(input.report.finalizedAt) : "" },
+    { label: "Work date", value: formatDate(input.inspection.scheduledStart, input.tenant.timezone) },
+    { label: "Completion date", value: input.report.finalizedAt ? formatDateTime(input.report.finalizedAt, input.tenant.timezone) : "" },
     { label: "Labor hours", value: jobsiteHours }
   ];
   state = ensureSpace(
@@ -1909,7 +1894,7 @@ async function renderSignatures(
         font: regularFont,
         color: theme.ink
       });
-      state.page.drawText(withFallback(formatDateTime(card.value.signedAt), DEFAULT_EMPTY_COPY), {
+      state.page.drawText(withFallback(formatDateTime(card.value.signedAt, input.tenant.timezone), DEFAULT_EMPTY_COPY), {
         x: x + 12,
         y: state.y - 58,
         size: 8,

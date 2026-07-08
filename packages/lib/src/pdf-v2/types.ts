@@ -4,7 +4,7 @@ import type { ComplianceReferenceSnapshot } from "../compliance-references";
 import type { ReportDraft } from "../report-engine";
 
 export type PdfInput = {
-  tenant: { name: string; branding: unknown };
+  tenant: { name: string; branding: unknown; timezone?: string | null };
   customerCompany: {
     name: string;
     contactName: string | null;
