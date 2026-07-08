@@ -931,7 +931,7 @@ describe("quotes", () => {
       })
     }));
     expect(sendQuoteStatusNotificationEmailMock).toHaveBeenCalledWith(expect.objectContaining({
-      recipientEmail: "office@example.com",
+      recipientEmail: "accounting@nwfireandsafety.com",
       quoteNumber: "Q-2026-0009",
       customerName: "Acme",
       siteName: "Main campus",
@@ -939,6 +939,11 @@ describe("quotes", () => {
       responseNote: "Please schedule next week.",
       quoteTotal: "$100.00",
       quoteUrl: "https://tradeworx.example/app/admin/quotes/quote_1"
+    }));
+    expect(sendQuoteStatusNotificationEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+      recipientEmail: "Jeremy@nwfireandsafety.com",
+      quoteNumber: "Q-2026-0009",
+      statusLabel: "Approved"
     }));
     expect(result.accessState).toBe("approved");
   });
@@ -1004,15 +1009,25 @@ describe("quotes", () => {
     expect(result.accessState).toBe("approved");
     expect(prismaMock.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
-        action: "quote.status_notification_failed"
+        action: "quote.status_notification_sent",
+        metadata: expect.objectContaining({
+          recipients: expect.arrayContaining([
+            expect.objectContaining({
+              recipientEmail: "accounting@nwfireandsafety.com",
+              sent: false,
+              error: "Resend unavailable"
+            }),
+            expect.objectContaining({
+              recipientEmail: "Jeremy@nwfireandsafety.com",
+              sent: true
+            })
+          ])
+        })
       })
     }));
   });
 
-  it("emails admins when a customer declines a hosted quote", async () => {
-    prismaMock.user.findMany.mockResolvedValue([
-      { email: "admin@example.com", name: "Office Admin" }
-    ]);
+  it("emails the fixed quote notification recipients when a customer declines a hosted quote", async () => {
     prismaMock.quote.findFirst.mockResolvedValue({
       id: "quote_1",
       tenantId: "tenant_1",
@@ -1071,21 +1086,19 @@ describe("quotes", () => {
 
     expect(result.accessState).toBe("declined");
     expect(sendQuoteStatusNotificationEmailMock).toHaveBeenCalledWith(expect.objectContaining({
-      recipientEmail: "admin@example.com",
+      recipientEmail: "accounting@nwfireandsafety.com",
       statusLabel: "Declined",
       responseNote: "Too expensive right now.",
       quoteTotal: "$250.00"
     }));
     expect(sendQuoteStatusNotificationEmailMock).toHaveBeenCalledWith(expect.objectContaining({
-      recipientEmail: "office@example.com",
+      recipientEmail: "Jeremy@nwfireandsafety.com",
       statusLabel: "Declined"
     }));
+    expect(prismaMock.user.findMany).not.toHaveBeenCalled();
   });
 
-  it("emails admins when an office user changes a quote to a terminal status", async () => {
-    prismaMock.user.findMany.mockResolvedValue([
-      { email: "admin@example.com", name: "Office Admin" }
-    ]);
+  it("emails the fixed quote notification recipients when an office user changes a quote to a terminal status", async () => {
     prismaMock.quote.findFirst.mockResolvedValue({
       id: "quote_1",
       tenantId: "tenant_1",
@@ -1110,11 +1123,18 @@ describe("quotes", () => {
     );
 
     expect(sendQuoteStatusNotificationEmailMock).toHaveBeenCalledWith(expect.objectContaining({
-      recipientEmail: "admin@example.com",
+      recipientEmail: "accounting@nwfireandsafety.com",
       statusLabel: "Approved",
       responseNote: "Approved by phone.",
       quoteUrl: "https://tradeworx.example/app/admin/quotes/quote_1"
     }));
+    expect(sendQuoteStatusNotificationEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+      recipientEmail: "Jeremy@nwfireandsafety.com",
+      statusLabel: "Approved",
+      responseNote: "Approved by phone.",
+      quoteUrl: "https://tradeworx.example/app/admin/quotes/quote_1"
+    }));
+    expect(prismaMock.user.findMany).not.toHaveBeenCalled();
   });
 
   it("blocks quote conversion until the quote is approved", async () => {

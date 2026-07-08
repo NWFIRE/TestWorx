@@ -6,7 +6,6 @@ import {
   QuoteStatus,
   QuoteSyncStatus,
   RecurrenceFrequency,
-  UserRole,
   WorkOrderLineBillableStatus,
   WorkOrderLineItemType,
   WorkOrderLineSource
@@ -42,6 +41,10 @@ const quoteStatusValues = Object.values(QuoteStatus);
 const quoteSyncStatusValues = Object.values(QuoteSyncStatus);
 const closedQuoteStatuses: QuoteStatus[] = [QuoteStatus.approved, QuoteStatus.declined, QuoteStatus.converted, QuoteStatus.cancelled];
 const actionableQuoteStatuses: QuoteStatus[] = [QuoteStatus.sent, QuoteStatus.viewed, QuoteStatus.ready_to_send];
+const QUOTE_STATUS_NOTIFICATION_RECIPIENTS = [
+  { email: "accounting@nwfireandsafety.com", name: "Accounting" },
+  { email: "Jeremy@nwfireandsafety.com", name: "Jeremy" }
+];
 const quoteReminderTypeValues = {
   sent_not_viewed_first: "sent_not_viewed_first",
   sent_not_viewed_second: "sent_not_viewed_second",
@@ -1051,27 +1054,8 @@ function normalizeRecipientEmailList(recipients: Array<{ email: string | null | 
     });
 }
 
-async function getQuoteStatusNotificationRecipients(input: {
-  tenantId: string;
-  tenantBillingEmail?: string | null;
-}) {
-  const admins = await prisma.user.findMany({
-    where: {
-      tenantId: input.tenantId,
-      isActive: true,
-      role: { in: [UserRole.tenant_admin, UserRole.office_admin] }
-    },
-    select: {
-      email: true,
-      name: true
-    },
-    orderBy: [{ role: "asc" }, { name: "asc" }, { email: "asc" }]
-  });
-
-  return normalizeRecipientEmailList([
-    ...admins,
-    { email: input.tenantBillingEmail, name: "Billing team" }
-  ]);
+function getQuoteStatusNotificationRecipients() {
+  return normalizeRecipientEmailList(QUOTE_STATUS_NOTIFICATION_RECIPIENTS);
 }
 
 async function sendQuoteStatusNotifications(input: {
@@ -1103,10 +1087,7 @@ async function sendQuoteStatusNotifications(input: {
     return;
   }
 
-  const recipients = await getQuoteStatusNotificationRecipients({
-    tenantId: input.quote.tenantId,
-    tenantBillingEmail: input.quote.tenant.billingEmail
-  });
+  const recipients = getQuoteStatusNotificationRecipients();
   if (recipients.length === 0) {
     await createQuoteAuditLog({
       tenantId: input.quote.tenantId,
