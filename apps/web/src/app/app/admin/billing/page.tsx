@@ -127,7 +127,7 @@ function SummaryQueueSection({
                     <p className="text-sm text-slate-600">
                       Total due:{" "}
                       <span className="font-semibold text-slate-950">
-                        {summary.invoiceTotals.totalDue > 0 ? `$${summary.invoiceTotals.totalDue.toFixed(2)}` : "Pending pricing"}
+                        {summary.metrics.missingPriceCount > 0 ? "Pending pricing" : `$${summary.invoiceTotals.totalDue.toFixed(2)}`}
                       </span>
                       {summary.invoiceTotals.taxTotal > 0 ? (
                         <span className="mt-1 block text-xs text-slate-500">
