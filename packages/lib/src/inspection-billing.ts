@@ -1673,15 +1673,22 @@ export function groupBillingReviewItems<T extends BillableItem>(items: T[]) {
     for (const item of categoryItems) {
       const key = buildBillingReviewGroupKey(item);
       const existing = grouped.get(key);
+      const itemSnapshot = calculateInvoiceLineSnapshot(item);
+      const itemTaxAmount = item.taxable === false
+        ? itemSnapshot.taxAmount
+        : item.taxAmount ?? itemSnapshot.taxAmount;
+      const itemLineTotal = item.taxable === false
+        ? itemSnapshot.lineTotal
+        : item.lineTotal ?? itemSnapshot.lineTotal;
 
       if (!existing) {
         grouped.set(key, {
           ...item,
           quantity: Number(item.quantity.toFixed(2)),
           amount: calculateAmount(item.quantity, item.unitPrice ?? null),
-          lineSubtotal: calculateLineSubtotal(item),
-          taxAmount: item.taxAmount ?? calculateInvoiceLineSnapshot(item).taxAmount,
-          lineTotal: item.lineTotal ?? calculateInvoiceLineSnapshot(item).lineTotal,
+          lineSubtotal: itemSnapshot.lineSubtotal,
+          taxAmount: itemTaxAmount,
+          lineTotal: itemLineTotal,
           subtotal: Number((item.amount ?? calculateAmount(item.quantity, item.unitPrice ?? null) ?? 0).toFixed(2)),
           itemIds: [item.id],
           sourceItemCount: 1,
@@ -1696,9 +1703,9 @@ export function groupBillingReviewItems<T extends BillableItem>(items: T[]) {
         ...existing,
         quantity: combinedQuantity,
         amount: calculateAmount(combinedQuantity, existing.unitPrice ?? null),
-        lineSubtotal: roundMoney((existing.lineSubtotal ?? existing.subtotal) + calculateLineSubtotal(item)),
-        taxAmount: roundMoney((existing.taxAmount ?? 0) + (item.taxAmount ?? calculateInvoiceLineSnapshot(item).taxAmount)),
-        lineTotal: roundMoney((existing.lineTotal ?? existing.subtotal) + (item.lineTotal ?? calculateInvoiceLineSnapshot(item).lineTotal)),
+        lineSubtotal: roundMoney((existing.lineSubtotal ?? existing.subtotal) + itemSnapshot.lineSubtotal),
+        taxAmount: roundMoney((existing.taxAmount ?? 0) + itemTaxAmount),
+        lineTotal: roundMoney((existing.lineTotal ?? existing.subtotal) + itemLineTotal),
         subtotal: Number((existing.subtotal + (item.amount ?? calculateAmount(item.quantity, item.unitPrice ?? null) ?? 0)).toFixed(2)),
         itemIds: [...existing.itemIds, item.id],
         sourceItemCount: existing.sourceItemCount + 1,

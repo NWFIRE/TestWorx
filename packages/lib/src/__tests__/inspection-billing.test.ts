@@ -977,6 +977,39 @@ describe("inspection billing extraction", () => {
     expect(grouped.material.some((group) => group.taxable === true && group.itemIds.includes("taxable_part_line"))).toBe(true);
     expect(grouped.material.some((group) => group.taxable === false && group.itemIds.includes("non_taxable_part_line"))).toBe(true);
   });
+
+  it("does not carry stale tax amounts on non-taxable review rows", () => {
+    const grouped = groupBillingReviewItems([
+      {
+        id: "service_fee_line",
+        tenantId: "tenant_1",
+        inspectionId: "inspection_1",
+        reportId: "report_1",
+        reportType: "inspection",
+        sourceSection: "service-fee",
+        sourceField: "serviceFee",
+        category: "fee",
+        description: "Service Fee",
+        quantity: 1,
+        unitPrice: 65,
+        amount: 65,
+        taxable: false,
+        taxableSource: "override",
+        quickBooksTaxableStatus: "non_taxable",
+        taxCodeId: "NON",
+        taxRate: 0,
+        taxAmount: 5.36,
+        lineTotal: 70.36
+      }
+    ]);
+
+    expect(grouped.fee[0]).toEqual(expect.objectContaining({
+      taxable: false,
+      taxAmount: 0,
+      lineSubtotal: 65,
+      lineTotal: 65
+    }));
+  });
 });
 
 describe("inspection billing persistence and admin review", () => {
