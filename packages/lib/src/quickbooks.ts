@@ -2022,7 +2022,14 @@ async function tryResolveRuleBasedQuickBooksMapping(input: {
     }
   });
 
-  if (!exactMatch) {
+  const matchedItem = exactMatch ?? (await findQuickBooksItemSuggestions({
+    tenantId: input.tenantId,
+    integrationId: input.integrationId,
+    term: ruleLabel,
+    limit: 1
+  }))[0] ?? null;
+
+  if (!matchedItem) {
     return null;
   }
 
@@ -2031,14 +2038,14 @@ async function tryResolveRuleBasedQuickBooksMapping(input: {
     integrationId: input.integrationId,
     internalCode: input.billingCode,
     internalName: input.displayName,
-    qbItemId: exactMatch.qbItemId,
+    qbItemId: matchedItem.qbItemId,
     matchSource: "rule"
   });
 
   return {
     status: "mapped" as const,
-    qbItemId: exactMatch.qbItemId,
-    qbItemName: exactMatch.qbItemName
+    qbItemId: matchedItem.qbItemId,
+    qbItemName: matchedItem.qbItemName
   };
 }
 
