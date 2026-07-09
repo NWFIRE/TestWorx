@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 
@@ -20,7 +21,7 @@ export async function submitCustomerIntakeAction(formData: FormData) {
       .getAll("uploads")
       .filter((value): value is File => value instanceof File && value.size > 0);
 
-    await submitCustomerIntakeRequest({
+    const result = await submitCustomerIntakeRequest({
       token,
       submission: {
         companyName: readText(formData, "companyName"),
@@ -54,6 +55,8 @@ export async function submitCustomerIntakeAction(formData: FormData) {
       },
       files
     });
+    revalidatePath("/app/admin/customer-intakes");
+    revalidatePath(`/app/admin/customer-intakes/${result.id}`);
     redirect(`/intake/customer/${encodeURIComponent(token)}?submitted=1`);
   } catch (error) {
     if (isRedirectError(error)) {

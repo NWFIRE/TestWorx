@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { CustomerIntakeStatus } from "@prisma/client";
 
-import { customerIntakeAdminAdjustmentSchema, customerIntakeSendSchema, customerIntakeSubmissionSchema } from "../customer-intake";
+import { customerIntakeAdminAdjustmentSchema, customerIntakeSendSchema, customerIntakeSubmissionSchema, shouldExpireCustomerIntakeRequest } from "../customer-intake";
 
 describe("customer intake validation", () => {
   it("accepts a complete customer intake submission", () => {
@@ -114,5 +115,28 @@ describe("customer intake validation", () => {
 
     expect(parsed.companyName).toBe("Commercial Fire LLC - Sprouts #809");
     expect(parsed.siteName).toBe("Sprouts Farmers Market #809");
+  });
+
+  it("only expires unsubmitted sent intake links", () => {
+    const now = new Date("2026-07-09T12:00:00.000Z");
+    const expiredAt = new Date("2026-07-08T12:00:00.000Z");
+
+    expect(shouldExpireCustomerIntakeRequest({
+      status: CustomerIntakeStatus.sent,
+      expiresAt: expiredAt,
+      now
+    })).toBe(true);
+
+    expect(shouldExpireCustomerIntakeRequest({
+      status: CustomerIntakeStatus.submitted,
+      expiresAt: expiredAt,
+      now
+    })).toBe(false);
+
+    expect(shouldExpireCustomerIntakeRequest({
+      status: CustomerIntakeStatus.approved,
+      expiresAt: expiredAt,
+      now
+    })).toBe(false);
   });
 });

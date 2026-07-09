@@ -140,6 +140,14 @@ function parseActor(actor: ActorContext) {
   return parsed;
 }
 
+export function shouldExpireCustomerIntakeRequest(input: {
+  status: CustomerIntakeStatus | string;
+  expiresAt: Date;
+  now?: Date;
+}) {
+  return input.status === CustomerIntakeStatus.sent && input.expiresAt <= (input.now ?? new Date());
+}
+
 function ensureOfficeActor(parsedActor: ReturnType<typeof parseActor>) {
   if (!["tenant_admin", "office_admin", "platform_admin"].includes(parsedActor.role)) {
     throw new Error("Only office administrators can manage customer intake requests.");
@@ -688,8 +696,7 @@ export async function getPublicCustomerIntakeRequest(token: string) {
     return null;
   }
 
-  const now = new Date();
-  if (request.expiresAt <= now && request.status !== CustomerIntakeStatus.expired) {
+  if (shouldExpireCustomerIntakeRequest({ status: request.status, expiresAt: request.expiresAt })) {
     await prisma.customerIntakeRequest.update({
       where: { id: request.id },
       data: { status: CustomerIntakeStatus.expired }
