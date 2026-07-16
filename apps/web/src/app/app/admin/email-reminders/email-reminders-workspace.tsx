@@ -46,7 +46,7 @@ type WorkspaceData = {
     label: string;
     subject: string;
     body: string;
-    category: "reminder" | "welcome";
+    category: "reminder" | "welcome" | "scheduling";
     previewEyebrow: string;
     previewTitle: string;
     previewFooter?: string;
@@ -55,6 +55,7 @@ type WorkspaceData = {
   options: {
     dueMonths: Array<{ value: string; label: string }>;
     inspectionTypes: Array<{ value: string; label: string }>;
+    serviceTypes: Array<{ value: string; label: string }>;
     divisions: Array<{ value: string; label: string }>;
   };
   summary: {
@@ -93,13 +94,57 @@ type WorkspaceData = {
 
 function mergePreviewTemplate(
   template: string,
-  fields: Record<"customerName" | "companyName" | "companyPhone" | "companyEmail", string>
+  fields: Record<"customerName" | "companyName" | "companyPhone" | "companyEmail" | "serviceDate" | "serviceTime" | "serviceTypes", string>
 ) {
   return template
-    .replace(/{{\s*(customerName|companyName|companyPhone|companyEmail)\s*}}/g, (_, key) => fields[key as keyof typeof fields] ?? "")
+    .replace(/{{\s*(customerName|companyName|companyPhone|companyEmail|serviceDate|serviceTime|serviceTypes)\s*}}/g, (_, key) => fields[key as keyof typeof fields] ?? "")
     .replace(/Hello\s+,/g, "Hello,")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function formatSchedulePreviewDate(value: string) {
+  if (!value) {
+    return "";
+  }
+
+  const parsed = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+
+function formatSchedulePreviewTime(value: string) {
+  if (!value) {
+    return "";
+  }
+
+  const [hoursText, minutesText = "00"] = value.split(":");
+  const hours = Number(hoursText);
+  const minutes = Number(minutesText);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return value;
+  }
+
+  const parsed = new Date();
+  parsed.setHours(hours, minutes, 0, 0);
+  return parsed.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function formatSelectedServicesForPreview(serviceTypes: string[]) {
+  return [...new Set(serviceTypes.map((value) => value.trim()).filter(Boolean))]
+    .map((value) => `- ${value}`)
+    .join("\n");
 }
 
 function formatDateTime(value: Date | string | null | undefined) {
@@ -144,6 +189,11 @@ export function EmailRemindersWorkspace({
     templateKey: string;
     subject: string;
     body: string;
+    schedulingDetails?: {
+      serviceDate: string;
+      serviceTime: string;
+      serviceTypes: string[];
+    };
   }) => Promise<{
     ok: boolean;
     error: string | null;
@@ -160,6 +210,10 @@ export function EmailRemindersWorkspace({
   const [templateKey, setTemplateKey] = useState(defaultTemplate?.key ?? "");
   const [subject, setSubject] = useState(defaultTemplate?.subject ?? "");
   const [body, setBody] = useState(defaultTemplate?.body ?? "");
+  const [serviceDate, setServiceDate] = useState("");
+  const [serviceTime, setServiceTime] = useState("");
+  const [selectedServiceTypes, setSelectedServiceTypes] = useState<string[]>([]);
+  const [customServiceType, setCustomServiceType] = useState("");
   const [recipientEmailOverrides, setRecipientEmailOverrides] = useState<Record<string, string>>({});
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>(
     initialCustomerCompanyIds.filter((customerCompanyId) =>
@@ -175,15 +229,25 @@ export function EmailRemindersWorkspace({
     () => data.templates.find((template) => template.key === templateKey) ?? defaultTemplate,
     [data.templates, defaultTemplate, templateKey]
   );
+  const isSchedulingTemplate = activeTemplate?.category === "scheduling";
+  const selectedServiceLabels = useMemo(
+    () => selectedServiceTypes
+      .map((value) => data.options.serviceTypes.find((option) => option.value === value)?.label ?? value)
+      .filter(Boolean),
+    [data.options.serviceTypes, selectedServiceTypes]
+  );
   const sampleRecipient = selectedRecipients[0] ?? data.recipients[0] ?? null;
   const previewFields = useMemo(
     () => ({
       customerName: sampleRecipient?.customerName ?? "",
       companyName: data.branding.legalBusinessName || data.tenantName,
       companyPhone: data.branding.phone || "",
-      companyEmail: data.branding.email || ""
+      companyEmail: data.branding.email || "",
+      serviceDate: formatSchedulePreviewDate(serviceDate),
+      serviceTime: formatSchedulePreviewTime(serviceTime),
+      serviceTypes: formatSelectedServicesForPreview(selectedServiceLabels)
     }),
-    [data.branding.email, data.branding.legalBusinessName, data.branding.phone, data.tenantName, sampleRecipient]
+    [data.branding.email, data.branding.legalBusinessName, data.branding.phone, data.tenantName, sampleRecipient, selectedServiceLabels, serviceDate, serviceTime]
   );
   const previewSubject = useMemo(() => mergePreviewTemplate(subject, previewFields), [previewFields, subject]);
   const previewBody = useMemo(() => mergePreviewTemplate(body, previewFields), [body, previewFields]);
@@ -438,6 +502,101 @@ export function EmailRemindersWorkspace({
               </select>
             </label>
 
+            {isSchedulingTemplate ? (
+              <div className="rounded-[24px] border border-blue-100 bg-blue-50/70 p-4">
+                <div>
+                  <p className="text-sm font-semibold text-slate-950">Scheduling details</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Select the appointment date, time, and service type(s). These values merge into the email automatically.
+                  </p>
+                </div>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-medium text-slate-700">Service date</span>
+                    <input
+                      className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
+                      onChange={(event) => setServiceDate(event.target.value)}
+                      type="date"
+                      value={serviceDate}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-medium text-slate-700">Service time</span>
+                    <input
+                      className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
+                      onChange={(event) => setServiceTime(event.target.value)}
+                      type="time"
+                      value={serviceTime}
+                    />
+                  </label>
+                </div>
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-slate-700">Type of service(s)</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {data.options.serviceTypes.map((option) => (
+                      <label
+                        className="flex min-h-11 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"
+                        key={option.value}
+                      >
+                        <input
+                          checked={selectedServiceTypes.includes(option.value)}
+                          onChange={(event) =>
+                            setSelectedServiceTypes((current) =>
+                              event.target.checked
+                                ? [...new Set([...current, option.value])]
+                                : current.filter((value) => value !== option.value)
+                            )
+                          }
+                          type="checkbox"
+                        />
+                        {option.label}
+                      </label>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <input
+                      className="h-12 min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
+                      onChange={(event) => setCustomServiceType(event.target.value)}
+                      placeholder="Add custom service request"
+                      value={customServiceType}
+                    />
+                    <button
+                      className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                      onClick={() => {
+                        const trimmed = customServiceType.trim();
+                        if (!trimmed) {
+                          return;
+                        }
+                        setSelectedServiceTypes((current) => [...new Set([...current, trimmed])]);
+                        setCustomServiceType("");
+                      }}
+                      type="button"
+                    >
+                      Add custom
+                    </button>
+                  </div>
+                  {selectedServiceLabels.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {selectedServiceLabels.map((label) => (
+                        <button
+                          className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50"
+                          key={label}
+                          onClick={() =>
+                            setSelectedServiceTypes((current) =>
+                              current.filter((value) => (data.options.serviceTypes.find((option) => option.value === value)?.label ?? value) !== label)
+                            )
+                          }
+                          type="button"
+                        >
+                          {label} ×
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">Subject</span>
               <input
@@ -542,6 +701,20 @@ export function EmailRemindersWorkspace({
                   });
                   return;
                 }
+                if (isSchedulingTemplate) {
+                  if (!serviceDate) {
+                    showToast({ title: "Select a service date before sending.", tone: "error" });
+                    return;
+                  }
+                  if (!serviceTime) {
+                    showToast({ title: "Select a service time before sending.", tone: "error" });
+                    return;
+                  }
+                  if (selectedServiceLabels.length === 0) {
+                    showToast({ title: "Select at least one service type before sending.", tone: "error" });
+                    return;
+                  }
+                }
 
                 startTransition(async () => {
                   const result = await sendAction({
@@ -550,7 +723,14 @@ export function EmailRemindersWorkspace({
                     recipientEmailOverrides: buildRecipientEmailOverridePayload(),
                     templateKey,
                     subject,
-                    body
+                    body,
+                    schedulingDetails: isSchedulingTemplate
+                      ? {
+                          serviceDate,
+                          serviceTime,
+                          serviceTypes: selectedServiceLabels
+                        }
+                      : undefined
                   });
 
                   if (result.ok) {
@@ -644,7 +824,7 @@ export function EmailRemindersWorkspace({
                         <p className="text-sm font-semibold text-slate-950">{entry.customerName}</p>
                         <p className="mt-1 text-sm text-slate-500">{entry.recipientEmail}</p>
                         <p className="mt-1 text-xs text-slate-400">
-                          {entry.templateLabel}{entry.dueMonth ? ` - due month ${entry.dueMonth}` : ""} - Sent by {entry.sentByName}
+                          {entry.templateLabel}{entry.dueMonth ? ` • due month ${entry.dueMonth}` : ""} • Sent by {entry.sentByName}
                         </p>
                       </div>
                       <StatusBadge

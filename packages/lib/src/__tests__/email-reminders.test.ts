@@ -526,4 +526,95 @@ describe("email reminders", () => {
       })
     );
   });
+
+  it("sends service scheduling emails with selected date, time, and service types", async () => {
+    prismaMock.customerCompany.findMany.mockResolvedValue([
+      {
+        id: "customer_4",
+        name: "St. Mary's Rehab",
+        contactName: "Sam Coordinator",
+        billingEmail: "maintenance@stmarys.test",
+        phone: "580-555-0100",
+        serviceAddressLine1: "100 Care Ave",
+        serviceCity: "Enid",
+        serviceState: "OK",
+        servicePostalCode: "73701",
+        billingAddressLine1: "100 Care Ave",
+        billingCity: "Enid",
+        billingState: "OK",
+        billingPostalCode: "73701",
+        sites: []
+      }
+    ]);
+    prismaMock.inspectionTask.findMany.mockResolvedValue([]);
+    prismaMock.tenant.findFirst.mockResolvedValue({
+      id: "tenant_1",
+      name: "Northwest Fire & Safety",
+      billingEmail: "billing@nwfireandsafety.com",
+      branding: {
+        legalBusinessName: "Northwest Fire & Safety",
+        phone: "580-540-3119",
+        email: "accounting@nwfireandsafety.com"
+      }
+    });
+    sendCustomerBrandedEmailMock.mockResolvedValue({
+      sent: true,
+      provider: "resend",
+      messageId: "msg_schedule",
+      error: null,
+      reason: "sent"
+    });
+
+    const { getEmailReminderWorkspaceData, sendManualEmailReminders } = await import("../email-reminders");
+    prismaMock.emailReminderSendLog.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    const workspace = await getEmailReminderWorkspaceData(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { dueMonth: "2026-04" }
+    );
+
+    expect(workspace.templates.map((template) => template.key)).toContain("service_inspection_scheduling");
+    expect(workspace.options.serviceTypes.length).toBeGreaterThan(0);
+
+    const result = await sendManualEmailReminders(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        dueMonth: "2026-04",
+        customerCompanyIds: ["customer_4"],
+        templateKey: "service_inspection_scheduling",
+        subject: "Service Scheduled for {{serviceDate}} at {{serviceTime}}",
+        body: "Hello {{customerName}},\n\n{{serviceTypes}}\n\nScheduled for {{serviceDate}} at {{serviceTime}}.",
+        schedulingDetails: {
+          serviceDate: "2026-07-21",
+          serviceTime: "13:30",
+          serviceTypes: ["Fire Alarm", "Custom pump test"]
+        }
+      }
+    );
+
+    expect(result.templateLabel).toBe("scheduling email");
+    expect(sendCustomerBrandedEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientEmail: "maintenance@stmarys.test",
+        eyebrow: "Service scheduling",
+        subjectLine: "Service Scheduled for Tuesday, July 21, 2026 at 1:30 PM",
+        bodyText: expect.stringContaining("- Fire Alarm")
+      })
+    );
+    expect(sendCustomerBrandedEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bodyText: expect.stringContaining("- Custom pump test")
+      })
+    );
+    expect(prismaMock.emailReminderSendLog.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({
+            templateKey: "service_inspection_scheduling",
+            dueMonth: null,
+            bodySnapshot: expect.stringContaining("Tuesday, July 21, 2026")
+          })
+        ]
+      })
+    );
+  });
 });

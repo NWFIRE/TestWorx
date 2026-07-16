@@ -12,6 +12,11 @@ export async function sendEmailRemindersAction(input: {
   templateKey: string;
   subject: string;
   body: string;
+  schedulingDetails?: {
+    serviceDate: string;
+    serviceTime: string;
+    serviceTypes: string[];
+  };
 }) {
   const session = await auth();
   if (!session?.user?.tenantId) {

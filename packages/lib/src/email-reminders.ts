@@ -12,6 +12,7 @@ import { inspectionTypeRegistry } from "./report-config";
 
 const inspectionReminderTemplateKey = "inspection_due_this_month";
 const customerWelcomeTemplateKey = "customer_welcome";
+const serviceSchedulingTemplateKey = "service_inspection_scheduling";
 const emailReminderPageSize = 20;
 const liveInspectionStatuses = [
   InspectionStatus.to_be_completed,
@@ -42,7 +43,7 @@ export type EmailReminderTemplateDefinition = {
   label: string;
   subject: string;
   body: string;
-  category: "reminder" | "welcome";
+  category: "reminder" | "welcome" | "scheduling";
   previewEyebrow: string;
   previewTitle: string;
   previewFooter?: string;
@@ -75,6 +76,27 @@ Best regards,
 {{companyName}}
 
 If your inspection has already been completed or scheduled, please disregard this message.`
+  },
+  {
+    key: serviceSchedulingTemplateKey,
+    label: "Service / Inspection Scheduling",
+    subject: "Service Scheduled for {{serviceDate}} at {{serviceTime}}",
+    category: "scheduling",
+    previewEyebrow: "Service scheduling",
+    previewTitle: "Your service has been scheduled",
+    previewFooter: "If this appointment time no longer works for your team, please reply to this message and we will help coordinate a better time.",
+    sendSuccessLabel: "scheduling email",
+    body: `Hello {{customerName}},
+
+Your service has been scheduled for {{serviceDate}} at {{serviceTime}}.
+
+Scheduled service(s):
+{{serviceTypes}}
+
+Our technician will arrive during the scheduled service window. If there are gate codes, special access instructions, preferred contacts, or site-specific requirements, please reply to this email so our team has the correct information before arrival.
+
+Thank you,
+{{companyName}}`
   },
   {
     key: customerWelcomeTemplateKey,
@@ -118,7 +140,12 @@ const sendManualEmailRemindersInputSchema = z.object({
   recipientEmailOverrides: z.record(z.string().trim().min(1), z.string().trim().email()).optional().default({}),
   templateKey: z.string().trim().min(1),
   subject: z.string().trim().min(1, "Add a subject before sending."),
-  body: z.string().trim().min(1, "Add message content before sending.")
+  body: z.string().trim().min(1, "Add message content before sending."),
+  schedulingDetails: z.object({
+    serviceDate: z.string().trim().optional().default(""),
+    serviceTime: z.string().trim().optional().default(""),
+    serviceTypes: z.array(z.string().trim().min(1)).optional().default([])
+  }).optional()
 });
 
 function parseActor(actor: ActorContext) {
@@ -201,12 +228,66 @@ function normalizeReminderText(value: string) {
     .trim();
 }
 
+type ReminderMergeFields =
+  Record<"customerName" | "companyName" | "companyPhone" | "companyEmail", string>
+  & Partial<Record<"serviceDate" | "serviceTime" | "serviceTypes", string>>;
+
+function formatSchedulingServiceList(serviceTypes: string[]) {
+  const uniqueServiceTypes = uniqueStrings(serviceTypes);
+  if (uniqueServiceTypes.length === 0) {
+    return "";
+  }
+
+  return uniqueServiceTypes.map((serviceType) => `- ${serviceType}`).join("\n");
+}
+
+function formatSchedulingDate(value?: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  const parsed = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+
+function formatSchedulingTime(value?: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  const [hoursText, minutesText = "00"] = value.split(":");
+  const hours = Number(hoursText);
+  const minutes = Number(minutesText);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return value;
+  }
+
+  const parsed = new Date();
+  parsed.setHours(hours, minutes, 0, 0);
+  return parsed.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
 export function mergeEmailReminderTemplate(
   template: string,
-  fields: Record<"customerName" | "companyName" | "companyPhone" | "companyEmail", string>
+  fields: ReminderMergeFields
 ) {
   return normalizeReminderText(
-    template.replace(/{{\s*(customerName|companyName|companyPhone|companyEmail)\s*}}/g, (_, key) => fields[key as keyof typeof fields] ?? "")
+    template.replace(
+      /{{\s*(customerName|companyName|companyPhone|companyEmail|serviceDate|serviceTime|serviceTypes)\s*}}/g,
+      (_, key) => fields[key as keyof ReminderMergeFields] ?? ""
+    )
   );
 }
 
@@ -215,13 +296,19 @@ function buildReminderMergeFields(input: {
   companyName: string;
   companyPhone?: string | null;
   companyEmail?: string | null;
+  serviceDate?: string | null;
+  serviceTime?: string | null;
+  serviceTypes?: string[];
 }) {
   return {
     customerName: input.customerName?.trim() ?? "",
     companyName: input.companyName.trim(),
     companyPhone: input.companyPhone?.trim() ?? "",
-    companyEmail: input.companyEmail?.trim() ?? ""
-  } satisfies Record<"customerName" | "companyName" | "companyPhone" | "companyEmail", string>;
+    companyEmail: input.companyEmail?.trim() ?? "",
+    serviceDate: formatSchedulingDate(input.serviceDate),
+    serviceTime: formatSchedulingTime(input.serviceTime),
+    serviceTypes: formatSchedulingServiceList(input.serviceTypes ?? [])
+  } satisfies ReminderMergeFields;
 }
 
 function buildReminderTextSearch(query: string): Prisma.InspectionTaskWhereInput | undefined {
@@ -666,6 +753,10 @@ export async function getEmailReminderWorkspaceData(
           label: definition.label
         }))
       ],
+      serviceTypes: (Object.entries(inspectionTypeRegistry) as Array<[InspectionType, { label: string }]>).map(([value, definition]) => ({
+        value,
+        label: definition.label
+      })),
       divisions: [
         { value: "", label: "All divisions" },
         ...uniqueStrings(
@@ -711,6 +802,19 @@ export async function sendManualEmailReminders(
   ensureAdmin(parsedActor);
   const parsedInput = sendManualEmailRemindersInputSchema.parse(input);
   const template = getEmailTemplateDefinition(parsedInput.templateKey);
+  const schedulingDetails = parsedInput.schedulingDetails ?? { serviceDate: "", serviceTime: "", serviceTypes: [] };
+
+  if (template.category === "scheduling") {
+    if (!schedulingDetails.serviceDate) {
+      throw new Error("Select a service date before sending the scheduling email.");
+    }
+    if (!schedulingDetails.serviceTime) {
+      throw new Error("Select a service time before sending the scheduling email.");
+    }
+    if (uniqueStrings(schedulingDetails.serviceTypes).length === 0) {
+      throw new Error("Select at least one service type before sending the scheduling email.");
+    }
+  }
 
   const tenantId = parsedActor.tenantId as string;
   const tenant = await prisma.tenant.findFirst({
@@ -770,7 +874,10 @@ export async function sendManualEmailReminders(
       customerName: recipient.customerName,
       companyName: branding.legalBusinessName,
       companyPhone: branding.phone,
-      companyEmail: branding.email
+      companyEmail: branding.email,
+      serviceDate: schedulingDetails.serviceDate,
+      serviceTime: schedulingDetails.serviceTime,
+      serviceTypes: schedulingDetails.serviceTypes
     });
     const mergedSubject = mergeEmailReminderTemplate(parsedInput.subject, mergeFields);
     const mergedBody = mergeEmailReminderTemplate(parsedInput.body, mergeFields);
@@ -807,11 +914,11 @@ export async function sendManualEmailReminders(
       templateKey: parsedInput.templateKey,
       recipientEmail,
       dueMonth: template.category === "reminder" ? parsedInput.dueMonth : null,
-      siteSummary: template.category === "reminder" ? recipient.siteSummary : null,
+      siteSummary: template.category === "reminder" || template.category === "scheduling" ? recipient.siteSummary : null,
       subjectSnapshot: mergedSubject,
       bodySnapshot: mergedBody,
-      inspectionTypes: template.category === "reminder" ? recipient.inspectionTypes : [],
-      divisions: template.category === "reminder" ? recipient.divisions : [],
+      inspectionTypes: template.category === "reminder" || template.category === "scheduling" ? recipient.inspectionTypes : [],
+      divisions: template.category === "reminder" || template.category === "scheduling" ? recipient.divisions : [],
       messageId: delivery.messageId,
       provider: delivery.provider,
       providerReason: delivery.reason,
@@ -830,7 +937,7 @@ export async function sendManualEmailReminders(
     data: {
       tenantId,
       actorUserId: parsedActor.userId,
-      action: template.category === "welcome" ? "customer_email.manual_send" : "email_reminder.manual_send",
+      action: template.category === "reminder" ? "email_reminder.manual_send" : "customer_email.manual_send",
       entityType: "EmailReminderSendLog",
       entityId: parsedInput.templateKey,
       metadata: {
@@ -839,7 +946,8 @@ export async function sendManualEmailReminders(
         sentCount,
         failedCount,
         customerCompanyIds: parsedInput.customerCompanyIds,
-        recipientEmailOverrideCustomerIds: Object.keys(parsedInput.recipientEmailOverrides)
+        recipientEmailOverrideCustomerIds: Object.keys(parsedInput.recipientEmailOverrides),
+        schedulingDetails: template.category === "scheduling" ? schedulingDetails : undefined
       }
     }
   });
