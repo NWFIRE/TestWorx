@@ -680,7 +680,6 @@ export async function getEmailReminderWorkspaceData(
     ? await prisma.emailReminderSendLog.findMany({
         where: {
           tenantId,
-          dueMonth,
           customerCompanyId: { in: customerIds }
         },
         orderBy: { sentAt: "desc" },

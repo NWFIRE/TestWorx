@@ -201,7 +201,7 @@ describe("email reminders", () => {
     const { getEmailReminderWorkspaceData } = await import("../email-reminders");
     const result = await getEmailReminderWorkspaceData(
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
-      { dueMonth: "2026-05" }
+      { dueMonth: "2026-07" }
     );
 
     expect(prismaMock.customerCompany.findMany).toHaveBeenCalledWith(
@@ -216,6 +216,7 @@ describe("email reminders", () => {
     );
     expect(result.recipients).toHaveLength(1);
     expect(result.recipients[0]?.customerName).toBe("Previously Emailed Customer");
+    expect(result.recipients[0]?.lastSentAt).toBe("2026-05-10T15:00:00.000Z");
   });
 
   it("uses the customer address when site context is empty", async () => {
