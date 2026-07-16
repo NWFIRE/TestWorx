@@ -297,7 +297,7 @@ export default async function BillingSummaryDetailPage({
         summaryId={summary.id}
       />
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(28rem,0.75fr)]">
+      <section className="grid gap-6 xl:grid-cols-[minmax(34rem,0.95fr)_minmax(42rem,1.05fr)]">
         <div className="space-y-6">
           {groupedEntries.map(([category, items]) => (
             <div key={category} className="rounded-[2rem] bg-white p-6 shadow-panel">
@@ -316,7 +316,7 @@ export default async function BillingSummaryDetailPage({
                   <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No {categoryLabels[category].toLowerCase()} extracted from this visit.</p>
                 ) : items.map((item: BillingSummaryLineItem) => (
                   <div key={item.id} className="rounded-[1.5rem] border border-slate-200 p-4">
-                    <div className="grid gap-5 2xl:grid-cols-[minmax(0,1.45fr)_minmax(22rem,0.72fr)] 2xl:items-start">
+                    <div className="grid gap-5 2xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)] 2xl:items-start">
                       <div className="min-w-0 space-y-2">
                         <p className="text-lg font-semibold text-ink">{item.description}</p>
                         <p className="text-sm text-slate-500">{item.reportType === "inspection" ? "inspection billing" : item.reportType.replaceAll("_", " ")} / {item.sourceSection?.replaceAll("-", " ") ?? "billables"}</p>

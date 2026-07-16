@@ -41,11 +41,11 @@ export function BillingReportPdfReviewPanel({ reports }: { reports: BillingRepor
   );
 
   return (
-    <section className="hidden rounded-[2rem] bg-white p-5 shadow-panel xl:block">
-      <div className="mb-4 flex items-start justify-between gap-3">
+    <section className="hidden rounded-[2rem] bg-white p-4 shadow-panel xl:block">
+      <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Report PDF Review</p>
-          <h3 className="mt-1 text-2xl font-semibold text-ink">Verify billing against report</h3>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Report PDF Review</p>
+          <h3 className="mt-1 text-xl font-semibold text-ink">Verify billing against report</h3>
         </div>
         {selectedReport ? (
           <a
@@ -82,7 +82,7 @@ export function BillingReportPdfReviewPanel({ reports }: { reports: BillingRepor
 
           {selectedReport ? (
             <>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
                 <p className="text-sm font-semibold text-slate-950">{selectedReport.reportLabel}</p>
                 <p className="mt-1 text-xs text-slate-500">
                   Finalized {formatReportDate(selectedReport.finalizedAt)} | {selectedReport.fileName}
@@ -93,7 +93,7 @@ export function BillingReportPdfReviewPanel({ reports }: { reports: BillingRepor
               </div>
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
                 <iframe
-                  className="h-[72vh] min-h-[42rem] w-full bg-white"
+                  className="h-[82vh] min-h-[50rem] w-full bg-white"
                   src={selectedReport.viewUrl}
                   title={`${selectedReport.reportLabel} PDF`}
                 />
