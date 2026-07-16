@@ -593,7 +593,7 @@ function AsyncUserLookupSection({
     const timer = window.setTimeout(() => {
       setDebouncedQuery(query);
       setPage(0);
-    }, 400);
+    }, 1200);
 
     return () => window.clearTimeout(timer);
   }, [query]);
@@ -763,6 +763,12 @@ function AsyncUserLookupSection({
                   setOpen(true);
                   if (!hasLoaded && !loading) {
                     void loadUsers(0, true);
+                  }
+                }}
+                onBlur={() => {
+                  if (query !== debouncedQuery) {
+                    setDebouncedQuery(query);
+                    setPage(0);
                   }
                 }}
                 onKeyDown={handleSearchKeyDown}

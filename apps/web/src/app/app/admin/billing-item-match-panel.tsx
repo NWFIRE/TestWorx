@@ -38,7 +38,7 @@ const initialSearchState: SearchState = {
 };
 
 const initialActionState: ActionState = { error: null, success: null };
-const LIVE_SEARCH_DEBOUNCE_MS = 400;
+const LIVE_SEARCH_DEBOUNCE_MS = 1200;
 
 function confidenceLabel(confidence: number) {
   if (confidence >= 0.96) {

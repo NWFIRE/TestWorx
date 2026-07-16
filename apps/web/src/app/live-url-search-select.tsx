@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { SearchSelect, type SearchSelectOption } from "./search-select";
 
-const LIVE_SEARCH_DEBOUNCE_MS = 250;
+const LIVE_SEARCH_DEBOUNCE_MS = 1200;
 
 function buildNextUrl({
   pathname,
@@ -194,7 +194,10 @@ export function LiveUrlSearchSelect({
       }}
       onCustomValueChange={updateQuery}
       onClear={clearQuery}
-      onInputBlur={() => setIsFocused(false)}
+      onInputBlur={() => {
+        setIsFocused(false);
+        applyQuery(query);
+      }}
       onInputFocus={() => setIsFocused(true)}
       onQueryCommit={(nextQuery) => applyQuery(nextQuery)}
       onQueryChange={updateQuery}

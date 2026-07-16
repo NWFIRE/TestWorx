@@ -16,7 +16,7 @@ const paymentTermsOptions = [
   { value: "net_60", label: "Net 60" },
   { value: "custom", label: "Custom terms" }
 ] as const;
-const LIVE_SEARCH_DEBOUNCE_MS = 400;
+const LIVE_SEARCH_DEBOUNCE_MS = 1200;
 
 type CustomerRecord = {
   id: string;
@@ -834,6 +834,11 @@ export function CustomerManagementCard({
             busy={isLoadingResults}
             onChange={(event) => setQueryInput(event.target.value)}
             onClear={clearSearch}
+            onBlur={() => {
+              if (queryInput.trim() !== activeQuery) {
+                void loadCustomers(1, queryInput.trim());
+              }
+            }}
             onKeyDown={handleSearchKeyDown}
             placeholder="Search customer name, contact, billing email, or phone"
             value={queryInput}

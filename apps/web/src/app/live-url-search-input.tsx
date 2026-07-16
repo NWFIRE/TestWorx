@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-const LIVE_SEARCH_DEBOUNCE_MS = 250;
+const LIVE_SEARCH_DEBOUNCE_MS = 1200;
 
 function buildNextUrl({
   pathname,
@@ -135,6 +135,7 @@ export function LiveUrlSearchInput({
         id={id}
         name={name}
         onChange={(event) => setQuery(event.target.value)}
+        onBlur={() => applyQuery(query)}
         onKeyDown={(event) => {
           if (event.key === "Enter") {
             event.preventDefault();
