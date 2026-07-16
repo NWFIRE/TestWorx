@@ -7,8 +7,7 @@ import {
   CircleAlert,
   ClipboardList,
   FileText,
-  ShieldCheck,
-  Wrench
+  ShieldCheck
 } from "lucide-react";
 
 import { auth } from "@/auth";
@@ -110,18 +109,6 @@ function formatInspectionMetaLine(inspection: DashboardInspection, timezone?: st
   return [inspection.secondaryTitle, formatTenantDateTime(inspection.scheduledStart, timezone)]
     .filter(Boolean)
     .join(" - ");
-}
-
-function buildActivityItems(
-  inspections: CompletedDashboardInspection[],
-  timezone?: string | null
-): Array<{ title: string; meta: string; tag: string; href: string }> {
-  return inspections.slice(0, 3).map((inspection) => ({
-    title: `${inspection.primaryTitle ?? inspection.site.name} finalized`,
-    meta: formatInspectionMetaLine(inspection, timezone),
-    tag: inspection.billingStatus ? inspection.billingStatus.replaceAll("_", " ") : "Completed",
-    href: `/app/admin/inspections/${inspection.id}?from=${encodeURIComponent("/app/admin/dashboard")}`
-  }));
 }
 
 function buildAlertItems(data: AdminDashboardData, readyToBillCount: number, inspectionNotice?: string) {
@@ -303,7 +290,6 @@ export default async function AdminDashboardPage({
     (deficiency) => deficiency.severity === "high" || deficiency.severity === "critical"
   ).length;
   const todayItems = data.activeInspections.slice(0, 3);
-  const activityItems = buildActivityItems(data.completedInspections, data.timezone);
   const billingPipeline = calculateBillingPipeline(billingSummaries);
   const archivedInspectionItems = data.completedInspections.filter(
     (inspection) => inspection.status === "invoiced" || inspection.billingStatus === "invoiced"
@@ -451,8 +437,7 @@ export default async function AdminDashboardPage({
                 </div>
               </section>
 
-              <WorkspaceSplit className="gap-5" variant="balanced">
-                <SectionCard>
+              <SectionCard>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
@@ -511,47 +496,7 @@ export default async function AdminDashboardPage({
                       ))
                     )}
                   </div>
-                </SectionCard>
-
-                <SectionCard>
-                  <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
-                    Recent activity
-                  </h3>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Important movement across reporting, billing, and customer delivery.
-                  </p>
-
-                  <div className="mt-4 space-y-4">
-                    {activityItems.length === 0 ? (
-                      <EmptyState
-                        description="No completed activity has been recorded yet."
-                        title="No recent activity"
-                      />
-                    ) : (
-                      activityItems.map((item) => (
-                        <Link
-                          key={item.title}
-                          href={item.href}
-                          className="flex gap-3 rounded-2xl p-1 transition hover:bg-slate-50"
-                        >
-                            <div className="mt-1 rounded-full border border-[color:var(--border-subtle)] bg-[color:var(--surface-muted)] p-2 text-slate-700">
-                            <Wrench className="h-4 w-4" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="text-sm font-semibold leading-6 text-slate-900">
-                                {item.title}
-                              </div>
-                              <StatusBadge label={item.tag} tone="slate" />
-                            </div>
-                            <div className="mt-1 text-sm leading-6 text-[color:var(--text-secondary)]">{item.meta}</div>
-                          </div>
-                        </Link>
-                      ))
-                    )}
-                  </div>
-                </SectionCard>
-              </WorkspaceSplit>
+              </SectionCard>
 
               <section className="grid gap-5 2xl:grid-cols-2">
                 <InspectionListCard
