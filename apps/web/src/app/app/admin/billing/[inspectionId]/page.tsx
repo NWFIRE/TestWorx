@@ -11,8 +11,9 @@ import {
 import { BillingSummaryStatusActions } from "../billing-summary-status-actions";
 import { BillingManualLineForm } from "../../billing-manual-line-form";
 import { BillingItemMatchPanel } from "../../billing-item-match-panel";
-import { AppPageShell, WorkspaceSplit } from "../../operations-ui";
+import { AppPageShell } from "../../operations-ui";
 import { addBillingSummaryManualLineAction, clearBillingSummaryItemCatalogLinkAction, getBillingManualLineCatalogItems, linkBillingSummaryItemCatalogAction, removeBillingSummaryItemGroupAction, searchBillingSummaryItemCatalogMatchesAction, sendQuickBooksInvoiceAction, syncBillingSummaryToQuickBooksAction, updateBillingSummaryItemGroupAction, updateBillingSummaryNotesAction, updateBillingSummaryStatusAction } from "../../actions";
+import { BillingReportPdfReviewPanel } from "./billing-report-pdf-review-panel";
 
 type BillingSummaryDetail = NonNullable<Awaited<ReturnType<typeof getAdminBillingSummaryDetail>>>;
 type BillingSummaryLineItem = BillingSummaryDetail["reviewGroupedItems"][keyof BillingSummaryDetail["reviewGroupedItems"]][number] & {
@@ -296,7 +297,7 @@ export default async function BillingSummaryDetailPage({
         summaryId={summary.id}
       />
 
-      <WorkspaceSplit variant="content-heavy">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(28rem,0.75fr)]">
         <div className="space-y-6">
           {groupedEntries.map(([category, items]) => (
             <div key={category} className="rounded-[2rem] bg-white p-6 shadow-panel">
@@ -415,6 +416,20 @@ export default async function BillingSummaryDetailPage({
         </div>
 
         <div className="space-y-6">
+          <BillingReportPdfReviewPanel
+            reports={summary.reportPdfs.map((report) => ({
+              inspectionTaskId: report.inspectionTaskId,
+              inspectionReportId: report.inspectionReportId,
+              reportLabel: report.reportLabel,
+              reportStatus: report.reportStatus,
+              finalizedAt: report.finalizedAt ? report.finalizedAt.toISOString() : null,
+              attachmentId: report.attachmentId,
+              fileName: report.fileName,
+              viewUrl: report.viewUrl,
+              downloadUrl: report.downloadUrl
+            }))}
+          />
+
           <div className="rounded-[2rem] bg-white p-6 shadow-panel">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Summary status</p>
             <h3 className="mt-1 text-2xl font-semibold text-ink">{formatBillingSummaryStatusLabel(summary.status)}</h3>
@@ -455,7 +470,7 @@ export default async function BillingSummaryDetailPage({
             </form>
           </div>
         </div>
-      </WorkspaceSplit>
+      </section>
     </AppPageShell>
   );
 }

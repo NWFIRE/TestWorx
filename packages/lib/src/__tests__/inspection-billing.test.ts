@@ -8,6 +8,7 @@ const { prismaMock, txMock } = vi.hoisted(() => ({
     $executeRaw: vi.fn(),
     $transaction: vi.fn(),
     inspection: { findFirst: vi.fn() },
+    inspectionTask: { findMany: vi.fn() },
     customerCompany: { findFirst: vi.fn() },
     billingPayerAccount: { findFirst: vi.fn() },
     billingContractProfile: { findFirst: vi.fn() },
@@ -32,6 +33,7 @@ const { prismaMock, txMock } = vi.hoisted(() => ({
     $queryRawUnsafe: vi.fn(),
     $executeRaw: vi.fn(),
     inspection: { findFirst: vi.fn() },
+    inspectionTask: { findMany: vi.fn() },
     customerCompany: { findFirst: vi.fn() },
     billingPayerAccount: { findFirst: vi.fn() },
     billingContractProfile: { findFirst: vi.fn() },
@@ -566,6 +568,7 @@ describe("inspection billing extraction", () => {
     prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue(null);
     prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([]);
     prismaMock.quickBooksCatalogItemAlias.findMany.mockResolvedValue([]);
+    prismaMock.inspectionTask.findMany.mockResolvedValue([]);
     prismaMock.workOrderLineItem.findMany.mockResolvedValue([]);
     prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof prismaMock) => Promise<unknown>) => callback(prismaMock as never));
     prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
@@ -2659,10 +2662,39 @@ describe("inspection billing persistence and admin review", () => {
           })
         }
       ]);
+    prismaMock.inspectionTask.findMany.mockResolvedValueOnce([
+      {
+        id: "task_1",
+        inspectionType: "kitchen_suppression",
+        customDisplayLabel: null,
+        report: {
+          id: "report_1",
+          status: "finalized",
+          finalizedAt: new Date("2026-03-20T16:00:00.000Z"),
+          updatedAt: new Date("2026-03-20T16:00:00.000Z"),
+          attachments: [
+            {
+              id: "attachment_pdf_1",
+              fileName: "Pinecrest Kitchen Suppression.pdf",
+              createdAt: new Date("2026-03-20T16:05:00.000Z")
+            }
+          ]
+        }
+      }
+    ]);
 
     const detail = await getAdminBillingSummaryDetail({ userId: "office_1", role: "office_admin", tenantId: "tenant_1" }, "inspection_1");
     expect(detail?.groupedItems.material).toHaveLength(3);
     expect(detail?.notes).toBe("Review pricing");
+    expect(detail?.reportPdfs).toEqual([
+      expect.objectContaining({
+        attachmentId: "attachment_pdf_1",
+        inspectionReportId: "report_1",
+        reportLabel: "Kitchen suppression",
+        viewUrl: "/api/attachments/attachment_pdf_1?disposition=inline",
+        downloadUrl: "/api/attachments/attachment_pdf_1"
+      })
+    ]);
   });
 
   it("uses detail-page catalog pricing resolution for billing summary totals", async () => {

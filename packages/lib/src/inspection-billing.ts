@@ -24,7 +24,7 @@ import { saveQuickBooksItemMappingForCode } from "./quickbooks";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
 import { reconcileInspectionStatusTx } from "./inspection-status-consistency";
 import { hasWorkOrderLaborLineColumns, hasWorkOrderLineItemTable } from "./work-order-line-item-table";
-import { getCustomerFacingSiteLabel } from "./scheduling";
+import { formatInspectionTaskTypeLabel, getCustomerFacingSiteLabel } from "./scheduling";
 import {
   calculateInvoiceTotalsFromItems,
   calculateInvoiceLineSnapshot,
@@ -3813,7 +3813,7 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
     return null;
   }
 
-  const [billingResolutionSnapshot, providerContextRecord] = await Promise.all([
+  const [billingResolutionSnapshot, providerContextRecord, reportPdfTasks] = await Promise.all([
     prisma.inspectionBillingSummary.findFirst({
       where: {
         tenantId,
@@ -3846,6 +3846,39 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
         siteProviderAssignment: {
           include: {
             serviceSite: { select: { id: true, name: true } }
+          }
+        }
+      }
+    }),
+    prisma.inspectionTask.findMany({
+      where: {
+        tenantId,
+        inspectionId
+      },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: {
+        id: true,
+        inspectionType: true,
+        customDisplayLabel: true,
+        report: {
+          select: {
+            id: true,
+            status: true,
+            finalizedAt: true,
+            updatedAt: true,
+            attachments: {
+              where: {
+                kind: "pdf",
+                source: "generated"
+              },
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: {
+                id: true,
+                fileName: true,
+                createdAt: true
+              }
+            }
           }
         }
       }
@@ -3915,6 +3948,30 @@ export async function getAdminBillingSummaryDetail(actor: ActorContext, inspecti
     items: displayItems,
     groupedItems: groupBillableItems(displayItems),
     reviewGroupedItems: groupBillingReviewItems(displayItems),
+    reportPdfs: reportPdfTasks
+      .map((task) => {
+        const generatedPdf = task.report?.attachments[0] ?? null;
+        if (!task.report || !generatedPdf) {
+          return null;
+        }
+
+        const reportLabel = task.customDisplayLabel?.trim() || formatInspectionTaskTypeLabel(task.inspectionType);
+        return {
+          inspectionTaskId: task.id,
+          inspectionReportId: task.report.id,
+          reportType: task.inspectionType,
+          reportLabel,
+          reportStatus: task.report.status,
+          finalizedAt: task.report.finalizedAt,
+          updatedAt: task.report.updatedAt,
+          attachmentId: generatedPdf.id,
+          fileName: generatedPdf.fileName,
+          createdAt: generatedPdf.createdAt,
+          viewUrl: `/api/attachments/${generatedPdf.id}?disposition=inline`,
+          downloadUrl: `/api/attachments/${generatedPdf.id}`
+        };
+      })
+      .filter((reportPdf): reportPdf is NonNullable<typeof reportPdf> => Boolean(reportPdf)),
     reportTypes: [...new Set(displayItems.map((item) => item.reportType).filter((reportType) => reportType !== INSPECTION_LEVEL_REPORT_TYPE))],
     metrics: buildSummaryMetrics(displayItems),
     billingResolution: billingResolutionSnapshot?.billingResolutionSnapshot ?? null,
