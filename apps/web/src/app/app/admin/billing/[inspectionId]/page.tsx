@@ -361,15 +361,6 @@ export default async function BillingSummaryDetailPage({
                               </p>
                             ) : null}
                             <p className="mt-2">{describeAutomaticFeeSource(item)}</p>
-                            {typeof item.metadata?.serviceFeePriority === "number" ? (
-                              <p className="mt-2 text-amber-800">Rule priority: {item.metadata.serviceFeePriority}</p>
-                            ) : null}
-                            {typeof item.metadata?.serviceFeeRuleId === "string" && item.metadata.serviceFeeRuleId ? (
-                              <p className="mt-1 break-all text-xs text-amber-700">Rule id: {item.metadata.serviceFeeRuleId}</p>
-                            ) : null}
-                            {typeof item.metadata?.complianceRuleId === "string" && item.metadata.complianceRuleId ? (
-                              <p className="mt-1 break-all text-xs text-amber-700">Rule id: {item.metadata.complianceRuleId}</p>
-                            ) : null}
                           </div>
                         ) : (
                           <BillingItemMatchPanel
