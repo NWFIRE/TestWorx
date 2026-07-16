@@ -303,12 +303,7 @@ export function EmailRemindersWorkspace({
       </section>
 
       <FilterBar
-        defaultOpen={Boolean(
-          data.filters.query ||
-            data.filters.hasValidEmail !== "all" ||
-            data.filters.inspectionType ||
-            data.filters.division
-        )}
+        defaultOpen
         description="Search customers, refine the current list, and prepare a branded email without leaving the workspace."
         title="Recipient filters"
       >
@@ -354,9 +349,9 @@ export function EmailRemindersWorkspace({
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">Recipients</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Customer list</h2>
+              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Email recipient list</h2>
               <p className="mt-2 text-sm text-[color:var(--text-muted)]">
-                Select one or more customers, review the shared draft, and send polished customer emails manually.
+                Select customers with prior email activity, or search for a customer to send a new message.
               </p>
             </div>
             {data.recipients.length > 0 ? (
@@ -375,7 +370,7 @@ export function EmailRemindersWorkspace({
 
           {data.recipients.length === 0 ? (
             <EmptyState
-              description="No customers matched the current filters. Try another month or widen the search."
+              description="Search for a customer or adjust the filters to find email recipients."
               title="No recipients found"
             />
           ) : (

@@ -645,16 +645,32 @@ export async function getEmailReminderWorkspaceData(
   const tenantId = parsedActor.tenantId as string;
   const dueMonth = normalizeMonthKey(input?.dueMonth);
   const page = Number.isFinite(input?.page) && (input?.page ?? 1) > 0 ? Math.floor(input?.page ?? 1) : 1;
+  const query = input?.query?.trim() ?? "";
+  const requestedCustomerCompanyIds = uniqueStrings(input?.customerCompanyIds ?? []);
+  let scopedCustomerCompanyIds = requestedCustomerCompanyIds.length > 0 ? requestedCustomerCompanyIds : undefined;
+
+  if (!query && !scopedCustomerCompanyIds) {
+    const previouslyEmailedCustomers = await prisma.emailReminderSendLog.findMany({
+      where: { tenantId },
+      distinct: ["customerCompanyId"],
+      select: { customerCompanyId: true }
+    });
+    scopedCustomerCompanyIds = uniqueStrings(previouslyEmailedCustomers.map((entry) => entry.customerCompanyId));
+    if (scopedCustomerCompanyIds.length === 0) {
+      scopedCustomerCompanyIds = ["__no_previous_email_recipients__"];
+    }
+  }
+
   const customers = await fetchRecipientCustomers({
     tenantId,
-    query: input?.query?.trim() ?? "",
+    query,
     hasValidEmail: input?.hasValidEmail ?? "all",
-    customerCompanyIds: input?.customerCompanyIds
+    customerCompanyIds: scopedCustomerCompanyIds
   });
   const taskRows = await fetchRecipientTaskRows({
     tenantId,
     dueMonth,
-    customerCompanyIds: input?.customerCompanyIds,
+    customerCompanyIds: scopedCustomerCompanyIds,
     inspectionType: input?.inspectionType ?? "",
     division: input?.division ?? ""
   });
@@ -722,7 +738,7 @@ export async function getEmailReminderWorkspaceData(
     tenantName: tenant.name,
     branding,
     filters: {
-      query: input?.query?.trim() ?? "",
+      query,
       dueMonth,
       hasValidEmail: input?.hasValidEmail ?? "all",
       inspectionType: input?.inspectionType ?? "",

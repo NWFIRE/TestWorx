@@ -155,6 +155,69 @@ describe("email reminders", () => {
     expect(result.recipients[0]?.lastSentAt).toBe("2026-04-10T15:00:00.000Z");
   });
 
+  it("defaults the recipient customer list to customers with prior email activity", async () => {
+    prismaMock.customerCompany.findMany.mockResolvedValue([
+      {
+        id: "customer_sent",
+        name: "Previously Emailed Customer",
+        contactName: "Pat Recipient",
+        billingEmail: "pat@example.test",
+        phone: "555-1111",
+        serviceAddressLine1: "100 Sent Ave",
+        serviceCity: "Enid",
+        serviceState: "OK",
+        servicePostalCode: "73701",
+        billingAddressLine1: "100 Sent Ave",
+        billingCity: "Enid",
+        billingState: "OK",
+        billingPostalCode: "73701",
+        sites: []
+      }
+    ]);
+    prismaMock.inspectionTask.findMany.mockResolvedValue([]);
+    prismaMock.emailReminderSendLog.findMany
+      .mockResolvedValueOnce([
+        { customerCompanyId: "customer_sent" },
+        { customerCompanyId: "customer_sent" }
+      ])
+      .mockResolvedValueOnce([
+        {
+          customerCompanyId: "customer_sent",
+          sentAt: new Date("2026-05-10T15:00:00.000Z")
+        }
+      ])
+      .mockResolvedValueOnce([]);
+    prismaMock.tenant.findFirst.mockResolvedValue({
+      id: "tenant_1",
+      name: "Northwest Fire & Safety",
+      billingEmail: "billing@nwfireandsafety.com",
+      branding: {
+        legalBusinessName: "Northwest Fire & Safety",
+        phone: "580-540-3119",
+        email: "accounting@nwfireandsafety.com"
+      }
+    });
+
+    const { getEmailReminderWorkspaceData } = await import("../email-reminders");
+    const result = await getEmailReminderWorkspaceData(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { dueMonth: "2026-05" }
+    );
+
+    expect(prismaMock.customerCompany.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            { tenantId: "tenant_1" },
+            { id: { in: ["customer_sent"] } }
+          ])
+        })
+      })
+    );
+    expect(result.recipients).toHaveLength(1);
+    expect(result.recipients[0]?.customerName).toBe("Previously Emailed Customer");
+  });
+
   it("uses the customer address when site context is empty", async () => {
     prismaMock.customerCompany.findMany.mockResolvedValue([
       {
@@ -219,7 +282,7 @@ describe("email reminders", () => {
     const { getEmailReminderWorkspaceData } = await import("../email-reminders");
     const result = await getEmailReminderWorkspaceData(
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
-      { dueMonth: "2026-04" }
+      { dueMonth: "2026-04", query: "acme" }
     );
 
     expect(result.recipients[0]?.siteSummary).toBe("500 Service Ave, Tulsa OK 74103");
@@ -487,7 +550,7 @@ describe("email reminders", () => {
     const { getEmailReminderWorkspaceData, sendManualEmailReminders } = await import("../email-reminders");
     const workspace = await getEmailReminderWorkspaceData(
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
-      { dueMonth: "2026-04" }
+      { dueMonth: "2026-04", customerCompanyIds: ["customer_3"] }
     );
 
     expect(workspace.templates.map((template) => template.key)).toContain("customer_welcome");
@@ -569,7 +632,7 @@ describe("email reminders", () => {
     prismaMock.emailReminderSendLog.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     const workspace = await getEmailReminderWorkspaceData(
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
-      { dueMonth: "2026-04" }
+      { dueMonth: "2026-04", customerCompanyIds: ["customer_4"] }
     );
 
     expect(workspace.templates.map((template) => template.key)).toContain("service_inspection_scheduling");
