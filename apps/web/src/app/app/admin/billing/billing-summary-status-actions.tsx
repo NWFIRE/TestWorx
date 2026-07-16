@@ -41,7 +41,7 @@ type BillingSummaryStatusActionsProps = {
   quickbooksSyncError: string | null;
   quickbooksSendError: string | null;
   canUseQuickBooksActions: boolean;
-  hasMissingPrices: boolean;
+  hasMissingBillingSetup: boolean;
   summaryModeMismatch: boolean;
   syncBillingSummaryToQuickBooksAction: (formData: FormData) => Promise<BillingSummaryActionResult>;
   sendQuickBooksInvoiceAction: (formData: FormData) => Promise<BillingSummaryActionResult>;
@@ -100,7 +100,7 @@ export function BillingSummaryStatusActions({
   quickbooksSyncError,
   quickbooksSendError,
   canUseQuickBooksActions,
-  hasMissingPrices,
+  hasMissingBillingSetup,
   summaryModeMismatch,
   syncBillingSummaryToQuickBooksAction,
   sendQuickBooksInvoiceAction,
@@ -186,12 +186,12 @@ export function BillingSummaryStatusActions({
       <div className="mt-4 grid gap-3">
         {!hasVerifiedQuickBooksInvoice ? (
           <p className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-500">
-            Choose Sync Only to create the QuickBooks invoice without emailing the customer. Use Sync and send only when you are ready for QuickBooks to deliver it.
+            QuickBooks applies the final item pricing and tax when the invoice is created. Choose Sync Only to create the QuickBooks invoice without emailing the customer. Use Sync and send only when you are ready for QuickBooks to deliver it.
           </p>
         ) : null}
         <ActionButton
           className="w-full"
-          disabled={hasVerifiedQuickBooksInvoice || hasMissingPrices || !canUseQuickBooksActions}
+          disabled={hasVerifiedQuickBooksInvoice || hasMissingBillingSetup || !canUseQuickBooksActions}
           onClick={() => runAction("sync", () => {
             const formData = new FormData();
             formData.set("inspectionId", inspectionId);
@@ -214,7 +214,7 @@ export function BillingSummaryStatusActions({
         {!hasVerifiedQuickBooksInvoice ? (
           <ActionButton
             className="w-full"
-            disabled={hasMissingPrices || !canUseQuickBooksActions}
+            disabled={hasMissingBillingSetup || !canUseQuickBooksActions}
             onClick={() => runAction("sync-send", () => {
               const formData = new FormData();
               formData.set("inspectionId", inspectionId);

@@ -53,12 +53,6 @@ const categoryLabels = {
   fee: "Fees"
 } as const;
 
-function asRecord(value: unknown) {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
-}
-
 function formatBillingSummaryStatusLabel(status: string) {
   if (status === "draft" || status === "reviewed") {
     return "Ready To Bill";
@@ -75,10 +69,6 @@ function formatEditableQuantity(quantity: number) {
   }
 
   return Number.isInteger(quantity) ? String(quantity) : String(Number(quantity.toFixed(2)));
-}
-
-function formatMoney(value: number | null | undefined) {
-  return `$${Number(value ?? 0).toFixed(2)}`;
 }
 
 function buildBillingItemContext(item: {
@@ -246,9 +236,8 @@ export default async function BillingSummaryDetailPage({
     ? summary.quickbooksConnectionMode
     : null;
   const summaryModeMismatch = Boolean(summaryQuickBooksMode && summaryQuickBooksMode !== quickBooksConnection.connection.appMode);
-  const pricingSnapshot = asRecord(summary.pricingSnapshot);
-  const minimumTicketSnapshot = asRecord(pricingSnapshot?.minimumTicket);
-  const invoiceTotals = summary.invoiceTotals;
+  const quickBooksInvoiceLabel = summary.quickbooksInvoiceNumber
+    ?? (summary.quickbooksSyncStatus === "synced" || summary.quickbooksSyncStatus === "sent" ? "Synced" : "Not synced");
 
   return (
     <AppPageShell density="wide">
@@ -271,61 +260,18 @@ export default async function BillingSummaryDetailPage({
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Labor hours</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.laborHoursTotal}</p></div>
         <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Material items</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.materialItemCount}</p></div>
-        <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Missing prices</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.missingPriceCount}</p></div>
-        <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Total due</p><p className="mt-2 text-3xl font-semibold text-ink">{invoiceTotals.totalDue > 0 ? formatMoney(invoiceTotals.totalDue) : "Pending pricing"}</p></div>
+        <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Billing setup</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.missingPriceCount > 0 ? `${summary.metrics.missingPriceCount} item${summary.metrics.missingPriceCount === 1 ? "" : "s"}` : "Ready"}</p></div>
+        <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">QuickBooks invoice</p><p className="mt-2 text-3xl font-semibold text-ink">{quickBooksInvoiceLabel}</p></div>
       </div>
 
-      <div className="rounded-[2rem] bg-white p-6 shadow-panel">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Invoice totals</p>
-            <h3 className="mt-2 text-2xl font-semibold text-ink">Tax and subtotal snapshot</h3>
-            <p className="mt-2 max-w-2xl text-sm text-slate-500">
-              Totals are calculated from the saved invoice line snapshots, including QuickBooks taxable/non-taxable item status.
-            </p>
-          </div>
-          <div className="grid min-w-72 gap-2 text-sm">
-            <div className="flex items-center justify-between gap-8">
-              <span className="text-slate-500">Subtotal</span>
-              <span className="font-semibold text-ink">{formatMoney(invoiceTotals.subtotalBeforeTax)}</span>
-            </div>
-            <div className="flex items-center justify-between gap-8">
-              <span className="text-slate-500">Taxable subtotal</span>
-              <span className="font-semibold text-ink">{formatMoney(invoiceTotals.taxableSubtotal)}</span>
-            </div>
-            <div className="flex items-center justify-between gap-8">
-              <span className="text-slate-500">Non-taxable subtotal</span>
-              <span className="font-semibold text-ink">{formatMoney(invoiceTotals.nonTaxableSubtotal)}</span>
-            </div>
-            <div className="flex items-center justify-between gap-8 border-t border-slate-200 pt-2">
-              <span className="text-slate-500">Sales tax</span>
-              <span className="font-semibold text-ink">{formatMoney(invoiceTotals.taxTotal)}</span>
-            </div>
-            <div className="flex items-center justify-between gap-8 border-t border-slate-200 pt-3 text-base">
-              <span className="font-semibold text-ink">Total</span>
-              <span className="text-xl font-semibold text-ink">{formatMoney(invoiceTotals.totalDue)}</span>
-            </div>
-          </div>
+      {summary.customerIsTaxExempt ? (
+        <div className="rounded-[2rem] border border-blue-200 bg-blue-50 px-6 py-4 text-sm text-blue-900 shadow-panel">
+          <p className="font-semibold text-blue-950">Tax-exempt customer</p>
+          <p className="mt-2">
+            Item taxability remains visible for QuickBooks mapping, but QuickBooks should apply the customer exemption when the invoice is synced.
+          </p>
         </div>
-        {invoiceTotals.warnings.length > 0 ? (
-          <div className="mt-5 rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
-            <p className="font-semibold text-amber-950">Tax review needed</p>
-            <div className="mt-2 space-y-1">
-              {invoiceTotals.warnings.map((warning) => (
-                <p key={warning}>{warning}</p>
-              ))}
-            </div>
-          </div>
-        ) : null}
-        {summary.customerIsTaxExempt ? (
-          <div className="mt-5 rounded-[1.5rem] border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-blue-900">
-            <p className="font-semibold text-blue-950">Tax-exempt customer</p>
-            <p className="mt-2">
-              Taxable items stay marked as taxable for item tracking and QuickBooks mapping, but this invoice will calculate $0.00 sales tax while the customer is tax exempt.
-            </p>
-          </div>
-        ) : null}
-      </div>
+      ) : null}
 
       {isInvoiced ? (
         <div className="rounded-[2rem] border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm text-emerald-800 shadow-panel">
@@ -342,15 +288,6 @@ export default async function BillingSummaryDetailPage({
           This billing summary was synced in QuickBooks {summaryQuickBooksMode === "sandbox" ? "Sandbox" : "Live"}. Re-sync it in {quickBooksConnection.connection.appModeLabel} mode before opening or sending it.
         </div>
       ) : null}
-      {minimumTicketSnapshot?.applied === true ? (
-        <div className="rounded-[2rem] border border-blue-200 bg-blue-50 px-6 py-4 text-sm text-blue-900 shadow-panel">
-          <p className="font-semibold">Minimum ticket applied</p>
-          <p className="mt-1">
-            Subtotal was ${Number(minimumTicketSnapshot.subtotalBeforeMinimum ?? 0).toFixed(2)}. {String(minimumTicketSnapshot.ruleName ?? "Minimum ticket")} is ${Number(minimumTicketSnapshot.minimumAmount ?? 0).toFixed(2)}, so a ${Number(minimumTicketSnapshot.adjustmentAmount ?? 0).toFixed(2)} minimum adjustment was added.
-          </p>
-        </div>
-      ) : null}
-
       <BillingManualLineForm
         action={addBillingSummaryManualLineAction}
         catalogItems={manualLineCatalogItems}
@@ -391,11 +328,6 @@ export default async function BillingSummaryDetailPage({
                           <span className={item.taxable ? "rounded-full bg-emerald-50 px-3 py-1 text-emerald-700" : "rounded-full bg-slate-100 px-3 py-1 text-slate-600"}>
                             {item.taxable ? "Taxable" : "Non-taxable"}
                           </span>
-                          {item.taxable ? (
-                            <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700">
-                              Line tax {formatMoney(item.taxAmount)}
-                            </span>
-                          ) : null}
                         </div>
                         {buildBillingItemContext(item).map((line) => (
                           <p key={line} className="text-sm text-slate-500">{line}</p>
@@ -419,7 +351,7 @@ export default async function BillingSummaryDetailPage({
                             </div>
                           </details>
                         ) : null}
-                        {item.unitPrice === null || item.unitPrice === undefined ? <p className="text-sm font-semibold text-amber-700">Missing unit price. Review recommended.</p> : null}
+                        {item.unitPrice === null || item.unitPrice === undefined ? <p className="text-sm font-semibold text-amber-700">QuickBooks billing setup needed before sync.</p> : null}
                         {item.category === "fee" && !isManualBillingLine(item) ? (
                           <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50/70 px-4 py-4 text-sm text-amber-900">
                             <p className="font-semibold text-amber-950">{isComplianceReportingFeeItem(item) ? "Compliance reporting fee assessed" : "Automatic fee line"}</p>
@@ -429,9 +361,6 @@ export default async function BillingSummaryDetailPage({
                               </p>
                             ) : null}
                             <p className="mt-2">{describeAutomaticFeeSource(item)}</p>
-                            {isComplianceReportingFeeItem(item) && item.unitPrice !== null && item.unitPrice !== undefined ? (
-                              <p className="mt-2 text-amber-800">Assessed fee: ${(item.quantity * item.unitPrice).toFixed(2)}</p>
-                            ) : null}
                             {typeof item.metadata?.serviceFeePriority === "number" ? (
                               <p className="mt-2 text-amber-800">Rule priority: {item.metadata.serviceFeePriority}</p>
                             ) : null}
@@ -463,13 +392,10 @@ export default async function BillingSummaryDetailPage({
                         {item.itemIds.map((sourceItemId) => (
                           <input key={sourceItemId} name="itemIds" type="hidden" value={sourceItemId} />
                         ))}
+                        <input name="unitPrice" type="hidden" value={item.unitPrice ?? ""} />
                         <label className="text-sm text-slate-600">
                           Quantity
                           <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={formatEditableQuantity(item.quantity)} disabled={isInvoiced} inputMode="decimal" min="0.01" name="quantity" placeholder="1" step="0.01" type="number" />
-                        </label>
-                        <label className="text-sm text-slate-600">
-                          Unit price
-                          <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={item.unitPrice ?? ""} disabled={isInvoiced} name="unitPrice" step="0.01" type="number" />
                         </label>
                         <label className="flex min-h-11 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
                           <input className="h-4 w-4 rounded border-slate-300 text-slateblue" defaultChecked={item.taxable === true} disabled={isInvoiced} name="taxable" type="checkbox" />
@@ -488,11 +414,6 @@ export default async function BillingSummaryDetailPage({
                             Remove line
                           </button>
                         </div>
-                        <p className="sm:col-span-2 2xl:col-span-1 text-xs text-slate-500">
-                          Subtotal: {item.unitPrice !== null && item.unitPrice !== undefined ? formatMoney(item.lineSubtotal ?? item.quantity * item.unitPrice) : "Pending price"}
-                          {item.taxAmount ? ` | Tax: ${formatMoney(item.taxAmount)}` : ""}
-                          {item.lineTotal ? ` | Line total: ${formatMoney(item.lineTotal)}` : ""}
-                        </p>
                       </form>
                     </div>
                   </div>
@@ -510,7 +431,7 @@ export default async function BillingSummaryDetailPage({
               canUseQuickBooksActions={canUseQuickBooksActions}
               connectedCompany={quickBooksConnection.tenant.quickbooksCompanyName}
               connectedRealm={quickBooksConnection.tenant.quickbooksRealmId}
-              hasMissingPrices={summary.metrics.missingPriceCount > 0}
+              hasMissingBillingSetup={summary.metrics.missingPriceCount > 0}
               inspectionId={summary.inspectionId}
               quickbooksAppModeLabel={quickBooksConnection.connection.appModeLabel}
               quickbooksInvoiceId={summary.quickbooksInvoiceId}
@@ -536,7 +457,7 @@ export default async function BillingSummaryDetailPage({
             <form action={updateBillingSummaryNotesAction} className="mt-4 space-y-3">
               <input name="summaryId" type="hidden" value={summary.id} />
               <input name="inspectionId" type="hidden" value={summary.inspectionId} />
-              <textarea className="min-h-40 w-full rounded-2xl border border-slate-200 px-4 py-3 disabled:bg-slate-50" defaultValue={summary.notes ?? ""} disabled={isInvoiced} name="notes" placeholder="Missing unit price, customer billing notes, or invoice prep reminders" />
+              <textarea className="min-h-40 w-full rounded-2xl border border-slate-200 px-4 py-3 disabled:bg-slate-50" defaultValue={summary.notes ?? ""} disabled={isInvoiced} name="notes" placeholder="Missing QuickBooks mapping, customer billing notes, or invoice prep reminders" />
               <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-50" disabled={isInvoiced} type="submit">
                 {isInvoiced ? "Notes locked" : "Save note"}
               </button>

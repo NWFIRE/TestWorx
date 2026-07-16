@@ -26,7 +26,7 @@ const statusTones = {
 
 const statusOptions = [
   { value: "all", label: "Ready To Bill" },
-  { value: "needs_pricing", label: "Needs pricing" },
+  { value: "needs_pricing", label: "Needs setup" },
   { value: "invoiced", label: "Invoiced" }
 ] as const;
 
@@ -49,6 +49,22 @@ function formatBillingSummaryStatus(status: string) {
     return "Invoiced";
   }
   return status.replaceAll("_", " ");
+}
+
+function formatQuickBooksSummaryStatus(summary: AdminBillingSummary) {
+  if (summary.quickbooksInvoiceNumber) {
+    return summary.quickbooksInvoiceNumber;
+  }
+
+  if (summary.metrics.missingPriceCount > 0) {
+    return "Needs setup";
+  }
+
+  if (summary.quickbooksSyncStatus === "synced" || summary.quickbooksSyncStatus === "sent") {
+    return "Synced";
+  }
+
+  return "Ready to sync";
 }
 
 function SummaryQueueSection({
@@ -125,15 +141,8 @@ function SummaryQueueSection({
                       <span className="font-semibold text-slate-950">{summary.metrics.feeCount}</span>
                     </p>
                     <p className="text-sm text-slate-600">
-                      Total due:{" "}
-                      <span className="font-semibold text-slate-950">
-                        {summary.metrics.missingPriceCount > 0 ? "Pending pricing" : `$${summary.invoiceTotals.totalDue.toFixed(2)}`}
-                      </span>
-                      {summary.invoiceTotals.taxTotal > 0 ? (
-                        <span className="mt-1 block text-xs text-slate-500">
-                          Subtotal ${summary.invoiceTotals.subtotalBeforeTax.toFixed(2)} + tax ${summary.invoiceTotals.taxTotal.toFixed(2)}
-                        </span>
-                      ) : null}
+                      QuickBooks:{" "}
+                      <span className="font-semibold text-slate-950">{formatQuickBooksSummaryStatus(summary)}</span>
                     </p>
                   </div>
                 </div>
@@ -195,7 +204,7 @@ export default async function AdminBillingPage({
             </Link>
           </div>
         }
-        description="Review visit-level labor, materials, services, and fees extracted from finalized inspection reports before invoicing."
+        description="Review quantities, item mappings, services, materials, and fees before QuickBooks creates the final invoice pricing."
         eyebrow="Billing"
         title="Inspection billing summaries"
       />
@@ -210,8 +219,8 @@ export default async function AdminBillingPage({
         />
         <KPIStatCard
           href={buildBillingHref("needs_pricing")}
-          label="Needs pricing"
-          note="Ready-to-bill summaries with missing pricing decisions."
+          label="Needs setup"
+          note="Ready-to-bill summaries that need QuickBooks billing setup before sync."
           tone="amber"
           value={openSummaries.filter((summary) => summary.metrics.missingPriceCount > 0).length}
         />
@@ -232,7 +241,7 @@ export default async function AdminBillingPage({
 
       <FilterBar
         defaultOpen={selectedStatus !== "all"}
-        description="Ready To Bill shows summaries that still need billing action. Use Invoiced for completed invoice history."
+        description="Ready To Bill shows summaries that still need billing action. Use Invoiced for completed QuickBooks history."
         title="Queue filters"
       >
         {statusOptions.map((option) => (
@@ -248,7 +257,7 @@ export default async function AdminBillingPage({
 
       <SummaryQueueSection
         ctaLabel={selectedStatus === "invoiced" ? "View invoice detail" : "Review billing"}
-        description={selectedStatus === "all" ? "Completed, finalized work that is ready for pricing, invoice creation, or QuickBooks follow-through. Invoiced work is archived below." : "Billing summaries matching the selected queue."}
+        description={selectedStatus === "all" ? "Completed, finalized work that is ready for item review, invoice creation, or QuickBooks follow-through. Invoiced work is archived below." : "Billing summaries matching the selected queue."}
         emptyText="No billing summaries match the current queue filter."
         emptyTitle="No billing summaries in this queue"
         summaries={filteredSummaries}

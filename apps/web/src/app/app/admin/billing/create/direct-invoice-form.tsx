@@ -64,15 +64,6 @@ type DirectInvoiceResult = {
   sentTo: string | null;
 };
 
-const DEFAULT_OKLAHOMA_SALES_TAX_RATE = 0.0825;
-
-function toCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD"
-  }).format(value || 0);
-}
-
 function formatQuantityInputValue(quantity: number) {
   return quantity > 0 ? String(Math.trunc(quantity)) : "";
 }
@@ -91,7 +82,6 @@ function buildCatalogSecondaryLabel(item: CatalogOption) {
     formatItemType(item.itemType),
     item.description,
     item.sku ? `SKU ${item.sku}` : null,
-    item.unitPrice !== null ? `$${item.unitPrice.toFixed(2)}` : null,
     item.taxable ? "Taxable" : "Non-taxable",
     item.quickbooksItemId ? `QB ${item.quickbooksItemId}` : null,
     item.quickbooksItemId ? "QuickBooks mapped" : "No QuickBooks mapping"
@@ -132,23 +122,6 @@ export function DirectInvoiceForm({
   const [pending, startTransition] = useTransition();
   const { showToast } = useToast();
 
-  const subtotal = useMemo(
-    () => value.lineItems.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0),
-    [value.lineItems]
-  );
-  const taxableSubtotal = useMemo(
-    () => value.lineItems.reduce((sum, line) => sum + (line.taxable ? line.quantity * line.unitPrice : 0), 0),
-    [value.lineItems]
-  );
-  const nonTaxableSubtotal = useMemo(
-    () => value.lineItems.reduce((sum, line) => sum + (!line.taxable ? line.quantity * line.unitPrice : 0), 0),
-    [value.lineItems]
-  );
-  const taxTotal = useMemo(
-    () => Number((taxableSubtotal * DEFAULT_OKLAHOMA_SALES_TAX_RATE).toFixed(2)),
-    [taxableSubtotal]
-  );
-  const totalDue = subtotal + taxTotal;
   const catalogOptions = useMemo<SearchSelectOption[]>(
     () => catalogItems.map((item) => ({
       value: item.id,
@@ -370,7 +343,7 @@ export function DirectInvoiceForm({
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Invoice line items</h2>
-              <p className="mt-1 text-sm text-slate-500">Select from the synced QuickBooks parts and services catalog and adjust pricing only when needed.</p>
+              <p className="mt-1 text-sm text-slate-500">Select synced QuickBooks parts and services, then enter quantities. QuickBooks applies final pricing and tax.</p>
             </div>
             <button
               className="pressable inline-flex min-h-11 items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
@@ -387,7 +360,7 @@ export function DirectInvoiceForm({
           <div className="space-y-4">
             {value.lineItems.map((line, index) => (
               <div key={line.id} className="rounded-[24px] border border-slate-200/80 bg-slate-50/70 p-4">
-                <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr_0.7fr_0.7fr_auto]">
+                <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr_0.7fr_auto]">
                   <label className="block">
                     <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Part or service</span>
                     <SearchSelect
@@ -422,17 +395,6 @@ export function DirectInvoiceForm({
                     />
                   </label>
 
-                  <label className="block">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Unit price</span>
-                    <input
-                      className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900"
-                      onChange={(event) => updateLine(index, { unitPrice: Number(event.target.value || "0") })}
-                      step="0.01"
-                      type="number"
-                      value={line.unitPrice}
-                    />
-                  </label>
-
                   <div className="flex items-end">
                     <button
                       className="pressable inline-flex min-h-11 items-center rounded-2xl border border-rose-200 bg-white px-4 py-3 text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
@@ -459,10 +421,9 @@ export function DirectInvoiceForm({
                     />
                     Taxable
                   </label>
-                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Line total</p>
-                    <p className="mt-1 text-lg font-semibold text-slate-950">{toCurrency(line.quantity * line.unitPrice)}</p>
-                  </div>
+                  <p className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
+                    Final amount is calculated in QuickBooks.
+                  </p>
                 </div>
               </div>
             ))}
@@ -472,26 +433,11 @@ export function DirectInvoiceForm({
 
       <aside className="space-y-6">
         <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.04)]">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Invoice total</p>
-          <p className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-slate-950">{toCurrency(totalDue)}</p>
-          <div className="mt-5 grid gap-2 text-sm">
-            <div className="flex items-center justify-between gap-6">
-              <span className="text-slate-500">Subtotal</span>
-              <span className="font-semibold text-slate-950">{toCurrency(subtotal)}</span>
-            </div>
-            <div className="flex items-center justify-between gap-6">
-              <span className="text-slate-500">Taxable subtotal</span>
-              <span className="font-semibold text-slate-950">{toCurrency(taxableSubtotal)}</span>
-            </div>
-            <div className="flex items-center justify-between gap-6">
-              <span className="text-slate-500">Non-taxable subtotal</span>
-              <span className="font-semibold text-slate-950">{toCurrency(nonTaxableSubtotal)}</span>
-            </div>
-            <div className="flex items-center justify-between gap-6 border-t border-slate-200 pt-2">
-              <span className="text-slate-500">Sales tax</span>
-              <span className="font-semibold text-slate-950">{toCurrency(taxTotal)}</span>
-            </div>
-          </div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">QuickBooks pricing</p>
+          <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-slate-950">Final invoice amounts are generated in QuickBooks.</h3>
+          <p className="mt-3 text-sm leading-6 text-slate-500">
+            TradeWorx sends the customer, mapped QuickBooks items, quantities, taxable flags, and delivery choice. QuickBooks is the pricing and tax source of truth.
+          </p>
           <p className="mt-3 text-sm text-slate-500">
             {shouldSkipAutomaticFees
               ? "Walk-in invoices skip automatic service and compliance fee rules."

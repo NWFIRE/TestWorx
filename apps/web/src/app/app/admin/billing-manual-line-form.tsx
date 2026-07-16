@@ -27,7 +27,6 @@ function buildCatalogSecondaryLabel(item: CatalogItem) {
     formatItemType(item.itemType),
     item.description,
     item.sku ? `SKU ${item.sku}` : null,
-    item.unitPrice !== null ? `$${item.unitPrice.toFixed(2)}` : null,
     item.taxable ? "Taxable" : "Non-taxable",
     item.quickbooksItemId ? `QB ${item.quickbooksItemId}` : null,
     item.quickbooksItemId ? "QuickBooks mapped" : "No QuickBooks mapping"
@@ -92,13 +91,13 @@ export function BillingManualLineForm({
           <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Additional line items</p>
           <h2 className="mt-2 text-xl font-semibold text-slate-950">Add billing work not tied to a report</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-            Add parts, labor, services, or fees directly to this inspection invoice. These lines use the products/services catalog and sync to QuickBooks with the selected item mapping.
+            Add parts, labor, services, or fees directly to this inspection invoice. These lines use the products/services catalog and let QuickBooks apply final pricing when synced.
           </p>
         </div>
       </div>
 
       <form
-        className="mt-5 grid gap-4 lg:grid-cols-[1.2fr_1fr_0.4fr_0.45fr_auto]"
+        className="mt-5 grid gap-4 lg:grid-cols-[1.2fr_1fr_0.4fr_auto]"
         onSubmit={(event) => {
           event.preventDefault();
           if (disabled) {
@@ -124,6 +123,7 @@ export function BillingManualLineForm({
         <input name="summaryId" type="hidden" value={summaryId} />
         <input name="inspectionId" type="hidden" value={inspectionId} />
         <input name="catalogItemId" type="hidden" value={catalogItemId} />
+        <input name="unitPrice" type="hidden" value={unitPrice} />
 
         <SearchSelect
           customValue={selectedCatalogItem?.name ?? ""}
@@ -161,20 +161,6 @@ export function BillingManualLineForm({
             step="0.01"
             type="number"
             value={formatQuantityInputValue(quantity)}
-          />
-        </label>
-
-        <label className="block text-sm text-slate-600">
-          Unit price
-          <input
-            className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3 disabled:bg-slate-50"
-            disabled={disabled}
-            name="unitPrice"
-            onChange={(event) => setUnitPrice(event.target.value)}
-            placeholder="0.00"
-            step="0.01"
-            type="number"
-            value={unitPrice}
           />
         </label>
 

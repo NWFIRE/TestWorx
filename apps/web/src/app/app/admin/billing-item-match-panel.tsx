@@ -71,7 +71,6 @@ function buildCatalogOptionSecondaryLabel(candidate: MatchCandidate) {
     formatItemType(candidate.itemType),
     candidate.description,
     candidate.sku ? `SKU ${candidate.sku}` : null,
-    candidate.unitPrice !== null ? `$${candidate.unitPrice.toFixed(2)}` : null,
     candidate.taxable ? "Taxable" : "Non-taxable",
     candidate.quickbooksItemId ? `QB ${candidate.quickbooksItemId}` : null,
     candidate.quickbooksItemId ? "QuickBooks mapped" : "No QuickBooks mapping"
@@ -206,7 +205,6 @@ export function BillingItemMatchPanel({
         {activeMatch ? (
           <span className="min-w-0 break-words text-xs text-slate-500">
             {formatItemType(activeMatch.itemType)}
-            {activeMatch.unitPrice !== null ? ` | $${activeMatch.unitPrice.toFixed(2)}` : ""}
             {` | ${activeMatch.taxable ? "Taxable" : "Non-taxable"}`}
             {` | ${activeMatch.quickbooksItemId ? "QuickBooks mapped" : "No QuickBooks mapping"}`}
             {` | ${confidenceLabel(activeMatch.confidence)} via ${formatMatchMethod(activeMatch.matchMethod)}`}
