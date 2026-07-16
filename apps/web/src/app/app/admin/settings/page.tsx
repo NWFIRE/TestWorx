@@ -425,7 +425,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
         />
       </section>
       <WorkspaceSplit
-        className="lg:grid-cols-[minmax(0,1.05fr)_minmax(28rem,1fr)] 2xl:grid-cols-[minmax(0,1.08fr)_minmax(32rem,1fr)]"
+        className="2xl:grid-cols-[minmax(0,1.08fr)_minmax(32rem,1fr)]"
         variant="balanced"
       >
         <div className="space-y-6">

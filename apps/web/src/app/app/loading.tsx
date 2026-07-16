@@ -29,7 +29,7 @@ export default function WorkspaceLoading() {
         <SkeletonCard />
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.45fr)]">
+      <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.45fr)]">
         <SkeletonCard tall />
         <SkeletonCard tall />
       </div>

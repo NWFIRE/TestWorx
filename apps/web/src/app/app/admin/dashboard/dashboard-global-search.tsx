@@ -33,7 +33,7 @@ export function DashboardGlobalSearch() {
   return (
     <SearchInput
       aria-label="Search inspections, reports, and customers"
-      className="min-w-[280px] flex-1"
+      className="w-full min-w-0 flex-1 sm:min-w-[280px] lg:max-w-[420px]"
       onChange={(event) => setQuery(event.target.value)}
       onClear={() => setQuery("")}
       onKeyDown={handleKeyDown}

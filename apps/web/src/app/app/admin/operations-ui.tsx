@@ -83,7 +83,7 @@ export function PageHeader({
 
   return (
     <SectionCard className={className}>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div className={widthClass}>
           {eyebrow ? (
             <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[var(--tenant-primary)]">
@@ -94,7 +94,7 @@ export function PageHeader({
             {title}
           </h1>
         </div>
-        {actions ? <div className="flex flex-wrap items-center gap-3">{actions}</div> : null}
+        {actions ? <div className="flex w-full min-w-0 flex-wrap items-center gap-3 xl:w-auto">{actions}</div> : null}
       </div>
     </SectionCard>
   );
@@ -111,10 +111,10 @@ export function WorkspaceSplit({
 }) {
   const variantClass =
     variant === "content-heavy"
-      ? "xl:grid-cols-[minmax(0,1.3fr)_minmax(22rem,0.85fr)] 2xl:grid-cols-[minmax(0,1.45fr)_minmax(24rem,0.78fr)]"
+      ? "2xl:grid-cols-[minmax(0,1.45fr)_minmax(24rem,0.78fr)]"
       : variant === "even"
-        ? "xl:grid-cols-2"
-        : "xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.95fr)] 2xl:grid-cols-[minmax(0,1.22fr)_minmax(24rem,0.88fr)]";
+        ? "2xl:grid-cols-2"
+        : "2xl:grid-cols-[minmax(0,1.22fr)_minmax(24rem,0.88fr)]";
 
   return <section className={cn("grid gap-6", variantClass, className)}>{children}</section>;
 }

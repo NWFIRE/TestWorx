@@ -426,7 +426,7 @@ export default async function AdminDashboardPage({
             <div className="space-y-5 lg:space-y-6">
               <section className="relative overflow-hidden rounded-[28px] bg-slateblue p-5 text-white shadow-[0_20px_50px_rgb(var(--tenant-primary-rgb)_/_0.18)] lg:px-6 lg:py-6 lg:shadow-[0_22px_60px_rgb(var(--tenant-primary-rgb)_/_0.18)]">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(0,0,0,0.14),transparent_42%)]" />
-                <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                <div className="relative flex flex-col gap-5 2xl:flex-row 2xl:items-end 2xl:justify-between">
                   <div className="max-w-2xl">
                     <div className="text-[10px] font-semibold tracking-[0.24em] text-white/70 lg:text-[11px]">
                       TODAY&apos;S OPERATIONS
@@ -438,7 +438,7 @@ export default async function AdminDashboardPage({
                       Move field work, finalize reports, and invoice only the work that still requires action.
                     </p>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 lg:w-[360px]">
+                  <div className="grid grid-cols-2 gap-3 2xl:w-[360px]">
                     <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
                       <div className="text-xs text-white/70">Techs active</div>
                       <div className="mt-1 text-2xl font-semibold">{data.technicians.length}</div>
