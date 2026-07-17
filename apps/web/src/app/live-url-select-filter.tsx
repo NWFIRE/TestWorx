@@ -28,7 +28,10 @@ export function LiveUrlSelectFilter({
 
   return (
     <select
-      className={className ?? "h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-slateblue"}
+      className={
+        className ??
+        "h-12 w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-slateblue"
+      }
       defaultValue={value}
       onChange={(event) => {
         const nextSearch = new URLSearchParams(searchParams.toString());

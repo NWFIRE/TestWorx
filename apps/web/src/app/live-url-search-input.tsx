@@ -127,7 +127,7 @@ export function LiveUrlSearchInput({
   }
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative w-full min-w-0 ${className}`}>
       <input
         aria-busy={pending}
         autoComplete="off"
