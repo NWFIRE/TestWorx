@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { QUOTE_TAX_DISCLAIMER } from "@testworx/lib";
 import { getCustomerQuoteDetail, getQuoteStatusTone, quoteStatusLabels } from "@testworx/lib/server/index";
 
 import { AppPageShell, PageHeader, SectionCard, StatusBadge } from "../../../admin/operations-ui";
@@ -99,14 +100,13 @@ export default async function CustomerQuoteDetailPage({
                 <span>Subtotal</span>
                 <span className="font-semibold text-slate-950">${quote.subtotal.toFixed(2)}</span>
               </div>
-              <div className="flex items-center justify-between text-slate-600">
-                <span>Tax</span>
-                <span className="font-semibold text-slate-950">${quote.taxAmount.toFixed(2)}</span>
-              </div>
               <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-base font-semibold text-slate-950">
                 <span>Total</span>
                 <span>${quote.total.toFixed(2)}</span>
               </div>
+              <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+                {QUOTE_TAX_DISCLAIMER}
+              </p>
             </div>
           </SectionCard>
 

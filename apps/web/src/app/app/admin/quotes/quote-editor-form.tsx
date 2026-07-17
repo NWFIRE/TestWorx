@@ -5,7 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 import { ActionButton } from "@/app/action-button";
 import { SearchSelect, type SearchSelectOption } from "@/app/search-select";
 import { useToast } from "@/app/toast-provider";
-import { DEFAULT_QUOTE_SALES_TAX_RATE, isUserFacingSiteLabel } from "@testworx/lib";
+import { QUOTE_TAX_DISCLAIMER, isUserFacingSiteLabel } from "@testworx/lib";
 
 type QuoteCatalogItem = {
   code: string;
@@ -183,16 +183,7 @@ export function QuoteEditorForm({
       )),
     [value.lineItems]
   );
-  const taxableSubtotal = useMemo(
-    () =>
-      roundMoney(value.lineItems.reduce(
-        (sum, line) => line.taxable ? sum + calculateLineSubtotal(line) : sum,
-        0
-      )),
-    [value.lineItems]
-  );
-  const taxAmount = roundMoney(taxableSubtotal * DEFAULT_QUOTE_SALES_TAX_RATE);
-  const total = roundMoney(subtotal + taxAmount);
+  const total = subtotal;
 
   function updateLine(index: number, patch: Partial<QuoteLineValue>) {
     setValue((current) => ({
@@ -278,7 +269,7 @@ export function QuoteEditorForm({
     >
       {quoteId ? <input name="quoteId" type="hidden" value={quoteId} /> : null}
       <input name="lineItemsJson" type="hidden" value={JSON.stringify(value.lineItems)} />
-      <input name="taxAmount" type="hidden" value={taxAmount} />
+      <input name="taxAmount" type="hidden" value="0" />
 
       <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.04)]">
           <div className="grid gap-4 md:grid-cols-2">
@@ -480,7 +471,7 @@ export function QuoteEditorForm({
                     </div>
                   </div>
 
-                  <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.8fr)_0.55fr_0.65fr_auto_auto]">
+                  <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.8fr)_0.55fr_auto_auto]">
                     <label className="block">
                       <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Description</span>
                       <textarea
@@ -500,15 +491,6 @@ export function QuoteEditorForm({
                         type="number"
                         value={line.discountAmount}
                       />
-                    </label>
-
-                    <label className="flex items-center gap-2 pt-8 text-sm text-slate-600">
-                      <input
-                        checked={line.taxable}
-                        onChange={(event) => updateLine(index, { taxable: event.target.checked })}
-                        type="checkbox"
-                      />
-                      Taxable
                     </label>
 
                     <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
@@ -600,18 +582,13 @@ export function QuoteEditorForm({
               <span>Subtotal</span>
               <span className="font-semibold text-slate-950">{toCurrency(subtotal)}</span>
             </div>
-            <div className="flex items-center justify-between text-sm text-slate-600">
-              <span>Taxable subtotal</span>
-              <span className="font-semibold text-slate-950">{toCurrency(taxableSubtotal)}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm text-slate-600">
-              <span>Sales tax</span>
-              <span className="font-semibold text-slate-950">{toCurrency(taxAmount)}</span>
-            </div>
             <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-base font-semibold text-slate-950">
               <span>Total</span>
               <span>{toCurrency(total)}</span>
             </div>
+            <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+              {QUOTE_TAX_DISCLAIMER}
+            </p>
           </div>
         </section>
 

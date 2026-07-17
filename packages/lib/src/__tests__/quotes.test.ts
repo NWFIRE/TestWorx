@@ -273,7 +273,7 @@ describe("quotes", () => {
     expect(prismaMock.auditLog.create).toHaveBeenCalled();
   });
 
-  it("calculates quote sales tax from taxable line subtotals", async () => {
+  it("keeps quotes pre-tax even when line items are taxable", async () => {
     prismaMock.quote.count.mockResolvedValue(4);
     prismaMock.quote.create.mockResolvedValue({
       id: "quote_taxable",
@@ -324,8 +324,8 @@ describe("quotes", () => {
     expect(prismaMock.quote.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         subtotal: 110,
-        taxAmount: 9.08,
-        total: 119.08
+        taxAmount: 0,
+        total: 110
       })
     }));
   });

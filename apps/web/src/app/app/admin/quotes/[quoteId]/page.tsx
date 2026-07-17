@@ -371,7 +371,7 @@ export default async function QuoteDetailPage({
 
           <SectionCard>
             <h2 className="text-xl font-semibold text-slate-950">Convert to work</h2>
-            <p className="mt-2 text-sm text-slate-500">Approved quotes convert into an unassigned work order with the quote services, labor, fees, materials, pricing, and tax flags preserved.</p>
+            <p className="mt-2 text-sm text-slate-500">Approved quotes convert into an unassigned work order with the quote services, labor, fees, materials, and pricing preserved. Taxes are applied when the final invoice is prepared.</p>
             <form action={convertQuoteAction} className="mt-4">
               <input name="quoteId" type="hidden" value={detail.id} />
               <button

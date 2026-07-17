@@ -1,6 +1,6 @@
 "use client";
 
-import { hostedQuoteStateLabels, quoteStatusLabels } from "@testworx/lib";
+import { QUOTE_TAX_DISCLAIMER, hostedQuoteStateLabels, quoteStatusLabels } from "@testworx/lib";
 
 type QuoteStatusValue = keyof typeof quoteStatusLabels;
 
@@ -121,12 +121,10 @@ export function ProposalActionBanner({
 
 export function TotalSummaryCard({
   subtotal,
-  tax,
   total,
   primaryColor
 }: {
   subtotal: number;
-  tax: number;
   total: number;
   primaryColor: string;
 }) {
@@ -142,14 +140,13 @@ export function TotalSummaryCard({
           <span>Subtotal</span>
           <span className="font-semibold text-white">{formatMoney(subtotal)}</span>
         </div>
-        <div className="flex items-center justify-between text-white/72">
-          <span>Tax</span>
-          <span className="font-semibold text-white">{formatMoney(tax)}</span>
-        </div>
         <div className="flex items-center justify-between border-t border-white/15 pt-5 text-lg">
           <span className="text-white/88">Total</span>
           <span className="text-2xl font-semibold text-white">{formatMoney(total)}</span>
         </div>
+        <p className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm leading-6 text-white/82">
+          {QUOTE_TAX_DISCLAIMER}
+        </p>
       </div>
     </section>
   );

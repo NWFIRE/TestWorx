@@ -35,7 +35,6 @@ import {
 import { createInspection, ensureGenericInspectionSite, getCustomerFacingSiteLabel } from "./scheduling";
 import { assertTenantContext, canAccessQuoteWorkspace } from "./permissions";
 import { assertWorkOrderLineItemTable } from "./work-order-line-item-table";
-import { DEFAULT_QUOTE_SALES_TAX_RATE } from "./quotes-shared";
 
 const quoteStatusValues = Object.values(QuoteStatus);
 const quoteSyncStatusValues = Object.values(QuoteSyncStatus);
@@ -697,14 +696,12 @@ function calculateLineTotal(input: { quantity: number; unitPrice: number; discou
   return roundMoney(Math.max(0, input.quantity * input.unitPrice - input.discountAmount));
 }
 
-function calculateQuoteTotals(lineItems: Array<{ quantity: number; unitPrice: number; discountAmount: number; taxable: boolean }>) {
+function calculateQuoteTotals(lineItems: Array<{ quantity: number; unitPrice: number; discountAmount: number }>) {
   const subtotal = roundMoney(lineItems.reduce((sum, line) => sum + calculateLineTotal(line), 0));
-  const taxableSubtotal = roundMoney(lineItems.reduce((sum, line) => line.taxable ? sum + calculateLineTotal(line) : sum, 0));
-  const taxAmount = roundMoney(taxableSubtotal * DEFAULT_QUOTE_SALES_TAX_RATE);
   return {
     subtotal,
-    taxAmount,
-    total: roundMoney(subtotal + taxAmount)
+    taxAmount: 0,
+    total: subtotal
   };
 }
 

@@ -5252,7 +5252,7 @@ export async function syncQuoteToQuickBooksEstimate(actor: ActorContext, quoteId
         unitPrice: line.unitPrice,
         qbItemId,
         qbItemName,
-        taxable: line.taxable
+        taxable: false
       }));
     }
 

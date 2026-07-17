@@ -7,6 +7,7 @@ import {
   groupQuotePresentationLineItems
 } from "./quote-presentation";
 import { getQuoteTermsContent } from "./quote-terms";
+import { QUOTE_TAX_DISCLAIMER } from "./quotes-shared";
 import { getCustomerFacingSiteLabel } from "./scheduling";
 import { decodeStoredFile } from "./storage";
 
@@ -639,8 +640,8 @@ function renderSummaryAndTotals(
   }));
   const summaryHeight =
     22 + summaryRows.reduce((sum, row) => sum + row.height, 0) + Math.max(0, summaryRows.length - 1) * 10;
-  const pricingSummaryTextHeight = 0;
-  const totalsRowsHeight = 22 + 22;
+  const pricingSummaryTextHeight = measureTextHeight(regularFont, QUOTE_TAX_DISCLAIMER, totalWidth - CARD_PADDING * 2, 8.5, 3);
+  const totalsRowsHeight = 22;
   const proposalTotalBoxHeight = 72;
   const totalCardHeight =
     20 +
@@ -707,8 +708,7 @@ function renderSummaryAndTotals(
   const totalsWidth = totalWidth - CARD_PADDING * 2;
   let rowY = state.cursorY - 58;
   for (const [label, value] of [
-    ["Subtotal", formatMoney(input.quote.subtotal)],
-    ["Tax", formatMoney(input.quote.taxAmount)]
+    ["Subtotal", formatMoney(input.quote.subtotal)]
   ] as const) {
     state.page.drawText(label, {
       x: totalsX,
@@ -726,6 +726,18 @@ function renderSummaryAndTotals(
     });
     rowY -= 22;
   }
+
+  rowY = drawTextBlock(
+    state.page,
+    regularFont,
+    QUOTE_TAX_DISCLAIMER,
+    totalsX,
+    rowY - 4,
+    totalsWidth,
+    8.5,
+    theme.muted,
+    3
+  ) - 12;
 
   drawDivider(state.page, totalsX, rowY - 2, totalsWidth, theme.line);
   const proposalTotalTop = rowY - 20;

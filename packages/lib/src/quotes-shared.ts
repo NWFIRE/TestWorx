@@ -10,7 +10,8 @@ const quoteStatusValues = [
   "cancelled"
 ] as const;
 
-export const DEFAULT_QUOTE_SALES_TAX_RATE = 0.0825;
+export const DEFAULT_QUOTE_SALES_TAX_RATE = 0;
+export const QUOTE_TAX_DISCLAIMER = "Sales tax is not included on this quote and will be applied to the final invoice when applicable.";
 
 function formatQuoteStatusLabel(status: (typeof quoteStatusValues)[number]) {
   return status.replaceAll("_", " ").replace(/\b\w/g, (match) => match.toUpperCase());

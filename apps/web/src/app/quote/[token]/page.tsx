@@ -361,7 +361,7 @@ export default async function HostedQuotePage({
                         <p className="mt-3 text-sm leading-7 text-slate-700">A 30% deposit is required before planning, engineering, or design submittals begin.</p>
                       </div>
                     ) : null}
-                    <TotalSummaryCard primaryColor={primaryColor} subtotal={quote.subtotal} tax={quote.taxAmount} total={quote.total} />
+                    <TotalSummaryCard primaryColor={primaryColor} subtotal={quote.subtotal} total={quote.total} />
                   </div>
                 </div>
               </section>
