@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-const LIVE_SEARCH_DEBOUNCE_MS = 1200;
+const LIVE_SEARCH_DEBOUNCE_MS = 300;
 
 function buildNextUrl({
   pathname,
@@ -59,12 +59,21 @@ export function LiveUrlSearchInput({
   const [pending, startTransition] = useTransition();
   const searchDebounceRef = useRef<number | null>(null);
   const lastAppliedValueRef = useRef(initialValue.trim());
+  const hasFocusRef = useRef(false);
   const resetPageKeyList = resetPageKeys.join("\u001f");
 
   useEffect(() => {
     const nextAppliedValue = initialValue.trim();
     lastAppliedValueRef.current = nextAppliedValue;
-    const timeout = window.setTimeout(() => setQuery(initialValue), 0);
+    const timeout = window.setTimeout(() => {
+      setQuery((currentQuery) => {
+        if (hasFocusRef.current && currentQuery.trim() !== nextAppliedValue) {
+          return currentQuery;
+        }
+
+        return initialValue;
+      });
+    }, 0);
     return () => window.clearTimeout(timeout);
   }, [initialValue]);
 
@@ -135,7 +144,13 @@ export function LiveUrlSearchInput({
         id={id}
         name={name}
         onChange={(event) => setQuery(event.target.value)}
-        onBlur={() => applyQuery(query)}
+        onBlur={() => {
+          hasFocusRef.current = false;
+          applyQuery(query);
+        }}
+        onFocus={() => {
+          hasFocusRef.current = true;
+        }}
         onKeyDown={(event) => {
           if (event.key === "Enter") {
             event.preventDefault();
@@ -160,6 +175,7 @@ export function LiveUrlSearchInput({
             aria-label="Clear search"
             className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
             onClick={clearQuery}
+            onMouseDown={(event) => event.preventDefault()}
             type="button"
           >
             X

@@ -237,6 +237,30 @@ describe("technician dashboard inspection access", () => {
     expect(prismaMock.inspection.findMany.mock.calls[0]?.[0]).not.toHaveProperty("take");
   });
 
+  it("searches the same customer address and contact fields displayed in admin inspection rows", async () => {
+    prismaMock.inspection.findMany.mockResolvedValueOnce([]);
+
+    await getAdminSchedulingQueueData(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        query: "Monroe",
+        includeCounts: false,
+        includeTechnicians: false
+      }
+    );
+
+    expect(prismaMock.inspection.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        OR: expect.arrayContaining([
+          { customerCompany: { serviceAddressLine1: { contains: "Monroe", mode: "insensitive" } } },
+          { customerCompany: { billingAddressLine1: { contains: "Monroe", mode: "insensitive" } } },
+          { customerCompany: { contactEmails: { contains: "Monroe", mode: "insensitive" } } },
+          { site: { addressLine1: { contains: "Monroe", mode: "insensitive" } } }
+        ])
+      })
+    }));
+  });
+
   it("calculates admin inspection KPI counts from the full matching queue instead of the capped display rows", async () => {
     const buildInspection = (index: number) => ({
       id: `inspection_${index}`,
