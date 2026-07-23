@@ -814,6 +814,37 @@ function buildQuickBooksQuoteCatalogDescription(item: {
   return sku ? `SKU ${sku}` : "";
 }
 
+function resolveQuickBooksQuoteCatalogCategory(item: {
+  name: string;
+  itemType: string;
+  sku?: string | null;
+}) {
+  const normalizedItemType = item.itemType.trim().toLowerCase();
+  const searchText = [item.name, item.sku, item.itemType].filter(Boolean).join(" ").toLowerCase();
+
+  if (normalizedItemType.includes("service")) {
+    return "service";
+  }
+
+  if (/(labor|technician|hourly|man ?hour)/i.test(searchText)) {
+    return "labor";
+  }
+
+  if (/(fee|permit|design|submittal|compliance|filing)/i.test(searchText)) {
+    return autoQuoteServiceFeeCategory;
+  }
+
+  if (normalizedItemType.includes("inventory") && !normalizedItemType.includes("noninventory")) {
+    return "material";
+  }
+
+  if (/(part|parts|material|materials|equipment|device|panel|detector|strobe|horn|module|valve|pump|battery|cylinder|cartridge|link|cap|nozzle)/i.test(searchText)) {
+    return "material";
+  }
+
+  return "service";
+}
+
 function resolveDirectQuickBooksItemId(code: string) {
   return code.startsWith(quickBooksQuoteCodePrefix) ? code.slice(quickBooksQuoteCodePrefix.length) : null;
 }
@@ -1587,7 +1618,7 @@ export async function getQuoteFormOptions(actor: ActorContext) {
         code: buildQuickBooksQuoteCatalogCode(item.quickbooksItemId),
         title: item.name,
         description: buildQuickBooksQuoteCatalogDescription(item),
-        category: item.itemType.toLowerCase(),
+        category: resolveQuickBooksQuoteCatalogCategory(item),
         inspectionType: null,
         inspectionTypeLabel: null,
         source: "quickbooks" as const,

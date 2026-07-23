@@ -135,6 +135,7 @@ import {
   updateQuoteReminderControl,
   updateQuoteReminderSettings
 } from "../quotes";
+import { buildQuotePresentationLineItems, groupQuotePresentationLineItems } from "../quote-presentation";
 
 describe("quotes", () => {
   beforeEach(() => {
@@ -678,6 +679,78 @@ describe("quotes", () => {
         expect.objectContaining({ value: "kitchen_suppression", label: "Kitchen Suppression System" })
       ])
     );
+  });
+
+  it("normalizes QuickBooks catalog items into quote service and material categories", async () => {
+    prismaMock.quickBooksCatalogItem.findMany.mockResolvedValue([
+      {
+        quickbooksItemId: "qb_service_1",
+        name: "Fire Extinguisher Annual Inspection",
+        sku: "FE-ANNUAL",
+        itemType: "NonInventory",
+        unitPrice: 12,
+        taxable: false
+      },
+      {
+        quickbooksItemId: "qb_material_1",
+        name: "Fusible Link 360",
+        sku: "LINK-360",
+        itemType: "NonInventory",
+        unitPrice: 7.7,
+        taxable: true
+      }
+    ]);
+
+    const result = await getQuoteFormOptions(
+      { userId: "admin_1", role: "office_admin", tenantId: "tenant_1" }
+    );
+
+    expect(result.catalog).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "QBO_ITEM:qb_service_1",
+        category: "service"
+      }),
+      expect.objectContaining({
+        code: "QBO_ITEM:qb_material_1",
+        category: "material"
+      })
+    ]));
+  });
+
+  it("groups explicitly categorized quote services separately from materials even when service names mention equipment", () => {
+    const grouped = groupQuotePresentationLineItems(buildQuotePresentationLineItems([
+      {
+        id: "service_1",
+        title: "Fire Extinguisher Annual Inspection",
+        description: "Annual extinguisher inspection and tagging",
+        internalCode: "QBO_ITEM:qb_service_1",
+        category: "service",
+        quantity: 6,
+        unitPrice: 12,
+        total: 72
+      },
+      {
+        id: "material_1",
+        title: "Fusible Link 360",
+        description: "Replacement link",
+        internalCode: "QBO_ITEM:qb_material_1",
+        category: "material",
+        quantity: 3,
+        unitPrice: 7.7,
+        total: 23.1
+      }
+    ]));
+
+    expect(grouped).toEqual([
+      expect.objectContaining({
+        title: "Services",
+        items: [expect.objectContaining({ id: "service_1" })]
+      }),
+      expect.objectContaining({
+        title: "Materials / Equipment",
+        items: [expect.objectContaining({ id: "material_1" })]
+      })
+    ]);
   });
 
   it("saves a quote line item QuickBooks mapping and persists the chosen qb item id", async () => {

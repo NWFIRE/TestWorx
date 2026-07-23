@@ -23,7 +23,7 @@ export type QuotePresentationLineItem = {
   id?: string;
   title: string;
   description: string | null;
-  group: "Equipment" | "Labor" | "Permits / Design / Fees" | "Services";
+  group: "Materials / Equipment" | "Labor" | "Permits / Design / Fees" | "Services";
   quantity?: number;
   unitPrice?: number;
   total?: number;
@@ -47,6 +47,10 @@ function isInternalFragment(value: string) {
   return internalDescriptionPatterns.some((pattern) => pattern.test(value.trim()));
 }
 
+function normalizeQuoteCategory(value: string | null | undefined) {
+  return normalizeOptionalText(value)?.toLowerCase().replace(/[\s-]+/g, "_") ?? null;
+}
+
 export function getCustomerFacingQuoteDescription(description: string | null | undefined) {
   const normalized = normalizeOptionalText(description);
   if (!normalized) {
@@ -68,7 +72,26 @@ export function getCustomerFacingQuoteDescription(description: string | null | u
 }
 
 function inferLineGroup(line: QuotePresentationLineItemInput): QuotePresentationLineItem["group"] {
-  const haystack = [line.title, line.description, line.internalCode, line.category].filter(Boolean).join(" ").toLowerCase();
+  const category = normalizeQuoteCategory(line.category);
+  if (category) {
+    if (["fee", "service_fee", "permit", "design", "submittal"].includes(category)) {
+      return "Permits / Design / Fees";
+    }
+
+    if (["labor"].includes(category)) {
+      return "Labor";
+    }
+
+    if (["material", "materials", "part", "parts", "inventory", "equipment", "replacement"].includes(category)) {
+      return "Materials / Equipment";
+    }
+
+    if (["inspection", "service", "repair", "maintenance", "noninventory", "other"].includes(category)) {
+      return "Services";
+    }
+  }
+
+  const haystack = [line.title, line.description, line.internalCode].filter(Boolean).join(" ").toLowerCase();
 
   if (/(permit|design|submittal|plan review|compliance|reporting fee|fee|filing)/i.test(haystack)) {
     return "Permits / Design / Fees";
@@ -79,7 +102,7 @@ function inferLineGroup(line: QuotePresentationLineItemInput): QuotePresentation
   }
 
   if (/(panel|pull station|strobe|horn|detector|module|device|extinguisher|sprinkler|valve|pump|hood|suppression|battery|material|equipment|sign|light)/i.test(haystack)) {
-    return "Equipment";
+    return "Materials / Equipment";
   }
 
   return "Services";
@@ -98,7 +121,7 @@ export function buildQuotePresentationLineItems(lineItems: QuotePresentationLine
 }
 
 export function groupQuotePresentationLineItems(lineItems: QuotePresentationLineItem[]) {
-  const groupOrder: QuotePresentationLineItem["group"][] = ["Equipment", "Labor", "Permits / Design / Fees", "Services"];
+  const groupOrder: QuotePresentationLineItem["group"][] = ["Services", "Materials / Equipment", "Labor", "Permits / Design / Fees"];
   return groupOrder
     .map((group) => ({
       title: group,
