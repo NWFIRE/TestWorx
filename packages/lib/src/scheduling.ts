@@ -1375,8 +1375,9 @@ export function normalizeInspectionPriorityFilter(input?: string | null): Inspec
 function inspectionStatusFromFilterValue(value: string): InspectionFilterStatus[] {
   switch (value.trim().toLowerCase()) {
     case "":
-    case "all":
       return [];
+    case "all":
+      return [...inspectionFilterStatuses];
     case "open":
       return [...activeOperationalInspectionStatuses];
     case "archived":
@@ -5689,6 +5690,12 @@ export async function getAdminSchedulingQueueData(
     ? {
         OR: [
           { id: { contains: requestedQuery, mode: "insensitive" as const } },
+          { archiveCustomerName: { contains: requestedQuery, mode: "insensitive" as const } },
+          { archiveSiteName: { contains: requestedQuery, mode: "insensitive" as const } },
+          { archiveSiteAddress: { contains: requestedQuery, mode: "insensitive" as const } },
+          { archiveSiteCity: { contains: requestedQuery, mode: "insensitive" as const } },
+          { archiveTechnicianName: { contains: requestedQuery, mode: "insensitive" as const } },
+          { archiveResultStatus: { contains: requestedQuery, mode: "insensitive" as const } },
           { customerCompany: { name: { contains: requestedQuery, mode: "insensitive" as const } } },
           { customerCompany: { contactName: { contains: requestedQuery, mode: "insensitive" as const } } },
           { customerCompany: { contactEmails: { contains: requestedQuery, mode: "insensitive" as const } } },

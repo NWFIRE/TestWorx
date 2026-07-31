@@ -17,7 +17,13 @@ vi.mock("@testworx/db", () => ({
   prisma: prismaMock
 }));
 
-import { filterSubsetDuplicateOperationalInspections, getAdminSchedulingQueueData, getTechnicianDashboardData } from "../scheduling";
+import {
+  filterSubsetDuplicateOperationalInspections,
+  getAdminSchedulingQueueData,
+  getTechnicianDashboardData,
+  inspectionFilterStatuses,
+  normalizeInspectionStatusFilters
+} from "../scheduling";
 
 describe("technician dashboard inspection access", () => {
   beforeEach(() => {
@@ -237,6 +243,11 @@ describe("technician dashboard inspection access", () => {
     expect(prismaMock.inspection.findMany.mock.calls[0]?.[0]).not.toHaveProperty("take");
   });
 
+  it("treats the all statuses filter as every searchable inspection status", () => {
+    expect(normalizeInspectionStatusFilters("all")).toEqual([...inspectionFilterStatuses]);
+    expect(normalizeInspectionStatusFilters(null)).toEqual([]);
+  });
+
   it("searches the same customer address and contact fields displayed in admin inspection rows", async () => {
     prismaMock.inspection.findMany.mockResolvedValueOnce([]);
 
@@ -252,6 +263,7 @@ describe("technician dashboard inspection access", () => {
     expect(prismaMock.inspection.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         OR: expect.arrayContaining([
+          { archiveCustomerName: { contains: "Monroe", mode: "insensitive" } },
           { customerCompany: { serviceAddressLine1: { contains: "Monroe", mode: "insensitive" } } },
           { customerCompany: { billingAddressLine1: { contains: "Monroe", mode: "insensitive" } } },
           { customerCompany: { contactEmails: { contains: "Monroe", mode: "insensitive" } } },

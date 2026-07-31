@@ -14,6 +14,7 @@ import {
   getAdminSchedulingQueueData,
   getInspectionClassificationTone,
   getInspectionStatusTone,
+  inspectionFilterStatuses,
   normalizeInspectionClassificationFilters,
   normalizeInspectionPriorityFilter,
   normalizeInspectionStatusFilters,
@@ -34,7 +35,7 @@ import { InspectionCreatePanel } from "./inspection-create-panel";
 import { CreateInspectionTrigger } from "./create-inspection-trigger";
 
 const statusOptions = [
-  { value: "", label: "All statuses" },
+  { value: "all", label: "All statuses" },
   { value: "open", label: "Open" },
   { value: "completed", label: "Completed" },
   { value: "archived", label: "Archived" },
@@ -186,6 +187,9 @@ function buildInspectionsHref(input: {
 
 function resolveStatusSelectValue(statuses: string[]) {
   const normalized = statuses.join(",");
+  if (normalized === inspectionFilterStatuses.join(",")) {
+    return "all";
+  }
   if (!normalized || normalized === activeOperationalInspectionStatuses.join(",")) {
     return "open";
   }
