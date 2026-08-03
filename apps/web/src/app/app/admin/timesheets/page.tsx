@@ -30,6 +30,10 @@ function toDateTimeLocalAt(dateKey: string, hours: number, minutes = 0) {
   return `${dateKey}T${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
 }
 
+function getDayLabel(label: string) {
+  return label.split(" • ")[0] ?? label;
+}
+
 export default async function AdminTimesheetsPage({
   searchParams
 }: {
@@ -118,6 +122,54 @@ export default async function AdminTimesheetsPage({
           </button>
         </form>
       </FilterBar>
+
+      <section className="enterprise-card rounded-[26px] p-5 lg:p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm uppercase tracking-[0.24em] text-[var(--tenant-primary)]">Weekly overview</p>
+            <h2 className="mt-2 text-2xl font-bold tracking-[-0.035em] text-ink">Consolidated time by technician</h2>
+          </div>
+          <StatusBadge label={`${workspace.employeeSummaries.length} employees`} tone="slate" />
+        </div>
+
+        <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
+          <table className="min-w-[980px] w-full border-collapse text-left">
+            <thead className="bg-slate-100 text-xs font-bold uppercase tracking-[0.16em] text-slate-600">
+              <tr>
+                <th className="px-4 py-3">Employee</th>
+                {workspace.employeeSummaries[0]?.rows.map((row) => (
+                  <th className="px-3 py-3 text-center" key={row.dateKey}>
+                    {getDayLabel(row.label)}
+                  </th>
+                ))}
+                <th className="px-3 py-3 text-center">Gross</th>
+                <th className="px-3 py-3 text-center">Lunch</th>
+                <th className="px-3 py-3 text-center">Net</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 bg-white">
+              {workspace.employeeSummaries.map((summary) => (
+                <tr className="transition hover:bg-slate-50" key={summary.employee.id}>
+                  <td className="min-w-[16rem] px-4 py-4">
+                    <p className="font-bold text-slate-950">{summary.employee.name}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">{summary.employee.email}</p>
+                  </td>
+                  {summary.rows.map((row) => (
+                    <td className="px-3 py-4 text-center" key={row.dateKey}>
+                      <span className={row.netMinutes > 0 ? "text-sm font-bold text-slate-950" : "text-sm font-semibold text-slate-400"}>
+                        {formatTimesheetHours(row.netMinutes)}
+                      </span>
+                    </td>
+                  ))}
+                  <td className="px-3 py-4 text-center text-sm font-semibold text-slate-700">{formatTimesheetHours(summary.totals.grossMinutes)}</td>
+                  <td className="px-3 py-4 text-center text-sm font-semibold text-slate-700">{formatTimesheetHours(summary.totals.lunchDeductionMinutes)}</td>
+                  <td className="px-3 py-4 text-center text-base font-black text-slate-950">{formatTimesheetHours(summary.totals.netMinutes)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <div className="space-y-5">
         {workspace.employeeSummaries.map((summary) => (
