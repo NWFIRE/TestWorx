@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 import { formatTimesheetDateTimeLocal, formatTimesheetHours, getAdminTimesheetWorkspace } from "@testworx/lib/server/index";
 
 import { AppPageShell, FilterBar, KPIStatCard, PageHeader, StatusBadge } from "../operations-ui";
-import { correctTimeEntryAction, createAdminTimeEntryAction } from "../../timesheets/actions";
+import { correctTimeEntryAction, createAdminTimeEntryAction, deleteTimeEntryAction } from "../../timesheets/actions";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -240,6 +240,12 @@ export default async function AdminTimesheetsPage({
                               </label>
                               <button className="min-h-11 rounded-2xl bg-slate-950 px-4 text-sm font-bold text-white lg:col-span-2" type="submit">
                                 Save correction
+                              </button>
+                            </form>
+                            <form action={deleteTimeEntryAction} className="mt-3">
+                              <input name="timeEntryId" type="hidden" value={entry.id} />
+                              <button className="min-h-11 w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 text-sm font-bold text-rose-700 transition hover:bg-rose-100" type="submit">
+                                Delete entry
                               </button>
                             </form>
                           </details>

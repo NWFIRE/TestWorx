@@ -697,3 +697,34 @@ export async function createAdminTimeEntry(actor: ActorContext, input: unknown) 
 
   return createdEntry;
 }
+
+export async function deleteTimeEntry(actor: ActorContext, timeEntryId: string) {
+  const parsedActor = parseActor(actor);
+  ensureAdmin(parsedActor);
+  const tenantId = requireTenantId(parsedActor);
+  const entry = await prisma.timeEntry.findFirst({
+    where: {
+      id: timeEntryId,
+      tenantId
+    }
+  });
+
+  if (!entry) {
+    throw new Error("Time entry not found.");
+  }
+
+  await writeTimesheetAuditLog(parsedActor, "time_entry.deleted", entry.id, {
+    employeeId: entry.employeeId,
+    clockInAt: entry.clockInAt.toISOString(),
+    clockOutAt: entry.clockOutAt?.toISOString() ?? null,
+    grossMinutes: entry.grossMinutes,
+    lunchDeductionMinutes: entry.lunchDeductionMinutes,
+    netMinutes: entry.netMinutes,
+    status: entry.status,
+    notes: entry.notes ?? null
+  });
+
+  await prisma.timeEntry.delete({
+    where: { id: entry.id }
+  });
+}

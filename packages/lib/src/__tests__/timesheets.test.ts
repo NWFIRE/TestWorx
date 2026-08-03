@@ -9,6 +9,7 @@ const { prismaMock } = vi.hoisted(() => ({
       findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      delete: vi.fn(),
       findMany: vi.fn()
     },
     user: {
@@ -31,6 +32,7 @@ import {
   clockOutEmployee,
   correctTimeEntry,
   createAdminTimeEntry,
+  deleteTimeEntry,
   formatTimesheetDateTimeLocal,
   getAdminTimesheetWorkspace,
   getEmployeeTimesheet
@@ -316,6 +318,48 @@ describe("timesheets", () => {
         entityId: "entry_manual"
       })
     }));
+  });
+
+  it("lets admins delete employee time entries with audit history", async () => {
+    const clockInAt = new Date("2026-05-04T13:00:00Z");
+    const clockOutAt = new Date("2026-05-04T22:00:00Z");
+    prismaMock.timeEntry.findFirst.mockResolvedValue({
+      id: "entry_1",
+      tenantId: "tenant_1",
+      employeeId: "tech_1",
+      clockInAt,
+      clockOutAt,
+      grossMinutes: 540,
+      lunchDeductionMinutes: 30,
+      netMinutes: 510,
+      status: "closed",
+      notes: "Signed ticket attached."
+    });
+    prismaMock.timeEntry.delete.mockResolvedValue({ id: "entry_1" });
+
+    await deleteTimeEntry(adminActor, "entry_1");
+
+    expect(prismaMock.timeEntry.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "entry_1",
+        tenantId: "tenant_1"
+      }
+    });
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        action: "time_entry.deleted",
+        entityId: "entry_1",
+        metadata: expect.objectContaining({
+          employeeId: "tech_1",
+          grossMinutes: 540,
+          netMinutes: 510,
+          notes: "Signed ticket attached."
+        })
+      })
+    }));
+    expect(prismaMock.timeEntry.delete).toHaveBeenCalledWith({
+      where: { id: "entry_1" }
+    });
   });
 
   it("returns admin weekly summaries for active internal employees", async () => {

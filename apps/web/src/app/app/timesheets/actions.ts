@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { clockInEmployee, clockOutEmployee, correctTimeEntry, createAdminTimeEntry } from "@testworx/lib/server/index";
+import { clockInEmployee, clockOutEmployee, correctTimeEntry, createAdminTimeEntry, deleteTimeEntry } from "@testworx/lib/server/index";
 import type { ActorContext } from "@testworx/types";
 
 async function getActor(): Promise<ActorContext> {
@@ -66,6 +66,17 @@ export async function createAdminTimeEntryAction(formData: FormData) {
       notes: String(formData.get("notes") ?? ""),
       correctionReason: String(formData.get("correctionReason") ?? "")
     });
+  } catch (error) {
+    timesheetErrorRedirect(error);
+  }
+  revalidatePath("/app/admin/timesheets");
+  revalidatePath("/app/tech/timesheets");
+}
+
+export async function deleteTimeEntryAction(formData: FormData) {
+  const actor = await getActor();
+  try {
+    await deleteTimeEntry(actor, String(formData.get("timeEntryId") ?? ""));
   } catch (error) {
     timesheetErrorRedirect(error);
   }
