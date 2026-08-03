@@ -349,6 +349,31 @@ describe("team management", () => {
     );
   });
 
+  it("deactivates a team member and records an audit event", async () => {
+    prismaMock.user.findFirst
+      .mockResolvedValueOnce(makeAdminUser())
+      .mockResolvedValueOnce({ id: "user_tech", role: "technician", isActive: true });
+    prismaMock.user.update.mockResolvedValue({ id: "user_tech", isActive: false });
+
+    const { setUserActiveState } = await import("../team-management");
+
+    await setUserActiveState(makeActor(), "user_tech", false);
+
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: "user_tech" },
+      data: { isActive: false }
+    });
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: "tenant_1",
+        actorUserId: "user_admin",
+        action: "team.member_deactivated",
+        entityType: "User",
+        entityId: "user_tech"
+      })
+    });
+  });
+
   it("blocks permanent removal when the account has operational history", async () => {
     prismaMock.user.findFirst
       .mockResolvedValueOnce(makeAdminUser())

@@ -1,6 +1,7 @@
 "use client";
 
 import { type KeyboardEvent, useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { BrandLoader } from "@/app/brand-loader";
 import { LiveUrlSearchInput } from "@/app/live-url-search-input";
@@ -380,10 +381,17 @@ function InviteFormCard({
 }
 
 function UserRow({ user, customerMode = false }: { user: WorkspaceUser; customerMode?: boolean }) {
+  const router = useRouter();
+  const [displayUser, setDisplayUser] = useState(user);
+  const pendingActiveStateRef = useRef<boolean | null>(null);
   const [allowanceState, allowanceFormAction, allowancePending] = useActionState(updateUserAllowancesAction, initialTeamActionState);
   const [statusState, statusFormAction, statusPending] = useActionState(setUserActiveStateAction, initialTeamActionState);
   const [resetState, resetFormAction, resetPending] = useActionState(issuePasswordResetAction, initialTeamActionState);
   const [removeState, removeFormAction, removePending] = useActionState(removeUserAction, initialTeamActionState);
+
+  useEffect(() => {
+    setDisplayUser(user);
+  }, [user]);
 
   useEffect(() => {
     if (allowanceState.success) {
@@ -391,45 +399,68 @@ function UserRow({ user, customerMode = false }: { user: WorkspaceUser; customer
     }
   }, [allowanceState.success, user.id]);
 
+  useEffect(() => {
+    if (!statusState.success) {
+      return;
+    }
+
+    const nextIsActive = pendingActiveStateRef.current;
+    pendingActiveStateRef.current = null;
+
+    if (typeof nextIsActive === "boolean") {
+      setDisplayUser((current) => ({ ...current, isActive: nextIsActive }));
+      notifyTeamUserAccessChanged(user.id, nextIsActive);
+    } else {
+      notifyTeamUserAccessChanged(user.id);
+    }
+
+    router.refresh();
+  }, [router, statusState.success, user.id]);
+
   return (
     <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-panel">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-lg font-semibold text-ink">{user.name}</h3>
-            <StatusBadge label={user.isActive ? "Active" : "Inactive"} tone={user.isActive ? "active" : "inactive"} />
-            <StatusBadge label={roleLabels[user.role] ?? user.role} tone="pending" />
+            <h3 className="text-lg font-semibold text-ink">{displayUser.name}</h3>
+            <StatusBadge label={displayUser.isActive ? "Active" : "Inactive"} tone={displayUser.isActive ? "active" : "inactive"} />
+            <StatusBadge label={roleLabels[displayUser.role] ?? displayUser.role} tone="pending" />
           </div>
-          <p className="mt-1 text-sm text-slate-500">{user.email}</p>
+          <p className="mt-1 text-sm text-slate-500">{displayUser.email}</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            {user.allowanceLabels.length > 0 ? user.allowanceLabels.map((item) => (
+            {displayUser.allowanceLabels.length > 0 ? displayUser.allowanceLabels.map((item) => (
               <span key={item.key} className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">{item.label}</span>
             )) : (
               <span className="text-xs text-slate-400">No additional allowances</span>
             )}
           </div>
           <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-500">
-            <span>Last active: {formatDateTime(user.lastLoginAt)}</span>
-            <span>Created: {formatDateTime(user.createdAt)}</span>
-            {user.customerCompany ? <span>Customer: {user.customerCompany.name}</span> : null}
+            <span>Last active: {formatDateTime(displayUser.lastLoginAt)}</span>
+            <span>Created: {formatDateTime(displayUser.createdAt)}</span>
+            {displayUser.customerCompany ? <span>Customer: {displayUser.customerCompany.name}</span> : null}
           </div>
         </div>
         <div className="grid gap-2 sm:grid-cols-3 lg:w-[28rem]">
-          <form action={statusFormAction}>
-            <input name="userId" type="hidden" value={user.id} />
-            <input name="nextState" type="hidden" value={user.isActive ? "inactive" : "active"} />
+          <form
+            action={statusFormAction}
+            onSubmit={() => {
+              pendingActiveStateRef.current = !displayUser.isActive;
+            }}
+          >
+            <input name="userId" type="hidden" value={displayUser.id} />
+            <input name="nextState" type="hidden" value={displayUser.isActive ? "inactive" : "active"} />
             <button className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 disabled:opacity-60" disabled={statusPending} type="submit">
-              {user.isActive ? "Deactivate" : "Reactivate"}
+              {displayUser.isActive ? "Deactivate" : "Reactivate"}
             </button>
           </form>
           <form action={resetFormAction}>
-            <input name="userId" type="hidden" value={user.id} />
+            <input name="userId" type="hidden" value={displayUser.id} />
             <button className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 disabled:opacity-60" disabled={resetPending} type="submit">
               Reset password
             </button>
           </form>
           <form action={removeFormAction}>
-            <input name="userId" type="hidden" value={user.id} />
+            <input name="userId" type="hidden" value={displayUser.id} />
             <button className="w-full rounded-xl border border-rose-200 px-3 py-2.5 text-sm font-semibold text-rose-700 disabled:opacity-60" disabled={removePending} type="submit">
               Remove
             </button>
@@ -438,19 +469,19 @@ function UserRow({ user, customerMode = false }: { user: WorkspaceUser; customer
       </div>
 
       <form action={allowanceFormAction} className="mt-5 space-y-4 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-        <input name="userId" type="hidden" value={user.id} />
+        <input name="userId" type="hidden" value={displayUser.id} />
         <p className="text-sm font-semibold text-slate-700">Allowances</p>
         <AllowanceFieldset
           allowanceKeys={customerMode ? customerAllowanceKeys : internalAllowanceKeys}
           labelMap={customerMode ? customerAllowanceLabelMap : internalAllowanceLabelMap}
-          values={user.allowances}
+          values={displayUser.allowances}
         />
         <button className="inline-flex min-h-11 items-center justify-center rounded-xl bg-slateblue px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60" disabled={allowancePending} type="submit">
           Save allowances
         </button>
       </form>
 
-      {!customerMode && user.role === "technician" ? <TechnicianEligibilityForm user={user} /> : null}
+      {!customerMode && displayUser.role === "technician" ? <TechnicianEligibilityForm user={displayUser} /> : null}
 
       <div className="mt-4 space-y-3">
         <ResultCallout error={allowanceState.error} success={allowanceState.success} />
@@ -557,13 +588,13 @@ function clearUserLookupCache() {
   }
 }
 
-function notifyTeamUserAccessChanged(userId: string) {
+function notifyTeamUserAccessChanged(userId: string, isActive?: boolean) {
   if (typeof window === "undefined") {
     return;
   }
 
   clearUserLookupCache();
-  window.dispatchEvent(new CustomEvent(teamUserAccessChangedEvent, { detail: { userId } }));
+  window.dispatchEvent(new CustomEvent(teamUserAccessChangedEvent, { detail: { userId, isActive } }));
 }
 
 function AsyncUserLookupSection({
@@ -712,9 +743,13 @@ function AsyncUserLookupSection({
 
   useEffect(() => {
     const handleAccessChange = (event: Event) => {
-      const detail = event instanceof CustomEvent ? event.detail as { userId?: string } | undefined : undefined;
+      const detail = event instanceof CustomEvent ? event.detail as { userId?: string; isActive?: boolean } | undefined : undefined;
       if (detail?.userId && selectedUser?.id && detail.userId !== selectedUser.id) {
         return;
+      }
+
+      if (detail?.userId && detail.userId === selectedUser?.id && typeof detail.isActive === "boolean") {
+        setSelectedUser((current) => current ? { ...current, isActive: detail.isActive ?? current.isActive } : current);
       }
 
       clearUserLookupCache();
