@@ -320,6 +320,8 @@ describe("timesheets", () => {
 
   it("returns admin weekly summaries for active internal employees", async () => {
     prismaMock.user.findMany.mockResolvedValue([
+      { id: "admin_hidden_1", name: "Ashley O'Brien", email: "ashley@example.com", role: "office_admin" },
+      { id: "admin_hidden_2", name: "Jeremy O'Brien", email: "jeremy@example.com", role: "tenant_admin" },
       { id: "tech_1", name: "Eli Rodriguez", email: "eli@example.com", role: "technician" }
     ]);
     prismaMock.timeEntry.findMany.mockResolvedValue([]);
@@ -334,6 +336,7 @@ describe("timesheets", () => {
       })
     }));
     expect(workspace.employeeSummaries).toHaveLength(1);
+    expect(workspace.employees.map((employee) => employee.name)).toEqual(["Eli Rodriguez"]);
     expect(workspace.employeeSummaries[0].rows).toHaveLength(7);
   });
 });

@@ -11,6 +11,7 @@ const DEFAULT_LUNCH_DEDUCTION_MINUTES = 30;
 const MAX_TIME_ENTRY_MINUTES = 24 * 60;
 const adminRoles = new Set(["tenant_admin", "office_admin", "platform_admin"]);
 const internalRoles = new Set(["tenant_admin", "office_admin", "platform_admin", "technician"]);
+const hiddenAdminTimesheetEmployeeNames = new Set(["ashley o'brien", "jeremy o'brien"]);
 
 const correctionSchema = z.object({
   timeEntryId: z.string().trim().min(1),
@@ -307,6 +308,10 @@ export function formatTimesheetHours(minutes: number) {
   return minutesToHours(minutes).toFixed(2);
 }
 
+function isHiddenFromAdminTimesheets(employee: { name: string | null }) {
+  return hiddenAdminTimesheetEmployeeNames.has((employee.name ?? "").trim().toLowerCase());
+}
+
 async function getTenantTimezone(tenantId: string) {
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
@@ -530,7 +535,7 @@ export async function getAdminTimesheetWorkspace(actor: ActorContext, input?: { 
   const timezone = await getTenantTimezone(tenantId);
   const weekStart = getWeekStart(input?.week);
   const range = weekRange(weekStart);
-  const employees = await prisma.user.findMany({
+  const employees = (await prisma.user.findMany({
     where: {
       tenantId,
       role: { in: ["tenant_admin", "office_admin", "technician"] },
@@ -543,7 +548,7 @@ export async function getAdminTimesheetWorkspace(actor: ActorContext, input?: { 
       email: true,
       role: true
     }
-  });
+  })).filter((employee) => !isHiddenFromAdminTimesheets(employee));
   const visibleEmployees = input?.employeeId
     ? employees.filter((employee) => employee.id === input.employeeId)
     : employees;
