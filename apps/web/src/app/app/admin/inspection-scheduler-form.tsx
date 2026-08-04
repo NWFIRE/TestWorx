@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChangeEvent, DragEvent, MouseEvent, ReactNode } from "react";
+import type { ChangeEvent, DragEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CustomerOption, SiteOption, TechnicianOption } from "@testworx/types";
@@ -157,6 +157,46 @@ function formatFileSize(bytes: number) {
 
 function fileSelectionKey(file: File) {
   return `${file.name.toLowerCase()}-${file.size}-${file.lastModified}`;
+}
+
+function getScrollableAncestors(element: HTMLElement) {
+  const ancestors: HTMLElement[] = [];
+  let current = element.parentElement;
+
+  while (current) {
+    const style = window.getComputedStyle(current);
+    const canScrollY = /(auto|scroll|overlay)/.test(`${style.overflowY} ${style.overflow}`);
+    if (canScrollY && current.scrollHeight > current.clientHeight) {
+      ancestors.push(current);
+    }
+    current = current.parentElement;
+  }
+
+  return ancestors;
+}
+
+function runPreservingScrollPosition(element: HTMLElement, callback: () => void) {
+  const scrollableAncestors = getScrollableAncestors(element).map((ancestor) => ({
+    element: ancestor,
+    top: ancestor.scrollTop,
+    left: ancestor.scrollLeft
+  }));
+  const windowScroll = { x: window.scrollX, y: window.scrollY };
+
+  callback();
+
+  const restore = () => {
+    window.scrollTo(windowScroll.x, windowScroll.y);
+    for (const item of scrollableAncestors) {
+      item.element.scrollTo(item.left, item.top);
+    }
+  };
+
+  restore();
+  window.requestAnimationFrame(() => {
+    restore();
+    window.requestAnimationFrame(restore);
+  });
 }
 
 function serializeInitialValues(initialValues?: InspectionSchedulerFormInitialValues) {
@@ -364,6 +404,7 @@ export function InspectionSchedulerForm({
   const [externalDocumentUploadError, setExternalDocumentUploadError] = useState<string | null>(null);
   const [submitLocked, setSubmitLocked] = useState(false);
   const externalDocumentsDragDepthRef = useRef(0);
+  const skipNextAddServiceLineClickRef = useRef(false);
   const initialValuesSignature = serializeInitialValues(initialValues);
   const filteredSites = useMemo(
     () => sites.filter((site) => isUserFacingSiteLabel(site.name) && (!selectedCustomerId || site.customerCompanyId === selectedCustomerId)),
@@ -516,6 +557,34 @@ export function InspectionSchedulerForm({
         assignedTechnicianId: current[0]?.assignedTechnicianId ?? ""
       }
     ]);
+  };
+
+  const handleAddServiceLinePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    skipNextAddServiceLineClickRef.current = true;
+    runPreservingScrollPosition(event.currentTarget, addServiceLine);
+  };
+
+  const handleAddServiceLineClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (skipNextAddServiceLineClickRef.current) {
+      skipNextAddServiceLineClickRef.current = false;
+      return;
+    }
+
+    runPreservingScrollPosition(event.currentTarget, addServiceLine);
+  };
+
+  const handleAddServiceLineKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      skipNextAddServiceLineClickRef.current = false;
+    }
   };
 
   const removeServiceLine = (lineId: string) => {
@@ -1144,10 +1213,9 @@ export function InspectionSchedulerForm({
         <div className="flex justify-start">
           <button
             className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-            onClick={(event) => {
-              event.preventDefault();
-              addServiceLine();
-            }}
+            onClick={handleAddServiceLineClick}
+            onKeyDown={handleAddServiceLineKeyDown}
+            onPointerDown={handleAddServiceLinePointerDown}
             type="button"
           >
             Add service line
