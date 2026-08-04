@@ -33,7 +33,31 @@ function shouldProtectFocusedElementFromKeyboard() {
 }
 
 function isKeyboardFocusableElement(target: EventTarget | null): target is HTMLElement {
-  return target instanceof HTMLElement && Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  if (target.closest("textarea, [contenteditable='true']")) {
+    return true;
+  }
+
+  const input = target.closest("input");
+  if (!(input instanceof HTMLInputElement)) {
+    return false;
+  }
+
+  const textEntryInputTypes = new Set([
+    "",
+    "email",
+    "number",
+    "password",
+    "search",
+    "tel",
+    "text",
+    "url"
+  ]);
+
+  return textEntryInputTypes.has(input.type);
 }
 
 function syncTextareaHeight(textarea: HTMLTextAreaElement) {

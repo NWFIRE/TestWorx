@@ -363,7 +363,6 @@ export function InspectionSchedulerForm({
   const [externalDocumentsDragActive, setExternalDocumentsDragActive] = useState(false);
   const [externalDocumentUploadError, setExternalDocumentUploadError] = useState<string | null>(null);
   const [submitLocked, setSubmitLocked] = useState(false);
-  const externalDocumentsDropZoneRef = useRef<HTMLButtonElement | null>(null);
   const externalDocumentsDragDepthRef = useRef(0);
   const initialValuesSignature = serializeInitialValues(initialValues);
   const filteredSites = useMemo(
@@ -506,9 +505,6 @@ export function InspectionSchedulerForm({
     event.preventDefault();
     event.stopPropagation();
     externalDocumentsInputRef.current?.click();
-    window.requestAnimationFrame(() => {
-      externalDocumentsDropZoneRef.current?.focus({ preventScroll: true });
-    });
   };
 
   const addServiceLine = () => {
@@ -1196,7 +1192,6 @@ export function InspectionSchedulerForm({
               onDragLeave={handleExternalDocumentDragLeave}
               onDragOver={handleExternalDocumentDragOver}
               onDrop={handleExternalDocumentDrop}
-              ref={externalDocumentsDropZoneRef}
               type="button"
             >
               <span className="text-sm font-semibold text-ink">Drag and drop PDF files here, or click to browse.</span>
