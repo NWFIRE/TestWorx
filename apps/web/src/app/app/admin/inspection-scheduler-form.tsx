@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChangeEvent, DragEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import type { ChangeEvent, DragEvent, MouseEvent, ReactNode } from "react";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CustomerOption, SiteOption, TechnicianOption } from "@testworx/types";
@@ -157,46 +157,6 @@ function formatFileSize(bytes: number) {
 
 function fileSelectionKey(file: File) {
   return `${file.name.toLowerCase()}-${file.size}-${file.lastModified}`;
-}
-
-function getScrollableAncestors(element: HTMLElement) {
-  const ancestors: HTMLElement[] = [];
-  let current = element.parentElement;
-
-  while (current) {
-    const style = window.getComputedStyle(current);
-    const canScrollY = /(auto|scroll|overlay)/.test(`${style.overflowY} ${style.overflow}`);
-    if (canScrollY && current.scrollHeight > current.clientHeight) {
-      ancestors.push(current);
-    }
-    current = current.parentElement;
-  }
-
-  return ancestors;
-}
-
-function runPreservingScrollPosition(element: HTMLElement, callback: () => void) {
-  const scrollableAncestors = getScrollableAncestors(element).map((ancestor) => ({
-    element: ancestor,
-    top: ancestor.scrollTop,
-    left: ancestor.scrollLeft
-  }));
-  const windowScroll = { x: window.scrollX, y: window.scrollY };
-
-  callback();
-
-  const restore = () => {
-    window.scrollTo(windowScroll.x, windowScroll.y);
-    for (const item of scrollableAncestors) {
-      item.element.scrollTo(item.left, item.top);
-    }
-  };
-
-  restore();
-  window.requestAnimationFrame(() => {
-    restore();
-    window.requestAnimationFrame(restore);
-  });
 }
 
 function serializeInitialValues(initialValues?: InspectionSchedulerFormInitialValues) {
@@ -404,7 +364,8 @@ export function InspectionSchedulerForm({
   const [externalDocumentUploadError, setExternalDocumentUploadError] = useState<string | null>(null);
   const [submitLocked, setSubmitLocked] = useState(false);
   const externalDocumentsDragDepthRef = useRef(0);
-  const skipNextAddServiceLineClickRef = useRef(false);
+  const addServiceLineButtonRef = useRef<HTMLButtonElement | null>(null);
+  const keepAddServiceLineVisibleRef = useRef(false);
   const initialValuesSignature = serializeInitialValues(initialValues);
   const filteredSites = useMemo(
     () => sites.filter((site) => isUserFacingSiteLabel(site.name) && (!selectedCustomerId || site.customerCompanyId === selectedCustomerId)),
@@ -549,6 +510,7 @@ export function InspectionSchedulerForm({
   };
 
   const addServiceLine = () => {
+    keepAddServiceLineVisibleRef.current = true;
     const nextLine = createServiceLineDraft(inspectionMonth);
     setServiceLines((current) => [
       ...current,
@@ -559,32 +521,10 @@ export function InspectionSchedulerForm({
     ]);
   };
 
-  const handleAddServiceLinePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (event.pointerType === "mouse" && event.button !== 0) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-    skipNextAddServiceLineClickRef.current = true;
-    runPreservingScrollPosition(event.currentTarget, addServiceLine);
-  };
-
   const handleAddServiceLineClick = (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    if (skipNextAddServiceLineClickRef.current) {
-      skipNextAddServiceLineClickRef.current = false;
-      return;
-    }
-
-    runPreservingScrollPosition(event.currentTarget, addServiceLine);
-  };
-
-  const handleAddServiceLineKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
-    if (event.key === "Enter" || event.key === " ") {
-      skipNextAddServiceLineClickRef.current = false;
-    }
+    addServiceLine();
   };
 
   const removeServiceLine = (lineId: string) => {
@@ -648,6 +588,26 @@ export function InspectionSchedulerForm({
     setServiceLines(buildInitialServiceLines(initialValues));
     setShowProtectedSaveConfirm(false);
   }, [autoSelectGenericSiteOnCustomerChange, initialValues, initialValuesSignature, sites]);
+
+  useEffect(() => {
+    if (!keepAddServiceLineVisibleRef.current) {
+      return;
+    }
+
+    keepAddServiceLineVisibleRef.current = false;
+    const button = addServiceLineButtonRef.current;
+    if (!button) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      button.scrollIntoView({
+        block: "nearest",
+        inline: "nearest",
+        behavior: "auto"
+      });
+    });
+  }, [serviceLines.length]);
 
   const [state, formAction, pending] = useActionState(async (previousState: typeof initialState, formData: FormData) => {
     const result = await action(previousState, formData);
@@ -1046,7 +1006,7 @@ export function InspectionSchedulerForm({
           </select>
         </div>
       </div>
-      <div className="min-w-0 space-y-4 rounded-[1.25rem] border border-slate-200 p-4 sm:rounded-[1.5rem]">
+      <div className="min-w-0 space-y-4 rounded-[1.25rem] border border-slate-200 p-4 [overflow-anchor:none] sm:rounded-[1.5rem]">
         <div className="flex flex-col gap-3">
           <div>
             <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 sm:text-sm sm:tracking-[0.2em]">Services on this visit</p>
@@ -1214,8 +1174,8 @@ export function InspectionSchedulerForm({
           <button
             className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
             onClick={handleAddServiceLineClick}
-            onKeyDown={handleAddServiceLineKeyDown}
-            onPointerDown={handleAddServiceLinePointerDown}
+            onMouseDown={(event) => event.preventDefault()}
+            ref={addServiceLineButtonRef}
             type="button"
           >
             Add service line
