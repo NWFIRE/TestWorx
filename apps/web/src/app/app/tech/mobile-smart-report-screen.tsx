@@ -178,6 +178,7 @@ export function MobileSmartReportScreen({
   taskId: string;
   mode: "edit" | "review";
 }) {
+  void mode;
   const router = useRouter();
   const controller = useMobileReportDraftController({ data, inspectionId, taskId });
   const [finalizeQueued, setFinalizeQueued] = useState(false);
@@ -218,12 +219,11 @@ export function MobileSmartReportScreen({
   }
 
   return (
-    <GuidedReportWorkflow
+    <SingleScrollReportWorkflow
       controller={controller}
       data={data}
       expandedRows={expandedRows}
       finalizeQueued={finalizeQueued}
-      initialStep={mode === "review" ? "review" : "overview"}
       isReadOnly={isReadOnly}
       isWorkOrder={isWorkOrder}
       onExit={() => router.back()}
@@ -243,7 +243,25 @@ function findTemplateSection(data: TechnicianReportEditorData, sectionId: string
   return data.template.sections.find((section) => section.id === sectionId) ?? null;
 }
 
-function GuidedReportWorkflow({
+type ReportWorkflowProps = {
+  data: TechnicianReportEditorData;
+  controller: ReturnType<typeof useMobileReportDraftController>;
+  progress: ReturnType<typeof buildMobileInspectionProgressSummary>;
+  preview: ReturnType<typeof buildReportPreview>;
+  validationIssues: ReturnType<typeof collectFinalizationValidationIssues>;
+  expandedRows: Record<string, string | null>;
+  setExpandedRows: (value: SetStateAction<Record<string, string | null>>) => void;
+  isReadOnly: boolean;
+  finalizeQueued: boolean;
+  isWorkOrder: boolean;
+  openSections: Record<string, boolean>;
+  setOpenSections: (value: SetStateAction<Record<string, boolean>>) => void;
+  onExit: () => void;
+  onFinalize: () => void;
+  onSelectReport: (taskId: string) => void;
+};
+
+function SingleScrollReportWorkflow({
   data,
   controller,
   progress,
@@ -253,7 +271,151 @@ function GuidedReportWorkflow({
   setExpandedRows,
   isReadOnly,
   finalizeQueued,
-  initialStep,
+  isWorkOrder,
+  openSections,
+  setOpenSections,
+  onExit,
+  onFinalize,
+  onSelectReport
+}: ReportWorkflowProps) {
+  const blockers = validationIssues.filter((issue) => issue.severity === "blocking");
+  const progressLabel = progress.percent !== null ? `${progress.percent}% complete` : "Not started";
+
+  return (
+    <div
+      className="min-h-screen bg-slate-50"
+      style={{ paddingBottom: "var(--mobile-report-bottom-clearance, calc(var(--mobile-tab-bar-offset, 5.5rem) + 2rem))" }}
+    >
+      <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-3 shadow-[0_10px_28px_rgba(15,23,42,0.08)] backdrop-blur md:px-6">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+          <button
+            className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm"
+            onClick={onExit}
+            type="button"
+          >
+            Back
+          </button>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="truncate text-base font-semibold tracking-[-0.02em] text-slate-950 md:text-xl">{data.siteName ?? data.customerName ?? "Inspection Report"}</h1>
+              <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-blue-800">{data.inspectionTypeLabel}</span>
+              <span className="rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-800">{progress.reportStatus}</span>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
+              <span>Single page report</span>
+              <span className="text-slate-300">/</span>
+              <span>{controller.saveState}</span>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <AddReportTypeControl
+              existingReports={data.inspectionWorkspace.relatedTasks.map((task) => ({
+                id: task.id,
+                displayLabel: task.displayLabel
+              }))}
+              inspectionId={data.inspectionWorkspace.inspectionId}
+            />
+            <div className="hidden min-w-24 text-right md:block">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Progress</p>
+              <p className="mt-1 text-sm font-semibold text-slate-950">{progressLabel}</p>
+            </div>
+          </div>
+        </div>
+        <GuidedReportSwitcher
+          currentTaskId={data.inspectionWorkspace.relatedTasks.find((task) => task.isCurrent)?.id ?? null}
+          onSelectReport={onSelectReport}
+          tasks={data.inspectionWorkspace.relatedTasks}
+        />
+      </div>
+
+      <main className="mx-auto max-w-6xl space-y-4 px-4 py-5 md:px-6">
+        {controller.errorMessage ? (
+          <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{controller.errorMessage}</p>
+        ) : null}
+        {controller.finalizeErrorMessage ? (
+          <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{controller.finalizeErrorMessage}</p>
+        ) : null}
+        {finalizeQueued ? (
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            Finalization is saved on this device. TradeWorx will upload it automatically when service is available.
+          </div>
+        ) : null}
+
+        <SingleScrollOverviewCard data={data} isWorkOrder={isWorkOrder} progress={progress} />
+
+        <SingleScrollSection title={isWorkOrder ? "Work Performed" : "Inspection Details"}>
+          {isWorkOrder ? (
+            <WorkOrderSummarySection controller={controller} data={data} disabled={isReadOnly} />
+          ) : (
+            <ChecklistTab
+              controller={controller}
+              data={data}
+              expandedRows={expandedRows}
+              isReadOnly={isReadOnly}
+              openSections={openSections}
+              progress={progress}
+              setExpandedRows={setExpandedRows}
+              setOpenSections={setOpenSections}
+            />
+          )}
+        </SingleScrollSection>
+
+        <SingleScrollSection title="Labor & Materials">
+          {isWorkOrder ? (
+            <>
+              <WorkOrderLaborHoursSection controller={controller} data={data} disabled={isReadOnly} />
+              <WorkOrderProductsAndServicesCard data={data} disabled={isReadOnly} variant="parts" />
+            </>
+          ) : (
+            <GuidedReportLaborMaterialsStep data={data} preview={preview} />
+          )}
+        </SingleScrollSection>
+
+        <SingleScrollSection title="Photos">
+          {isWorkOrder ? (
+            <WorkOrderPhotosSection
+              controller={controller}
+              data={data}
+              disabled={isReadOnly}
+              expandedRows={expandedRows}
+              setExpandedRows={setExpandedRows}
+            />
+          ) : (
+            <PhotosTab controller={controller} data={data} disabled={isReadOnly} draft={controller.draft} />
+          )}
+        </SingleScrollSection>
+
+        <SingleScrollSection title="Deficiencies">
+          <IssuesTab data={data} draft={controller.draft} preview={preview} validationIssues={validationIssues} />
+        </SingleScrollSection>
+
+        <SingleScrollSection title="Review">
+          <GuidedReportReviewSummary controller={controller} data={data} preview={preview} progress={progress} validationIssues={validationIssues} />
+        </SingleScrollSection>
+
+        <GuidedReportFinalizeStep
+          blockers={blockers}
+          controller={controller}
+          data={data}
+          isReadOnly={isReadOnly}
+          onFinalize={onFinalize}
+        />
+      </main>
+    </div>
+  );
+}
+
+function LegacyGuidedReportWorkflow({
+  data,
+  controller,
+  progress,
+  preview,
+  validationIssues,
+  expandedRows,
+  setExpandedRows,
+  isReadOnly,
+  finalizeQueued,
+  initialStep = "overview",
   isWorkOrder,
   openSections,
   setOpenSections,
@@ -270,7 +432,7 @@ function GuidedReportWorkflow({
   setExpandedRows: (value: SetStateAction<Record<string, string | null>>) => void;
   isReadOnly: boolean;
   finalizeQueued: boolean;
-  initialStep: GuidedReportStepId;
+  initialStep?: GuidedReportStepId;
   isWorkOrder: boolean;
   openSections: Record<string, boolean>;
   setOpenSections: (value: SetStateAction<Record<string, boolean>>) => void;
@@ -325,9 +487,7 @@ function GuidedReportWorkflow({
               <span className="rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-800">{progress.reportStatus}</span>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
-              <span>Step {stepProgress}</span>
-              <span className="text-slate-300">/</span>
-              <span>{activeStep.label}</span>
+              <span>Single page report</span>
               <span className="text-slate-300">/</span>
               <span>{controller.saveState}</span>
             </div>
@@ -539,6 +699,8 @@ function GuidedReportWorkflow({
   );
 }
 
+void LegacyGuidedReportWorkflow;
+
 function GuidedReportSwitcher({
   tasks,
   currentTaskId,
@@ -574,6 +736,60 @@ function GuidedReportSwitcher({
         );
       })}
     </div>
+  );
+}
+
+function SingleScrollSection({
+  title,
+  children
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-panel">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Report section</p>
+        <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">{title}</h2>
+      </div>
+      <div className="space-y-4">{children}</div>
+    </section>
+  );
+}
+
+function SingleScrollOverviewCard({
+  data,
+  progress,
+  isWorkOrder
+}: {
+  data: TechnicianReportEditorData;
+  progress: ReturnType<typeof buildMobileInspectionProgressSummary>;
+  isWorkOrder: boolean;
+}) {
+  const rows = [
+    ["Customer", data.customerName ?? "Not captured"],
+    ["Location", data.siteName ?? data.serviceAddress ?? "Not captured"],
+    ["Address", data.serviceAddress ?? "Not captured"],
+    ["Scheduled", "Current visit"],
+    ["Report", data.inspectionTypeLabel],
+    ["Status", progress.reportStatus]
+  ];
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
+      <div className="border-b border-slate-200 bg-slate-950 px-5 py-5 text-white">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-200">{isWorkOrder ? "Work order" : "Technician report"}</p>
+        <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em]">{data.siteName ?? data.customerName ?? "Inspection Report"}</h2>
+      </div>
+      <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-3">
+        {rows.map(([label, value]) => (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" key={label}>
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">{label}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-950">{value}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -767,7 +983,7 @@ function GuidedReportFinalizeStep({
   controller: ReturnType<typeof useMobileReportDraftController>;
   blockers: ReturnType<typeof collectFinalizationValidationIssues>;
   isReadOnly: boolean;
-  onBack: () => void;
+  onBack?: () => void;
   onFinalize: () => void;
 }) {
   return (
@@ -804,21 +1020,23 @@ function GuidedReportFinalizeStep({
           />
         </div>
       </section>
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <button
-          className="min-h-12 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm"
-          onClick={onBack}
-          type="button"
-        >
-          Back
-        </button>
+      <div className={`flex flex-col-reverse gap-3 sm:flex-row sm:items-center ${onBack ? "sm:justify-between" : "sm:justify-end"}`}>
+        {onBack ? (
+          <button
+            className="min-h-12 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm"
+            onClick={onBack}
+            type="button"
+          >
+            Back
+          </button>
+        ) : null}
         <button
           className="min-h-12 rounded-2xl bg-[var(--tenant-primary)] px-6 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)] shadow-[0_16px_34px_rgb(var(--tenant-primary-rgb)/0.18)] disabled:opacity-50"
           disabled={isReadOnly || blockers.length > 0 || controller.finalizeInFlight || controller.saveState === "Finalizing" || controller.saveState === "Finalize queued"}
           onClick={onFinalize}
           type="button"
         >
-          {blockers.length > 0 ? "Resolve Required Items" : "Finalize Work Order"}
+          {blockers.length > 0 ? "Resolve Required Items" : `Finalize ${data.inspectionTypeLabel}`}
         </button>
       </div>
     </div>
