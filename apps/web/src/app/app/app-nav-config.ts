@@ -5,7 +5,7 @@ export type AppNavItem = {
   label: string;
   shortLabel: string;
   abbreviation: string;
-  icon?: "calendar" | "clock" | "branch" | "alert" | "invoice" | "dollar" | "check" | "settings" | "grid" | "clipboard" | "portal" | "team" | "mail" | "book";
+  icon?: "calendar" | "clock" | "branch" | "alert" | "invoice" | "dollar" | "check" | "settings" | "sign-out" | "grid" | "clipboard" | "portal" | "team" | "mail" | "book";
   description?: string;
   tone?: "blue" | "amber" | "emerald" | "violet" | "slate";
   group?: "Dashboard" | "Work" | "Billing" | "Customers" | "Operations" | "Settings" | "Portal";

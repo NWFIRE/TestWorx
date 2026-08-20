@@ -168,6 +168,13 @@ function NavIcon({
           <circle {...shared} cx="12" cy="12" r="4" />
         </svg>
       );
+    case "sign-out":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <path {...shared} d="M10 5H6.5A2.5 2.5 0 0 0 4 7.5v9A2.5 2.5 0 0 0 6.5 19H10" />
+          <path {...shared} d="M14 8l4 4-4 4M18 12H9" />
+        </svg>
+      );
     case "grid":
       return (
         <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
@@ -293,6 +300,40 @@ function NavItem({
   );
 }
 
+function SignOutNavItem({
+  collapsed,
+  compact,
+  onSignOut,
+  signOutAction
+}: {
+  collapsed: boolean;
+  compact: boolean;
+  onSignOut?: () => void;
+  signOutAction: () => Promise<void>;
+}) {
+  return (
+    <form action={signOutAction} onSubmit={onSignOut}>
+      <button
+        aria-label="Sign out"
+        className={`pressable pressable-row group relative flex min-h-[44px] w-full min-w-0 items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-sm font-semibold text-[color:var(--text-muted)] outline-none transition-all duration-200 hover:bg-white/90 hover:text-ink hover:shadow-[0_8px_18px_rgba(9,18,32,0.06)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.38)] focus-visible:ring-offset-2 motion-reduce:transition-none ${
+          collapsed ? "justify-center px-2" : ""
+        } ${compact ? "min-h-[48px]" : ""}`}
+        title={collapsed ? "Sign out" : undefined}
+        type="submit"
+      >
+        <span aria-hidden="true" className="flex h-5 w-5 shrink-0 items-center justify-center text-[color:var(--text-muted)] group-hover:text-ink">
+          <NavIcon className="h-5 w-5" icon="sign-out" />
+        </span>
+        {!collapsed ? (
+          <span className="min-w-0 flex-1 text-left">
+            <span className="block truncate text-sm font-semibold">Sign out</span>
+          </span>
+        ) : null}
+      </button>
+    </form>
+  );
+}
+
 function BrandBlock({
   collapsed
 }: {
@@ -340,7 +381,9 @@ function NavSection({
   navItems,
   onPrefetch,
   pathname,
-  onNavigate
+  onNavigate,
+  onSignOut,
+  signOutAction
 }: {
   collapsed: boolean;
   compact: boolean;
@@ -348,6 +391,8 @@ function NavSection({
   onPrefetch?: (href: string) => void;
   pathname: string;
   onNavigate?: (href: string) => void;
+  onSignOut?: () => void;
+  signOutAction: () => Promise<void>;
 }) {
   const groupedNavItems = useMemo(() => {
     if (!SIMPLIFIED_WORKSPACE_NAV_ENABLED) {
@@ -355,6 +400,10 @@ function NavSection({
         {
           group: "Workspace",
           items: navItems,
+        },
+        {
+          group: "Settings",
+          items: [],
         },
       ];
     }
@@ -388,6 +437,9 @@ function NavSection({
     for (const item of navItems) {
       const group = item.group ?? "Dashboard";
       grouped.set(group, [...(grouped.get(group) ?? []), item]);
+    }
+    if (!grouped.has("Settings")) {
+      grouped.set("Settings", []);
     }
 
     const knownGroups = groupOrder
@@ -469,6 +521,9 @@ function NavSection({
                           onNavigate={onNavigate}
                         />
                       ))}
+                      {group === "Settings" ? (
+                        <SignOutNavItem collapsed={collapsed} compact={compact} onSignOut={onSignOut} signOutAction={signOutAction} />
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -864,7 +919,9 @@ export function AppShell({
             navItems={navItems}
             onNavigate={handleSidebarNavigate}
             onPrefetch={prefetchNavHref}
+            onSignOut={() => setDrawerOpen(false)}
             pathname={activePathname}
+            signOutAction={signOutAction}
           />
         </aside>
       ) : null}
@@ -909,7 +966,9 @@ export function AppShell({
               navItems={navItems}
               onNavigate={handleSidebarNavigate}
               onPrefetch={prefetchNavHref}
+              onSignOut={() => setDrawerOpen(false)}
               pathname={activePathname}
+              signOutAction={signOutAction}
             />
           </aside>
         </>
@@ -962,11 +1021,6 @@ export function AppShell({
                   >
                     <BrandLoader animated={isRefreshing} className={isRefreshing ? "opacity-100" : "opacity-85"} label={isRefreshing ? "Refreshing" : "Refresh page"} size="sm" tone="muted" />
                   </button>
-                  <form action={signOutAction}>
-                    <button className="pressable min-h-11 rounded-xl border border-[color:var(--border-default)] bg-white px-4 py-2 text-sm font-bold text-[color:var(--text-secondary)] shadow-sm outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2" type="submit">
-                      Sign out
-                    </button>
-                  </form>
                 </div>
               </>
             )}
