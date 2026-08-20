@@ -21,6 +21,7 @@ const DRAWER_SELECTOR =
 const MOBILE_KEYBOARD_THRESHOLD = 120;
 const EXPANDED_SIDEBAR_BREAKPOINT = 1280;
 const SIMPLIFIED_WORKSPACE_NAV_ENABLED = process.env.NEXT_PUBLIC_SIMPLIFIED_WORKSPACE_NAV !== "0";
+const DROPDOWN_NAV_GROUPS = new Set(["Work", "Billing", "Customers", "Operations", "Settings"]);
 
 function shouldProtectFocusedElementFromKeyboard() {
   if (typeof window === "undefined") {
@@ -398,6 +399,10 @@ function NavSection({
 
     return [...knownGroups, ...unknownGroups];
   }, [navItems]);
+  const activeGroup = useMemo(() => {
+    return groupedNavItems.find(({ items }) => items.some((item) => isAppNavItemActive(pathname, item)))?.group ?? null;
+  }, [groupedNavItems, pathname]);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -406,24 +411,54 @@ function NavSection({
           <p className="px-2 pb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--text-muted)]">Workspace</p>
         ) : null}
         <div className="space-y-4">
-          {groupedNavItems.map(({ group, items }) => (
-            <div className="space-y-1.5" key={group}>
-              {!collapsed && groupedNavItems.length > 1 ? (
-                <p className="px-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--text-muted)]">{group}</p>
-              ) : null}
-              {items.map((item) => (
-                <NavItem
-                  key={item.href}
-                  active={isAppNavItemActive(pathname, item)}
-                  collapsed={collapsed}
-                  compact={compact}
-                  item={item}
-                  onPrefetch={onPrefetch}
-                  onNavigate={onNavigate}
-                />
-              ))}
-            </div>
-          ))}
+          {groupedNavItems.map(({ group, items }) => {
+            const isDropdownGroup = DROPDOWN_NAV_GROUPS.has(group);
+            const isOpen = !isDropdownGroup || collapsed || group === activeGroup || openGroups[group] !== false;
+            const groupPanelId = `sidebar-group-${group.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+
+            return (
+              <div className="space-y-1.5" key={group}>
+                {!collapsed && groupedNavItems.length > 1 ? (
+                  isDropdownGroup ? (
+                    <button
+                      aria-controls={groupPanelId}
+                      aria-expanded={isOpen}
+                      className="flex min-h-9 w-full items-center justify-between rounded-xl border border-transparent px-2 text-left text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--text-muted)] transition hover:border-[color:var(--border-default)] hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.28)]"
+                      onClick={() => {
+                        if (group === activeGroup && isOpen) {
+                          return;
+                        }
+                        setOpenGroups((current) => ({ ...current, [group]: !isOpen }));
+                      }}
+                      type="button"
+                    >
+                      <span>{group}</span>
+                      <span aria-hidden="true" className={`text-xs transition-transform ${isOpen ? "rotate-90" : ""}`}>
+                        ›
+                      </span>
+                    </button>
+                  ) : (
+                    <p className="px-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--text-muted)]">{group}</p>
+                  )
+                ) : null}
+                {isOpen ? (
+                  <div className="space-y-1.5" id={groupPanelId}>
+                    {items.map((item) => (
+                      <NavItem
+                        key={item.href}
+                        active={isAppNavItemActive(pathname, item)}
+                        collapsed={collapsed}
+                        compact={compact}
+                        item={item}
+                        onPrefetch={onPrefetch}
+                        onNavigate={onNavigate}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       </nav>
     </div>
