@@ -413,8 +413,9 @@ function NavSection({
         <div className="space-y-4">
           {groupedNavItems.map(({ group, items }) => {
             const isDropdownGroup = DROPDOWN_NAV_GROUPS.has(group);
-            const isOpen = !isDropdownGroup || collapsed || group === activeGroup || openGroups[group] !== false;
+            const isOpen = collapsed || !isDropdownGroup || (openGroups[group] ?? group === activeGroup);
             const groupPanelId = `sidebar-group-${group.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+            const groupHasActiveItem = group === activeGroup;
 
             return (
               <div className="space-y-1.5" key={group}>
@@ -423,39 +424,54 @@ function NavSection({
                     <button
                       aria-controls={groupPanelId}
                       aria-expanded={isOpen}
-                      className="flex min-h-9 w-full items-center justify-between rounded-xl border border-transparent px-2 text-left text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--text-muted)] transition hover:border-[color:var(--border-default)] hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.28)]"
+                      className={`flex min-h-9 w-full items-center justify-between rounded-xl border px-2.5 text-left text-[10px] font-bold uppercase tracking-[0.18em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.28)] ${
+                        isOpen
+                          ? "border-[color:var(--border-default)] bg-white text-ink shadow-[0_8px_18px_rgb(15_23_42/0.06)]"
+                          : groupHasActiveItem
+                            ? "border-[color:rgb(var(--tenant-primary-rgb)/0.25)] bg-[color:rgb(var(--tenant-primary-rgb)/0.08)] text-ink"
+                            : "border-transparent text-[color:var(--text-muted)] hover:border-[color:var(--border-default)] hover:bg-white hover:text-ink"
+                      }`}
                       onClick={() => {
-                        if (group === activeGroup && isOpen) {
-                          return;
-                        }
                         setOpenGroups((current) => ({ ...current, [group]: !isOpen }));
                       }}
                       type="button"
                     >
                       <span>{group}</span>
-                      <span aria-hidden="true" className={`text-xs transition-transform ${isOpen ? "rotate-90" : ""}`}>
-                        ›
+                      <span
+                        aria-hidden="true"
+                        className={`flex size-5 items-center justify-center rounded-full border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                      >
+                        <svg className="size-3" fill="none" viewBox="0 0 12 12">
+                          <path d="M3 4.5 6 7.5l3-3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+                        </svg>
                       </span>
                     </button>
                   ) : (
                     <p className="px-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--text-muted)]">{group}</p>
                   )
                 ) : null}
-                {isOpen ? (
-                  <div className="space-y-1.5" id={groupPanelId}>
-                    {items.map((item) => (
-                      <NavItem
-                        key={item.href}
-                        active={isAppNavItemActive(pathname, item)}
-                        collapsed={collapsed}
-                        compact={compact}
-                        item={item}
-                        onPrefetch={onPrefetch}
-                        onNavigate={onNavigate}
-                      />
-                    ))}
+                <div
+                  className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
+                    isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                  }`}
+                  id={groupPanelId}
+                >
+                  <div className="min-h-0 overflow-hidden">
+                    <div className="space-y-1.5">
+                      {items.map((item) => (
+                        <NavItem
+                          key={item.href}
+                          active={isAppNavItemActive(pathname, item)}
+                          collapsed={collapsed}
+                          compact={compact}
+                          item={item}
+                          onPrefetch={onPrefetch}
+                          onNavigate={onNavigate}
+                        />
+                      ))}
+                    </div>
                   </div>
-                ) : null}
+                </div>
               </div>
             );
           })}
