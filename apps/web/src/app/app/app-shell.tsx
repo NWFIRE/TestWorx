@@ -481,7 +481,16 @@ function NavSection({
                             : "border-transparent text-[color:var(--text-muted)] hover:border-[color:var(--border-default)] hover:bg-white hover:text-ink"
                       }`}
                       onClick={() => {
-                        setOpenGroups((current) => ({ ...current, [group]: !isOpen }));
+                        setOpenGroups(() => {
+                          const nextOpenGroups: Record<string, boolean> = {};
+                          for (const groupedItem of groupedNavItems) {
+                            if (DROPDOWN_NAV_GROUPS.has(groupedItem.group)) {
+                              nextOpenGroups[groupedItem.group] = false;
+                            }
+                          }
+                          nextOpenGroups[group] = !isOpen;
+                          return nextOpenGroups;
+                        });
                       }}
                       type="button"
                     >
