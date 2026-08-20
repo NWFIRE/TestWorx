@@ -33,6 +33,8 @@ import {
 import { InspectionTypeInlineList } from "../../inspection-type-inline-list";
 import { InspectionCreatePanel } from "./inspection-create-panel";
 import { CreateInspectionTrigger } from "./create-inspection-trigger";
+import { FastInspectionDeleteButton } from "./fast-inspection-delete-button";
+import { deleteInspectionAction } from "../actions";
 
 const statusOptions = [
   { value: "all", label: "All statuses" },
@@ -561,13 +563,19 @@ export default async function AdminInspectionsPage({
                           {inspection.assignedTechnicianNames.join(", ") || "Shared queue"}
                         </div>
 
-                        <div className="flex justify-start lg:justify-end">
+                        <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
                           <Link
                             className="inline-flex min-h-10 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)] group-hover/row:border-[color:rgb(var(--tenant-primary-rgb)/0.34)]"
                             href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`}
                           >
                             Open
                           </Link>
+                          <FastInspectionDeleteButton
+                            action={deleteInspectionAction}
+                            customerLabel={customerLabel}
+                            inspectionId={inspection.id}
+                            redirectTo={currentPath}
+                          />
                         </div>
                       </div>
                     );
