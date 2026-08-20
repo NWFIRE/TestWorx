@@ -459,9 +459,6 @@ function NavSection({
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <nav aria-label="Primary navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
-        {!collapsed ? (
-          <p className="px-2 pb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--text-muted)]">Workspace</p>
-        ) : null}
         <div className="space-y-4">
           {groupedNavItems.map(({ group, items }) => {
             const isDropdownGroup = DROPDOWN_NAV_GROUPS.has(group);
@@ -471,7 +468,7 @@ function NavSection({
 
             return (
               <div className="space-y-1.5" key={group}>
-                {!collapsed && groupedNavItems.length > 1 ? (
+                {!collapsed && groupedNavItems.length > 1 && group !== "Dashboard" ? (
                   isDropdownGroup ? (
                     <button
                       aria-controls={groupPanelId}
