@@ -382,6 +382,7 @@ async function fetchRecipientCustomers(input: {
   query?: string;
   hasValidEmail?: "all" | "yes" | "no";
   customerCompanyIds?: string[];
+  activeOnly?: boolean;
 }) {
   const andFilters: Prisma.CustomerCompanyWhereInput[] = [{ tenantId: input.tenantId }];
   const textSearch = buildCustomerReminderSearch(input.query ?? "");
@@ -391,6 +392,10 @@ async function fetchRecipientCustomers(input: {
 
   if (input.customerCompanyIds?.length) {
     andFilters.push({ id: { in: input.customerCompanyIds } });
+  }
+
+  if (input.activeOnly) {
+    andFilters.push({ isActive: true });
   }
 
   if (input.hasValidEmail === "yes") {
@@ -415,6 +420,7 @@ async function fetchRecipientCustomers(input: {
       contactName: true,
       billingEmail: true,
       phone: true,
+      isActive: true,
       serviceAddressLine1: true,
       serviceCity: true,
       serviceState: true,
@@ -728,6 +734,11 @@ export async function getEmailReminderWorkspaceData(
     lastSentByCustomerId,
     restrictToTaskMatches: Boolean(input?.inspectionType || input?.division)
   });
+  const activeCustomersWithEmail = await fetchRecipientCustomers({
+    tenantId,
+    hasValidEmail: "yes",
+    activeOnly: true
+  });
   const pagedRecipients = allRecipients.slice((page - 1) * emailReminderPageSize, page * emailReminderPageSize);
   const tenant = await prisma.tenant.findFirst({
     where: { id: tenantId },
@@ -819,6 +830,12 @@ export async function getEmailReminderWorkspaceData(
       customerName: recipient.customerName,
       recipientEmail: recipient.recipientEmail,
       hasValidEmail: recipient.hasValidEmail
+    })),
+    blastEligibleRecipients: activeCustomersWithEmail.map((customer) => ({
+      customerCompanyId: customer.id,
+      customerName: customer.name,
+      recipientEmail: customer.billingEmail?.trim() || null,
+      hasValidEmail: Boolean(customer.billingEmail?.trim())
     })),
     recipients: pagedRecipients.map((recipient) => ({
       ...recipient,

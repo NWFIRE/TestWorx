@@ -69,6 +69,12 @@ type WorkspaceData = {
     recipientEmail: string | null;
     hasValidEmail: boolean;
   }>;
+  blastEligibleRecipients: Array<{
+    customerCompanyId: string;
+    customerName: string;
+    recipientEmail: string | null;
+    hasValidEmail: boolean;
+  }>;
   recipients: Array<{
     customerCompanyId: string;
     customerName: string;
@@ -223,13 +229,20 @@ export function EmailRemindersWorkspace({
   const [recipientEmailOverrides, setRecipientEmailOverrides] = useState<Record<string, string>>({});
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>(
     initialCustomerCompanyIds.filter((customerCompanyId) =>
-      data.selectableRecipients.some((recipient) => recipient.customerCompanyId === customerCompanyId)
+      [...data.selectableRecipients, ...data.blastEligibleRecipients].some((recipient) => recipient.customerCompanyId === customerCompanyId)
     )
   );
 
+  const allSelectableRecipientMap = useMemo(() => {
+    const recipientMap = new Map<string, WorkspaceData["selectableRecipients"][number]>();
+    for (const recipient of [...data.selectableRecipients, ...data.blastEligibleRecipients]) {
+      recipientMap.set(recipient.customerCompanyId, recipient);
+    }
+    return recipientMap;
+  }, [data.blastEligibleRecipients, data.selectableRecipients]);
   const selectedRecipients = useMemo(
-    () => data.selectableRecipients.filter((recipient) => selectedCustomerIds.includes(recipient.customerCompanyId)),
-    [data.selectableRecipients, selectedCustomerIds]
+    () => selectedCustomerIds.map((customerCompanyId) => allSelectableRecipientMap.get(customerCompanyId)).filter((recipient): recipient is WorkspaceData["selectableRecipients"][number] => Boolean(recipient)),
+    [allSelectableRecipientMap, selectedCustomerIds]
   );
   const activeTemplate = useMemo(
     () => data.templates.find((template) => template.key === templateKey) ?? defaultTemplate,
@@ -263,6 +276,8 @@ export function EmailRemindersWorkspace({
   );
   const allVisibleSelected = data.recipients.length > 0 && data.recipients.every((recipient) => selectedCustomerIds.includes(recipient.customerCompanyId));
   const allMatchingSelected = data.selectableRecipients.length > 0 && data.selectableRecipients.every((recipient) => selectedCustomerIds.includes(recipient.customerCompanyId));
+  const allBlastEligibleSelected = data.blastEligibleRecipients.length > 0 && data.blastEligibleRecipients.every((recipient) => selectedCustomerIds.includes(recipient.customerCompanyId));
+  const selectedRecipientsForOverrides = selectedRecipients.slice(0, 50);
 
   function navigateToPage(nextPage: number) {
     const nextSearch = new URLSearchParams(searchParams.toString());
@@ -361,40 +376,65 @@ export function EmailRemindersWorkspace({
                 Select customers with prior email activity, or search for a customer to send a new message.
               </p>
             </div>
-            {data.recipients.length > 0 ? (
+            {data.recipients.length > 0 || data.blastEligibleRecipients.length > 0 ? (
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <label className="flex items-center gap-3 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] px-4 py-3 text-sm text-[color:var(--text-secondary)]">
-                  <input
-                    checked={allVisibleSelected}
-                    onChange={(event) =>
-                      setSelectedCustomerIds((current) => {
-                        const visibleIds = data.recipients.map((recipient) => recipient.customerCompanyId);
-                        if (event.target.checked) {
-                          return [...new Set([...current, ...visibleIds])];
+                {data.recipients.length > 0 ? (
+                  <>
+                    <label className="flex items-center gap-3 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] px-4 py-3 text-sm text-[color:var(--text-secondary)]">
+                      <input
+                        checked={allVisibleSelected}
+                        onChange={(event) =>
+                          setSelectedCustomerIds((current) => {
+                            const visibleIds = data.recipients.map((recipient) => recipient.customerCompanyId);
+                            if (event.target.checked) {
+                              return [...new Set([...current, ...visibleIds])];
+                            }
+                            return current.filter((customerCompanyId) => !visibleIds.includes(customerCompanyId));
+                          })
                         }
-                        return current.filter((customerCompanyId) => !visibleIds.includes(customerCompanyId));
-                      })
-                    }
-                    type="checkbox"
-                  />
-                  Select visible recipients
-                </label>
+                        type="checkbox"
+                      />
+                      Select visible recipients
+                    </label>
+                    <button
+                      className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
+                        allMatchingSelected
+                          ? "border-[color:rgb(var(--tenant-primary-rgb)/0.28)] bg-[color:rgb(var(--tenant-primary-rgb)/0.08)] text-[var(--tenant-primary)]"
+                          : "border-[color:var(--border-default)] bg-white text-[color:var(--text-secondary)] hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)]"
+                      }`}
+                      onClick={() =>
+                        setSelectedCustomerIds(
+                          allMatchingSelected
+                            ? []
+                            : data.selectableRecipients.map((recipient) => recipient.customerCompanyId)
+                        )
+                      }
+                      type="button"
+                    >
+                      {allMatchingSelected ? "Clear all selected" : `Select all ${data.pagination.totalCount} matching`}
+                    </button>
+                  </>
+                ) : null}
                 <button
                   className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
-                    allMatchingSelected
-                      ? "border-[color:rgb(var(--tenant-primary-rgb)/0.28)] bg-[color:rgb(var(--tenant-primary-rgb)/0.08)] text-[var(--tenant-primary)]"
-                      : "border-[color:var(--border-default)] bg-white text-[color:var(--text-secondary)] hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)]"
+                    allBlastEligibleSelected
+                      ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                      : "border-[color:var(--border-default)] bg-white text-[color:var(--text-secondary)] hover:border-emerald-300 hover:text-emerald-800"
                   }`}
                   onClick={() =>
-                    setSelectedCustomerIds(
-                      allMatchingSelected
-                        ? []
-                        : data.selectableRecipients.map((recipient) => recipient.customerCompanyId)
-                    )
+                    setSelectedCustomerIds((current) => {
+                      const blastIds = data.blastEligibleRecipients.map((recipient) => recipient.customerCompanyId);
+                      if (allBlastEligibleSelected) {
+                        return current.filter((customerCompanyId) => !blastIds.includes(customerCompanyId));
+                      }
+                      return [...new Set([...current, ...blastIds])];
+                    })
                   }
                   type="button"
                 >
-                  {allMatchingSelected ? "Clear all selected" : `Select all ${data.pagination.totalCount} matching`}
+                  {allBlastEligibleSelected
+                    ? "Clear current customers"
+                    : `Select all current customers with emails (${data.blastEligibleRecipients.length})`}
                 </button>
               </div>
             ) : null}
@@ -657,8 +697,13 @@ export function EmailRemindersWorkspace({
                     Optional. Enter a different email here for this send only. The customer file will not be changed.
                   </p>
                 </div>
+                {selectedRecipients.length > selectedRecipientsForOverrides.length ? (
+                  <p className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                    Showing one-off override fields for the first {selectedRecipientsForOverrides.length} selected recipients. All {selectedRecipients.length} selected customers will still be included in the send.
+                  </p>
+                ) : null}
                 <div className="mt-4 space-y-3">
-                  {selectedRecipients.map((recipient) => {
+                  {selectedRecipientsForOverrides.map((recipient) => {
                     const overrideValue = recipientEmailOverrides[recipient.customerCompanyId] ?? "";
                     const resolvedEmail = getSendRecipientEmail(recipient);
 

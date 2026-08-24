@@ -219,6 +219,90 @@ describe("email reminders", () => {
     expect(result.recipients[0]?.lastSentAt).toBe("2026-05-10T15:00:00.000Z");
   });
 
+  it("exposes active customers with listed emails for blast notice selection", async () => {
+    prismaMock.customerCompany.findMany
+      .mockResolvedValueOnce([
+        {
+          id: "customer_sent",
+          name: "Previously Emailed Customer",
+          contactName: "Pat Recipient",
+          billingEmail: "pat@example.test",
+          phone: "555-1111",
+          isActive: true,
+          serviceAddressLine1: "100 Sent Ave",
+          serviceCity: "Enid",
+          serviceState: "OK",
+          servicePostalCode: "73701",
+          billingAddressLine1: "100 Sent Ave",
+          billingCity: "Enid",
+          billingState: "OK",
+          billingPostalCode: "73701",
+          sites: []
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "customer_active_email",
+          name: "Active Email Customer",
+          contactName: "Alex Recipient",
+          billingEmail: "alex@example.test",
+          phone: "555-2222",
+          isActive: true,
+          serviceAddressLine1: "200 Active Ave",
+          serviceCity: "Enid",
+          serviceState: "OK",
+          servicePostalCode: "73701",
+          billingAddressLine1: "200 Active Ave",
+          billingCity: "Enid",
+          billingState: "OK",
+          billingPostalCode: "73701",
+          sites: []
+        }
+      ]);
+    prismaMock.inspectionTask.findMany.mockResolvedValue([]);
+    prismaMock.emailReminderSendLog.findMany
+      .mockResolvedValueOnce([{ customerCompanyId: "customer_sent" }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    prismaMock.tenant.findFirst.mockResolvedValue({
+      id: "tenant_1",
+      name: "Northwest Fire & Safety",
+      billingEmail: "billing@nwfireandsafety.com",
+      branding: {
+        legalBusinessName: "Northwest Fire & Safety",
+        phone: "580-540-3119",
+        email: "accounting@nwfireandsafety.com"
+      }
+    });
+
+    const { getEmailReminderWorkspaceData } = await import("../email-reminders");
+    const result = await getEmailReminderWorkspaceData(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { dueMonth: "2026-07" }
+    );
+
+    expect(prismaMock.customerCompany.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            { tenantId: "tenant_1" },
+            { isActive: true },
+            { billingEmail: { not: null } },
+            { NOT: { billingEmail: "" } }
+          ])
+        })
+      })
+    );
+    expect(result.blastEligibleRecipients).toEqual([
+      {
+        customerCompanyId: "customer_active_email",
+        customerName: "Active Email Customer",
+        recipientEmail: "alex@example.test",
+        hasValidEmail: true
+      }
+    ]);
+  });
+
   it("uses the customer address when site context is empty", async () => {
     prismaMock.customerCompany.findMany.mockResolvedValue([
       {
