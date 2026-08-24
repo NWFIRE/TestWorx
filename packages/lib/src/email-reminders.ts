@@ -814,6 +814,12 @@ export async function getEmailReminderWorkspaceData(
       withValidEmail: allRecipients.filter((recipient) => recipient.hasValidEmail).length,
       sentRecently: allRecipients.filter((recipient) => recipient.lastSentAt).length
     },
+    selectableRecipients: allRecipients.map((recipient) => ({
+      customerCompanyId: recipient.customerCompanyId,
+      customerName: recipient.customerName,
+      recipientEmail: recipient.recipientEmail,
+      hasValidEmail: recipient.hasValidEmail
+    })),
     recipients: pagedRecipients.map((recipient) => ({
       ...recipient,
       lastSentAt: recipient.lastSentAt ? recipient.lastSentAt.toISOString() : null

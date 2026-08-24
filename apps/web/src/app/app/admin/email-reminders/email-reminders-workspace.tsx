@@ -63,6 +63,12 @@ type WorkspaceData = {
     withValidEmail: number;
     sentRecently: number;
   };
+  selectableRecipients: Array<{
+    customerCompanyId: string;
+    customerName: string;
+    recipientEmail: string | null;
+    hasValidEmail: boolean;
+  }>;
   recipients: Array<{
     customerCompanyId: string;
     customerName: string;
@@ -217,13 +223,13 @@ export function EmailRemindersWorkspace({
   const [recipientEmailOverrides, setRecipientEmailOverrides] = useState<Record<string, string>>({});
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>(
     initialCustomerCompanyIds.filter((customerCompanyId) =>
-      data.recipients.some((recipient) => recipient.customerCompanyId === customerCompanyId)
+      data.selectableRecipients.some((recipient) => recipient.customerCompanyId === customerCompanyId)
     )
   );
 
   const selectedRecipients = useMemo(
-    () => data.recipients.filter((recipient) => selectedCustomerIds.includes(recipient.customerCompanyId)),
-    [data.recipients, selectedCustomerIds]
+    () => data.selectableRecipients.filter((recipient) => selectedCustomerIds.includes(recipient.customerCompanyId)),
+    [data.selectableRecipients, selectedCustomerIds]
   );
   const activeTemplate = useMemo(
     () => data.templates.find((template) => template.key === templateKey) ?? defaultTemplate,
@@ -256,6 +262,7 @@ export function EmailRemindersWorkspace({
     [activeTemplate, previewFields]
   );
   const allVisibleSelected = data.recipients.length > 0 && data.recipients.every((recipient) => selectedCustomerIds.includes(recipient.customerCompanyId));
+  const allMatchingSelected = data.selectableRecipients.length > 0 && data.selectableRecipients.every((recipient) => selectedCustomerIds.includes(recipient.customerCompanyId));
 
   function navigateToPage(nextPage: number) {
     const nextSearch = new URLSearchParams(searchParams.toString());
@@ -263,7 +270,7 @@ export function EmailRemindersWorkspace({
     router.replace(`${pathname}?${nextSearch.toString()}`, { scroll: false });
   }
 
-  function getSendRecipientEmail(recipient: WorkspaceData["recipients"][number]) {
+  function getSendRecipientEmail(recipient: WorkspaceData["selectableRecipients"][number]) {
     return recipientEmailOverrides[recipient.customerCompanyId]?.trim() || recipient.recipientEmail || "";
   }
 
@@ -355,16 +362,41 @@ export function EmailRemindersWorkspace({
               </p>
             </div>
             {data.recipients.length > 0 ? (
-              <label className="flex items-center gap-3 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] px-4 py-3 text-sm text-[color:var(--text-secondary)]">
-                <input
-                  checked={allVisibleSelected}
-                  onChange={(event) =>
-                    setSelectedCustomerIds(event.target.checked ? data.recipients.map((recipient) => recipient.customerCompanyId) : [])
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <label className="flex items-center gap-3 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] px-4 py-3 text-sm text-[color:var(--text-secondary)]">
+                  <input
+                    checked={allVisibleSelected}
+                    onChange={(event) =>
+                      setSelectedCustomerIds((current) => {
+                        const visibleIds = data.recipients.map((recipient) => recipient.customerCompanyId);
+                        if (event.target.checked) {
+                          return [...new Set([...current, ...visibleIds])];
+                        }
+                        return current.filter((customerCompanyId) => !visibleIds.includes(customerCompanyId));
+                      })
+                    }
+                    type="checkbox"
+                  />
+                  Select visible recipients
+                </label>
+                <button
+                  className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
+                    allMatchingSelected
+                      ? "border-[color:rgb(var(--tenant-primary-rgb)/0.28)] bg-[color:rgb(var(--tenant-primary-rgb)/0.08)] text-[var(--tenant-primary)]"
+                      : "border-[color:var(--border-default)] bg-white text-[color:var(--text-secondary)] hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)]"
+                  }`}
+                  onClick={() =>
+                    setSelectedCustomerIds(
+                      allMatchingSelected
+                        ? []
+                        : data.selectableRecipients.map((recipient) => recipient.customerCompanyId)
+                    )
                   }
-                  type="checkbox"
-                />
-                Select visible recipients
-              </label>
+                  type="button"
+                >
+                  {allMatchingSelected ? "Clear all selected" : `Select all ${data.pagination.totalCount} matching`}
+                </button>
+              </div>
             ) : null}
           </div>
 
