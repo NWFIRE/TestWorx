@@ -591,6 +591,95 @@ describe("email reminders", () => {
     );
   });
 
+  it("sends the Pye-Barker acquisition announcement without scheduling requirements", async () => {
+    prismaMock.customerCompany.findMany.mockResolvedValue([
+      {
+        id: "customer_announcement",
+        name: "Black Forest Decor",
+        contactName: "Mark Black",
+        billingEmail: "mark@blackforestdecor.com",
+        phone: "580-555-0199",
+        serviceAddressLine1: "2717 N Van Buren St",
+        serviceCity: "Enid",
+        serviceState: "OK",
+        servicePostalCode: "73703",
+        billingAddressLine1: "2717 N Van Buren St",
+        billingCity: "Enid",
+        billingState: "OK",
+        billingPostalCode: "73703",
+        sites: []
+      }
+    ]);
+    prismaMock.inspectionTask.findMany.mockResolvedValue([]);
+    prismaMock.tenant.findFirst.mockResolvedValue({
+      id: "tenant_1",
+      name: "Northwest Fire & Safety",
+      billingEmail: "billing@nwfireandsafety.com",
+      branding: {
+        legalBusinessName: "Northwest Fire & Safety",
+        phone: "580-540-3119",
+        email: "accounting@nwfireandsafety.com"
+      }
+    });
+    sendCustomerBrandedEmailMock.mockResolvedValue({
+      sent: true,
+      provider: "resend",
+      messageId: "msg_announcement",
+      error: null,
+      reason: "sent"
+    });
+    prismaMock.emailReminderSendLog.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    const { getEmailReminderWorkspaceData, sendManualEmailReminders } = await import("../email-reminders");
+    const workspace = await getEmailReminderWorkspaceData(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { dueMonth: "2026-04", customerCompanyIds: ["customer_announcement"] }
+    );
+    const announcementTemplate = workspace.templates.find((template) => template.key === "pye_barker_acquisition_announcement");
+
+    expect(announcementTemplate).toEqual(
+      expect.objectContaining({
+        label: "Pye-Barker Acquisition Announcement",
+        category: "announcement"
+      })
+    );
+
+    const result = await sendManualEmailReminders(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        dueMonth: "2026-04",
+        customerCompanyIds: ["customer_announcement"],
+        templateKey: "pye_barker_acquisition_announcement",
+        subject: announcementTemplate?.subject ?? "",
+        body: announcementTemplate?.body ?? ""
+      }
+    );
+
+    expect(result.templateLabel).toBe("announcement email");
+    expect(sendCustomerBrandedEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientEmail: "mark@blackforestdecor.com",
+        eyebrow: "Company update",
+        subjectLine: "Northwest Fire & Safety Has Joined Pye-Barker Fire & Safety",
+        title: "Northwest Fire & Safety has joined Pye-Barker Fire & Safety",
+        bodyText: expect.stringContaining("same exceptional service")
+      })
+    );
+    expect(prismaMock.emailReminderSendLog.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({
+            templateKey: "pye_barker_acquisition_announcement",
+            dueMonth: null,
+            siteSummary: null,
+            inspectionTypes: [],
+            divisions: []
+          })
+        ]
+      })
+    );
+  });
+
   it("sends service scheduling emails with selected date, time, and service types", async () => {
     prismaMock.customerCompany.findMany.mockResolvedValue([
       {

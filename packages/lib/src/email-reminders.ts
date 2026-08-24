@@ -13,6 +13,7 @@ import { inspectionTypeRegistry } from "./report-config";
 const inspectionReminderTemplateKey = "inspection_due_this_month";
 const customerWelcomeTemplateKey = "customer_welcome";
 const serviceSchedulingTemplateKey = "service_inspection_scheduling";
+const pyeBarkerAcquisitionAnnouncementTemplateKey = "pye_barker_acquisition_announcement";
 const emailReminderPageSize = 20;
 const liveInspectionStatuses = [
   InspectionStatus.to_be_completed,
@@ -43,7 +44,7 @@ export type EmailReminderTemplateDefinition = {
   label: string;
   subject: string;
   body: string;
-  category: "reminder" | "welcome" | "scheduling";
+  category: "reminder" | "welcome" | "scheduling" | "announcement";
   previewEyebrow: string;
   previewTitle: string;
   previewFooter?: string;
@@ -122,6 +123,30 @@ Best regards,
 {{companyName}}
 
 If there is anything you would like us to be aware of regarding your property or systems, please don't hesitate to let us know.`
+  },
+  {
+    key: pyeBarkerAcquisitionAnnouncementTemplateKey,
+    label: "Pye-Barker Acquisition Announcement",
+    subject: "Northwest Fire & Safety Has Joined Pye-Barker Fire & Safety",
+    category: "announcement",
+    previewEyebrow: "Company update",
+    previewTitle: "Northwest Fire & Safety has joined Pye-Barker Fire & Safety",
+    previewFooter: "Thank you for trusting Northwest Fire & Safety. We look forward to continuing to serve you.",
+    sendSuccessLabel: "announcement email",
+    body: `Hello {{customerName}},
+
+We are writing to share an important and positive update: Northwest Fire & Safety, LLC has been acquired by Pye-Barker Fire & Safety.
+
+While our company is joining the Pye-Barker family, our commitment to you remains the same. You can continue to expect the same exceptional service, responsiveness, local relationships, and attention to detail that you have come to know from Northwest Fire & Safety.
+
+Our team will continue supporting your fire protection, inspection, service, and compliance needs. The familiar people you work with are still here, and we are excited to pair our local service commitment with the added resources, experience, and support of Pye-Barker Fire & Safety.
+
+There is no immediate action required from you. If any account, billing, scheduling, or operational details need to be updated in the future, our team will communicate those changes clearly and directly.
+
+Thank you for your continued trust and partnership. We are grateful for the opportunity to serve you and look forward to continuing to protect your people, property, and operations.
+
+Best regards,
+{{companyName}}`
   }
 ];
 

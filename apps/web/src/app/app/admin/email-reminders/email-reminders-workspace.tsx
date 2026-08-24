@@ -46,7 +46,7 @@ type WorkspaceData = {
     label: string;
     subject: string;
     body: string;
-    category: "reminder" | "welcome" | "scheduling";
+    category: "reminder" | "welcome" | "scheduling" | "announcement";
     previewEyebrow: string;
     previewTitle: string;
     previewFooter?: string;
