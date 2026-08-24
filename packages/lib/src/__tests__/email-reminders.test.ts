@@ -579,6 +579,82 @@ describe("email reminders", () => {
     expect(prismaMock.auditLog.create).toHaveBeenCalled();
   });
 
+  it("retries customer email blasts once when the provider rate limits a send", async () => {
+    prismaMock.customerCompany.findMany.mockResolvedValue([
+      {
+        id: "customer_1",
+        name: "Zoe Bible Church",
+        contactName: "Zoe Admin",
+        contactEmails: null,
+        billingEmail: "zbc729@faithingod.com",
+        phone: "555-1111",
+        serviceAddressLine1: "123 Main St",
+        serviceCity: "Tulsa",
+        serviceState: "OK",
+        servicePostalCode: "74101",
+        billingAddressLine1: "123 Main St",
+        billingCity: "Tulsa",
+        billingState: "OK",
+        billingPostalCode: "74101",
+        sites: []
+      }
+    ]);
+    prismaMock.tenant.findFirst.mockResolvedValue({
+      id: "tenant_1",
+      name: "Northwest Fire & Safety",
+      billingEmail: "billing@nwfireandsafety.com",
+      branding: {
+        legalBusinessName: "Northwest Fire & Safety",
+        phone: "580-540-3119",
+        email: "accounting@nwfireandsafety.com"
+      }
+    });
+    prismaMock.inspectionTask.findMany.mockResolvedValue([]);
+    sendCustomerBrandedEmailMock
+      .mockResolvedValueOnce({
+        sent: false,
+        provider: "resend",
+        messageId: null,
+        error: "Too many requests. You can only make 10 requests per second.",
+        reason: "provider_error"
+      })
+      .mockResolvedValueOnce({
+        sent: true,
+        provider: "resend",
+        messageId: "msg_retry",
+        error: null,
+        reason: "sent"
+      });
+
+    const { sendManualEmailReminders } = await import("../email-reminders");
+    const result = await sendManualEmailReminders(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      {
+        dueMonth: "2026-08",
+        customerCompanyIds: ["customer_1"],
+        templateKey: "pye_barker_acquisition_announcement",
+        subject: "Northwest Fire & Safety Has Joined Pye-Barker Fire & Safety",
+        body: "Hello {{customerName}},\n\nNorthwest Fire & Safety has joined Pye-Barker Fire & Safety."
+      }
+    );
+
+    expect(result.sentCount).toBe(1);
+    expect(result.failedCount).toBe(0);
+    expect(sendCustomerBrandedEmailMock).toHaveBeenCalledTimes(2);
+    expect(prismaMock.emailReminderSendLog.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({
+            customerCompanyId: "customer_1",
+            messageId: "msg_retry",
+            providerReason: "sent",
+            providerError: null
+          })
+        ]
+      })
+    );
+  });
+
   it("uses a one-off recipient email override without changing the customer file", async () => {
     prismaMock.customerCompany.findMany.mockResolvedValue([
       {

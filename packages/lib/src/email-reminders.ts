@@ -15,6 +15,8 @@ const customerWelcomeTemplateKey = "customer_welcome";
 const serviceSchedulingTemplateKey = "service_inspection_scheduling";
 const pyeBarkerAcquisitionAnnouncementTemplateKey = "pye_barker_acquisition_announcement";
 const emailReminderPageSize = 20;
+const emailReminderSendIntervalMs = process.env.NODE_ENV === "test" ? 0 : 150;
+const emailReminderRateLimitRetryDelayMs = process.env.NODE_ENV === "test" ? 0 : 1250;
 const liveInspectionStatuses = [
   InspectionStatus.to_be_completed,
   InspectionStatus.scheduled,
@@ -275,6 +277,21 @@ function normalizeReminderText(value: string) {
     .replace(/Hello\s+,/g, "Hello,")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function waitForEmailReminderSendWindow(delayMs: number) {
+  if (delayMs <= 0) {
+    return Promise.resolve();
+  }
+
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
+}
+
+function isEmailProviderRateLimitError(value: string | null | undefined) {
+  const normalized = value?.toLowerCase() ?? "";
+  return normalized.includes("too many requests") || normalized.includes("rate limit") || normalized.includes("429");
 }
 
 type ReminderMergeFields =
@@ -970,6 +987,7 @@ export async function sendManualEmailReminders(
   const logsToCreate: Array<Prisma.EmailReminderSendLogCreateManyInput> = [];
   let sentCount = 0;
   let failedCount = 0;
+  let sendIndex = 0;
 
   for (const recipient of recipients) {
     const overrideEmail = parsedInput.recipientEmailOverrides[recipient.customerCompanyId]?.trim();
@@ -991,7 +1009,12 @@ export async function sendManualEmailReminders(
     });
     const mergedSubject = mergeEmailReminderTemplate(parsedInput.subject, mergeFields);
     const mergedBody = mergeEmailReminderTemplate(parsedInput.body, mergeFields);
-    const delivery = await sendCustomerBrandedEmail({
+    if (sendIndex > 0) {
+      await waitForEmailReminderSendWindow(emailReminderSendIntervalMs);
+    }
+    sendIndex += 1;
+
+    const emailPayload = {
       recipientEmail,
       recipientName: recipient.customerName || "Customer",
       tenantName: tenant.name,
@@ -1009,7 +1032,13 @@ export async function sendManualEmailReminders(
         primaryColor: branding.primaryColor,
         accentColor: branding.accentColor
       }
-    });
+    };
+    let delivery = await sendCustomerBrandedEmail(emailPayload);
+
+    if (!delivery.sent && isEmailProviderRateLimitError(delivery.error)) {
+      await waitForEmailReminderSendWindow(emailReminderRateLimitRetryDelayMs);
+      delivery = await sendCustomerBrandedEmail(emailPayload);
+    }
 
     if (delivery.sent) {
       sentCount += 1;
