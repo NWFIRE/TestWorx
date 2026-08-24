@@ -883,7 +883,7 @@ export function AppShell({
   const closeDrawer = () => setDrawerOpen(false);
 
   const shell = (
-    <div className="bg-paper lg:flex lg:overflow-hidden" style={{ minHeight: "var(--app-height, 100dvh)" }}>
+    <div className="flex min-h-0 overflow-hidden bg-paper" style={{ height: "var(--app-height, 100dvh)" }}>
       {isTechnician ? <TechnicianSyncBootstrap /> : null}
       {navItems.length > 0 ? (
         <aside
@@ -980,11 +980,7 @@ export function AppShell({
         </>
       ) : null}
 
-      <div
-        className="flex min-w-0 flex-1 flex-col lg:h-[100dvh] lg:min-h-0"
-        ref={shellContentRef}
-        style={{ minHeight: "var(--app-height, 100dvh)" }}
-      >
+      <div className="flex h-full min-w-0 flex-1 flex-col" ref={shellContentRef}>
         <header className="sticky top-0 z-30 border-b border-[color:var(--border-strong)] bg-white/97 shadow-[0_8px_26px_rgba(9,18,32,0.07)] backdrop-blur">
           <div
             className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8"
@@ -1034,7 +1030,7 @@ export function AppShell({
         </header>
 
         <main
-          className={`min-w-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-6 sm:px-6 lg:px-8 ${isTechnician ? "pb-28 lg:pb-6" : ""}`}
+          className={`min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-6 sm:px-6 lg:px-8 ${isTechnician ? "pb-28 lg:pb-6" : ""}`}
           ref={contentRef}
           style={{
             paddingBottom: isTechnician
