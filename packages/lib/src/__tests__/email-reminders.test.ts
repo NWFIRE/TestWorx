@@ -227,6 +227,7 @@ describe("email reminders", () => {
           name: "Previously Emailed Customer",
           contactName: "Pat Recipient",
           billingEmail: "pat@example.test",
+          contactEmails: null,
           phone: "555-1111",
           isActive: true,
           serviceAddressLine1: "100 Sent Ave",
@@ -246,6 +247,7 @@ describe("email reminders", () => {
           name: "Active Email Customer",
           contactName: "Alex Recipient",
           billingEmail: "alex@example.test",
+          contactEmails: null,
           phone: "555-2222",
           isActive: true,
           serviceAddressLine1: "200 Active Ave",
@@ -287,8 +289,20 @@ describe("email reminders", () => {
           AND: expect.arrayContaining([
             { tenantId: "tenant_1" },
             { isActive: true },
-            { billingEmail: { not: null } },
-            { NOT: { billingEmail: "" } }
+            {
+              OR: [
+                { contactEmails: { not: null } },
+                { billingEmail: { not: null } }
+              ]
+            },
+            {
+              NOT: {
+                AND: [
+                  { OR: [{ contactEmails: null }, { contactEmails: "" }] },
+                  { OR: [{ billingEmail: null }, { billingEmail: "" }] }
+                ]
+              }
+            }
           ])
         })
       })
@@ -298,6 +312,102 @@ describe("email reminders", () => {
         customerCompanyId: "customer_active_email",
         customerName: "Active Email Customer",
         recipientEmail: "alex@example.test",
+        hasValidEmail: true
+      }
+    ]);
+  });
+
+  it("uses contact email first and falls back to billing email for blast recipients", async () => {
+    prismaMock.customerCompany.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "customer_contact",
+          name: "Contact Email Customer",
+          contactName: "Casey Contact",
+          contactEmails: "casey@example.test",
+          billingEmail: "billing-contact@example.test",
+          phone: "555-3333",
+          isActive: true,
+          serviceAddressLine1: "300 Contact Ave",
+          serviceCity: "Enid",
+          serviceState: "OK",
+          servicePostalCode: "73701",
+          billingAddressLine1: "300 Contact Ave",
+          billingCity: "Enid",
+          billingState: "OK",
+          billingPostalCode: "73701",
+          sites: []
+        },
+        {
+          id: "customer_billing",
+          name: "Billing Fallback Customer",
+          contactName: "Bailey Billing",
+          contactEmails: null,
+          billingEmail: "billing-fallback@example.test",
+          phone: "555-4444",
+          isActive: true,
+          serviceAddressLine1: "400 Billing Ave",
+          serviceCity: "Enid",
+          serviceState: "OK",
+          servicePostalCode: "73701",
+          billingAddressLine1: "400 Billing Ave",
+          billingCity: "Enid",
+          billingState: "OK",
+          billingPostalCode: "73701",
+          sites: []
+        },
+        {
+          id: "customer_missing",
+          name: "No Email Customer",
+          contactName: "No Email",
+          contactEmails: null,
+          billingEmail: null,
+          phone: "555-5555",
+          isActive: true,
+          serviceAddressLine1: "500 Missing Ave",
+          serviceCity: "Enid",
+          serviceState: "OK",
+          servicePostalCode: "73701",
+          billingAddressLine1: "500 Missing Ave",
+          billingCity: "Enid",
+          billingState: "OK",
+          billingPostalCode: "73701",
+          sites: []
+        }
+      ]);
+    prismaMock.inspectionTask.findMany.mockResolvedValue([]);
+    prismaMock.emailReminderSendLog.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    prismaMock.tenant.findFirst.mockResolvedValue({
+      id: "tenant_1",
+      name: "Northwest Fire & Safety",
+      billingEmail: "billing@nwfireandsafety.com",
+      branding: {
+        legalBusinessName: "Northwest Fire & Safety",
+        phone: "580-540-3119",
+        email: "accounting@nwfireandsafety.com"
+      }
+    });
+
+    const { getEmailReminderWorkspaceData } = await import("../email-reminders");
+    const result = await getEmailReminderWorkspaceData(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { dueMonth: "2026-07", query: "customer" }
+    );
+
+    expect(result.blastEligibleRecipients).toEqual([
+      {
+        customerCompanyId: "customer_contact",
+        customerName: "Contact Email Customer",
+        recipientEmail: "casey@example.test",
+        hasValidEmail: true
+      },
+      {
+        customerCompanyId: "customer_billing",
+        customerName: "Billing Fallback Customer",
+        recipientEmail: "billing-fallback@example.test",
         hasValidEmail: true
       }
     ]);

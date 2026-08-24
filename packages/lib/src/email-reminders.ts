@@ -207,6 +207,30 @@ function uniqueStrings(values: Array<string | null | undefined>) {
   return [...new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)))];
 }
 
+function isValidReminderEmail(value: string | null | undefined) {
+  return Boolean(value?.trim().match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/));
+}
+
+function getFirstValidContactEmail(value: string | null | undefined) {
+  return value
+    ?.split(/[,\n;]/)
+    .map((email) => email.trim())
+    .find((email) => isValidReminderEmail(email)) ?? null;
+}
+
+function resolveCustomerRecipientEmail(input: {
+  contactEmails?: string | null;
+  billingEmail?: string | null;
+}) {
+  const contactEmail = getFirstValidContactEmail(input.contactEmails);
+  if (contactEmail) {
+    return contactEmail;
+  }
+
+  const billingEmail = input.billingEmail?.trim();
+  return isValidReminderEmail(billingEmail) ? billingEmail ?? null : null;
+}
+
 function formatListSummary(values: string[]) {
   if (values.length === 0) {
     return "No site context";
@@ -364,6 +388,7 @@ function buildCustomerReminderSearch(query: string): Prisma.CustomerCompanyWhere
     OR: [
       { name: { contains: trimmed, mode: "insensitive" } },
       { contactName: { contains: trimmed, mode: "insensitive" } },
+      { contactEmails: { contains: trimmed, mode: "insensitive" } },
       { billingEmail: { contains: trimmed, mode: "insensitive" } },
       { phone: { contains: trimmed, mode: "insensitive" } },
       { serviceAddressLine1: { contains: trimmed, mode: "insensitive" } },
@@ -399,13 +424,28 @@ async function fetchRecipientCustomers(input: {
   }
 
   if (input.hasValidEmail === "yes") {
-    andFilters.push({ billingEmail: { not: null } });
-    andFilters.push({ NOT: { billingEmail: "" } });
+    andFilters.push({
+      OR: [
+        { contactEmails: { not: null } },
+        { billingEmail: { not: null } }
+      ]
+    });
+    andFilters.push({
+      NOT: {
+        AND: [
+          { OR: [{ contactEmails: null }, { contactEmails: "" }] },
+          { OR: [{ billingEmail: null }, { billingEmail: "" }] }
+        ]
+      }
+    });
   }
 
   if (input.hasValidEmail === "no") {
     andFilters.push({
-      OR: [{ billingEmail: null }, { billingEmail: "" }]
+      AND: [
+        { OR: [{ contactEmails: null }, { contactEmails: "" }] },
+        { OR: [{ billingEmail: null }, { billingEmail: "" }] }
+      ]
     });
   }
 
@@ -418,6 +458,7 @@ async function fetchRecipientCustomers(input: {
       id: true,
       name: true,
       contactName: true,
+      contactEmails: true,
       billingEmail: true,
       phone: true,
       isActive: true,
@@ -550,6 +591,7 @@ async function fetchRecipientTaskRows(input: {
               id: true,
               name: true,
               contactName: true,
+              contactEmails: true,
               billingEmail: true,
               serviceAddressLine1: true,
               serviceCity: true,
@@ -610,8 +652,8 @@ function buildRecipientRows(input: {
         {
           customerCompanyId: customer.id,
           customerName: customer.name,
-          recipientEmail: customer.billingEmail?.trim() || null,
-          hasValidEmail: Boolean(customer.billingEmail?.trim()),
+          recipientEmail: resolveCustomerRecipientEmail(customer),
+          hasValidEmail: Boolean(resolveCustomerRecipientEmail(customer)),
           dueMonth: input.dueMonth,
           siteSummary: formatListSummary(baseSiteNames),
           siteNames: baseSiteNames,
@@ -831,12 +873,17 @@ export async function getEmailReminderWorkspaceData(
       recipientEmail: recipient.recipientEmail,
       hasValidEmail: recipient.hasValidEmail
     })),
-    blastEligibleRecipients: activeCustomersWithEmail.map((customer) => ({
-      customerCompanyId: customer.id,
-      customerName: customer.name,
-      recipientEmail: customer.billingEmail?.trim() || null,
-      hasValidEmail: Boolean(customer.billingEmail?.trim())
-    })),
+    blastEligibleRecipients: activeCustomersWithEmail
+      .map((customer) => {
+        const recipientEmail = resolveCustomerRecipientEmail(customer);
+        return {
+          customerCompanyId: customer.id,
+          customerName: customer.name,
+          recipientEmail,
+          hasValidEmail: Boolean(recipientEmail)
+        };
+      })
+      .filter((recipient) => recipient.hasValidEmail),
     recipients: pagedRecipients.map((recipient) => ({
       ...recipient,
       lastSentAt: recipient.lastSentAt ? recipient.lastSentAt.toISOString() : null
