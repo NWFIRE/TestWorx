@@ -278,6 +278,15 @@ export function EmailRemindersWorkspace({
   const allMatchingSelected = data.selectableRecipients.length > 0 && data.selectableRecipients.every((recipient) => selectedCustomerIds.includes(recipient.customerCompanyId));
   const allBlastEligibleSelected = data.blastEligibleRecipients.length > 0 && data.blastEligibleRecipients.every((recipient) => selectedCustomerIds.includes(recipient.customerCompanyId));
   const selectedRecipientsForOverrides = selectedRecipients.slice(0, 50);
+  const sendableSelectedRecipients = useMemo(
+    () =>
+      selectedRecipients.filter((recipient) => {
+        const resolvedEmail = recipientEmailOverrides[recipient.customerCompanyId]?.trim() || recipient.recipientEmail || "";
+        return isValidEmail(resolvedEmail);
+      }),
+    [recipientEmailOverrides, selectedRecipients]
+  );
+  const skippedSelectedRecipientCount = selectedRecipients.length - sendableSelectedRecipients.length;
 
   function navigateToPage(nextPage: number) {
     const nextSearch = new URLSearchParams(searchParams.toString());
@@ -687,6 +696,11 @@ export function EmailRemindersWorkspace({
               <p className="mt-2">
                 The preview uses {sampleRecipient ? sampleRecipient.customerName : "the current template"} as a sample merge target.
               </p>
+              {skippedSelectedRecipientCount > 0 ? (
+                <p className="mt-2 text-amber-700">
+                  {skippedSelectedRecipientCount} selected customer{skippedSelectedRecipientCount === 1 ? "" : "s"} without a valid email will be skipped.
+                </p>
+              ) : null}
             </div>
 
             {selectedRecipients.length > 0 ? (
@@ -762,15 +776,21 @@ export function EmailRemindersWorkspace({
                   return;
                 }
 
-                const invalidRecipient = selectedRecipients.find((recipient) => {
-                  const resolvedEmail = getSendRecipientEmail(recipient);
-                  return !resolvedEmail || !isValidEmail(resolvedEmail);
+                const invalidOverride = Object.entries(recipientEmailOverrides).find(([customerCompanyId, email]) => {
+                  const selected = selectedCustomerIds.includes(customerCompanyId);
+                  const trimmedEmail = email.trim();
+                  return selected && trimmedEmail.length > 0 && !isValidEmail(trimmedEmail);
                 });
-                if (invalidRecipient) {
+                if (invalidOverride) {
+                  const invalidRecipient = allSelectableRecipientMap.get(invalidOverride[0]);
                   showToast({
-                    title: `Add a valid email for ${invalidRecipient.customerName}.`,
+                    title: `Add a valid email for ${invalidRecipient?.customerName ?? "the selected customer"}.`,
                     tone: "error"
                   });
+                  return;
+                }
+                if (sendableSelectedRecipients.length === 0) {
+                  showToast({ title: "Select at least one customer with a valid email.", tone: "error" });
                   return;
                 }
                 if (isSchedulingTemplate) {
@@ -791,7 +811,7 @@ export function EmailRemindersWorkspace({
                 startTransition(async () => {
                   const result = await sendAction({
                     dueMonth: data.filters.dueMonth,
-                    customerCompanyIds: selectedRecipients.map((recipient) => recipient.customerCompanyId),
+                    customerCompanyIds: sendableSelectedRecipients.map((recipient) => recipient.customerCompanyId),
                     recipientEmailOverrides: buildRecipientEmailOverridePayload(),
                     templateKey,
                     subject,
