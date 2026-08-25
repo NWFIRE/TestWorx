@@ -47,6 +47,7 @@ import {
   editableInspectionStatuses,
   updateInspectionBillingSourceType,
   updateInspection,
+  updateInspectionScheduledDate,
   updateInspectionStatus,
   reopenCompletedReportForCorrection,
   regenerateFinalizedReportPdf,
@@ -432,6 +433,59 @@ export async function updateInspectionAction(
       success: null,
       redirectTo: null,
       createdInspectionId: null
+    };
+  }
+}
+
+export async function updateInspectionScheduledDateAction(
+  _: { error: string | null; success: string | null },
+  formData: FormData
+) {
+  const session = await auth();
+  const inspectionId = String(formData.get("inspectionId") ?? "");
+  const scheduledStartValue = String(formData.get("scheduledStart") ?? "").trim();
+  const scheduledEndValue = String(formData.get("scheduledEnd") ?? "").trim();
+
+  if (!session?.user?.tenantId || !inspectionId) {
+    return { error: "Unauthorized", success: null };
+  }
+
+  if (!["tenant_admin", "office_admin"].includes(session.user.role)) {
+    return { error: "Only administrators can change inspection schedules.", success: null };
+  }
+
+  const scheduledStart = scheduledStartValue ? new Date(scheduledStartValue) : null;
+  const scheduledEnd = scheduledEndValue ? new Date(scheduledEndValue) : null;
+
+  if (!scheduledStart || Number.isNaN(scheduledStart.getTime())) {
+    return { error: "Choose a valid scheduled date.", success: null };
+  }
+
+  if (scheduledEndValue && (!scheduledEnd || Number.isNaN(scheduledEnd.getTime()))) {
+    return { error: "Choose a valid scheduled end time or leave it blank.", success: null };
+  }
+
+  try {
+    await updateInspectionScheduledDate(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      inspectionId,
+      { scheduledStart, scheduledEnd }
+    );
+
+    revalidatePath("/app/admin");
+    revalidatePath("/app/admin/dashboard");
+    revalidatePath("/app/admin/inspections");
+    revalidatePath("/app/admin/upcoming-inspections");
+    revalidatePath("/app/admin/reports");
+    revalidatePath("/app/admin/billing");
+    revalidatePath("/app/tech");
+    revalidatePath(`/app/admin/inspections/${inspectionId}`);
+
+    return { error: null, success: "Scheduled date updated." };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Unable to update scheduled date.",
+      success: null
     };
   }
 }

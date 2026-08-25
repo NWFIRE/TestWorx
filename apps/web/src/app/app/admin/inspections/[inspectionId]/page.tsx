@@ -23,7 +23,7 @@ import {
   isDueAtTimeOfServiceCustomer
 } from "@testworx/lib/server/index";
 
-import { deleteInspectionAction, regenerateCompletedReportPdfAction, reopenCompletedReportAction, updateInspectionAction, updateInspectionStatusAdminAction } from "../../actions";
+import { deleteInspectionAction, regenerateCompletedReportPdfAction, reopenCompletedReportAction, updateInspectionAction, updateInspectionScheduledDateAction, updateInspectionStatusAdminAction } from "../../actions";
 import { AdminReportDeleteButton } from "../../admin-report-delete-button";
 import { DeleteInspectionCard } from "../../delete-inspection-card";
 import { InspectionExternalDocumentsCard } from "../../inspection-external-documents-card";
@@ -31,6 +31,7 @@ import { InspectionCloseoutRequestActions } from "../../inspection-closeout-requ
 import { InspectionPdfUploadCard } from "../../inspection-pdf-upload-card";
 import { InspectionReportCorrectionsCard } from "../../inspection-report-corrections-card";
 import { InspectionReportTypeManagement } from "../../inspection-report-type-management";
+import { InspectionScheduleDateCard } from "../../inspection-schedule-date-card";
 import { InspectionSchedulerForm } from "../../inspection-scheduler-form";
 import { InspectionStatusUpdateCard } from "../../inspection-status-update-card";
 import { PriorityBadge, StatusBadge } from "../../operations-ui";
@@ -519,6 +520,15 @@ export default async function EditInspectionPage({
                 </div>
               </div>
             </div>
+            {!isReviewMode ? (
+              <InspectionScheduleDateCard
+                action={updateInspectionScheduledDateAction}
+                currentScheduledLabel={format(inspection.scheduledStart, "MMM d, yyyy h:mm a")}
+                inspectionId={inspection.id}
+                scheduledEnd={toDateTimeLocal(inspection.scheduledEnd)}
+                scheduledStart={toDateTimeLocal(inspection.scheduledStart)}
+              />
+            ) : null}
             {!isReviewMode ? (
               <details className="rounded-2xl border border-slate-200 p-5">
                 <summary className="cursor-pointer text-base font-semibold text-slate-950">Admin tools</summary>

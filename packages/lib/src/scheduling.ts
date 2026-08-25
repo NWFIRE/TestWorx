@@ -3315,6 +3315,134 @@ export async function updateInspection(actor: ActorContext, inspectionId: string
   });
 }
 
+export async function updateInspectionScheduledDate(
+  actor: ActorContext,
+  inspectionId: string,
+  input: { scheduledStart: Date; scheduledEnd?: Date | null }
+) {
+  const parsedActor = parseActor(actor);
+  if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
+    throw new Error("Only office administrators can change inspection schedules.");
+  }
+
+  if (!(input.scheduledStart instanceof Date) || Number.isNaN(input.scheduledStart.getTime())) {
+    throw new Error("Choose a valid scheduled date.");
+  }
+
+  if (input.scheduledEnd && input.scheduledEnd <= input.scheduledStart) {
+    throw new Error("Scheduled end must be after the scheduled start.");
+  }
+
+  const tenantId = parsedActor.tenantId as string;
+  const nextDueMonth = format(input.scheduledStart, "yyyy-MM");
+  const nextDueDayOrWindow = format(input.scheduledStart, "yyyy-MM-dd");
+
+  return prisma.$transaction(async (tx) => {
+    const inspection = await tx.inspection.findFirst({
+      where: { id: inspectionId, tenantId },
+      include: {
+        tasks: {
+          include: {
+            recurrence: true,
+            serviceSchedule: { select: { id: true } }
+          }
+        }
+      }
+    });
+
+    if (!inspection) {
+      throw new Error("Inspection not found.");
+    }
+
+    const previousScheduledStart = inspection.scheduledStart;
+    const previousScheduledEnd = inspection.scheduledEnd;
+    const existingDurationMs =
+      previousScheduledEnd && previousScheduledStart
+        ? Math.max(previousScheduledEnd.getTime() - previousScheduledStart.getTime(), 0)
+        : null;
+    const scheduledEnd = input.scheduledEnd !== undefined
+      ? input.scheduledEnd
+      : existingDurationMs === null
+        ? null
+        : new Date(input.scheduledStart.getTime() + existingDurationMs);
+
+    await tx.inspection.update({
+      where: { id: inspection.id },
+      data: {
+        scheduledStart: input.scheduledStart,
+        scheduledEnd
+      }
+    });
+
+    const canSyncServiceSchedules = await hasServiceScheduleInfrastructure(tx);
+
+    await Promise.all(
+      inspection.tasks.map(async (task) => {
+        const frequency = task.recurrence?.frequency ?? getDefaultInspectionRecurrenceFrequency(task.inspectionType);
+        const nextDueAt = nextDueFrom(input.scheduledStart, frequency);
+
+        await tx.inspectionTask.update({
+          where: { id: task.id },
+          data: {
+            dueMonth: nextDueMonth,
+            dueDate: input.scheduledStart
+          }
+        });
+
+        if (task.recurrence) {
+          await tx.inspectionRecurrence.update({
+            where: { id: task.recurrence.id },
+            data: {
+              anchorScheduledStart: input.scheduledStart,
+              nextDueAt
+            }
+          });
+        }
+
+        if (task.serviceScheduleId && canSyncServiceSchedules) {
+          await tx.serviceSchedule.updateMany({
+            where: {
+              id: task.serviceScheduleId,
+              tenantId
+            },
+            data: {
+              dueMonth: nextDueMonth,
+              dueDayOrWindow: nextDueDayOrWindow,
+              nextDueDate: nextDueAt
+            }
+          });
+        }
+      })
+    );
+
+    await createAuditLog(tx, {
+      tenantId,
+      actorUserId: parsedActor.userId,
+      action: "inspection.schedule_updated",
+      entityId: inspection.id,
+      metadata: {
+        previousScheduledStart: previousScheduledStart.toISOString(),
+        nextScheduledStart: input.scheduledStart.toISOString(),
+        previousScheduledEnd: previousScheduledEnd?.toISOString() ?? null,
+        nextScheduledEnd: scheduledEnd?.toISOString() ?? null,
+        syncedTaskDueMonth: nextDueMonth,
+        syncedServiceScheduleCount: inspection.tasks.filter((task) => task.serviceScheduleId).length
+      }
+    });
+
+    return tx.inspection.findUniqueOrThrow({
+      where: { id: inspection.id },
+      include: {
+        site: true,
+        customerCompany: true,
+        assignedTechnician: true,
+        technicianAssignments: { include: { technician: true } },
+        tasks: { include: { recurrence: true, serviceSchedule: true } }
+      }
+    });
+  });
+}
+
 export async function updateInspectionStatus(
   actor: ActorContext,
   inspectionId: string,
