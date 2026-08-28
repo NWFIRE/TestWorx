@@ -37,7 +37,7 @@ export function HeroSection() {
     <section className="pb-12 pt-10 md:pb-16 md:pt-14 xl:pb-[72px] xl:pt-16">
       <SectionContainer>
         <div className="grid grid-cols-12 items-start gap-10 xl:gap-12">
-          <div className="col-span-12 lg:col-span-4 2xl:pr-6">
+          <div className="col-span-12 2xl:col-span-4 2xl:pr-6">
             <Eyebrow className="text-slate-600">Built for modern fire protection teams</Eyebrow>
             <h1 className="mt-5 max-w-[13ch] text-[40px] font-extrabold leading-[0.98] tracking-[-0.05em] text-slate-950 md:text-[52px] xl:text-[60px] 2xl:text-[64px]">
               The operating system for fire inspection companies.
@@ -66,7 +66,7 @@ export function HeroSection() {
             </div>
           </div>
 
-          <div className="col-span-12 lg:col-span-8">
+          <div className="col-span-12 2xl:col-span-8">
             <div className="relative">
               <ScreenshotCard className="w-full max-w-none">
                 <div className="border-b border-slate-200 px-2 pb-6">
@@ -87,7 +87,7 @@ export function HeroSection() {
                   </div>
                 </div>
 
-                <div className="grid gap-5 pt-6 xl:grid-cols-[1.05fr_1.25fr_1fr]">
+                <div className="grid gap-5 pt-6 xl:grid-cols-2">
                   <section className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
                     <div className="flex items-center justify-between">
                       <div>
@@ -123,9 +123,9 @@ export function HeroSection() {
                           ["Priority service windows", "3 stops"],
                           ["Technician utilization", "87% scheduled"]
                         ].map(([label, value]) => (
-                          <div key={label} className="flex items-center justify-between text-sm">
+                          <div key={label} className="flex items-center justify-between gap-4 text-sm">
                             <span className="text-slate-600">{label}</span>
-                            <span className="font-semibold text-slate-950">{value}</span>
+                            <span className="shrink-0 text-right font-semibold text-slate-950">{value}</span>
                           </div>
                         ))}
                       </div>
@@ -141,12 +141,12 @@ export function HeroSection() {
                       <ClipboardCheck className="h-5 w-5 text-blue-600" />
                     </div>
                     <div className="mt-4 rounded-[22px] border border-slate-200 bg-slate-950 p-5 text-white">
-                      <div className="flex items-center justify-between">
-                        <div>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
                           <p className="max-w-[18rem] text-sm font-semibold leading-5">Wet Chemical System Acceptance Test</p>
                           <p className="mt-1 text-sm text-white/65">NFPA 17A (2024 Edition) • Hosted report ready</p>
                         </div>
-                        <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-200">
+                        <span className="shrink-0 rounded-full bg-emerald-400/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-200">
                           Finalized
                         </span>
                       </div>
@@ -163,16 +163,16 @@ export function HeroSection() {
                       </div>
                     </div>
 
-                    <div className="mt-4 grid gap-3 xl:grid-cols-2">
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       {[
                         ["Draft in field", "6 active report sessions"],
                         ["Waiting on signatures", "2 customer approvals"],
                         ["Posted today", "9 hosted reports available"],
                         ["Deficiencies captured", "17 open items"]
                       ].map(([label, value]) => (
-                        <div key={label} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                           <p className="text-sm text-slate-600">{label}</p>
-                          <p className="text-sm font-semibold text-slate-950">{value}</p>
+                          <p className="mt-1 text-sm font-semibold leading-5 text-slate-950">{value}</p>
                         </div>
                       ))}
                     </div>
@@ -190,7 +190,7 @@ export function HeroSection() {
                           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
                             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Summary</p>
                             <p className="mt-2 text-sm leading-6 text-slate-700">
-                              Customer-facing hosted report, premium PDF, and inspection packet are ready.
+                              Hosted report, premium PDF, and inspection packet are ready.
                             </p>
                           </div>
                           <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm">
@@ -224,7 +224,7 @@ export function HeroSection() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-semibold text-slate-950">Ready To Bill</p>
-                          <p className="mt-1 text-sm text-slate-500">Completed inspection ready for invoice review</p>
+                          <p className="mt-1 text-sm text-slate-500">Completed inspection ready for review</p>
                         </div>
                         <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700">
                           Review
@@ -238,7 +238,7 @@ export function HeroSection() {
                         ].map(([label, value]) => (
                           <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
-                            <p className="mt-2 text-sm font-semibold text-slate-950">{value}</p>
+                            <p className="mt-2 text-sm font-semibold leading-5 text-slate-950">{value}</p>
                           </div>
                         ))}
                       </div>
@@ -254,9 +254,9 @@ export function HeroSection() {
                           ["Needs pricing", "5"],
                           ["Awaiting pricing review", "2"]
                         ].map(([label, value]) => (
-                          <div key={label} className="flex items-center justify-between text-sm">
+                          <div key={label} className="flex items-center justify-between gap-4 text-sm">
                             <span className="text-slate-600">{label}</span>
-                            <span className="font-semibold text-slate-950">{value}</span>
+                            <span className="shrink-0 text-right font-semibold text-slate-950">{value}</span>
                           </div>
                         ))}
                       </div>
@@ -269,9 +269,9 @@ export function HeroSection() {
                           ["Grouping mode", "Per inspection"],
                           ["Last sync", "12 minutes ago"]
                         ].map(([label, value]) => (
-                          <div key={label} className="flex items-center justify-between text-sm">
+                          <div key={label} className="flex items-center justify-between gap-4 text-sm">
                             <span className="text-slate-600">{label}</span>
-                            <span className="font-semibold text-slate-950">{value}</span>
+                            <span className="shrink-0 text-right font-semibold text-slate-950">{value}</span>
                           </div>
                         ))}
                       </div>
