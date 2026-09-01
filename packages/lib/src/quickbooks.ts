@@ -2013,6 +2013,48 @@ async function tryResolveRuleBasedQuickBooksMapping(input: {
     return null;
   }
 
+  const normalizedCode = input.billingCode.trim().toUpperCase();
+  if (normalizedCode.startsWith("COMPLIANCE_REPORTING_FEE_")) {
+    const existingComplianceMapping = await prisma.quickBooksItemMap.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        integrationId: input.integrationId,
+        internalCode: { startsWith: "COMPLIANCE_REPORTING_FEE_" },
+        qbActive: true
+      },
+      orderBy: { updatedAt: "desc" }
+    });
+
+    if (existingComplianceMapping) {
+      const cachedMappedItem = await prisma.quickBooksItemCache.findUnique({
+        where: {
+          tenantId_integrationId_qbItemId: {
+            tenantId: input.tenantId,
+            integrationId: input.integrationId,
+            qbItemId: existingComplianceMapping.qbItemId
+          }
+        }
+      });
+
+      if (cachedMappedItem?.qbActive) {
+        await saveQuickBooksItemMapping({
+          tenantId: input.tenantId,
+          integrationId: input.integrationId,
+          internalCode: input.billingCode,
+          internalName: input.displayName,
+          qbItemId: cachedMappedItem.qbItemId,
+          matchSource: "rule"
+        });
+
+        return {
+          status: "mapped" as const,
+          qbItemId: cachedMappedItem.qbItemId,
+          qbItemName: cachedMappedItem.qbItemName
+        };
+      }
+    }
+  }
+
   const exactMatch = await prisma.quickBooksItemCache.findFirst({
     where: {
       tenantId: input.tenantId,

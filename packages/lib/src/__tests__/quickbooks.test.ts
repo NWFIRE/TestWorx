@@ -46,6 +46,7 @@ const prismaMock = {
     update: vi.fn()
   },
   quickBooksItemMap: {
+    findFirst: vi.fn(),
     findUnique: vi.fn(),
     findMany: vi.fn(),
     upsert: vi.fn(),
@@ -2276,6 +2277,82 @@ describe("quickbooks billing sync hardening", () => {
       create: expect.objectContaining({
         internalCode: "COMPLIANCE_REPORTING_FEE_KITCHEN_SUPPRESSION",
         internalName: "Compliance Reporting Fee",
+        qbItemId: "qb_compliance_item",
+        matchSource: "rule"
+      })
+    }));
+    const invoiceBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body ?? "{}"));
+    expect(invoiceBody.Line?.[0]?.SalesItemLineDetail?.ItemRef).toEqual({
+      value: "qb_compliance_item",
+      name: "Compliance Reporting Fee"
+    });
+  });
+
+  it("reuses an active compliance fee mapping for a newly assessed compliance division", async () => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: "qbo_customer_1" });
+    prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue({
+      ...buildBillingSummary(),
+      items: [
+        {
+          id: "item_compliance_fee_fire_extinguishers",
+          description: "Compliance Reporting Fee",
+          quantity: 1,
+          unitPrice: 18,
+          amount: 18,
+          unit: "ea",
+          category: "fee",
+          code: "COMPLIANCE_REPORTING_FEE_FIRE_EXTINGUISHERS"
+        }
+      ]
+    });
+    prismaMock.inspectionBillingSummary.update.mockResolvedValue(undefined);
+    prismaMock.quickBooksItemMap.findUnique.mockResolvedValue(null);
+    prismaMock.quickBooksItemMap.findFirst.mockResolvedValue({
+      id: "map_compliance_kitchen",
+      tenantId: "tenant_1",
+      integrationId: "realm_1",
+      internalCode: "COMPLIANCE_REPORTING_FEE_KITCHEN_SUPPRESSION",
+      internalName: "Compliance Reporting Fee",
+      qbItemId: "qb_compliance_item",
+      qbItemName: "Compliance Reporting Fee",
+      qbItemType: "Service",
+      qbSyncToken: "1",
+      qbActive: true,
+      matchSource: "manual",
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-01T00:00:00.000Z")
+    });
+    const complianceCacheItem = {
+      id: "cache_compliance_fee",
+      tenantId: "tenant_1",
+      integrationId: "realm_1",
+      qbItemId: "qb_compliance_item",
+      qbItemName: "Compliance Reporting Fee",
+      normalizedName: "compliance reporting fee",
+      qbItemType: "Service",
+      qbActive: true,
+      qbSyncToken: "1",
+      rawJson: {}
+    };
+    prismaMock.quickBooksItemCache.findUnique.mockResolvedValue(complianceCacheItem);
+    prismaMock.quickBooksCatalogItem.findFirst.mockResolvedValue({ taxable: false });
+
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ Customer: { Id: "qbo_customer_1", DisplayName: "Pinecrest Property Management", SyncToken: "0" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "invoice_1", DocNumber: "TW2026-1000" } }));
+
+    const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
+
+    await syncBillingSummaryToQuickBooks(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      "inspection_1"
+    );
+
+    expect(prismaMock.quickBooksItemMap.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({
+        internalCode: "COMPLIANCE_REPORTING_FEE_FIRE_EXTINGUISHERS",
         qbItemId: "qb_compliance_item",
         matchSource: "rule"
       })
