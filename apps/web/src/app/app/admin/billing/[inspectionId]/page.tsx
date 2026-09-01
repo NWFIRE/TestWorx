@@ -297,7 +297,7 @@ export default async function BillingSummaryDetailPage({
         summaryId={summary.id}
       />
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(34rem,0.95fr)_minmax(42rem,1.05fr)]">
+      <section className="grid min-w-0 gap-6 2xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
         <div className="space-y-6">
           {groupedEntries.map(([category, items]) => (
             <div key={category} className="rounded-[2rem] bg-white p-6 shadow-panel">

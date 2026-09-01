@@ -265,7 +265,7 @@ export default async function InspectionArchivePage({
           </div>
         ) : (
           <div className="mt-5 overflow-hidden rounded-[24px] border border-slate-200/80">
-            <div className="hidden grid-cols-[10rem_8rem_minmax(12rem,1fr)_minmax(12rem,1fr)_minmax(10rem,0.9fr)_minmax(10rem,0.9fr)_9rem_7rem_8rem_8rem] gap-4 bg-slate-50 px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 xl:grid">
+            <div className="hidden grid-cols-[8rem_7rem_minmax(9rem,1.15fr)_minmax(10rem,1.3fr)_minmax(8rem,1fr)_minmax(8rem,1fr)_minmax(7rem,0.8fr)_6rem_6rem_5.5rem] gap-4 bg-slate-50 px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 min-[1800px]:grid">
               <span>Completed</span>
               <span>Inspection #</span>
               <span>Customer</span>
@@ -279,39 +279,41 @@ export default async function InspectionArchivePage({
             </div>
             <div className="divide-y divide-slate-200/80">
               {data.inspections.map((inspection) => (
-                <div key={inspection.id} className="grid gap-4 px-5 py-5 xl:grid-cols-[10rem_8rem_minmax(12rem,1fr)_minmax(12rem,1fr)_minmax(10rem,0.9fr)_minmax(10rem,0.9fr)_9rem_7rem_8rem_8rem] xl:items-start">
+                <div key={inspection.id} className="grid gap-x-6 gap-y-5 px-5 py-5 md:grid-cols-2 2xl:grid-cols-3 min-[1800px]:grid-cols-[8rem_7rem_minmax(9rem,1.15fr)_minmax(10rem,1.3fr)_minmax(8rem,1fr)_minmax(8rem,1fr)_minmax(7rem,0.8fr)_6rem_6rem_5.5rem] min-[1800px]:items-start min-[1800px]:gap-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 xl:hidden">Completed</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 min-[1800px]:hidden">Completed</p>
                     <p className="text-sm font-semibold text-slate-950">{format(inspection.completedAt, "MMM d, yyyy")}</p>
                     <p className="mt-1 text-sm text-slate-500">{format(inspection.completedAt, "h:mm a")}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 xl:hidden">Inspection #</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 min-[1800px]:hidden">Inspection #</p>
                     <p className="text-sm font-semibold text-slate-950">{inspection.inspectionNumber}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 xl:hidden">Customer</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 min-[1800px]:hidden">Customer</p>
                     <p className="text-sm font-semibold text-slate-950">{inspection.customerName}</p>
                     {inspection.quoteNumber ? <p className="mt-1 text-sm text-slate-500">Quote {inspection.quoteNumber}</p> : null}
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 xl:hidden">Site</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 min-[1800px]:hidden">Site</p>
                     <p className="text-sm font-semibold text-slate-950">{inspection.siteName}</p>
                     <p className="mt-1 text-sm text-slate-500">{inspection.siteAddress}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 xl:hidden">Inspection type</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 min-[1800px]:hidden">Inspection type</p>
                     <p className="text-sm text-slate-700">{inspection.inspectionTypeLabels.join(", ")}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 xl:hidden">Division</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 min-[1800px]:hidden">Division</p>
                     <p className="text-sm text-slate-700">{inspection.divisions.map(formatDivisionLabel).join(", ")}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 xl:hidden">Technician</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 min-[1800px]:hidden">Technician</p>
                     <p className="text-sm text-slate-700">{inspection.technicianName}</p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 min-[1800px]:hidden">Result</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 min-[1800px]:mt-0">
                     <StatusBadge
                       label={inspection.resultStatus}
                       tone={getArchiveResultStatusTone({
@@ -319,12 +321,14 @@ export default async function InspectionArchivePage({
                         hasDeficiencies: inspection.hasDeficiencies
                       })}
                     />
+                    </div>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 xl:hidden">Report</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 min-[1800px]:hidden">Report</p>
                     <p className="text-sm text-slate-700">{inspection.hasReport ? `${inspection.reportCount} available` : "No report"}</p>
                   </div>
-                  <div className="flex items-start">
+                  <div className="flex items-start md:col-span-2 2xl:col-span-1 min-[1800px]:col-span-1">
+                    <span className="sr-only">Actions</span>
                     <Link
                       className="inline-flex rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                       href={`/app/admin/archive/${inspection.id}?from=${encodeURIComponent(buildArchiveHref({ ...currentParams, page: String(data.pagination.page) }))}`}
