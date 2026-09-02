@@ -74,6 +74,7 @@ type WorkspaceData = {
     customerName: string;
     recipientEmail: string | null;
     hasValidEmail: boolean;
+    successfulTemplateKeys: string[];
   }>;
   recipients: Array<{
     customerCompanyId: string;
@@ -277,6 +278,13 @@ export function EmailRemindersWorkspace({
   const allVisibleSelected = data.recipients.length > 0 && data.recipients.every((recipient) => selectedCustomerIds.includes(recipient.customerCompanyId));
   const allMatchingSelected = data.selectableRecipients.length > 0 && data.selectableRecipients.every((recipient) => selectedCustomerIds.includes(recipient.customerCompanyId));
   const allBlastEligibleSelected = data.blastEligibleRecipients.length > 0 && data.blastEligibleRecipients.every((recipient) => selectedCustomerIds.includes(recipient.customerCompanyId));
+  const recipientsNotSentActiveTemplate = useMemo(
+    () => data.blastEligibleRecipients.filter((recipient) => !recipient.successfulTemplateKeys.includes(templateKey)),
+    [data.blastEligibleRecipients, templateKey]
+  );
+  const allRecipientsNotSentActiveTemplateSelected =
+    recipientsNotSentActiveTemplate.length > 0 &&
+    recipientsNotSentActiveTemplate.every((recipient) => selectedCustomerIds.includes(recipient.customerCompanyId));
   const selectedRecipientsForOverrides = selectedRecipients.slice(0, 50);
   const sendableSelectedRecipients = useMemo(
     () =>
@@ -426,6 +434,32 @@ export function EmailRemindersWorkspace({
                 ) : null}
                 <button
                   className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
+                    recipientsNotSentActiveTemplate.length === 0
+                      ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+                      : allRecipientsNotSentActiveTemplateSelected
+                        ? "border-blue-300 bg-blue-50 text-blue-800"
+                        : "border-[color:var(--border-default)] bg-white text-[color:var(--text-secondary)] hover:border-blue-300 hover:text-blue-800"
+                  }`}
+                  disabled={recipientsNotSentActiveTemplate.length === 0}
+                  onClick={() => {
+                    const unsentIds = recipientsNotSentActiveTemplate.map((recipient) => recipient.customerCompanyId);
+                    setSelectedCustomerIds((current) => {
+                      if (allRecipientsNotSentActiveTemplateSelected) {
+                        return current.filter((customerCompanyId) => !unsentIds.includes(customerCompanyId));
+                      }
+                      return [...new Set([...current, ...unsentIds])];
+                    });
+                  }}
+                  type="button"
+                >
+                  {recipientsNotSentActiveTemplate.length === 0
+                    ? "Everyone has been sent this email"
+                    : allRecipientsNotSentActiveTemplateSelected
+                      ? "Clear customers not sent this email"
+                      : `Select customers not sent this email (${recipientsNotSentActiveTemplate.length})`}
+                </button>
+                <button
+                  className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
                     allBlastEligibleSelected
                       ? "border-emerald-300 bg-emerald-50 text-emerald-800"
                       : "border-[color:var(--border-default)] bg-white text-[color:var(--text-secondary)] hover:border-emerald-300 hover:text-emerald-800"
@@ -563,6 +597,8 @@ export function EmailRemindersWorkspace({
                 onChange={(event) => {
                   const nextTemplate = data.templates.find((template) => template.key === event.target.value);
                   setTemplateKey(event.target.value);
+                  setSelectedCustomerIds([]);
+                  setRecipientEmailOverrides({});
                   if (nextTemplate) {
                     setSubject(nextTemplate.subject);
                     setBody(nextTemplate.body);

@@ -265,7 +265,12 @@ describe("email reminders", () => {
     prismaMock.emailReminderSendLog.findMany
       .mockResolvedValueOnce([{ customerCompanyId: "customer_sent" }])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([]);
+      .mockResolvedValueOnce([
+        {
+          customerCompanyId: "customer_active_email",
+          templateKey: "pye_barker_acquisition_announcement"
+        }
+      ]);
     prismaMock.tenant.findFirst.mockResolvedValue({
       id: "tenant_1",
       name: "Northwest Fire & Safety",
@@ -312,7 +317,8 @@ describe("email reminders", () => {
         customerCompanyId: "customer_active_email",
         customerName: "Active Email Customer",
         recipientEmail: "alex@example.test",
-        hasValidEmail: true
+        hasValidEmail: true,
+        successfulTemplateKeys: ["pye_barker_acquisition_announcement"]
       }
     ]);
   });
@@ -402,13 +408,15 @@ describe("email reminders", () => {
         customerCompanyId: "customer_contact",
         customerName: "Contact Email Customer",
         recipientEmail: "casey@example.test",
-        hasValidEmail: true
+        hasValidEmail: true,
+        successfulTemplateKeys: []
       },
       {
         customerCompanyId: "customer_billing",
         customerName: "Billing Fallback Customer",
         recipientEmail: "billing-fallback@example.test",
-        hasValidEmail: true
+        hasValidEmail: true,
+        successfulTemplateKeys: []
       }
     ]);
   });

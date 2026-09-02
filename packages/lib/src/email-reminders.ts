@@ -740,11 +740,16 @@ export async function getEmailReminderWorkspaceData(
   let scopedCustomerCompanyIds = requestedCustomerCompanyIds.length > 0 ? requestedCustomerCompanyIds : undefined;
 
   if (!query && !scopedCustomerCompanyIds) {
-    const previouslyEmailedCustomers = await prisma.emailReminderSendLog.findMany({
-      where: { tenantId },
+    const previouslyEmailedCustomers = (await prisma.emailReminderSendLog.findMany({
+      where: {
+        tenantId,
+        messageId: { not: null },
+        providerReason: "sent",
+        providerError: null
+      },
       distinct: ["customerCompanyId"],
       select: { customerCompanyId: true }
-    });
+    })) ?? [];
     scopedCustomerCompanyIds = uniqueStrings(previouslyEmailedCustomers.map((entry) => entry.customerCompanyId));
     if (scopedCustomerCompanyIds.length === 0) {
       scopedCustomerCompanyIds = ["__no_previous_email_recipients__"];
@@ -767,17 +772,20 @@ export async function getEmailReminderWorkspaceData(
 
   const customerIds = uniqueStrings(customers.map((customer) => customer.id));
   const logs = customerIds.length
-    ? await prisma.emailReminderSendLog.findMany({
+    ? (await prisma.emailReminderSendLog.findMany({
         where: {
           tenantId,
-          customerCompanyId: { in: customerIds }
+          customerCompanyId: { in: customerIds },
+          messageId: { not: null },
+          providerReason: "sent",
+          providerError: null
         },
         orderBy: { sentAt: "desc" },
         select: {
           customerCompanyId: true,
           sentAt: true
         }
-      })
+      })) ?? []
     : [];
   const lastSentByCustomerId = new Map<string, Date>();
   for (const log of logs) {
@@ -798,6 +806,29 @@ export async function getEmailReminderWorkspaceData(
     hasValidEmail: "yes",
     activeOnly: true
   });
+  const activeCustomerIds = activeCustomersWithEmail.map((customer) => customer.id);
+  const successfulTemplateSendLogs = activeCustomerIds.length
+    ? (await prisma.emailReminderSendLog.findMany({
+        where: {
+          tenantId,
+          customerCompanyId: { in: activeCustomerIds },
+          messageId: { not: null },
+          providerReason: "sent",
+          providerError: null
+        },
+        distinct: ["customerCompanyId", "templateKey"],
+        select: {
+          customerCompanyId: true,
+          templateKey: true
+        }
+      })) ?? []
+    : [];
+  const successfulTemplateKeysByCustomerId = new Map<string, Set<string>>();
+  for (const log of successfulTemplateSendLogs) {
+    const templateKeys = successfulTemplateKeysByCustomerId.get(log.customerCompanyId) ?? new Set<string>();
+    templateKeys.add(log.templateKey);
+    successfulTemplateKeysByCustomerId.set(log.customerCompanyId, templateKeys);
+  }
   const pagedRecipients = allRecipients.slice((page - 1) * emailReminderPageSize, page * emailReminderPageSize);
   const tenant = await prisma.tenant.findFirst({
     where: { id: tenantId },
@@ -818,7 +849,7 @@ export async function getEmailReminderWorkspaceData(
     branding: tenant.branding,
     billingEmail: tenant.billingEmail
   });
-  const history = await prisma.emailReminderSendLog.findMany({
+  const history = (await prisma.emailReminderSendLog.findMany({
     where: { tenantId },
     orderBy: { sentAt: "desc" },
     take: 8,
@@ -826,7 +857,7 @@ export async function getEmailReminderWorkspaceData(
       customerCompany: { select: { name: true } },
       sentBy: { select: { name: true } }
     }
-  });
+  })) ?? [];
 
   return {
     tenantName: tenant.name,
@@ -897,7 +928,8 @@ export async function getEmailReminderWorkspaceData(
           customerCompanyId: customer.id,
           customerName: customer.name,
           recipientEmail,
-          hasValidEmail: Boolean(recipientEmail)
+          hasValidEmail: Boolean(recipientEmail),
+          successfulTemplateKeys: [...(successfulTemplateKeysByCustomerId.get(customer.id) ?? [])]
         };
       })
       .filter((recipient) => recipient.hasValidEmail),
