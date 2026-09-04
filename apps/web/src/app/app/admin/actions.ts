@@ -349,6 +349,8 @@ export async function deleteInspectionAction(
 ) {
   const session = await auth();
   const inspectionId = String(formData.get("inspectionId") ?? "");
+  const requestedScope = String(formData.get("deleteScope") ?? "single");
+  const deleteScope = requestedScope === "future" ? "future" : "single";
   const redirectTo = resolveInspectionDeleteRedirectTarget(String(formData.get("redirectTo") ?? ""));
 
   if (!session?.user?.tenantId || !inspectionId) {
@@ -358,7 +360,8 @@ export async function deleteInspectionAction(
   try {
     await deleteInspection(
       { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-      inspectionId
+      inspectionId,
+      deleteScope
     );
 
     revalidatePath("/app/admin");
@@ -369,7 +372,13 @@ export async function deleteInspectionAction(
     revalidatePath("/app/tech");
     revalidatePath("/app/customer");
 
-    return { error: null, success: "Inspection deleted successfully.", redirectTo };
+    return {
+      error: null,
+      success: deleteScope === "future"
+        ? "Inspection and future recurring inspections deleted successfully."
+        : "Inspection deleted successfully.",
+      redirectTo
+    };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Unable to delete inspection.",

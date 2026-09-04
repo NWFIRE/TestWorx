@@ -15,6 +15,7 @@ export function FastInspectionDeleteButton({
   action,
   customerLabel,
   inspectionId,
+  hasRecurrence = false,
   redirectTo
 }: {
   action: (
@@ -23,28 +24,39 @@ export function FastInspectionDeleteButton({
   ) => Promise<{ error: string | null; success: string | null; redirectTo: string | null }>;
   customerLabel: string;
   inspectionId: string;
+  hasRecurrence?: boolean;
   redirectTo: string;
 }) {
   const [state, setState] = useState(initialState);
   const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
-  const { confirm, dialog } = useConfirmDialog();
+  const { confirm, choose, dialog } = useConfirmDialog();
 
   const handleDelete = async () => {
     if (isDeleting) {
       return;
     }
 
-    const confirmed = await confirm({
-      eyebrow: "Danger zone",
-      title: "Delete inspection?",
-      description: `This permanently deletes the inspection for ${customerLabel}. Owned reports, attachments, signatures, deficiencies, and inspection documents are removed with it. This cannot be undone.`,
-      confirmLabel: "Delete inspection",
-      cancelLabel: "Cancel",
-      variant: "danger"
-    });
+    const deleteChoice = hasRecurrence
+      ? await choose({
+          eyebrow: "Recurring inspection",
+          title: "How much should be deleted?",
+          description: `Delete only this scheduled inspection for ${customerLabel}, or delete it together with all future inspections in the same recurrence. Past inspections will not be removed.`,
+          confirmLabel: "Delete this and all future",
+          alternateLabel: "Delete only this inspection",
+          cancelLabel: "Cancel",
+          variant: "danger"
+        })
+      : await confirm({
+          eyebrow: "Danger zone",
+          title: "Delete inspection?",
+          description: `This permanently deletes the inspection for ${customerLabel}. Owned reports, attachments, signatures, deficiencies, and inspection documents are removed with it. This cannot be undone.`,
+          confirmLabel: "Delete inspection",
+          cancelLabel: "Cancel",
+          variant: "danger"
+        }).then((confirmed) => confirmed ? "alternate" as const : "cancel" as const);
 
-    if (!confirmed) {
+    if (deleteChoice === "cancel") {
       return;
     }
 
@@ -55,6 +67,7 @@ export function FastInspectionDeleteButton({
       const formData = new FormData();
       formData.set("inspectionId", inspectionId);
       formData.set("redirectTo", redirectTo);
+      formData.set("deleteScope", deleteChoice === "confirm" ? "future" : "single");
 
       const result = await action(initialState, formData);
       setState(result);

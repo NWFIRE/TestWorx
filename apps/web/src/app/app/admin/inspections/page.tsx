@@ -573,6 +573,7 @@ export default async function AdminInspectionsPage({
                           <FastInspectionDeleteButton
                             action={deleteInspectionAction}
                             customerLabel={customerLabel}
+                            hasRecurrence={inspection.tasks.some((task) => task.recurrence && task.recurrence.frequency !== "ONCE")}
                             inspectionId={inspection.id}
                             redirectTo={currentPath}
                           />

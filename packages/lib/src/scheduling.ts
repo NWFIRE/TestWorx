@@ -2001,7 +2001,76 @@ export async function createOneTimeInspectionSite(
   });
 }
 
-export async function deleteInspection(actor: ActorContext, inspectionId: string) {
+export type InspectionDeleteScope = "single" | "future";
+
+const inspectionDeletionInclude = {
+  customerCompany: { select: { name: true } },
+  site: { select: { name: true } },
+  amendments: { select: { id: true } },
+  replacementAmendments: { select: { id: true } },
+  billingSummary: {
+    select: {
+      id: true,
+      status: true,
+      quickbooksInvoiceId: true,
+      quickbooksSyncStatus: true
+    }
+  },
+  tasks: {
+    select: {
+      id: true,
+      serviceScheduleId: true,
+      recurrence: {
+        select: {
+          frequency: true,
+          seriesId: true
+        }
+      }
+    }
+  },
+  attachments: {
+    select: {
+      id: true,
+      storageKey: true
+    }
+  },
+  reports: {
+    select: {
+      id: true,
+      attachments: {
+        select: {
+          id: true,
+          storageKey: true
+        }
+      },
+      signatures: {
+        select: {
+          id: true,
+          imageDataUrl: true
+        }
+      },
+      deficiencies: {
+        select: {
+          id: true,
+          photoStorageKey: true
+        }
+      }
+    }
+  },
+  documents: {
+    select: {
+      id: true,
+      originalStorageKey: true,
+      signedStorageKey: true
+    }
+  }
+} satisfies Prisma.InspectionInclude;
+
+export async function deleteInspection(
+  actor: ActorContext,
+  inspectionId: string,
+  scope: InspectionDeleteScope = "single"
+) {
   const parsedActor = parseActor(actor);
   if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
     throw new Error("Only office administrators can delete inspections.");
@@ -2011,71 +2080,82 @@ export async function deleteInspection(actor: ActorContext, inspectionId: string
 
   const inspection = await prisma.inspection.findFirst({
     where: { id: inspectionId, tenantId },
-    include: {
-      customerCompany: { select: { name: true } },
-      site: { select: { name: true } },
-      amendments: { select: { id: true } },
-      replacementAmendments: { select: { id: true } },
-      billingSummary: {
-        select: {
-          id: true,
-          status: true,
-          quickbooksInvoiceId: true,
-          quickbooksSyncStatus: true
-        }
-      },
-      attachments: {
-        select: {
-          id: true,
-          storageKey: true
-        }
-      },
-      reports: {
-        select: {
-          id: true,
-          attachments: {
-            select: {
-              id: true,
-              storageKey: true
-            }
-          },
-          signatures: {
-            select: {
-              id: true,
-              imageDataUrl: true
-            }
-          },
-          deficiencies: {
-            select: {
-              id: true,
-              photoStorageKey: true
-            }
-          }
-        }
-      },
-      documents: {
-        select: {
-          id: true,
-          originalStorageKey: true,
-          signedStorageKey: true
-        }
-      }
-    }
+    include: inspectionDeletionInclude
   });
 
   if (!inspection) {
     throw new Error("Inspection not found.");
   }
 
-  const blockedReason = inspection.amendments.length > 0 || inspection.replacementAmendments.length > 0
-    ? "This inspection is linked to amendment history and cannot be deleted."
-    : hasRiskyInspectionAccountingState({
-        billingStatus: inspection.billingSummary?.status,
-        quickbooksInvoiceId: inspection.billingSummary?.quickbooksInvoiceId,
-        quickbooksSyncStatus: inspection.billingSummary?.quickbooksSyncStatus
+  const recurringSeriesIds = [...new Set(
+    inspection.tasks
+      .filter((task) => task.recurrence && task.recurrence.frequency !== RecurrenceFrequency.ONCE)
+      .map((task) => task.recurrence?.seriesId)
+      .filter((value): value is string => Boolean(value))
+  )];
+  const recurringServiceScheduleIds = [...new Set(
+    inspection.tasks
+      .filter((task) => task.recurrence && task.recurrence.frequency !== RecurrenceFrequency.ONCE)
+      .map((task) => task.serviceScheduleId)
+      .filter((value): value is string => Boolean(value))
+  )];
+  const futureInspections = scope === "future" && (recurringSeriesIds.length > 0 || recurringServiceScheduleIds.length > 0)
+    ? await prisma.inspection.findMany({
+        where: {
+          tenantId,
+          id: { not: inspectionId },
+          scheduledStart: { gte: inspection.scheduledStart },
+          tasks: {
+            some: {
+              OR: [
+                ...(recurringSeriesIds.length > 0
+                  ? [{ recurrence: { is: { seriesId: { in: recurringSeriesIds } } } }]
+                  : []),
+                ...(recurringServiceScheduleIds.length > 0
+                  ? [{ serviceScheduleId: { in: recurringServiceScheduleIds } }]
+                  : [])
+              ]
+            }
+          }
+        },
+        include: inspectionDeletionInclude,
+        orderBy: { scheduledStart: "asc" }
       })
-      ? "This inspection has invoicing or QuickBooks history and cannot be deleted."
-      : null;
+    : [];
+  const recurringSeriesIdSet = new Set(recurringSeriesIds);
+  const recurringServiceScheduleIdSet = new Set(recurringServiceScheduleIds);
+  const mixedFutureInspection = futureInspections.find((futureInspection) =>
+    futureInspection.tasks.some((task) => {
+      const matchesSeries = task.recurrence?.seriesId
+        ? recurringSeriesIdSet.has(task.recurrence.seriesId)
+        : false;
+      const matchesSchedule = task.serviceScheduleId
+        ? recurringServiceScheduleIdSet.has(task.serviceScheduleId)
+        : false;
+      return !matchesSeries && !matchesSchedule;
+    })
+  );
+  if (mixedFutureInspection) {
+    throw new Error(
+      "A future recurring visit also contains unrelated services. Edit that visit separately before deleting this recurrence."
+    );
+  }
+
+  const inspectionsToDelete = [inspection, ...futureInspections];
+  const blockedInspection = inspectionsToDelete.find((candidate) =>
+    candidate.amendments.length > 0 ||
+    candidate.replacementAmendments.length > 0 ||
+    hasRiskyInspectionAccountingState({
+      billingStatus: candidate.billingSummary?.status,
+      quickbooksInvoiceId: candidate.billingSummary?.quickbooksInvoiceId,
+      quickbooksSyncStatus: candidate.billingSummary?.quickbooksSyncStatus
+    })
+  );
+  const blockedReason = blockedInspection
+    ? blockedInspection.amendments.length > 0 || blockedInspection.replacementAmendments.length > 0
+      ? "This inspection or a future occurrence is linked to amendment history and cannot be deleted."
+      : "This inspection or a future occurrence has invoicing or QuickBooks history and cannot be deleted."
+    : null;
 
   if (blockedReason) {
     await prisma.auditLog.create({
@@ -2096,21 +2176,23 @@ export async function deleteInspection(actor: ActorContext, inspectionId: string
     throw new Error(blockedReason);
   }
 
+  const inspectionIds = inspectionsToDelete.map((candidate) => candidate.id);
+  const reports = inspectionsToDelete.flatMap((candidate) => candidate.reports);
   const storageKeys = [
-    ...inspection.attachments.map((attachment) => attachment.storageKey),
-    ...inspection.reports.flatMap((report) => [
+    ...inspectionsToDelete.flatMap((candidate) => candidate.attachments.map((attachment) => attachment.storageKey)),
+    ...reports.flatMap((report) => [
       ...report.attachments.map((attachment) => attachment.storageKey),
       ...report.signatures.map((signature) => signature.imageDataUrl),
       ...report.deficiencies.map((deficiency) => deficiency.photoStorageKey).filter((key): key is string => Boolean(key))
     ]),
-    ...inspection.documents.flatMap((document) => [
+    ...inspectionsToDelete.flatMap((candidate) => candidate.documents).flatMap((document) => [
       document.originalStorageKey,
       document.signedStorageKey
     ].filter((key): key is string => Boolean(key)))
   ];
 
   await prisma.$transaction(async (tx) => {
-    const reportIds = inspection.reports.map((report) => report.id);
+    const reportIds = reports.map((report) => report.id);
 
     if (reportIds.length) {
       await tx.reportCorrectionEvent.deleteMany({
@@ -2122,7 +2204,7 @@ export async function deleteInspection(actor: ActorContext, inspectionId: string
       where: {
         tenantId,
         OR: [
-          { inspectionId },
+          { inspectionId: { in: inspectionIds } },
           { inspectionReportId: { in: reportIds } }
         ]
       }
@@ -2131,43 +2213,54 @@ export async function deleteInspection(actor: ActorContext, inspectionId: string
       where: { tenantId, inspectionReportId: { in: reportIds } }
     });
     await tx.deficiency.deleteMany({
-      where: { tenantId, inspectionId }
+      where: { tenantId, inspectionId: { in: inspectionIds } }
     });
     await tx.inspectionDocument.deleteMany({
-      where: { tenantId, inspectionId }
+      where: { tenantId, inspectionId: { in: inspectionIds } }
     });
     await tx.inspectionReport.deleteMany({
-      where: { tenantId, inspectionId }
+      where: { tenantId, inspectionId: { in: inspectionIds } }
     });
     await tx.inspectionRecurrence.deleteMany({
-      where: { tenantId, inspectionTask: { inspectionId } }
+      where: { tenantId, inspectionTask: { inspectionId: { in: inspectionIds } } }
     });
     await tx.inspectionTask.deleteMany({
-      where: { tenantId, inspectionId }
+      where: { tenantId, inspectionId: { in: inspectionIds } }
     });
     await tx.inspectionTechnicianAssignment.deleteMany({
-      where: { tenantId, inspectionId }
+      where: { tenantId, inspectionId: { in: inspectionIds } }
     });
     await tx.inspectionBillingSummary.deleteMany({
-      where: { tenantId, inspectionId }
+      where: { tenantId, inspectionId: { in: inspectionIds } }
     });
-    await tx.inspection.delete({
-      where: { id: inspectionId }
-    });
+    if (scope === "future" && recurringServiceScheduleIds.length > 0) {
+      await tx.serviceSchedule.updateMany({
+        where: { tenantId, id: { in: recurringServiceScheduleIds } },
+        data: { isActive: false }
+      });
+    }
+    for (const candidateId of inspectionIds) {
+      await tx.inspection.delete({
+        where: { id: candidateId }
+      });
+    }
 
     await createAuditLog(tx, {
       tenantId,
       actorUserId: parsedActor.userId,
-      action: "inspection.deleted",
+      action: scope === "future" ? "inspection.series_deleted" : "inspection.deleted",
       entityId: inspectionId,
       metadata: {
         customerName: inspection.customerCompany.name,
         siteName: inspection.site.name,
-        deletedReportCount: inspection.reports.length,
-        deletedDocumentCount: inspection.documents.length,
-        deletedAttachmentCount: inspection.attachments.length + inspection.reports.reduce((count, report) => count + report.attachments.length, 0),
-        deletedSignatureCount: inspection.reports.reduce((count, report) => count + report.signatures.length, 0),
-        deletedDeficiencyCount: inspection.reports.reduce((count, report) => count + report.deficiencies.length, 0)
+        scope,
+        deletedInspectionCount: inspectionIds.length,
+        deactivatedServiceScheduleCount: scope === "future" ? recurringServiceScheduleIds.length : 0,
+        deletedReportCount: reports.length,
+        deletedDocumentCount: inspectionsToDelete.reduce((count, candidate) => count + candidate.documents.length, 0),
+        deletedAttachmentCount: inspectionsToDelete.reduce((count, candidate) => count + candidate.attachments.length, 0) + reports.reduce((count, report) => count + report.attachments.length, 0),
+        deletedSignatureCount: reports.reduce((count, report) => count + report.signatures.length, 0),
+        deletedDeficiencyCount: reports.reduce((count, report) => count + report.deficiencies.length, 0)
       }
     });
   });

@@ -8,14 +8,17 @@ export type ConfirmDialogOptions = {
   title: string;
   description: string;
   confirmLabel?: string;
+  alternateLabel?: string;
   cancelLabel?: string;
   eyebrow?: string;
   details?: Array<{ label: string; value: string | null | undefined }>;
   variant?: ConfirmDialogVariant;
 };
 
+export type ConfirmDialogChoice = "confirm" | "alternate" | "cancel";
+
 type PendingConfirmation = ConfirmDialogOptions & {
-  resolve: (value: boolean) => void;
+  resolve: (value: ConfirmDialogChoice) => void;
 };
 
 function variantClasses(variant: ConfirmDialogVariant) {
@@ -23,17 +26,20 @@ function variantClasses(variant: ConfirmDialogVariant) {
     case "danger":
       return {
         badge: "border-rose-200 bg-rose-50 text-rose-700",
-        confirm: "bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-200"
+        confirm: "bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-200",
+        alternate: "border-rose-200 bg-white text-rose-700 hover:bg-rose-50 focus:ring-rose-100"
       };
     case "warning":
       return {
         badge: "border-amber-200 bg-amber-50 text-amber-700",
-        confirm: "bg-amber-600 text-white hover:bg-amber-700 focus:ring-amber-200"
+        confirm: "bg-amber-600 text-white hover:bg-amber-700 focus:ring-amber-200",
+        alternate: "border-amber-200 bg-white text-amber-700 hover:bg-amber-50 focus:ring-amber-100"
       };
     default:
       return {
         badge: "border-blue-100 bg-blue-50 text-blue-700",
-        confirm: "bg-slateblue text-white hover:brightness-110 focus:ring-blue-200"
+        confirm: "bg-slateblue text-white hover:brightness-110 focus:ring-blue-200",
+        alternate: "border-blue-200 bg-white text-blue-700 hover:bg-blue-50 focus:ring-blue-100"
       };
   }
 }
@@ -43,16 +49,21 @@ export function useConfirmDialog() {
   const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
   const dialogPanelRef = useRef<HTMLDivElement | null>(null);
 
-  const close = useCallback((confirmed: boolean) => {
+  const close = useCallback((choice: ConfirmDialogChoice) => {
     setPendingConfirmation((current) => {
-      current?.resolve(confirmed);
+      current?.resolve(choice);
       return null;
     });
   }, []);
 
-  const confirm = useCallback((options: ConfirmDialogOptions) => new Promise<boolean>((resolve) => {
+  const choose = useCallback((options: ConfirmDialogOptions) => new Promise<ConfirmDialogChoice>((resolve) => {
     setPendingConfirmation({ ...options, resolve });
   }), []);
+
+  const confirm = useCallback(
+    async (options: ConfirmDialogOptions) => (await choose(options)) === "confirm",
+    [choose]
+  );
 
   useEffect(() => {
     if (!pendingConfirmation) {
@@ -66,11 +77,11 @@ export function useConfirmDialog() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        close(false);
+        close("cancel");
       }
       if (event.key === "Enter") {
         event.preventDefault();
-        close(true);
+        close("confirm");
       }
       if (event.key === "Tab") {
         const focusable = dialogPanelRef.current?.querySelectorAll<HTMLElement>(
@@ -107,7 +118,7 @@ export function useConfirmDialog() {
       className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm animate-in fade-in duration-150"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
-          close(false);
+          close("cancel");
         }
       }}
       role="dialog"
@@ -125,7 +136,7 @@ export function useConfirmDialog() {
           <button
             aria-label="Close confirmation"
             className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-xl leading-none text-slate-500 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-blue-100"
-            onClick={() => close(false)}
+            onClick={() => close("cancel")}
             type="button"
           >
             x
@@ -149,15 +160,24 @@ export function useConfirmDialog() {
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button
             className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100"
-            onClick={() => close(false)}
+            onClick={() => close("cancel")}
             ref={cancelButtonRef}
             type="button"
           >
             {pendingConfirmation.cancelLabel ?? "Cancel"}
           </button>
+          {pendingConfirmation.alternateLabel ? (
+            <button
+              className={`inline-flex min-h-12 items-center justify-center rounded-2xl border px-5 py-3 text-sm font-semibold transition focus:outline-none focus:ring-4 ${variantClasses(pendingConfirmation.variant ?? "default").alternate}`}
+              onClick={() => close("alternate")}
+              type="button"
+            >
+              {pendingConfirmation.alternateLabel}
+            </button>
+          ) : null}
           <button
             className={`inline-flex min-h-12 items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold transition focus:outline-none focus:ring-4 ${variantClasses(pendingConfirmation.variant ?? "default").confirm}`}
-            onClick={() => close(true)}
+            onClick={() => close("confirm")}
             type="button"
           >
             {pendingConfirmation.confirmLabel ?? "Confirm"}
@@ -167,5 +187,5 @@ export function useConfirmDialog() {
     </div>
   ) : null;
 
-  return { confirm, dialog };
+  return { confirm, choose, dialog };
 }

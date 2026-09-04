@@ -621,7 +621,12 @@ export default async function EditInspectionPage({
               <details className="rounded-2xl border border-rose-100 p-5">
                 <summary className="cursor-pointer text-base font-semibold text-rose-700">Danger zone</summary>
                 <div className="mt-5 border-t border-rose-100 pt-5">
-                  <DeleteInspectionCard action={deleteInspectionAction} inspectionId={inspection.id} redirectTo={originPath} />
+                  <DeleteInspectionCard
+                    action={deleteInspectionAction}
+                    hasRecurrence={inspectionView.tasks.some((task) => task.recurrence && task.recurrence.frequency !== "ONCE")}
+                    inspectionId={inspection.id}
+                    redirectTo={originPath}
+                  />
                 </div>
               </details>
             ) : null}

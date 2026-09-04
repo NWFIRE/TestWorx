@@ -15,6 +15,7 @@ export function DeleteInspectionCard({
   action,
   inspectionId,
   redirectTo,
+  hasRecurrence = false,
   disabled = false
 }: {
   action: (
@@ -23,13 +24,15 @@ export function DeleteInspectionCard({
   ) => Promise<{ error: string | null; success: string | null; redirectTo: string | null }>;
   inspectionId: string;
   redirectTo?: string | null;
+  hasRecurrence?: boolean;
   disabled?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const formRef = useRef<HTMLFormElement | null>(null);
   const confirmedSubmitRef = useRef(false);
+  const deleteScopeRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
-  const { confirm, dialog } = useConfirmDialog();
+  const { confirm, choose, dialog } = useConfirmDialog();
 
   useEffect(() => {
     if (state.success) {
@@ -45,15 +48,28 @@ export function DeleteInspectionCard({
       onSubmit={async (event) => {
         if (!confirmedSubmitRef.current) {
           event.preventDefault();
-          const confirmed = await confirm({
-            eyebrow: "Danger zone",
-            title: "Delete inspection?",
-            description: "This permanently deletes the inspection and all owned report records, attachments, signatures, deficiencies, and inspection documents. This cannot be undone.",
-            confirmLabel: "Delete inspection",
-            cancelLabel: "Cancel",
-            variant: "danger"
-          });
-          if (confirmed) {
+          const deleteScope = hasRecurrence
+            ? await choose({
+                eyebrow: "Recurring inspection",
+                title: "How much should be deleted?",
+                description: "Delete only this scheduled inspection, or delete it together with all future inspections in the same recurrence. Past inspections will not be removed.",
+                confirmLabel: "Delete this and all future",
+                alternateLabel: "Delete only this inspection",
+                cancelLabel: "Cancel",
+                variant: "danger"
+              })
+            : await confirm({
+                eyebrow: "Danger zone",
+                title: "Delete inspection?",
+                description: "This permanently deletes the inspection and all owned report records, attachments, signatures, deficiencies, and inspection documents. This cannot be undone.",
+                confirmLabel: "Delete inspection",
+                cancelLabel: "Cancel",
+                variant: "danger"
+              }).then((confirmed) => confirmed ? "alternate" as const : "cancel" as const);
+          if (deleteScope !== "cancel") {
+            if (deleteScopeRef.current) {
+              deleteScopeRef.current.value = deleteScope === "confirm" ? "future" : "single";
+            }
             confirmedSubmitRef.current = true;
             formRef.current?.requestSubmit();
           }
@@ -63,6 +79,7 @@ export function DeleteInspectionCard({
       }}
     >
       <input name="inspectionId" type="hidden" value={inspectionId} />
+      <input defaultValue="single" name="deleteScope" ref={deleteScopeRef} type="hidden" />
       <input name="redirectTo" type="hidden" value={redirectTo ?? ""} />
       <p className="text-sm uppercase tracking-[0.25em] text-rose-700">Danger zone</p>
       <h3 className="mt-2 text-2xl font-semibold text-ink">Delete inspection</h3>
