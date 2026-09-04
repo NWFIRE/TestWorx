@@ -16,7 +16,6 @@ import {
 import {
   AppPageShell,
   EmptyState,
-  FilterBar,
   FilterChipLink,
   KPIStatCard,
   PageHeader,
@@ -268,11 +267,10 @@ export default async function AdminBillingPage({
         />
       </section>
 
-      <FilterBar
-        defaultOpen={selectedStatus !== "all" || selectedSort !== "newest"}
-        description="Ready To Bill shows summaries that still need billing action. Use Invoiced for completed QuickBooks history."
-        title="Queue filters"
-      >
+      <SectionCard>
+        <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">
+          Queue filters
+        </p>
         <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap gap-2">
             {statusOptions.map((option) => (
@@ -298,7 +296,7 @@ export default async function AdminBillingPage({
             />
           </div>
         </div>
-      </FilterBar>
+      </SectionCard>
 
       <SummaryQueueSection
         ctaLabel={selectedStatus === "invoiced" ? "View invoice detail" : "Review billing"}
