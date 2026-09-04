@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useTransition } from "react";
+import { useEffect, useState } from "react";
 
 type Option = {
   value: string;
@@ -24,7 +24,11 @@ export function LiveUrlSelectFilter({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [, startTransition] = useTransition();
+  const [selectedValue, setSelectedValue] = useState(value);
+
+  useEffect(() => {
+    setSelectedValue(value);
+  }, [value]);
 
   return (
     <select
@@ -32,10 +36,11 @@ export function LiveUrlSelectFilter({
         className ??
         "h-12 w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-slateblue"
       }
-      defaultValue={value}
+      value={selectedValue}
       onChange={(event) => {
         const nextSearch = new URLSearchParams(searchParams.toString());
         const nextValue = event.target.value.trim();
+        setSelectedValue(nextValue);
 
         if (nextValue) {
           nextSearch.set(paramKey, nextValue);
@@ -48,9 +53,7 @@ export function LiveUrlSelectFilter({
         }
 
         const nextUrl = nextSearch.toString() ? `${pathname}?${nextSearch.toString()}` : pathname;
-        startTransition(() => {
-          router.replace(nextUrl, { scroll: false });
-        });
+        router.replace(nextUrl, { scroll: false });
       }}
     >
       {options.map((option) => (
