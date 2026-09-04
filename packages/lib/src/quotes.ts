@@ -24,6 +24,7 @@ import { buildQuoteEmailDefaultMessage, buildQuoteEmailSubject } from "./quote-e
 import { getDefaultQuoteExpirationDate } from "./quote-terms";
 import { inspectionTypeRegistry } from "./report-config";
 import { generateQuotePdf } from "./quote-pdf";
+import { resolveQuoteLineItemCategory } from "./quote-presentation";
 import { resolveServiceFeeForLocationTx } from "./service-fees";
 import {
   resolveQuickBooksItemForBilling,
@@ -819,30 +820,12 @@ function resolveQuickBooksQuoteCatalogCategory(item: {
   itemType: string;
   sku?: string | null;
 }) {
-  const normalizedItemType = item.itemType.trim().toLowerCase();
-  const searchText = [item.name, item.sku, item.itemType].filter(Boolean).join(" ").toLowerCase();
-
-  if (normalizedItemType.includes("service")) {
-    return "service";
-  }
-
-  if (/(labor|technician|hourly|man ?hour)/i.test(searchText)) {
-    return "labor";
-  }
-
-  if (/(fee|permit|design|submittal|compliance|filing)/i.test(searchText)) {
-    return autoQuoteServiceFeeCategory;
-  }
-
-  if (normalizedItemType.includes("inventory") && !normalizedItemType.includes("noninventory")) {
-    return "material";
-  }
-
-  if (/(part|parts|material|materials|equipment|device|panel|detector|strobe|horn|module|valve|pump|battery|cylinder|cartridge|link|cap|nozzle)/i.test(searchText)) {
-    return "material";
-  }
-
-  return "service";
+  const category = resolveQuoteLineItemCategory({
+    title: item.name,
+    description: item.sku,
+    itemType: item.itemType
+  });
+  return category === "fee" ? autoQuoteServiceFeeCategory : category;
 }
 
 function resolveDirectQuickBooksItemId(code: string) {

@@ -7,6 +7,7 @@ type QuotePresentationLineItemInput = {
   unitPrice?: number;
   total?: number;
   id?: string;
+  itemType?: string | null;
 };
 
 const quoteProposalTypeLabels = {
@@ -51,6 +52,52 @@ function normalizeQuoteCategory(value: string | null | undefined) {
   return normalizeOptionalText(value)?.toLowerCase().replace(/[\s-]+/g, "_") ?? null;
 }
 
+export function resolveQuoteLineItemCategory(line: QuotePresentationLineItemInput) {
+  const category = normalizeQuoteCategory(line.category);
+  const haystack = [line.title, line.description, line.internalCode, line.itemType]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (/(permit|design|submittal|plan review|compliance|reporting fee|service fee|filing|\bfee\b)/i.test(haystack)) {
+    return "fee" as const;
+  }
+
+  if (/(labor|technician|hourly|man ?hour|installation|\binstall\b|programming|startup|commissioning|training|\bdemo\b)/i.test(haystack)) {
+    return "labor" as const;
+  }
+
+  const isInspectionService = /\binspection\b/i.test(haystack)
+    && !/(inspection\s+(tag|label|sticker|kit)|(?:tag|label|sticker|kit)\s+for\s+inspection)/i.test(haystack);
+  if (isInspectionService || /\b(service call|preventive maintenance|annual testing|system testing|certification|hood cleaning|exhaust cleaning)\b/i.test(haystack)) {
+    return "service" as const;
+  }
+
+  if (/(fusible\s+link|pull station|sprinkler head|strobe|horn|detector|module|device|panel|valve|pump|extinguisher|battery|cylinder|cartridge|nozzle|equipment|replacement part|material|\bsign\b|\blight\b)/i.test(haystack)) {
+    return "material" as const;
+  }
+
+  if (["fee", "service_fee", "permit", "design", "submittal"].includes(category ?? "")) {
+    return "fee" as const;
+  }
+  if (category === "labor") {
+    return "labor" as const;
+  }
+  if (["material", "materials", "part", "parts", "inventory", "equipment", "replacement"].includes(category ?? "")) {
+    return "material" as const;
+  }
+  if (["inspection", "service", "repair", "maintenance", "noninventory", "other"].includes(category ?? "")) {
+    return "service" as const;
+  }
+
+  const itemType = normalizeQuoteCategory(line.itemType);
+  if (itemType === "inventory") {
+    return "material" as const;
+  }
+
+  return "service" as const;
+}
+
 export function getCustomerFacingQuoteDescription(description: string | null | undefined) {
   const normalized = normalizeOptionalText(description);
   if (!normalized) {
@@ -72,39 +119,16 @@ export function getCustomerFacingQuoteDescription(description: string | null | u
 }
 
 function inferLineGroup(line: QuotePresentationLineItemInput): QuotePresentationLineItem["group"] {
-  const category = normalizeQuoteCategory(line.category);
-  if (category) {
-    if (["fee", "service_fee", "permit", "design", "submittal"].includes(category)) {
-      return "Permits / Design / Fees";
-    }
-
-    if (["labor"].includes(category)) {
-      return "Labor";
-    }
-
-    if (["material", "materials", "part", "parts", "inventory", "equipment", "replacement"].includes(category)) {
-      return "Materials / Equipment";
-    }
-
-    if (["inspection", "service", "repair", "maintenance", "noninventory", "other"].includes(category)) {
-      return "Services";
-    }
-  }
-
-  const haystack = [line.title, line.description, line.internalCode].filter(Boolean).join(" ").toLowerCase();
-
-  if (/(permit|design|submittal|plan review|compliance|reporting fee|fee|filing)/i.test(haystack)) {
+  const category = resolveQuoteLineItemCategory(line);
+  if (category === "fee") {
     return "Permits / Design / Fees";
   }
-
-  if (/(labor|installation|install|programming|startup|commissioning|training|demo|testing labor)/i.test(haystack)) {
+  if (category === "labor") {
     return "Labor";
   }
-
-  if (/(panel|pull station|strobe|horn|detector|module|device|extinguisher|sprinkler|valve|pump|hood|suppression|battery|material|equipment|sign|light)/i.test(haystack)) {
+  if (category === "material") {
     return "Materials / Equipment";
   }
-
   return "Services";
 }
 

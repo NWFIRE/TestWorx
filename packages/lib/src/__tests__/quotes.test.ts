@@ -687,7 +687,7 @@ describe("quotes", () => {
         quickbooksItemId: "qb_service_1",
         name: "Fire Extinguisher Annual Inspection",
         sku: "FE-ANNUAL",
-        itemType: "NonInventory",
+        itemType: "Service",
         unitPrice: 12,
         taxable: false
       },
@@ -695,7 +695,7 @@ describe("quotes", () => {
         quickbooksItemId: "qb_material_1",
         name: "Fusible Link 360",
         sku: "LINK-360",
-        itemType: "NonInventory",
+        itemType: "Service",
         unitPrice: 7.7,
         taxable: true
       }
@@ -751,6 +751,26 @@ describe("quotes", () => {
         items: [expect.objectContaining({ id: "material_1" })]
       })
     ]);
+  });
+
+  it("corrects conflicting legacy categories using clear service and material names", () => {
+    const grouped = groupQuotePresentationLineItems(buildQuotePresentationLineItems([
+      { id: "link", title: "Fusible Link - 280 - 500", category: "service" },
+      { id: "backflow", title: "Backflow Inspection", category: "material" },
+      { id: "alarm", title: "Fire Alarm - Annual Inspection", category: "material" },
+      { id: "kitchen", title: "Kitchen Suppression Inspection", category: "material" },
+      { id: "extinguisher", title: "Annual Inspection - Fire Extinguisher", category: "material" },
+      { id: "sprinkler", title: "Sprinkler - Annual Inspection (WET)", category: "material" }
+    ]));
+
+    expect(grouped.find((group) => group.title === "Services")?.items.map((item) => item.id)).toEqual([
+      "backflow",
+      "alarm",
+      "kitchen",
+      "extinguisher",
+      "sprinkler"
+    ]);
+    expect(grouped.find((group) => group.title === "Materials / Equipment")?.items.map((item) => item.id)).toEqual(["link"]);
   });
 
   it("saves a quote line item QuickBooks mapping and persists the chosen qb item id", async () => {
