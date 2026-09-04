@@ -5,6 +5,48 @@ export type BillingQueueSummaryLike = {
   } | null;
 };
 
+export const billingQueueSortOptions = ["newest", "oldest", "alphabetical"] as const;
+export type BillingQueueSort = (typeof billingQueueSortOptions)[number];
+
+type SortableBillingQueueSummary = {
+  id: string;
+  customerName: string;
+  siteName?: string | null;
+  inspectionDate: Date | string;
+};
+
+export function sortBillingSummaries<TSummary extends SortableBillingQueueSummary>(
+  summaries: TSummary[],
+  sort: BillingQueueSort
+) {
+  const compareNames = (left: string, right: string) =>
+    left.localeCompare(right, undefined, { sensitivity: "base", numeric: true });
+  const compareDates = (left: Date | string, right: Date | string) =>
+    new Date(left).getTime() - new Date(right).getTime();
+
+  return [...summaries].sort((left, right) => {
+    if (sort === "alphabetical") {
+      return (
+        compareNames(left.customerName, right.customerName) ||
+        compareNames(left.siteName ?? "", right.siteName ?? "") ||
+        compareDates(right.inspectionDate, left.inspectionDate) ||
+        compareNames(left.id, right.id)
+      );
+    }
+
+    const dateOrder = sort === "oldest"
+      ? compareDates(left.inspectionDate, right.inspectionDate)
+      : compareDates(right.inspectionDate, left.inspectionDate);
+
+    return (
+      dateOrder ||
+      compareNames(left.customerName, right.customerName) ||
+      compareNames(left.siteName ?? "", right.siteName ?? "") ||
+      compareNames(left.id, right.id)
+    );
+  });
+}
+
 export function isOpenBillingQueueStatus(status: string | null | undefined) {
   return status !== "invoiced";
 }

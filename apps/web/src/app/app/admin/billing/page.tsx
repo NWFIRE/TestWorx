@@ -3,7 +3,15 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { filterBillingSummariesForQueue, getAdminBillingSummaries, isOpenBillingQueueStatus } from "@testworx/lib/server/index";
+import { LiveUrlSelectFilter } from "@/app/live-url-select-filter";
+import {
+  billingQueueSortOptions,
+  filterBillingSummariesForQueue,
+  getAdminBillingSummaries,
+  isOpenBillingQueueStatus,
+  sortBillingSummaries,
+  type BillingQueueSort
+} from "@testworx/lib/server/index";
 
 import {
   AppPageShell,
@@ -30,6 +38,12 @@ const statusOptions = [
   { value: "invoiced", label: "Invoiced" }
 ] as const;
 
+const sortOptions = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "alphabetical", label: "Customer A-Z" }
+] as const;
+
 function normalizeBillingStatus(status?: string) {
   if (status === "ready") {
     return "reviewed";
@@ -37,8 +51,16 @@ function normalizeBillingStatus(status?: string) {
   return status;
 }
 
-function buildBillingHref(status?: string) {
-  return status && status !== "all" ? `/app/admin/billing?status=${status}` : "/app/admin/billing";
+function buildBillingHref(status: string | undefined, sort: BillingQueueSort) {
+  const params = new URLSearchParams();
+  if (status && status !== "all") {
+    params.set("status", status);
+  }
+  if (sort !== "newest") {
+    params.set("sort", sort);
+  }
+  const query = params.toString();
+  return query ? `/app/admin/billing?${query}` : "/app/admin/billing";
 }
 
 function formatBillingSummaryStatus(status: string) {
@@ -164,7 +186,7 @@ function SummaryQueueSection({
 export default async function AdminBillingPage({
   searchParams
 }: {
-  searchParams?: Promise<{ status?: string }>;
+  searchParams?: Promise<{ status?: string; sort?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -180,6 +202,9 @@ export default async function AdminBillingPage({
     requestedStatus && statusOptions.some((option) => option.value === requestedStatus)
       ? requestedStatus
       : "all";
+  const selectedSort: BillingQueueSort = billingQueueSortOptions.includes(params.sort as BillingQueueSort)
+    ? (params.sort as BillingQueueSort)
+    : "newest";
 
   const summaries = await getAdminBillingSummaries({
     userId: session.user.id,
@@ -188,7 +213,11 @@ export default async function AdminBillingPage({
   });
   const openSummaries = summaries.filter((summary: AdminBillingSummary) => isOpenBillingQueueStatus(summary.status));
   const invoicedSummaries = summaries.filter((summary: AdminBillingSummary) => summary.status === "invoiced");
-  const filteredSummaries = filterBillingSummariesForQueue(summaries, selectedStatus);
+  const filteredSummaries = sortBillingSummaries(
+    filterBillingSummariesForQueue(summaries, selectedStatus),
+    selectedSort
+  );
+  const sortedInvoicedSummaries = sortBillingSummaries(invoicedSummaries, selectedSort);
 
   return (
     <AppPageShell>
@@ -211,21 +240,21 @@ export default async function AdminBillingPage({
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KPIStatCard
-          href={buildBillingHref()}
+          href={buildBillingHref(undefined, selectedSort)}
           label="Ready To Bill"
           note="Completed, finalized work ready for billing follow-through."
           tone="blue"
           value={openSummaries.length}
         />
         <KPIStatCard
-          href={buildBillingHref("needs_pricing")}
+          href={buildBillingHref("needs_pricing", selectedSort)}
           label="Needs setup"
           note="Ready-to-bill summaries that need QuickBooks billing setup before sync."
           tone="amber"
           value={openSummaries.filter((summary) => summary.metrics.missingPriceCount > 0).length}
         />
         <KPIStatCard
-          href={buildBillingHref("invoiced")}
+          href={buildBillingHref("invoiced", selectedSort)}
           label="Invoiced"
           note="Archived summaries already moved through invoicing."
           tone="emerald"
@@ -240,19 +269,35 @@ export default async function AdminBillingPage({
       </section>
 
       <FilterBar
-        defaultOpen={selectedStatus !== "all"}
+        defaultOpen={selectedStatus !== "all" || selectedSort !== "newest"}
         description="Ready To Bill shows summaries that still need billing action. Use Invoiced for completed QuickBooks history."
         title="Queue filters"
       >
-        {statusOptions.map((option) => (
-          <FilterChipLink
-            active={selectedStatus === option.value}
-            href={buildBillingHref(option.value)}
-            key={option.value}
-            label={option.label}
-            tone="emerald"
-          />
-        ))}
+        <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {statusOptions.map((option) => (
+              <FilterChipLink
+                active={selectedStatus === option.value}
+                href={buildBillingHref(option.value, selectedSort)}
+                key={option.value}
+                label={option.label}
+                tone="emerald"
+              />
+            ))}
+          </div>
+          <div className="w-full lg:w-56">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Sort by
+            </p>
+            <LiveUrlSelectFilter
+              className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-900 outline-none transition focus:border-slateblue"
+              options={[...sortOptions]}
+              paramKey="sort"
+              resetPageKeys={[]}
+              value={selectedSort}
+            />
+          </div>
+        </div>
       </FilterBar>
 
       <SummaryQueueSection
@@ -270,7 +315,7 @@ export default async function AdminBillingPage({
           description="Completed billing summaries already marked invoiced."
           emptyText="No inspections have been marked invoiced yet."
           emptyTitle="No invoiced summaries yet"
-          summaries={invoicedSummaries}
+          summaries={sortedInvoicedSummaries}
           title="Invoiced archive"
         />
       ) : null}

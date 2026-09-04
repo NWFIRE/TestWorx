@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { filterBillingSummariesForQueue, isOpenBillingQueueStatus } from "../billing-queue";
+import { filterBillingSummariesForQueue, isOpenBillingQueueStatus, sortBillingSummaries } from "../billing-queue";
 
 describe("billing queue filtering", () => {
   const summaries = [
@@ -34,5 +34,18 @@ describe("billing queue filtering", () => {
     expect(filterBillingSummariesForQueue(summaries, "invoiced").map((summary) => summary.id)).toEqual([
       "invoice_1"
     ]);
+  });
+
+  it("sorts summaries by newest, oldest, or customer name without mutating the source", () => {
+    const source = [
+      { id: "2", customerName: "Zulu Fire", siteName: "Main", inspectionDate: new Date("2026-06-01T12:00:00Z") },
+      { id: "1", customerName: "Alpha Safety", siteName: "West", inspectionDate: new Date("2026-08-01T12:00:00Z") },
+      { id: "3", customerName: "Bravo Systems", siteName: "East", inspectionDate: new Date("2026-07-01T12:00:00Z") }
+    ];
+
+    expect(sortBillingSummaries(source, "newest").map((summary) => summary.id)).toEqual(["1", "3", "2"]);
+    expect(sortBillingSummaries(source, "oldest").map((summary) => summary.id)).toEqual(["2", "3", "1"]);
+    expect(sortBillingSummaries(source, "alphabetical").map((summary) => summary.id)).toEqual(["1", "3", "2"]);
+    expect(source.map((summary) => summary.id)).toEqual(["2", "1", "3"]);
   });
 });
