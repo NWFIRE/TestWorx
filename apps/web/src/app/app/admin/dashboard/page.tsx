@@ -21,7 +21,7 @@ import {
   getAdminDashboardData,
   getAdminBillingSummaries,
   getAdminDeficiencyDashboardData,
-  getAdminFieldServiceRequests,
+  getPendingFieldServiceRequestCount,
   getAdminSchedulingQueueData,
   getInspectionStatusTone,
   isDueAtTimeOfServiceCustomer,
@@ -279,7 +279,7 @@ export default async function AdminDashboardPage({
       actor,
       { status: "open" }
     ),
-    getAdminFieldServiceRequests(actor)
+    getPendingFieldServiceRequestCount(actor)
   ]);
   const params = searchParams ? await searchParams : {};
   const inspectionNotice = Array.isArray(params.inspection)
@@ -291,7 +291,7 @@ export default async function AdminDashboardPage({
   const dashboardOperationalInspections = filterSubsetDuplicateOperationalInspections(schedulingQueueData.inspections);
   const openInspectionCount = dashboardOperationalInspections.length;
   const readyToBillSummaryCount = billingSummaries.filter((summary) => isOpenBillingQueueStatus(summary.status)).length;
-  const alerts = buildAlertItems(data, readyToBillSummaryCount, fieldRequests.counts.pending, inspectionNotice);
+  const alerts = buildAlertItems(data, readyToBillSummaryCount, fieldRequests, inspectionNotice);
   const complianceFlags = deficiencyData.deficiencies.filter(
     (deficiency) => deficiency.severity === "high" || deficiency.severity === "critical"
   ).length;
@@ -550,7 +550,7 @@ export default async function AdminDashboardPage({
                     ))
                   )}
                 </div>
-                {fieldRequests.counts.pending > 0 ? <Link className="mt-4 inline-flex min-h-10 items-center rounded-xl border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-900" href="/app/admin/service-requests">Review field requests</Link> : null}
+                {fieldRequests > 0 ? <Link className="mt-4 inline-flex min-h-10 items-center rounded-xl border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-900" href="/app/admin/service-requests">Review field requests</Link> : null}
               </SectionCard>
 
               <section className="rounded-[28px] border border-slate-200/80 bg-[#0f172a] p-5 text-white shadow-[0_16px_44px_rgba(15,23,42,0.14)] lg:p-6">

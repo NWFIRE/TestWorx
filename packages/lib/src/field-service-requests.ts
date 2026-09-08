@@ -14,10 +14,11 @@ import { assertTenantContext } from "./permissions";
 const officeRoles = new Set(["tenant_admin", "office_admin", "platform_admin"]);
 
 function optionalText(max: number) {
-  return z.string().trim().max(max).optional().transform((value) => value || null);
+  return z.string().trim().max(max).nullish().transform((value) => value || null);
 }
 
 export const fieldServiceRequestSchema = z.object({
+  submissionId: z.string().uuid().optional(),
   customerCompanyId: z.string().trim().min(1, "Select a customer."),
   siteId: optionalText(191),
   requestType: z.nativeEnum(FieldServiceRequestType),
@@ -84,7 +85,7 @@ export async function getFieldServiceRequestFormData(actor: ActorContext) {
 export async function createFieldServiceRequest(actor: ActorContext, input: unknown) {
   const parsed = parseActor(actor);
   if (parsed.role !== "technician") throw new Error("Only technicians can submit field requests.");
-  const values = fieldServiceRequestSchema.parse(input);
+  const { submissionId, ...values } = fieldServiceRequestSchema.parse(input);
 
   const customer = await prisma.customerCompany.findFirst({
     where: { id: values.customerCompanyId, tenantId: parsed.tenantId, isActive: true },
@@ -93,9 +94,10 @@ export async function createFieldServiceRequest(actor: ActorContext, input: unkn
   if (!customer) throw new Error("That customer is not available in this workspace.");
   if (values.siteId && customer.sites.length === 0) throw new Error("That site does not belong to the selected customer.");
 
-  return prisma.$transaction(async (tx) => {
+  try {
+    return await prisma.$transaction(async (tx) => {
     const request = await tx.fieldServiceRequest.create({
-      data: { tenantId: parsed.tenantId, requestedByUserId: parsed.userId, ...values }
+      data: { ...(submissionId ? { id: submissionId } : {}), tenantId: parsed.tenantId, requestedByUserId: parsed.userId, ...values }
     });
     await tx.auditLog.create({
       data: {
@@ -108,7 +110,23 @@ export async function createFieldServiceRequest(actor: ActorContext, input: unkn
       }
     });
     return request;
-  });
+    });
+  } catch (error) {
+    // A retry after a lost response must return the saved request, not create another.
+    if (submissionId && error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const saved = await prisma.fieldServiceRequest.findFirst({
+        where: { id: submissionId, tenantId: parsed.tenantId, requestedByUserId: parsed.userId }
+      });
+      if (saved) return saved;
+    }
+    throw error;
+  }
+}
+
+export async function getPendingFieldServiceRequestCount(actor: ActorContext) {
+  const parsed = parseActor(actor);
+  if (!officeRoles.has(parsed.role)) throw new Error("Only office users can review field requests.");
+  return prisma.fieldServiceRequest.count({ where: { tenantId: parsed.tenantId, status: "pending" } });
 }
 
 export async function getAdminFieldServiceRequests(actor: ActorContext) {
@@ -141,24 +159,27 @@ export async function reviewFieldServiceRequest(actor: ActorContext, input: unkn
   const parsed = parseActor(actor);
   if (!officeRoles.has(parsed.role)) throw new Error("Only office users can review field requests.");
   const values = fieldServiceRequestReviewSchema.parse(input);
-  const existing = await prisma.fieldServiceRequest.findFirst({ where: { id: values.requestId, tenantId: parsed.tenantId }, select: { id: true, status: true } });
+  const existing = await prisma.fieldServiceRequest.findFirst({ where: { id: values.requestId, tenantId: parsed.tenantId }, select: { id: true, status: true, adminNote: true, updatedAt: true } });
   if (!existing) throw new Error("Field request not found.");
+  if (existing.status === values.status && existing.adminNote === values.adminNote) return existing;
+  if (existing.status === "resolved" || existing.status === "declined") throw new Error("This request has already been closed. Refresh to see the latest office update.");
 
   return prisma.$transaction(async (tx) => {
-    const request = await tx.fieldServiceRequest.update({
-      where: { id: existing.id },
+    const updated = await tx.fieldServiceRequest.updateMany({
+      where: { id: existing.id, tenantId: parsed.tenantId, updatedAt: existing.updatedAt, status: existing.status },
       data: { status: values.status, adminNote: values.adminNote, reviewedByUserId: parsed.userId, reviewedAt: new Date() }
     });
+    if (updated.count !== 1) throw new Error("This request changed while you were reviewing it. Refresh before trying again.");
     await tx.auditLog.create({
       data: {
         tenantId: parsed.tenantId,
         actorUserId: parsed.userId,
         action: "field_service_request.reviewed",
         entityType: "FieldServiceRequest",
-        entityId: request.id,
+        entityId: existing.id,
         metadata: { previousStatus: existing.status, status: values.status } satisfies Prisma.InputJsonValue
       }
     });
-    return request;
+    return { id: existing.id, status: values.status };
   });
 }

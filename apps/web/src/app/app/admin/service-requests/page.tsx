@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { fieldServiceRequestStatusLabels, fieldServiceRequestTypeLabels, getAdminFieldServiceRequests } from "@testworx/lib/server/index";
 import { AppPageShell, KPIStatCard, PageHeader, SectionCard } from "../operations-ui";
-import { reviewFieldServiceRequestAction } from "./actions";
+import { RequestReviewForm } from "./review-form";
 
 export default async function AdminServiceRequestsPage() {
   const session = await auth();
@@ -36,12 +36,12 @@ export default async function AdminServiceRequestsPage() {
                   {request.preferredTiming ? <p className="mt-3 text-sm text-slate-600"><span className="font-semibold">Preferred timing:</span> {request.preferredTiming}</p> : null}
                   <p className="mt-4 text-xs font-medium text-slate-500">Submitted by {request.requestedBy.name} · {new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: data.timezone }).format(request.createdAt)}</p>
                 </div>
-                <form action={reviewFieldServiceRequestAction} className="w-full space-y-3 rounded-2xl border border-slate-200 bg-white p-4 xl:max-w-sm">
+                <RequestReviewForm>
                   <input name="requestId" type="hidden" value={request.id} />
                   <label className="block text-sm font-semibold text-slate-700">Office note<textarea className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" defaultValue={request.adminNote ?? ""} name="adminNote" placeholder="Next step, assignment, or disposition" /></label>
                   <div className="grid grid-cols-3 gap-2"><button className="min-h-11 rounded-xl border border-blue-200 bg-blue-50 px-2 text-xs font-semibold text-blue-800" name="status" type="submit" value="acknowledged">Acknowledge</button><button className="min-h-11 rounded-xl bg-emerald-700 px-2 text-xs font-semibold text-white" name="status" type="submit" value="resolved">Resolve</button><button className="min-h-11 rounded-xl border border-slate-200 px-2 text-xs font-semibold text-slate-700" name="status" type="submit" value="declined">Decline</button></div>
-                  <Link className="flex min-h-11 items-center justify-center rounded-xl border border-slate-200 text-sm font-semibold text-slate-700" href={`/app/admin/inspections?customerCompanyId=${encodeURIComponent(request.customerCompanyId)}${request.siteId ? `&siteId=${encodeURIComponent(request.siteId)}` : ""}`}>Create scheduled work</Link>
-                </form>
+                  <Link className="flex min-h-11 items-center justify-center rounded-xl border border-slate-200 text-sm font-semibold text-slate-700" href={`/app/admin/inspections?create=1&customerCompanyId=${encodeURIComponent(request.customerCompanyId)}${request.siteId ? `&siteId=${encodeURIComponent(request.siteId)}` : ""}`}>Create scheduled work</Link>
+                </RequestReviewForm>
               </div>
             </article>
           )) : <div className="rounded-[24px] border border-dashed border-emerald-300 bg-emerald-50/60 p-7 text-center"><p className="font-semibold text-emerald-900">The field request queue is clear.</p><p className="mt-1 text-sm text-emerald-700">New technician requests will appear here automatically.</p></div>}

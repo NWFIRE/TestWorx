@@ -1,7 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { useRef, useState } from "react";
 import { submitFieldRequestAction, type FieldRequestActionState } from "./actions";
 
 type CustomerOption = {
@@ -13,18 +12,45 @@ type CustomerOption = {
 const initialState: FieldRequestActionState = { ok: false, message: "" };
 const fieldClass = "min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base text-slate-950 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100";
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ pending }: { pending: boolean }) {
   return <button className="min-h-14 w-full rounded-2xl bg-blue-700 px-5 text-base font-semibold text-white shadow-[0_12px_26px_rgba(29,78,216,0.22)] transition hover:bg-blue-800 disabled:cursor-wait disabled:opacity-70" disabled={pending} type="submit">{pending ? "Sending request..." : "Send to office"}</button>;
 }
 
 export function FieldRequestForm({ customers }: { customers: CustomerOption[] }) {
-  const [state, action] = useActionState(submitFieldRequestAction, initialState);
+  const [state, setState] = useState(initialState);
+  const [pending, setPending] = useState(false);
+  const submitting = useRef(false);
+  const submissionId = useRef<string | null>(null);
   const [customerId, setCustomerId] = useState("");
   const selectedCustomer = customers.find((customer) => customer.id === customerId);
 
   return (
-    <form action={action} className="space-y-5">
+    <form className="space-y-5" onSubmit={async (event) => {
+      event.preventDefault();
+      if (submitting.current) return;
+      const form = event.currentTarget;
+      const data = new FormData(form);
+      submissionId.current ??= crypto.randomUUID();
+      data.set("submissionId", submissionId.current);
+      submitting.current = true;
+      setPending(true);
+      setState(initialState);
+      try {
+        const result = await submitFieldRequestAction(initialState, data);
+        setState(result);
+        if (result.ok) {
+          form.reset();
+          setCustomerId("");
+          submissionId.current = null;
+        }
+      } catch {
+        setState({ ok: false, message: "Connection interrupted. Your details are still here. Please try again." });
+      } finally {
+        submitting.current = false;
+        setPending(false);
+      }
+    }}>
+      <fieldset disabled={pending} className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="space-y-2 text-sm font-semibold text-slate-700">
           Customer
@@ -35,7 +61,7 @@ export function FieldRequestForm({ customers }: { customers: CustomerOption[] })
         </label>
         <label className="space-y-2 text-sm font-semibold text-slate-700">
           Site or location
-          <select className={fieldClass} disabled={!selectedCustomer?.sites.length} name="siteId">
+          <select key={customerId} defaultValue="" className={fieldClass} disabled={!selectedCustomer?.sites.length} name="siteId">
             <option value="">{selectedCustomer?.sites.length ? "Select site (optional)" : "No saved sites"}</option>
             {selectedCustomer?.sites.map((site) => <option key={site.id} value={site.id}>{site.name} - {site.addressLine1}, {site.city}</option>)}
           </select>
@@ -77,7 +103,8 @@ export function FieldRequestForm({ customers }: { customers: CustomerOption[] })
         </label>
       </div>
       {state.message ? <p aria-live="polite" className={state.ok ? "rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800" : "rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-800"}>{state.message}</p> : null}
-      <SubmitButton />
+      <SubmitButton pending={pending} />
+      </fieldset>
     </form>
   );
 }
