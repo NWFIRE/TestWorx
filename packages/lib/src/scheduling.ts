@@ -2233,17 +2233,26 @@ export async function deleteInspection(
     await tx.inspectionBillingSummary.deleteMany({
       where: { tenantId, inspectionId: { in: inspectionIds } }
     });
+    await tx.inspectionCloseoutRequest.deleteMany({
+      where: { tenantId, inspectionId: { in: inspectionIds } }
+    });
+    await tx.inspectionCloseoutRequest.updateMany({
+      where: { tenantId, createdInspectionId: { in: inspectionIds } },
+      data: { createdInspectionId: null }
+    });
+    await tx.quote.updateMany({
+      where: { tenantId, convertedInspectionId: { in: inspectionIds } },
+      data: { convertedInspectionId: null }
+    });
     if (scope === "future" && recurringServiceScheduleIds.length > 0) {
       await tx.serviceSchedule.updateMany({
         where: { tenantId, id: { in: recurringServiceScheduleIds } },
         data: { isActive: false }
       });
     }
-    for (const candidateId of inspectionIds) {
-      await tx.inspection.delete({
-        where: { id: candidateId }
-      });
-    }
+    await tx.inspection.deleteMany({
+      where: { tenantId, id: { in: inspectionIds } }
+    });
 
     await createAuditLog(tx, {
       tenantId,

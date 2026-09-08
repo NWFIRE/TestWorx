@@ -22,8 +22,10 @@ const {
     inspectionTask: { deleteMany: vi.fn() },
     inspectionTechnicianAssignment: { deleteMany: vi.fn() },
     inspectionBillingSummary: { deleteMany: vi.fn() },
+    inspectionCloseoutRequest: { deleteMany: vi.fn(), updateMany: vi.fn() },
+    quote: { updateMany: vi.fn() },
     serviceSchedule: { updateMany: vi.fn() },
-    inspection: { delete: vi.fn() },
+    inspection: { deleteMany: vi.fn() },
     auditLog: { create: vi.fn() }
   }
 }));
@@ -114,8 +116,19 @@ describe("inspection deletion", () => {
       "inspection_1"
     );
 
-    expect(transactionMock.inspection.delete).toHaveBeenCalledWith({
-      where: { id: "inspection_1" }
+    expect(transactionMock.inspection.deleteMany).toHaveBeenCalledWith({
+      where: { tenantId: "tenant_1", id: { in: ["inspection_1"] } }
+    });
+    expect(transactionMock.inspectionCloseoutRequest.deleteMany).toHaveBeenCalledWith({
+      where: { tenantId: "tenant_1", inspectionId: { in: ["inspection_1"] } }
+    });
+    expect(transactionMock.inspectionCloseoutRequest.updateMany).toHaveBeenCalledWith({
+      where: { tenantId: "tenant_1", createdInspectionId: { in: ["inspection_1"] } },
+      data: { createdInspectionId: null }
+    });
+    expect(transactionMock.quote.updateMany).toHaveBeenCalledWith({
+      where: { tenantId: "tenant_1", convertedInspectionId: { in: ["inspection_1"] } },
+      data: { convertedInspectionId: null }
     });
     expect(deleteStoredFileMock).toHaveBeenCalledTimes(6);
     expect(transactionMock.auditLog.create).toHaveBeenCalledWith({
@@ -147,7 +160,7 @@ describe("inspection deletion", () => {
       )
     ).rejects.toThrow(/invoicing or QuickBooks history/i);
 
-    expect(transactionMock.inspection.delete).not.toHaveBeenCalled();
+    expect(transactionMock.inspection.deleteMany).not.toHaveBeenCalled();
   });
 
   it("deletes the selected recurring inspection and future occurrences while preserving past visits", async () => {
@@ -211,11 +224,11 @@ describe("inspection deletion", () => {
       where: { tenantId: "tenant_1", id: { in: ["schedule_1"] } },
       data: { isActive: false }
     });
-    expect(transactionMock.inspection.delete).toHaveBeenNthCalledWith(1, {
-      where: { id: "inspection_current" }
-    });
-    expect(transactionMock.inspection.delete).toHaveBeenNthCalledWith(2, {
-      where: { id: "inspection_future" }
+    expect(transactionMock.inspection.deleteMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: "tenant_1",
+        id: { in: ["inspection_current", "inspection_future"] }
+      }
     });
     expect(transactionMock.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -258,6 +271,6 @@ describe("inspection deletion", () => {
 
     expect(inspectionFindManyMock).not.toHaveBeenCalled();
     expect(transactionMock.serviceSchedule.updateMany).not.toHaveBeenCalled();
-    expect(transactionMock.inspection.delete).toHaveBeenCalledTimes(1);
+    expect(transactionMock.inspection.deleteMany).toHaveBeenCalledTimes(1);
   });
 });

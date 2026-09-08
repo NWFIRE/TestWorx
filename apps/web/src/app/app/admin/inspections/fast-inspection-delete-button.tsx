@@ -80,6 +80,12 @@ export function FastInspectionDeleteButton({
           router.refresh();
         }
       }
+    } catch (error) {
+      setState({
+        error: error instanceof Error ? error.message : "Unable to delete inspection. Please try again.",
+        success: null,
+        redirectTo: null
+      });
     } finally {
       setIsDeleting(false);
     }
