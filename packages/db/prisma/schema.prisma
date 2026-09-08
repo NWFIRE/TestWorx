@@ -145,6 +145,26 @@ enum InspectionCloseoutRequestStatus {
   dismissed
 }
 
+enum FieldServiceRequestType {
+  service_ticket
+  work_order
+  follow_up
+  quote_request
+  other
+}
+
+enum FieldServiceRequestPriority {
+  normal
+  urgent
+}
+
+enum FieldServiceRequestStatus {
+  pending
+  acknowledged
+  resolved
+  declined
+}
+
 enum StripeWebhookEventStatus {
   received
   processing
@@ -461,6 +481,7 @@ model Tenant {
   technicianDeviceRegistrations TechnicianDeviceRegistration[]
   customerIntakeRequests    CustomerIntakeRequest[]
   serviceSchedules          ServiceSchedule[]
+  fieldServiceRequests      FieldServiceRequest[]
   technicianReportTypeEligibilities TechnicianReportTypeEligibility[]
 }
 
@@ -512,6 +533,8 @@ model User {
   addedWorkOrderLineItems WorkOrderLineItem[] @relation("WorkOrderLineItemAddedBy")
   timeEntries            TimeEntry[]          @relation("TimeEntryEmployee")
   correctedTimeEntries   TimeEntry[]          @relation("TimeEntryCorrectedBy")
+  requestedFieldServiceRequests FieldServiceRequest[] @relation("FieldServiceRequestRequestedBy")
+  reviewedFieldServiceRequests  FieldServiceRequest[] @relation("FieldServiceRequestReviewedBy")
 }
 
 model CustomerIntakeRequest {
@@ -651,6 +674,7 @@ model CustomerCompany {
   quotes                    Quote[]
   emailReminderSendLogs     EmailReminderSendLog[]
   serviceSchedules          ServiceSchedule[]
+  fieldServiceRequests      FieldServiceRequest[]
 
   @@index([tenantId, billingType])
   @@index([tenantId, billToAccountId])
@@ -818,6 +842,36 @@ model Site {
   quotes            Quote[]
   providerAssignments ServiceSiteProviderAssignment[]
   serviceSchedules ServiceSchedule[]
+  fieldServiceRequests FieldServiceRequest[]
+}
+
+model FieldServiceRequest {
+  id                String                      @id @default(cuid())
+  tenantId          String
+  requestedByUserId String
+  customerCompanyId String
+  siteId            String?
+  requestType       FieldServiceRequestType
+  priority          FieldServiceRequestPriority @default(normal)
+  status            FieldServiceRequestStatus   @default(pending)
+  title             String
+  description       String
+  equipmentContext  String?
+  preferredTiming   String?
+  adminNote         String?
+  reviewedByUserId  String?
+  reviewedAt        DateTime?
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+  tenant            Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedBy       User                        @relation("FieldServiceRequestRequestedBy", fields: [requestedByUserId], references: [id])
+  reviewedBy        User?                       @relation("FieldServiceRequestReviewedBy", fields: [reviewedByUserId], references: [id])
+  customerCompany   CustomerCompany             @relation(fields: [customerCompanyId], references: [id])
+  site              Site?                       @relation(fields: [siteId], references: [id])
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, requestedByUserId, createdAt])
+  @@index([tenantId, customerCompanyId])
 }
 
 model ServiceSiteProviderAssignment {

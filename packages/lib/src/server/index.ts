@@ -28,6 +28,7 @@ export * from "../customer-intake";
 export * from "../customer-import";
 export * from "../deficiency-service";
 export * from "../email-reminders";
+export * from "../field-service-requests";
 export * from "../env";
 export * from "../inspection-billing";
 export * from "../inspection-archive";

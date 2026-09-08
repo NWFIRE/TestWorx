@@ -74,6 +74,16 @@ const adminNavItems: AppNavItem[] = [
     tone: "violet",
     group: "Work"
   },
+  {
+    href: "/app/admin/service-requests",
+    label: "Service Requests",
+    shortLabel: "Requests",
+    abbreviation: "SR",
+    icon: "alert",
+    description: "Review service and work requests from field technicians",
+    tone: "amber",
+    group: "Work"
+  },
   quotesNavItem,
   {
     href: "/app/deficiencies",
@@ -233,6 +243,18 @@ const navByRole: Record<string, AppNavItem[]> = {
       group: "Work",
       matchMode: "exact",
       matchPrefixes: ["/app/tech/inspections", "/app/tech/reports"]
+    },
+    {
+      href: "/app/tech/requests",
+      label: "Request Support",
+      shortLabel: "Request",
+      abbreviation: "RQ",
+      icon: "alert",
+      description: "Request a service ticket, work order, follow-up, or quote",
+      tone: "amber",
+      group: "Work",
+      matchMode: "exact",
+      matchPrefixes: ["/app/tech/requests"]
     },
     {
       href: "/app/manuals",

@@ -16,6 +16,7 @@ const baseTechnicianTabs: MobileTab[] = [
   { href: "/app/tech", label: "Home" },
   { href: "/app/tech/work", label: "Work", matchPrefixes: ["/app/tech/work"] },
   { href: "/app/tech/inspections", label: "Inspections", matchPrefixes: ["/app/tech/inspections", "/app/tech/reports"] },
+  { href: "/app/tech/requests", label: "Request", matchPrefixes: ["/app/tech/requests"] },
   { href: "/app/manuals", label: "Manuals", matchPrefixes: ["/app/manuals"] },
   { href: "/app/tech/profile", label: "Profile", matchPrefixes: ["/app/tech/profile"] }
 ];
@@ -35,15 +36,10 @@ function getTechnicianTabs(allowances?: Record<string, boolean> | null) {
   if (!allowances?.quoteAccess) {
     return baseTechnicianTabs;
   }
-
-  return [
-    baseTechnicianTabs[0] ?? defaultTechnicianTab,
-    baseTechnicianTabs[1] ?? defaultTechnicianTab,
-    baseTechnicianTabs[2] ?? defaultTechnicianTab,
-    quotesMobileTab,
-    baseTechnicianTabs[3] ?? defaultTechnicianTab,
-    baseTechnicianTabs[4] ?? defaultTechnicianTab
-  ];
+  const profileIndex = baseTechnicianTabs.findIndex((tab) => tab.label === "Profile");
+  return profileIndex < 0
+    ? [...baseTechnicianTabs, quotesMobileTab]
+    : [...baseTechnicianTabs.slice(0, profileIndex), quotesMobileTab, ...baseTechnicianTabs.slice(profileIndex)];
 }
 
 function isActive(pathname: string, tab: MobileTab) {
@@ -90,6 +86,13 @@ function MobileTabIcon({ label, active }: { label: string; active: boolean }) {
         <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
           <path {...shared} d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v16H7.5A2.5 2.5 0 0 0 5 21.5v-16Z" />
           <path {...shared} d="M7.5 3A2.5 2.5 0 0 0 5 5.5V19m4-11h6m-6 4h6" />
+        </svg>
+      );
+    case "Request":
+      return (
+        <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+          <path {...shared} d="M12 3 2.8 19h18.4L12 3Z" />
+          <path {...shared} d="M12 9v4m0 3h.01" />
         </svg>
       );
     case "Quotes":
@@ -160,6 +163,7 @@ export function TechnicianMobileHeader({
     Home: "Today's work and next action",
     Work: "Assigned and claimable jobs",
     Inspections: "Start, finish, and finalize reports",
+    Request: "Send field needs to the office",
     Quotes: "Customer quote follow-up",
     Manuals: "Field references",
     Profile: "Sync and offline status"
@@ -200,7 +204,7 @@ export function TechnicianMobileTabBar({
     >
       <div className="pointer-events-none mx-auto w-full max-w-screen-sm px-2">
         <div className="pointer-events-auto rounded-t-[1.6rem] border border-b-0 border-slate-200 bg-white/96 px-2 pb-3 pt-2 shadow-[0_-12px_30px_rgba(15,23,42,0.10)] backdrop-blur">
-          <div className={`grid gap-1 ${technicianTabs.length > 5 ? "grid-cols-6" : "grid-cols-5"}`}>
+          <div className="grid auto-cols-[minmax(64px,1fr)] grid-flow-col gap-1 overflow-x-auto overscroll-x-contain">
             {technicianTabs.map((tab) => {
               const active = isActive(pathname, tab);
               const badgeCount = tab.label === "Work"

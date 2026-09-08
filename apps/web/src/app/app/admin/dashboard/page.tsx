@@ -21,6 +21,7 @@ import {
   getAdminDashboardData,
   getAdminBillingSummaries,
   getAdminDeficiencyDashboardData,
+  getAdminFieldServiceRequests,
   getAdminSchedulingQueueData,
   getInspectionStatusTone,
   isDueAtTimeOfServiceCustomer,
@@ -111,7 +112,7 @@ function formatInspectionMetaLine(inspection: DashboardInspection, timezone?: st
     .join(" - ");
 }
 
-function buildAlertItems(data: AdminDashboardData, readyToBillCount: number, inspectionNotice?: string) {
+function buildAlertItems(data: AdminDashboardData, readyToBillCount: number, fieldRequestCount: number, inspectionNotice?: string) {
   const alerts: string[] = [];
 
   if (inspectionNotice === "deleted") {
@@ -137,6 +138,10 @@ function buildAlertItems(data: AdminDashboardData, readyToBillCount: number, ins
     alerts.push(
       `${readyToBillCount} billing summar${readyToBillCount === 1 ? "y is" : "ies are"} Ready To Bill.`
     );
+  }
+
+  if (fieldRequestCount > 0) {
+    alerts.push(`${fieldRequestCount} field service request${fieldRequestCount === 1 ? " needs" : "s need"} office review.`);
   }
 
   const amendedCount = data.activeInspections.filter(
@@ -256,7 +261,7 @@ export default async function AdminDashboardPage({
   };
   const fastManagementWindowEnd = endOfDay(addDays(startOfDay(new Date()), FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS));
 
-  const [data, schedulingQueueData, billingSummaries, deficiencyData] = await Promise.all([
+  const [data, schedulingQueueData, billingSummaries, deficiencyData, fieldRequests] = await Promise.all([
     getAdminDashboardData({
       userId: session.user.id,
       role: session.user.role,
@@ -273,7 +278,8 @@ export default async function AdminDashboardPage({
     getAdminDeficiencyDashboardData(
       actor,
       { status: "open" }
-    )
+    ),
+    getAdminFieldServiceRequests(actor)
   ]);
   const params = searchParams ? await searchParams : {};
   const inspectionNotice = Array.isArray(params.inspection)
@@ -285,7 +291,7 @@ export default async function AdminDashboardPage({
   const dashboardOperationalInspections = filterSubsetDuplicateOperationalInspections(schedulingQueueData.inspections);
   const openInspectionCount = dashboardOperationalInspections.length;
   const readyToBillSummaryCount = billingSummaries.filter((summary) => isOpenBillingQueueStatus(summary.status)).length;
-  const alerts = buildAlertItems(data, readyToBillSummaryCount, inspectionNotice);
+  const alerts = buildAlertItems(data, readyToBillSummaryCount, fieldRequests.counts.pending, inspectionNotice);
   const complianceFlags = deficiencyData.deficiencies.filter(
     (deficiency) => deficiency.severity === "high" || deficiency.severity === "critical"
   ).length;
@@ -544,6 +550,7 @@ export default async function AdminDashboardPage({
                     ))
                   )}
                 </div>
+                {fieldRequests.counts.pending > 0 ? <Link className="mt-4 inline-flex min-h-10 items-center rounded-xl border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-900" href="/app/admin/service-requests">Review field requests</Link> : null}
               </SectionCard>
 
               <section className="rounded-[28px] border border-slate-200/80 bg-[#0f172a] p-5 text-white shadow-[0_16px_44px_rgba(15,23,42,0.14)] lg:p-6">
@@ -561,7 +568,8 @@ export default async function AdminDashboardPage({
                   {[
                     { label: "Create invoices for ready work", href: "/app/admin/reports" },
                     { label: "Review Ready To Bill", href: "/app/admin/billing" },
-                    { label: "Follow up on open deficiencies", href: "/app/deficiencies?status=open" }
+                    { label: "Follow up on open deficiencies", href: "/app/deficiencies?status=open" },
+                    { label: "Review field service requests", href: "/app/admin/service-requests" }
                   ].map((item) => (
                     <Link
                       key={item.label}
