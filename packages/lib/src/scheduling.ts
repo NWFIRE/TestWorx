@@ -1084,6 +1084,26 @@ function isStrictTaskTypeSubset<T extends { inspectionType: InspectionType | key
   return true;
 }
 
+function hasSameTaskTypeCounts<T extends { inspectionType: InspectionType | keyof typeof inspectionTypeRegistry }>(left: T[], right: T[]) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  const leftCounts = getTaskTypeCounts(left);
+  const rightCounts = getTaskTypeCounts(right);
+  return leftCounts.size === rightCounts.size &&
+    [...leftCounts.entries()].every(([inspectionType, count]) => rightCounts.get(inspectionType) === count);
+}
+
+function hasSameScheduledStart(left: Date | string | null | undefined, right: Date | string | null | undefined) {
+  if (!left || !right) {
+    return false;
+  }
+  const leftTime = new Date(left).getTime();
+  const rightTime = new Date(right).getTime();
+  return !Number.isNaN(leftTime) && leftTime === rightTime;
+}
+
 function getRecurringTaskSourceKeys<T extends {
   serviceScheduleId?: string | null;
   recurrence?: { seriesId?: string | null } | null;
@@ -1142,7 +1162,10 @@ export function filterSubsetDuplicateOperationalInspections<T extends {
         return false;
       }
 
-      if (hasSameRecurringTaskSources(inspection.tasks, other.tasks)) {
+      const isExactSemanticDuplicate =
+        hasSameScheduledStart(inspection.scheduledStart, other.scheduledStart) &&
+        hasSameTaskTypeCounts(inspection.tasks, other.tasks);
+      if (hasSameRecurringTaskSources(inspection.tasks, other.tasks) || isExactSemanticDuplicate) {
         return otherIndex < inspectionIndex;
       }
 

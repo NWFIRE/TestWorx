@@ -252,6 +252,43 @@ describe("technician dashboard inspection access", () => {
     ]);
   });
 
+  it("collapses legacy duplicates with different schedule ids when the visit details are otherwise exact", () => {
+    const inspections = filterSubsetDuplicateOperationalInspections([
+      {
+        id: "legacy_duplicate_1",
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        scheduledStart: new Date("2026-10-01T09:00:00.000Z"),
+        tasks: [
+          { inspectionType: "kitchen_suppression", dueMonth: "2026-10", serviceScheduleId: "legacy_schedule_1" }
+        ]
+      },
+      {
+        id: "legacy_duplicate_2",
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        scheduledStart: new Date("2026-10-01T09:00:00.000Z"),
+        tasks: [
+          { inspectionType: "kitchen_suppression", dueMonth: "2026-10", serviceScheduleId: "legacy_schedule_2" }
+        ]
+      },
+      {
+        id: "later_october_visit",
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        scheduledStart: new Date("2026-10-15T09:00:00.000Z"),
+        tasks: [
+          { inspectionType: "kitchen_suppression", dueMonth: "2026-10", serviceScheduleId: "schedule_later" }
+        ]
+      }
+    ]);
+
+    expect(inspections.map((inspection) => inspection.id)).toEqual([
+      "legacy_duplicate_1",
+      "later_october_visit"
+    ]);
+  });
+
   it("allows admin fast inspection management to query the full due window without the default 40-row truncation", async () => {
     const dueWindowEnd = new Date("2026-07-18T23:59:59.999Z");
     prismaMock.inspection.findMany.mockResolvedValueOnce([]);
