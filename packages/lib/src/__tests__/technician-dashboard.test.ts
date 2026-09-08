@@ -212,6 +212,46 @@ describe("technician dashboard inspection access", () => {
     ]);
   });
 
+  it("keeps one occurrence when concurrent generation created the same recurring inspection twice", () => {
+    const inspections = filterSubsetDuplicateOperationalInspections([
+      {
+        id: "generated_1",
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        scheduledStart: new Date("2026-10-01T09:00:00.000Z"),
+        tasks: [
+          { inspectionType: "fire_alarm", dueMonth: "2026-10", serviceScheduleId: "schedule_alarm" },
+          { inspectionType: "fire_extinguisher", dueMonth: "2026-10", serviceScheduleId: "schedule_extinguisher" }
+        ]
+      },
+      {
+        id: "generated_2",
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        scheduledStart: new Date("2026-10-01T09:00:00.000Z"),
+        tasks: [
+          { inspectionType: "fire_alarm", dueMonth: "2026-10", serviceScheduleId: "schedule_alarm" },
+          { inspectionType: "fire_extinguisher", dueMonth: "2026-10", serviceScheduleId: "schedule_extinguisher" }
+        ]
+      },
+      {
+        id: "intentional_separate_visit",
+        customerCompanyId: "customer_1",
+        siteId: "site_1",
+        scheduledStart: new Date("2026-10-15T09:00:00.000Z"),
+        tasks: [
+          { inspectionType: "fire_alarm", dueMonth: "2026-10", serviceScheduleId: "different_schedule" },
+          { inspectionType: "fire_extinguisher", dueMonth: "2026-10", serviceScheduleId: "different_extinguisher_schedule" }
+        ]
+      }
+    ]);
+
+    expect(inspections.map((inspection) => inspection.id)).toEqual([
+      "generated_1",
+      "intentional_separate_visit"
+    ]);
+  });
+
   it("allows admin fast inspection management to query the full due window without the default 40-row truncation", async () => {
     const dueWindowEnd = new Date("2026-07-18T23:59:59.999Z");
     prismaMock.inspection.findMany.mockResolvedValueOnce([]);

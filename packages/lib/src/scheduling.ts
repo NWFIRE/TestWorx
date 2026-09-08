@@ -1084,6 +1084,29 @@ function isStrictTaskTypeSubset<T extends { inspectionType: InspectionType | key
   return true;
 }
 
+function getRecurringTaskSourceKeys<T extends {
+  serviceScheduleId?: string | null;
+  recurrence?: { seriesId?: string | null } | null;
+}>(tasks: T[]) {
+  return [...new Set(tasks.flatMap((task) => {
+    if (task.serviceScheduleId) {
+      return [`schedule:${task.serviceScheduleId}`];
+    }
+    return task.recurrence?.seriesId ? [`series:${task.recurrence.seriesId}`] : [];
+  }))].sort();
+}
+
+function hasSameRecurringTaskSources<T extends {
+  serviceScheduleId?: string | null;
+  recurrence?: { seriesId?: string | null } | null;
+}>(left: T[], right: T[]) {
+  const leftKeys = getRecurringTaskSourceKeys(left);
+  const rightKeys = getRecurringTaskSourceKeys(right);
+  return leftKeys.length > 0 &&
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every((key, index) => key === rightKeys[index]);
+}
+
 export function filterSubsetDuplicateOperationalInspections<T extends {
   id: string;
   customerCompanyId?: string | null;
@@ -1093,16 +1116,18 @@ export function filterSubsetDuplicateOperationalInspections<T extends {
     dueDate?: Date | string | null;
     dueMonth?: string | null;
     inspectionType: InspectionType | keyof typeof inspectionTypeRegistry;
+    serviceScheduleId?: string | null;
+    recurrence?: { seriesId?: string | null } | null;
   }>;
 }>(inspections: T[]) {
-  return inspections.filter((inspection) => {
+  return inspections.filter((inspection, inspectionIndex) => {
     const duplicateScopeKey = [
       inspection.customerCompanyId ?? "unknown_customer",
       inspection.siteId ?? "unknown_site",
       getClaimableInspectionPeriodKey(inspection)
     ].join("|");
 
-    return !inspections.some((other) => {
+    return !inspections.some((other, otherIndex) => {
       if (other.id === inspection.id) {
         return false;
       }
@@ -1113,7 +1138,15 @@ export function filterSubsetDuplicateOperationalInspections<T extends {
         getClaimableInspectionPeriodKey(other)
       ].join("|");
 
-      return duplicateScopeKey === otherScopeKey && isStrictTaskTypeSubset(inspection.tasks, other.tasks);
+      if (duplicateScopeKey !== otherScopeKey) {
+        return false;
+      }
+
+      if (hasSameRecurringTaskSources(inspection.tasks, other.tasks)) {
+        return otherIndex < inspectionIndex;
+      }
+
+      return isStrictTaskTypeSubset(inspection.tasks, other.tasks);
     });
   });
 }
@@ -5614,7 +5647,27 @@ async function generateMissingInspectionsFromServiceSchedules(input: {
       continue;
     }
 
-    await prisma.$transaction(async (tx) => {
+    const created = await prisma.$transaction(async (tx) => {
+      const occurrenceLockKey = [
+        input.tenantId,
+        firstSchedule.customerCompanyId,
+        firstSchedule.siteId,
+        format(scheduledStart, "yyyy-MM")
+      ].join("\u001f");
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${occurrenceLockKey}, 0))`;
+
+      const scheduleIds = group.map((schedule) => schedule.id);
+      const existingOccurrence = await tx.inspectionTask.findFirst({
+        where: {
+          tenantId: input.tenantId,
+          serviceScheduleId: { in: scheduleIds }
+        },
+        select: { id: true }
+      });
+      if (existingOccurrence) {
+        return false;
+      }
+
       const inspection = await tx.inspection.create({
         data: {
           tenantId: input.tenantId,
@@ -5671,8 +5724,11 @@ async function generateMissingInspectionsFromServiceSchedules(input: {
           scheduledStart: scheduledStart.toISOString()
         }
       });
+      return true;
     }, upcomingServiceScheduleTransactionOptions);
-    createdInspectionCount += 1;
+    if (created) {
+      createdInspectionCount += 1;
+    }
     for (const schedule of group) {
       scheduleIdsToAdvance.add(schedule.id);
     }
