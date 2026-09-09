@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma } from "@prisma/client";
-import { createFieldServiceRequest, reviewFieldServiceRequest, getPendingFieldServiceRequestCount, fieldServiceRequestReviewSchema, fieldServiceRequestSchema } from "../field-service-requests";
+import { createFieldServiceRequest, reviewFieldServiceRequest, getPendingFieldServiceRequestCount, fieldServiceRequestReviewSchema, fieldServiceRequestSchema, getFieldServiceRequestForScheduling, resolveFieldServiceRequestForInspection } from "../field-service-requests";
 
 const db = vi.hoisted(() => ({
   customerCompany: { findFirst: vi.fn() },
+  inspection: { findFirst: vi.fn() },
   fieldServiceRequest: { create: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(), count: vi.fn() },
   auditLog: { create: vi.fn() },
   $transaction: vi.fn()
@@ -25,6 +26,7 @@ beforeEach(() => {
   db.fieldServiceRequest.create.mockResolvedValue({ id: input.submissionId });
   db.fieldServiceRequest.findFirst.mockResolvedValue({ id: "request_1", status: "pending", adminNote: null, updatedAt: new Date("2026-09-08") });
   db.fieldServiceRequest.updateMany.mockResolvedValue({ count: 1 });
+  db.inspection.findFirst.mockResolvedValue({ customerCompanyId: "customer_1", siteId: "site_1" });
 });
 
 describe("field service request validation", () => {
@@ -60,6 +62,31 @@ describe("field service request validation", () => {
 });
 
 describe("field request persistence", () => {
+  it("loads only open requests in the office tenant for scheduling", async () => {
+    await getFieldServiceRequestForScheduling(office, "request_1");
+    expect(db.fieldServiceRequest.findFirst).toHaveBeenCalledWith({ where: { id: "request_1", tenantId: "tenant_1", status: { in: ["pending", "acknowledged"] } } });
+  });
+
+  it("resolves a saved ticket request and records the resulting inspection", async () => {
+    await resolveFieldServiceRequestForInspection(office, "request_1", "inspection_1");
+    expect(db.fieldServiceRequest.updateMany).toHaveBeenCalledWith({
+      where: { id: "request_1", tenantId: "tenant_1", status: { in: ["pending", "acknowledged"] }, customerCompanyId: "customer_1", OR: [{ siteId: null }, { siteId: "site_1" }] },
+      data: { status: "resolved", reviewedByUserId: "office_1", reviewedAt: expect.any(Date) }
+    });
+    expect(db.auditLog.create).toHaveBeenCalledWith({ data: expect.objectContaining({ entityId: "request_1", metadata: { inspectionId: "inspection_1" } }) });
+  });
+
+  it("does not resolve a request without a saved tenant ticket", async () => {
+    db.inspection.findFirst.mockResolvedValue(null);
+    await expect(resolveFieldServiceRequestForInspection(office, "request_1", "inspection_1")).rejects.toThrow("not found");
+    expect(db.fieldServiceRequest.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects duplicate or mismatched scheduling so the surrounding transaction can roll back", async () => {
+    db.fieldServiceRequest.updateMany.mockResolvedValue({ count: 0 });
+    await expect(resolveFieldServiceRequestForInspection(office, "request_1", "inspection_1")).rejects.toThrow("already been handled");
+    expect(db.auditLog.create).not.toHaveBeenCalled();
+  });
   it("accepts null optional fields from a form without saved sites", async () => {
     await createFieldServiceRequest(tech, input);
     expect(db.fieldServiceRequest.create).toHaveBeenCalledWith({ data: expect.objectContaining({

@@ -4,7 +4,9 @@ Technicians use Request Support to submit service tickets, work orders, follow-u
 
 Submission requires a connection. Validation or connection errors preserve the current form's fields. A successful submission clears the form. Each submission uses a stable UUID across retries so a lost response does not create a second request. Reloading or leaving the page does not preserve an unsent form.
 
-Office review supports acknowledgement, resolution, and decline with an optional note. Repeating the same review does not change its timestamp. A stale review cannot reopen a closed request or overwrite a competing edit. Create scheduled work opens the existing inspection creation form with the customer and optional site selected; scheduling remains an explicit office action.
+Office review supports acknowledgement, resolution, and decline with an optional note. Repeating the same review does not change its timestamp. A stale review cannot reopen a closed request or overwrite a competing edit. Create scheduled work opens a one-time work order with customer/site, field details, urgency, and the requesting technician preselected. Office staff can adjust the assignment. If that technician is unavailable, the form asks staff to select an active technician.
+
+Saving the new ticket automatically resolves its source request in the same database transaction and records the ticket ID in the request audit log. Failed saves and duplicate warnings leave the request open. An explicit successful addition to an existing inspection also resolves the request after the selected report types have been added. The technician's request status and office sidebar badge refresh after success. Closing the creation form clears the source request reference.
 
 ## Verification
 

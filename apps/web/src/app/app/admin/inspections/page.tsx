@@ -11,6 +11,7 @@ import {
   formatInspectionClassificationLabel,
   formatInspectionStatusLabel,
   getAdminInspectionCreateOptions,
+  getFieldServiceRequestForScheduling,
   getAdminSchedulingQueueData,
   getInspectionClassificationTone,
   getInspectionStatusTone,
@@ -218,6 +219,7 @@ export default async function AdminInspectionsPage({
     month?: string;
     customerCompanyId?: string;
     siteId?: string;
+    sourceRequestId?: string;
   }>;
 }) {
   const session = await auth();
@@ -289,6 +291,12 @@ export default async function AdminInspectionsPage({
   )
     ? requestedSiteId
     : undefined;
+  const sourceRequestId = typeof params.sourceRequestId === "string" ? params.sourceRequestId.trim() : "";
+  // Retain form context during save revalidation so pending PDF uploads can finish.
+  const sourceRequest = createOpen && sourceRequestId ? await getFieldServiceRequestForScheduling(actor, sourceRequestId, true) : null;
+  const requestUnavailable = createOpen && Boolean(sourceRequestId) && !sourceRequest;
+  const requestingTechnicianId = sourceRequest && createOptions.technicians.some((technician) => technician.id === sourceRequest.requestedByUserId)
+    ? sourceRequest.requestedByUserId : undefined;
   const fastManagementInspections = filterSubsetDuplicateOperationalInspections(
     fastQueueData.inspections.filter((inspection) =>
       isInFastManagementWindow(inspection, fastManagementWindowEnd)
@@ -331,14 +339,20 @@ export default async function AdminInspectionsPage({
         title="Inspections"
       />
 
+      {requestUnavailable ? <p role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900">This request is no longer available for scheduling. Return to Requests to see its current status.</p> : null}
+      {sourceRequest && !requestingTechnicianId ? <p role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900">The requesting technician is no longer available for assignment. Select an active technician below.</p> : null}
       <InspectionCreatePanel
         customers={createOptions.customers}
-        initialOpen={createOpen}
+        initialOpen={createOpen && !requestUnavailable}
         initialValues={{
           inspectionMonth: requestedMonth || undefined,
           scheduledStart: requestedMonth ? `${requestedMonth}-01T09:00` : undefined,
-          customerCompanyId: initialCustomerId,
-          siteId: initialSiteId
+          customerCompanyId: sourceRequest?.customerCompanyId ?? initialCustomerId,
+          siteId: sourceRequest?.siteId ?? initialSiteId,
+          sourceRequestId: sourceRequest?.id,
+          isPriority: sourceRequest?.priority === "urgent",
+          notes: sourceRequest ? [sourceRequest.title, sourceRequest.description, sourceRequest.equipmentContext, sourceRequest.preferredTiming].filter(Boolean).join("\n\n") : undefined,
+          tasks: sourceRequest ? [{ inspectionType: "work_order", frequency: "ONCE", assignedTechnicianId: requestingTechnicianId }] : undefined
         }}
         showTrigger={false}
         sites={createOptions.sites}

@@ -129,6 +129,48 @@ export async function getPendingFieldServiceRequestCount(actor: ActorContext) {
   return prisma.fieldServiceRequest.count({ where: { tenantId: parsed.tenantId, status: "pending" } });
 }
 
+export async function getFieldServiceRequestForScheduling(actor: ActorContext, requestId: string, includeClosed = false) {
+  const parsed = parseActor(actor);
+  if (!officeRoles.has(parsed.role)) throw new Error("Only office users can schedule field requests.");
+  return prisma.fieldServiceRequest.findFirst({
+    where: { id: requestId, tenantId: parsed.tenantId, ...(includeClosed ? {} : { status: { in: [FieldServiceRequestStatus.pending, FieldServiceRequestStatus.acknowledged] } }) }
+  });
+}
+
+export async function resolveFieldServiceRequestForInspectionTx(
+  tx: Prisma.TransactionClient,
+  actor: ActorContext,
+  requestId: string,
+  inspectionId: string
+) {
+  const parsed = parseActor(actor);
+  if (!officeRoles.has(parsed.role)) throw new Error("Only office users can schedule field requests.");
+  const inspection = await tx.inspection.findFirst({
+    where: { id: inspectionId, tenantId: parsed.tenantId },
+    select: { customerCompanyId: true, siteId: true }
+  });
+  if (!inspection) throw new Error("Scheduled ticket not found.");
+  const updated = await tx.fieldServiceRequest.updateMany({
+    where: {
+      id: requestId, tenantId: parsed.tenantId,
+      status: { in: ["pending", "acknowledged"] },
+      customerCompanyId: inspection.customerCompanyId,
+      OR: [{ siteId: null }, { siteId: inspection.siteId }]
+    },
+    data: { status: "resolved", reviewedByUserId: parsed.userId, reviewedAt: new Date() }
+  });
+  if (updated.count !== 1) throw new Error("This request has already been handled or does not match this customer/site. Refresh the request queue before continuing.");
+  await tx.auditLog.create({ data: {
+    tenantId: parsed.tenantId, actorUserId: parsed.userId,
+    action: "field_service_request.resolved_by_scheduling", entityType: "FieldServiceRequest", entityId: requestId,
+    metadata: { inspectionId }
+  } });
+}
+
+export async function resolveFieldServiceRequestForInspection(actor: ActorContext, requestId: string, inspectionId: string) {
+  return prisma.$transaction((tx) => resolveFieldServiceRequestForInspectionTx(tx, actor, requestId, inspectionId));
+}
+
 export async function getAdminFieldServiceRequests(actor: ActorContext) {
   const parsed = parseActor(actor);
   if (!officeRoles.has(parsed.role)) throw new Error("Only office users can review field requests.");

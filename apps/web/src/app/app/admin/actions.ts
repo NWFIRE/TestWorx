@@ -12,6 +12,8 @@ import {
   approveInspectionCloseoutRequest,
   dismissInspectionCloseoutRequest,
   createInspection,
+  getFieldServiceRequestForScheduling,
+  resolveFieldServiceRequestForInspection,
   detectPotentialDuplicateInspections,
   generateQuoteFromDeficiencies,
   clearBillingSummaryItemCatalogLink,
@@ -257,6 +259,13 @@ export async function createInspectionAction(
   try {
     const actor = { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId };
     const resolvedInput = await resolveInspectionSiteSelection(actor, parsed.data, formData);
+    const sourceRequestId = String(formData.get("sourceRequestId") ?? "").trim();
+    if (sourceRequestId) {
+      const request = await getFieldServiceRequestForScheduling(actor, sourceRequestId);
+      if (!request || request.customerCompanyId !== resolvedInput.customerCompanyId || (request.siteId && request.siteId !== resolvedInput.siteId)) {
+        return { error: "This request has already been handled or the selected customer/site does not match. Refresh the request queue.", success: null };
+      }
+    }
     const duplicateResolution = String(formData.get("duplicateInspectionResolution") ?? "");
     const duplicateExistingInspectionId = String(formData.get("duplicateExistingInspectionId") ?? "").trim();
 
@@ -280,6 +289,11 @@ export async function createInspectionAction(
         });
       }
 
+      if (sourceRequestId) {
+        await resolveFieldServiceRequestForInspection(actor, sourceRequestId, duplicateExistingInspectionId);
+        revalidatePath("/app/admin/service-requests");
+        revalidatePath("/app/tech/requests");
+      }
       revalidatePath("/app/admin");
       revalidatePath("/app/admin/dashboard");
       revalidatePath("/app/admin/inspections");
@@ -309,7 +323,11 @@ export async function createInspectionAction(
       };
     }
 
-    const inspection = await createInspection(actor, resolvedInput);
+    const inspection = await createInspection(actor, resolvedInput, sourceRequestId || undefined);
+    if (sourceRequestId) {
+      revalidatePath("/app/admin/service-requests");
+      revalidatePath("/app/tech/requests");
+    }
     if (duplicateResolution === "create_anyway" && duplicateDetection.matches.length > 0) {
       await recordInspectionDuplicateOverride(actor, {
         inspectionId: inspection.id,

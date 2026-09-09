@@ -3067,7 +3067,7 @@ function getReviewCompletionSummary(input: {
   };
 }
 
-export async function createInspection(actor: ActorContext, input: z.infer<typeof scheduleInspectionSchema>) {
+export async function createInspection(actor: ActorContext, input: z.infer<typeof scheduleInspectionSchema>, sourceRequestId?: string) {
   const parsedActor = parseActor(actor);
   if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
     throw new Error("Only office administrators can create inspections.");
@@ -3214,6 +3214,10 @@ export async function createInspection(actor: ActorContext, input: z.infer<typeo
     const primaryInspection = createdInspections.find((inspection) => inspection.isCurrentPeriod) ?? createdInspections[0];
     if (!primaryInspection) {
       throw new Error("No inspection visits were created.");
+    }
+    if (sourceRequestId) {
+      const { resolveFieldServiceRequestForInspectionTx } = await import("./field-service-requests");
+      await resolveFieldServiceRequestForInspectionTx(tx, actor, sourceRequestId, primaryInspection.id);
     }
     return tx.inspection.findUniqueOrThrow({
       where: { id: primaryInspection.id },

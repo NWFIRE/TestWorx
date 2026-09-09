@@ -50,6 +50,7 @@ export function InspectionCreatePanel({
       params.set("create", "1");
     } else {
       params.delete("create");
+      params.delete("sourceRequestId");
     }
 
     const nextSearch = params.toString();
@@ -105,6 +106,7 @@ export function InspectionCreatePanel({
           autoSelectGenericSiteOnCustomerChange
           customers={customers}
           onSuccess={() => {
+            window.dispatchEvent(new Event("field-request-reviewed"));
             setOpen(false);
             updateCreateQueryParam(false);
             router.refresh();

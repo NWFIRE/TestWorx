@@ -103,6 +103,7 @@ type ServiceLineDraft = {
 };
 
 export type InspectionSchedulerFormInitialValues = {
+  sourceRequestId?: string;
   inspectionId?: string;
   customerCompanyId?: string;
   siteId?: string;
@@ -165,6 +166,7 @@ function serializeInitialValues(initialValues?: InspectionSchedulerFormInitialVa
   }
 
   return JSON.stringify({
+    sourceRequestId: initialValues.sourceRequestId ?? null,
     inspectionId: initialValues.inspectionId ?? null,
     customerCompanyId: initialValues.customerCompanyId ?? null,
     siteId: initialValues.siteId ?? null,
@@ -781,6 +783,7 @@ export function InspectionSchedulerForm({
       ref={formRef}
     >
       {initialValues?.inspectionId ? <input name="inspectionId" type="hidden" value={initialValues.inspectionId} /> : null}
+      {initialValues?.sourceRequestId ? <input name="sourceRequestId" type="hidden" value={initialValues.sourceRequestId} /> : null}
       <input name="serviceLinesJson" type="hidden" value={serviceLinesJson} />
       <input name="inspectionClassification" type="hidden" value={inspectionClassification} />
       <input name="isPriority" type="hidden" value={isPriority ? "on" : ""} />
