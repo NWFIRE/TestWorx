@@ -101,6 +101,52 @@ describe("generic inspection site helper", () => {
     });
   });
 
+  it.each([
+    { name: " Temporary Site " },
+    { name: " Temporary Site ", addressLine1: " ", city: "", state: " ", postalCode: "" },
+    { name: " Temporary Site ", city: " Tulsa " }
+  ])("creates a one-time site with optional address details: %j", async (input) => {
+    prismaMock.customerCompany.findFirst.mockResolvedValue({ id: "customer_1", name: "NW Fire" });
+    prismaMock.site.create.mockResolvedValue({ id: "site_custom_new" });
+    const { createOneTimeInspectionSite } = await import("../scheduling");
+    await createOneTimeInspectionSite(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" }, "customer_1", input
+    );
+    expect(prismaMock.customerCompany.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "customer_1", tenantId: "tenant_1" }
+    }));
+    expect(prismaMock.site.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ name: "Temporary Site", addressLine1: "", addressLine2: null,
+        city: input.city?.trim() || "", state: "", postalCode: "" }),
+      select: { id: true }
+    });
+  });
+
+  it("still requires a one-time site name", async () => {
+    const { createOneTimeInspectionSite } = await import("../scheduling");
+    await expect(createOneTimeInspectionSite(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" }, "customer_1", { name: " " }
+    )).rejects.toThrow("Enter a site name");
+    expect(prismaMock.site.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a customer outside the tenant", async () => {
+    prismaMock.customerCompany.findFirst.mockResolvedValue(null);
+    const { createOneTimeInspectionSite } = await import("../scheduling");
+    await expect(createOneTimeInspectionSite(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" }, "other_customer", { name: "Site" }
+    )).rejects.toThrow("Customer not found");
+    expect(prismaMock.site.create).not.toHaveBeenCalled();
+  });
+
+  it("does not allow technicians to create one-time sites", async () => {
+    const { createOneTimeInspectionSite } = await import("../scheduling");
+    await expect(createOneTimeInspectionSite(
+      { userId: "tech_1", role: "technician", tenantId: "tenant_1" }, "customer_1", { name: "Site" }
+    )).rejects.toThrow("Only administrators");
+    expect(prismaMock.site.create).not.toHaveBeenCalled();
+  });
+
   it("creates a one-time site for the selected customer", async () => {
     prismaMock.customerCompany.findFirst.mockResolvedValue({
       id: "customer_1",

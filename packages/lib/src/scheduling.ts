@@ -2010,17 +2010,20 @@ export async function createOneTimeInspectionSite(
   customerCompanyId: string,
   input: {
     name: string;
-    addressLine1: string;
+    addressLine1?: string;
     addressLine2?: string | null;
-    city: string;
-    state: string;
-    postalCode: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
     notes?: string | null;
   }
 ) {
   const parsed = parseActor(actor);
   if (!["tenant_admin", "office_admin", "platform_admin"].includes(parsed.role)) {
     throw new Error("Only administrators can create one-time inspection sites.");
+  }
+  if (!input.name.trim()) {
+    throw new Error("Enter a site name for the one-time site.");
   }
 
   const tenantId = parsed.tenantId as string;
@@ -2044,11 +2047,11 @@ export async function createOneTimeInspectionSite(
       tenantId,
       customerCompanyId: customerCompany.id,
       name: input.name.trim(),
-      addressLine1: input.addressLine1.trim(),
+      addressLine1: input.addressLine1?.trim() || "",
       addressLine2: input.addressLine2?.trim() || null,
-      city: input.city.trim(),
-      state: input.state.trim(),
-      postalCode: input.postalCode.trim(),
+      city: input.city?.trim() || "",
+      state: input.state?.trim() || "",
+      postalCode: input.postalCode?.trim() || "",
       notes: input.notes?.trim() || `Created as a one-time inspection site for ${customerCompany.name}.`
     },
     select: {

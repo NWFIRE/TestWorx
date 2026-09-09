@@ -889,7 +889,7 @@ export function InspectionSchedulerForm({
           <div>
             <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 sm:text-sm sm:tracking-[0.2em]">One-time site</p>
             <h4 className="mt-1 text-lg font-semibold text-ink">Create a site just for this inspection</h4>
-            <p className="mt-2 text-sm leading-5 text-slate-500">This creates a real site under the selected customer so the inspection, report, billing, and PDF flow stay intact.</p>
+            <p className="mt-2 text-sm leading-5 text-slate-500">Only a site name is required. Address details and notes are optional and can be added later.</p>
           </div>
           <div className="grid min-w-0 gap-4 md:grid-cols-2">
             <div className="min-w-0">
@@ -898,7 +898,7 @@ export function InspectionSchedulerForm({
             </div>
             <div className="min-w-0">
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customSiteAddressLine1">Address line 1</label>
-              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3.5" id="customSiteAddressLine1" name="customSiteAddressLine1" required={customSiteSelected} />
+              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3.5" id="customSiteAddressLine1" name="customSiteAddressLine1" />
             </div>
           </div>
           <div className="grid min-w-0 gap-4 md:grid-cols-2">
@@ -908,17 +908,17 @@ export function InspectionSchedulerForm({
             </div>
             <div className="min-w-0">
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customSiteCity">City</label>
-              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3.5" id="customSiteCity" name="customSiteCity" required={customSiteSelected} />
+              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3.5" id="customSiteCity" name="customSiteCity" />
             </div>
           </div>
           <div className="grid min-w-0 gap-4 md:grid-cols-2">
             <div className="min-w-0">
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customSiteState">State / region</label>
-              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3.5" id="customSiteState" name="customSiteState" required={customSiteSelected} />
+              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3.5" id="customSiteState" name="customSiteState" />
             </div>
             <div className="min-w-0">
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="customSitePostalCode">Postal code</label>
-              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3.5" id="customSitePostalCode" name="customSitePostalCode" required={customSiteSelected} />
+              <input className="w-full rounded-2xl border border-slate-200 px-4 py-3.5" id="customSitePostalCode" name="customSitePostalCode" />
             </div>
           </div>
           <div>

@@ -194,10 +194,6 @@ async function resolveInspectionSiteSelection<T extends {
       throw new Error("Enter a site name for the one-time site.");
     }
 
-    if (!customSiteAddressLine1 || !customSiteCity || !customSiteState || !customSitePostalCode) {
-      throw new Error("Complete the one-time site address before creating the inspection.");
-    }
-
     const customSite = await createOneTimeInspectionSite(actor, input.customerCompanyId, {
       name: customSiteName,
       addressLine1: customSiteAddressLine1,
