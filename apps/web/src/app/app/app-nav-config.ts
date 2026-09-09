@@ -1,6 +1,7 @@
 import { canAccessProductsServicesWorkspace, canAccessQuoteWorkspace } from "@testworx/lib";
 
 export type AppNavItem = {
+  badgeCount?: number;
   href: string;
   label: string;
   shortLabel: string;

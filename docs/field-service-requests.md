@@ -8,6 +8,8 @@ Office review supports acknowledgement, resolution, and decline with an optional
 
 ## Verification
 
+The admin sidebar displays a red badge for pending requests. Closed Work groups show the same count on their header. Counts refresh every 30 seconds while visible, on navigation/window focus, and after office review. Acknowledged or closed requests no longer count. Temporary network failures preserve the last known count. Run `node scripts/check-request-badge.cjs` to verify count refresh behavior with simulated API responses.
+
 Run `npm test --workspace @testworx/lib -- --run src/__tests__/field-service-requests.test.ts` for validation, tenant isolation, retry, and review concurrency checks.
 
 Run `node scripts/check-field-request-form.cjs` for phone-width Chromium checks against the real form component with simulated success, validation failure, and connection failure responses. This does not submit production requests.

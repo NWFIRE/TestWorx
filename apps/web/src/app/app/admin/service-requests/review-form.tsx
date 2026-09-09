@@ -19,6 +19,7 @@ export function RequestReviewForm({ children }: { children: ReactNode }) {
     setMessage("");
     try {
       const result = await reviewFieldServiceRequestAction(data);
+      if (result.ok) window.dispatchEvent(new Event("field-request-reviewed"));
       setMessage(result.message);
     } catch {
       setMessage("Connection interrupted. Your note is still here. Please try again.");

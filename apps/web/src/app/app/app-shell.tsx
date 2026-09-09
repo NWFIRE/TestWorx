@@ -6,6 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { usePathname, useRouter } from "next/navigation";
 
 import { BrandLoader } from "@/app/brand-loader";
+import { useRequestBadge } from "./use-request-badge";
+import { RequestCountBadge } from "./request-count-badge";
 import { useSmartBack } from "@/app/use-smart-back";
 import { getAppNavItemsForRole, getCurrentAppNavItem, isAppNavItemActive, type AppNavItem } from "./app-nav-config";
 import { MobilePullToRefresh } from "./mobile-pull-to-refresh";
@@ -272,7 +274,7 @@ function NavItem({
   return (
     <Link
       aria-current={active ? "page" : undefined}
-      aria-label={item.label}
+      aria-label={item.badgeCount ? `${item.label}, ${item.badgeCount} requests awaiting review` : item.label}
         className={`pressable pressable-row group relative flex min-h-[44px] min-w-0 items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-sm outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.38)] focus-visible:ring-offset-2 motion-reduce:transition-none before:absolute before:bottom-1.5 before:left-0 before:top-1.5 before:w-1 before:rounded-full before:opacity-0 ${
           active
           ? "bg-white text-ink before:opacity-100 shadow-[inset_0_0_0_1px_var(--tenant-primary-border),0_10px_24px_rgba(9,18,32,0.10)]"
@@ -283,7 +285,7 @@ function NavItem({
       onFocus={() => onPrefetch?.(item.href)}
       onPointerEnter={() => onPrefetch?.(item.href)}
       prefetch
-      title={collapsed ? item.label : undefined}
+      title={collapsed ? `${item.label}${item.badgeCount ? ` (${item.badgeCount} awaiting review)` : ""}` : undefined}
     >
       <span
         aria-hidden="true"
@@ -296,6 +298,7 @@ function NavItem({
           <span className={`block truncate text-sm ${active ? "font-bold text-ink" : "font-semibold"}`}>{item.shortLabel}</span>
         </span>
       ) : null}
+      <RequestCountBadge count={item.badgeCount ?? 0} collapsed={collapsed} />
     </Link>
   );
 }
@@ -494,7 +497,7 @@ function NavSection({
                       }}
                       type="button"
                     >
-                      <span>{group}</span>
+                      <span className="flex items-center gap-2">{group}{!isOpen ? <RequestCountBadge count={items.reduce((total, item) => total + (item.badgeCount ?? 0), 0)} /> : null}</span>
                       <span
                         aria-hidden="true"
                         className={`flex size-5 items-center justify-center rounded-full border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
@@ -563,7 +566,10 @@ export function AppShell({
   const router = useRouter();
   const pathname = usePathname();
   const isTechnician = role === "technician";
-  const navItems = useMemo(() => getAppNavItemsForRole(role, allowances, sidebarOrder), [allowances, role, sidebarOrder]);
+  const pendingRequestCount = useRequestBadge(role, pathname);
+  const navItems = useMemo(() => getAppNavItemsForRole(role, allowances, sidebarOrder).map((item) =>
+    item.href === "/app/admin/service-requests" ? { ...item, badgeCount: pendingRequestCount } : item
+  ), [allowances, role, sidebarOrder, pendingRequestCount]);
   const [pendingNavHref, setPendingNavHref] = useState<string | null>(null);
   const activePathname = pendingNavHref && !isAppNavItemActive(pathname, { href: pendingNavHref, label: "", shortLabel: "", abbreviation: "" })
     ? pendingNavHref
