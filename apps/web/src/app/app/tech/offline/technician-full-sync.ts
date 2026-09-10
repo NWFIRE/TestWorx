@@ -35,7 +35,23 @@ async function fetchTechnicianUpdates() {
   return payload as TechnicianSyncPayload;
 }
 
-export async function runTechnicianFullSync(): Promise<TechnicianManualSyncResult> {
+let pendingSync: Promise<TechnicianManualSyncResult> | null = null;
+let refreshRequested = false;
+
+export function runTechnicianFullSync(refreshAfterPending = false): Promise<TechnicianManualSyncResult> {
+  if (pendingSync && refreshAfterPending) refreshRequested = true;
+  pendingSync ??= (async () => {
+    let result: TechnicianManualSyncResult;
+    do {
+      refreshRequested = false;
+      result = await performTechnicianFullSync();
+    } while (refreshRequested);
+    return result;
+  })().finally(() => { pendingSync = null; });
+  return pendingSync;
+}
+
+async function performTechnicianFullSync(): Promise<TechnicianManualSyncResult> {
   startTechnicianSyncEngine();
 
   if (!window.navigator.onLine) {

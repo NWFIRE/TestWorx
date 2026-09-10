@@ -18,6 +18,7 @@ const WORK_ORDER_LINE_ITEM_STORE = "workOrderLineItems";
 const SYNC_QUEUE_STORE = "syncQueue";
 const META_STORE = "meta";
 const OFFLINE_CHANGE_EVENT = "tradeworx-offline-change";
+const SCREEN_CHANGE_EVENT = "tradeworx-screen-change";
 
 let databasePromise: Promise<IDBDatabase> | null = null;
 
@@ -86,6 +87,14 @@ export function subscribeToOfflineChanges(callback: () => void) {
   return () => window.removeEventListener(OFFLINE_CHANGE_EVENT, callback);
 }
 
+export function subscribeToScreenChanges(key: LocalScreenSnapshotKey, callback: () => void) {
+  const listener = (event: Event) => {
+    if ((event as CustomEvent).detail === key) callback();
+  };
+  window.addEventListener(SCREEN_CHANGE_EVENT, listener);
+  return () => window.removeEventListener(SCREEN_CHANGE_EVENT, listener);
+}
+
 export async function putScreenSnapshot<T>(key: LocalScreenSnapshotKey, payload: T, updatedAt = new Date().toISOString()) {
   const record: ScreenSnapshotRecord<T> = { key, payload, updatedAt };
   await runTransaction<void>(SCREEN_SNAPSHOT_STORE, "readwrite", (store, resolve, reject) => {
@@ -94,6 +103,7 @@ export async function putScreenSnapshot<T>(key: LocalScreenSnapshotKey, payload:
     request.onerror = () => reject(request.error);
   });
   notifyOfflineChange();
+  window.dispatchEvent(new CustomEvent(SCREEN_CHANGE_EVENT, { detail: key }));
 }
 
 export async function getScreenSnapshot<T>(key: LocalScreenSnapshotKey) {

@@ -120,11 +120,8 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
       </section>
 
       {filter === "active" ? null : (
-      <section className="space-y-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Recently completed</p>
-          <h3 className="mt-1 text-xl font-semibold text-slate-950">Last two weeks</h3>
-        </div>
+      <details className="space-y-3 rounded-[1.75rem] border border-slate-200 bg-white p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-600">Completed history (last two weeks)</summary>
         {dashboard.recentCompleted.length > 0 ? dashboard.recentCompleted.map((inspection: any) => (
           <article className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]" key={inspection.id}>
             <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
@@ -138,7 +135,7 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
             Completed inspections will appear here after you finish and sync them.
           </div>
         )}
-      </section>
+      </details>
       )}
     </div>
   );
