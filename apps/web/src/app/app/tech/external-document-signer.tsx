@@ -5,6 +5,7 @@ import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 import { BrandLoader } from "@/app/brand-loader";
 import { PageBackControl } from "@/app/page-back-control";
+import { JobTimeControl, useJobTime } from "./job-time-control";
 
 const initialState = { error: null as string | null, success: null as string | null };
 
@@ -291,7 +292,8 @@ export function ExternalDocumentSigner({
   document: inspectionDocument,
   action,
   backNavigation,
-  dispatchNotes
+  dispatchNotes,
+  jobTimeUserId
 }: {
   inspectionId: string;
   document: {
@@ -309,8 +311,11 @@ export function ExternalDocumentSigner({
     fallbackHref: string;
   };
   dispatchNotes?: string | null;
+  jobTimeUserId?: string;
 }) {
+  const timer = useJobTime(inspectionId, jobTimeUserId);
   const [state, formAction, pending] = useActionState(action, initialState);
+  useEffect(() => { if (state.success) window.dispatchEvent(new Event("job-time-changed")); }, [state.success]);
   const [pages, setPages] = useState<RenderedPage[]>([]);
   const [annotationStrokes, setAnnotationStrokes] = useState<AnnotationStroke[]>([]);
   const [activeColor, setActiveColor] = useState<string>(strokeColorOptions[0].value);
@@ -427,6 +432,7 @@ export function ExternalDocumentSigner({
 
   return (
     <div className="space-y-6">
+      {jobTimeUserId ? <JobTimeControl timer={timer} /> : null}
       <div className="rounded-[2rem] bg-white p-6 shadow-panel">
         {backNavigation ? (
           <PageBackControl className="mb-2" fallbackHref={backNavigation.fallbackHref} label={backNavigation.label} />
@@ -517,7 +523,7 @@ export function ExternalDocumentSigner({
                 key={page.pageIndex}
                 activeColor={activeColor}
                 activeWidth={activeWidth}
-                disabled={pending || Boolean(pdfError)}
+                disabled={pending || !timer.canEdit || Boolean(pdfError)}
                 interactionMode={interactionMode}
                 onStrokeComplete={(stroke) => {
                   setAnnotationStrokes((current) => [...current, stroke]);
@@ -612,7 +618,7 @@ export function ExternalDocumentSigner({
           {state.success ? <p className="text-sm text-emerald-600">{state.success}</p> : null}
           <button
             className="w-full rounded-2xl bg-[var(--tenant-primary)] px-5 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)] disabled:opacity-60"
-            disabled={pending || totalStrokeCount === 0 || Boolean(pdfError) || loadingPdf}
+            disabled={pending || !timer.canEdit || totalStrokeCount === 0 || Boolean(pdfError) || loadingPdf}
             type="submit"
           >
             {pending

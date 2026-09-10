@@ -30,6 +30,7 @@ import { deleteLocalWorkOrderLineItem, listLocalWorkOrderLineItems, putLocalWork
 import { queueWorkOrderLaborLineItemUpsert, queueWorkOrderLineItemDelete, queueWorkOrderLineItemUpsert } from "./offline/offline-sync";
 import type { LocalWorkOrderLineItemRecord } from "./offline/offline-types";
 import { useMobileReportDraftController } from "./use-mobile-report-draft-controller";
+import { JobTimeControl, useJobTime } from "./job-time-control";
 
 type GuidedReportStepId = "overview" | "details" | "labor" | "photos" | "deficiencies" | "review" | "finalize";
 
@@ -180,7 +181,8 @@ export function MobileSmartReportScreen({
 }) {
   void mode;
   const router = useRouter();
-  const controller = useMobileReportDraftController({ data, inspectionId, taskId });
+  const timer = useJobTime(inspectionId, data.jobTimeUserId);
+  const controller = useMobileReportDraftController({ data: { ...data, canEdit: data.canEdit && timer.canEdit }, inspectionId, taskId });
   const [finalizeQueued, setFinalizeQueued] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, string | null>>({});
@@ -191,7 +193,7 @@ export function MobileSmartReportScreen({
   );
   const preview = useMemo(() => buildReportPreview(controller.draft), [controller.draft]);
   const validationIssues = useMemo(() => collectFinalizationValidationIssues(controller.draft), [controller.draft]);
-  const isReadOnly = !data.canEdit || data.reportStatus === "finalized" || controller.saveState === "Finalized";
+  const isReadOnly = !data.canEdit || !timer.canEdit || data.reportStatus === "finalized" || controller.saveState === "Finalized";
   const isWorkOrder = data.template.label.toLowerCase() === "work order";
 
   async function handleFinalize() {
@@ -219,6 +221,8 @@ export function MobileSmartReportScreen({
   }
 
   return (
+    <>
+    {data.jobTimeUserId ? <JobTimeControl timer={timer} beforePause={controller.flushDraftSync} /> : null}
     <SingleScrollReportWorkflow
       controller={controller}
       data={data}
@@ -236,6 +240,7 @@ export function MobileSmartReportScreen({
       setOpenSections={setOpenSections}
       validationIssues={validationIssues}
     />
+    </>
   );
 }
 
@@ -308,13 +313,13 @@ function SingleScrollReportWorkflow({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <AddReportTypeControl
+            <fieldset disabled={isReadOnly}><AddReportTypeControl
               existingReports={data.inspectionWorkspace.relatedTasks.map((task) => ({
                 id: task.id,
                 displayLabel: task.displayLabel
               }))}
               inspectionId={data.inspectionWorkspace.inspectionId}
-            />
+            /></fieldset>
             <div className="hidden min-w-24 text-right md:block">
               <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Progress</p>
               <p className="mt-1 text-sm font-semibold text-slate-950">{progressLabel}</p>
@@ -493,13 +498,13 @@ function LegacyGuidedReportWorkflow({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <AddReportTypeControl
+            <fieldset disabled={isReadOnly}><AddReportTypeControl
               existingReports={data.inspectionWorkspace.relatedTasks.map((task) => ({
                 id: task.id,
                 displayLabel: task.displayLabel
               }))}
               inspectionId={data.inspectionWorkspace.inspectionId}
-            />
+            /></fieldset>
             <div className="hidden min-w-24 text-right md:block">
               <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Progress</p>
               <p className="mt-1 text-sm font-semibold text-slate-950">{stepProgress}</p>

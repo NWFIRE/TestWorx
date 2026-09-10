@@ -18,6 +18,8 @@ const LAST_SYNC_META_KEY = "last-sync-at";
 const STALE_SYNCING_ENTRY_MS = 30_000;
 
 let syncStarted = false;
+let jobTimeUserId: string | null = null;
+export function setJobTimeSyncUser(userId: string | null) { jobTimeUserId = userId; }
 let syncInFlight: Promise<void> | null = null;
 let intervalHandle: number | null = null;
 let onlineHandler: (() => void) | null = null;
@@ -78,6 +80,7 @@ async function upsertPendingQueueEntry(
   const timestamp = nowIso();
   const nextEntry: SyncQueueEntry = {
     ...input,
+    payload: { ...input.payload, queueOrderAt: timestamp },
     status: "pending",
     retryCount: existing?.retryCount ?? 0,
     lastError: null,
@@ -211,13 +214,19 @@ export async function processSyncQueue() {
   }
 
   syncInFlight = (async () => {
-    const entries = (await listSyncQueueEntries()).filter(isProcessableQueueEntry).sort((left, right) => left.updatedAt.localeCompare(right.updatedAt));
+    const allEntries = (await listSyncQueueEntries()).filter((entry) => entry.operation !== "job_time_event" || entry.payload.userId === jobTimeUserId);
+    // A rejected clock event must be reviewed before dependent edits can sync.
+    if (allEntries.some((entry) => entry.operation === "job_time_event" && entry.status === "conflict")) return;
+    const entries = allEntries.filter(isProcessableQueueEntry).sort((left, right) =>
+      String(left.payload.queueOrderAt ?? left.createdAt).localeCompare(String(right.payload.queueOrderAt ?? right.createdAt)));
 
     for (const entry of entries) {
       const current = await getSyncQueueEntry(entry.id);
       if (!current || !isProcessableQueueEntry(current)) {
         continue;
       }
+      if (current.operation === "job_time_event" && current.payload.action === "pause" &&
+          (await listSyncQueueEntries()).some((queued) => queued.id !== current.id && ["failed", "conflict"].includes(queued.status))) break;
 
       if (current.operation === "report_autosave") {
         const local = await getLocalReportDraft(current.entityId);
@@ -230,6 +239,7 @@ export async function processSyncQueue() {
       const syncMarker = nowIso();
       await putSyncQueueEntry({
         ...current,
+        payload: { ...current.payload, queueOrderAt: current.payload.queueOrderAt ?? current.createdAt },
         status: "syncing",
         lastError: null,
         lastAttemptAt: syncMarker,
@@ -237,7 +247,13 @@ export async function processSyncQueue() {
       });
 
       try {
-        if (current.operation === "report_autosave") {
+        if (current.operation === "job_time_event") {
+          const response = await fetch("/api/tech/job-time", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(current.payload) });
+          if (!response.ok) {
+            const result = await response.json().catch(() => ({}));
+            throw Object.assign(new Error(result.error ?? "Unable to sync job time."), { syncConflict: response.status === 409 || response.status === 403 });
+          }
+        } else if (current.operation === "report_autosave") {
           await syncReportAutosave(current);
         } else if (current.operation === "report_finalize") {
           await syncReportFinalize(current);
@@ -266,6 +282,7 @@ export async function processSyncQueue() {
         } else {
           await deleteSyncQueueEntry(current.id);
           await putOfflineMeta(LAST_SYNC_META_KEY, nowIso());
+          if (current.operation === "job_time_event" || current.operation === "report_finalize") window.dispatchEvent(new Event("job-time-changed"));
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to sync this change.";
@@ -308,6 +325,8 @@ export async function processSyncQueue() {
             }
           }
         }
+        // Do not send a pause/finalize past a failed save or rejected start.
+        if (!/Start or resume this job/i.test(message)) break;
       }
     }
   })().finally(() => {
@@ -315,6 +334,13 @@ export async function processSyncQueue() {
   });
 
   return syncInFlight;
+}
+
+export async function queueJobTimeEvent(payload: { inspectionId: string; sessionId: string; userId: string; action: "start" | "pause"; occurredAt: string; offline: boolean }) {
+  await upsertPendingQueueEntry({ id: `job_time:${payload.sessionId}:${payload.action}`, entityType: "job_time", entityId: payload.sessionId, operation: "job_time_event", payload });
+  await processSyncQueue();
+  // A save already in flight may have taken its queue snapshot before this event.
+  await processSyncQueue();
 }
 
 export async function recordSuccessfulSync(timestamp = nowIso()) {
@@ -409,6 +435,7 @@ export async function queueReportFinalizeSync(input: {
     entityId: input.reportId,
     operation: "report_finalize",
     payload: {
+      jobFinishedAt: nowIso(),
       inspectionReportId: input.inspectionReportId,
       contentJson: input.contentJson,
       taskDisplayLabel: input.taskDisplayLabel

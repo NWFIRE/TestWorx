@@ -37,6 +37,7 @@ import { InspectionStatusUpdateCard } from "../../inspection-status-update-card"
 import { PriorityBadge, StatusBadge } from "../../operations-ui";
 import { InspectionPacketCard } from "../../../inspection-packet-card";
 import { InspectionDetailTabs } from "./inspection-detail-tabs";
+import { JobTimeReview } from "../../job-time-review";
 
 type InspectionType = Parameters<typeof getDefaultInspectionRecurrenceFrequency>[0];
 type RecurrenceFrequency = ReturnType<typeof getDefaultInspectionRecurrenceFrequency>;
@@ -355,6 +356,7 @@ export default async function EditInspectionPage({
         overview={
           <div className="grid gap-5 lg:grid-cols-[1.4fr_0.9fr]">
             <div className="space-y-5">
+              <JobTimeReview inspectionId={inspectionId} />
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-sm text-slate-500">Status</p>

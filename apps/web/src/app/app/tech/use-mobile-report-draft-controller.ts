@@ -167,6 +167,7 @@ export function useMobileReportDraftController({
   const queueTimerRef = useRef<number | null>(null);
   const fieldTimerRef = useRef<Map<string, number>>(new Map());
   const localInteractionStartedRef = useRef(false);
+  const syncGenerationRef = useRef(0);
   const finalizeInFlightRef = useRef(false);
   const showDeviceSyncWarnings = data.showDeviceSyncWarnings !== false;
 
@@ -241,6 +242,8 @@ export function useMobileReportDraftController({
       immediateQueue?: boolean;
     }
   ) => {
+    if (!data.canEdit || data.reportStatus === "finalized") return;
+    const syncGeneration = syncGenerationRef.current;
     localInteractionStartedRef.current = true;
     const nextDraft = mutation(draftRef.current);
     draftRef.current = nextDraft;
@@ -256,6 +259,7 @@ export function useMobileReportDraftController({
         lastError: null
       });
 
+      if (syncGeneration !== syncGenerationRef.current) return;
       if (options?.debounceKey) {
         const existingTimer = fieldTimerRef.current.get(options.debounceKey);
         if (existingTimer) {
@@ -277,7 +281,7 @@ export function useMobileReportDraftController({
       setErrorMessage(toTechnicianFacingSaveMessage(error instanceof Error ? error.message : null, "save"));
       setSaveState("Error");
     }
-  }, [persistDraftLocally, scheduleDraftSync]);
+  }, [data.canEdit, data.reportStatus, persistDraftLocally, scheduleDraftSync]);
 
   useEffect(() => {
     let cancelled = false;
@@ -610,7 +614,15 @@ export function useMobileReportDraftController({
     });
   }, [persistDraftLocally]);
 
+  const flushDraftSync = useCallback(async () => {
+    syncGenerationRef.current += 1;
+    clearPendingDraftSyncTimers();
+    if (!localInteractionStartedRef.current || localRecordRef.current?.pendingFinalize || data.reportStatus === "finalized") return;
+    await queueReportDraftSync({ reportId: data.reportId, inspectionReportId: data.reportId, contentJson: draftRef.current, taskDisplayLabel: data.customInspectionTypeLabel ?? null });
+  }, [clearPendingDraftSyncTimers, data.reportId, data.reportStatus, data.customInspectionTypeLabel]);
+
   const finalizeReport = useCallback(async () => {
+    if (!data.canEdit) return { ok: false as const };
     if (finalizeInFlightRef.current) {
       return { ok: false as const };
     }
@@ -662,7 +674,7 @@ export function useMobileReportDraftController({
       finalizeInFlightRef.current = false;
       setFinalizeInFlight(false);
     }
-  }, [clearPendingDraftSyncTimers, data.customInspectionTypeLabel, data.reportId, data.reportStatus, persistDraftLocally]);
+  }, [clearPendingDraftSyncTimers, data.canEdit, data.customInspectionTypeLabel, data.reportId, data.reportStatus, persistDraftLocally]);
 
   return {
     draft,
@@ -685,6 +697,7 @@ export function useMobileReportDraftController({
     updateSignature,
     updateSignerName,
     persistCurrentDraftLocally,
+    flushDraftSync,
     finalizeReport
   };
 }

@@ -3617,6 +3617,7 @@ export async function updateInspectionStatus(
   const parsedActor = parseActor(actor);
   const tenantId = parsedActor.tenantId as string;
   const trimmedNote = options?.note?.trim() ? options.note.trim() : null;
+  await (await import("./job-time")).assertJobStarted(actor, inspectionId);
 
   const inspection = await prisma.inspection.findFirst({
     where: { id: inspectionId, tenantId },
@@ -3667,6 +3668,9 @@ export async function updateInspectionStatus(
   return prisma.$transaction(async (tx) => {
     if (inspection.status === status) {
       return inspection;
+    }
+    if ([InspectionStatus.completed, InspectionStatus.invoiced, InspectionStatus.cancelled].includes(status as "completed" | "invoiced" | "cancelled")) {
+      await (await import("./job-time")).stopJobTimeTx(tx, tenantId, inspectionId, new Date());
     }
 
     const priorityState = resolveInspectionPriorityState({
@@ -3772,6 +3776,7 @@ export async function completeInspectionWithCloseoutRequest(
   const parsedActor = parseActor(actor);
   const tenantId = parsedActor.tenantId as string;
   const parsedRequest = inspectionCloseoutRequestSchema.parse(input ?? { requestType: "none" });
+  await (await import("./job-time")).assertJobStarted(actor, inspectionId);
 
   const inspection = await prisma.inspection.findFirst({
     where: { id: inspectionId, tenantId },
@@ -3833,6 +3838,7 @@ export async function completeInspectionWithCloseoutRequest(
             priorityClearedAt: priorityState.priorityClearedAt
           }
         });
+    await (await import("./job-time")).stopJobTimeTx(tx, tenantId, inspectionId, new Date());
 
     const generatedInspections = inspection.status === InspectionStatus.completed
       ? []
@@ -3998,6 +4004,7 @@ export async function addInspectionTask(actor: ActorContext, input: {
   const parsedActor = parseActor(actor);
   const tenantId = parsedActor.tenantId as string;
   const inspectionType = inspectionTypeEnum.parse(input.inspectionType);
+  await (await import("./job-time")).assertJobStarted(actor, input.inspectionId);
 
   return prisma.$transaction(async (tx) => {
     const inspection = await tx.inspection.findFirst({
@@ -4110,6 +4117,7 @@ export async function removeInspectionTask(actor: ActorContext, input: {
 }) {
   const parsedActor = parseActor(actor);
   const tenantId = parsedActor.tenantId as string;
+  await (await import("./job-time")).assertJobStarted(actor, input.inspectionId);
 
   return prisma.$transaction(async (tx) => {
     const inspection = await tx.inspection.findFirst({

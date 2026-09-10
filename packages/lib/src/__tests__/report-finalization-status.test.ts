@@ -14,6 +14,8 @@ import { resolveInspectionCompletionAfterTaskFinalizationTx } from "../report-se
 
 function buildTxMock() {
   return {
+    $queryRaw: vi.fn(),
+    jobTimeSession: { updateMany: vi.fn(async () => ({ count: 1 })) },
     inspection: {
       findFirst: vi.fn(),
       findMany: vi.fn(),

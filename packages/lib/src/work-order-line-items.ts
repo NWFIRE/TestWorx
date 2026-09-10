@@ -506,6 +506,7 @@ export async function upsertWorkOrderLineItem(actor: ActorContext, input: {
   technicianNotes?: string | null;
 }) {
   const { parsedActor } = await getAuthorizedWorkOrderInspection(actor, input.inspectionId);
+  await (await import("./job-time")).assertJobStarted(actor, input.inspectionId);
   await assertWorkOrderLineItemTable();
   const tenantId = parsedActor.tenantId as string;
   const catalogItem = await prisma.quickBooksCatalogItem.findFirst({
@@ -649,6 +650,7 @@ export async function upsertWorkOrderLaborLineItem(actor: ActorContext, input: {
   technicianNotes?: string | null;
 }) {
   const { parsedActor } = await getAuthorizedWorkOrderInspection(actor, input.inspectionId);
+  await (await import("./job-time")).assertJobStarted(actor, input.inspectionId);
   await assertWorkOrderLineItemTable();
   await assertWorkOrderLaborTypeTable();
   if (!await hasWorkOrderLaborLineColumns()) {
@@ -811,6 +813,7 @@ export async function deleteWorkOrderLineItem(actor: ActorContext, input: {
   lineItemId: string;
 }) {
   const { parsedActor } = await getAuthorizedWorkOrderInspection(actor, input.inspectionId);
+  await (await import("./job-time")).assertJobStarted(actor, input.inspectionId);
   if (!await hasWorkOrderLineItemTable()) {
     return { ok: true };
   }

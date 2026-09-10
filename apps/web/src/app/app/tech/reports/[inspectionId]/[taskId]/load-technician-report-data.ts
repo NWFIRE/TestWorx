@@ -79,6 +79,7 @@ export async function loadTechnicianReportData(inspectionId: string, taskId: str
     : [[], [], []];
 
   const data: TechnicianReportEditorData = {
+    jobTimeUserId: session.user.role === "technician" ? session.user.id : undefined,
     reportId: report.id,
     reportStatus: report.status,
     reportUpdatedAt: report.updatedAt,

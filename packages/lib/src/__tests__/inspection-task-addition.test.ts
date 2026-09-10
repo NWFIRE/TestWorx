@@ -43,6 +43,7 @@ const { prismaMock, txMock } = vi.hoisted(() => {
   return {
     txMock: tx,
     prismaMock: {
+      jobTimeSession: { findFirst: vi.fn(async () => ({ id: "active-session" })) },
       auditLog: {
         create: vi.fn()
       },

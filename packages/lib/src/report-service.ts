@@ -8,6 +8,7 @@ import { actorContextSchema, reportStatuses } from "@testworx/types";
 
 import { resolveTenantBranding } from "./branding";
 import { assertTenantEntitlementForTenant } from "./billing";
+import { assertJobStarted } from "./job-time";
 import { snapshotComplianceReferences } from "./compliance-references";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
 import { syncInspectionBillingSummaryTx } from "./inspection-billing";
@@ -1109,6 +1110,7 @@ async function persistReportDraftTransaction(input: {
   startInspectionFromReportWork?: boolean;
 }) {
   const tenantId = input.parsedActor.tenantId as string;
+  await assertJobStarted(input.parsedActor, input.report.inspectionId, input.tx);
 
   await input.tx.inspectionReport.update({
     where: { id: input.report.id },
@@ -1529,6 +1531,7 @@ export async function saveReportDraft(actor: ActorContext, input: {
   taskDisplayLabel?: string | null;
 }) {
   const { parsedActor, report } = await getAuthorizedEditableReport(actor, input.inspectionReportId);
+  await assertJobStarted(actor, report.inspectionId);
 
   if (!canEditReport(parsedActor.role, report.status)) {
     throw new Error("This report is locked.");
@@ -1830,6 +1833,7 @@ async function replaceGeneratedReportPdfTx(
 }
 
 type FinalizeInspectionReportInput = {
+  jobFinishedAt?: string;
   inspectionReportId?: string;
   inspectionId?: string;
   taskId?: string;
@@ -2000,6 +2004,7 @@ export async function finalizeInspectionReport(actor: ActorContext, input: Final
   const { parsedActor, report } = await getAuthorizedEditableReport(actor, inspectionReportId, {
     allowCompletedInspectionFinalize: true
   });
+  await assertJobStarted(actor, report.inspectionId);
 
   if (!canFinalizeReport(parsedActor.role, report.status)) {
     throw new Error("This report cannot be finalized.");
@@ -2220,6 +2225,16 @@ export async function finalizeInspectionReport(actor: ActorContext, input: Final
       });
     }
 
+    if (parsedActor.role === "technician" && input.jobFinishedAt) {
+      const finish = new Date(input.jobFinishedAt);
+      const now = new Date();
+      if (!Number.isFinite(finish.getTime()) || finish.getTime() > now.getTime() + 60_000 || finish.getTime() < now.getTime() - 30 * 86400_000) throw new Error("Job finish time needs office review. Check the device clock.");
+      if (now.getTime() - finish.getTime() > 60_000) {
+        const invalid = await tx.jobTimeSession.findFirst({ where: { tenantId: parsedActor.tenantId!, inspectionId: report.inspectionId, technicianId: parsedActor.userId, endReason: "completed", endedAt: finalizedAt, startedAt: { gt: finish } } });
+        if (invalid) throw new Error("Job finish time is before the recorded start. Contact the office.");
+        await tx.jobTimeSession.updateMany({ where: { tenantId: parsedActor.tenantId!, inspectionId: report.inspectionId, technicianId: parsedActor.userId, endReason: "completed", endedAt: finalizedAt }, data: { endedAt: finish, needsReview: true } });
+      }
+    }
     return finalized;
   }, { timeout: 20_000 });
 

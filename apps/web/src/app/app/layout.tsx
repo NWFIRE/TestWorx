@@ -43,7 +43,7 @@ export default async function AppLayout({ children }: Readonly<{ children: React
         role={session.user.role}
         sidebarOrder={sidebarOrder}
         signOutAction={signOutAction}
-        user={{ email: session.user.email ?? null, name: session.user.name ?? null }}
+        user={{ id: session.user.id, email: session.user.email ?? null, name: session.user.name ?? null }}
       >
         {children}
       </AppShell>

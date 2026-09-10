@@ -29,12 +29,16 @@ export default async function TechnicianInspectionDocumentPage({
       inspectionId,
       documentId
     );
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && /Closed inspections are no longer available/i.test(error.message)) {
+      redirect("/app/tech/inspections?job=completed");
+    }
     notFound();
   }
 
   return (
     <ExternalDocumentSigner
+      jobTimeUserId={session.user.id}
       action={signInspectionDocumentAction}
       backNavigation={{ fallbackHref: "/app/tech/inspections", label: "Back to inspections" }}
       document={{

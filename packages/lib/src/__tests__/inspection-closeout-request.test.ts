@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock, txMock } = vi.hoisted(() => {
   const tx = {
+    $queryRaw: vi.fn(),
+    jobTimeSession: { updateMany: vi.fn(async () => ({ count: 1 })) },
     inspection: {
       findFirst: vi.fn(),
       update: vi.fn(),
@@ -30,6 +32,7 @@ const { prismaMock, txMock } = vi.hoisted(() => {
   return {
     txMock: tx,
     prismaMock: {
+      jobTimeSession: { findFirst: vi.fn(async () => ({ id: "active-session" })) },
       inspection: {
         findFirst: vi.fn()
       },

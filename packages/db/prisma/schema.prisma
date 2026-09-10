@@ -402,6 +402,7 @@ model SubscriptionPlan {
 }
 
 model Tenant {
+  jobTimeSessions JobTimeSession[]
   id                        String                 @id @default(cuid())
   slug                      String                 @unique
   name                      String
@@ -486,6 +487,7 @@ model Tenant {
 }
 
 model User {
+  jobTimeSessions JobTimeSession[]
   id                  String                  @id @default(cuid())
   tenantId            String?
   customerCompanyId   String?
@@ -972,6 +974,7 @@ model Asset {
 }
 
 model Inspection {
+  jobTimeSessions JobTimeSession[]
     id                    String                  @id @default(cuid())
     tenantId              String
     customerCompanyId     String
@@ -1197,6 +1200,24 @@ model EmailReminderSendLog {
   @@index([tenantId, sentAt])
   @@index([tenantId, dueMonth])
   @@index([tenantId, customerCompanyId, sentAt])
+}
+
+model JobTimeSession {
+  id String @id @default(cuid())
+  tenantId String
+  inspectionId String
+  technicianId String
+  startedAt DateTime
+  endedAt DateTime?
+  endReason String?
+  needsReview Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  inspection Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  technician User @relation(fields: [technicianId], references: [id])
+  @@index([tenantId, inspectionId, startedAt])
+  @@index([tenantId, technicianId, startedAt])
 }
 
 model InspectionTechnicianAssignment {

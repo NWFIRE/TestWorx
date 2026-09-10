@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { InspectionDocumentStatus, InspectionStatus } from "@prisma/client";
 
 const prismaMock = {
+  $transaction: vi.fn(),
+  jobTimeSession: { findFirst: vi.fn(async () => ({ id: "active-session" })) },
   user: {
     findFirst: vi.fn()
   },
@@ -9,6 +11,7 @@ const prismaMock = {
     findFirst: vi.fn()
   },
   inspectionDocument: {
+    count: vi.fn(async () => 1),
     create: vi.fn(),
     findFirst: vi.fn(),
     findMany: vi.fn(),
@@ -52,6 +55,12 @@ vi.mock("../scheduling", () => ({
   }),
   isActiveOperationalInspectionStatus: vi.fn(() => true)
 }));
+vi.mock("../inspection-status-consistency", () => ({ reconcileInspectionStatusTx: vi.fn(async () => ({ completed: true })) }));
+vi.mock("../inspection-billing", () => ({ syncInspectionBillingSummaryTx: vi.fn(async () => undefined) }));
+
+beforeEach(() => {
+  prismaMock.$transaction.mockImplementation(async (callback) => callback(prismaMock));
+});
 
 vi.mock("../storage", async () => {
   const actual = await vi.importActual<typeof import("../storage")>("../storage");
@@ -165,7 +174,8 @@ describe("inspection external documents", () => {
     );
   });
 
-  it("creates a separate signed PDF and updates status when signed", async () => {
+  it.each([0, 1])("creates a separate signed PDF and reconciles completion with %i remaining signatures", async (remaining) => {
+    prismaMock.inspectionDocument.count.mockResolvedValueOnce(remaining);
     const { buildStoredFilePayload, decodeStoredFile, deleteStoredFile } = await import("../storage");
     vi.mocked(decodeStoredFile)
       .mockResolvedValueOnce({ mimeType: "application/pdf", bytes: minimalPdfBytes() })
@@ -218,6 +228,10 @@ describe("inspection external documents", () => {
       })
     );
     expect(deleteStoredFile).toHaveBeenCalledWith("blob:tenant_1/inspection-document-signed/old.pdf");
+    const { reconcileInspectionStatusTx } = await import("../inspection-status-consistency");
+    const { syncInspectionBillingSummaryTx } = await import("../inspection-billing");
+    expect(reconcileInspectionStatusTx).toHaveBeenCalledTimes(remaining === 0 ? 1 : 0);
+    expect(syncInspectionBillingSummaryTx).toHaveBeenCalledTimes(remaining === 0 ? 1 : 0);
   });
 
   it("creates an annotated signed PDF when markup data is provided", async () => {

@@ -558,6 +558,7 @@ export function AppShell({
   allowances?: Record<string, boolean> | null;
   sidebarOrder?: string[] | null;
   user: {
+    id?: string;
     name: string | null;
     email: string | null;
   };
@@ -890,7 +891,7 @@ export function AppShell({
 
   const shell = (
     <div className="flex min-h-0 overflow-hidden bg-paper" style={{ height: "var(--app-height, 100dvh)" }}>
-      {isTechnician ? <TechnicianSyncBootstrap /> : null}
+      {isTechnician ? <TechnicianSyncBootstrap userId={user.id} /> : null}
       {navItems.length > 0 ? (
         <aside
           aria-label="Primary navigation"

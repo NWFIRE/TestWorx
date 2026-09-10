@@ -65,6 +65,7 @@ export type WorkOrderLaborTypeForMobile = {
 };
 
 export type TechnicianReportEditorData = {
+  jobTimeUserId?: string;
   reportId: string;
   reportStatus: "draft" | "submitted" | "finalized";
   reportUpdatedAt: string;

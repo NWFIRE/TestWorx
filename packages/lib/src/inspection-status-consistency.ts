@@ -3,6 +3,7 @@ import { reportStatuses } from "@testworx/types";
 
 import type { JsonObject } from "./json-types";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
+import { stopJobTimeTx } from "./job-time";
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -215,6 +216,7 @@ export async function reconcileInspectionStatusTx(tx: TransactionClient, input: 
   const changed = inspection.status !== nextStatus;
 
   if (shouldCloseInspection) {
+    await stopJobTimeTx(tx, input.tenantId, input.inspectionId, completedAt);
     await tx.inspectionTask.updateMany({
       where: {
         tenantId: input.tenantId,

@@ -576,6 +576,7 @@ export async function signInspectionDocument(actor: ActorContext, input: {
   if (!allowed) {
     throw new Error("You do not have access to sign this inspection document.");
   }
+  await (await import("./job-time")).assertJobStarted(actor, document.inspectionId);
 
   if (parsedActor.role === "technician" && !isActiveOperationalInspectionStatus(document.inspection.status)) {
     throw new Error("Closed inspections are no longer available in the technician app.");
@@ -623,7 +624,8 @@ export async function signInspectionDocument(actor: ActorContext, input: {
 
   const previousAnnotatedKey = document.annotatedStorageKey;
   const previousSignedKey = document.signedStorageKey;
-  const updated = await prisma.inspectionDocument.update({
+  const updated = await prisma.$transaction(async (tx) => {
+  const updatedDocument = await tx.inspectionDocument.update({
     where: { id: document.id },
     data: {
       status: requiresSignature ? InspectionDocumentStatus.SIGNED : InspectionDocumentStatus.ANNOTATED,
@@ -635,6 +637,16 @@ export async function signInspectionDocument(actor: ActorContext, input: {
       signedAt: requiresSignature ? savedAt : document.signedAt
     }
   });
+  if (requiresSignature) {
+    const remaining = await tx.inspectionDocument.count({ where: { tenantId: parsedActor.tenantId!, inspectionId: document.inspectionId, requiresSignature: true, status: { notIn: [InspectionDocumentStatus.SIGNED, InspectionDocumentStatus.EXPORTED] } } });
+    if (remaining === 0) {
+      const { reconcileInspectionStatusTx } = await import("./inspection-status-consistency");
+      const result = await reconcileInspectionStatusTx(tx, { tenantId: parsedActor.tenantId!, inspectionId: document.inspectionId, actorUserId: parsedActor.userId, source: "mobile_or_web_finalize", completedAt: savedAt });
+      if (result.completed) await (await import("./inspection-billing")).syncInspectionBillingSummaryTx(tx, { tenantId: parsedActor.tenantId!, inspectionId: document.inspectionId });
+    }
+  }
+  return updatedDocument;
+  }, { timeout: 20_000 });
 
   await createInspectionDocumentAuditLog({
     tenantId: parsedActor.tenantId as string,

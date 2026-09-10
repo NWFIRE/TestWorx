@@ -1,8 +1,8 @@
 export type SyncQueueStatus = "pending" | "syncing" | "synced" | "failed" | "conflict";
 
-export type SyncQueueEntityType = "inspection_report" | "work_order_line_item";
+export type SyncQueueEntityType = "inspection_report" | "work_order_line_item" | "job_time";
 
-export type SyncQueueOperation = "report_autosave" | "report_finalize" | "work_order_line_upsert" | "work_order_line_delete";
+export type SyncQueueOperation = "report_autosave" | "report_finalize" | "work_order_line_upsert" | "work_order_line_delete" | "job_time_event";
 
 export type LocalScreenSnapshotKey =
   | "technician-home"
