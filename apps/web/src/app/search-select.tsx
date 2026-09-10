@@ -138,7 +138,9 @@ export function SearchSelect({
   }
 
   function updateQuery(nextQuery: string) {
-    setQueryOverride({ text: nextQuery, value, customValue });
+    // Keep typed text when editing clears the previously selected option.
+    const nextValue = selectedOption && nextQuery !== selectedOption.label ? "" : value;
+    setQueryOverride({ text: nextQuery, value: nextValue, customValue: allowCustomValue ? nextQuery : customValue });
     onQueryChange?.(nextQuery);
     setActiveIndex(0);
     setOpen(true);

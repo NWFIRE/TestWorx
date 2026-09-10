@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { SearchSelect } from "@/app/search-select";
 import { submitFieldRequestAction, type FieldRequestActionState } from "./actions";
 
 type CustomerOption = {
@@ -22,12 +23,24 @@ export function FieldRequestForm({ customers }: { customers: CustomerOption[] })
   const submitting = useRef(false);
   const submissionId = useRef<string | null>(null);
   const [customerId, setCustomerId] = useState("");
+  const customerOptions = useMemo(() => customers.map((customer) => ({
+    value: customer.id,
+    label: customer.name,
+    secondaryLabel: customer.sites[0]
+      ? [customer.sites[0].name, customer.sites[0].addressLine1, customer.sites[0].city, customer.sites[0].state].filter(Boolean).join(" · ")
+      : "No saved sites",
+    keywords: customer.sites.map((site) => [site.name, site.addressLine1, site.city, site.state].join(" ")).join(" ")
+  })), [customers]);
   const selectedCustomer = customers.find((customer) => customer.id === customerId);
 
   return (
     <form className="space-y-5" onSubmit={async (event) => {
       event.preventDefault();
       if (submitting.current) return;
+      if (!selectedCustomer) {
+        setState({ ok: false, message: "Select a customer from the search results before sending your request." });
+        return;
+      }
       const form = event.currentTarget;
       const data = new FormData(form);
       submissionId.current ??= crypto.randomUUID();
@@ -52,13 +65,18 @@ export function FieldRequestForm({ customers }: { customers: CustomerOption[] })
     }}>
       <fieldset disabled={pending} className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className="space-y-2 text-sm font-semibold text-slate-700">
-          Customer
-          <select className={fieldClass} name="customerCompanyId" onChange={(event) => setCustomerId(event.target.value)} required value={customerId}>
-            <option value="">Select customer</option>
-            {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
-          </select>
-        </label>
+        <SearchSelect
+          className="min-w-0 [&_input[role=combobox]]:text-base"
+          disabled={pending}
+          emptyText="No matching customers. Try another name or location."
+          label="Customer"
+          name="customerCompanyId"
+          onChange={(value) => setCustomerId(value)}
+          options={customerOptions}
+          placeholder="Type to search customers"
+          required
+          value={customerId}
+        />
         <label className="space-y-2 text-sm font-semibold text-slate-700">
           Site or location
           <select key={customerId} defaultValue="" className={fieldClass} disabled={!selectedCustomer?.sites.length} name="siteId">

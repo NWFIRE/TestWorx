@@ -17,6 +17,7 @@ async function main() {
     bundle: true,
     write: false,
     jsx: "automatic",
+    alias: { "@": path.resolve(__dirname, "../apps/web/src") },
     plugins: [{
       name: "mock-request-save",
       setup(builder) {
@@ -38,13 +39,30 @@ async function main() {
     await page.route("http://localhost/**", (route) => route.fulfill({ contentType: "text/html", body: '<div id="root"></div><script>window.submissions=[];window.saveMode="validation";</script>' }));
     await page.goto("http://localhost/request-test");
     await page.addScriptTag({ content: bundle.outputFiles[0].text });
-    await page.locator('[name="customerCompanyId"]').selectOption("first");
+    const search = page.getByRole("combobox", { name: "Customer", exact: true });
+    await search.fill("eNiD");
+    await page.getByRole("option", { name: /First Customer/ }).click();
+    assert.equal(await page.locator('[name="customerCompanyId"]').inputValue(), "first");
     await page.locator('[name="siteId"]').selectOption("first-site");
-    await page.locator('[name="customerCompanyId"]').selectOption("second");
+    await search.fill("sec");
+    assert.equal(await search.inputValue(), "sec", "Editing a selection must preserve the new search text");
+    assert.equal(await page.locator('[name="customerCompanyId"]').inputValue(), "");
+    await search.press("Enter");
+    assert.equal(await page.locator('[name="customerCompanyId"]').inputValue(), "second");
     assert.equal(await page.locator('[name="siteId"]').inputValue(), "");
     assert.equal(await page.locator('[name="siteId"]').isDisabled(), true);
     await page.locator('[name="title"]').fill("Replace pull station");
     await page.locator('[name="description"]').fill("The pull station at the east exit is damaged.");
+    await page.getByRole("button", { name: "Clear selection" }).click();
+    assert.equal(await search.inputValue(), "");
+    await search.fill("no matching customer");
+    await page.getByText("No matching customers. Try another name or location.").waitFor();
+    await search.press("Escape");
+    await page.getByRole("button", { name: "Send to office" }).click();
+    await page.getByText("Select a customer from the search results before sending your request.").waitFor();
+    assert.equal(await page.evaluate(() => window.submissions.length), 0, "Unselected search text cannot be submitted");
+    await search.fill("SECOND");
+    await page.getByRole("option", { name: /Second Customer/ }).click();
     await page.getByRole("button", { name: "Send to office" }).click();
     await page.getByText("Please correct the details").waitFor();
     assert.equal(await page.locator('[name="title"]').inputValue(), "Replace pull station");
@@ -60,8 +78,9 @@ async function main() {
     assert.equal(submissions[0].siteId, undefined, "Disabled optional site is omitted by the browser");
     assert.equal(await page.locator('[name="title"]').inputValue(), "");
     assert.equal(await page.locator('[name="customerCompanyId"]').inputValue(), "");
+    assert.equal(await search.inputValue(), "");
     assert.deepEqual(errors, []);
-    console.log("Browser smoke checks passed: optional site, customer change, failure retention, retry ID, double submission, success reset, and no page errors.");
+    console.log("Browser smoke checks passed: customer/location search, selection editing, keyboard selection, clear, no matches, required selection, optional site, customer change, failure retention, retry ID, double submission, success reset, and no page errors.");
   } finally {
     await browser.close();
   }
