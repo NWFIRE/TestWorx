@@ -103,6 +103,26 @@ export async function stopJobTimeTx(tx: Prisma.TransactionClient, tenantId: stri
   await tx.jobTimeSession.updateMany({ where: { tenantId, inspectionId, endedAt: null }, data: { endedAt, endReason: "completed" } });
 }
 
+export async function applyJobFinishTimeTx(tx: Prisma.TransactionClient, actor: Actor, inspectionId: string, finalizedAt: Date, capturedTime?: string) {
+  if (actor.role !== "technician" || !actor.tenantId || !capturedTime) return;
+  const finish = new Date(capturedTime);
+  const age = finalizedAt.getTime() - finish.getTime();
+  const where = { tenantId: actor.tenantId, inspectionId, technicianId: actor.userId, endReason: "completed", endedAt: finalizedAt };
+  let needsReview = !Number.isFinite(age) || age < -60_000 || age > 30 * 86400_000;
+  if (!needsReview && age <= 60_000) return;
+  if (!needsReview) {
+    needsReview = Boolean(await tx.jobTimeSession.findFirst({ where: { ...where, startedAt: { gt: finish } }, select: { id: true } }));
+  }
+  // Bad device clocks must not roll back a valid report and its billing handoff.
+  const result = await tx.jobTimeSession.updateMany({ where, data: {
+    ...(needsReview ? {} : { endedAt: finish }), needsReview: true
+  } });
+  if (needsReview && result.count) {
+    await tx.auditLog.create({ data: { tenantId: actor.tenantId, actorUserId: actor.userId, action: "job.time_conflict", entityType: "Inspection", entityId: inspectionId,
+      metadata: { occurredAt: capturedTime, message: "Device finish time needs office review. Server completion time was retained." } } });
+  }
+}
+
 export async function correctJobTime(actor: Actor, raw: unknown) {
   if (!actor.tenantId || !officeRoles.includes(actor.role)) throw new Error("Only office administrators can correct job time.");
   const input = z.object({ id: z.string().min(1), startedAt: z.string().datetime(), endedAt: z.string().datetime(), reason: z.string().trim().min(1).max(1000), updatedAt: z.string().datetime() }).parse(raw);

@@ -6,7 +6,7 @@ const db = vi.hoisted(() => ({
   tenant: { findUnique: vi.fn() }, auditLog: { create: vi.fn() }, $executeRaw: vi.fn(), $queryRaw: vi.fn(), $transaction: vi.fn()
 }));
 vi.mock("@testworx/db", () => ({ prisma: db }));
-import { assertJobStarted, recordJobTimeEvent, correctJobTime, getJobTime, stopJobTimeTx } from "../job-time";
+import { applyJobFinishTimeTx, assertJobStarted, recordJobTimeEvent, correctJobTime, getJobTime, stopJobTimeTx } from "../job-time";
 const actor = { userId: "tech", tenantId: "tenant", role: "technician" };
 const id = "c9678537-a28e-40a0-a8c8-7f73d055c321";
 const event = () => ({ action: "start", sessionId: id, inspectionId: "job", userId: "tech", occurredAt: new Date().toISOString(), offline: false });
@@ -22,6 +22,21 @@ beforeEach(() => {
   db.jobTimeSession.updateMany.mockResolvedValue({ count: 1 });
 });
 describe("job time", () => {
+  it.each(["invalid", "2099-01-01T00:00:00.000Z", "2000-01-01T00:00:00.000Z"])("retains server completion and flags an invalid device finish: %s", async (time) => {
+    await applyJobFinishTimeTx(db as never, actor, "job", new Date(), time);
+    expect(db.jobTimeSession.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { needsReview: true } }));
+    expect(db.auditLog.create).toHaveBeenCalledOnce();
+  });
+  it("keeps server completion when a captured finish precedes the job start", async () => {
+    db.jobTimeSession.findFirst.mockResolvedValue({ id });
+    await applyJobFinishTimeTx(db as never, actor, "job", new Date("2026-09-11T12:00:00Z"), "2026-09-11T11:00:00Z");
+    expect(db.jobTimeSession.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { needsReview: true } }));
+  });
+  it("preserves a valid delayed finish time", async () => {
+    await applyJobFinishTimeTx(db as never, actor, "job", new Date("2026-09-11T12:00:00Z"), "2026-09-11T11:00:00Z");
+    expect(db.jobTimeSession.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { endedAt: new Date("2026-09-11T11:00:00Z"), needsReview: true } }));
+    expect(db.auditLog.create).not.toHaveBeenCalled();
+  });
   it("blocks editing before start or while paused", async () => {
     await expect(assertJobStarted(actor, "job")).rejects.toThrow("Start or resume");
     expect(db.jobTimeSession.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId: "tenant", technicianId: "tech", inspectionId: "job", endedAt: null } }));

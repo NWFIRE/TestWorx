@@ -32,7 +32,7 @@ function buildReportSaveState(record: LocalReportDraftRecord | null, reportStatu
     }
 
     if (record.syncStatus === "failed") {
-      return "Finalize queued";
+      return "Finalize failed";
     }
 
     if (record.syncStatus === "syncing" || record.syncStatus === "pending") {
@@ -127,7 +127,7 @@ function toTechnicianFacingSaveMessage(message: string | null | undefined, actio
     return normalized;
   }
 
-  if (/signatures are required|items need attention|add at least one/i.test(normalized)) {
+  if (/required|items need attention|add at least one|start or resume|finalization has not synced|incomplete/i.test(normalized)) {
     return normalized;
   }
 
@@ -138,6 +138,7 @@ function toTechnicianFacingSaveMessage(message: string | null | undefined, actio
 
 function toTechnicianFacingStoredSyncMessage(message: string | null | undefined, action: "save" | "finalize") {
   const normalized = (message ?? "").trim();
+  if (action === "finalize" && /required|items need attention|add at least one|start or resume|incomplete/i.test(normalized)) return normalized;
   if (/locked|cannot edit|cannot be finalized|already finalized|already completed|closed inspections/i.test(normalized)) {
     return "Your work is saved on this iPad, but the office copy changed. Open Profile or contact the office before continuing.";
   }
@@ -627,11 +628,6 @@ export function useMobileReportDraftController({
       return { ok: false as const };
     }
 
-    if (localRecordRef.current?.pendingFinalize) {
-      setSaveState(buildReportSaveState(localRecordRef.current, data.reportStatus));
-      return { ok: true as const };
-    }
-
     const nextDraft = draftRef.current;
     setFinalizeErrorMessage(null);
 
@@ -648,6 +644,7 @@ export function useMobileReportDraftController({
     const finalizedAt = new Date().toISOString();
 
     try {
+      syncGenerationRef.current += 1;
       clearPendingDraftSyncTimers();
       await persistDraftLocally(nextDraft, {
         reportStatus: "submitted",
@@ -657,24 +654,25 @@ export function useMobileReportDraftController({
         lastError: null
       });
 
-      await queueReportFinalizeSync({
+      const result = await queueReportFinalizeSync({
         reportId: data.reportId,
         inspectionReportId: data.reportId,
         contentJson: nextDraft,
         taskDisplayLabel: data.customInspectionTypeLabel ?? null
       });
 
-      setSaveState("Finalize queued");
+      setSaveState(result.finalized ? "Finalized" : "Finalize queued");
 
-      return { ok: true as const };
+      return { ok: true as const, queued: !result.finalized };
     } catch (error) {
+      setSaveState("Finalize failed");
       setFinalizeErrorMessage(toTechnicianFacingSaveMessage(error instanceof Error ? error.message : null, "finalize"));
       return { ok: false as const };
     } finally {
       finalizeInFlightRef.current = false;
       setFinalizeInFlight(false);
     }
-  }, [clearPendingDraftSyncTimers, data.canEdit, data.customInspectionTypeLabel, data.reportId, data.reportStatus, persistDraftLocally]);
+  }, [clearPendingDraftSyncTimers, data.canEdit, data.customInspectionTypeLabel, data.reportId, persistDraftLocally]);
 
   return {
     draft,

@@ -193,13 +193,14 @@ export function MobileSmartReportScreen({
   );
   const preview = useMemo(() => buildReportPreview(controller.draft), [controller.draft]);
   const validationIssues = useMemo(() => collectFinalizationValidationIssues(controller.draft), [controller.draft]);
-  const isReadOnly = !data.canEdit || !timer.canEdit || data.reportStatus === "finalized" || controller.saveState === "Finalized";
+  const finalizationPending = controller.finalizeInFlight || controller.saveState === "Finalizing" || controller.saveState === "Finalize queued";
+  const isReadOnly = !data.canEdit || !timer.canEdit || data.reportStatus === "finalized" || controller.saveState === "Finalized" || finalizationPending;
   const isWorkOrder = data.template.label.toLowerCase() === "work order";
 
   async function handleFinalize() {
     const result = await controller.finalizeReport();
     if (result.ok) {
-      setFinalizeQueued(true);
+      setFinalizeQueued(result.queued);
     }
   }
 
@@ -222,7 +223,7 @@ export function MobileSmartReportScreen({
 
   return (
     <>
-    {data.jobTimeUserId ? <JobTimeControl timer={timer} beforePause={controller.flushDraftSync} /> : null}
+    {data.jobTimeUserId ? <fieldset disabled={finalizationPending}><JobTimeControl timer={timer} beforePause={controller.flushDraftSync} /></fieldset> : null}
     <SingleScrollReportWorkflow
       controller={controller}
       data={data}
@@ -340,7 +341,7 @@ function SingleScrollReportWorkflow({
         {controller.finalizeErrorMessage ? (
           <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{controller.finalizeErrorMessage}</p>
         ) : null}
-        {finalizeQueued ? (
+        {finalizeQueued && controller.saveState === "Finalize queued" ? (
           <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
             Finalization is saved on this device. TradeWorx will upload it automatically when service is available.
           </div>
@@ -592,7 +593,7 @@ function LegacyGuidedReportWorkflow({
       {controller.finalizeErrorMessage ? (
         <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{controller.finalizeErrorMessage}</p>
       ) : null}
-      {finalizeQueued ? (
+      {finalizeQueued && controller.saveState === "Finalize queued" ? (
         <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
           Finalization is saved on this device. TradeWorx will upload it automatically when service is available.
         </div>

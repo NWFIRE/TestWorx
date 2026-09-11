@@ -8,7 +8,7 @@ import { actorContextSchema, reportStatuses } from "@testworx/types";
 
 import { resolveTenantBranding } from "./branding";
 import { assertTenantEntitlementForTenant } from "./billing";
-import { assertJobStarted } from "./job-time";
+import { applyJobFinishTimeTx, assertJobStarted } from "./job-time";
 import { snapshotComplianceReferences } from "./compliance-references";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
 import { syncInspectionBillingSummaryTx } from "./inspection-billing";
@@ -2225,16 +2225,7 @@ export async function finalizeInspectionReport(actor: ActorContext, input: Final
       });
     }
 
-    if (parsedActor.role === "technician" && input.jobFinishedAt) {
-      const finish = new Date(input.jobFinishedAt);
-      const now = new Date();
-      if (!Number.isFinite(finish.getTime()) || finish.getTime() > now.getTime() + 60_000 || finish.getTime() < now.getTime() - 30 * 86400_000) throw new Error("Job finish time needs office review. Check the device clock.");
-      if (now.getTime() - finish.getTime() > 60_000) {
-        const invalid = await tx.jobTimeSession.findFirst({ where: { tenantId: parsedActor.tenantId!, inspectionId: report.inspectionId, technicianId: parsedActor.userId, endReason: "completed", endedAt: finalizedAt, startedAt: { gt: finish } } });
-        if (invalid) throw new Error("Job finish time is before the recorded start. Contact the office.");
-        await tx.jobTimeSession.updateMany({ where: { tenantId: parsedActor.tenantId!, inspectionId: report.inspectionId, technicianId: parsedActor.userId, endReason: "completed", endedAt: finalizedAt }, data: { endedAt: finish, needsReview: true } });
-      }
-    }
+    await applyJobFinishTimeTx(tx, parsedActor, report.inspectionId, finalizedAt, input.jobFinishedAt);
     return finalized;
   }, { timeout: 20_000 });
 

@@ -5692,7 +5692,7 @@ async function generateMissingInspectionsFromServiceSchedules(input: {
         firstSchedule.siteId,
         format(scheduledStart, "yyyy-MM")
       ].join("\u001f");
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${occurrenceLockKey}, 0))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${occurrenceLockKey}, 0))`;
 
       const scheduleIds = group.map((schedule) => schedule.id);
       const existingOccurrence = await tx.inspectionTask.findFirst({

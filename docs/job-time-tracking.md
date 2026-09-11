@@ -12,6 +12,8 @@ Load the job online once before starting offline. Start/pause events are queued 
 
 Clock events more than 30 days old or in the future require office assistance. Conflicts remain on the device; after the office addresses overlapping time, use **Retry job time after office review**. Do not clear device storage when unsynced work remains.
 
+An invalid captured finish time does not roll back a valid report or its billing handoff. The server completion time is retained, the session is flagged for review, and an office audit entry explains the discrepancy. Online Finalize waits for server confirmation; validation failures remain retryable after correction rather than being presented as successful queued completions. Offline requests remain queued. Verify these paths with `node scripts/check-report-finalize-sync.cjs`.
+
 Technician lists refresh after job synchronization, on returning to the app, and when connectivity returns. Snapshot updates also update the visible screen without navigation. Offline reopening preserves the latest cached list instead of replacing it with older route data. Completed history remains available in a collapsed section, separate from active work. Run `node scripts/check-technician-snapshots.cjs` to verify these behaviors with simulated APIs and real IndexedDB.
 
 ## Office review

@@ -134,7 +134,7 @@ async function syncReportFinalize(entry: SyncQueueEntry) {
 
   if (!response.ok) {
     throw Object.assign(new Error(payload.error ?? "Unable to finalize report."), {
-      syncConflict: response.status === 409 || toConflictStatus(payload.error)
+      syncConflict: response.status === 422 || response.status === 409 || toConflictStatus(payload.error)
     });
   }
 
@@ -441,7 +441,21 @@ export async function queueReportFinalizeSync(input: {
       taskDisplayLabel: input.taskDisplayLabel
     }
   });
-  void processSyncQueue();
+  if (!window.navigator.onLine) return { finalized: false };
+  await processSyncQueue();
+  // A save already in flight may have captured the queue before finalization was added.
+  await processSyncQueue();
+  const remaining = await getSyncQueueEntry(buildQueueId(input.reportId, "report_finalize"));
+  if (remaining) {
+    if (!window.navigator.onLine) return { finalized: false };
+    const message = remaining.lastError ?? "Finalization has not synced yet. Check pending changes in Profile and retry.";
+    if (remaining.status === "pending") {
+      const local = await getLocalReportDraft(input.reportId);
+      if (local) await putLocalReportDraft({ ...local, syncStatus: "failed", lastError: message });
+    }
+    throw new Error(message);
+  }
+  return { finalized: true };
 }
 
 export async function queueWorkOrderLineItemUpsert(input: {
