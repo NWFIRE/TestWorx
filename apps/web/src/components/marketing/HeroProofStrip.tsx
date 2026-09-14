@@ -11,14 +11,14 @@ const proofItems = [
 
 export function HeroProofStrip() {
   return (
-    <section className="mt-5">
+    <section className="bg-[#09283c] text-white" aria-label="Platform capabilities">
       <SectionContainer>
-        <div className="rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(241,245,249,0.92))] px-5 py-[18px] shadow-[0_12px_28px_rgba(15,23,42,0.04)] md:px-6 md:py-5">
+        <div className="py-7">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 xl:gap-6">
             {proofItems.map((item) => (
               <div key={item} className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 h-4.5 w-4.5 shrink-0 text-slate-500" />
-                <p className="text-sm font-medium leading-6 text-slate-700">{item}</p>
+                <CheckCircle2 aria-hidden="true" className="mt-1 h-4 w-4 shrink-0 text-blue-300" />
+                <p className="text-sm font-medium leading-6 text-white">{item}</p>
               </div>
             ))}
           </div>

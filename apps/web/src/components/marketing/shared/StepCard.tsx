@@ -8,7 +8,7 @@ export function StepCard({
   body: string;
 }) {
   return (
-    <article className="rounded-[20px] border border-slate-200 bg-slate-50/70 p-6">
+    <article className="min-w-0 rounded-lg border border-slate-200 bg-slate-50/70 p-6">
       <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-sm font-semibold text-blue-700">
         {step}
       </div>

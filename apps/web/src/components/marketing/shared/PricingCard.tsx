@@ -31,20 +31,18 @@ export function PricingCard({
   return (
     <article
       className={cn(
-        "relative flex min-h-[460px] flex-col rounded-[24px] border bg-white p-7 md:p-8",
+        "relative flex min-h-[460px] min-w-0 flex-col rounded-lg border bg-white p-7 md:p-8",
         featured
-          ? "border-blue-300 shadow-[0_22px_60px_rgba(37,99,235,0.14)]"
-          : "border-slate-200/95 shadow-[0_14px_30px_rgba(15,23,42,0.05)]"
+          ? "border-blue-400 shadow-sm"
+          : "border-slate-200"
       )}
     >
-      {featured ? (
-        <div className="absolute right-6 top-6 rounded-full border border-blue-500/20 bg-blue-700 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white shadow-[0_8px_18px_rgba(37,99,235,0.18)]">
-          Most Popular
-        </div>
-      ) : null}
-      <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">{name}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">{name}</p>
+        {featured ? <span className="rounded-md bg-blue-700 px-3 py-1 text-xs font-semibold text-white">Most Popular</span> : null}
+      </div>
       <p className="mt-4 text-base leading-7 text-slate-600">{subtitle}</p>
-      <div className="mt-8 flex items-end gap-2">
+      <div className="mt-8 flex flex-wrap items-end gap-2">
         <span className="text-4xl font-bold tracking-[-0.05em] text-slate-950">{price}</span>
         <span className="pb-1 text-sm text-slate-500">{cadence}</span>
       </div>
