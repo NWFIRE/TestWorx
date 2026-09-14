@@ -14,6 +14,7 @@ import { BillingItemMatchPanel } from "../../billing-item-match-panel";
 import { AppPageShell } from "../../operations-ui";
 import { addBillingSummaryManualLineAction, clearBillingSummaryItemCatalogLinkAction, getBillingManualLineCatalogItems, linkBillingSummaryItemCatalogAction, removeBillingSummaryItemGroupAction, searchBillingSummaryItemCatalogMatchesAction, sendQuickBooksInvoiceAction, syncBillingSummaryToQuickBooksAction, updateBillingSummaryItemGroupAction, updateBillingSummaryNotesAction, updateBillingSummaryStatusAction } from "../../actions";
 import { BillingReportPdfReviewPanel } from "./billing-report-pdf-review-panel";
+import styles from "./billing-detail.module.css";
 
 type BillingSummaryDetail = NonNullable<Awaited<ReturnType<typeof getAdminBillingSummaryDetail>>>;
 type BillingSummaryLineItem = BillingSummaryDetail["reviewGroupedItems"][keyof BillingSummaryDetail["reviewGroupedItems"]][number] & {
@@ -241,14 +242,14 @@ export default async function BillingSummaryDetailPage({
     ?? (summary.quickbooksSyncStatus === "synced" || summary.quickbooksSyncStatus === "sent" ? "Synced" : "Not synced");
 
   return (
-    <AppPageShell density="wide">
-      <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+    <AppPageShell className={styles.detail} density="wide">
+      <div className="rounded-3xl bg-white p-4 shadow-panel">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing detail</p>
-            <h2 className="mt-2 text-3xl font-semibold text-ink">{summary.customerName}</h2>
-            <p className="mt-3 text-slate-500">{summary.siteName} | {format(summary.inspectionDate, "MMM d, yyyy h:mm a")} | Technician: {summary.technicianName ?? "Unassigned"}</p>
-            <p className="mt-2 text-slate-500">Reports: {summary.reportTypes.length > 0 ? summary.reportTypes.map((type: BillingSummaryDetail["reportTypes"][number]) => type.replaceAll("_", " ")).join(", ") : "Inspection-level billing only"}</p>
+            <h2 className="mt-1 text-2xl font-semibold text-ink">{summary.customerName}</h2>
+            <p className="mt-2 text-sm text-slate-500">{summary.siteName} | {format(summary.inspectionDate, "MMM d, yyyy h:mm a")} | Technician: {summary.technicianName ?? "Unassigned"}</p>
+            <p className="mt-1 text-sm text-slate-500">Reports: {summary.reportTypes.length > 0 ? summary.reportTypes.map((type: BillingSummaryDetail["reportTypes"][number]) => type.replaceAll("_", " ")).join(", ") : "Inspection-level billing only"}</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Link className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={`/app/admin/inspections/${summary.inspectionId}?from=${encodeURIComponent("/app/admin/billing")}`}>
@@ -258,7 +259,7 @@ export default async function BillingSummaryDetailPage({
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className={styles.metrics}>
         <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Labor hours</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.laborHoursTotal}</p></div>
         <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Material items</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.materialItemCount}</p></div>
         <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Billing setup</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.missingPriceCount > 0 ? `${summary.metrics.missingPriceCount} item${summary.metrics.missingPriceCount === 1 ? "" : "s"}` : "Ready"}</p></div>
@@ -289,50 +290,49 @@ export default async function BillingSummaryDetailPage({
           This billing summary was synced in QuickBooks {summaryQuickBooksMode === "sandbox" ? "Sandbox" : "Live"}. Re-sync it in {quickBooksConnection.connection.appModeLabel} mode before opening or sending it.
         </div>
       ) : null}
-      <BillingManualLineForm
+      <details className="rounded-2xl border border-slate-200 bg-white px-4 py-2">
+        <summary className="min-h-11 cursor-pointer content-center text-sm font-semibold text-slateblue">Add a billing line</summary>
+        <BillingManualLineForm
         action={addBillingSummaryManualLineAction}
         catalogItems={manualLineCatalogItems}
         disabled={isInvoiced}
         inspectionId={summary.inspectionId}
         summaryId={summary.id}
       />
+      </details>
 
-      <section className="grid min-w-0 gap-6 2xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <div className="space-y-6">
+      <section className="grid min-w-0 items-start gap-4 2xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="min-w-0 space-y-4">
           {groupedEntries.map(([category, items]) => (
-            <div key={category} className="rounded-[2rem] bg-white p-6 shadow-panel">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <p className="text-sm uppercase tracking-[0.25em] text-slate-500">{categoryLabels[category]}</p>
-                  <h3 className="mt-1 text-2xl font-semibold text-ink">{items.length} grouped row{items.length === 1 ? "" : "s"}</h3>
-                  <p className="mt-1 text-sm text-slate-500">
+            <div key={category} className="rounded-3xl bg-white p-4 shadow-panel">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-base font-semibold text-ink">{categoryLabels[category]} <span className="text-sm font-normal text-slate-500">({items.length} grouped row{items.length === 1 ? "" : "s"})</span></h3>
+                  <p className="text-xs text-slate-500">
                     {items.reduce((sum, item) => sum + item.sourceItemCount, 0)} original item{items.reduce((sum, item) => sum + item.sourceItemCount, 0) === 1 ? "" : "s"}
                   </p>
-                </div>
               </div>
 
               <div className="space-y-4">
                 {items.length === 0 ? (
-                  <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500">No {categoryLabels[category].toLowerCase()} extracted from this visit.</p>
+                  <p className="text-sm text-slate-500">No {categoryLabels[category].toLowerCase()} extracted from this visit.</p>
                 ) : items.map((item: BillingSummaryLineItem) => (
                   <div key={item.id} className="rounded-[1.5rem] border border-slate-200 p-4">
-                    <div className="grid gap-5 2xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)] 2xl:items-start">
+                    <div className="grid min-w-0 gap-3">
                       <div className="min-w-0 space-y-2">
                         <p className="text-lg font-semibold text-ink">{item.description}</p>
-                        <p className="text-sm text-slate-500">{item.reportType === "inspection" ? "inspection billing" : item.reportType.replaceAll("_", " ")} / {item.sourceSection?.replaceAll("-", " ") ?? "billables"}</p>
-                        <p className="text-sm text-slate-500">Source: {item.sourceField ?? "report mapping"}</p>
-                        <p className="text-sm text-slate-500">
-                          Tax status: {item.taxable === true ? "Taxable" : item.taxable === false ? "Non-taxable" : "Not snapped yet"}
-                          {item.taxableSource ? ` / ${item.taxableSource === "quickbooks" ? "Synced from QuickBooks" : item.taxableSource}` : ""}
-                        </p>
-                        <div className="flex flex-wrap gap-2 text-xs font-semibold">
-                          <span className={item.taxable ? "rounded-full bg-emerald-50 px-3 py-1 text-emerald-700" : "rounded-full bg-slate-100 px-3 py-1 text-slate-600"}>
-                            {item.taxable ? "Taxable" : "Non-taxable"}
-                          </span>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
+                          <p>{item.reportType === "inspection" ? "inspection billing" : item.reportType.replaceAll("_", " ")} / {item.sourceSection?.replaceAll("-", " ") ?? "billables"}</p>
+                          <p>Source: {item.sourceField ?? "report mapping"}</p>
+                          <p>
+                            Tax status: {item.taxable === true ? "Taxable" : item.taxable === false ? "Non-taxable" : "Not snapped yet"}
+                            {item.taxableSource ? ` / ${item.taxableSource === "quickbooks" ? "Synced from QuickBooks" : item.taxableSource}` : ""}
+                          </p>
                         </div>
-                        {buildBillingItemContext(item).map((line) => (
-                          <p key={line} className="text-sm text-slate-500">{line}</p>
-                        ))}
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                          {buildBillingItemContext(item).map((line) => (
+                            <p key={line} className="text-sm text-slate-500">{line}</p>
+                          ))}
+                        </div>
                         {item.sourceItemCount > 1 ? (
                           <details className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                             <summary className="cursor-pointer font-medium text-slate-700">
@@ -378,7 +378,7 @@ export default async function BillingSummaryDetailPage({
                           />
                         )}
                       </div>
-                      <form action={updateBillingSummaryItemGroupAction} className="grid gap-3 rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4 sm:grid-cols-2 2xl:grid-cols-1">
+                      <form action={updateBillingSummaryItemGroupAction} className={styles.lineControls}>
                         <input name="summaryId" type="hidden" value={summary.id} />
                         <input name="inspectionId" type="hidden" value={summary.inspectionId} />
                         {item.itemIds.map((sourceItemId) => (
@@ -393,7 +393,7 @@ export default async function BillingSummaryDetailPage({
                           <input className="h-4 w-4 rounded border-slate-300 text-slateblue" defaultChecked={item.taxable === true} disabled={isInvoiced} name="taxable" type="checkbox" />
                           Taxable
                         </label>
-                        <div className="grid gap-2 sm:col-span-2 xl:col-span-1">
+                        <div className="grid grid-cols-2 gap-2">
                           <button className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-50" disabled={isInvoiced} type="submit">
                             {isInvoiced ? "Locked" : "Save line"}
                           </button>
@@ -415,7 +415,7 @@ export default async function BillingSummaryDetailPage({
           ))}
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-4">
           <BillingReportPdfReviewPanel
             reports={summary.reportPdfs.map((report) => ({
               inspectionTaskId: report.inspectionTaskId,

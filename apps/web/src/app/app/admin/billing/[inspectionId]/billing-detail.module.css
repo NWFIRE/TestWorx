@@ -1,0 +1,52 @@
+.detail {
+  min-width: 0;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  background: var(--border-subtle);
+}
+
+.metrics > div {
+  min-width: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0;
+  box-shadow: none;
+  overflow-wrap: anywhere;
+}
+
+.metrics > div > p:last-child {
+  margin-top: 0.25rem;
+  font-size: 1.25rem;
+  line-height: 1.5;
+}
+
+.lineControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: end;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.lineControls > * {
+  min-width: 0;
+}
+
+@media (min-width: 640px) {
+  .lineControls {
+    grid-template-columns: minmax(5rem, 0.6fr) minmax(7rem, 0.7fr) minmax(12rem, 1.4fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

@@ -93,7 +93,7 @@ export function BillingReportPdfReviewPanel({ reports }: { reports: BillingRepor
               </div>
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
                 <iframe
-                  className="h-[82vh] min-h-[50rem] w-full bg-white"
+                  className="h-[72vh] min-h-[32rem] w-full bg-white"
                   src={selectedReport.viewUrl}
                   title={`${selectedReport.reportLabel} PDF`}
                 />

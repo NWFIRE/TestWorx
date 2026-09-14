@@ -31,7 +31,7 @@ export function AppPageShell({
   className?: string;
   density?: "default" | "wide";
 }) {
-  return <section className={cn(density === "wide" ? "space-y-6 lg:space-y-7" : "space-y-5 lg:space-y-6", className)}>{children}</section>;
+  return <section className={cn("min-w-0 space-y-4", density === "wide" && "w-full", className)}>{children}</section>;
 }
 
 export function SectionCard({
@@ -47,7 +47,7 @@ export function SectionCard({
     <section
       id={id}
       className={cn(
-        "enterprise-card rounded-[26px] p-5 lg:p-6",
+        "enterprise-card min-w-0 rounded-[22px] p-4 lg:p-5",
         className
       )}
     >
@@ -83,14 +83,14 @@ export function PageHeader({
 
   return (
     <SectionCard className={className}>
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className={widthClass}>
           {eyebrow ? (
             <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[var(--tenant-primary)]">
               {eyebrow}
             </p>
           ) : null}
-          <h1 className="mt-2 text-3xl font-bold tracking-[-0.045em] text-ink md:text-4xl">
+          <h1 className="mt-1 text-2xl font-bold tracking-[-0.045em] text-ink md:text-3xl">
             {title}
           </h1>
         </div>
@@ -116,7 +116,7 @@ export function WorkspaceSplit({
         ? "2xl:grid-cols-2"
         : "2xl:grid-cols-[minmax(0,1.22fr)_minmax(24rem,0.88fr)]";
 
-  return <section className={cn("grid gap-6", variantClass, className)}>{children}</section>;
+  return <section className={cn("grid min-w-0 gap-4", variantClass, className)}>{children}</section>;
 }
 
 export function KPIStatCard({
@@ -134,11 +134,11 @@ export function KPIStatCard({
   tone?: Tone;
 }) {
   const content = (
-    <div className="enterprise-card flex h-full flex-col justify-between gap-3 rounded-[22px] p-4 lg:p-5">
+    <div className="enterprise-card flex h-full min-w-0 flex-col justify-between gap-2 rounded-[22px] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xs font-bold leading-5 text-[color:var(--text-secondary)] lg:text-sm">{label}</div>
-          <div className="mt-2 text-[30px] font-bold tracking-[-0.055em] text-ink lg:mt-3 lg:text-3xl lg:tracking-[-0.045em]">
+          <div className="mt-1 text-2xl font-bold tracking-[-0.045em] text-ink">
             {value}
           </div>
         </div>
