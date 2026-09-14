@@ -2352,6 +2352,7 @@ export async function deleteInspection(
       }
     });
   }
+  return { deletedInspectionIds: inspectionIds };
 }
 
 async function validateSchedulingReferences(tx: Prisma.TransactionClient, tenantId: string, input: z.infer<typeof scheduleInspectionSchema>) {

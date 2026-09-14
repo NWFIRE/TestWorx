@@ -134,13 +134,12 @@ function resolveInspectionDeleteRedirectTarget(input: string | null | undefined)
     return fallback;
   }
 
-  if (candidate.startsWith("/app/admin/inspections/")) {
+  const url = new URL(candidate, "https://tradeworx.local");
+  if (!["/app/admin/inspections", "/app/admin/archive", "/app/admin/billing", "/app/admin/reports", "/app/admin/dashboard", "/app/admin/amendments", "/app/admin/upcoming-inspections"].includes(url.pathname)) {
     return fallback;
   }
-
-  return candidate.includes("?")
-    ? `${candidate}&inspection=deleted`
-    : `${candidate}?inspection=deleted`;
+  url.searchParams.set("inspection", "deleted");
+  return `${url.pathname}${url.search}`;
 }
 
 function mergePurchaseOrderIntoInspectionNotes(notes: string | null | undefined, purchaseOrderNumber: string) {
@@ -372,7 +371,7 @@ export async function deleteInspectionAction(
   }
 
   try {
-    await deleteInspection(
+    const deletion = await deleteInspection(
       { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
       inspectionId,
       deleteScope
@@ -391,7 +390,8 @@ export async function deleteInspectionAction(
       success: deleteScope === "future"
         ? "Inspection and future recurring inspections deleted successfully."
         : "Inspection deleted successfully.",
-      redirectTo
+      redirectTo,
+      deletedInspectionIds: deletion.deletedInspectionIds
     };
   } catch (error) {
     return {

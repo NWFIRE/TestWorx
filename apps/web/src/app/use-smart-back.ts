@@ -7,7 +7,8 @@ import {
   buildRouteHref,
   getStoredPreviousRoute,
   hasSafeBrowserBackTarget,
-  resolveSmartBackFallback
+  resolveSmartBackFallback,
+  takeRepairedBackTarget
 } from "./smart-navigation";
 
 function closeActiveOverlay() {
@@ -54,6 +55,11 @@ export function useSmartBack(defaultFallbackHref?: string | null) {
       return;
     }
 
+    const repairedTarget = takeRepairedBackTarget(currentHref);
+    if (repairedTarget !== undefined) {
+      router.replace(repairedTarget ?? resolveSmartBackFallback(pathname, overrideFallbackHref ?? defaultFallbackHref));
+      return;
+    }
     const previousRoute = getStoredPreviousRoute(currentHref);
     if (hasSafeBrowserBackTarget(previousRoute)) {
       router.back();

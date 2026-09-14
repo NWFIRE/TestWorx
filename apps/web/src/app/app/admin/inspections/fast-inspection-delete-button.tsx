@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useConfirmDialog } from "../../confirm-dialog";
+import { forgetDeletedInspectionRoutes } from "../../../smart-navigation";
 
 const initialState = {
   error: null as string | null,
@@ -21,7 +22,7 @@ export function FastInspectionDeleteButton({
   action: (
     _: { error: string | null; success: string | null; redirectTo: string | null },
     formData: FormData
-  ) => Promise<{ error: string | null; success: string | null; redirectTo: string | null }>;
+  ) => Promise<{ error: string | null; success: string | null; redirectTo: string | null; deletedInspectionIds?: string[] }>;
   customerLabel: string;
   inspectionId: string;
   hasRecurrence?: boolean;
@@ -73,6 +74,7 @@ export function FastInspectionDeleteButton({
       setState(result);
 
       if (result.success) {
+        forgetDeletedInspectionRoutes(result.deletedInspectionIds ?? [inspectionId]);
         const target = result.redirectTo || redirectTo;
         if (target && target !== window.location.pathname + window.location.search) {
           router.replace(target);

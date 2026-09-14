@@ -205,11 +205,13 @@ describe("inspection deletion", () => {
       }
     ]);
 
-    await deleteInspection(
+    const result = await deleteInspection(
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
       "inspection_current",
       "future"
     );
+
+    expect(result.deletedInspectionIds).toEqual(["inspection_current", "inspection_future"]);
 
     expect(inspectionFindManyMock).toHaveBeenCalledWith(
       expect.objectContaining({

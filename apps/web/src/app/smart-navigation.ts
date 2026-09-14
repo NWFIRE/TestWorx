@@ -2,12 +2,15 @@
 
 const navigationStateKey = "tradeworx.navigation.v1";
 const maxHistoryEntries = 40;
+let memoryState: NavigationState | null = null;
 
 export type NavigationState = {
   current: string | null;
   previous: string | null;
   entries: string[];
   updatedAt: number;
+  deletedInspectionIds?: string[];
+  repaired?: boolean;
 };
 
 function normalizeHref(href: string | null | undefined) {
@@ -54,18 +57,21 @@ function readSessionState(): NavigationState {
   try {
     const stored = window.sessionStorage.getItem(navigationStateKey);
     if (!stored) {
-      return { current: null, previous: null, entries: [], updatedAt: 0 };
+      return memoryState ?? { current: null, previous: null, entries: [], updatedAt: 0 };
     }
 
     const parsed = JSON.parse(stored) as Partial<NavigationState>;
+    if (memoryState && memoryState.updatedAt >= (parsed.updatedAt ?? 0)) return memoryState;
     return {
       current: typeof parsed.current === "string" ? parsed.current : null,
       previous: typeof parsed.previous === "string" ? parsed.previous : null,
       entries: Array.isArray(parsed.entries) ? parsed.entries.filter((entry) => typeof entry === "string") : [],
-      updatedAt: typeof parsed.updatedAt === "number" ? parsed.updatedAt : 0
+      updatedAt: typeof parsed.updatedAt === "number" ? parsed.updatedAt : 0,
+      deletedInspectionIds: Array.isArray(parsed.deletedInspectionIds) ? parsed.deletedInspectionIds.filter((id) => typeof id === "string") : [],
+      repaired: parsed.repaired === true
     };
   } catch {
-    return { current: null, previous: null, entries: [], updatedAt: 0 };
+    return memoryState ?? { current: null, previous: null, entries: [], updatedAt: 0 };
   }
 }
 
@@ -74,6 +80,7 @@ function writeSessionState(state: NavigationState) {
     return;
   }
 
+  memoryState = state;
   try {
     window.sessionStorage.setItem(navigationStateKey, JSON.stringify(state));
   } catch {
@@ -95,7 +102,7 @@ function getSameOriginReferrer() {
 }
 
 export function rememberNavigationRoute(currentHref: string, options: { initial: boolean }) {
-  if (!isTrackableAppHref(currentHref)) {
+  if (!isTrackableAppHref(currentHref) || isDeletedInspectionRoute(currentHref)) {
     return;
   }
 
@@ -104,6 +111,7 @@ export function rememberNavigationRoute(currentHref: string, options: { initial:
   const previousCandidate = options.initial ? getSameOriginReferrer() : existing.current;
   const previous = previousCandidate &&
     isTrackableAppHref(previousCandidate) &&
+    !isDeletedInspectionRoute(previousCandidate) &&
     normalizeHref(previousCandidate) !== normalizedCurrent
     ? normalizeHref(previousCandidate)
     : existing.previous;
@@ -114,6 +122,7 @@ export function rememberNavigationRoute(currentHref: string, options: { initial:
     : existing.entries.slice(-maxHistoryEntries);
 
   writeSessionState({
+    ...existing,
     current: normalizedCurrent,
     previous,
     entries: nextEntries,
@@ -128,6 +137,7 @@ export function getStoredPreviousRoute(currentHref: string) {
 
   return candidates.find((candidate) => (
     isTrackableAppHref(candidate) &&
+    !isDeletedInspectionRoute(candidate) &&
     normalizeHref(candidate) !== current
   )) ?? null;
 }
@@ -137,7 +147,7 @@ export function hasSafeBrowserBackTarget(previousHref?: string | null) {
     return false;
   }
 
-  if (window.history.length <= 1) {
+  if (readSessionState().repaired || isDeletedInspectionRoute(previousHref) || window.history.length <= 1) {
     return false;
   }
 
@@ -146,6 +156,45 @@ export function hasSafeBrowserBackTarget(previousHref?: string | null) {
   }
 
   return Boolean(getSameOriginReferrer());
+}
+
+function matchesInspectionRoute(href: string | null | undefined, ids: string[]) {
+  const path = pathnameOnly(normalizeHref(href));
+  const match = path.match(/^\/app\/(?:admin|tech|customer)\/(?:inspections|reports|billing|archive)\/([^/]+)(?:\/|$)/);
+  if (!match?.[1]) return false;
+  try { return ids.includes(decodeURIComponent(match[1])); } catch { return false; }
+}
+
+export function isDeletedInspectionRoute(href: string | null | undefined) {
+  return matchesInspectionRoute(href, readSessionState().deletedInspectionIds ?? []);
+}
+
+export function forgetDeletedInspectionRoutes(inspectionIds: string[]) {
+  const state = readSessionState();
+  const deletedInspectionIds = [...new Set([...(state.deletedInspectionIds ?? []), ...inspectionIds])];
+  const keep = (href: string | null): href is string => Boolean(href) && !matchesInspectionRoute(href, deletedInspectionIds);
+  const entries = state.entries.filter(keep);
+  writeSessionState({
+    ...state,
+    current: keep(state.current) ? state.current : null,
+    previous: keep(state.previous) ? state.previous : entries.at(-1) ?? null,
+    entries,
+    deletedInspectionIds,
+    repaired: true,
+    updatedAt: Date.now()
+  });
+}
+
+// Browser history cannot remove older entries. After deletion, consume the
+// cleaned app history explicitly instead of guessing where browser.back leads.
+export function takeRepairedBackTarget(currentHref: string): string | null | undefined {
+  const state = readSessionState();
+  if (!state.repaired) return undefined;
+  const target = getStoredPreviousRoute(currentHref);
+  const index = target ? state.entries.lastIndexOf(target) : -1;
+  const entries = index >= 0 ? state.entries.slice(0, index) : [];
+  writeSessionState({ ...state, current: target, previous: entries.at(-1) ?? null, entries, updatedAt: Date.now() });
+  return target;
 }
 
 export function resolveSmartBackFallback(pathname: string | null | undefined, explicitFallbackHref?: string | null) {

@@ -1,12 +1,13 @@
 "use client";
 
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { buildRouteHref, rememberNavigationRoute } from "./smart-navigation";
+import { buildRouteHref, isDeletedInspectionRoute, rememberNavigationRoute } from "./smart-navigation";
 
 export function NavigationHistoryTracker() {
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initializedRef = useRef(false);
   const [hash, setHash] = useState("");
@@ -20,9 +21,14 @@ export function NavigationHistoryTracker() {
   }, []);
 
   useEffect(() => {
+    if (isDeletedInspectionRoute(currentHref)) {
+      const fallback = pathname.startsWith("/app/tech/") ? "/app/tech/inspections" : pathname.startsWith("/app/customer/") ? "/app/customer" : "/app/admin/inspections";
+      router.replace(fallback);
+      return;
+    }
     rememberNavigationRoute(currentHref, { initial: !initializedRef.current });
     initializedRef.current = true;
-  }, [currentHref]);
+  }, [currentHref, pathname, router]);
 
   return null;
 }

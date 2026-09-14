@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 import { useConfirmDialog } from "../confirm-dialog";
+import { forgetDeletedInspectionRoutes } from "../../smart-navigation";
 
 const initialState = {
   error: null as string | null,
@@ -21,13 +22,18 @@ export function DeleteInspectionCard({
   action: (
     _: { error: string | null; success: string | null; redirectTo: string | null },
     formData: FormData
-  ) => Promise<{ error: string | null; success: string | null; redirectTo: string | null }>;
+  ) => Promise<{ error: string | null; success: string | null; redirectTo: string | null; deletedInspectionIds?: string[] }>;
   inspectionId: string;
   redirectTo?: string | null;
   hasRecurrence?: boolean;
   disabled?: boolean;
 }) {
-  const [state, formAction, pending] = useActionState(action, initialState);
+  const [state, formAction, pending] = useActionState<{
+    error: string | null;
+    success: string | null;
+    redirectTo: string | null;
+    deletedInspectionIds?: string[];
+  }, FormData>(action, initialState);
   const formRef = useRef<HTMLFormElement | null>(null);
   const confirmedSubmitRef = useRef(false);
   const deleteScopeRef = useRef<HTMLInputElement | null>(null);
@@ -36,9 +42,10 @@ export function DeleteInspectionCard({
 
   useEffect(() => {
     if (state.success) {
+      forgetDeletedInspectionRoutes(state.deletedInspectionIds ?? [inspectionId]);
       router.replace(state.redirectTo || "/app/admin/inspections?inspection=deleted");
     }
-  }, [router, state.redirectTo, state.success]);
+  }, [inspectionId, router, state]);
 
   return (
     <form
