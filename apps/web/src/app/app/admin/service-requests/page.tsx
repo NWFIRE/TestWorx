@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { fieldServiceRequestStatusLabels, fieldServiceRequestTypeLabels, getAdminFieldServiceRequests } from "@testworx/lib/server/index";
 import { AppPageShell, KPIStatCard, PageHeader, SectionCard } from "../operations-ui";
 import { RequestReviewForm } from "./review-form";
+import { ResolvedRequestDetails } from "./resolved-request-details";
 
 export default async function AdminServiceRequestsPage() {
   const session = await auth();
@@ -11,7 +12,7 @@ export default async function AdminServiceRequestsPage() {
   if (!["tenant_admin", "office_admin", "platform_admin"].includes(session.user.role)) redirect("/app");
   const data = await getAdminFieldServiceRequests({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId });
   const active = data.requests.filter((request) => request.status === "pending" || request.status === "acknowledged");
-  const history = data.requests.filter((request) => request.status === "resolved" || request.status === "declined").slice(0, 30);
+  const history = data.requests.filter((request) => request.status === "resolved" || request.status === "declined");
 
   return (
     <AppPageShell>
@@ -47,7 +48,7 @@ export default async function AdminServiceRequestsPage() {
           )) : <div className="rounded-[24px] border border-dashed border-emerald-300 bg-emerald-50/60 p-7 text-center"><p className="font-semibold text-emerald-900">The field request queue is clear.</p><p className="mt-1 text-sm text-emerald-700">New technician requests will appear here automatically.</p></div>}
         </div>
       </SectionCard>
-      {history.length ? <SectionCard><details><summary className="cursor-pointer font-semibold text-slate-800">Resolved request history ({history.length})</summary><div className="mt-4 space-y-2">{history.map((request) => <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 p-4 text-sm" key={request.id}><div><p className="font-semibold text-slate-900">{request.title}</p><p className="text-slate-500">{request.customerCompany.name} · {request.requestedBy.name}</p></div><span className="text-xs font-semibold text-slate-600">{fieldServiceRequestStatusLabels[request.status]}</span></div>)}</div></details></SectionCard> : null}
+      {history.length ? <SectionCard><details><summary className="cursor-pointer font-semibold text-slate-800">Resolved request history ({history.length})</summary><div className="mt-4 space-y-2">{history.map((request) => <ResolvedRequestDetails key={request.id} request={request} timezone={data.timezone} statusLabel={fieldServiceRequestStatusLabels[request.status]} typeLabel={fieldServiceRequestTypeLabels[request.requestType]} />)}</div></details></SectionCard> : null}
     </AppPageShell>
   );
 }
