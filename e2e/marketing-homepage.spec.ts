@@ -7,6 +7,11 @@ test.describe("Public marketing homepage", () => {
       await page.goto("/");
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(/Exceptional service\.\s*Connected teams\./);
       await expect(page.getByAltText("Field technician using a tablet beside a fire alarm control panel")).toBeVisible();
+      const brand = page.locator("header").getByRole("link", { name: "TradeWorx home" });
+      await expect(brand).toHaveAttribute("href", "/");
+      const logo = brand.locator("img");
+      await expect(logo).toHaveAttribute("src", /(?:%2F|\/)icon\.png/);
+      await expect.poll(() => logo.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       for (const id of ["product", "features", "pricing", "final-cta", "footer-contact"]) {
         await expect(page.locator(`[id="${id}"]`)).toHaveCount(1);

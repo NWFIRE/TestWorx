@@ -13,6 +13,8 @@ marketing imagery, not a customer testimonial or an actual app screenshot.
 - Existing login, pricing, legal, and contact destinations are retained.
 - Redundant simulated dashboard sections are no longer rendered on the homepage.
 - Hero imagery is a compressed local WebP, served through Next Image.
+- Header and footer use the app's existing `/icon.png` TradeWorx logo and
+  matching uppercase wordmark rather than a separate marketing placeholder.
 - Animation respects reduced-motion preferences.
 
 ## Regression checks
