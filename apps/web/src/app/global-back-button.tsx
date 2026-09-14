@@ -8,7 +8,7 @@ export function GlobalBackButton() {
   const pathname = usePathname();
   const smartBack = useSmartBack();
 
-  if (pathname === "/" || pathname.startsWith("/app")) {
+  if (pathname === "/" || pathname === "/start-trial" || pathname === "/book-demo" || pathname.startsWith("/app")) {
     return null;
   }
 

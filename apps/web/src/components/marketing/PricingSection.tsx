@@ -1,4 +1,5 @@
 import { PricingCard } from "./shared/PricingCard";
+import { marketingDestinations } from "@testworx/lib/marketing-inquiries-shared";
 import { SectionContainer } from "./shared/SectionContainer";
 import { SectionHeading } from "./shared/SectionHeading";
 
@@ -21,7 +22,7 @@ export function PricingSection() {
               "Customer-ready report delivery",
               "Manuals library and hosted documents"
             ]}
-            href="/login"
+            href={`${marketingDestinations.trial}?plan=starter`}
             name="Starter"
             price="$149"
             secondaryText="For smaller teams replacing spreadsheets and disconnected tools"
@@ -38,7 +39,7 @@ export function PricingSection() {
               "Parts, services, and contract support",
               "Priority onboarding guidance"
             ]}
-            href="/login"
+            href={`${marketingDestinations.trial}?plan=pro`}
             name="Pro"
             price="$349"
             secondaryText="Most teams running inspections every day start here."
@@ -54,7 +55,7 @@ export function PricingSection() {
               "Implementation planning and tailored rollout",
               "Enterprise support options"
             ]}
-            href="#final-cta"
+            href={`${marketingDestinations.demo}?plan=enterprise`}
             name="Enterprise"
             price="Custom"
             secondaryText="For multi-team operations, advanced billing workflows, and rollout support"

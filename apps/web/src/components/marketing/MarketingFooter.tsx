@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { marketingDestinations } from "@testworx/lib/marketing-inquiries-shared";
 
 import { LogoLockup } from "./shared/LogoLockup";
 import { SectionContainer } from "./shared/SectionContainer";
@@ -9,7 +10,7 @@ const columns = [
     links: [
       { href: "#features", label: "Features" },
       { href: "#pricing", label: "Pricing" },
-      { href: "#final-cta", label: "Demo" }
+      { href: marketingDestinations.demo, label: "Demo" }
     ]
   },
   {
@@ -67,7 +68,7 @@ export function MarketingFooter() {
             <Link className="font-semibold text-slate-700 transition hover:text-slate-950" href="/login">
               Sign in
             </Link>
-            <Link className="transition hover:text-slate-950" href="/login">
+            <Link className="transition hover:text-slate-950" href={marketingDestinations.trial}>
               Start Free Trial
             </Link>
             <a className="transition hover:text-slate-950" href="mailto:hello@tradeworx.net">

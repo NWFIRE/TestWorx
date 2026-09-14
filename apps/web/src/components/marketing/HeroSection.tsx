@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Check, ClipboardCheck } from "lucide-react";
+import { marketingDestinations } from "@testworx/lib/marketing-inquiries-shared";
 import { PrimaryButton } from "./shared/PrimaryButton";
 import { SectionContainer } from "./shared/SectionContainer";
 import styles from "./marketing.module.css";
@@ -16,7 +17,7 @@ export function HeroSection() {
           </h1>
           <p className="mt-6 max-w-lg text-lg leading-8 text-slate-600">Give your field and office teams one place to schedule work, complete inspections, deliver reports, and prepare jobs for billing.</p>
           <div className="mt-8 flex flex-wrap items-center gap-6">
-            <PrimaryButton href="#footer-contact">Book a demo <ArrowRight aria-hidden="true" className="ml-3 h-4 w-4" /></PrimaryButton>
+            <PrimaryButton href={marketingDestinations.demo}>Book a demo <ArrowRight aria-hidden="true" className="ml-3 h-4 w-4" /></PrimaryButton>
             <Link className="inline-flex min-h-12 items-center gap-2 font-semibold text-blue-900 underline-offset-4 hover:underline" href="#product">Explore the platform <ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
           </div>
           <div className="mt-8 flex flex-wrap gap-x-5 gap-y-3 text-sm text-slate-600">

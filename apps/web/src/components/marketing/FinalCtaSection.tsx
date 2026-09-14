@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { marketingDestinations } from "@testworx/lib/marketing-inquiries-shared";
 
 import { PrimaryButton } from "./shared/PrimaryButton";
 import { SecondaryButton } from "./shared/SecondaryButton";
@@ -17,8 +18,8 @@ export function FinalCtaSection() {
               Modern workflows for field service, reporting, manuals, billing, and customer operations.
             </p>
             <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
-              <PrimaryButton href="/login">Start Free Trial</PrimaryButton>
-              <SecondaryButton href="#footer-contact">Book Demo</SecondaryButton>
+              <PrimaryButton href={marketingDestinations.trial}>Start Free Trial</PrimaryButton>
+              <SecondaryButton href={marketingDestinations.demo}>Book Demo</SecondaryButton>
             </div>
             <p className="mt-5 text-sm text-slate-300">
               Existing customer?{" "}
