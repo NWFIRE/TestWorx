@@ -1037,7 +1037,7 @@ export function AppShell({
         </header>
 
         <main
-          className={`min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-4 sm:px-5 lg:px-6 ${isTechnician ? "pb-28 lg:pb-6" : ""}`}
+          className={`workspace-content min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-5 lg:px-6 ${isTechnician ? "pb-28 lg:pb-6" : ""}`}
           ref={contentRef}
           style={{
             paddingBottom: isTechnician

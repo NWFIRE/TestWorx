@@ -136,6 +136,11 @@ body[data-keyboard-open="true"] {
 }
 
 @layer components {
+  .workspace-content {
+    --shadow-panel: 0 6px 18px rgba(9, 18, 32, 0.07);
+    --shadow-crisp: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 5px 16px rgba(9, 18, 32, 0.06);
+  }
+
   .pressable,
   .pressable-icon,
   .pressable-surface,

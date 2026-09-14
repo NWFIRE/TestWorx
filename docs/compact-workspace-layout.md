@@ -1,5 +1,10 @@
 # Compact workspace layout
 
+The second density pass uses 12px section gaps, 16px shared card padding, and
+lighter shadows scoped to workspace content. Billing line padding is 12px and
+metric padding is 10px vertically. Text sizes, control heights, PDF dimensions,
+and mobile safe-area/keyboard clearances are unchanged by this refinement.
+
 Authenticated pages have smaller outer gutters. Shared page shells, section
 cards, headings, split layouts, and metric cards use tighter spacing. Public
 marketing pages are not targeted. Mobile safe-area and keyboard clearances,

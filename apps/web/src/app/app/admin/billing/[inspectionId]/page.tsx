@@ -301,8 +301,8 @@ export default async function BillingSummaryDetailPage({
       />
       </details>
 
-      <section className="grid min-w-0 items-start gap-4 2xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <div className="min-w-0 space-y-4">
+      <section className="grid min-w-0 items-start gap-3 2xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="min-w-0 space-y-3">
           {groupedEntries.map(([category, items]) => (
             <div key={category} className="rounded-3xl bg-white p-4 shadow-panel">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -312,11 +312,11 @@ export default async function BillingSummaryDetailPage({
                   </p>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {items.length === 0 ? (
                   <p className="text-sm text-slate-500">No {categoryLabels[category].toLowerCase()} extracted from this visit.</p>
                 ) : items.map((item: BillingSummaryLineItem) => (
-                  <div key={item.id} className="rounded-[1.5rem] border border-slate-200 p-4">
+                  <div key={item.id} className="rounded-2xl border border-slate-200 p-3">
                     <div className="grid min-w-0 gap-3">
                       <div className="min-w-0 space-y-2">
                         <p className="text-lg font-semibold text-ink">{item.description}</p>
@@ -415,7 +415,7 @@ export default async function BillingSummaryDetailPage({
           ))}
         </div>
 
-        <div className="min-w-0 space-y-4">
+        <div className="min-w-0 space-y-3">
           <BillingReportPdfReviewPanel
             reports={summary.reportPdfs.map((report) => ({
               inspectionTaskId: report.inspectionTaskId,
@@ -430,7 +430,7 @@ export default async function BillingSummaryDetailPage({
             }))}
           />
 
-          <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+          <div className="rounded-3xl bg-white p-4 shadow-panel">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Summary status</p>
             <h3 className="mt-1 text-2xl font-semibold text-ink">{formatBillingSummaryStatusLabel(summary.status)}</h3>
             <BillingSummaryStatusActions
@@ -458,7 +458,7 @@ export default async function BillingSummaryDetailPage({
             />
           </div>
 
-          <div className="rounded-[2rem] bg-white p-6 shadow-panel">
+          <div className="rounded-3xl bg-white p-4 shadow-panel">
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Review notes</p>
             <form action={updateBillingSummaryNotesAction} className="mt-4 space-y-3">
               <input name="summaryId" type="hidden" value={summary.id} />

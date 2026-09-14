@@ -31,7 +31,7 @@ export function AppPageShell({
   className?: string;
   density?: "default" | "wide";
 }) {
-  return <section className={cn("min-w-0 space-y-4", density === "wide" && "w-full", className)}>{children}</section>;
+  return <section className={cn("min-w-0 space-y-3", density === "wide" && "w-full", className)}>{children}</section>;
 }
 
 export function SectionCard({
@@ -47,7 +47,7 @@ export function SectionCard({
     <section
       id={id}
       className={cn(
-        "enterprise-card min-w-0 rounded-[22px] p-4 lg:p-5",
+        "enterprise-card min-w-0 rounded-[20px] p-4",
         className
       )}
     >
@@ -86,7 +86,7 @@ export function PageHeader({
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className={widthClass}>
           {eyebrow ? (
-            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[var(--tenant-primary)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--tenant-primary)]">
               {eyebrow}
             </p>
           ) : null}
@@ -116,7 +116,7 @@ export function WorkspaceSplit({
         ? "2xl:grid-cols-2"
         : "2xl:grid-cols-[minmax(0,1.22fr)_minmax(24rem,0.88fr)]";
 
-  return <section className={cn("grid min-w-0 gap-4", variantClass, className)}>{children}</section>;
+  return <section className={cn("grid min-w-0 gap-3", variantClass, className)}>{children}</section>;
 }
 
 export function KPIStatCard({
@@ -134,7 +134,7 @@ export function KPIStatCard({
   tone?: Tone;
 }) {
   const content = (
-    <div className="enterprise-card flex h-full min-w-0 flex-col justify-between gap-2 rounded-[22px] p-4">
+    <div className="enterprise-card flex h-full min-w-0 flex-col justify-between gap-2 rounded-[20px] px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xs font-bold leading-5 text-[color:var(--text-secondary)] lg:text-sm">{label}</div>

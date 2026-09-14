@@ -14,7 +14,7 @@ const config: Config = {
         surface: "rgb(var(--surface-rgb, 255 255 255) / <alpha-value>)"
       },
       boxShadow: {
-        panel: "0 24px 54px rgba(9, 18, 32, 0.13)",
+        panel: "var(--shadow-panel, 0 24px 54px rgba(9, 18, 32, 0.13))",
         soft: "0 16px 36px rgba(9, 18, 32, 0.10)",
         crisp: "0 1px 0 rgba(255,255,255,0.8) inset, 0 18px 42px rgba(9,18,32,0.11)"
       }
