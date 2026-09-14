@@ -1,33 +1,37 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 const TECHNICIAN_CACHE_URLS = [
   "/app",
   "/app/tech",
   "/app/tech/work",
   "/app/tech/inspections",
-  "/app/tech/manuals",
   "/app/tech/profile"
 ];
 
-export function PwaServiceWorkerRegistration() {
+export function PwaServiceWorkerRegistration({ canWarmTechnicianCache = false }: { canWarmTechnicianCache?: boolean }) {
+  const pathname = usePathname();
+  const shouldWarm = canWarmTechnicianCache && (pathname === "/app/tech" || pathname.startsWith("/app/tech/"));
   useEffect(() => {
     if (!("serviceWorker" in navigator) || window.location.protocol !== "https:" && window.location.hostname !== "localhost") {
       return;
     }
 
     let cancelled = false;
+    let removeStateListener: (() => void) | undefined;
 
     async function registerServiceWorker() {
       try {
         const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-        if (cancelled) {
+        if (cancelled || !shouldWarm) {
           return;
         }
 
         const worker = registration.active ?? registration.waiting ?? registration.installing;
         const postWarmCacheMessage = () => {
+          if (cancelled) return;
           const target = registration.active ?? navigator.serviceWorker.controller ?? worker;
           target?.postMessage({
             type: "TRADEWORX_WARM_TECH_CACHE",
@@ -40,11 +44,13 @@ export function PwaServiceWorkerRegistration() {
           return;
         }
 
-        worker?.addEventListener("statechange", () => {
-          if (worker.state === "activated") {
+        const onStateChange = () => {
+          if (worker?.state === "activated") {
             postWarmCacheMessage();
           }
-        });
+        };
+        worker?.addEventListener("statechange", onStateChange);
+        removeStateListener = () => worker?.removeEventListener("statechange", onStateChange);
       } catch (error) {
         console.warn("TradeWorx offline app shell registration failed", error);
       }
@@ -54,8 +60,9 @@ export function PwaServiceWorkerRegistration() {
 
     return () => {
       cancelled = true;
+      removeStateListener?.();
     };
-  }, []);
+  }, [shouldWarm]);
 
   return null;
 }

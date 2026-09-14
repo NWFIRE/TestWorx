@@ -65,7 +65,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     <html lang="en">
       <body style={theme}>
         <ToastProvider>
-          <PwaServiceWorkerRegistration />
+          <PwaServiceWorkerRegistration canWarmTechnicianCache={session?.user?.role === "technician"} />
           <NavigationHistoryTracker />
           <GlobalBackButton />
           {children}

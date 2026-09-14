@@ -1,4 +1,4 @@
-const CACHE_VERSION = "tradeworx-pwa-v1";
+const CACHE_VERSION = "tradeworx-pwa-v2";
 const APP_SHELL_CACHE = `${CACHE_VERSION}:app-shell`;
 const ASSET_CACHE = `${CACHE_VERSION}:assets`;
 const LAST_TECH_NAVIGATION_KEY = "last-tech-navigation";
@@ -6,7 +6,6 @@ const TECH_NAVIGATION_FALLBACKS = [
   "/app/tech",
   "/app/tech/work",
   "/app/tech/inspections",
-  "/app/tech/manuals",
   "/app/tech/profile",
   "/app"
 ];
@@ -54,7 +53,12 @@ function isTechnicianNavigation(request) {
   }
 
   const url = new URL(request.url);
-  return url.pathname === "/app" || url.pathname.startsWith("/app/tech");
+  return url.pathname === "/app" || url.pathname === "/app/tech" || url.pathname.startsWith("/app/tech/");
+}
+
+function isCacheablePage(response) {
+  return response.ok && !response.redirected &&
+    response.headers.get("content-type")?.includes("text/html");
 }
 
 async function rememberLastTechnicianNavigation(request) {
@@ -111,58 +115,65 @@ function offlineFallbackResponse() {
 }
 
 async function cacheFirstAsset(request) {
-  const cached = await caches.match(request);
+  const cached = await caches.match(request).catch(() => undefined);
   if (cached) {
     return cached;
   }
 
   const response = await fetch(request);
   if (response.ok) {
-    const cache = await caches.open(ASSET_CACHE);
-    await cache.put(request, response.clone());
+    try {
+      const cache = await caches.open(ASSET_CACHE);
+      await cache.put(request, response.clone());
+    } catch {
+      // Storage is optional; a successful network response must still load.
+    }
   }
   return response;
 }
 
 async function networkFirstTechnicianNavigation(request) {
-  const cache = await caches.open(APP_SHELL_CACHE);
-
   try {
     const response = await fetch(request);
-    if (response.ok) {
-      await cache.put(request, response.clone());
-      await rememberLastTechnicianNavigation(request);
+    if (isCacheablePage(response)) {
+      try {
+        const cache = await caches.open(APP_SHELL_CACHE);
+        await cache.put(request, response.clone());
+        await rememberLastTechnicianNavigation(request);
+      } catch {
+        // Cache quota or unavailable storage must not replace a live page.
+      }
     }
     return response;
   } catch {
-    const exact = await cache.match(request);
-    if (exact) {
-      return exact;
-    }
-
-    const lastNavigation = await readLastTechnicianNavigation();
-    const candidates = [
-      lastNavigation,
-      ...TECH_NAVIGATION_FALLBACKS
-    ].filter(Boolean);
-
-    for (const pathname of candidates) {
-      const cached = await cache.match(new Request(new URL(pathname, self.location.origin), {
-        method: "GET",
-        credentials: "same-origin"
-      }));
-      if (cached) {
-        return cached;
+    try {
+      const cache = await caches.open(APP_SHELL_CACHE);
+      const exact = await cache.match(request);
+      if (exact) {
+        return exact;
       }
-    }
 
+      const lastNavigation = await readLastTechnicianNavigation();
+      const candidates = [lastNavigation, ...TECH_NAVIGATION_FALLBACKS].filter(Boolean);
+      for (const pathname of candidates) {
+        const cached = await cache.match(new Request(new URL(pathname, self.location.origin), {
+          method: "GET",
+          credentials: "same-origin"
+        }));
+        if (cached) return cached;
+      }
+    } catch {
+      // The offline screen remains available even when device storage fails.
+    }
     return offlineFallbackResponse();
   }
 }
 
 async function warmTechnicianCache(urls) {
-  const cache = await caches.open(APP_SHELL_CACHE);
+  const cache = await caches.open(APP_SHELL_CACHE).catch(() => null);
+  if (!cache) return;
   for (const pathname of urls) {
+    if (typeof pathname !== "string" || !TECH_NAVIGATION_FALLBACKS.includes(pathname)) continue;
     try {
       const request = new Request(new URL(pathname, self.location.origin), {
         method: "GET",
@@ -170,7 +181,7 @@ async function warmTechnicianCache(urls) {
         headers: { "X-TradeWorx-Prefetch": "technician-offline" }
       });
       const response = await fetch(request);
-      if (response.ok) {
+      if (isCacheablePage(response)) {
         await cache.put(request, response.clone());
       }
     } catch {
