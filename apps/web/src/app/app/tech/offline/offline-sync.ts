@@ -204,6 +204,19 @@ async function markQueueEntryStatus(entry: SyncQueueEntry, status: SyncQueueEntr
   });
 }
 
+async function getQueueInspectionKey(entry: SyncQueueEntry) {
+  if (typeof entry.payload.inspectionId === "string") return `inspection:${entry.payload.inspectionId}`;
+  if (entry.entityType === "inspection_report") {
+    const local = await getLocalReportDraft(entry.entityId);
+    if (local) return `inspection:${local.inspectionId}`;
+  }
+  if (entry.entityType === "work_order_line_item") {
+    const local = await getLocalWorkOrderLineItem(entry.entityId);
+    if (local) return `inspection:${local.inspectionId}`;
+  }
+  return `${entry.entityType}:${entry.entityId}`;
+}
+
 export async function processSyncQueue() {
   if (!window.navigator.onLine) {
     return;
@@ -215,8 +228,19 @@ export async function processSyncQueue() {
 
   syncInFlight = (async () => {
     const allEntries = (await listSyncQueueEntries()).filter((entry) => entry.operation !== "job_time_event" || entry.payload.userId === jobTimeUserId);
-    // A rejected clock event must be reviewed before dependent edits can sync.
-    if (allEntries.some((entry) => entry.operation === "job_time_event" && entry.status === "conflict")) return;
+    const inspectionKeys = new Map<string, string>();
+    const blockedInspections = new Set<string>();
+    const awaitingJobStart = new Set<string>();
+    for (const entry of allEntries) {
+      const key = await getQueueInspectionKey(entry);
+      inspectionKeys.set(entry.id, key);
+      // Finalization contains the full draft and supersedes its older autosave.
+      if (entry.operation === "report_autosave" && isFinalizationPendingOrComplete(await getLocalReportDraft(entry.entityId))) {
+        await deleteSyncQueueEntry(entry.id);
+        continue;
+      }
+      if (entry.status === "conflict" && !isProcessableQueueEntry(entry)) blockedInspections.add(key);
+    }
     const entries = allEntries.filter(isProcessableQueueEntry).sort((left, right) =>
       String(left.payload.queueOrderAt ?? left.createdAt).localeCompare(String(right.payload.queueOrderAt ?? right.createdAt)));
 
@@ -225,8 +249,9 @@ export async function processSyncQueue() {
       if (!current || !isProcessableQueueEntry(current)) {
         continue;
       }
-      if (current.operation === "job_time_event" && current.payload.action === "pause" &&
-          (await listSyncQueueEntries()).some((queued) => queued.id !== current.id && ["failed", "conflict"].includes(queued.status))) break;
+      const inspectionKey = inspectionKeys.get(current.id)!;
+      if (blockedInspections.has(inspectionKey) && !(awaitingJobStart.has(inspectionKey) &&
+          current.operation === "job_time_event" && current.payload.action === "start")) continue;
 
       if (current.operation === "report_autosave") {
         const local = await getLocalReportDraft(current.entityId);
@@ -325,8 +350,11 @@ export async function processSyncQueue() {
             }
           }
         }
-        // Do not send a pause/finalize past a failed save or rejected start.
-        if (!/Start or resume this job/i.test(message)) break;
+        // Preserve dependent writes for this job without blocking unrelated jobs.
+        // A queued start must still get a chance to unlock a save sent before it.
+        blockedInspections.add(inspectionKey);
+        if (/Start or resume this job/i.test(message)) awaitingJobStart.add(inspectionKey);
+        else awaitingJobStart.delete(inspectionKey);
       }
     }
   })().finally(() => {
