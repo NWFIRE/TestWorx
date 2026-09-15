@@ -40,6 +40,7 @@ const saveStateTone: Record<string, string> = {
   Syncing: "text-blue-700",
   Finalizing: "text-blue-700",
   "Finalize queued": "text-blue-700",
+  "Finalize failed": "text-rose-700",
   "Saved on device": "text-amber-700",
   "Needs review": "text-rose-700",
   Finalized: "text-slate-700"
@@ -56,7 +57,7 @@ function buildReportSaveState(record: LocalReportDraftRecord | null, reportStatu
     }
 
     if (record.syncStatus === "failed") {
-      return "Finalize queued";
+      return "Finalize failed";
     }
 
     if (record.syncStatus === "syncing" || record.syncStatus === "pending") {
@@ -114,7 +115,7 @@ function toTechnicianFacingSaveMessage(message: string | null | undefined, actio
     return normalized;
   }
 
-  if (/signatures are required|items need attention|add at least one/i.test(normalized)) {
+  if (/required|items need attention|add at least one|start or resume|select an active|did not confirm finalization/i.test(normalized)) {
     return normalized;
   }
 
@@ -125,6 +126,7 @@ function toTechnicianFacingSaveMessage(message: string | null | undefined, actio
 
 function toTechnicianFacingStoredSyncMessage(message: string | null | undefined, action: "save" | "finalize") {
   const normalized = (message ?? "").trim();
+  if (action === "finalize" && /required|items need attention|start or resume|select an active|did not confirm finalization/i.test(normalized)) return normalized;
   if (/locked|cannot edit|cannot be finalized|already finalized|already completed|closed inspections/i.test(normalized)) {
     return "Your work is saved on this iPad, but the office copy changed. Open Profile or contact the office before continuing.";
   }
@@ -928,12 +930,6 @@ export function MobileChecklistReportScreen({
       return;
     }
 
-    if (localRecordRef.current?.pendingFinalize) {
-      setSaveState(buildReportSaveState(localRecordRef.current, data.reportStatus));
-      setFinalizeQueued(true);
-      return;
-    }
-
     const nextDraft = createDerivedDraft(data.template, draftRef.current);
     draftRef.current = nextDraft;
     setDraft(nextDraft);
@@ -964,17 +960,19 @@ export function MobileChecklistReportScreen({
         syncStatus: "pending",
         lastError: null
       });
-      await queueReportFinalizeSync({
+      const result = await queueReportFinalizeSync({
         reportId: data.reportId,
         inspectionReportId: data.reportId,
         contentJson: nextDraft,
         taskDisplayLabel: data.customInspectionTypeLabel ?? null
       });
-      trackChecklistEvent("finalize_queued_offline", { reportId: data.reportId });
-      setSaveState("Finalize queued");
-      setFinalizeQueued(true);
+      if (!result.finalized) trackChecklistEvent("finalize_queued_offline", { reportId: data.reportId });
+      setSaveState(result.finalized ? "Finalized" : "Finalize queued");
+      setFinalizeQueued(!result.finalized);
     } catch (error) {
       const message = error instanceof Error ? error.message : null;
+      setSaveState("Finalize failed");
+      setFinalizeQueued(false);
       setFinalizeErrorMessage(toTechnicianFacingSaveMessage(message, "finalize"));
       trackChecklistEvent("finalize_sync_failed", { reportId: data.reportId, reason: message ?? "queue_failed" });
     } finally {
@@ -1250,7 +1248,7 @@ export function MobileChecklistReportScreen({
               </button>
               <button
                 className="min-h-12 rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)] disabled:opacity-50"
-                disabled={blockingIssues.length > 0 || finalizeInFlightRef.current || saveState === "Finalizing" || saveState === "Finalize queued"}
+                disabled={blockingIssues.length > 0 || finalizeInFlightRef.current || saveState === "Finalized" || saveState === "Finalizing" || saveState === "Finalize queued"}
                 onClick={() => { void finalizeInspection(); }}
                 type="button"
               >

@@ -19,7 +19,7 @@ async function main() {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
-    let failure = false, saveStarted = false;
+    let failure = false, saveStarted = false, invalidSuccess = false;
     const calls = [], errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.route("http://localhost/**", async (route) => {
@@ -35,6 +35,7 @@ async function main() {
       }
       if (url.includes("/api/reports/finalize")) {
         calls.push("finalize");
+        if (invalidSuccess) return route.fulfill({ json: {} });
         if (failure) return route.fulfill({ status: 422, json: { error: "Customer signature is required before finalizing." } });
         return route.fulfill({ json: { status: "finalized", finalizedAt: new Date().toISOString() } });
       }
@@ -59,6 +60,12 @@ async function main() {
     assert.equal(calls.length, before, "validation errors should wait for correction");
     failure = false;
     assert.equal((await page.evaluate(() => window.finalize("retry"))).finalized, true);
+    await page.evaluate(() => window.initialize("invalid-success"));
+    invalidSuccess = true;
+    assert.match(await page.evaluate(() => window.finalize("invalid-success").catch(e => e.message)), /did not confirm/);
+    assert.notEqual((await page.evaluate(() => window.read("invalid-success"))).reportStatus, "finalized");
+    invalidSuccess = false;
+    assert.equal((await page.evaluate(() => window.finalize("invalid-success"))).finalized, true);
     // Offline completion is queued, never represented as server-confirmed.
     await page.evaluate(() => { Object.defineProperty(navigator, "onLine", { configurable: true, get: () => false }); });
     await page.evaluate(() => window.initialize("offline"));
@@ -93,6 +100,8 @@ async function main() {
     const blockedAt = calls.length;
     assert.match(await page.evaluate(() => window.finalize("blocked-report").catch(error => error.message)), /pending|sync|correction/i);
     assert.equal(calls.length, blockedAt, "Must not finalize past unsaved materials on the same job");
+    assert.equal((await page.evaluate(() => window.read("blocked-report"))).syncStatus, "failed", "Blocked finalization must unlock correction controls, not stay Finalizing");
+    assert.match((await page.evaluate(() => window.read("blocked-report"))).lastError, /Material needs correction/);
     await page.evaluate(() => window.remove("material-conflict"));
     assert.equal((await page.evaluate(() => window.finalize("blocked-report"))).finalized, true);
     assert.deepEqual(errors, []);

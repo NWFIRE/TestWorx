@@ -127,7 +127,7 @@ function toTechnicianFacingSaveMessage(message: string | null | undefined, actio
     return normalized;
   }
 
-  if (/required|items need attention|add at least one|start or resume|finalization has not synced|incomplete/i.test(normalized)) {
+  if (/required|items need attention|add at least one|start or resume|select an active|did not confirm finalization|finalization has not synced|incomplete/i.test(normalized)) {
     return normalized;
   }
 
@@ -138,7 +138,7 @@ function toTechnicianFacingSaveMessage(message: string | null | undefined, actio
 
 function toTechnicianFacingStoredSyncMessage(message: string | null | undefined, action: "save" | "finalize") {
   const normalized = (message ?? "").trim();
-  if (action === "finalize" && /required|items need attention|add at least one|start or resume|incomplete/i.test(normalized)) return normalized;
+  if (action === "finalize" && /required|items need attention|add at least one|start or resume|select an active|did not confirm finalization|incomplete/i.test(normalized)) return normalized;
   if (/locked|cannot edit|cannot be finalized|already finalized|already completed|closed inspections/i.test(normalized)) {
     return "Your work is saved on this iPad, but the office copy changed. Open Profile or contact the office before continuing.";
   }

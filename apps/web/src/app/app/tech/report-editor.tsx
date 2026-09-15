@@ -119,6 +119,7 @@ const saveStateTone: Record<string, string> = {
   Syncing: "text-blue-700",
   Finalizing: "text-blue-700",
   "Finalize queued": "text-blue-700",
+  "Finalize failed": "text-rose-700",
   "Saved on device": "text-amber-700",
   "Needs review": "text-rose-700"
 };
@@ -134,7 +135,7 @@ function buildReportSaveState(record: LocalReportDraftRecord | null, reportStatu
     }
 
     if (record.syncStatus === "failed") {
-      return "Finalize queued";
+      return "Finalize failed";
     }
 
     if (record.syncStatus === "syncing" || record.syncStatus === "pending") {
@@ -260,7 +261,7 @@ function toTechnicianFacingSaveMessage(message: string | null | undefined, actio
     return normalized;
   }
 
-  if (/signatures are required|items need attention/i.test(normalized)) {
+  if (/required|items need attention|start or resume|select an active|did not confirm finalization/i.test(normalized)) {
     return normalized;
   }
 
@@ -271,6 +272,7 @@ function toTechnicianFacingSaveMessage(message: string | null | undefined, actio
 
 function toTechnicianFacingStoredSyncMessage(message: string | null | undefined, action: "save" | "finalize") {
   const normalized = (message ?? "").trim();
+  if (action === "finalize" && /required|items need attention|start or resume|select an active|did not confirm finalization/i.test(normalized)) return normalized;
   if (/locked|cannot edit|cannot be finalized|already finalized|already completed|closed inspections/i.test(normalized)) {
     return "Your work is saved on this iPad, but the office copy changed. Open Profile or contact the office before continuing.";
   }
@@ -1000,12 +1002,6 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
       return;
     }
 
-    if (localRecordRef.current?.pendingFinalize) {
-      setSaveState(buildReportSaveState(localRecordRef.current, data.reportStatus));
-      router.push("/app/tech/inspections?finalize=queued");
-      return;
-    }
-
     if (saveInFlightRef.current) {
       setErrorMessage("Please wait for the current save to finish before finalizing.");
       return;
@@ -1030,17 +1026,18 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
         syncStatus: "pending",
         lastError: null
       });
-      await queueReportFinalizeSync({
+      const result = await queueReportFinalizeSync({
         reportId: data.reportId,
         inspectionReportId: data.reportId,
         contentJson: latestDraftRef.current,
         taskDisplayLabel: taskDisplayLabel.trim() || null
       });
-      setSaveState("Finalize queued");
+      setSaveState(result.finalized ? "Finalized" : "Finalize queued");
       setDirty(false);
 
-      router.push("/app/tech/inspections?finalize=queued");
+      router.push(result.finalized ? "/app/tech/inspections" : "/app/tech/inspections?finalize=queued");
     } catch (error) {
+      setSaveState("Finalize failed");
       setFinalizeErrorMessage(toTechnicianFacingSaveMessage(error instanceof Error ? error.message : null, "finalize"));
     } finally {
       finalizeInFlightRef.current = false;

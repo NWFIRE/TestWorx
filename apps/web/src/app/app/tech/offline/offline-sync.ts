@@ -137,6 +137,9 @@ async function syncReportFinalize(entry: SyncQueueEntry) {
       syncConflict: response.status === 422 || response.status === 409 || toConflictStatus(payload.error)
     });
   }
+  if (payload.status !== "finalized") {
+    throw new Error("The server did not confirm finalization. Your work is saved on this device; sign in if needed and retry.");
+  }
 
   const reportId = String(entry.entityId);
   const local = await getLocalReportDraft(reportId);
@@ -230,6 +233,7 @@ export async function processSyncQueue() {
     const allEntries = (await listSyncQueueEntries()).filter((entry) => entry.operation !== "job_time_event" || entry.payload.userId === jobTimeUserId);
     const inspectionKeys = new Map<string, string>();
     const blockedInspections = new Set<string>();
+    const blockingErrors = new Map<string, string>();
     const awaitingJobStart = new Set<string>();
     for (const entry of allEntries) {
       const key = await getQueueInspectionKey(entry);
@@ -239,7 +243,10 @@ export async function processSyncQueue() {
         await deleteSyncQueueEntry(entry.id);
         continue;
       }
-      if (entry.status === "conflict" && !isProcessableQueueEntry(entry)) blockedInspections.add(key);
+      if (entry.status === "conflict" && !isProcessableQueueEntry(entry)) {
+        blockedInspections.add(key);
+        blockingErrors.set(key, entry.lastError ?? "An earlier change on this job needs correction.");
+      }
     }
     const entries = allEntries.filter(isProcessableQueueEntry).sort((left, right) =>
       String(left.payload.queueOrderAt ?? left.createdAt).localeCompare(String(right.payload.queueOrderAt ?? right.createdAt)));
@@ -251,7 +258,19 @@ export async function processSyncQueue() {
       }
       const inspectionKey = inspectionKeys.get(current.id)!;
       if (blockedInspections.has(inspectionKey) && !(awaitingJobStart.has(inspectionKey) &&
-          current.operation === "job_time_event" && current.payload.action === "start")) continue;
+          current.operation === "job_time_event" && current.payload.action === "start")) {
+        if (current.operation === "report_finalize") {
+          const message = blockingErrors.get(inspectionKey) ?? "An earlier change on this job must sync before finalization.";
+          const local = await getLocalReportDraft(current.entityId);
+          // A blocked request is not actively finalizing. Keep the saved draft and
+          // queue entry, but unlock correction/start controls instead of trapping the UI.
+          if (local && (local.syncStatus !== "failed" || local.lastError !== message)) {
+            await putLocalReportDraft({ ...local, syncStatus: "failed", lastError: message });
+          }
+          if (current.lastError !== message) await putSyncQueueEntry({ ...current, lastError: message });
+        }
+        continue;
+      }
 
       if (current.operation === "report_autosave") {
         const local = await getLocalReportDraft(current.entityId);
@@ -353,6 +372,7 @@ export async function processSyncQueue() {
         // Preserve dependent writes for this job without blocking unrelated jobs.
         // A queued start must still get a chance to unlock a save sent before it.
         blockedInspections.add(inspectionKey);
+        blockingErrors.set(inspectionKey, message);
         if (/Start or resume this job/i.test(message)) awaitingJobStart.add(inspectionKey);
         else awaitingJobStart.delete(inspectionKey);
       }
