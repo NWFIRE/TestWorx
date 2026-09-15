@@ -1,8 +1,13 @@
 import { InspectionStatus } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { syncInspectionArchiveStateTxMock } = vi.hoisted(() => ({
-  syncInspectionArchiveStateTxMock: vi.fn()
+const { syncInspectionArchiveStateTxMock, ensureBillingMock } = vi.hoisted(() => ({
+  syncInspectionArchiveStateTxMock: vi.fn(),
+  ensureBillingMock: vi.fn()
+}));
+
+vi.mock("../inspection-billing-readiness", () => ({
+  ensureCompletedInspectionBillingSummaryTx: ensureBillingMock
 }));
 
 vi.mock("../inspection-archive", () => ({
@@ -10,6 +15,7 @@ vi.mock("../inspection-archive", () => ({
 }));
 
 import { repairInspectionStatusConsistencyTx } from "../inspection-status-consistency";
+import { reconcileInspectionStatusTx } from "../inspection-status-consistency";
 import { resolveInspectionCompletionAfterTaskFinalizationTx } from "../report-service";
 
 function buildTxMock() {
@@ -34,6 +40,26 @@ describe("inspection completion after report finalization", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     syncInspectionArchiveStateTxMock.mockResolvedValue(undefined);
+  });
+
+  it.each(["repair", "admin_status_update", "tech_status_update"] as const)("creates missing billing on %s completion", async (source) => {
+    const tx = buildTxMock();
+    tx.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1", status: InspectionStatus.in_progress, isPriority: false, billingSummary: null,
+      tasks: [{ id: "task_1", status: InspectionStatus.completed, schedulingStatus: "scheduled_now", report: { status: "finalized", finalizedAt: new Date() } }]
+    });
+    await reconcileInspectionStatusTx(tx as never, { tenantId: "tenant_1", inspectionId: "inspection_1", actorUserId: "office_1", source });
+    expect(ensureBillingMock).toHaveBeenCalledWith(tx, expect.objectContaining({ tenantId: "tenant_1", inspectionId: "inspection_1" }));
+  });
+
+  it("leaves existing reviewed billing unchanged during repair", async () => {
+    const tx = buildTxMock();
+    tx.inspection.findFirst.mockResolvedValue({
+      id: "inspection_1", status: InspectionStatus.completed, isPriority: false, billingSummary: { status: "reviewed" },
+      tasks: [{ id: "task_1", status: InspectionStatus.completed, schedulingStatus: "scheduled_now", report: { status: "finalized", finalizedAt: new Date() } }]
+    });
+    await reconcileInspectionStatusTx(tx as never, { tenantId: "tenant_1", inspectionId: "inspection_1", actorUserId: "office_1", source: "repair" });
+    expect(ensureBillingMock).not.toHaveBeenCalled();
   });
 
   it("marks the parent inspection completed only when every active task is finalized", async () => {

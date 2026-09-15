@@ -12,6 +12,7 @@ import { applyJobFinishTimeTx, assertJobStarted } from "./job-time";
 import { snapshotComplianceReferences } from "./compliance-references";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
 import { syncInspectionBillingSummaryTx } from "./inspection-billing";
+import { ensureCompletedInspectionBillingSummaryTx } from "./inspection-billing-readiness";
 import { reconcileInspectionStatusTx } from "./inspection-status-consistency";
 import type { JsonInputValue, JsonObject, JsonValue } from "./json-types";
 import { assertTenantContext } from "./permissions";
@@ -1998,6 +1999,10 @@ export async function finalizeInspectionReport(actor: ActorContext, input: Final
 
   const alreadyFinalized = await getIdempotentFinalizedReport(actor, inspectionReportId);
   if (alreadyFinalized) {
+    await prisma.$transaction((tx) => ensureCompletedInspectionBillingSummaryTx(tx, {
+      tenantId: parsedActorForLookup.tenantId as string,
+      inspectionId: alreadyFinalized.inspectionId
+    }), { timeout: 20_000 });
     return alreadyFinalized;
   }
 

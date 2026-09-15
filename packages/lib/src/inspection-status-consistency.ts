@@ -4,6 +4,7 @@ import { reportStatuses } from "@testworx/types";
 import type { JsonObject } from "./json-types";
 import { syncInspectionArchiveStateTx } from "./inspection-archive";
 import { stopJobTimeTx } from "./job-time";
+import { ensureCompletedInspectionBillingSummaryTx } from "./inspection-billing-readiness";
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -247,6 +248,13 @@ export async function reconcileInspectionStatusTx(tx: TransactionClient, input: 
       inspectionId: input.inspectionId,
       completedAtOverride: completedAt
     });
+  }
+
+  // Report/document finalization already refreshes its summary after rollup.
+  // Manual completion and status repairs must not leave completed work invisible to billing.
+  if (nextStatus === InspectionStatus.completed && !inspection.billingSummary &&
+      input.source !== "mobile_or_web_finalize" && input.source !== "sync_finalize") {
+    await ensureCompletedInspectionBillingSummaryTx(tx, input);
   }
 
   await createInspectionStatusAuditLog(tx, {
