@@ -56,6 +56,7 @@ const categoryLabels = {
 } as const;
 
 function formatBillingSummaryStatusLabel(status: string) {
+  if (status === "billing_review") return "Needs billing review";
   if (status === "draft" || status === "reviewed") {
     return "Ready To Bill";
   }

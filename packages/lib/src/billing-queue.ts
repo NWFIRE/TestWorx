@@ -48,7 +48,28 @@ export function sortBillingSummaries<TSummary extends SortableBillingQueueSummar
 }
 
 export function isOpenBillingQueueStatus(status: string | null | undefined) {
-  return status !== "invoiced";
+  return status === "draft" || status === "reviewed";
+}
+
+export function assertBillingInvoiceCreationAllowed(summary: { status: string; quickbooksInvoiceId?: string | null }) {
+  if (summary.quickbooksInvoiceId || summary.status === "invoiced") {
+    throw new Error("This work already has an invoice. Review the existing invoice instead of creating another.");
+  }
+  if (!isOpenBillingQueueStatus(summary.status)) {
+    throw new Error("Check prior invoices and confirm this work has not been billed before releasing it from billing review.");
+  }
+}
+
+export function assertBillingStatusChangeAllowed(currentStatus: string, nextStatus: string, confirmedUnbilled = false) {
+  if (!["draft", "reviewed", "invoiced", "billing_review"].includes(nextStatus)) {
+    throw new Error("Invalid billing status.");
+  }
+  if (currentStatus === "invoiced" && nextStatus !== "invoiced") {
+    throw new Error("Invoiced work cannot be reopened here. Review the existing invoice instead of billing it again.");
+  }
+  if (currentStatus === "billing_review" && isOpenBillingQueueStatus(nextStatus) && !confirmedUnbilled) {
+    throw new Error("Confirm that you checked prior invoices and this work has not already been billed.");
+  }
 }
 
 export function filterBillingSummariesForQueue<TSummary extends BillingQueueSummaryLike>(

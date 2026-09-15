@@ -326,6 +326,21 @@ describe("quickbooks billing sync hardening", () => {
     resetServerEnvForTests();
   });
 
+  it.each([
+    { status: "billing_review", quickbooksInvoiceId: null },
+    { status: "invoiced", quickbooksInvoiceId: null },
+    { status: "draft", quickbooksInvoiceId: "prior_invoice" }
+  ])("rejects duplicate-risk billing before any QuickBooks request: %j", async (state) => {
+    prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
+    prismaMock.inspectionBillingSummary.findUnique.mockResolvedValue({ ...buildBillingSummary(), ...state });
+    const { syncBillingSummaryToQuickBooks } = await import("../quickbooks");
+    await expect(syncBillingSummaryToQuickBooks(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" }, "inspection_1"
+    )).rejects.toThrow();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(prismaMock.inspectionBillingSummary.update).not.toHaveBeenCalled();
+  });
+
   it("marks billing summaries synced without emailing by default after the created invoice is verified", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue(buildTenantConnection());
     prismaMock.customerCompany.findUnique.mockResolvedValue({ quickbooksCustomerId: null });

@@ -11,7 +11,7 @@ type BillingSummaryActionResult = {
   error: string | null;
   message: string | null;
   detail: {
-    status: "draft" | "reviewed" | "invoiced";
+    status: "draft" | "reviewed" | "invoiced" | "billing_review";
     quickbooksSyncStatus: string | null;
     quickbooksInvoiceNumber: string | null;
     quickbooksInvoiceId: string | null;
@@ -27,7 +27,7 @@ type BillingSummaryActionResult = {
 type BillingSummaryStatusActionsProps = {
   summaryId: string;
   inspectionId: string;
-  summaryStatus: "draft" | "reviewed" | "invoiced";
+  summaryStatus: "draft" | "reviewed" | "invoiced" | "billing_review";
   quickbooksSyncStatus: string | null;
   quickbooksSendStatus: "not_sent" | "sent" | "send_failed" | "send_skipped";
   quickbooksInvoiceNumber: string | null;
@@ -108,6 +108,7 @@ export function BillingSummaryStatusActions({
 }: BillingSummaryStatusActionsProps) {
   const [pending, startTransition] = useTransition();
   const [activeAction, setActiveAction] = useState<string | null>(null);
+  const [confirmedUnbilled, setConfirmedUnbilled] = useState(false);
   const [state, setState] = useState({
     summaryStatus,
     quickbooksSyncStatus,
@@ -162,6 +163,8 @@ export function BillingSummaryStatusActions({
   }
 
   const hasVerifiedQuickBooksInvoice = Boolean(state.quickbooksInvoiceId && ["synced", "sent"].includes(state.quickbooksSyncStatus ?? ""));
+  const needsBillingReview = state.summaryStatus === "billing_review";
+  const cannotCreateInvoice = needsBillingReview || state.summaryStatus === "invoiced" || Boolean(state.quickbooksInvoiceId);
   const openQuickBooksUrl = state.quickbooksInvoiceId && !summaryModeMismatch && canUseQuickBooksActions
     ? buildQuickBooksInvoiceAppUrl(state.quickbooksInvoiceId, state.quickbooksMode)
     : null;
@@ -184,6 +187,16 @@ export function BillingSummaryStatusActions({
       </div>
 
       <div className="mt-4 grid gap-3">
+        {needsBillingReview ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="font-semibold">Check prior billing before creating an invoice</p>
+            <p className="mt-2">This work is on hold, not Ready To Bill. Recovered billing records may already have been invoiced outside this summary. Compare prior QuickBooks invoices and service details first. No inspection or invoice has been deleted.</p>
+            <label className="mt-3 flex items-start gap-2">
+              <input type="checkbox" checked={confirmedUnbilled} onChange={(event) => setConfirmedUnbilled(event.target.checked)} />
+              I checked prior invoices and confirmed this work has not been billed.
+            </label>
+          </div>
+        ) : null}
         {!hasVerifiedQuickBooksInvoice ? (
           <p className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-500">
             QuickBooks applies the final item pricing and tax when the invoice is created. Choose Sync Only to create the QuickBooks invoice without emailing the customer. Use Sync and send only when you are ready for QuickBooks to deliver it.
@@ -191,7 +204,7 @@ export function BillingSummaryStatusActions({
         ) : null}
         <ActionButton
           className="w-full"
-          disabled={hasVerifiedQuickBooksInvoice || hasMissingBillingSetup || !canUseQuickBooksActions}
+          disabled={cannotCreateInvoice || hasMissingBillingSetup || !canUseQuickBooksActions}
           onClick={() => runAction("sync", () => {
             const formData = new FormData();
             formData.set("inspectionId", inspectionId);
@@ -214,7 +227,7 @@ export function BillingSummaryStatusActions({
         {!hasVerifiedQuickBooksInvoice ? (
           <ActionButton
             className="w-full"
-            disabled={hasMissingBillingSetup || !canUseQuickBooksActions}
+            disabled={cannotCreateInvoice || hasMissingBillingSetup || !canUseQuickBooksActions}
             onClick={() => runAction("sync-send", () => {
               const formData = new FormData();
               formData.set("inspectionId", inspectionId);
@@ -245,38 +258,40 @@ export function BillingSummaryStatusActions({
 
         <ActionButton
           className="w-full"
-          disabled={state.summaryStatus !== "invoiced"}
-          onClick={() => runAction("draft", () => {
+          disabled={state.summaryStatus === "invoiced" || needsBillingReview || Boolean(state.quickbooksInvoiceId)}
+          onClick={() => runAction("billing_review", () => {
             const formData = new FormData();
             formData.set("summaryId", summaryId);
             formData.set("inspectionId", inspectionId);
-            formData.set("status", "draft");
+            formData.set("status", "billing_review");
             return formData;
           }, updateBillingSummaryStatusAction)}
-          pending={pending && activeAction === "draft"}
-          pendingLabel="Moving back to Ready To Bill..."
+          pending={pending && activeAction === "billing_review"}
+          pendingLabel="Holding for billing review..."
         >
-          {state.summaryStatus === "invoiced" ? "Move back to Ready To Bill" : "Currently Ready To Bill"}
+          {state.summaryStatus === "invoiced" ? "Already invoiced" : needsBillingReview ? "On hold for billing review" : "Hold for prior billing review"}
         </ActionButton>
 
         <ActionButton
           className="w-full"
-          disabled={state.summaryStatus === "reviewed" || state.summaryStatus === "invoiced"}
+          disabled={state.summaryStatus === "reviewed" || state.summaryStatus === "invoiced" || (needsBillingReview && !confirmedUnbilled)}
           onClick={() => runAction("reviewed", () => {
             const formData = new FormData();
             formData.set("summaryId", summaryId);
             formData.set("inspectionId", inspectionId);
             formData.set("status", "reviewed");
+            formData.set("confirmedUnbilled", String(confirmedUnbilled));
             return formData;
           }, updateBillingSummaryStatusAction)}
           pending={pending && activeAction === "reviewed"}
           pendingLabel="Confirming Ready To Bill..."
         >
-          {state.summaryStatus === "reviewed" ? "Ready To Bill confirmed" : "Confirm Ready To Bill"}
+          {state.summaryStatus === "reviewed" ? "Ready To Bill confirmed" : needsBillingReview ? "Release unbilled work to Ready To Bill" : "Confirm Ready To Bill"}
         </ActionButton>
 
         <ActionButton
           className="w-full"
+          disabled={state.summaryStatus === "invoiced"}
           onClick={() => runAction("invoiced", () => {
             const formData = new FormData();
             formData.set("summaryId", summaryId);
@@ -288,7 +303,7 @@ export function BillingSummaryStatusActions({
           pendingLabel="Marking invoiced..."
           tone="primary"
         >
-          {state.summaryStatus === "invoiced" ? "Currently invoiced" : "Mark invoiced"}
+          {state.summaryStatus === "invoiced" ? "Currently invoiced" : needsBillingReview ? "Already billed - mark invoiced" : "Mark invoiced"}
         </ActionButton>
       </div>
 

@@ -11,6 +11,11 @@ const finalizedReport = {
 };
 
 describe("inspection lifecycle resolver", () => {
+  it("keeps held historical work out of dashboard Ready To Bill counts", () => {
+    expect(resolveInspectionLifecycleSummary({
+      inspectionStatus: "completed", reports: [finalizedReport], billingStatus: "billing_review"
+    })).toMatchObject({ actionState: "needs_attention", primaryLabel: "Needs billing review" });
+  });
   it("closes completed finalized invoiced work with no action queue state", () => {
     const summary = resolveInspectionLifecycleSummary({
       inspectionStatus: "completed",

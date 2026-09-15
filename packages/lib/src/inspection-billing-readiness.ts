@@ -1,6 +1,6 @@
 import { InspectionStatus, type Prisma } from "@prisma/client";
 
-/** Recover a missing summary without repricing or changing an existing invoice. */
+/** Missing local billing is not proof that historical work has never been invoiced. */
 export async function ensureCompletedInspectionBillingSummaryTx(
   tx: Prisma.TransactionClient,
   input: { tenantId: string; inspectionId: string }
@@ -20,5 +20,12 @@ export async function ensureCompletedInspectionBillingSummaryTx(
   }
 
   const { syncInspectionBillingSummaryTx } = await import("./inspection-billing");
-  return syncInspectionBillingSummaryTx(tx, input);
+  const summary = await syncInspectionBillingSummaryTx(tx, input);
+  if (!summary) return null;
+  const held = await tx.inspectionBillingSummary.updateMany({
+    where: { id: summary.id, tenantId: input.tenantId, status: "draft", quickbooksInvoiceId: null },
+    data: { status: "billing_review" }
+  });
+  if (held.count !== 1) throw new Error("Billing changed during recovery. Review the existing summary before retrying.");
+  return { ...summary, status: "billing_review" as const };
 }

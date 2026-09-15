@@ -954,7 +954,7 @@ export async function generateQuoteFromDeficiencyAction(formData: FormData) {
 export async function updateBillingSummaryStatusAction(formData: FormData) {
   const session = await auth();
   const summaryId = String(formData.get("summaryId") ?? "");
-  const status = String(formData.get("status") ?? "") as "draft" | "reviewed" | "invoiced";
+  const status = String(formData.get("status") ?? "") as "draft" | "reviewed" | "invoiced" | "billing_review";
   const inspectionId = String(formData.get("inspectionId") ?? "");
   if (!session?.user?.tenantId || !summaryId || !status || !inspectionId) {
     return { ok: false, error: "Unauthorized", message: null, detail: null };
@@ -965,17 +965,25 @@ export async function updateBillingSummaryStatusAction(formData: FormData) {
       { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
       inspectionId
     );
+    if (!detail || detail.id !== summaryId) {
+      return { ok: false, error: "Billing summary not found.", message: null, detail: null };
+    }
     const blockMessage = extractBillingResolutionBlockMessage(detail);
-    if (blockMessage) {
+    if (blockMessage && detail?.status !== "billing_review") {
       return { ok: false, error: blockMessage, message: null, detail };
     }
   }
 
-  await updateBillingSummaryStatus(
-    { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
-    summaryId,
-    status
-  );
+  try {
+    await updateBillingSummaryStatus(
+      { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
+      summaryId,
+      status,
+      formData.get("confirmedUnbilled") === "true"
+    );
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unable to update billing status.", message: null, detail: null };
+  }
 
   revalidatePath("/app/admin");
   revalidatePath("/app/admin/billing");

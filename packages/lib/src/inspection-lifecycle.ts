@@ -15,6 +15,7 @@ export type LifecycleReportStatus =
   | "void";
 
 export type LifecycleBillingStatus =
+  | "billing_review"
   | "not_billable"
   | "not_billed"
   | "ready_to_bill"
@@ -104,6 +105,7 @@ export function resolveBillingLifecycleStatus(input: {
   if (input.billingStatus === "reviewed") {
     return "ready_to_bill" satisfies LifecycleBillingStatus;
   }
+  if (input.billingStatus === "billing_review") return "billing_review" satisfies LifecycleBillingStatus;
   if (input.billingStatus === "draft") {
     return "invoice_draft" satisfies LifecycleBillingStatus;
   }
@@ -196,6 +198,11 @@ export function resolveInspectionLifecycleSummary(input: {
   const reportStatus = resolveReportLifecycleStatus(input.reports ?? []);
   const billingStatus = resolveBillingLifecycleStatus(input);
   const hasClosedBilling = hasClosedBillingStatus(billingStatus);
+
+  if (billingStatus === "billing_review") {
+    return { inspectionStatus, reportStatus, billingStatus, actionState: "needs_attention",
+      primaryLabel: "Needs billing review", secondaryLabel: "Check prior invoices before billing this work.", nextAction: "Review Billing" };
+  }
 
   if (input.hasSyncIssue || input.quickbooksSyncStatus === "failed" || input.quickbooksSyncStatus === "sync_error") {
     return {

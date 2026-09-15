@@ -1,5 +1,6 @@
 import { ComplianceReportingDivision, InspectionStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@testworx/db";
+import { assertBillingInvoiceCreationAllowed } from "./billing-queue";
 import { z } from "zod";
 
 import type { ActorContext } from "@testworx/types";
@@ -4798,6 +4799,7 @@ export async function syncBillingSummaryToQuickBooks(
     throw new Error("Billing summary not found.");
   }
 
+  assertBillingInvoiceCreationAllowed(summary);
   const deliverySnapshot = (summary.deliverySnapshot ?? {}) as Record<string, unknown>;
 
   if (summary.quickbooksInvoiceId && isVerifiedQuickBooksSyncStatus(summary.quickbooksSyncStatus)) {

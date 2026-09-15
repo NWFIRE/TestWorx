@@ -1,5 +1,6 @@
 import { InspectionStatus, Prisma } from "@prisma/client";
 import { prisma } from "@testworx/db";
+import { assertBillingStatusChangeAllowed } from "./billing-queue";
 
 import type { ActorContext, InspectionType, ReportStatus } from "@testworx/types";
 import { actorContextSchema, reportStatuses } from "@testworx/types";
@@ -147,7 +148,7 @@ function isRuleControlledFeeItem(item: BillableItem) {
   return item.category === "fee" && item.metadata?.manualBillingLine !== true;
 }
 
-export type BillingSummaryStatus = "draft" | "reviewed" | "invoiced";
+export type BillingSummaryStatus = "draft" | "reviewed" | "invoiced" | "billing_review";
 
 type PersistedBillingSummary = {
   id: string;
@@ -4033,67 +4034,37 @@ async function getAuthorizedBillingSummary(actor: ActorContext, summaryId: strin
   };
 }
 
-export async function updateBillingSummaryStatus(actor: ActorContext, summaryId: string, status: BillingSummaryStatus) {
+export async function updateBillingSummaryStatus(actor: ActorContext, summaryId: string, status: BillingSummaryStatus, confirmedUnbilled = false) {
   const { summary } = await getAuthorizedBillingSummary(actor, summaryId);
-  const resetQuickBooksFields = summary.status === "invoiced" && status !== "invoiced";
+  assertBillingStatusChangeAllowed(summary.status, status, confirmedUnbilled);
   const nextInspectionStatus = status === "invoiced"
     ? InspectionStatus.invoiced
-    : resetQuickBooksFields
-      ? InspectionStatus.completed
-      : null;
-  if (resetQuickBooksFields) {
-    await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`
-        UPDATE "InspectionBillingSummary"
-        SET "status" = ${status},
-            "quickbooksSyncStatus" = 'not_synced',
-            "quickbooksInvoiceId" = NULL,
-            "quickbooksInvoiceNumber" = NULL,
-            "quickbooksConnectionMode" = NULL,
-            "quickbooksCustomerId" = NULL,
-            "quickbooksSyncedAt" = NULL,
-            "quickbooksSyncError" = NULL,
-            "updatedAt" = NOW()
-        WHERE "id" = ${summary.id}
-      `;
-
-      if (nextInspectionStatus) {
-        await tx.inspection.update({
-          where: { id: summary.inspectionId },
-          data: nextInspectionStatus === "completed"
-            ? { status: nextInspectionStatus, isPriority: false, priorityClearedAt: new Date() }
-            : { status: nextInspectionStatus }
-        });
-
-        await reconcileInspectionStatusTx(tx, {
-          tenantId: summary.tenantId,
-          inspectionId: summary.inspectionId,
-          actorUserId: actorContextSchema.parse(actor).userId,
-          source: "billing_status_update"
-        });
-
-        await syncInspectionArchiveStateTx(tx, {
-          tenantId: summary.tenantId,
-          inspectionId: summary.inspectionId
-        });
-      }
-    });
-    return;
-  }
+    : null;
 
   await prisma.$transaction(async (tx) => {
+    const current = await tx.$queryRaw<Array<{ status: string }>>`
+      SELECT "status" FROM "InspectionBillingSummary"
+      WHERE "id" = ${summary.id} AND "tenantId" = ${summary.tenantId} FOR UPDATE
+    `;
+    if (!current[0]) throw new Error("Billing summary not found.");
+    assertBillingStatusChangeAllowed(current[0].status, status, confirmedUnbilled);
     await tx.$executeRaw`
       UPDATE "InspectionBillingSummary"
       SET "status" = ${status}, "updatedAt" = NOW()
-      WHERE "id" = ${summary.id}
+      WHERE "id" = ${summary.id} AND "tenantId" = ${summary.tenantId}
     `;
+    if (current[0].status !== status) {
+      await tx.auditLog.create({ data: {
+        tenantId: summary.tenantId, actorUserId: actorContextSchema.parse(actor).userId,
+        action: "billing.status_changed", entityType: "InspectionBillingSummary", entityId: summary.id,
+        metadata: { inspectionId: summary.inspectionId, from: current[0].status, to: status, confirmedUnbilled }
+      } });
+    }
 
     if (nextInspectionStatus) {
       await tx.inspection.update({
           where: { id: summary.inspectionId },
-          data: nextInspectionStatus === "completed"
-            ? { status: nextInspectionStatus, isPriority: false, priorityClearedAt: new Date() }
-            : { status: nextInspectionStatus }
+          data: { status: nextInspectionStatus }
         });
 
       await reconcileInspectionStatusTx(tx, {

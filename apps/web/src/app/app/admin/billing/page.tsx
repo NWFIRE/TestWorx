@@ -28,12 +28,14 @@ type AdminBillingSummary = Awaited<ReturnType<typeof getAdminBillingSummaries>>[
 const statusTones = {
   draft: "blue",
   reviewed: "blue",
+  billing_review: "amber",
   invoiced: "violet"
 } as const;
 
 const statusOptions = [
   { value: "all", label: "Ready To Bill" },
   { value: "needs_pricing", label: "Needs setup" },
+  { value: "billing_review", label: "Needs billing review" },
   { value: "invoiced", label: "Invoiced" }
 ] as const;
 
@@ -63,6 +65,7 @@ function buildBillingHref(status: string | undefined, sort: BillingQueueSort) {
 }
 
 function formatBillingSummaryStatus(status: string) {
+  if (status === "billing_review") return "Needs billing review";
   if (status === "reviewed" || status === "draft") {
     return "Ready To Bill";
   }
