@@ -20,7 +20,7 @@ async function main() {
   try {
     const page = await browser.newPage();
     let failure = false, saveStarted = false, invalidSuccess = false;
-    const calls = [], errors = [];
+    const calls = [], errors = [], clockCalls = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.route("http://localhost/**", async (route) => {
       const url = route.request().url();
@@ -40,7 +40,12 @@ async function main() {
         if (failure) return route.fulfill({ status: 422, json: { error: "Customer signature is required before finalizing." } });
         return route.fulfill({ json: { status: "finalized", finalizedAt: new Date().toISOString() } });
       }
-      if (url.includes("/api/tech/job-time")) return route.fulfill({ status: 409, json: { error: "Pause your current job first. Overlapping job time needs office review." } });
+      if (url.includes("/api/tech/job-time")) {
+        const event = route.request().postDataJSON();
+        clockCalls.push(event.action);
+        if (event.sessionId === "recovery") return route.fulfill({ json: { ok: true } });
+        return route.fulfill({ status: 409, json: { error: "Pause your current job first. Overlapping job time needs office review." } });
+      }
       return route.fulfill({ contentType: "text/html", body: "<main>Finalize sync test</main>" });
     });
     await page.goto("http://localhost/test");
@@ -118,8 +123,30 @@ async function main() {
     assert.equal(calls.length, blockedAt, "Must not finalize past unsaved materials on the same job");
     assert.equal((await page.evaluate(() => window.read("blocked-report"))).syncStatus, "failed", "Blocked finalization must unlock correction controls, not stay Finalizing");
     assert.match((await page.evaluate(() => window.read("blocked-report"))).lastError, /Material needs correction/);
+    // Timer recovery must not be blocked behind invalid material/report writes.
+    for (const action of ["pause", "start"]) {
+      await page.evaluate(async (action) => {
+        await window.seed({id:`recovery-${action}`, entityType:"job_time", entityId:"recovery", operation:"job_time_event", status:"pending", retryCount:0,
+          lastError:null, createdAt:new Date().toISOString(), updatedAt:new Date().toISOString(), lastAttemptAt:null,
+          payload:{inspectionId:"blocked-job", userId:"tech", sessionId:"recovery", action}});
+        await window.sync();
+      }, action);
+      assert.equal(clockCalls.at(-1), action);
+      assert.notEqual((await page.evaluate(() => window.read("blocked-report"))).reportStatus, "finalized");
+    }
     await page.evaluate(() => window.remove("material-conflict"));
     assert.equal((await page.evaluate(() => window.finalize("blocked-report"))).finalized, true);
+    await page.evaluate(async () => {
+      await window.initialize("resume-report", "resume-job");
+      const base = { retryCount:1, createdAt:new Date().toISOString(), updatedAt:new Date().toISOString(), lastAttemptAt:null };
+      await window.seed({...base, id:"resume-report-queue", entityType:"inspection_report", entityId:"resume-report", operation:"report_finalize", status:"conflict",
+        lastError:"Start or resume this job before editing.", payload:{inspectionReportId:"resume-report",contentJson:{complete:true}}});
+      await window.seed({...base, id:"resume-start", entityType:"job_time", entityId:"recovery", operation:"job_time_event", status:"pending",lastError:null,
+        payload:{inspectionId:"resume-job",userId:"tech",sessionId:"recovery",action:"start"}});
+      await window.sync();
+      await window.sync();
+    });
+    assert.equal((await page.evaluate(() => window.read("resume-report"))).reportStatus, "finalized", "Confirmed start must retry only job-start-blocked work");
     assert.deepEqual(errors, []);
     console.log("PASS: in-flight saves, confirmed finalization, validation retries, offline finalization, cross-job failure isolation, same-job material protection, and no browser errors.");
   } finally { await browser.close(); }

@@ -39,7 +39,7 @@ function buildWorkOrderLineQueueId(lineItemId: string, operation: SyncQueueEntry
 }
 
 function toConflictStatus(message: string | null | undefined) {
-  return /locked|cannot edit|cannot be finalized|already finalized|already completed|closed inspections|does not have access/i.test(message ?? "");
+  return /locked|cannot edit|cannot be finalized|already finalized|already completed|closed inspections|does not have access|Start or resume this job/i.test(message ?? "");
 }
 
 function hasNewerQueueVersion(entry: SyncQueueEntry | null, syncMarker: string) {
@@ -234,7 +234,6 @@ export async function processSyncQueue() {
     const inspectionKeys = new Map<string, string>();
     const blockedInspections = new Set<string>();
     const blockingErrors = new Map<string, string>();
-    const awaitingJobStart = new Set<string>();
     for (const entry of allEntries) {
       const key = await getQueueInspectionKey(entry);
       inspectionKeys.set(entry.id, key);
@@ -257,8 +256,9 @@ export async function processSyncQueue() {
         continue;
       }
       const inspectionKey = inspectionKeys.get(current.id)!;
-      if (blockedInspections.has(inspectionKey) && !(awaitingJobStart.has(inspectionKey) &&
-          current.operation === "job_time_event" && current.payload.action === "start")) {
+      // Timer recovery must remain available even when saved report/line data
+      // needs correction. The server still validates starts, pauses and overlap.
+      if (blockedInspections.has(inspectionKey) && current.operation !== "job_time_event") {
         if (current.operation === "report_finalize") {
           const message = blockingErrors.get(inspectionKey) ?? "An earlier change on this job must sync before finalization.";
           const local = await getLocalReportDraft(current.entityId);
@@ -296,6 +296,15 @@ export async function processSyncQueue() {
           if (!response.ok) {
             const result = await response.json().catch(() => ({}));
             throw Object.assign(new Error(result.error ?? "Unable to sync job time."), { syncConflict: response.status === 409 || response.status === 403 });
+          }
+          if (current.payload.action === "start") {
+            for (const waiting of await listSyncQueueEntries()) {
+              if (waiting.operation !== "job_time_event" && ["failed", "conflict"].includes(waiting.status) &&
+                  /Start or resume this job/i.test(waiting.lastError ?? "") &&
+                  await getQueueInspectionKey(waiting) === inspectionKey) {
+                await putSyncQueueEntry({ ...waiting, status: "pending", lastError: null });
+              }
+            }
           }
         } else if (current.operation === "report_autosave") {
           await syncReportAutosave(current);
@@ -377,8 +386,6 @@ export async function processSyncQueue() {
         // A queued start must still get a chance to unlock a save sent before it.
         blockedInspections.add(inspectionKey);
         blockingErrors.set(inspectionKey, message);
-        if (/Start or resume this job/i.test(message)) awaitingJobStart.add(inspectionKey);
-        else awaitingJobStart.delete(inspectionKey);
       }
     }
   })().finally(() => {

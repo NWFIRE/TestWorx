@@ -16,6 +16,11 @@ continue enforcing job-start and authorization checks. Rejected timer events
 must never replace a verified active session in the UI or disable other jobs.
 Retrying job time from a report retries only that inspection's events.
 
+Timer start/pause events must also bypass report dependency blocks, so technicians
+can recover a running timer even when a material line needs correction. A save
+rejected for a missing start waits rather than retrying continuously; a confirmed
+start requeues those specific errors on the same job. Other conflicts remain held.
+
 When completed work exists only on a field device, keep its local storage intact
 and sync/retry there. Never synthesize signatures or mark an empty server draft
 complete to move it into billing. Billing remains dependent on successful report
