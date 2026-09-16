@@ -243,7 +243,7 @@ export async function processSyncQueue() {
         await deleteSyncQueueEntry(entry.id);
         continue;
       }
-      if (entry.status === "conflict" && !isProcessableQueueEntry(entry)) {
+      if (entry.operation !== "job_time_event" && entry.status === "conflict" && !isProcessableQueueEntry(entry)) {
         blockedInspections.add(key);
         blockingErrors.set(key, entry.lastError ?? "An earlier change on this job needs correction.");
       }
@@ -369,6 +369,10 @@ export async function processSyncQueue() {
             }
           }
         }
+        // A rejected extra start must not deadlock an already running job. Report
+        // and line-item APIs still enforce a valid started job and permissions.
+        // Keep the clock event for review/retry without blocking report delivery.
+        if (current.operation === "job_time_event") continue;
         // Preserve dependent writes for this job without blocking unrelated jobs.
         // A queued start must still get a chance to unlock a save sent before it.
         blockedInspections.add(inspectionKey);

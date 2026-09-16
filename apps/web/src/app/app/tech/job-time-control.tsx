@@ -28,10 +28,11 @@ export function useJobTime(inspectionId: string, userId?: string) {
         await putOfflineMeta(key, JSON.stringify(data));
       }
       const events = (await listSyncQueueEntries()).filter((entry) => entry.operation === "job_time_event" && entry.payload.userId === userId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-      const conflict = events.find((entry) => entry.status === "conflict");
-      if (conflict) { setError(conflict.lastError ?? "Job time needs office review."); setSnapshot(null); return; }
-      if (!data) { setError("Connect once to load this job before starting offline."); return; }
+      const conflict = events.find((entry) => entry.payload.inspectionId === inspectionId && ["conflict", "failed"].includes(entry.status));
+      if (!data) { if (version === refreshVersion.current) setError("Connect once to load this job before starting offline."); return; }
       for (const event of events) {
+        // Rejected events must not replace the server's valid running session.
+        if (["conflict", "failed"].includes(event.status)) continue;
         const payload = event.payload;
         if (payload.action === "start") {
           data.active = { id: String(payload.sessionId), inspectionId: String(payload.inspectionId), startedAt: String(payload.occurredAt), endedAt: null, needsReview: true };
@@ -44,7 +45,7 @@ export function useJobTime(inspectionId: string, userId?: string) {
       }
       if (version !== refreshVersion.current) return;
       setSnapshot(data);
-      setError(events.length ? "Job time saved on this device; waiting to sync." : "");
+      setError(conflict?.lastError ?? (events.some((entry) => entry.payload.inspectionId === inspectionId) ? "Job time saved on this device; waiting to sync." : ""));
     } catch (caught) {
       if (version !== refreshVersion.current) return;
       setError(caught instanceof Error ? caught.message : "Unable to load job time.");
@@ -81,7 +82,7 @@ export function useJobTime(inspectionId: string, userId?: string) {
     busy.current = true; setPending(true);
     try {
       for (const entry of await listSyncQueueEntries()) {
-        if (entry.operation === "job_time_event" && entry.payload.userId === userId && ["conflict", "failed"].includes(entry.status)) await putSyncQueueEntry({ ...entry, status: "pending", lastError: null });
+        if (entry.operation === "job_time_event" && entry.payload.userId === userId && entry.payload.inspectionId === inspectionId && ["conflict", "failed"].includes(entry.status)) await putSyncQueueEntry({ ...entry, status: "pending", lastError: null });
       }
       await processSyncQueue(); await refresh();
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to retry job time."); }
@@ -105,6 +106,6 @@ export function JobTimeControl({ timer, beforePause }: { timer: ReturnType<typeo
     </div>
     {otherJob && <p className="mt-2 text-sm text-amber-800">Another job is running{snapshot?.active?.inspection?.customerCompany.name ? `: ${snapshot.active.inspection.customerCompany.name}` : ""}. Pause it before starting this job.</p>}
     {error && <p role="status" className="mt-2 text-sm text-amber-800">{error}</p>}
-    {error && !snapshot && <button type="button" disabled={pending} className="mt-2 min-h-11 text-sm font-semibold text-blue-700" onClick={() => void timer.retry()}>Retry job time after office review</button>}
+    {error && <button type="button" disabled={pending} className="mt-2 min-h-11 text-sm font-semibold text-blue-700" onClick={() => void timer.retry()}>Retry job time sync</button>}
   </section>;
 }

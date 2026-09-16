@@ -35,10 +35,12 @@ async function main() {
       }
       if (url.includes("/api/reports/finalize")) {
         calls.push("finalize");
+        if (route.request().postDataJSON().inspectionReportId === "no-start") return route.fulfill({ status: 409, json: { error: "Start or resume this job before editing." } });
         if (invalidSuccess) return route.fulfill({ json: {} });
         if (failure) return route.fulfill({ status: 422, json: { error: "Customer signature is required before finalizing." } });
         return route.fulfill({ json: { status: "finalized", finalizedAt: new Date().toISOString() } });
       }
+      if (url.includes("/api/tech/job-time")) return route.fulfill({ status: 409, json: { error: "Pause your current job first. Overlapping job time needs office review." } });
       return route.fulfill({ contentType: "text/html", body: "<main>Finalize sync test</main>" });
     });
     await page.goto("http://localhost/test");
@@ -81,6 +83,20 @@ async function main() {
     });
     assert.equal((await page.evaluate(() => window.finalize("other-job-report"))).finalized, true, "Old job conflicts must not block current job finalization");
     await page.evaluate(() => window.remove("old-clock"));
+    // A redundant rejected start must not deadlock a job already started on the server.
+    for (const status of ["conflict", "pending"]) {
+      await page.evaluate(async (status) => {
+        await window.initialize("clock-report", "clock-job");
+        await window.seed({id:"extra-start", entityType:"job_time", entityId:"extra-session", operation:"job_time_event", status, retryCount:1,
+          lastError:"Pause your current job first. Overlapping job time needs office review.", createdAt:"2026-01-01T00:00:00Z", updatedAt:"2026-01-01T00:00:00Z", lastAttemptAt:null,
+          payload:{inspectionId:"clock-job", userId:"tech", action:"start"}});
+      }, status);
+      assert.equal((await page.evaluate(() => window.finalize("clock-report"))).finalized, true);
+    }
+    await page.evaluate(() => window.initialize("no-start", "clock-job"));
+    assert.match(await page.evaluate(() => window.finalize("no-start").catch(error => error.message)), /Start or resume/);
+    assert.notEqual((await page.evaluate(() => window.read("no-start"))).reportStatus, "finalized");
+    await page.evaluate(() => window.remove("extra-start"));
     await page.evaluate(async () => {
       await window.initialize("stale", "stale-job");
       await window.initialize("unrelated-report", "unrelated-job");
