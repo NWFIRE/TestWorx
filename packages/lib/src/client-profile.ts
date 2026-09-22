@@ -9,7 +9,7 @@ import { mapSiteProviderAssignmentForDisplay } from "./contract-provider-billing
 import { getQuickBooksCustomerInvoiceHistory } from "./quickbooks";
 import { quoteStatusLabels } from "./quotes";
 import { inspectionTypeRegistry } from "./report-config";
-import { getCustomerFacingSiteLabel, inspectionStatusLabels } from "./scheduling";
+import { formatInspectionTaskSummary, getCustomerFacingSiteLabel, inspectionStatusLabels } from "./scheduling";
 import { assertTenantContext } from "./permissions";
 import { invoiceDeliverySettingsSchema, requiredBillingReferencesSchema } from "./third-party-billing";
 
@@ -141,7 +141,7 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
     return null;
   }
 
-  const [inspections, quotes, documents, attachments, quickBooksBilling, completedInspections] = await Promise.all([
+  const [inspections, quotes, documents, attachments, quickBooksBilling, completedInspections, recentInspections] = await Promise.all([
     prisma.inspection.findMany({
       where: { tenantId, customerCompanyId },
       orderBy: [{ scheduledStart: "desc" }],
@@ -224,10 +224,21 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
         scheduledStart: true,
         reports: { where: { status: "finalized" }, select: { status: true, finalizedAt: true } }
       }
+    }),
+    // Activity is independent of the schedule-sorted history preview.
+    prisma.inspection.findMany({
+      where: { tenantId, customerCompanyId },
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      take: 30,
+      select: {
+        id: true, status: true, updatedAt: true,
+        site: { select: { name: true } },
+        tasks: { select: { inspectionType: true, customDisplayLabel: true } }
+      }
     })
   ]);
 
-  const inspectionIds = inspections.map((inspection) => inspection.id);
+  const inspectionIds = [...new Set([...inspections, ...recentInspections].map((inspection) => inspection.id))];
   const quoteIds = quotes.map((quote) => quote.id);
   const billingSummaryIds = inspections
     .map((inspection) => inspection.billingSummary?.id ?? null)
@@ -374,13 +385,13 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
     .slice(0, 30);
 
   const activity = [
-    ...inspectionHistory.map((inspection) => ({
+    ...recentInspections.map((inspection) => ({
       id: `inspection-${inspection.id}`,
       type: "Inspection",
-      title: `${inspection.statusLabel} inspection ${inspection.inspectionNumber}`,
-      detail: `${inspection.siteName} • ${inspection.inspectionTypes.map((type) => type.label).join(", ")}`,
-      timestamp: inspection.scheduledStart,
-      href: inspection.inspectionLink
+      title: `Inspection ${inspection.id.slice(-8).toUpperCase()} updated: ${inspectionStatusLabels[inspection.status]}`,
+      detail: `${resolveClientSiteName(inspection.site.name)} • ${formatInspectionTaskSummary(inspection.tasks.map((task) => ({ inspectionType: task.inspectionType, displayLabel: task.customDisplayLabel })))}`,
+      timestamp: inspection.updatedAt,
+      href: `/app/admin/inspections/${inspection.id}`
     })),
     ...quoteHistory.map((quote) => ({
       id: `quote-${quote.id}`,
@@ -407,6 +418,7 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
       href: null
     }))
   ]
+    .filter((entry) => entry.timestamp instanceof Date && entry.timestamp.getTime() <= now.getTime())
     .sort((left, right) => right.timestamp.getTime() - left.timestamp.getTime())
     .slice(0, 30);
 

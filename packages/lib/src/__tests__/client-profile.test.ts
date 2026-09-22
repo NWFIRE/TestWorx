@@ -247,15 +247,37 @@ describe("client profile workspace data", () => {
     expect(result?.quoteHistory[0]?.detailLink).toBe("/app/admin/quotes/quote_1");
     expect(result?.inspectionHistory[0]?.inspectionLink).toBe("/app/admin/inspections/inspection_1");
     expect(result?.activity.some((entry) => entry.type === "Invoice")).toBe(true);
+    expect(result?.activity.find((entry) => entry.id === "inspection-inspection_1")?.timestamp)
+      .toEqual(new Date("2026-04-12T10:00:00.000Z"));
+    expect(prismaMock.inspection.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { tenantId: "tenant_1", customerCompanyId: "customer_1" },
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      take: 30
+    }));
 
     const history = await prismaMock.inspection.findMany.mock.results[0].value;
     prismaMock.inspection.findMany
       .mockResolvedValueOnce(Array.from({ length: 50 }, (_, index) => ({ ...history[0], id: `future_${index}`, scheduledStart: new Date("2027-06-01T14:00:00Z") })))
-      .mockResolvedValueOnce([history[1]]);
+      .mockResolvedValueOnce([history[1]])
+      .mockResolvedValueOnce([
+        { ...history[0], id: "recent_edit", scheduledStart: new Date("2027-06-01"),
+          updatedAt: new Date("2026-04-13T10:00:00Z"), tasks: [
+            ...Array.from({ length: 80 }, () => ({ inspectionType: "kitchen_suppression", customDisplayLabel: null })),
+            { inspectionType: "fire_alarm", customDisplayLabel: "Gym system" }
+          ] },
+        { ...history[0], id: "older_edit", updatedAt: new Date("2026-04-12T10:00:00Z") },
+        { ...history[0], id: "invalid_future_event", updatedAt: new Date("2099-01-01") }
+      ]);
     const recurrenceHeavy = await getClientProfileData(
       { userId: "office_1", role: "office_admin", tenantId: "tenant_1" }, "customer_1"
     );
     expect(recurrenceHeavy?.overview.lastInspectionAt).toEqual(history[1].scheduledStart);
+    const inspectionActivity = recurrenceHeavy?.activity.filter((entry) => entry.type === "Inspection");
+    expect(inspectionActivity?.map((entry) => entry.id)).toEqual(["inspection-recent_edit", "inspection-older_edit"]);
+    expect(inspectionActivity?.[0]?.timestamp).toEqual(new Date("2026-04-13T10:00:00Z"));
+    expect(inspectionActivity?.[0]?.detail).toContain("Kitchen suppression (80)");
+    expect(inspectionActivity?.[0]?.detail).toContain("Gym system");
+    expect(inspectionActivity?.[0]?.detail.match(/Kitchen suppression/g)).toHaveLength(1);
   });
 
   it("uses completed history rather than future recurrences or unfinished visits", async () => {
