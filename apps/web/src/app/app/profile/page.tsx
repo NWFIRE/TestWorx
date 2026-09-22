@@ -22,10 +22,10 @@ export default async function ProfilePage() {
   return (
     <div className="mx-auto w-full max-w-5xl space-y-5">
       <header><p className="text-xs font-semibold tracking-wide text-blue-700">Your account</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">My profile</h1><p className="mt-2 text-sm text-slate-500">Manage your personal details and review your workspace access.</p></header>
-      <section aria-label="Profile summary" className="flex min-w-0 flex-wrap items-center gap-5 rounded-2xl border border-slate-200 bg-gradient-to-r from-blue-50 via-white to-white p-5 sm:p-7">
+      <section aria-label="Profile summary" className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-5 rounded-2xl border border-slate-200 bg-gradient-to-r from-blue-50 via-white to-white p-5 sm:p-7 md:grid-cols-[auto_minmax(0,1fr)_auto]">
         <div aria-hidden="true" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-blue-200 bg-white text-xl font-semibold text-blue-700">{initials || "TW"}</div>
         <div className="min-w-0 flex-1"><h2 className="break-words text-xl font-semibold text-slate-900">{profile.name}</h2><p className="mt-1 break-all text-sm text-slate-500">{profile.email}</p></div>
-        <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-800">{role}</span>
+        <span className="col-span-2 justify-self-start rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-800 md:col-span-1">{role}</span>
       </section>
       <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
