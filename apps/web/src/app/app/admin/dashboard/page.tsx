@@ -39,6 +39,7 @@ import {
   WorkspaceSplit
 } from "../operations-ui";
 import { DashboardGlobalSearch } from "./dashboard-global-search";
+import { summarizeDashboardQueue } from "./queue-summary";
 
 type AdminDashboardData = Awaited<ReturnType<typeof getAdminDashboardData>>;
 type AdminBillingSummary = Awaited<ReturnType<typeof getAdminBillingSummaries>>[number];
@@ -112,7 +113,7 @@ function formatInspectionMetaLine(inspection: DashboardInspection, timezone?: st
     .join(" - ");
 }
 
-function buildAlertItems(data: AdminDashboardData, readyToBillCount: number, fieldRequestCount: number, inspectionNotice?: string) {
+function buildAlertItems(data: AdminDashboardData, sharedQueueCount: number, readyToBillCount: number, fieldRequestCount: number, inspectionNotice?: string) {
   const alerts: string[] = [];
 
   if (inspectionNotice === "deleted") {
@@ -128,9 +129,9 @@ function buildAlertItems(data: AdminDashboardData, readyToBillCount: number, fie
     );
   }
 
-  if (data.summary.unassignedInspections > 0) {
+  if (sharedQueueCount > 0) {
     alerts.push(
-      `${data.summary.unassignedInspections} inspection${data.summary.unassignedInspections === 1 ? "" : "s"} are still sitting in the shared queue.`
+      `${sharedQueueCount} unassigned inspection${sharedQueueCount === 1 ? " is" : "s are"} in the shared queue (overdue and next 60 days).`
     );
   }
 
@@ -289,9 +290,9 @@ export default async function AdminDashboardPage({
   const greeting = getGreetingByHour(new Date(), data.timezone);
   const firstName = getGreetingName(session.user.name);
   const dashboardOperationalInspections = filterSubsetDuplicateOperationalInspections(schedulingQueueData.inspections);
-  const openInspectionCount = dashboardOperationalInspections.length;
+  const { openInspectionCount, sharedQueueCount } = summarizeDashboardQueue(dashboardOperationalInspections);
   const readyToBillSummaryCount = billingSummaries.filter((summary) => isOpenBillingQueueStatus(summary.status)).length;
-  const alerts = buildAlertItems(data, readyToBillSummaryCount, fieldRequests, inspectionNotice);
+  const alerts = buildAlertItems(data, sharedQueueCount, readyToBillSummaryCount, fieldRequests, inspectionNotice);
   const complianceFlags = deficiencyData.deficiencies.filter(
     (deficiency) => deficiency.severity === "high" || deficiency.severity === "critical"
   ).length;
