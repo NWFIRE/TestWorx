@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { auth, signOut } from "@/auth";
 import { getManualLibraryData, getTechnicianDashboardData } from "@testworx/lib/server/index";
@@ -25,6 +26,7 @@ export default async function TechnicianProfilePage() {
 
   return (
     <div className="space-y-5 pb-4">
+      <Link href="/app/profile" className="flex min-h-12 items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-semibold text-blue-700">My profile <span aria-hidden="true">&rarr;</span></Link>
       <TechnicianProfileScreen
         initialData={{
           dashboard,

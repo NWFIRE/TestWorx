@@ -91,6 +91,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const currentUser = await prisma.user.findUnique({
           where: { id: token.sub },
           select: {
+            name: true,
             role: true,
             tenantId: true,
             allowances: true
@@ -98,6 +99,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         });
 
         if (currentUser) {
+          token.name = currentUser.name;
           token.role = currentUser.role;
           token.tenantId = currentUser.tenantId;
           token.allowances =

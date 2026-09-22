@@ -6,7 +6,7 @@ export type AppNavItem = {
   label: string;
   shortLabel: string;
   abbreviation: string;
-  icon?: "calendar" | "clock" | "branch" | "alert" | "invoice" | "dollar" | "check" | "settings" | "sign-out" | "grid" | "clipboard" | "portal" | "team" | "mail" | "book";
+  icon?: "calendar" | "clock" | "branch" | "alert" | "invoice" | "dollar" | "check" | "settings" | "sign-out" | "grid" | "clipboard" | "portal" | "team" | "mail" | "book" | "user";
   description?: string;
   tone?: "blue" | "amber" | "emerald" | "violet" | "slate";
   group?: "Dashboard" | "Work" | "Billing" | "Customers" | "Operations" | "Settings" | "Portal";
@@ -15,6 +15,11 @@ export type AppNavItem = {
 };
 
 type InternalAllowances = Record<string, boolean> | null | undefined;
+
+const profileNavItem: AppNavItem = {
+  href: "/app/profile", label: "My profile", shortLabel: "My profile", abbreviation: "ME",
+  icon: "user", description: "Personal details and workspace access", tone: "blue", group: "Settings", matchMode: "exact"
+};
 
 const quotesNavItem: AppNavItem = {
   href: "/app/admin/quotes",
@@ -181,6 +186,7 @@ const adminNavItems: AppNavItem[] = [
     matchMode: "exact",
     matchPrefixes: ["/app/admin/timesheets"]
   },
+  profileNavItem,
   {
     href: "/app/admin/settings",
     label: "Settings / Service Fees",
@@ -291,7 +297,7 @@ const navByRole: Record<string, AppNavItem[]> = {
       tone: "slate",
       group: "Settings",
       matchMode: "exact",
-      matchPrefixes: ["/app/tech/profile"]
+      matchPrefixes: ["/app/tech/profile", "/app/profile"]
     }
   ],
   customer_user: [
@@ -306,7 +312,8 @@ const navByRole: Record<string, AppNavItem[]> = {
       group: "Portal",
       matchMode: "exact",
       matchPrefixes: ["/app/customer/reports", "/app/customer/quotes"]
-    }
+    },
+    profileNavItem
   ]
 };
 

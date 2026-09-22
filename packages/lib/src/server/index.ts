@@ -1,4 +1,5 @@
 import "server-only";
+export * from "../user-profile";
 
 export * from "../quote-email";
 export * from "../report-calculations";

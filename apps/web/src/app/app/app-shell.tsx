@@ -112,6 +112,8 @@ function NavIcon({
   };
 
   switch (icon) {
+    case "user":
+      return <svg aria-hidden="true" className={className} viewBox="0 0 24 24"><circle {...shared} cx="12" cy="8" r="4" /><path {...shared} d="M4 21v-2a8 8 0 0 1 16 0v2" /></svg>;
     case "calendar":
       return (
         <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
@@ -387,7 +389,7 @@ function NavSection({
       ];
     }
 
-    const groupOrder: NonNullable<AppNavItem["group"]>[] = ["Dashboard", "Work", "Billing", "Customers", "Operations", "Settings", "Portal"];
+    const groupOrder: NonNullable<AppNavItem["group"]>[] = ["Dashboard", "Work", "Billing", "Customers", "Operations", "Portal", "Settings"];
     const simplifiedRank = new Map([
       ["/app/admin/dashboard", 10],
       ["/app/admin/inspections", 20],

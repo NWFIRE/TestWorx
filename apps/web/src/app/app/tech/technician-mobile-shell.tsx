@@ -18,7 +18,7 @@ const baseTechnicianTabs: MobileTab[] = [
   { href: "/app/tech/inspections", label: "Inspections", matchPrefixes: ["/app/tech/inspections", "/app/tech/reports"] },
   { href: "/app/tech/requests", label: "Request", matchPrefixes: ["/app/tech/requests"] },
   { href: "/app/manuals", label: "Manuals", matchPrefixes: ["/app/manuals"] },
-  { href: "/app/tech/profile", label: "Profile", matchPrefixes: ["/app/tech/profile"] }
+  { href: "/app/tech/profile", label: "Profile", matchPrefixes: ["/app/tech/profile", "/app/profile"] }
 ];
 
 const quotesMobileTab: MobileTab = {

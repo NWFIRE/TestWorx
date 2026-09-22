@@ -37,7 +37,7 @@ export function NativeTechnicianRouteGuard({
       const allowedNativePrefixes = canAccessQuoteWorkspace(role, allowances)
         ? [...baseAllowedNativePrefixes, "/app/admin/quotes"]
         : baseAllowedNativePrefixes;
-      const allowed = allowedNativePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+      const allowed = pathname === "/app/profile" || allowedNativePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
       if (!allowed) {
         router.replace("/app/tech");
       }
