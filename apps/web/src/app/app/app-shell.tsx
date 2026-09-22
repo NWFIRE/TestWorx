@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { BrandLoader } from "@/app/brand-loader";
@@ -247,39 +247,15 @@ function NavItem({
   onPrefetch?: (href: string) => void;
   onNavigate?: (href: string) => void;
 }) {
-  const toneClasses: Record<NonNullable<AppNavItem["tone"]>, { activeBar: string; activeIcon: string }> = {
-    blue: {
-      activeBar: "before:bg-[var(--tenant-primary)]",
-      activeIcon: "text-[var(--tenant-primary)]"
-    },
-    amber: {
-      activeBar: "before:bg-amber-500",
-      activeIcon: "text-amber-600"
-    },
-    emerald: {
-      activeBar: "before:bg-emerald-500",
-      activeIcon: "text-emerald-600"
-    },
-    violet: {
-      activeBar: "before:bg-[var(--tenant-accent)]",
-      activeIcon: "text-[var(--tenant-accent)]"
-    },
-    slate: {
-      activeBar: "before:bg-slate-500",
-      activeIcon: "text-slate-700"
-    }
-  };
-  const tone = toneClasses[item.tone ?? "blue"];
-
   return (
     <Link
       aria-current={active ? "page" : undefined}
       aria-label={item.badgeCount ? `${item.label}, ${item.badgeCount} requests awaiting review` : item.label}
-        className={`pressable pressable-row group relative flex min-h-[44px] min-w-0 items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-sm outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.38)] focus-visible:ring-offset-2 motion-reduce:transition-none before:absolute before:bottom-1.5 before:left-0 before:top-1.5 before:w-1 before:rounded-full before:opacity-0 ${
+        className={`group relative flex min-h-12 min-w-0 items-center gap-4 overflow-hidden px-6 py-3 text-sm outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 before:absolute before:bottom-0 before:left-0 before:top-0 before:w-0.5 before:bg-blue-600 before:opacity-0 ${
           active
-          ? "bg-white text-ink before:opacity-100 shadow-[inset_0_0_0_1px_var(--tenant-primary-border),0_10px_24px_rgba(9,18,32,0.10)]"
-          : "text-[color:var(--text-muted)] hover:bg-white/90 hover:text-ink hover:shadow-[0_8px_18px_rgba(9,18,32,0.06)]"
-      } ${tone.activeBar} ${collapsed ? "justify-center px-2" : ""} ${compact ? "min-h-[48px]" : ""}`}
+          ? "bg-blue-50/60 text-blue-700 before:opacity-100"
+          : "text-slate-600 hover:bg-slate-50 hover:text-blue-700"
+      } ${collapsed ? "justify-center !px-2" : ""} ${compact ? "min-h-[48px]" : ""}`}
       href={item.href}
       onClick={() => onNavigate?.(item.href)}
       onFocus={() => onPrefetch?.(item.href)}
@@ -289,13 +265,13 @@ function NavItem({
     >
       <span
         aria-hidden="true"
-        className={`flex h-5 w-5 shrink-0 items-center justify-center ${active ? tone.activeIcon : "text-[color:var(--text-muted)] group-hover:text-ink"}`}
+        className={`flex h-5 w-5 shrink-0 items-center justify-center ${active ? "text-blue-600" : "text-[#839fca] group-hover:text-blue-600"}`}
       >
         <NavIcon className="h-5 w-5" icon={item.icon} />
       </span>
       {!collapsed ? (
         <span className="min-w-0 flex-1">
-          <span className={`block truncate text-sm ${active ? "font-bold text-ink" : "font-semibold"}`}>{item.shortLabel}</span>
+          <span className={`block truncate text-sm ${active ? "font-semibold" : "font-medium"}`}>{item.shortLabel}</span>
         </span>
       ) : null}
       <RequestCountBadge count={item.badgeCount ?? 0} collapsed={collapsed} />
@@ -318,18 +294,18 @@ function SignOutNavItem({
     <form action={signOutAction} onSubmit={onSignOut}>
       <button
         aria-label="Sign out"
-        className={`pressable pressable-row group relative flex min-h-[44px] w-full min-w-0 items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-sm font-semibold text-[color:var(--text-muted)] outline-none transition-all duration-200 hover:bg-white/90 hover:text-ink hover:shadow-[0_8px_18px_rgba(9,18,32,0.06)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.38)] focus-visible:ring-offset-2 motion-reduce:transition-none ${
-          collapsed ? "justify-center px-2" : ""
+        className={`group relative flex min-h-12 w-full min-w-0 items-center gap-4 overflow-hidden px-6 py-3 text-sm font-medium text-slate-600 outline-none transition-colors hover:bg-slate-50 hover:text-blue-700 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
+          collapsed ? "justify-center !px-2" : ""
         } ${compact ? "min-h-[48px]" : ""}`}
         title={collapsed ? "Sign out" : undefined}
         type="submit"
       >
-        <span aria-hidden="true" className="flex h-5 w-5 shrink-0 items-center justify-center text-[color:var(--text-muted)] group-hover:text-ink">
+        <span aria-hidden="true" className="flex h-5 w-5 shrink-0 items-center justify-center text-[#839fca] group-hover:text-blue-600">
           <NavIcon className="h-5 w-5" icon="sign-out" />
         </span>
         {!collapsed ? (
           <span className="min-w-0 flex-1 text-left">
-            <span className="block truncate text-sm font-semibold">Sign out</span>
+            <span className="block truncate text-sm font-medium">Sign out</span>
           </span>
         ) : null}
       </button>
@@ -343,20 +319,20 @@ function BrandBlock({
   collapsed: boolean;
 }) {
   return (
-    <div className={`flex min-w-0 items-center gap-3 overflow-hidden ${collapsed ? "justify-center" : ""}`}>
-      <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[color:var(--border-default)] bg-white shadow-[0_8px_22px_rgba(9,18,32,0.10)]">
+    <div className="flex min-w-0 items-center justify-center gap-2 overflow-hidden">
+      <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden">
         <Image
           alt="TradeWorx"
           className="object-contain p-1"
           fill
           priority
-          sizes="36px"
+          sizes="44px"
           src="/icon.png"
         />
       </div>
       {!collapsed ? (
         <div className="min-w-0 overflow-hidden">
-          <p className="truncate text-[13px] font-black uppercase tracking-[0.26em] text-ink">TradeWorx</p>
+          <p className="truncate text-[21px] font-bold tracking-[-0.045em] text-[#173c50]">TradeWorx</p>
         </div>
       ) : null}
     </div>
@@ -458,30 +434,28 @@ function NavSection({
     return groupedNavItems.find(({ items }) => items.some((item) => isAppNavItemActive(pathname, item)))?.group ?? null;
   }, [groupedNavItems, pathname]);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const navId = useId();
+  const groupIcons: Record<string, AppNavItem["icon"]> = { Work: "clipboard", Billing: "dollar", Customers: "team", Operations: "grid", Settings: "settings" };
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <nav aria-label="Primary navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
-        <div className="space-y-4">
+      <nav aria-label="Primary navigation" className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-6 pt-2">
+        <div className="space-y-1">
           {groupedNavItems.map(({ group, items }) => {
             const isDropdownGroup = DROPDOWN_NAV_GROUPS.has(group);
             const isOpen = collapsed || !isDropdownGroup || (openGroups[group] ?? group === activeGroup);
-            const groupPanelId = `sidebar-group-${group.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+            const groupPanelId = `${navId}-sidebar-group-${group.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
             const groupHasActiveItem = group === activeGroup;
 
             return (
-              <div className="space-y-1.5" key={group}>
+              <div className={group === "Settings" ? "mt-4 border-t border-slate-100 pt-3" : ""} key={group}>
                 {!collapsed && groupedNavItems.length > 1 && group !== "Dashboard" ? (
                   isDropdownGroup ? (
                     <button
                       aria-controls={groupPanelId}
                       aria-expanded={isOpen}
-                      className={`flex min-h-9 w-full items-center justify-between rounded-xl border px-2.5 text-left text-[10px] font-bold uppercase tracking-[0.18em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.28)] ${
-                        isOpen
-                          ? "border-[color:var(--border-default)] bg-white text-ink shadow-[0_8px_18px_rgb(15_23_42/0.06)]"
-                          : groupHasActiveItem
-                            ? "border-[color:rgb(var(--tenant-primary-rgb)/0.25)] bg-[color:rgb(var(--tenant-primary-rgb)/0.08)] text-ink"
-                            : "border-transparent text-[color:var(--text-muted)] hover:border-[color:var(--border-default)] hover:bg-white hover:text-ink"
+                      className={`group flex min-h-14 w-full items-center justify-between gap-3 px-6 py-3 text-left text-[15px] font-medium transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
+                        isOpen || groupHasActiveItem ? "text-blue-700" : "text-slate-600"
                       }`}
                       onClick={() => {
                         setOpenGroups(() => {
@@ -497,10 +471,10 @@ function NavSection({
                       }}
                       type="button"
                     >
-                      <span className="flex items-center gap-2">{group}{!isOpen ? <RequestCountBadge count={items.reduce((total, item) => total + (item.badgeCount ?? 0), 0)} /> : null}</span>
+                      <span className="flex min-w-0 items-center gap-4"><NavIcon className={`h-5 w-5 shrink-0 ${isOpen || groupHasActiveItem ? "text-blue-600" : "text-[#839fca] group-hover:text-blue-600"}`} icon={groupIcons[group]} />{group}{!isOpen ? <RequestCountBadge count={items.reduce((total, item) => total + (item.badgeCount ?? 0), 0)} /> : null}</span>
                       <span
                         aria-hidden="true"
-                        className={`flex size-5 items-center justify-center rounded-full border border-[color:var(--border-default)] bg-[color:var(--surface-raised)] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                        className={`flex size-4 shrink-0 items-center justify-center text-[#839fca] transition-transform duration-200 motion-reduce:transition-none ${isOpen ? "rotate-180" : ""}`}
                       >
                         <svg className="size-3" fill="none" viewBox="0 0 12 12">
                           <path d="M3 4.5 6 7.5l3-3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
@@ -516,9 +490,11 @@ function NavSection({
                     isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
                   }`}
                   id={groupPanelId}
+                  inert={!isOpen}
+                  aria-hidden={!isOpen}
                 >
                   <div className="min-h-0 overflow-hidden">
-                    <div className="space-y-1.5">
+                    <div className={!collapsed && isDropdownGroup ? "ml-6 border-l border-slate-100 py-1" : ""}>
                       {items.map((item) => (
                         <NavItem
                           key={item.href}
@@ -895,21 +871,21 @@ export function AppShell({
       {navItems.length > 0 ? (
         <aside
           aria-label="Primary navigation"
-          className={`hidden overflow-hidden border-r border-[color:var(--border-strong)] bg-[color:var(--sidebar-bg)] shadow-[4px_0_24px_rgba(9,18,32,0.06)] transition-[width] duration-200 motion-reduce:transition-none lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col ${
+          className={`hidden shrink-0 overflow-hidden border-r border-slate-200 bg-white transition-[width] duration-200 motion-reduce:transition-none lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col ${
             sidebarCollapsed ? "lg:w-[72px]" : "lg:w-64"
           }`}
         >
-          <div className={`border-b border-[color:var(--border-default)] bg-[color:var(--sidebar-header-bg)] ${sidebarCollapsed ? "px-2 py-2.5" : "px-4 py-3"}`}>
-            <div className={`flex items-start ${sidebarCollapsed ? "justify-center" : "justify-between gap-3"}`}>
+          <div className={`relative shrink-0 bg-white ${sidebarCollapsed ? "px-2 py-4" : "px-6 pb-6 pt-12"}`}>
+            <div className="flex items-center justify-center">
               <BrandBlock collapsed={sidebarCollapsed} />
               {!sidebarCollapsed ? (
                 <button
                   aria-label="Collapse sidebar"
-                  className="pressable pressable-icon inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-transparent text-[color:var(--text-muted)] outline-none transition-colors hover:border-[color:var(--border-default)] hover:bg-white hover:text-ink focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2"
+                  className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-md text-[#839fca] outline-none transition-colors hover:bg-slate-50 hover:text-blue-700 focus-visible:ring-2 focus-visible:ring-blue-500"
                   onClick={() => setSidebarCollapsed(true)}
                   type="button"
                 >
-                  <span aria-hidden="true">&lt;</span>
+                  <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="m13 5-7 7 7 7m6-14-7 7 7 7" /></svg>
                 </button>
               ) : null}
             </div>
@@ -921,7 +897,7 @@ export function AppShell({
                   onClick={() => setSidebarCollapsed(false)}
                   type="button"
                 >
-                  <span aria-hidden="true">&gt;</span>
+                  <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="m5 5 7 7-7 7m6-14 7 7-7 7" /></svg>
                 </button>
               </div>
             ) : null}
@@ -951,7 +927,7 @@ export function AppShell({
           <aside
             aria-label="Primary navigation"
             aria-modal={drawerOpen}
-            className={`fixed inset-y-0 left-0 z-50 flex w-[min(320px,86vw)] flex-col overflow-hidden border-r border-[color:var(--border-strong)] bg-[color:var(--sidebar-bg)] shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none lg:hidden ${
+            className={`fixed inset-y-0 left-0 z-50 flex w-[min(320px,86vw)] flex-col overflow-hidden border-r border-slate-200 bg-white shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none lg:hidden ${
               drawerOpen ? "translate-x-0 visible" : "-translate-x-full invisible"
             }`}
             ref={drawerRef}
@@ -962,7 +938,7 @@ export function AppShell({
               paddingBottom: "max(0rem, env(safe-area-inset-bottom))"
             }}
           >
-            <div className="flex items-center justify-between gap-3 border-b border-[color:var(--border-default)] bg-[color:var(--sidebar-header-bg)] px-4 py-4">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 bg-white px-6 py-6">
               <BrandBlock collapsed={false} />
               <button
                 aria-label="Close navigation"
