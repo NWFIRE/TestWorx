@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 type ConfirmDialogVariant = "default" | "danger" | "warning";
 
@@ -48,17 +49,36 @@ export function useConfirmDialog() {
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
   const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
   const dialogPanelRef = useRef<HTMLDivElement | null>(null);
+  const pendingRef = useRef<PendingConfirmation | null>(null);
+  const promiseRef = useRef<Promise<ConfirmDialogChoice> | null>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
 
   const close = useCallback((choice: ConfirmDialogChoice) => {
-    setPendingConfirmation((current) => {
-      current?.resolve(choice);
-      return null;
-    });
+    const current = pendingRef.current;
+    pendingRef.current = null;
+    promiseRef.current = null;
+    setPendingConfirmation(null);
+    current?.resolve(choice);
   }, []);
 
-  const choose = useCallback((options: ConfirmDialogOptions) => new Promise<ConfirmDialogChoice>((resolve) => {
-    setPendingConfirmation({ ...options, resolve });
-  }), []);
+  const choose = useCallback((options: ConfirmDialogOptions) => {
+    if (promiseRef.current) return promiseRef.current;
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const promise = new Promise<ConfirmDialogChoice>((resolve) => {
+      const pending = { ...options, resolve };
+      pendingRef.current = pending;
+      setPendingConfirmation(pending);
+    });
+    promiseRef.current = promise;
+    return promise;
+  }, []);
+
+  useEffect(() => () => {
+    pendingRef.current?.resolve("cancel");
+    pendingRef.current = null;
+    promiseRef.current = null;
+  }, []);
 
   const confirm = useCallback(
     async (options: ConfirmDialogOptions) => (await choose(options)) === "confirm",
@@ -72,16 +92,14 @@ export function useConfirmDialog() {
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const focusTimeout = window.setTimeout(() => cancelButtonRef.current?.focus({ preventScroll: true }), 20);
+    const focusTimeout = window.setTimeout(() => {
+      if (!dialogPanelRef.current?.contains(document.activeElement)) cancelButtonRef.current?.focus({ preventScroll: true });
+    }, 20);
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
         close("cancel");
-      }
-      if (event.key === "Enter") {
-        event.preventDefault();
-        close("confirm");
       }
       if (event.key === "Tab") {
         const focusable = dialogPanelRef.current?.querySelectorAll<HTMLElement>(
@@ -108,16 +126,18 @@ export function useConfirmDialog() {
       window.clearTimeout(focusTimeout);
       window.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
+      if (openerRef.current?.isConnected) openerRef.current.focus({ preventScroll: true });
     };
   }, [close, pendingConfirmation]);
 
-  const dialog = pendingConfirmation ? (
+  const dialog = pendingConfirmation ? createPortal(
     <div
-      aria-labelledby="tradeworx-confirm-title"
+      aria-labelledby={titleId}
       aria-modal="true"
       className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm animate-in fade-in duration-150"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
+        // A double-click on the opener can land its second press on the backdrop.
+        if (event.target === event.currentTarget && event.detail <= 1) {
           close("cancel");
         }
       }}
@@ -129,7 +149,7 @@ export function useConfirmDialog() {
             <span className={`inline-flex rounded-full border px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.18em] ${variantClasses(pendingConfirmation.variant ?? "default").badge}`}>
               {pendingConfirmation.eyebrow ?? "Confirm action"}
             </span>
-            <h2 className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-slate-950" id="tradeworx-confirm-title">
+            <h2 className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-slate-950" id={titleId}>
               {pendingConfirmation.title}
             </h2>
           </div>
@@ -184,7 +204,7 @@ export function useConfirmDialog() {
           </button>
         </div>
       </div>
-    </div>
+    </div>, document.body
   ) : null;
 
   return { confirm, choose, dialog };

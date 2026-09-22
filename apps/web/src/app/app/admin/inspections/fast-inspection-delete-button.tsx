@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useConfirmDialog } from "../../confirm-dialog";
@@ -30,13 +30,16 @@ export function FastInspectionDeleteButton({
 }) {
   const [state, setState] = useState(initialState);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleted, setIsDeleted] = useState(false);
+  const busyRef = useRef(false);
   const router = useRouter();
   const { confirm, choose, dialog } = useConfirmDialog();
 
   const handleDelete = async () => {
-    if (isDeleting) {
+    if (busyRef.current || isDeleted) {
       return;
     }
+    busyRef.current = true;
 
     const deleteChoice = hasRecurrence
       ? await choose({
@@ -58,6 +61,7 @@ export function FastInspectionDeleteButton({
         }).then((confirmed) => confirmed ? "alternate" as const : "cancel" as const);
 
     if (deleteChoice === "cancel") {
+      busyRef.current = false;
       return;
     }
 
@@ -74,10 +78,11 @@ export function FastInspectionDeleteButton({
       setState(result);
 
       if (result.success) {
+        setIsDeleted(true);
         forgetDeletedInspectionRoutes(result.deletedInspectionIds ?? [inspectionId]);
         const target = result.redirectTo || redirectTo;
         if (target && target !== window.location.pathname + window.location.search) {
-          router.replace(target);
+          router.replace(target, { scroll: false });
         } else {
           router.refresh();
         }
@@ -89,6 +94,7 @@ export function FastInspectionDeleteButton({
         redirectTo: null
       });
     } finally {
+      busyRef.current = false;
       setIsDeleting(false);
     }
   };
@@ -97,11 +103,11 @@ export function FastInspectionDeleteButton({
     <>
       <button
         className="inline-flex min-h-10 items-center rounded-2xl border border-rose-200 bg-white px-4 text-sm font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={isDeleting}
-        onClick={handleDelete}
+        disabled={isDeleting || isDeleted}
+        onClick={(event) => { event.stopPropagation(); void handleDelete(); }}
         type="button"
       >
-        {isDeleting ? "Deleting..." : "Delete"}
+        {isDeleted ? "Deleted" : isDeleting ? "Deleting..." : "Delete"}
       </button>
       {state.error ? (
         <p className="mt-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 lg:col-span-8">

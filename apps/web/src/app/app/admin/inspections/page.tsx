@@ -514,7 +514,7 @@ export default async function AdminInspectionsPage({
                     return (
                       <div
                         key={inspection.id}
-                        className={`group/row grid gap-4 rounded-[20px] border px-4 py-4 transition duration-150 hover:-translate-y-px hover:border-[color:rgb(var(--tenant-primary-rgb)/0.28)] hover:bg-white hover:shadow-[0_14px_30px_rgba(15,23,42,0.08)] md:px-5 md:py-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1.35fr)_0.74fr_0.84fr_0.74fr_0.95fr_0.9fr_0.62fr] lg:items-center lg:gap-5 ${
+                        className={`group/row grid gap-4 rounded-[20px] border px-4 py-4 transition-[background-color,border-color,box-shadow] duration-150 hover:border-[color:rgb(var(--tenant-primary-rgb)/0.28)] hover:bg-white hover:shadow-[0_14px_30px_rgba(15,23,42,0.08)] md:px-5 md:py-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1.35fr)_0.74fr_0.84fr_0.74fr_0.95fr_0.9fr_0.62fr] lg:items-center lg:gap-5 ${
                           index % 2 === 0
                             ? "border-[color:rgb(220_229_240_/_0.9)] bg-white"
                             : "border-[color:rgb(225_232_242_/_0.88)] bg-[color:rgb(252_253_255_/_0.96)]"
