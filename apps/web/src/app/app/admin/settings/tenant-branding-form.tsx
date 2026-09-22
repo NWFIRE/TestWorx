@@ -111,7 +111,7 @@ export function TenantBrandingForm({
           Used for scheduled work, quotes, reminders, customer activity, reports, and all operational timestamps.
         </p>
       </div>
-      <div className="grid gap-4 md:grid-cols-3">
+<div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr))]">
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="phone">Phone</label>
           <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={values.phone} id="phone" name="phone" />
@@ -134,7 +134,7 @@ export function TenantBrandingForm({
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="addressLine2">Address line 2</label>
           <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={values.addressLine2} id="addressLine2" name="addressLine2" />
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr))]">
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="city">City</label>
             <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={values.city} id="city" name="city" />

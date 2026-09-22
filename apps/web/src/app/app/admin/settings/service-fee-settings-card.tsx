@@ -135,7 +135,7 @@ export function ServiceFeeSettingsCard({
               </select>
             </div>
           </div>
-          <div className="mt-4 grid gap-4 lg:grid-cols-5">
+<div className="mt-4 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr))]">
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="city">City</label>
               <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" id="city" name="city" />
@@ -237,7 +237,7 @@ export function ServiceFeeSettingsCard({
                     </select>
                   </div>
                 </div>
-                <div className="grid gap-4 lg:grid-cols-5">
+<div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr))]">
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-600">City</label>
                     <input className="w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={rule.city ?? ""} name="city" />

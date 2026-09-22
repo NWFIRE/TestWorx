@@ -62,7 +62,7 @@ export function WorkOrderLaborTypeSettingsCard({
         {laborTypes.map((laborType) => (
           <form action={formAction} className="rounded-[1.5rem] border border-slate-200 p-4" key={laborType.id}>
             <input name="laborTypeId" type="hidden" value={laborType.id} />
-            <div className="grid gap-3 lg:grid-cols-[1.1fr_0.45fr_1.2fr_0.35fr_0.35fr_auto] lg:items-end">
+<div className="grid items-end gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr))]">
               <div>
                 <p className="text-sm font-semibold text-slate-950">{laborType.name}</p>
                 <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">{laborType.code}</p>

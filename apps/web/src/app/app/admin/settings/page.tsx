@@ -15,7 +15,7 @@ import {
   getTenantQuickBooksConnectionSettings
 } from "@testworx/lib/server/index";
 
-import { AppPageShell, KPIStatCard, PageHeader, SectionCard, WorkspaceSplit } from "../operations-ui";
+import { AppPageShell, KPIStatCard, PageHeader, SectionCard } from "../operations-ui";
 import { BrandLoader } from "@/app/brand-loader";
 import { getAppNavItemsForRole } from "../../app-nav-config";
 
@@ -51,6 +51,7 @@ import { QuickBooksSettingsCard } from "./quickbooks-settings-card";
 import { SettingsDisclosureCard } from "./settings-disclosure-card";
 import { SidebarOrderForm } from "./sidebar-order-form";
 import { TenantBrandingForm } from "./tenant-branding-form";
+import { SettingsSidePanel } from "./settings-side-panel";
 import { WorkOrderLaborTypeSettingsCard } from "./work-order-labor-type-settings-card";
 
 type SettingsSearchParams = Record<string, string | string[] | undefined>;
@@ -393,9 +394,9 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   return (
     <AppPageShell density="wide">
       <PageHeader
-        description="Manage subscription readiness, billing contacts, branding, and service fee rules from one quieter settings workspace."
+        description="Manage billing rules, integrations, and company preferences."
         eyebrow="Tenant settings"
-        title="Billing and branding"
+        title="Settings"
         contentWidth="full"
       />
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -424,17 +425,21 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
           value={feesOpen ? "Open" : "Ready"}
         />
       </section>
-      <WorkspaceSplit
-        className="2xl:grid-cols-[minmax(0,1.08fr)_minmax(32rem,1fr)]"
-        variant="balanced"
-      >
-        <div className="space-y-6">
+      <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_16rem]">
+        <aside aria-label="Company preferences" className="min-w-0 rounded-2xl border border-slate-200 bg-white p-2 xl:col-start-2 xl:row-start-1">
+          <p className="px-4 pb-1 pt-3 text-xs font-semibold text-slate-500">Company preferences</p>
+          <SettingsSidePanel title="Tenant branding" description="Logo, colors, and business details">
           <TenantBrandingForm values={{ ...brandingSettings.branding, billingEmail: brandingSettings.billingEmail, timezone: brandingSettings.timezone }} />
+          </SettingsSidePanel>
+          <SettingsSidePanel title="Sidebar order" description="Arrange navigation sections">
           <SidebarOrderForm
             items={sidebarItems}
             savedOrder={brandingSettings.branding.sidebarOrder}
             updateAction={updateTenantSidebarOrderAction}
           />
+          </SettingsSidePanel>
+        </aside>
+        <div className="min-w-0 space-y-4 xl:col-start-1 xl:row-start-1">
           <QuickBooksSettingsCard
             companyName={quickBooksSettings.tenant.quickbooksCompanyName}
             configured={quickBooksSettings.config.enabled}
@@ -458,8 +463,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
             realmId={quickBooksSettings.tenant.quickbooksRealmId}
             supportReference={quickBooksSettings.supportReference}
           />
-        </div>
-        <div className="space-y-6">
           <SettingsDisclosureCard
             description="Review stored QuickBooks item ids for each internal billing code, fix inactive references, and confirm suggested matches without loading the full section until you need it."
             eyebrow="QuickBooks item mappings"
@@ -604,7 +607,8 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
             ) : null}
           </SectionCard>
         </div>
-      </WorkspaceSplit>
+      </div>
+      <SettingsDisclosureCard eyebrow="Subscription" title="Plans and add-ons" openLabel="View plans">
       <BillingPlansSection
         addons={billingSettings.config.addons}
         canManageSubscription={canManageSubscription}
@@ -615,6 +619,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
         }))}
         startBillingCheckoutAction={startBillingCheckoutAction}
       />
+      </SettingsDisclosureCard>
     </AppPageShell>
   );
 }

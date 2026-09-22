@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 type SettingsDisclosureCardProps = {
@@ -27,6 +27,7 @@ export function SettingsDisclosureCard({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(initialOpen);
+  const panelId = useId();
 
   useEffect(() => {
     setOpen(initialOpen);
@@ -60,13 +61,15 @@ export function SettingsDisclosureCard({
         : "";
 
   return (
-    <div className={`self-start rounded-[2rem] border border-slate-200 bg-white shadow-panel ${spanClass}`}>
-  <div className="flex flex-wrap items-start justify-between gap-4 p-6">
-        <div className="max-w-2xl">
-          <p className="text-sm uppercase tracking-[0.25em] text-slate-500">{eyebrow}</p>
-          <h3 className="mt-2 text-2xl font-semibold text-ink">{title}</h3>
+    <div className={`min-w-0 self-start rounded-2xl border border-slate-200 bg-white ${spanClass}`}>
+  <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
+        <div className="min-w-0 max-w-2xl">
+          <p className="text-xs font-medium text-slate-500">{eyebrow}</p>
+          <h3 className="mt-1 text-lg font-semibold text-ink">{title}</h3>
         </div>
         <button
+          aria-expanded={open}
+          aria-controls={panelId}
           className="pressable inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue"
           onClick={toggleOpen}
           type="button"
@@ -75,11 +78,14 @@ export function SettingsDisclosureCard({
         </button>
       </div>
       <div
+        id={panelId}
+        inert={!open}
+        aria-hidden={!open}
         className="grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out"
         style={{ gridTemplateRows: open ? "1fr" : "0fr", opacity: open ? 1 : 0 }}
       >
         <div className="overflow-hidden">
-          <div className="px-6 pb-6">
+          <div className="min-w-0 px-3 pb-4 sm:px-5 [&>div]:p-0 [&>div]:shadow-none">
             {children}
           </div>
         </div>

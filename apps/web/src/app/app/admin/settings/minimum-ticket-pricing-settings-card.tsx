@@ -65,7 +65,7 @@ export function MinimumTicketPricingSettingsCard({
       </div>
 
       <form action={formAction} className="rounded-[1.5rem] border border-slate-200 p-5">
-        <div className="grid gap-4 lg:grid-cols-3">
+<div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr))]">
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="ruleType">Minimum type</label>
             <select className="w-full rounded-2xl border border-slate-200 px-4 py-3 disabled:bg-slate-50 disabled:text-slate-400" defaultValue="local_service" disabled={!storageReady} id="ruleType" name="ruleType">
@@ -83,7 +83,7 @@ export function MinimumTicketPricingSettingsCard({
             <input className="w-full rounded-2xl border border-slate-200 px-4 py-3 disabled:bg-slate-50 disabled:text-slate-400" defaultValue={59} disabled={!storageReady} id="amount" min="0" name="amount" required step="0.01" type="number" />
           </div>
         </div>
-        <div className="mt-4 grid gap-4 lg:grid-cols-5">
+<div className="mt-4 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr))]">
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="appliesTo">Applies to</label>
             <select className="w-full rounded-2xl border border-slate-200 px-4 py-3 disabled:bg-slate-50 disabled:text-slate-400" defaultValue="all" disabled={!storageReady} id="appliesTo" name="appliesTo">
@@ -124,10 +124,10 @@ export function MinimumTicketPricingSettingsCard({
         </button>
       </form>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr))]">
         {rules.map((rule) => (
           <div key={`${rule.ruleType}-${rule.id || rule.name}`} className="rounded-[1.5rem] border border-slate-200 p-5">
-            <div className="flex items-start justify-between gap-3">
+<div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{ruleLabels[rule.ruleType] ?? rule.ruleType}</p>
                 <h4 className="mt-2 text-lg font-semibold text-ink">{rule.name}</h4>
