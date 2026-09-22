@@ -440,6 +440,13 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
           </SettingsSidePanel>
         </aside>
         <div className="min-w-0 space-y-4 xl:col-start-1 xl:row-start-1">
+          <SettingsDisclosureCard
+            eyebrow="Integrations"
+            title="QuickBooks Online"
+            openLabel="Manage connection"
+            initialOpen={isSectionOpen(params, "quickbooksOpen", quickBooksNotice)}
+            queryKey="quickbooksOpen"
+          >
           <QuickBooksSettingsCard
             companyName={quickBooksSettings.tenant.quickbooksCompanyName}
             configured={quickBooksSettings.config.enabled}
@@ -463,6 +470,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
             realmId={quickBooksSettings.tenant.quickbooksRealmId}
             supportReference={quickBooksSettings.supportReference}
           />
+          </SettingsDisclosureCard>
           <SettingsDisclosureCard
             description="Review stored QuickBooks item ids for each internal billing code, fix inactive references, and confirm suggested matches without loading the full section until you need it."
             eyebrow="QuickBooks item mappings"
@@ -591,13 +599,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
             <p className="mt-2 text-sm text-[color:var(--text-secondary)]">Stripe status: {billingSettings.tenant.stripeSubscriptionStatus ?? "Not connected"}</p>
             <p className="mt-2 text-sm text-[color:var(--text-secondary)]">Current period end: {billingSettings.tenant.stripeCurrentPeriodEndsAt ? new Date(billingSettings.tenant.stripeCurrentPeriodEndsAt).toLocaleDateString() : "Not synced yet"}</p>
             <p className="mt-2 text-sm text-[color:var(--text-secondary)]">Cancel at period end: {billingSettings.tenant.stripeCancelAtPeriodEnd ? "Yes" : "No"}</p>
-            <div className="mt-4 rounded-2xl border border-[color:var(--border-default)] bg-[color:var(--surface-subtle)] px-4 py-3 text-sm text-[color:var(--text-secondary)]">
-              <p>{billingSettings.config.enabled ? "Stripe is configured and ready for checkout sessions." : "Stripe env vars are not fully configured yet. Plan selection is shown, but checkout buttons are disabled until env configuration is completed."}</p>
-              <p className="mt-2">Webhook sync: {billingSettings.config.webhookConfigured ? "Configured" : "Missing STRIPE_WEBHOOK_SECRET"}</p>
-              <p className="mt-2">Advanced recurrence: {billingSettings.entitlements.advancedRecurrence ? "Enabled" : "Upgrade required"}</p>
-              <p className="mt-2">Uploaded inspection PDFs: {billingSettings.entitlements.uploadedInspectionPdfs ? "Enabled" : "Upgrade required"}</p>
-              {!canManageSubscription ? <p className="mt-2">Subscription checkout and Stripe portal access remain limited to tenant admins.</p> : null}
-            </div>
             {canManageSubscription ? (
               <form action={openBillingPortalAction} className="mt-4">
                 <button className="w-full rounded-2xl border border-[color:var(--border-default)] bg-white px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-50" disabled={!billingSettings.config.enabled || !billingSettings.tenant.stripeCustomerId} type="submit">

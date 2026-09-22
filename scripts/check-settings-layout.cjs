@@ -1,11 +1,15 @@
 const assert = require("node:assert/strict");
 const path = require("node:path");
+const fs = require("node:fs");
 const { build } = require("esbuild");
 const { chromium } = require("@playwright/test");
 const postcss = require("postcss");
 const tailwind = require("tailwindcss");
 
 async function main() {
+  const settingsSource=fs.readFileSync("apps/web/src/app/app/admin/settings/page.tsx","utf8");
+  assert.doesNotMatch(settingsSource,/Stripe env vars|STRIPE_WEBHOOK_SECRET|Webhook sync:|Advanced recurrence:|Uploaded inspection PDFs:/);
+  assert.match(settingsSource,/isSectionOpen\(params, "quickbooksOpen", quickBooksNotice\)/);
   const css = await postcss([tailwind({content:["apps/web/src/app/app/admin/settings/*.tsx"]})]).process("@tailwind base; @tailwind utilities;",{from:undefined});
   const bundle = await build({stdin:{contents:`
     import React from "react"; import {createRoot} from "react-dom/client";
@@ -14,6 +18,7 @@ async function main() {
     import {TenantBrandingForm} from "./apps/web/src/app/app/admin/settings/tenant-branding-form";
     import {SidebarOrderForm} from "./apps/web/src/app/app/admin/settings/sidebar-order-form";
     import {MinimumTicketPricingSettingsCard} from "./apps/web/src/app/app/admin/settings/minimum-ticket-pricing-settings-card";
+    import {QuickBooksSettingsCard} from "./apps/web/src/app/app/admin/settings/quickbooks-settings-card";
     window.saved=[];
     const save=async(_,fd)=>{window.saved.push(Object.fromEntries(fd));return {error:null,success:"Saved"}};
     const values={logoDataUrl:"",primaryColor:"#123456",accentColor:"#123456",legalBusinessName:"Northwest Fire & Safety",billingEmail:"accounting@example.com",email:"office@example.com",phone:"580-540-3119",website:"https://example.com",addressLine1:"2517 N. Van Buren",addressLine2:"",city:"Enid",state:"OK",postalCode:"73703",timezone:"America/Chicago"};
@@ -23,7 +28,8 @@ async function main() {
         <SettingsSidePanel title="Tenant branding" description="Logo, colors, and business details"><TenantBrandingForm values={values}/></SettingsSidePanel>
         <SettingsSidePanel title="Sidebar order" description="Arrange navigation sections"><SidebarOrderForm items={[{href:"/one",label:"One"},{href:"/two",label:"Two"}]} savedOrder={[]} updateAction={save}/></SettingsSidePanel>
       </aside>
-      <div className="min-w-0 space-y-4 xl:col-start-1 xl:row-start-1"><SettingsDisclosureCard eyebrow="Minimum ticket pricing" title="Location-based minimums" openLabel="Open minimum pricing" initialOpen><MinimumTicketPricingSettingsCard rules={rules} upsertRuleAction={save} deleteRuleAction={async()=>{}}/></SettingsDisclosureCard></div>
+      <div className="min-w-0 space-y-4 xl:col-start-1 xl:row-start-1"><SettingsDisclosureCard eyebrow="Minimum ticket pricing" title="Location-based minimums" openLabel="Open minimum pricing" initialOpen><MinimumTicketPricingSettingsCard rules={rules} upsertRuleAction={save} deleteRuleAction={async()=>{}}/></SettingsDisclosureCard>
+      <SettingsDisclosureCard eyebrow="Integrations" title="QuickBooks Online" openLabel="Manage connection"><QuickBooksSettingsCard connected configured companyName="Test company" realmId="123" connectedAt={null} appConnectionMode="live" appConnectionModeLabel="Live" storedConnectionMode="live" storedConnectionModeLabel="Live" modeMismatch={false} reconnectRequired={false} statusLabel="Connected" guidance={null} hasStoredConnection connectAction={async()=>{}} disconnectAction={async()=>{}} syncCustomersAction={save} importCustomersAction={async()=>{}} importCatalogAction={async()=>{}}/></SettingsDisclosureCard></div>
     </div></main>);
   `,loader:"tsx",resolveDir:path.resolve(__dirname,"..")},bundle:true,write:false,jsx:"automatic",alias:{"@testworx/lib":path.resolve("packages/lib/src/timezone.ts")},define:{"process.env.NODE_ENV":'"production"'},plugins:[{name:"next-test",setup(b){
     b.onResolve({filter:/^next\/(navigation|image)$/},args=>({path:args.path,namespace:"test"}));
@@ -71,6 +77,11 @@ async function main() {
     assert.equal(await page.evaluate(()=>saved[1].amount),"59");
     await page.getByRole("button",{name:"Hide section"}).click();
     assert.equal(await page.getByRole("button",{name:"Save minimum rule"}).count(),0,"Hidden fields must not be focusable");
+    assert.equal(await page.getByRole("button",{name:"Sync Customers",exact:true}).count(),0,"QuickBooks controls start collapsed");
+    await page.getByRole("button",{name:"Manage connection"}).click();
+    await page.getByRole("button",{name:"Sync Customers",exact:true}).click();
+    await page.waitForFunction(()=>saved.length===3);
+    assert.equal(await page.getByRole("button",{name:"Disconnect QuickBooks"}).count(),1);
     assert.deepEqual(errors,[]);
     console.log("PASS: 320/390/768/1280/1920 layouts, side panels, Escape/focus restoration, retained drafts, branding save, sidebar reorder/save, rule save, disclosure accessibility.");
   } finally {await browser.close()}
