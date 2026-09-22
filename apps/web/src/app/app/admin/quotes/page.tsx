@@ -3,8 +3,8 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { LiveUrlSearchSelect } from "@/app/live-url-search-select";
-import type { SearchSelectOption } from "@/app/search-select";
+import { LiveUrlSearchInput } from "@/app/live-url-search-input";
+import { LiveUrlSelectFilter } from "@/app/live-url-select-filter";
 import {
   formatQuoteReminderStage,
   getCustomerFacingSiteLabel,
@@ -79,18 +79,6 @@ function buildHref(params: { status?: string; syncStatus?: string; query?: strin
   return query ? `/app/admin/quotes?${query}` : "/app/admin/quotes";
 }
 
-function uniqueSearchOptions(options: SearchSelectOption[]) {
-  const seen = new Set<string>();
-  return options.filter((option) => {
-    const valueKey = option.value.trim().toLowerCase();
-    if (!valueKey || seen.has(valueKey)) {
-      return false;
-    }
-    seen.add(valueKey);
-    return true;
-  });
-}
-
 export default async function QuotesPage({
   searchParams
 }: {
@@ -117,55 +105,12 @@ export default async function QuotesPage({
     allowances: session.user.allowances ?? null
   };
 
-  const [quotes, quoteSearchSource, quoteReminderSettings] = await Promise.all([
+  const [quotes, quoteReminderSettings] = await Promise.all([
     getQuoteWorkspaceData(
       actor,
       { status: selectedStatus, syncStatus: selectedSync, query }
     ),
-    getQuoteWorkspaceData(
-      actor,
-      { status: selectedStatus, syncStatus: selectedSync, query: "" }
-    ),
     getQuoteReminderSettings(actor)
-  ]);
-  const quoteSearchOptions = uniqueSearchOptions([
-    ...quoteSearchSource.map((quote) => ({
-      value: quote.quoteNumber,
-      label: quote.quoteNumber,
-      secondaryLabel: [quote.customerCompany.name, getCustomerFacingSiteLabel(quote.site?.name)].filter(Boolean).join(" | ") || "Quote",
-      badge: "Quote"
-    })),
-    ...quoteSearchSource.map((quote) => ({
-      value: quote.customerCompany.name,
-      label: quote.customerCompany.name,
-      secondaryLabel: "Customer",
-      badge: "Customer"
-    })),
-    ...quoteSearchSource.flatMap((quote) => {
-      const siteLabel = getCustomerFacingSiteLabel(quote.site?.name);
-      return siteLabel
-        ? [{
-          value: siteLabel,
-          label: siteLabel,
-          secondaryLabel: quote.customerCompany.name,
-          badge: "Site"
-        }]
-        : [];
-    }),
-    ...quoteSearchSource.flatMap((quote) => quote.recipientEmail
-      ? [{
-          value: quote.recipientEmail,
-          label: quote.recipientEmail,
-          secondaryLabel: quote.customerCompany.name,
-          badge: "Recipient"
-        }]
-      : []),
-    ...quoteSearchSource.flatMap((quote) => quote.lineItems.map((line) => ({
-      value: line.title,
-      label: line.title,
-      secondaryLabel: quote.quoteNumber,
-      badge: "Service"
-    })))
   ]);
 
   return (
@@ -214,26 +159,14 @@ export default async function QuotesPage({
       </SettingsDisclosureCard>
 
       <SectionCard>
-        <form action="/app/admin/quotes" className="grid gap-3 lg:grid-cols-[1.2fr_0.9fr_auto]">
-          <LiveUrlSearchSelect
-            emptyText="No matching quotes, customers, sites, or services found"
+        <div className="grid gap-3 lg:grid-cols-[1.2fr_0.9fr]">
+          <LiveUrlSearchInput
             initialValue={query}
-            options={quoteSearchOptions}
             paramKey="query"
             placeholder="Search quote number, customer, site, or service"
           />
-          <select className="field-contrast h-12 rounded-2xl border bg-white px-4 text-sm outline-none" defaultValue={selectedSync} name="syncStatus">
-            {syncOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <input name="status" type="hidden" value={selectedStatus} />
-          <button className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 py-3 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-subtle)]" type="submit">
-            Apply filters
-          </button>
-        </form>
+          <LiveUrlSelectFilter paramKey="syncStatus" value={selectedSync} options={[...syncOptions]} resetPageKeys={[]} />
+        </div>
       </SectionCard>
 
       <SectionCard>

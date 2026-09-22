@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
+import { SearchInput } from "@/app/search-input";
 
 import {
   addInspectionTaskAdminAction,
@@ -92,11 +93,12 @@ export function InspectionReportTypeManagement(input: {
           <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500" htmlFor="report-type-search">
             Add report type to current visit
           </label>
-          <input
-            className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-ink outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+          <SearchInput
+            className="mt-2"
             disabled={isPending}
             id="report-type-search"
             onChange={(event) => setReportTypeQuery(event.target.value)}
+            onClear={() => setReportTypeQuery("")}
             placeholder="Search report types"
             value={reportTypeQuery}
           />

@@ -1,47 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
-const LIVE_SEARCH_DEBOUNCE_MS = 300;
-
-function buildNextUrl({
-  pathname,
-  searchParams,
-  paramKey,
-  nextQuery,
-  resetPageKeys
-}: {
-  pathname: string;
-  searchParams: URLSearchParams;
-  paramKey: string;
-  nextQuery: string;
-  resetPageKeys: string[];
-}) {
-  const nextSearch = new URLSearchParams(searchParams.toString());
-  const trimmedValue = nextQuery.trim();
-  if (trimmedValue) {
-    nextSearch.set(paramKey, trimmedValue);
-  } else {
-    nextSearch.delete(paramKey);
-  }
-
-  for (const pageKey of resetPageKeys) {
-    nextSearch.set(pageKey, "1");
-  }
-
-  return nextSearch.toString() ? `${pathname}?${nextSearch.toString()}` : pathname;
-}
+import { SearchInput } from "./search-input";
+import { SEARCH_DEBOUNCE_MS } from "./search-behavior";
 
 export function LiveUrlSearchInput({
-  id,
-  name,
-  initialValue,
-  paramKey,
-  placeholder,
-  resetPageKeys = [],
-  debounceMs = LIVE_SEARCH_DEBOUNCE_MS,
-  className = ""
+  id, name, initialValue, paramKey, placeholder, resetPageKeys = [],
+  debounceMs = SEARCH_DEBOUNCE_MS, className = ""
 }: {
   id?: string;
   name?: string;
@@ -54,134 +21,93 @@ export function LiveUrlSearchInput({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [query, setQuery] = useState(initialValue);
   const [pending, startTransition] = useTransition();
-  const searchDebounceRef = useRef<number | null>(null);
-  const lastAppliedValueRef = useRef(initialValue.trim());
-  const hasFocusRef = useRef(false);
-  const resetPageKeyList = resetPageKeys.join("\u001f");
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const composing = useRef(false);
+  const draft = useRef(initialValue);
+  const applied = useRef(initialValue.trim());
+  const submitted = useRef(new Set<string>());
+  const resetKeys = resetPageKeys.join("\u001f");
+
+  const cancel = useCallback(() => {
+    if (timer.current !== null) clearTimeout(timer.current);
+    timer.current = null;
+  }, []);
 
   useEffect(() => {
-    const nextAppliedValue = initialValue.trim();
-    lastAppliedValueRef.current = nextAppliedValue;
-    const timeout = window.setTimeout(() => {
-      setQuery((currentQuery) => {
-        if (hasFocusRef.current && currentQuery.trim() !== nextAppliedValue) {
-          return currentQuery;
-        }
-
-        return initialValue;
-      });
+    // A slower response must not replace text entered since its request started.
+    if (submitted.current.delete(initialValue.trim())) return;
+    cancel();
+    applied.current = initialValue.trim();
+    draft.current = initialValue;
+    const sync = setTimeout(() => {
+      if (draft.current === initialValue) setQuery(initialValue);
     }, 0);
-    return () => window.clearTimeout(timeout);
-  }, [initialValue]);
-
-  const applyQuery = useCallback((nextQuery: string) => {
-    const trimmedValue = nextQuery.trim();
-    if (trimmedValue === lastAppliedValueRef.current) {
-      return;
-    }
-
-    if (searchDebounceRef.current !== null) {
-      window.clearTimeout(searchDebounceRef.current);
-      searchDebounceRef.current = null;
-    }
-
-    const nextUrl = buildNextUrl({
-      pathname,
-      searchParams,
-      paramKey,
-      nextQuery: trimmedValue,
-      resetPageKeys: resetPageKeyList ? resetPageKeyList.split("\u001f") : []
-    });
-    lastAppliedValueRef.current = trimmedValue;
-    startTransition(() => {
-      router.replace(nextUrl, { scroll: false });
-    });
-  }, [paramKey, pathname, resetPageKeyList, router, searchParams]);
+    return () => clearTimeout(sync);
+  }, [initialValue, cancel]);
 
   useEffect(() => {
-    const trimmedValue = query.trim();
-    if (trimmedValue === lastAppliedValueRef.current) {
-      return;
+    function restoreHistory() {
+      cancel();
+      submitted.current.clear();
+      const value = new URLSearchParams(window.location.search).get(paramKey) ?? "";
+      applied.current = value.trim();
+      draft.current = value;
+      setQuery(value);
     }
-
-    if (searchDebounceRef.current !== null) {
-      window.clearTimeout(searchDebounceRef.current);
-    }
-
-    const timeout = window.setTimeout(() => {
-      searchDebounceRef.current = null;
-      applyQuery(trimmedValue);
-    }, debounceMs);
-    searchDebounceRef.current = timeout;
-
+    window.addEventListener("popstate", restoreHistory);
     return () => {
-      window.clearTimeout(timeout);
-      if (searchDebounceRef.current === timeout) {
-        searchDebounceRef.current = null;
-      }
+      cancel();
+      window.removeEventListener("popstate", restoreHistory);
     };
-  }, [applyQuery, debounceMs, query]);
+  }, [cancel, paramKey, pathname]);
 
-  function clearQuery() {
-    if (searchDebounceRef.current !== null) {
-      window.clearTimeout(searchDebounceRef.current);
-      searchDebounceRef.current = null;
-    }
+  function applyQuery(value: string) {
+    cancel();
+    if (composing.current || window.location.pathname !== pathname) return;
+    const trimmed = value.trim();
+    if (trimmed === applied.current) return;
+    // Read current params at dispatch time so a dropdown changed while typing is retained.
+    const params = new URLSearchParams(window.location.search);
+    if (trimmed) params.set(paramKey, trimmed);
+    else params.delete(paramKey);
+    for (const key of resetKeys ? resetKeys.split("\u001f") : []) params.set(key, "1");
+    applied.current = trimmed;
+    submitted.current.add(trimmed);
+    startTransition(() => router.replace(params.size ? `${pathname}?${params}` : pathname, { scroll: false }));
+  }
 
-    setQuery("");
-    applyQuery("");
+  function updateQuery(value: string) {
+    cancel();
+    draft.current = value;
+    setQuery(value);
+    if (!composing.current) timer.current = setTimeout(() => applyQuery(value), debounceMs);
   }
 
   return (
-    <div className={`relative w-full min-w-0 ${className}`}>
-      <input
-        aria-busy={pending}
-        autoComplete="off"
-        className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 pr-20 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[color:var(--tenant-primary-border)] focus:ring-4 focus:ring-[color:rgb(var(--tenant-primary-rgb)/0.10)]"
-        id={id}
-        name={name}
-        onChange={(event) => setQuery(event.target.value)}
-        onBlur={() => {
-          hasFocusRef.current = false;
-          applyQuery(query);
-        }}
-        onFocus={() => {
-          hasFocusRef.current = true;
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            applyQuery(query);
-          }
-          if (event.key === "Escape" && query) {
-            event.preventDefault();
-            clearQuery();
-          }
-        }}
-        placeholder={placeholder}
-        role="searchbox"
-        type="text"
-        value={query}
-      />
-      <div className="absolute inset-y-0 right-2 flex items-center gap-1">
-        {pending ? (
-          <span className="h-2 w-2 rounded-full bg-blue-500" aria-label="Filtering inspections" />
-        ) : null}
-        {query ? (
-          <button
-            aria-label="Clear search"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-            onClick={clearQuery}
-            onMouseDown={(event) => event.preventDefault()}
-            type="button"
-          >
-            X
-          </button>
-        ) : null}
-      </div>
-    </div>
+    <SearchInput
+      busy={pending}
+      className={`w-full ${className}`}
+      id={id}
+      name={name ?? paramKey}
+      onChange={(event) => updateQuery(event.target.value)}
+      onClear={() => { updateQuery(""); applyQuery(""); }}
+      onBlur={(event) => {
+        // A result or navigation link must win over any queued list search.
+        if (event.relatedTarget instanceof Element && event.relatedTarget.closest("a[href]")) cancel();
+        else applyQuery(draft.current);
+      }}
+      onCompositionStart={() => { composing.current = true; cancel(); }}
+      onCompositionEnd={(event) => { composing.current = false; updateQuery(event.currentTarget.value); }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+          event.preventDefault();
+          applyQuery(draft.current);
+        }
+      }}
+      placeholder={placeholder}
+      value={query}
+    />
   );
 }

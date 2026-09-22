@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { SearchInput } from "@/app/search-input";
 
 import { inspectionTypeRegistry } from "@testworx/lib";
 
@@ -201,16 +202,16 @@ export function AddReportTypeControl({
                 <p className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{errorMessage}</p>
               ) : null}
 
-              <label className="block">
+              <div>
                 <span className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Search report types</span>
-                <input
-                  className="mt-2 min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                <SearchInput
+                  className="mt-2"
                   onChange={(event) => setSearch(event.target.value)}
+                  onClear={() => setSearch("")}
                   placeholder="Fire alarm, extinguisher, work order..."
-                  type="search"
                   value={search}
                 />
-              </label>
+              </div>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 {filteredTypes.map((inspectionType) => {

@@ -3,6 +3,7 @@
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { SearchSelect, type SearchSelectOption } from "@/app/search-select";
+import { SEARCH_DEBOUNCE_MS } from "@/app/search-behavior";
 
 type MatchCandidate = {
   catalogItemId: string;
@@ -38,7 +39,6 @@ const initialSearchState: SearchState = {
 };
 
 const initialActionState: ActionState = { error: null, success: null };
-const LIVE_SEARCH_DEBOUNCE_MS = 1200;
 
 function confidenceLabel(confidence: number) {
   if (confidence >= 0.96) {
@@ -141,7 +141,7 @@ export function BillingItemMatchPanel({
     const timeout = window.setTimeout(() => {
       searchDebounceRef.current = null;
       submitCatalogSearch(searchQuery);
-    }, LIVE_SEARCH_DEBOUNCE_MS);
+    }, SEARCH_DEBOUNCE_MS);
     searchDebounceRef.current = timeout;
 
     return () => {

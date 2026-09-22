@@ -34,18 +34,6 @@ function buildReadyToBillHref(input: { month?: string; query?: string }) {
   return query ? `/app/admin/reports?${query}` : "/app/admin/reports";
 }
 
-function uniqueSearchOptions<T extends { value: string }>(options: T[]) {
-  const seen = new Set<string>();
-  return options.filter((option) => {
-    const key = option.value.trim().toLowerCase();
-    if (!key || seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
-}
-
 export default async function AdminReportsQueuePage({
   searchParams
 }: {
@@ -73,34 +61,6 @@ export default async function AdminReportsQueuePage({
     },
     { month, query }
   );
-  const readyToBillSearchOptions = uniqueSearchOptions([
-    ...data.inspections.map((inspection) => ({
-      value: inspection.customerCompany.name,
-      label: inspection.customerCompany.name,
-      secondaryLabel: "Customer",
-      badge: "Customer"
-    })),
-    ...data.inspections.map((inspection) => ({
-      value: inspection.primaryTitle ?? inspection.site.name,
-      label: inspection.primaryTitle ?? inspection.site.name,
-      secondaryLabel: [inspection.secondaryTitle, inspection.site.city].filter(Boolean).join(" | ") || "Inspection location",
-      badge: "Location"
-    })),
-    ...data.inspections.map((inspection) => ({
-      value: inspection.id,
-      label: `Inspection ${inspection.id.slice(0, 8)}`,
-      secondaryLabel: [inspection.customerCompany.name, inspection.primaryTitle, format(inspection.completedAt ?? inspection.scheduledStart, "MMM d, yyyy")].filter(Boolean).join(" | "),
-      badge: "Inspection"
-    })),
-    ...data.inspections.flatMap((inspection) =>
-      inspection.reviewTasks.map((task) => ({
-        value: taskDisplayLabel(task),
-        label: taskDisplayLabel(task),
-        secondaryLabel: inspection.customerCompany.name,
-        badge: "Report"
-      }))
-    )
-  ]);
 
   return (
     <AppPageShell>
@@ -143,7 +103,6 @@ export default async function AdminReportsQueuePage({
           initialMonth={data.filters.month}
           initialQuery={data.filters.query}
           monthOptions={data.options.months}
-          searchOptions={readyToBillSearchOptions}
         />
       </FilterBar>
 

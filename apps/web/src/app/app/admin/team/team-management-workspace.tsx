@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { BrandLoader } from "@/app/brand-loader";
 import { LiveUrlSearchInput } from "@/app/live-url-search-input";
 import { SearchInput } from "@/app/search-input";
+import { SEARCH_DEBOUNCE_MS } from "@/app/search-behavior";
 import { customerAllowanceKeys, inspectionTypeRegistry, internalAllowanceKeys, type TeamAllowanceMap } from "@testworx/lib";
 
 import {
@@ -624,7 +625,7 @@ function AsyncUserLookupSection({
     const timer = window.setTimeout(() => {
       setDebouncedQuery(query);
       setPage(0);
-    }, 1200);
+    }, SEARCH_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timer);
   }, [query]);

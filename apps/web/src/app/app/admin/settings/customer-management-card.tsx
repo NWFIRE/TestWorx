@@ -7,6 +7,7 @@ import type { KeyboardEvent, ReactNode } from "react";
 
 import { BrandLoader } from "@/app/brand-loader";
 import { SearchInput } from "@/app/search-input";
+import { SEARCH_DEBOUNCE_MS } from "@/app/search-behavior";
 
 const initialState = { error: null as string | null, success: null as string | null, customerCompanyId: null as string | null };
 const paymentTermsOptions = [
@@ -16,7 +17,6 @@ const paymentTermsOptions = [
   { value: "net_60", label: "Net 60" },
   { value: "custom", label: "Custom terms" }
 ] as const;
-const LIVE_SEARCH_DEBOUNCE_MS = 1200;
 
 type CustomerRecord = {
   id: string;
@@ -699,7 +699,7 @@ export function CustomerManagementCard({
     pendingSearchTimeoutRef.current = window.setTimeout(() => {
       pendingSearchTimeoutRef.current = null;
       void loadCustomers(1, normalizedQuery);
-    }, LIVE_SEARCH_DEBOUNCE_MS);
+    }, SEARCH_DEBOUNCE_MS);
 
     return () => {
       if (pendingSearchTimeoutRef.current !== null) {
@@ -727,13 +727,16 @@ export function CustomerManagementCard({
   }, [prepareCustomerProfileNavigation, router]);
 
   function clearSearch() {
+    cancelPendingCustomerSearch();
     setQueryInput("");
     setSearchError(null);
+    void loadCustomers(1, "");
   }
 
   function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Enter") {
+    if (event.key === "Enter" && !event.nativeEvent.isComposing) {
       event.preventDefault();
+      cancelPendingCustomerSearch();
       void loadCustomers(1, queryInput.trim());
       return;
     }
