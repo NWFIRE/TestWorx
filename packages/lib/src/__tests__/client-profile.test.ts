@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { InspectionStatus, QuoteStatus } from "@prisma/client";
 
 const prismaMock = {
@@ -35,6 +35,11 @@ vi.mock("../quickbooks", () => ({
 }));
 
 describe("client profile workspace data", () => {
+  beforeAll(async () => {
+    // Load the server dependency graph outside individual behavior-test timeouts.
+    await import("../client-profile");
+  }, 60000);
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -231,11 +236,49 @@ describe("client profile workspace data", () => {
     expect(result?.overview.upcomingInspectionCount).toBe(1);
     expect(result?.overview.unpaidInvoiceCount).toBe(1);
     expect(result?.overview.totalInvoiced).toBe(230);
+    expect(result?.overview.lastInspectionAt).toEqual(new Date("2026-03-15T15:00:00.000Z"));
+    expect(prismaMock.inspection.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { tenantId: "tenant_1", customerCompanyId: "customer_1", status: { in: ["completed", "invoiced"] } },
+      select: expect.objectContaining({ completedAt: true })
+    }));
     expect(result?.billing.invoices[0]?.invoiceNumber).toBe("1001");
     expect(result?.documents.some((document) => document.href === "/api/inspection-documents/doc_1?variant=preferred")).toBe(true);
     expect(result?.documents.some((document) => document.href === "/api/attachments/attachment_1")).toBe(true);
     expect(result?.quoteHistory[0]?.detailLink).toBe("/app/admin/quotes/quote_1");
     expect(result?.inspectionHistory[0]?.inspectionLink).toBe("/app/admin/inspections/inspection_1");
     expect(result?.activity.some((entry) => entry.type === "Invoice")).toBe(true);
+
+    const history = await prismaMock.inspection.findMany.mock.results[0].value;
+    prismaMock.inspection.findMany
+      .mockResolvedValueOnce(Array.from({ length: 50 }, (_, index) => ({ ...history[0], id: `future_${index}`, scheduledStart: new Date("2027-06-01T14:00:00Z") })))
+      .mockResolvedValueOnce([history[1]]);
+    const recurrenceHeavy = await getClientProfileData(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" }, "customer_1"
+    );
+    expect(recurrenceHeavy?.overview.lastInspectionAt).toEqual(history[1].scheduledStart);
+  });
+
+  it("uses completed history rather than future recurrences or unfinished visits", async () => {
+    const { getLastCompletedClientInspectionDate } = await import("../client-profile");
+    const now = new Date("2026-09-21T12:00:00Z");
+    const base = { status: "completed", scheduledStart: new Date("2026-06-01T14:00:00Z"), reports: [] };
+    const future = { ...base, status: "to_be_completed", scheduledStart: new Date("2027-06-01T14:00:00Z") };
+    expect(getLastCompletedClientInspectionDate([base, future], now)).toEqual(base.scheduledStart);
+    expect(getLastCompletedClientInspectionDate([future, { ...base, status: "cancelled" }, { ...base, status: "in_progress" }], now)).toBeNull();
+    expect(getLastCompletedClientInspectionDate([], now)).toBeNull();
+    expect(getLastCompletedClientInspectionDate([{ ...future, status: "completed" }], now)).toBeNull();
+  });
+
+  it("prefers finalized reports over later administrative completion, including invoiced history", async () => {
+    const { getLastCompletedClientInspectionDate } = await import("../client-profile");
+    const now = new Date("2026-09-21T12:00:00Z");
+    const finalizedAt = new Date("2026-06-03T16:00:00Z");
+    const completedAt = new Date("2026-09-15T16:00:00Z");
+    const base = { status: "invoiced", scheduledStart: new Date("2027-06-01T14:00:00Z"), reports: [{ status: "finalized", finalizedAt }] };
+    expect(getLastCompletedClientInspectionDate([{ ...base, completedAt }], now)).toEqual(finalizedAt);
+    expect(getLastCompletedClientInspectionDate([{ ...base, completedAt, reports: [] }], now)).toEqual(completedAt);
+    expect(getLastCompletedClientInspectionDate([base], now)).toEqual(finalizedAt);
+    expect(getLastCompletedClientInspectionDate([{ ...base, reports: [], completedAt: new Date("2027-01-01") }], now)).toBeNull();
+    expect(getLastCompletedClientInspectionDate([{ ...base, reports: [{ status: "draft", finalizedAt }] }], now)).toBeNull();
   });
 });

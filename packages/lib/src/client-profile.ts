@@ -43,6 +43,20 @@ function maxDate(values: Array<Date | null | undefined>) {
   return valid[0] ?? null;
 }
 
+export function getLastCompletedClientInspectionDate(inspections: Array<{
+  status: string;
+  completedAt?: Date | null;
+  scheduledStart: Date;
+  reports: Array<{ status: string; finalizedAt: Date | null }>;
+}>, now = new Date()) {
+  return maxDate(inspections
+    .filter((inspection) => inspection.status === InspectionStatus.completed || inspection.status === InspectionStatus.invoiced)
+    .map((inspection) => maxDate(inspection.reports.filter((report) => report.status === "finalized").map((report) => report.finalizedAt)) ??
+      inspection.completedAt ??
+      inspection.scheduledStart)
+    .filter((date) => date instanceof Date && date.getTime() <= now.getTime()));
+}
+
 function buildAddressLines(input: {
   line1?: string | null;
   line2?: string | null;
@@ -127,7 +141,7 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
     return null;
   }
 
-  const [inspections, quotes, documents, attachments, quickBooksBilling] = await Promise.all([
+  const [inspections, quotes, documents, attachments, quickBooksBilling, completedInspections] = await Promise.all([
     prisma.inspection.findMany({
       where: { tenantId, customerCompanyId },
       orderBy: [{ scheduledStart: "desc" }],
@@ -200,7 +214,17 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
         }
       }
     }),
-    getQuickBooksCustomerInvoiceHistory(actor, customerCompanyId)
+    getQuickBooksCustomerInvoiceHistory(actor, customerCompanyId),
+    // Recurrences can fill the history preview; calculate completion independently.
+    prisma.inspection.findMany({
+      where: { tenantId, customerCompanyId, status: { in: [InspectionStatus.completed, InspectionStatus.invoiced] } },
+      select: {
+        status: true,
+        completedAt: true,
+        scheduledStart: true,
+        reports: { where: { status: "finalized" }, select: { status: true, finalizedAt: true } }
+      }
+    })
   ]);
 
   const inspectionIds = inspections.map((inspection) => inspection.id);
@@ -454,7 +478,7 @@ export async function getClientProfileData(actor: ActorContext, customerCompanyI
       totalPaid: invoiceSummary.totalPaid,
       overdueTotal: invoiceSummary.overdueTotal,
       totalHistoricalRevenue: invoiceSummary.totalInvoiced,
-      lastInspectionAt: maxDate(inspections.map((inspection) => inspection.scheduledStart)),
+      lastInspectionAt: getLastCompletedClientInspectionDate(completedInspections),
       lastInvoiceAt: invoiceSummary.lastInvoiceAt,
       lastActivityAt: maxDate([
         maxDate(inspections.map((inspection) => inspection.updatedAt)),

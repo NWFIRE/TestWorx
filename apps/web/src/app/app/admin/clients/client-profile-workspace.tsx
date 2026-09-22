@@ -491,7 +491,7 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
                   description="Quick operational and billing context so office staff can understand the customer at a glance."
                 />
                 <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  <SummaryMetric label="Last inspection" note="Most recent scheduled or completed inspection date." value={formatDate(data.overview.lastInspectionAt)} />
+                  <SummaryMetric label="Last inspection" note="Most recent completed inspection. Uses the scheduled date only for older completed records without a completion date." value={formatDate(data.overview.lastInspectionAt)} />
                   <SummaryMetric label="Last invoice" note="Most recent QuickBooks invoice date available." value={formatDate(data.overview.lastInvoiceAt)} />
                   <SummaryMetric label="Last activity" note="Most recent account activity across inspections, quotes, and billing." value={formatDate(data.overview.lastActivityAt)} />
                   <SummaryMetric label="Overdue total" note="Outstanding overdue balance currently visible in QuickBooks." value={formatMoney(data.overview.overdueTotal)} />
