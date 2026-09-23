@@ -14,6 +14,10 @@ The repair locks and rechecks records in one transaction. Each deleted visit's f
 
 The separate large Timberlake task-count anomaly is not repaired by this tool: task-level duplication inside retained visits requires its own review.
 
+## September 23, 2026 result
+
+The initial per-record transaction timed out and rolled back without changes. The batched, locked repair then removed 160 untouched generated duplicates (32 October 2026, 10 November, 10 December, 54 April 2027, 54 May 2027) and deactivated 105 unused duplicate schedules. October went from 52 inspections to 20 with no repeated customer/site groups. A post-repair dry run returned zero eligible duplicates. All 160 deletions have recovery snapshots and retained-inspection references; audit verification found no completed or billed deleted visits. Assigned canonical visits were preserved even when their redundant generated copies were unassigned.
+
 ## Checks
 
 - `node scripts/check-duplicate-repair.cjs`

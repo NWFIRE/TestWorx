@@ -8,6 +8,8 @@ for(const change of [{siteId:'other'},{scheduledStart:new Date('2026-10-02')},{i
 for(const change of [{notes:'Keep me'},{billingSummary:{}},{status:'completed'},{assignedTechnicianId:'tech'},{_count:{documents:1}}])assert.equal(untouched(visit('b',change)),false);
 const started=visit('b',{tasks:[{...b.tasks[0],report:{...b.tasks[0].report,autosaveVersion:2}}]});assert.equal(untouched(started),false);
 const complete=visit('done',{status:'invoiced',billingSummary:{status:'invoiced'}});
+const assigned=visit('assigned',{assignedTechnicianId:'tech',tasks:[{...a.tasks[0],assignedTechnicianId:'tech'}]});
+assert.equal(plan([a,assigned],new Set(['a']))[0].keep.id,'assigned');
 assert.equal(plan([a,complete],new Set(['a']))[0].keep.id,'done');
 const multi=visit('multi',{tasks:[...a.tasks,...a.tasks]});assert.equal(plan([a,multi],new Set(['a','multi']))[0].keep.id,'multi');
 const different=visit('different',{tasks:[{...a.tasks[0],customDisplayLabel:'Second hood'}]});assert.equal(plan([a,different],new Set(['a','different'])).length,0);

@@ -1,11 +1,11 @@
 // Dry-run by default. Repairs only untouched, system-generated duplicate visits.
 require('dotenv').config({path:'.env.runtime.production',quiet:true});
-const {PrismaClient}=require('@prisma/client');
+const {PrismaClient,Prisma}=require('@prisma/client');
 const crypto=require('node:crypto');
 const p=new PrismaClient();
 const countSelect={attachments:true,documents:true,deficiencies:true,jobTimeSessions:true,workOrderLineItems:true,amendments:true,replacementAmendments:true,convertedFromQuotes:true,createdFromCloseoutRequests:true};
 const include={customerCompany:{select:{name:true}},tasks:{include:{recurrence:true,report:{include:{_count:{select:{attachments:true,signatures:true,deficiencies:true,correctionEvents:true}}}}}},technicianAssignments:true,billingSummary:true,closeoutRequest:true,_count:{select:countSelect}};
-function taskKey(t){return JSON.stringify([t.inspectionType,t.customDisplayLabel||'',t.recurrence?.frequency||'',t.recurrence?.intervalCount||1,t.assignedTechnicianId||'']);}
+function taskKey(t){return JSON.stringify([t.inspectionType,t.customDisplayLabel||'',t.recurrence?.frequency||'',t.recurrence?.intervalCount||1]);}
 function emptyReport(r){return !r||(r.status==='draft'&&r.autosaveVersion===1&&!r.finalizedAt&&!r.technicianId&&r.correctionState==='none'&&Object.values(r._count).every(n=>n===0)&&(r.contentJson===null||JSON.stringify(r.contentJson)==='{"narrative":""}'));}
 function untouched(r){return ['to_be_completed','scheduled'].includes(r.status)&&!r.completedAt&&!r.archivedAt&&!r.assignedTechnicianId&&!r.notes&&!r.isPriority&&!r.providerContextId&&r.sourceType==='direct'&&!r.billingSummary&&!r.closeoutRequest&&!r.technicianAssignments.length&&Object.values(r._count).every(n=>n===0)&&r.tasks.length>0&&r.tasks.length<=10&&r.tasks.every(t=>!t.notes&&!t.addedByUserId&&!t.assignedTechnicianId&&['to_be_completed','scheduled'].includes(t.status)&&emptyReport(t.report));}
 function covers(keep,drop){const counts=new Map();for(const t of keep.tasks)counts.set(taskKey(t),(counts.get(taskKey(t))||0)+1);for(const t of drop.tasks){const k=taskKey(t);if(!(counts.get(k)>0))return false;counts.set(k,counts.get(k)-1);}return true;}
@@ -36,33 +36,35 @@ async function main(){
  await p.$transaction(async tx=>{
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`schedule-backfill:${tenantId}`}, 0))`;
   const duplicateScheduleIds=new Set();const keptScheduleIds=new Set();
-  for(const {keep,drop} of pairs){
-   const occurrenceKey=[tenantId,drop.customerCompanyId,drop.siteId,drop.scheduledStart.toISOString().slice(0,7)].join('\u001f');
+  const allIds=[...new Set(pairs.flatMap(x=>[x.keep.id,x.drop.id]))];
+  const dropIds=pairs.map(x=>x.drop.id);
+  if(!allIds.length)return;
+  for(const occurrenceKey of [...new Set(pairs.map(({drop})=>[tenantId,drop.customerCompanyId,drop.siteId,drop.scheduledStart.toISOString().slice(0,7)].join('\u001f')))].sort()){
    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${occurrenceKey}, 0))`;
-   await tx.$executeRaw`SELECT id FROM "Inspection" WHERE "tenantId"=${tenantId} AND id IN (${keep.id},${drop.id}) FOR UPDATE`;
-   await tx.$executeRaw`SELECT id FROM "InspectionReport" WHERE "tenantId"=${tenantId} AND "inspectionId"=${drop.id} FOR UPDATE`;
-   const current=await tx.inspection.findFirst({where:{id:drop.id,tenantId},include});
-   const retained=await tx.inspection.findFirst({where:{id:keep.id,tenantId},include});
+  }
+  await tx.$executeRaw`SELECT id FROM "Inspection" WHERE "tenantId"=${tenantId} AND id IN (${Prisma.join(allIds)}) ORDER BY id FOR UPDATE`;
+  await tx.$executeRaw`SELECT id FROM "InspectionReport" WHERE "tenantId"=${tenantId} AND "inspectionId" IN (${Prisma.join(dropIds)}) ORDER BY id FOR UPDATE`;
+  const currentRows=await tx.inspection.findMany({where:{tenantId,id:{in:allIds}},include});
+  const byId=new Map(currentRows.map(r=>[r.id,r]));const auditEntries=[];const reportIds=[];const taskIds=[];
+  for(const {keep,drop} of pairs){
+   const current=byId.get(drop.id);const retained=byId.get(keep.id);
    if(!current||!retained||!untouched(current)||!covers(retained,current)||JSON.stringify(current)!==JSON.stringify(drop)||JSON.stringify(retained)!==JSON.stringify(keep))throw Error('Inspection changed during review; nothing repaired.');
    for(const t of retained.tasks)if(t.serviceScheduleId)keptScheduleIds.add(t.serviceScheduleId);
    for(const t of current.tasks)if(t.serviceScheduleId)duplicateScheduleIds.add(t.serviceScheduleId);
    const snapshot=JSON.parse(JSON.stringify(current));
-   await tx.auditLog.create({data:{tenantId,actorUserId,entityType:'Inspection',entityId:current.id,action:'inspection.duplicate_repaired',metadata:{retainedInspectionId:keep.id,snapshot,reason:'Untouched generated visit covered by retained visit at identical customer, site, time and service multiplicities'}}});
-   const reportIds=current.tasks.flatMap(t=>t.report?[t.report.id]:[]);
-   const taskIds=current.tasks.map(t=>t.id);
-   await tx.inspectionReport.deleteMany({where:{tenantId,id:{in:reportIds}}});
-   await tx.inspectionRecurrence.deleteMany({where:{tenantId,inspectionTaskId:{in:taskIds}}});
-   await tx.inspectionTask.deleteMany({where:{tenantId,id:{in:taskIds}}});
-   await tx.inspection.delete({where:{id:current.id}});
+   auditEntries.push({tenantId,actorUserId,entityType:'Inspection',entityId:current.id,action:'inspection.duplicate_repaired',metadata:{retainedInspectionId:keep.id,snapshot,reason:'Untouched generated visit covered by retained visit at identical customer, site, time and service multiplicities'}});
+   reportIds.push(...current.tasks.flatMap(t=>t.report?[t.report.id]:[]));
+   taskIds.push(...current.tasks.map(t=>t.id));
   }
-  for(const id of duplicateScheduleIds){
-   if(keptScheduleIds.has(id))continue;
-   // Do not stop a series that still has any retained work attached to it.
-   if(await tx.inspectionTask.count({where:{tenantId,serviceScheduleId:id}}))continue;
-   const schedule=await tx.serviceSchedule.findFirst({where:{tenantId,id,isActive:true}});
-   if(!schedule)continue;
-   await tx.auditLog.create({data:{tenantId,actorUserId,entityType:'ServiceSchedule',entityId:id,action:'service_schedule.duplicate_deactivated',metadata:{snapshot:JSON.parse(JSON.stringify(schedule))}}});
-   await tx.serviceSchedule.update({where:{id},data:{isActive:false}});
+  await tx.auditLog.createMany({data:auditEntries});
+  await tx.inspectionReport.deleteMany({where:{tenantId,id:{in:reportIds}}});
+  await tx.inspectionRecurrence.deleteMany({where:{tenantId,inspectionTaskId:{in:taskIds}}});
+  await tx.inspectionTask.deleteMany({where:{tenantId,id:{in:taskIds}}});
+  await tx.inspection.deleteMany({where:{tenantId,id:{in:dropIds}}});
+  const schedules=await tx.serviceSchedule.findMany({where:{tenantId,id:{in:[...duplicateScheduleIds].filter(id=>!keptScheduleIds.has(id))},isActive:true,tasks:{none:{}}}});
+  if(schedules.length){
+   await tx.auditLog.createMany({data:schedules.map(schedule=>({tenantId,actorUserId,entityType:'ServiceSchedule',entityId:schedule.id,action:'service_schedule.duplicate_deactivated',metadata:{snapshot:JSON.parse(JSON.stringify(schedule))}}))});
+   await tx.serviceSchedule.updateMany({where:{tenantId,id:{in:schedules.map(s=>s.id)}},data:{isActive:false}});
   }
  },{timeout:120000});
  console.log(JSON.stringify({repaired:pairs.length,remaining:(await p.inspection.findMany({where:{tenantId,scheduledStart:{gte:new Date('2026-10-01T05:00:00Z'),lt:new Date('2026-11-01T05:00:00Z')}},select:{id:true}})).length}));
