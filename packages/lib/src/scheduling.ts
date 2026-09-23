@@ -11,6 +11,7 @@ import {
   UserRole
 } from "@prisma/client";
 import { prisma } from "@testworx/db";
+import { bindCompletedTaskSchedule } from "./recurring-schedule-backfill";
 import { z } from "zod";
 
 import type { ActorContext } from "@testworx/types";
@@ -5391,22 +5392,6 @@ function serviceScheduleOccurrenceKey(input: {
   ].join("\u001f");
 }
 
-function serviceScheduleExactDueKey(input: {
-  customerCompanyId: string;
-  siteId: string;
-  reportType: InspectionType;
-  frequency: RecurrenceFrequency;
-  nextDueDate: Date;
-}) {
-  return [
-    input.customerCompanyId,
-    input.siteId,
-    input.reportType,
-    input.frequency,
-    input.nextDueDate.toISOString()
-  ].join("\u001f");
-}
-
 async function ensureServiceSchedulesForCompletedRecurringTasks(input: {
   tenantId: string;
   rangeStart: Date;
@@ -5460,92 +5445,9 @@ async function ensureServiceSchedulesForCompletedRecurringTasks(input: {
     return 0;
   }
 
-  const existingSchedules = await prisma.serviceSchedule.findMany({
-    where: {
-      tenantId: input.tenantId,
-      isActive: true,
-      nextDueDate: {
-        gte: input.rangeStart,
-        lt: input.rangeEnd
-      }
-    },
-    select: {
-      customerCompanyId: true,
-      siteId: true,
-      reportType: true,
-      cadence: true,
-      nextDueDate: true
-    }
-  });
-
-  const existingCountsByExactDue = new Map<string, number>();
-  for (const schedule of existingSchedules) {
-    if (!schedule.nextDueDate) {
-      continue;
-    }
-
-    const key = serviceScheduleExactDueKey({
-      customerCompanyId: schedule.customerCompanyId,
-      siteId: schedule.siteId,
-      reportType: schedule.reportType,
-      frequency: schedule.cadence,
-      nextDueDate: schedule.nextDueDate
-    });
-    existingCountsByExactDue.set(key, (existingCountsByExactDue.get(key) ?? 0) + 1);
-  }
-
   let createdCount = 0;
   for (const task of candidateTasks.slice(0, upcomingServiceScheduleGenerationLimits.serviceSchedulesBackfilledPerRequest)) {
-    const nextDueDate = task.recurrence?.nextDueAt;
-    const frequency = task.recurrence?.frequency;
-    if (!nextDueDate || !frequency || frequency === RecurrenceFrequency.ONCE) {
-      continue;
-    }
-
-    const key = serviceScheduleExactDueKey({
-      customerCompanyId: task.inspection.customerCompanyId,
-      siteId: task.inspection.siteId,
-      reportType: task.inspectionType,
-      frequency,
-      nextDueDate
-    });
-    const existingCount = existingCountsByExactDue.get(key) ?? 0;
-    if (existingCount > 0) {
-      existingCountsByExactDue.set(key, existingCount - 1);
-      continue;
-    }
-
-    const dueMonth = format(nextDueDate, "yyyy-MM");
-    const existingSchedule = await prisma.serviceSchedule.findFirst({
-      where: {
-        tenantId: input.tenantId,
-        customerCompanyId: task.inspection.customerCompanyId,
-        siteId: task.inspection.siteId,
-        reportType: task.inspectionType,
-        cadence: frequency,
-        nextDueDate
-      },
-      select: { id: true }
-    });
-    if (existingSchedule) {
-      continue;
-    }
-
-    await prisma.serviceSchedule.create({
-      data: {
-        tenantId: input.tenantId,
-        customerCompanyId: task.inspection.customerCompanyId,
-        siteId: task.inspection.siteId,
-        serviceType: task.inspectionType,
-        reportType: task.inspectionType,
-        cadence: frequency,
-        nextDueDate,
-        dueMonth,
-        dueDayOrWindow: format(nextDueDate, "yyyy-MM-dd"),
-        isActive: true
-      }
-    });
-    createdCount += 1;
+    if (await bindCompletedTaskSchedule(input.tenantId, task.id)) createdCount += 1;
   }
 
   return createdCount;
@@ -5592,7 +5494,8 @@ async function generateMissingInspectionsFromServiceSchedules(input: {
         {
           inspectionType: { in: [...new Set(dueSchedules.map((schedule) => schedule.reportType))] },
           inspection: {
-            status: { in: [...activeOperationalInspectionStatuses] },
+            // An already completed/billed visit also fulfils this occurrence.
+            status: { in: [...activeOperationalInspectionStatuses, ...completedOperationalInspectionStatuses] },
             scheduledStart: {
               gte: input.rangeStart,
               lt: input.rangeEnd
