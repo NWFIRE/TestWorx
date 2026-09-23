@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@testworx/db";
 import type { ActorContext } from "@testworx/types";
-import { formatInspectionTaskSummary, formatInspectionStatusLabel, formatInspectionClassificationLabel } from "./scheduling";
+import { formatCustomerFacingInspectionAddress, getCustomerFacingSiteLabel, formatInspectionTaskSummary, formatInspectionStatusLabel, formatInspectionClassificationLabel } from "./scheduling";
 import { formatTenantDateTime, normalizeTenantTimezone } from "./timezone";
 
 export function inspectionMonthKey(date: Date, timezone: string) {
@@ -25,7 +25,10 @@ export async function getMonthlyInspectionList(actor: ActorContext, requestedMon
     orderBy: [{ scheduledStart: "asc" }, { id: "asc" }],
     select: {
       id: true, scheduledStart: true, status: true, inspectionClassification: true, isPriority: true,
-      customerCompany: { select: { name: true } },
+      customerCompany: { select: {
+        name: true, serviceAddressLine1: true, serviceAddressLine2: true, serviceCity: true, serviceState: true, servicePostalCode: true,
+        billingAddressLine1: true, billingAddressLine2: true, billingCity: true, billingState: true, billingPostalCode: true
+      } },
       site: { select: { name: true, addressLine1: true, addressLine2: true, city: true, state: true, postalCode: true } },
       assignedTechnician: { select: { name: true } },
       technicianAssignments: { select: { technician: { select: { name: true } } } },
@@ -37,8 +40,15 @@ export async function getMonthlyInspectionList(actor: ActorContext, requestedMon
     rows: inspections.filter(row => inspectionMonthKey(row.scheduledStart, timezone) === month).map(row => ({
       id: row.id,
       values: [
-        row.id.slice(-8).toUpperCase(), row.customerCompany.name, row.site.name,
-        [row.site.addressLine1, row.site.addressLine2, row.site.city, row.site.state, row.site.postalCode].filter(Boolean).join(", "),
+        row.id.slice(-8).toUpperCase(), row.customerCompany.name, getCustomerFacingSiteLabel(row.site.name) ?? "",
+        formatCustomerFacingInspectionAddress({
+          siteName: row.site.name, siteAddressLine1: row.site.addressLine1, siteAddressLine2: row.site.addressLine2,
+          siteCity: row.site.city, siteState: row.site.state, sitePostalCode: row.site.postalCode,
+          customerServiceAddressLine1: row.customerCompany.serviceAddressLine1, customerServiceAddressLine2: row.customerCompany.serviceAddressLine2,
+          customerServiceCity: row.customerCompany.serviceCity, customerServiceState: row.customerCompany.serviceState, customerServicePostalCode: row.customerCompany.servicePostalCode,
+          customerBillingAddressLine1: row.customerCompany.billingAddressLine1, customerBillingAddressLine2: row.customerCompany.billingAddressLine2,
+          customerBillingCity: row.customerCompany.billingCity, customerBillingState: row.customerCompany.billingState, customerBillingPostalCode: row.customerCompany.billingPostalCode
+        }),
         formatTenantDateTime(row.scheduledStart, timezone),
         formatInspectionTaskSummary(row.tasks.map(task => ({ inspectionType: task.inspectionType, displayLabel: task.customDisplayLabel }))),
         formatInspectionStatusLabel(row.status), formatInspectionClassificationLabel(row.inspectionClassification),
