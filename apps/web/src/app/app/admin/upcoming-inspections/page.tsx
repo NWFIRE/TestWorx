@@ -74,6 +74,7 @@ export default async function UpcomingInspectionsPage({
         description="Plan the next several months of inspections with a month-by-month view of what is already scheduled, what still needs assignment, and where new work should be added."
         actions={
           <div className="flex flex-wrap gap-3">
+            <Link className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue" href="/app/admin/inspections/monthly">Monthly list / CSV</Link>
             <Link
               className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
               href="/app/admin/inspections"
@@ -142,7 +143,8 @@ export default async function UpcomingInspectionsPage({
                   </span>
                 </summary>
 
-                <div className="mt-5 flex justify-start">
+                <div className="mt-5 flex flex-wrap justify-start gap-3">
+                  <Link className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={`/app/admin/inspections/monthly?month=${month.monthKey}`}>View full month / CSV</Link>
                   <Link
                     className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white"
                     href={`/app/admin/inspections?create=1&month=${month.monthKey}`}

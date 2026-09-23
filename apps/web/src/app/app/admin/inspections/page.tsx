@@ -332,7 +332,7 @@ export default async function AdminInspectionsPage({
     <AppPageShell density="wide">
       <PageHeader
         actions={
-          <CreateInspectionTrigger href={createInspectionHref} />
+          <div className="flex flex-wrap items-center gap-3"><Link href="/app/admin/inspections/monthly" className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue">Monthly list / CSV</Link><CreateInspectionTrigger href={createInspectionHref} /></div>
         }
         description="Create new inspections, filter active work fast, and open each visit into a focused operational command center."
         eyebrow="Inspections"

@@ -162,3 +162,4 @@ export async function completePasswordReset(
   return mod.completePasswordReset(...args);
 }
 export { getJobTime, recordJobTimeEvent, correctJobTime } from "../job-time";
+export { getMonthlyInspectionList } from "../monthly-inspections";
