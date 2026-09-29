@@ -25,6 +25,7 @@ import {
 import type { TechnicianReportEditorData } from "./report-editor";
 import { SearchSelect, type SearchSelectOption } from "@/app/search-select";
 import { AddReportTypeControl } from "./add-report-type-control";
+import { RemoveReportTypesControl } from "./remove-report-types-control";
 import { SignaturePad } from "./signature-pad";
 import { deleteLocalWorkOrderLineItem, listLocalWorkOrderLineItems, putLocalWorkOrderLineItem, subscribeToOfflineChanges } from "./offline/offline-db";
 import { queueWorkOrderLaborLineItemUpsert, queueWorkOrderLineItemDelete, queueWorkOrderLineItemUpsert } from "./offline/offline-sync";
@@ -335,6 +336,9 @@ function SingleScrollReportWorkflow({
       </div>
 
       <main className="mx-auto max-w-6xl space-y-4 px-4 py-5 md:px-6">
+        <fieldset disabled={isReadOnly || controller.saveState !== "Saved"}>
+          <RemoveReportTypesControl inspectionId={data.inspectionWorkspace.inspectionId} tasks={data.inspectionWorkspace.relatedTasks} />
+        </fieldset>
         {controller.errorMessage ? (
           <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{controller.errorMessage}</p>
         ) : null}
@@ -587,6 +591,9 @@ function LegacyGuidedReportWorkflow({
         </aside>
 
         <main className="min-w-0 space-y-4">
+          <fieldset disabled={isReadOnly || controller.saveState !== "Saved"}>
+            <RemoveReportTypesControl inspectionId={data.inspectionWorkspace.inspectionId} tasks={data.inspectionWorkspace.relatedTasks} />
+          </fieldset>
       {controller.errorMessage ? (
         <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{controller.errorMessage}</p>
       ) : null}

@@ -139,6 +139,15 @@ export async function listLocalReportDrafts() {
   });
 }
 
+export async function deleteLocalReportDraft(reportId: string) {
+  await runTransaction<void>(REPORT_DRAFT_STORE, "readwrite", (store, resolve, reject) => {
+    const request = store.delete(reportId);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+  notifyOfflineChange();
+}
+
 export async function putLocalWorkOrderLineItem(record: LocalWorkOrderLineItemRecord) {
   await runTransaction<void>(WORK_ORDER_LINE_ITEM_STORE, "readwrite", (store, resolve, reject) => {
     const request = store.put(record);

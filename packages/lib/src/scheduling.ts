@@ -4121,7 +4121,9 @@ export async function removeInspectionTask(actor: ActorContext, input: {
   const tenantId = parsedActor.tenantId as string;
   await (await import("./job-time")).assertJobStarted(actor, input.inspectionId);
 
-  return prisma.$transaction(async (tx) => {
+  const removal = await prisma.$transaction(async (tx) => {
+    // Serialize removals so two devices cannot remove the last two reports together.
+    await tx.$queryRaw`SELECT "id" FROM "Inspection" WHERE "id" = ${input.inspectionId} AND "tenantId" = ${tenantId} FOR UPDATE`;
     const inspection = await tx.inspection.findFirst({
       where: { id: input.inspectionId, tenantId },
       include: {
@@ -4150,6 +4152,7 @@ export async function removeInspectionTask(actor: ActorContext, input: {
       throw new Error("Report types can only be removed from active inspections.");
     }
 
+    await tx.$queryRaw`SELECT "id" FROM "InspectionReport" WHERE "inspectionTaskId" = ${input.inspectionTaskId} AND "tenantId" = ${tenantId} FOR UPDATE`;
     const task = await tx.inspectionTask.findFirst({
       where: {
         id: input.inspectionTaskId,
@@ -4183,8 +4186,17 @@ export async function removeInspectionTask(actor: ActorContext, input: {
       throw new Error("Report type not found.");
     }
 
-    if (parsedActor.role === "technician" && task.addedByUserId !== parsedActor.userId) {
-      throw new Error("Technicians can only remove report types they added themselves.");
+    if (parsedActor.role === "technician") {
+      if (isTerminalInspectionStatus(task.status) ||
+          (task.report && (task.report.status !== reportStatuses.draft || task.report.finalizedAt || task.report.signatures.length > 0))) {
+        throw new Error("Submitted, finalized, or signed reports cannot be removed by technicians. Contact the office.");
+      }
+      const remainingCount = await tx.inspectionTask.count({
+        where: { tenantId, inspectionId: inspection.id, id: { not: task.id }, schedulingStatus: { in: ["due_now", "scheduled_now", "completed", "deferred"] } }
+      });
+      if (remainingCount === 0) {
+        throw new Error("Keep at least one report on this inspection. Contact the office if the entire job is not needed.");
+      }
     }
 
     const reportActivityCount = task.report
@@ -4202,12 +4214,6 @@ export async function removeInspectionTask(actor: ActorContext, input: {
           }
         })
       : 0;
-
-    const canDeleteWorkedReport = ["tenant_admin", "office_admin", "platform_admin"].includes(parsedActor.role);
-
-    if (reportActivityCount > 0 && !canDeleteWorkedReport) {
-      throw new Error("This report type already has report activity. Mark it Not Needed instead so the work history is preserved.");
-    }
 
     const storageKeys = task.report
       ? [
@@ -4296,33 +4302,37 @@ export async function removeInspectionTask(actor: ActorContext, input: {
         removedByUserId: parsedActor.userId,
         reason: input.reason?.trim() || null,
         deletedReportActivityCount: reportActivityCount,
-        deletedWorkedReport: reportActivityCount > 0
+        deletedWorkedReport: reportActivityCount > 0,
+        removedTaskSnapshot: JSON.parse(JSON.stringify(task))
       }
     });
 
-    const cleanupResults = await Promise.allSettled(
-      [...new Set(storageKeys)].map((storageKey) => deleteStoredFile(storageKey))
-    );
-    const failedCleanupCount = cleanupResults.filter((result) => result.status === "rejected").length;
-
-    if (failedCleanupCount > 0) {
-      await prisma.auditLog.create({
-        data: {
-          tenantId,
-          actorUserId: parsedActor.userId,
-          action: "inspection.task_remove_storage_cleanup_failed",
-          entityType: "Inspection",
-          entityId: inspection.id,
-          metadata: {
-            inspectionTaskId: task.id,
-            failedCleanupCount
-          } as JsonObject
-        }
-      });
-    }
-
-    return { id: task.id };
+    return { id: task.id, inspectionId: inspection.id, storageKeys };
   });
+
+  // Files must survive a database rollback; clean them up only after commit.
+  const cleanupResults = await Promise.allSettled(
+    [...new Set(removal.storageKeys)].map((storageKey) => deleteStoredFile(storageKey))
+  );
+  const failedCleanupCount = cleanupResults.filter((result) => result.status === "rejected").length;
+
+  if (failedCleanupCount > 0) {
+    await prisma.auditLog.create({
+      data: {
+        tenantId,
+        actorUserId: parsedActor.userId,
+        action: "inspection.task_remove_storage_cleanup_failed",
+        entityType: "Inspection",
+        entityId: removal.inspectionId,
+        metadata: {
+          inspectionTaskId: removal.id,
+          failedCleanupCount
+        } as JsonObject
+      }
+    }).catch(() => undefined);
+  }
+
+  return { id: removal.id };
 }
 
 export async function markInspectionTaskNotNeeded(actor: ActorContext, input: {

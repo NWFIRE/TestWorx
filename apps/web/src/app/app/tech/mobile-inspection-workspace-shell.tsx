@@ -8,6 +8,7 @@ import {
   type TechnicianMobileTaskWorkspaceSummary
 } from "./mobile-inspection-workspace";
 import { AddReportTypeControl } from "./add-report-type-control";
+import { RemoveReportTypesControl } from "./remove-report-types-control";
 import { DispatchNotesCard } from "./dispatch-notes-card";
 import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
 import { InspectionFieldUpdateCard } from "./inspection-field-update-card";
@@ -217,6 +218,7 @@ export function MobileInspectionWorkspaceShell({
           <InspectionFieldUpdateCard inspectionId={workspace.inspectionId} />
           <div className="mt-4">
             <AddReportTypeControl inspectionId={workspace.inspectionId} />
+            <RemoveReportTypesControl inspectionId={workspace.inspectionId} tasks={workspace.relatedTasks} />
           </div>
         </>
       ) : null}

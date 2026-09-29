@@ -7,6 +7,7 @@ import type { MobileInspectionSectionProgress, MobileInspectionSectionStatus, Re
 
 import { buildSafeTaskProgressSummary, getTechnicianMobileTaskStatusLabel, type TechnicianMobileTaskWorkspaceSummary } from "./mobile-inspection-workspace";
 import { AddReportTypeControl } from "./add-report-type-control";
+import { RemoveReportTypesControl } from "./remove-report-types-control";
 import { DispatchNotesCard } from "./dispatch-notes-card";
 import { InspectionCustomerContactCard } from "./inspection-customer-contact-card";
 
@@ -99,6 +100,7 @@ export function MobileInspectionShell({
           <MobileReportNavigator currentMode={reportMode} onSelectReport={onSelectReport} workspace={workspace} />
 
           {reportMode === "edit" ? <AddReportTypeControl inspectionId={workspace.inspectionId} /> : null}
+          {reportMode === "edit" ? <RemoveReportTypesControl inspectionId={workspace.inspectionId} tasks={workspace.relatedTasks} /> : null}
 
           <DispatchNotesCard compact notes={dispatchNotes} />
 

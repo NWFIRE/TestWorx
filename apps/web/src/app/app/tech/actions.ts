@@ -156,6 +156,9 @@ export async function removeInspectionTaskAction(inspectionId: string, inspectio
       { inspectionId, inspectionTaskId }
     );
     revalidatePath("/app/tech");
+    revalidatePath("/app/tech/work");
+    revalidatePath("/app/tech/inspections");
+    revalidatePath(`/app/tech/reports/${inspectionId}`, "layout");
     revalidatePath("/app/admin");
     revalidatePath("/app/admin/inspections");
     revalidatePath("/app/admin/dashboard");

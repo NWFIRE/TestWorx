@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock, txMock } = vi.hoisted(() => {
   const tx = {
+    $queryRaw: vi.fn(async () => []),
     inspection: {
       findFirst: vi.fn()
     },
     inspectionTask: {
+      count: vi.fn(),
       create: vi.fn(),
       findFirst: vi.fn(),
       delete: vi.fn(),
@@ -66,6 +68,7 @@ describe("inspection task addition", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     txMock.inspectionTask.create.mockResolvedValue({ id: "task_new" });
+    txMock.inspectionTask.count.mockResolvedValue(1);
     txMock.inspectionRecurrence.create.mockResolvedValue({ id: "recurrence_new" });
     txMock.inspectionReport.create.mockResolvedValue({ id: "report_new" });
     txMock.inspectionTask.delete.mockResolvedValue({ id: "task_new" });
@@ -245,6 +248,7 @@ describe("inspection task addition", () => {
       addedByUserId: "tech_1",
       report: {
         id: "report_added",
+        status: "draft",
         attachments: [],
         signatures: [],
         deficiencies: []
@@ -277,7 +281,7 @@ describe("inspection task addition", () => {
     expect(removedTask).toEqual({ id: "task_added" });
   });
 
-  it("blocks technicians from removing original scheduled report types", async () => {
+  it("allows technicians to remove original scheduled draft report types", async () => {
     txMock.inspection.findFirst.mockResolvedValue({
       id: "inspection_1",
       tenantId: "tenant_1",
@@ -293,6 +297,7 @@ describe("inspection task addition", () => {
       addedByUserId: null,
       report: {
         id: "report_existing",
+        status: "draft",
         attachments: [],
         signatures: [],
         deficiencies: []
@@ -302,9 +307,9 @@ describe("inspection task addition", () => {
     await expect(removeInspectionTask(
       { userId: "tech_1", role: "technician", tenantId: "tenant_1" },
       { inspectionId: "inspection_1", inspectionTaskId: "task_existing" }
-    )).rejects.toThrow(/only remove report types they added/i);
+    )).resolves.toEqual({ id: "task_existing" });
 
-    expect(txMock.inspectionTask.delete).not.toHaveBeenCalled();
+    expect(txMock.inspectionTask.delete).toHaveBeenCalledWith({ where: { id: "task_existing" } });
   });
 
   it("allows office admins to remove a technician-added report type", async () => {
@@ -375,7 +380,7 @@ describe("inspection task addition", () => {
     expect(removedTask).toEqual({ id: "task_existing" });
   });
 
-  it("blocks removing a report type once report activity exists", async () => {
+  it("allows technicians to remove worked drafts and records the removed data", async () => {
     txMock.inspection.findFirst.mockResolvedValue({
       id: "inspection_1",
       tenantId: "tenant_1",
@@ -391,6 +396,7 @@ describe("inspection task addition", () => {
       addedByUserId: "tech_1",
       report: {
         id: "report_added",
+        status: "draft",
         attachments: [],
         signatures: [],
         deficiencies: []
@@ -401,9 +407,60 @@ describe("inspection task addition", () => {
     await expect(removeInspectionTask(
       { userId: "tech_1", role: "technician", tenantId: "tenant_1" },
       { inspectionId: "inspection_1", inspectionTaskId: "task_added" }
-    )).rejects.toThrow(/already has report activity/i);
+    )).resolves.toEqual({ id: "task_added" });
 
+    expect(txMock.inspectionTask.delete).toHaveBeenCalled();
+    expect(txMock.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      metadata: expect.objectContaining({ removedTaskSnapshot: expect.objectContaining({ id: "task_added" }) })
+    }) }));
+  });
+
+  it.each([
+    { status: "submitted", finalizedAt: null, signatures: [] },
+    { status: "finalized", finalizedAt: null, signatures: [] },
+    { status: "draft", finalizedAt: new Date(), signatures: [] },
+    { status: "draft", finalizedAt: null, signatures: [{ imageDataUrl: "signature" }] }
+  ])("protects submitted, finalized and signed reports even with force: %j", async (report) => {
+    txMock.inspection.findFirst.mockResolvedValue({ id: "inspection_1", assignedTechnicianId: "tech_1", status: InspectionStatus.in_progress });
+    txMock.inspectionTask.findFirst.mockResolvedValue({ id: "task_1", report: { id: "report_1", attachments: [], deficiencies: [], ...report } });
+    await expect(removeInspectionTask({ userId: "tech_1", role: "technician", tenantId: "tenant_1" }, { inspectionId: "inspection_1", inspectionTaskId: "task_1", force: true })).rejects.toThrow("cannot be removed by technicians");
     expect(txMock.inspectionTask.delete).not.toHaveBeenCalled();
+  });
+
+  it("protects the last current-visit report", async () => {
+    txMock.inspection.findFirst.mockResolvedValue({ id: "inspection_1", assignedTechnicianId: "tech_1", status: InspectionStatus.in_progress });
+    txMock.inspectionTask.findFirst.mockResolvedValue({ id: "task_1", report: null });
+    txMock.inspectionTask.count.mockResolvedValue(0);
+    await expect(removeInspectionTask({ userId: "tech_1", role: "technician", tenantId: "tenant_1" }, { inspectionId: "inspection_1", inspectionTaskId: "task_1" })).rejects.toThrow("Keep at least one report");
+    expect(txMock.inspectionTask.count).toHaveBeenCalledWith({ where: { tenantId: "tenant_1", inspectionId: "inspection_1", id: { not: "task_1" }, schedulingStatus: { in: ["due_now", "scheduled_now", "completed", "deferred"] } } });
+    expect(txMock.inspectionTask.delete).not.toHaveBeenCalled();
+  });
+
+  it("rejects unassigned technicians", async () => {
+    txMock.inspection.findFirst.mockResolvedValue({ id: "inspection_1", assignedTechnicianId: "other_tech", status: InspectionStatus.in_progress });
+    await expect(removeInspectionTask({ userId: "tech_1", role: "technician", tenantId: "tenant_1" }, { inspectionId: "inspection_1", inspectionTaskId: "task_1" })).rejects.toThrow("do not have access");
+    expect(txMock.inspectionTask.delete).not.toHaveBeenCalled();
+  });
+
+  it.each([InspectionStatus.completed, InspectionStatus.invoiced, InspectionStatus.cancelled])("protects closed inspections: %s", async (status) => {
+    txMock.inspection.findFirst.mockResolvedValue({ id: "inspection_1", assignedTechnicianId: "tech_1", status });
+    await expect(removeInspectionTask({ userId: "tech_1", role: "technician", tenantId: "tenant_1" }, { inspectionId: "inspection_1", inspectionTaskId: "task_1" })).rejects.toThrow("active inspections");
+    expect(txMock.inspectionTask.delete).not.toHaveBeenCalled();
+  });
+
+  it("scopes the inspection and task to the tenant and visit", async () => {
+    txMock.inspection.findFirst.mockResolvedValue({ id: "inspection_1", assignedTechnicianId: "tech_1", status: InspectionStatus.in_progress });
+    txMock.inspectionTask.findFirst.mockResolvedValue(null);
+    await expect(removeInspectionTask({ userId: "tech_1", role: "technician", tenantId: "tenant_1" }, { inspectionId: "inspection_1", inspectionTaskId: "foreign_task" })).rejects.toThrow("Report type not found");
+    expect(txMock.inspection.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "inspection_1", tenantId: "tenant_1" } }));
+    expect(txMock.inspectionTask.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "foreign_task", tenantId: "tenant_1", inspectionId: "inspection_1" } }));
+    expect(txMock.inspectionTask.delete).not.toHaveBeenCalled();
+  });
+
+  it("requires technicians to start the job", async () => {
+    prismaMock.jobTimeSession.findFirst.mockResolvedValueOnce(null as never);
+    await expect(removeInspectionTask({ userId: "tech_1", role: "technician", tenantId: "tenant_1" }, { inspectionId: "inspection_1", inspectionTaskId: "task_1" })).rejects.toThrow();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
   it("allows office admins to delete a report after work has started", async () => {
