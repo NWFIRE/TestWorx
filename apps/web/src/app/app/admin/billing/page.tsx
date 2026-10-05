@@ -3,9 +3,12 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { LiveUrlSelectFilter } from "@/app/live-url-select-filter";
+import { BillingQueueFilters } from "./billing-queue-filters";
 import {
   billingQueueSortOptions,
+  billingQueueStatusOptions as statusOptions,
+  buildBillingQueueHref,
+  searchBillingSummaries,
   filterBillingSummariesForQueue,
   getAdminBillingSummaries,
   isOpenBillingQueueStatus,
@@ -16,7 +19,6 @@ import {
 import {
   AppPageShell,
   EmptyState,
-  FilterChipLink,
   KPIStatCard,
   PageHeader,
   SectionCard,
@@ -32,36 +34,11 @@ const statusTones = {
   invoiced: "violet"
 } as const;
 
-const statusOptions = [
-  { value: "all", label: "Ready To Bill" },
-  { value: "needs_pricing", label: "Needs setup" },
-  { value: "billing_review", label: "Needs billing review" },
-  { value: "invoiced", label: "Invoiced" }
-] as const;
-
-const sortOptions = [
-  { value: "newest", label: "Newest first" },
-  { value: "oldest", label: "Oldest first" },
-  { value: "alphabetical", label: "Customer A-Z" }
-] as const;
-
 function normalizeBillingStatus(status?: string) {
   if (status === "ready") {
     return "reviewed";
   }
   return status;
-}
-
-function buildBillingHref(status: string | undefined, sort: BillingQueueSort) {
-  const params = new URLSearchParams();
-  if (status && status !== "all") {
-    params.set("status", status);
-  }
-  if (sort !== "newest") {
-    params.set("sort", sort);
-  }
-  const query = params.toString();
-  return query ? `/app/admin/billing?${query}` : "/app/admin/billing";
 }
 
 function formatBillingSummaryStatus(status: string) {
@@ -188,7 +165,7 @@ function SummaryQueueSection({
 export default async function AdminBillingPage({
   searchParams
 }: {
-  searchParams?: Promise<{ status?: string; sort?: string }>;
+  searchParams?: Promise<{ status?: string; sort?: string; q?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -199,6 +176,9 @@ export default async function AdminBillingPage({
   }
 
   const params = searchParams ? await searchParams : {};
+  const query = typeof params.q === "string" ? params.q.trim() : "";
+  const buildBillingHref = (status: string | undefined, sort: BillingQueueSort) =>
+    buildBillingQueueHref(status ?? "all", sort, query);
   const requestedStatus = typeof params.status === "string" ? normalizeBillingStatus(params.status) : undefined;
   const selectedStatus =
     requestedStatus && statusOptions.some((option) => option.value === requestedStatus)
@@ -216,10 +196,10 @@ export default async function AdminBillingPage({
   const openSummaries = summaries.filter((summary: AdminBillingSummary) => isOpenBillingQueueStatus(summary.status));
   const invoicedSummaries = summaries.filter((summary: AdminBillingSummary) => summary.status === "invoiced");
   const filteredSummaries = sortBillingSummaries(
-    filterBillingSummariesForQueue(summaries, selectedStatus),
+    searchBillingSummaries(filterBillingSummariesForQueue(summaries, selectedStatus), query),
     selectedSort
   );
-  const sortedInvoicedSummaries = sortBillingSummaries(invoicedSummaries, selectedSort);
+  const sortedInvoicedSummaries = sortBillingSummaries(searchBillingSummaries(invoicedSummaries, query), selectedSort);
 
   return (
     <AppPageShell>
@@ -274,37 +254,13 @@ export default async function AdminBillingPage({
         <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">
           Queue filters
         </p>
-        <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap gap-2">
-            {statusOptions.map((option) => (
-              <FilterChipLink
-                active={selectedStatus === option.value}
-                href={buildBillingHref(option.value, selectedSort)}
-                key={option.value}
-                label={option.label}
-                tone="emerald"
-              />
-            ))}
-          </div>
-          <div className="w-full lg:w-56">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Sort by
-            </p>
-            <LiveUrlSelectFilter
-              className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-900 outline-none transition focus:border-slateblue"
-              options={[...sortOptions]}
-              paramKey="sort"
-              resetPageKeys={[]}
-              value={selectedSort}
-            />
-          </div>
-        </div>
+        <BillingQueueFilters status={selectedStatus} sort={selectedSort} query={query} />
       </SectionCard>
 
       <SummaryQueueSection
         ctaLabel={selectedStatus === "invoiced" ? "View invoice detail" : "Review billing"}
         description={selectedStatus === "all" ? "Completed, finalized work that is ready for item review, invoice creation, or QuickBooks follow-through. Invoiced work is archived below." : "Billing summaries matching the selected queue."}
-        emptyText="No billing summaries match the current queue filter."
+        emptyText="No billing summaries match the current queue and search. Clear filters or choose another queue."
         emptyTitle="No billing summaries in this queue"
         summaries={filteredSummaries}
         title={selectedStatus === "all" ? "Ready To Bill queue" : `${statusOptions.find((option) => option.value === selectedStatus)?.label ?? selectedStatus} queue`}
@@ -314,8 +270,8 @@ export default async function AdminBillingPage({
         <SummaryQueueSection
           ctaLabel="View invoice detail"
           description="Completed billing summaries already marked invoiced."
-          emptyText="No inspections have been marked invoiced yet."
-          emptyTitle="No invoiced summaries yet"
+          emptyText={query ? "No invoiced summaries match this search." : "No inspections have been marked invoiced yet."}
+          emptyTitle={query ? "No matching invoices" : "No invoiced summaries yet"}
           summaries={sortedInvoicedSummaries}
           title="Invoiced archive"
         />

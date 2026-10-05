@@ -8,6 +8,39 @@ export type BillingQueueSummaryLike = {
 export const billingQueueSortOptions = ["newest", "oldest", "alphabetical"] as const;
 export type BillingQueueSort = (typeof billingQueueSortOptions)[number];
 
+export const billingQueueStatusOptions = [
+  { value: "all", label: "Ready To Bill" },
+  { value: "needs_pricing", label: "Needs setup" },
+  { value: "billing_review", label: "Needs billing review" },
+  { value: "invoiced", label: "Invoiced" }
+] as const;
+
+export function buildBillingQueueHref(status: string, sort: BillingQueueSort, query = "") {
+  const params = new URLSearchParams();
+  if (status !== "all") params.set("status", status);
+  if (sort !== "newest") params.set("sort", sort);
+  if (query.trim()) params.set("q", query.trim());
+  return params.size ? `/app/admin/billing?${params}` : "/app/admin/billing";
+}
+
+export function searchBillingSummaries<T extends {
+  customerName?: string | null;
+  siteName?: string | null;
+  inspectionId?: string | null;
+  technicianName?: string | null;
+  quickbooksInvoiceNumber?: string | null;
+  reportTypes?: string[];
+}>(summaries: T[], query: string) {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return summaries.filter((summary) => {
+    const text = [summary.customerName, summary.siteName, summary.inspectionId,
+      summary.technicianName, summary.quickbooksInvoiceNumber,
+      ...(summary.reportTypes ?? []).map((type) => type.replaceAll("_", " "))
+    ].filter(Boolean).join(" ").toLowerCase();
+    return terms.every((term) => text.includes(term));
+  });
+}
+
 type SortableBillingQueueSummary = {
   id: string;
   customerName: string;

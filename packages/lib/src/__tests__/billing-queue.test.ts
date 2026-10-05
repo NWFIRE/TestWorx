@@ -1,8 +1,34 @@
 import { describe, expect, it } from "vitest";
 
-import { assertBillingInvoiceCreationAllowed, assertBillingStatusChangeAllowed, filterBillingSummariesForQueue, isOpenBillingQueueStatus, sortBillingSummaries } from "../billing-queue";
+import { assertBillingInvoiceCreationAllowed, assertBillingStatusChangeAllowed, buildBillingQueueHref, filterBillingSummariesForQueue, isOpenBillingQueueStatus, searchBillingSummaries, sortBillingSummaries } from "../billing-queue";
 
 describe("billing queue filtering", () => {
+  const searchable = [
+    { id: "one", status: "invoiced", customerName: "Alpha Safety", siteName: "West", quickbooksInvoiceNumber: "INV-00123", inspectionId: "job-one", reportTypes: ["fire_alarm"] },
+    { id: "two", status: "reviewed", customerName: "Beta", quickbooksInvoiceNumber: null, technicianName: "Jane Smith" },
+    { id: "three", status: "billing_review", customerName: "Alpha", quickbooksInvoiceNumber: "00124" }
+  ];
+
+  it("searches invoice numbers as text, preserving leading zeros and partial matches", () => {
+    expect(searchBillingSummaries(searchable, " inv-0012 ").map((row) => row.id)).toEqual(["one"]);
+    expect(searchBillingSummaries(searchable, "0012").map((row) => row.id)).toEqual(["one", "three"]);
+    expect(searchBillingSummaries(searchable, "does not exist")).toEqual([]);
+  });
+
+  it("combines customer, site, report and technician terms without changing queue membership", () => {
+    expect(searchBillingSummaries(searchable, "ALPHA alarm").map((row) => row.id)).toEqual(["one"]);
+    expect(searchBillingSummaries(searchable, "jane").map((row) => row.id)).toEqual(["two"]);
+    expect(searchBillingSummaries(filterBillingSummariesForQueue(searchable, "all"), "00123")).toEqual([]);
+    expect(searchBillingSummaries(filterBillingSummariesForQueue(searchable, "invoiced"), "00123").map((row) => row.id)).toEqual(["one"]);
+    expect(searchBillingSummaries(searchable, "  ")).toEqual(searchable);
+  });
+
+  it("preserves and safely encodes search with status and sort changes", () => {
+    const href = buildBillingQueueHref("invoiced", "oldest", " INV #123 & 4 ");
+    const params = new URL(href, "https://example.test").searchParams;
+    expect(Object.fromEntries(params)).toEqual({ status: "invoiced", sort: "oldest", q: "INV #123 & 4" });
+    expect(buildBillingQueueHref("all", "newest", "")).toBe("/app/admin/billing");
+  });
   const summaries = [
     { id: "draft_1", status: "draft", metrics: { missingPriceCount: 0 } },
     { id: "ready_1", status: "reviewed", metrics: { missingPriceCount: 0 } },

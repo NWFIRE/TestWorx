@@ -24,3 +24,19 @@ No server matching rules, tenant scopes, roles, or save actions are changed.
 Run `node scripts/check-search-behavior.cjs` for browser regression checks of the
 actual shared components, with a mocked Next router. Production data is not
 modified by these tests.
+
+## Billing summaries
+
+The billing queue uses `BillingQueueFilters` to coordinate search, status and sort
+in one URL update. Dropdown/status changes include any text still waiting for its
+debounce, and delayed responses do not reset newer selections. Search matches
+customer, site, inspection ID, technician, report type and QuickBooks invoice
+number, case-insensitively and by partial text (including leading zeros).
+The default page searches both Ready To Bill and the invoiced archive; selecting
+a specific queue restricts results to that queue. Search never moves billed or
+review-held work into Ready To Bill. KPI counts remain overall queue totals.
+Clear search retains status/sort; Clear filters resets all three. Filters remain
+visible, and URL state supports refresh/history restoration.
+
+Run `node scripts/check-billing-queue-filters.cjs` for mobile/desktop controls,
+rapid filter changes, stale response protection, clear/reset and history checks.
