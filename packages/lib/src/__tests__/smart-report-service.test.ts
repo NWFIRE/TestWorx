@@ -128,4 +128,29 @@ describe("smart report service tenant scoping", () => {
       getInspectionReportDraft({ userId: "tech_1", role: "technician", tenantId: "tenant_1" }, "inspection_1", "task_1")
     ).rejects.toThrow(/closed inspections are no longer available/i);
   });
+
+  it.each([null, "vehicle-schedule"])("limits vehicle history to its own recurring service (%s)", async (serviceScheduleId) => {
+    prismaMock.inspectionReport.findFirst.mockReset();
+    prismaMock.inspectionReport.findFirst.mockResolvedValueOnce({
+      id: "report_1", tenantId: "tenant_1", inspectionId: "inspection_1", inspectionTaskId: "task_1",
+      status: "draft", updatedAt: new Date(), finalizedAt: null, contentJson: null,
+      inspection: {
+        id: "inspection_1", tenantId: "tenant_1", status: InspectionStatus.scheduled, siteId: "site_1",
+        customerCompanyId: "customer_1", assignedTechnicianId: "tech_1", scheduledStart: new Date(),
+        tasks: [{ id: "task_1", inspectionType: "vehicle_suppression" }], technicianAssignments: [],
+        site: { id: "site_1", name: "Fleet depot", addressLine1: "100 Example Street", city: "Example", state: "OK", postalCode: "73000" },
+        customerCompany: { id: "customer_1", name: "Example Fleet" }, tenant: { id: "tenant_1", name: "Example Company" }
+      },
+      task: { id: "task_1", inspectionType: "vehicle_suppression", serviceScheduleId },
+      technician: { id: "tech_1", name: "Example Technician" }, attachments: [], signatures: [], deficiencies: []
+    }).mockResolvedValueOnce(null);
+    prismaMock.asset.count.mockResolvedValue(0);
+    prismaMock.asset.findMany.mockResolvedValue([]);
+    await getInspectionReportDraft({ userId: "tech_1", role: "technician", tenantId: "tenant_1" }, "inspection_1", "task_1");
+    expect(prismaMock.inspectionReport.findFirst).toHaveBeenCalledTimes(serviceScheduleId ? 2 : 1);
+    if (serviceScheduleId) expect(prismaMock.inspectionReport.findFirst).toHaveBeenLastCalledWith(expect.objectContaining({ where: expect.objectContaining({
+      tenantId: "tenant_1", inspection: { siteId: "site_1" }, status: "finalized",
+      task: { inspectionType: "vehicle_suppression", serviceScheduleId }
+    }) }));
+  });
 });

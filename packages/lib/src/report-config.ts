@@ -9,6 +9,7 @@ import { jointCommissionFireAlarmReportTemplate } from "./joint-commission-fire-
 import { jointCommissionFireSprinklerReportTemplate } from "./joint-commission-fire-sprinkler-report";
 import { wetSprinklerReportTemplate } from "./wet-sprinkler-report";
 import { workOrderReportTemplate } from "./work-order-report";
+import { vehicleSuppressionReportTemplate } from "./vehicle-suppression-report";
 
 export type ReportPrimitiveValue = string | number | boolean | null;
 
@@ -286,15 +287,18 @@ export type ReportSectionDefinition = {
   fields: ReportFieldDefinition[];
   mobileDisplayType?: MobileReportDisplayType;
   groupKey?: string;
+  pdfDisplayType?: "checklist";
 };
 
 export type ReportTemplateDefinition = {
   label: string;
   description: string;
   defaultRecurrenceFrequency?: RecurrenceFrequency;
+  priorReportScope?: "site" | "service_schedule";
   pdf?: {
     subtitle?: string;
     nfpaReferences?: string[];
+    fullDetail?: boolean;
   };
   sections: ReportSectionDefinition[];
   billableMappings?: {
@@ -411,6 +415,7 @@ export function getReportPdfMetadata(inspectionType: InspectionType) {
 }
 
 export const inspectionTypeRegistry: Record<InspectionType, ReportTemplateDefinition> = {
+  vehicle_suppression: vehicleSuppressionReportTemplate,
   fire_extinguisher: {
     label: "Fire extinguisher",
     description: "Portable extinguisher inventory, visual condition, and service readiness.",

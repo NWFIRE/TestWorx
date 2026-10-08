@@ -646,6 +646,20 @@ Local or staging:
 
 ## Postgres verification
 
+### Vehicle Fire Suppression reports
+
+Select **Vehicle Fire Suppression** when creating an inspection or adding a report to an existing visit. Add a separate report for each vehicle. The default recurrence is semi-annual and can be changed through the existing scheduling controls.
+
+The shared technician editor captures vehicle/unit identification (not limited to a 17-character VIN), cylinder service history, detection/control equipment, daily/monthly/semi-annual checks, corrections, photos, and technician/customer signatures. Checks start unanswered. Failed checks require the notes field in that checklist section; use N/A only for checks outside the installed equipment/service scope and document limitations. Follow the installed system manufacturer's current instructions.
+
+Equipment identification can carry forward only from a finalized report for the same tenant, site, and recurring service schedule. Unlinked vehicle reports start without prior equipment data to avoid copying a different vehicle in a fleet. Prior results, dates of service, notes and signatures are not copied. Autosave, job-time controls, permissions, finalization, document downloads, and customer portal access use the existing shared paths.
+
+PDFs use tenant branding and include every field, readable option labels, calendar dates without timezone shifts, and explicit N/A results. No sample customer's details, business identity or logo are embedded. The PDF `fullDetail` option and section `pdfDisplayType: "checklist"` are reusable report-definition settings, not a vehicle-only renderer.
+
+Finalization extracts one `VEHICLE_FIRE_SUPPRESSION_INSPECTION` service quantity per vehicle report. Recorded equipment quantities are inventory, not replacement charges. Configure the corresponding catalog/QuickBooks product mapping before invoicing; pricing remains in the existing billing flow.
+
+Deploy migration `202610080001_vehicle_suppression_report` before releasing the application. It only adds an inspection-type enum value; it does not alter existing inspection/customer records. Regression coverage is in `vehicle-suppression.test.ts` and `smart-report-service.test.ts`.
+
 For a real local confidence pass with PostgreSQL running locally:
 
 ```bash

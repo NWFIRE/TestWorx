@@ -1,7 +1,8 @@
 import { resolveTenantBranding } from "../branding";
 import { buildComplianceSection } from "../compliance-references";
 import { buildReportPreview } from "../report-engine";
-import type { ReportPrimitiveValue } from "../report-config";
+import { inspectionTypeRegistry, type ReportPrimitiveValue, type ReportFieldDefinition } from "../report-config";
+import { resolveOptionProvider } from "../report-options";
 import { formatCustomerFacingInspectionAddress, getCustomerFacingSiteLabel } from "../scheduling";
 import { buildIndicatorLines } from "./indicators";
 import {
@@ -201,7 +202,7 @@ function buildKeyValueSection(
     items: (sectionConfig.fields ?? [])
       .map((field) => ({
         label: field.label,
-        value: cleanValue(field.key, formatFieldValue(sourceFields[field.key], field.format, field.fallback))
+        value: cleanValue(field.key, field.preserveText ? cleanCustomerFacingText(sourceFields[field.key]) : formatFieldValue(sourceFields[field.key], field.format, field.fallback))
       }))
       .filter((item) => item.value || !sectionConfig.fields?.find((field) => field.label === item.label)?.hideIfEmpty)
   };
@@ -359,8 +360,30 @@ function buildSignatureSection(input: PdfInput, config: ReportTypeConfig): Extra
   };
 }
 
-function getSourceSectionFields(input: PdfInput, sectionKey: string) {
-  return input.draft.sections[sectionKey]?.fields ?? {};
+function labelConfiguredValues(fields: ReportFieldDefinition[], values: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(values).map(([key, value]) => {
+    const field = fields.find((entry) => entry.id === key);
+    if (field?.type === "repeater" && Array.isArray(value)) {
+      return [key, value.map((row) => labelConfiguredValues(field.rowFields, row))];
+    }
+    // Calendar dates are not instants; do not shift them to the preceding local day.
+    if (field?.type === "date" && typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return [key, formatDate(value, "UTC")];
+    }
+    if (field && field.type !== "repeater" && field.optionProvider) {
+      const option = resolveOptionProvider(field.optionProvider).find((entry) => entry.value === value);
+      if (option) return [key, /^(na|n\/a)$/i.test(option.label) ? "Not applicable" : option.label];
+    }
+    return [key, value];
+  }));
+}
+
+function getSourceSectionFields(input: PdfInput, sectionKey: string): Record<string, unknown> {
+  const values = input.draft.sections[sectionKey]?.fields ?? {};
+  const template = inspectionTypeRegistry[input.task.inspectionType];
+  return template.pdf?.fullDetail
+    ? labelConfiguredValues(template.sections.find((section) => section.id === sectionKey)?.fields ?? [], values)
+    : values;
 }
 
 function readSectionRows(input: PdfInput, sectionKey: string, fieldKey: string) {
@@ -490,7 +513,7 @@ function mapExtinguisherInventoryRow(row: Record<string, unknown>) {
 function buildDatasetRows(input: PdfInput, dataset: string): Array<Record<string, unknown>> {
   const [sectionId, fieldId] = dataset.split(".", 2);
   if (sectionId && fieldId) {
-    const candidate = input.draft.sections[sectionId]?.fields?.[fieldId];
+    const candidate = getSourceSectionFields(input, sectionId)[fieldId];
     return Array.isArray(candidate) ? candidate as Array<Record<string, unknown>> : [];
   }
 
@@ -566,7 +589,7 @@ function buildSectionByConfig(input: PdfInput, sectionConfig: ReportSectionConfi
         return buildChecklistSection(getSourceSectionFields(input, sectionConfig.checklist.dataset), sectionConfig);
       }
       if (sectionConfig.renderer === "keyValue") {
-        return buildKeyValueSection(getSourceSectionFields(input, sectionConfig.key), sectionConfig, {
+        return buildKeyValueSection(getSourceSectionFields(input, sectionConfig.sourceSectionId ?? sectionConfig.key), sectionConfig, {
           customerName: input.customerCompany.name,
           siteName: input.site.name
         });

@@ -42,7 +42,24 @@ function buildDefaultReportTypeConfigV2(type: InspectionType): ReportTypeConfig 
     const repeaterFields = section.fields.filter((field): field is Extract<ReportFieldDefinition, { type: "repeater" }> => field.type === "repeater");
     const built = [] as ReportTypeConfig["sections"];
 
-    if (scalarFields.length > 0) {
+    if (scalarFields.length > 0 && section.pdfDisplayType === "checklist") {
+      built.push({
+        key: section.id,
+        title: section.label,
+        description: section.description,
+        renderer: "checklist",
+        checklist: {
+          dataset: section.id,
+          style: "passFailGrid",
+          items: scalarFields.filter((field) => field.type === "select" || field.type === "boolean").map((field) => ({ key: field.id, label: field.label }))
+        }
+      });
+      const detailFields = scalarFields.filter((field) => field.type !== "select" && field.type !== "boolean");
+      if (detailFields.length) built.push({
+        key: `${section.id}__details`, sourceSectionId: section.id, title: `${section.label} notes`, renderer: "keyValue",
+        fields: detailFields.map((field) => ({ key: field.id, label: field.label, format: inferFieldFormat(field), preserveText: true, hideIfEmpty: true }))
+      });
+    } else if (scalarFields.length > 0) {
       built.push({
         key: section.id,
         title: section.label,
@@ -52,6 +69,7 @@ function buildDefaultReportTypeConfigV2(type: InspectionType): ReportTypeConfig 
           key: field.id,
           label: field.label,
           format: inferFieldFormat(field),
+          preserveText: pdf.fullDetail && (field.type === "text" || field.type === "select" || field.type === "date"),
           hideIfEmpty: true
         }))
       });
@@ -73,7 +91,7 @@ function buildDefaultReportTypeConfigV2(type: InspectionType): ReportTypeConfig 
             .map((rowField, index) => ({
               key: rowField.id,
               label: rowField.label,
-              width: index === 0 ? "22%" : index === 1 ? "18%" : "15%",
+              width: pdf.fullDetail && repeaterField.rowFields.length < 6 ? undefined : index === 0 ? "22%" : index === 1 ? "18%" : "15%",
               hideIfEmpty: true,
               renderMode: /operation|condition|status|result/i.test(rowField.id) ? "stacked" : "plain"
             }))
@@ -101,7 +119,7 @@ function buildDefaultReportTypeConfigV2(type: InspectionType): ReportTypeConfig 
       outcomeMetrics: ["documentStatus", "outcome", "deficiencyCount", "serviceDate"],
       primaryFacts: ["customer", "site", "inspectionDate", "completionDate", "technician"],
       overviewFacts: ["scheduledWindow", "billingContact", "siteAddress"],
-      systemSummarySectionKey: firstSectionKey
+      systemSummarySectionKey: pdf.fullDetail ? undefined : firstSectionKey
     },
     statusMapping: {
       finalizedLabel: "Finalized",

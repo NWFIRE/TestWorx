@@ -16,7 +16,8 @@ export function renderKeyValueSection(runtime: PdfV2Runtime, cursor: PageCursor,
     return cursor;
   }
 
-  cursor = ensureSpace(runtime, cursor, 70);
+  const firstRowHeight = items.length ? Math.max(...items.slice(0, 2).map((item) => itemHeight(runtime, item, (contentWidth() - 12) / 2))) : 30;
+  cursor = ensureSpace(runtime, cursor, 70 + firstRowHeight);
   drawSectionTitle(runtime, cursor, section.title, section.description);
 
   if (items.length === 0) {

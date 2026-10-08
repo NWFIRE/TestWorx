@@ -54,6 +54,11 @@ export const inspectionTypeRegistry = {
     description: "Inspection for industrial suppression systems.",
     defaultRecurrenceFrequency: "ANNUAL"
   },
+  vehicle_suppression: {
+    label: "Vehicle Fire Suppression",
+    description: "Vehicle fire suppression and gas detection inspection, testing and maintenance.",
+    defaultRecurrenceFrequency: "SEMI_ANNUAL"
+  },
   emergency_exit_lighting: {
     label: "Emergency Exit Lighting",
     description: "Inspection and service for exit and emergency lighting.",

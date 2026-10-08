@@ -39,7 +39,8 @@ export const multiSystemInspectionTypes = [
   InspectionType.wet_fire_sprinkler,
   InspectionType.dry_fire_sprinkler,
   InspectionType.joint_commission_fire_sprinkler,
-  InspectionType.industrial_suppression
+  InspectionType.industrial_suppression,
+  InspectionType.vehicle_suppression
 ] as const;
 const multiSystemInspectionTypeSet = new Set<InspectionType>(multiSystemInspectionTypes);
 

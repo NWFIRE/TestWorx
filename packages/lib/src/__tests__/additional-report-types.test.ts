@@ -12,6 +12,7 @@ const additionalTypes = [
   "dry_fire_sprinkler",
   "kitchen_suppression",
   "industrial_suppression",
+  "vehicle_suppression",
   "emergency_exit_lighting"
 ] as const;
 

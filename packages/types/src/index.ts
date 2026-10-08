@@ -26,6 +26,7 @@ export const inspectionTypes = {
   dry_fire_sprinkler: "dry_fire_sprinkler",
   kitchen_suppression: "kitchen_suppression",
   industrial_suppression: "industrial_suppression",
+  vehicle_suppression: "vehicle_suppression",
   emergency_exit_lighting: "emergency_exit_lighting"
 } as const;
 

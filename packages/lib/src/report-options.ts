@@ -112,6 +112,9 @@ export type ReportOptionProviderKey =
   | "caps_used_types"
   | "kitchen_suppression_manufacturers"
   | "industrial_dry_chemical_manufacturers"
+  | "vehicleServiceScope"
+  | "vehicleDetectionTypes"
+  | "vehicleControlPanelTypes"
   | "emergency_light_types"
   | "emergency_light_battery_sizes"
   | "emergency_light_test_durations"
@@ -1372,6 +1375,30 @@ export const reportOptionProviders = {
   caps_used_types: capsUsedTypes,
   kitchen_suppression_manufacturers: kitchenSuppressionManufacturers,
   industrial_dry_chemical_manufacturers: industrialDryChemicalManufacturers,
+  vehicleServiceScope: [
+    { value: "daily", label: "Daily inspection" },
+    { value: "monthly", label: "Monthly visual inspection" },
+    { value: "semi_annual", label: "Semi-annual maintenance" },
+    { value: "annual", label: "Annual service" },
+    { value: "other", label: "Other service" }
+  ],
+  vehicleDetectionTypes: [
+    { value: "thermostat_280", label: "280-degree thermostat" },
+    { value: "thermostat_350", label: "350-degree thermostat" },
+    { value: "thermostat_450", label: "450-degree thermostat" },
+    { value: "firetrace", label: "Firetrace detection" },
+    { value: "gas_sensor", label: "Gas sensor" },
+    { value: "optical_sensor", label: "Optical sensor" },
+    { value: "manual_switch", label: "Manual activation switch" },
+    { value: "other", label: "Other (describe in notes)" }
+  ],
+  vehicleControlPanelTypes: [
+    { value: "circuit_monitor_plus", label: "Circuit Monitor Plus" },
+    { value: "control_panel", label: "Control panel" },
+    { value: "amgads_iii", label: "AMGaDS III" },
+    { value: "amgads_iii_plus", label: "AMGaDS III Plus" },
+    { value: "other", label: "Other" }
+  ],
   emergency_light_types: emergencyLightTypes,
   emergency_light_battery_sizes: emergencyLightBatterySizes,
   emergency_light_test_durations: emergencyLightTestDurations,

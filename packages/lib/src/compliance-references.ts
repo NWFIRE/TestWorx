@@ -58,10 +58,24 @@ const allReportTypes: InspectionType[] = [
   "dry_fire_sprinkler",
   "kitchen_suppression",
   "industrial_suppression",
+  "vehicle_suppression",
   "emergency_exit_lighting"
 ];
 
 export const complianceReferenceRegistry: ComplianceReference[] = [
+  {
+    id: "vehicle-manufacturer-instructions",
+    standardCode: "Manufacturer instructions",
+    editionYear: "Applicable revision",
+    fullTitle: "Vehicle fire suppression and gas detection inspection, testing and maintenance instructions",
+    shortTitle: "Vehicle system manufacturer instructions",
+    applicableReportTypes: ["vehicle_suppression"],
+    applicableInspectionSections: ["daily-inspection", "monthly-inspection", "semi-annual-maintenance"],
+    chapterReferences: [], tableReferences: [], nfpaSections: [], jointCommissionEPReferences: [],
+    complianceExplanation: "Record the applicable manual and revision used for the installed system. This checklist does not replace manufacturer procedures.",
+    applicabilityReason: "Vehicle system testing and maintenance depend on the installed equipment and manufacturer's instructions.",
+    displayOrder: 10, active: true, jurisdictionOverrideSupport: true
+  },
   {
     id: "nfpa-25-2026",
     standardCode: "NFPA 25",

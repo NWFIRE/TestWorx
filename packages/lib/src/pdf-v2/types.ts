@@ -67,6 +67,7 @@ export type FieldConfig = {
   format?: "text" | "date" | "datetime" | "boolean" | "number" | "address" | "badge" | "hours";
   hideIfEmpty?: boolean;
   fallback?: string;
+  preserveText?: boolean;
 };
 
 export type TableColumnConfig = {
@@ -98,6 +99,7 @@ export type ChecklistConfig = {
 
 export type ReportSectionConfig = {
   key: string;
+  sourceSectionId?: string;
   title: string;
   description?: string;
   renderer: ReportSectionRenderer;

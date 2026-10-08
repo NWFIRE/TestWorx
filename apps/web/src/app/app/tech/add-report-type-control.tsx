@@ -22,6 +22,7 @@ const preferredInspectionTypes: InspectionType[] = [
   "fire_extinguisher",
   "emergency_exit_lighting",
   "industrial_suppression",
+  "vehicle_suppression",
   "backflow",
   "work_order"
 ];

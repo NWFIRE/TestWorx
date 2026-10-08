@@ -1241,12 +1241,13 @@ export async function getInspectionReportDraft(actor: ActorContext, inspectionId
       progressPercent: progress.percent
     };
   });
-  const priorReport = await prisma.inspectionReport.findFirst({
+  const scheduleScopedPrior = resolveReportTemplate({ inspectionType: report.task.inspectionType }).priorReportScope === "service_schedule";
+  const priorReport = scheduleScopedPrior && !report.task.serviceScheduleId ? null : await prisma.inspectionReport.findFirst({
     where: {
       tenantId: parsedActor.tenantId as string,
       id: { not: report.id },
       inspectionId: { not: report.inspectionId },
-      task: { inspectionType: report.task.inspectionType },
+      task: { inspectionType: report.task.inspectionType, ...(scheduleScopedPrior ? { serviceScheduleId: report.task.serviceScheduleId } : {}) },
       inspection: { siteId: report.inspection.siteId },
       status: reportStatuses.finalized
     },
