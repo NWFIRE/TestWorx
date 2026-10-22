@@ -151,6 +151,7 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
       },
       report: {
         id: detail.report.id,
+        reportNumber: detail.report.reportNumber,
         finalizedAt: detail.report.finalizedAt,
         technicianName: detail.report.technician?.name ?? null,
         status: "finalized",

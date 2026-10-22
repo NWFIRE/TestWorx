@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { addDays, endOfDay, format, startOfDay } from "date-fns";
 import { redirect } from "next/navigation";
+import { isReportReferenceSearch } from "@testworx/lib/report-reference";
 
 import { auth } from "@/auth";
 import { LiveUrlSearchInput } from "@/app/live-url-search-input";
@@ -232,7 +233,7 @@ export default async function AdminInspectionsPage({
 
   const params = searchParams ? await searchParams : {};
   const requestedStatuses = normalizeInspectionStatusFilters(typeof params.status === "string" ? params.status : null);
-  const effectiveStatuses = requestedStatuses.length ? requestedStatuses : [...activeOperationalInspectionStatuses];
+  const effectiveStatuses = requestedStatuses.length ? requestedStatuses : isReportReferenceSearch(typeof params.q === "string" ? params.q : "") ? normalizeInspectionStatusFilters("all") : [...activeOperationalInspectionStatuses];
   const requestedClassifications = normalizeInspectionClassificationFilters(typeof params.classification === "string" ? params.classification : null);
   const requestedPriority = normalizeInspectionPriorityFilter(typeof params.priority === "string" ? params.priority : null);
   const query = typeof params.q === "string" ? params.q.trim() : "";
@@ -420,7 +421,7 @@ export default async function AdminInspectionsPage({
             <LiveUrlSearchInput
               initialValue={filterData.filters.query}
               paramKey="q"
-              placeholder="Search customer, location, address, city, reference, technician, type, priority, or status"
+              placeholder="Search report ID, customer, location, address, city, reference, technician, type, priority, or status"
             />
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

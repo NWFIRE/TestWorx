@@ -170,7 +170,7 @@ export default async function InspectionArchivePage({
             <LiveUrlSearchInput
               initialValue={data.filters.query}
               paramKey="query"
-              placeholder="Search inspection #, customer, site, address, city, or technician"
+              placeholder="Search report ID, inspection #, customer, site, address, city, or technician"
               resetPageKeys={["page"]}
             />
             <LiveUrlSelectFilter

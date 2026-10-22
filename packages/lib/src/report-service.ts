@@ -1,4 +1,5 @@
 import "server-only";
+import { formatReportReference } from "./report-reference";
 
 import { AttachmentKind, InspectionDocumentStatus, InspectionStatus, Prisma, ReportCorrectionState, SignatureKind } from "@prisma/client";
 import { prisma } from "@testworx/db";
@@ -1586,13 +1587,13 @@ export async function saveReportDraft(actor: ActorContext, input: {
   return Object.assign(updatedReport, { inspectionStatusChanged: startInspectionFromReportWork });
 }
 
-function buildGeneratedPdfName(report: { inspection: { customerCompany: { name: string }; site: { name: string } }; task: { inspectionType: string } }) {
+function buildGeneratedPdfName(report: { id: string; reportNumber?: number; inspection: { customerCompany: { name: string }; site: { name: string } }; task: { inspectionType: string } }) {
   const customerFacingSiteName = getCustomerFacingSiteLabel(report.inspection.site.name);
   return [
     slugifyFileName(report.inspection.customerCompany.name),
     customerFacingSiteName ? slugifyFileName(customerFacingSiteName) : null,
     slugifyFileName(report.task.inspectionType),
-    "report.pdf"
+    report.reportNumber ? `report-${formatReportReference(report)}.pdf` : "report.pdf"
   ].filter(Boolean).join("-");
 }
 
@@ -1786,6 +1787,7 @@ async function replaceGeneratedReportPdfTx(
     task: input.report.task as any,
     report: {
       id: input.report.id,
+      reportNumber: input.report.reportNumber,
       finalizedAt: input.report.finalizedAt,
       technicianName: input.report.technician?.name ?? null
     },
@@ -1804,17 +1806,7 @@ async function replaceGeneratedReportPdfTx(
     bytes: pdfBytes
   });
 
-  await tx.attachment.deleteMany({
-    where: {
-      tenantId: input.tenantId,
-      inspectionReportId: input.report.id,
-      kind: AttachmentKind.pdf,
-      source: "generated"
-    } as any
-  });
-
-  const generatedAttachment = await tx.attachment.create({
-    data: {
+  const attachmentData = {
       tenantId: input.tenantId,
       inspectionId: input.report.inspectionId,
       inspectionReportId: input.report.id,
@@ -1824,8 +1816,17 @@ async function replaceGeneratedReportPdfTx(
       mimeType: pdfPayload.mimeType,
       storageKey: pdfPayload.storageKey,
       customerVisible: true
-    } as any
-  });
+  };
+  // Refresh file contents in place so emailed and bookmarked attachment URLs survive.
+  if (priorGeneratedAttachments.length) {
+    await tx.attachment.updateMany({
+      where: { tenantId: input.tenantId, inspectionReportId: input.report.id, kind: AttachmentKind.pdf, source: "generated" },
+      data: attachmentData as any
+    });
+  }
+  const generatedAttachment = priorGeneratedAttachments.length
+    ? { ...priorGeneratedAttachments[0], ...attachmentData }
+    : await tx.attachment.create({ data: attachmentData as any });
 
   return {
     generatedAttachment,
@@ -2382,14 +2383,17 @@ async function rebuildGeneratedReportPdfDownload(actor: ReturnType<typeof parseA
   return rebuilt;
 }
 
-function shouldRefreshGeneratedPdfForCurrentRenderer(input: {
+export function shouldRefreshGeneratedPdfForCurrentRenderer(input: {
   attachment: {
     kind: AttachmentKind;
     source: string;
     inspectionReportId: string | null;
     createdAt: Date;
+    fileName?: string;
   };
   report: {
+    id?: string;
+    reportNumber?: number | null;
     status: ReportStatus;
     finalizedAt: Date | null;
     task?: { inspectionType: InspectionType } | null;
@@ -2400,8 +2404,8 @@ function shouldRefreshGeneratedPdfForCurrentRenderer(input: {
     Boolean(input.attachment.inspectionReportId) &&
     input.report?.status === reportStatuses.finalized &&
     Boolean(input.report.finalizedAt) &&
-    input.report.task?.inspectionType === "fire_extinguisher" &&
-    input.attachment.createdAt < FIRE_EXTINGUISHER_SIZE_TYPE_PDF_RENDERER_CUTOFF;
+    ((Boolean(input.report.reportNumber) && !input.attachment.fileName?.toLowerCase().endsWith(`-${formatReportReference({ id: input.report.id ?? "", reportNumber: input.report.reportNumber }).toLowerCase()}.pdf`)) ||
+      (!input.report.reportNumber && input.report.task?.inspectionType === "fire_extinguisher" && input.attachment.createdAt < FIRE_EXTINGUISHER_SIZE_TYPE_PDF_RENDERER_CUTOFF));
 }
 
 const MAX_UPLOADED_PDF_BYTES = 50 * 1024 * 1024;

@@ -1332,6 +1332,7 @@ model InspectionRecurrence {
 
 model InspectionReport {
   id                            String                @id @default(cuid())
+  reportNumber                  Int                   @unique @default(autoincrement())
   tenantId                      String
   inspectionId                  String
   inspectionTaskId              String                @unique

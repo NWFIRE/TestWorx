@@ -1,4 +1,5 @@
 import { addMonths, endOfDay, endOfMonth, endOfWeek, format, isSameDay, startOfDay, startOfMonth, subDays, subMonths } from "date-fns";
+import { reportReferenceSearchWhere } from "./report-reference";
 import {
   AttachmentKind,
   InspectionClassification,
@@ -5929,6 +5930,7 @@ export async function getAdminSchedulingQueueData(
     ? {
         OR: [
           { id: { contains: requestedQuery, mode: "insensitive" as const } },
+          { reports: { some: reportReferenceSearchWhere(requestedQuery) } },
           { archiveCustomerName: { contains: requestedQuery, mode: "insensitive" as const } },
           { archiveSiteName: { contains: requestedQuery, mode: "insensitive" as const } },
           { archiveSiteAddress: { contains: requestedQuery, mode: "insensitive" as const } },

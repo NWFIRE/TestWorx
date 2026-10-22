@@ -1,4 +1,5 @@
 import { resolveTenantBranding } from "../../../branding";
+import { formatReportReference } from "../../../report-reference";
 import { buildComplianceSection } from "../../../compliance-references";
 import { reportDraftSchema } from "../../../report-engine";
 import { formatCustomerFacingInspectionAddress, getCustomerFacingSiteLabel } from "../../../scheduling";
@@ -143,7 +144,7 @@ export function buildFireAlarmRenderModel(rawReport: unknown): FireAlarmReportRe
   return {
     report: {
       title: "Fire Alarm Inspection and Testing Report",
-      reportId: input.report.id,
+      reportId: formatReportReference(input.report),
       inspectionDate: formatShortDate(input.inspection.scheduledStart, timezone) ?? "",
       finalizedAt: formatDateTime(input.report.finalizedAt, timezone),
       documentStatus: status.documentStatus,

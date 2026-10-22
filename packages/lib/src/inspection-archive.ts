@@ -1,4 +1,5 @@
 import { InspectionStatus, Prisma, UserRole } from "@prisma/client";
+import { formatReportReference, reportReferenceSearchWhere } from "./report-reference";
 import { prisma } from "@testworx/db";
 
 import type { ActorContext, InspectionType } from "@testworx/types";
@@ -216,6 +217,7 @@ function buildArchiveTextSearch(query: string): Prisma.InspectionWhereInput | un
   return {
     OR: [
       { id: { contains: trimmed, mode: "insensitive" } },
+      { reports: { some: reportReferenceSearchWhere(trimmed) } },
       { archiveCustomerName: { contains: trimmed, mode: "insensitive" } },
       { archiveSiteName: { contains: trimmed, mode: "insensitive" } },
       { archiveSiteAddress: { contains: trimmed, mode: "insensitive" } },
@@ -587,6 +589,7 @@ export async function getAdminInspectionArchiveDetail(actor: ActorContext, inspe
       inspectionType: task.inspectionType,
       inspectionTypeLabel: task.customDisplayLabel?.trim() || inspectionTypeRegistry[task.inspectionType].label,
       reportId: task.report?.id ?? null,
+      reportReference: task.report ? formatReportReference(task.report) : null,
       reportStatus: task.report?.status ?? null,
       finalizedAt: task.report?.finalizedAt ?? null
     }))

@@ -14,6 +14,7 @@ const prismaMock = {
   attachment: {
     findFirst: vi.fn(),
     deleteMany: vi.fn(),
+    updateMany: vi.fn(),
     create: vi.fn()
   },
   inspectionReport: {
@@ -46,6 +47,17 @@ vi.mock("../pdf-report", () => ({
 }));
 
 describe("attachment download authorization", () => {
+  it("refreshes old numbered PDFs once, without touching uploaded PDFs or drafts", async () => {
+    const { shouldRefreshGeneratedPdfForCurrentRenderer: needsRefresh } = await import("../report-service");
+    const attachment = { kind: "pdf" as const, source: "generated", inspectionReportId: "report_1", createdAt: new Date("2020-01-01"), fileName: "old-report.pdf" };
+    const report = { id: "report_1", reportNumber: 1234, status: "finalized" as const, finalizedAt: new Date("2026-01-01"), task: { inspectionType: "fire_extinguisher" as const } };
+    expect(needsRefresh({ attachment, report })).toBe(true);
+    expect(needsRefresh({ attachment: { ...attachment, fileName: "customer-report-R-001234.pdf" }, report })).toBe(false);
+    expect(needsRefresh({ attachment: { ...attachment, source: "uploaded" }, report })).toBe(false);
+    expect(needsRefresh({ attachment, report: { ...report, status: "draft" } })).toBe(false);
+    expect(needsRefresh({ attachment, report: { ...report, task: { inspectionType: "fire_alarm" } } })).toBe(true);
+  }, 15000);
+
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
@@ -237,14 +249,17 @@ describe("attachment download authorization", () => {
       mimeType: "application/pdf",
       bytes: new Uint8Array([9, 9, 9])
     });
-    expect(prismaMock.attachment.deleteMany).toHaveBeenCalledWith({
+    expect(prismaMock.attachment.updateMany).toHaveBeenCalledWith({
       where: {
         tenantId: "tenant_1",
         inspectionReportId: "report_1",
         kind: "pdf",
         source: "generated"
-      }
+      },
+      data: expect.objectContaining({ inspectionReportId: "report_1", fileName: "rebuilt-report.pdf" })
     });
+    expect(prismaMock.attachment.deleteMany).not.toHaveBeenCalled();
+    expect(prismaMock.attachment.create).not.toHaveBeenCalled();
     expect(deleteStoredFileMock).toHaveBeenCalledWith("blob:tenant_1/generated-pdf/report.pdf");
   }, 15000);
 

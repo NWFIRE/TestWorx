@@ -1,4 +1,5 @@
 import { resolveTenantBranding } from "../branding";
+import { formatReportReference } from "../report-reference";
 import { buildComplianceSection } from "../compliance-references";
 import { buildReportPreview } from "../report-engine";
 import { inspectionTypeRegistry, type ReportPrimitiveValue, type ReportFieldDefinition } from "../report-config";
@@ -661,7 +662,7 @@ export function buildReportRenderModelV2(input: PdfInput): ReportRenderModelV2 {
       logoDataUrl: branding.logoDataUrl
     },
     header: {
-      reportId: input.report.id,
+      reportId: formatReportReference(input.report),
       serviceDate: formatDate(input.inspection.scheduledStart, input.tenant.timezone),
       companyName,
       reportTitle: config.title,
@@ -670,7 +671,7 @@ export function buildReportRenderModelV2(input: PdfInput): ReportRenderModelV2 {
     },
     footer: {
       brandLabel: companyName,
-      reportId: input.report.id,
+      reportId: formatReportReference(input.report),
       versionLabel: "Report PDF v2",
       documentState: reportState.documentStatus
     },

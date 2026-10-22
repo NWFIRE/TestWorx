@@ -12,6 +12,7 @@ export * from "./quote-email";
 export * from "./quotes-shared";
 export * from "./report-calculations";
 export * from "./report-engine";
+export * from "./report-reference";
 export * from "./report-options";
 export * from "./report-photo";
 export * from "./scheduling-shared";

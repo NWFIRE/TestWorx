@@ -118,6 +118,7 @@ export default async function InspectionArchiveDetailPage({
                 <div key={task.id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4 md:flex-row md:items-center md:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-slate-950">{task.inspectionTypeLabel}</p>
+                    {task.reportReference ? <p className="mt-1 text-sm text-slate-600">Report ID: {task.reportReference}</p> : null}
                     <p className="mt-1 text-sm text-slate-500">
                       {task.finalizedAt ? `Finalized ${format(task.finalizedAt, "MMM d, yyyy h:mm a")}` : task.reportStatus ? task.reportStatus : "No report history"}
                     </p>

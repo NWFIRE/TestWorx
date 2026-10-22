@@ -1,5 +1,6 @@
 import { acceptanceTestDefinitions, acceptanceTestInstallerDefaults } from "../../../acceptance-test-definition";
 import { resolveTenantBranding } from "../../../branding";
+import { formatReportReference } from "../../../report-reference";
 import { buildComplianceSection } from "../../../compliance-references";
 import { reportDraftSchema } from "../../../report-engine";
 import { formatCustomerFacingInspectionAddress, getCustomerFacingSiteLabel } from "../../../scheduling";
@@ -194,7 +195,7 @@ export function buildAcceptanceTestRenderModel(rawReport: unknown): AcceptanceTe
       result: overallResult,
       completionDate: formatDateTime(input.report.finalizedAt, timezone),
       narrative: buildNarrative(overallResult, failed, incomplete),
-      reportId: input.report.id,
+      reportId: formatReportReference(input.report),
       assignedTo: cleanText(input.report.assignedTo),
       status: resolveWorkflowStatus(input, failed, incomplete)
     },

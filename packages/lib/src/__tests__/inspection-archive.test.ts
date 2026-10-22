@@ -23,6 +23,23 @@ vi.mock("@testworx/db", () => ({
 }));
 
 describe("inspection archive", () => {
+  it("searches public report numbers within the actor's tenant", async () => {
+    prismaMock.inspection.findMany.mockResolvedValue([]);
+    prismaMock.inspection.count.mockResolvedValue(0);
+    prismaMock.customerCompany.findMany.mockResolvedValue([]);
+    prismaMock.site.findMany.mockResolvedValue([]);
+    prismaMock.user.findMany.mockResolvedValue([]);
+    const { getAdminInspectionArchiveData } = await import("../inspection-archive");
+    await getAdminInspectionArchiveData(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { query: "R-001234", page: 1 }
+    );
+    const where = prismaMock.inspection.findMany.mock.calls[0][0].where;
+    expect(where.tenantId).toBe("tenant_1");
+    expect(JSON.stringify(where)).toContain('"reportNumber":1234');
+    expect(JSON.stringify(where)).toContain('"reports":{"some":');
+  }, 20000);
+
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();

@@ -24,7 +24,7 @@ export type PdfInput = {
   site: { name: string; addressLine1: string; addressLine2: string | null; city: string; state: string; postalCode: string };
   inspection: { id: string; scheduledStart: Date; scheduledEnd: Date | null; status: string; notes: string | null };
   task: { inspectionType: InspectionType };
-  report: { id: string; finalizedAt: Date | null; technicianName: string | null };
+  report: { id: string; reportNumber?: number | null; finalizedAt: Date | null; technicianName: string | null };
   draft: ReportDraft;
   deficiencies: Array<{ title: string; description: string; severity: string; status: string; deviceType?: string | null; location?: string | null; notes?: string | null }>;
   photos: Array<{ fileName: string; storageKey: string }>;

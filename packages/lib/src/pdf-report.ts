@@ -1,4 +1,5 @@
 import "server-only";
+import { formatReportReference } from "./report-reference";
 
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import type { InspectionType } from "@testworx/types";
@@ -478,7 +479,7 @@ function renderPremiumPageChrome(
   });
   const reportTitle = getReportTitle(input);
   const metadataRows: KeyValueRow[] = [
-    { label: "Report ID", value: input.report.id },
+    { label: "Report ID", value: formatReportReference(input.report) },
     { label: "Service Date", value: formatDate(input.inspection.scheduledStart, input.tenant.timezone) },
     { label: "Page", value: String(pageNumber) }
   ];
@@ -554,7 +555,7 @@ function renderPremiumPageChrome(
     color: theme.softText
   });
 
-  const footerReference = joinPresentValues([getCustomerFacingReportState(input), input.report.id], " | ");
+  const footerReference = joinPresentValues([getCustomerFacingReportState(input), formatReportReference(input.report)], " | ");
   if (footerReference) {
     page.drawText(footerReference, {
       x: PAGE_MARGIN + 150,
@@ -648,7 +649,7 @@ function renderPageChrome(
   });
 
   const metaRows = [
-    ["Report ID", input.report.id],
+    ["Report ID", formatReportReference(input.report)],
     ["Inspection Date", formatDate(input.inspection.scheduledStart, input.tenant.timezone)],
     ["Page", `${pageNumber}`]
   ] satisfies Array<[string, string]>;

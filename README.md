@@ -471,6 +471,12 @@ npm run dev --workspace @testworx/web
 stripe listen --forward-to http://localhost:3000/api/stripe/webhook
 ```
 
+### Report references
+
+Generated reports use stable public references such as `R-001234`. The database assigns unique numbers to existing and new reports; internal IDs, authorization, and routes remain unchanged. Search by the reference (or an older internal report ID) in Inspections or Inspection Archive. An exact reference search in Inspections includes completed reports unless a status filter is explicitly selected.
+
+Older finalized generated PDFs refresh to include their reference when downloaded through the app, preserving attachment links. Uploaded PDFs and previously downloaded offline copies are not modified. Apply migration `202610220001_readable_report_numbers` before deploying this feature.
+
 3. Copy the reported webhook signing secret into `STRIPE_WEBHOOK_SECRET`.
 
 4. Trigger checkout from the tenant-admin billing page, or trigger events manually:
