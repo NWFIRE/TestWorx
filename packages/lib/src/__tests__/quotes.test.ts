@@ -324,14 +324,14 @@ describe("quotes", () => {
 
     expect(prismaMock.quote.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
-        subtotal: 110,
+        subtotal: 175,
         taxAmount: 0,
-        total: 110
+        total: 175
       })
     }));
   });
 
-  it("automatically adds the location-based service fee when creating a quote", async () => {
+  it("does not add automatic service fees even when location rules exist", async () => {
     prismaMock.quote.count.mockResolvedValue(6);
     prismaMock.quote.create.mockResolvedValue({
       id: "quote_4",
@@ -377,35 +377,11 @@ describe("quotes", () => {
       }
     );
 
-    expect(resolveServiceFeeForLocationTxMock).toHaveBeenCalledWith(
-      prismaMock,
-      expect.objectContaining({
-        tenantId: "tenant_1",
-        customerCompanyId: "customer_1",
-        siteId: "site_1",
-        location: {
-          city: "Oklahoma City",
-          state: "OK",
-          postalCode: "73102"
-        }
-      })
-    );
+    expect(resolveServiceFeeForLocationTxMock).not.toHaveBeenCalled();
     expect(prismaMock.quote.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        subtotal: 77.5,
-        total: 77.5,
-        lineItems: {
-          create: expect.arrayContaining([
-            expect.objectContaining({
-              internalCode: "SERVICE_FEE_OKC",
-              title: "Service Fee",
-              category: "service_fee",
-              unitPrice: 22.5
-            })
-          ])
-        }
-      })
+      data: expect.objectContaining({ subtotal: 55, total: 55 })
     }));
+    expect(prismaMock.quote.create.mock.calls[0][0].data.lineItems.create).toHaveLength(1);
   });
 
   it("persists the direct QuickBooks item id when a quote line is selected from the imported catalog", async () => {

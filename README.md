@@ -471,6 +471,12 @@ npm run dev --workspace @testworx/web
 stripe listen --forward-to http://localhost:3000/api/stripe/webhook
 ```
 
+### Manual invoicing and retired automatic service fees
+
+Completed inspections continue to produce billing summaries for office review. QuickBooks invoices are created/sent only through explicit administrator actions. Automatic service-fee insertion has been removed from inspection billing, quote saves, and direct invoice creation; its settings and auto-billing eligibility control are no longer displayed. Manual fee lines, compliance reporting fees, minimum-ticket rules, and historical invoices are unchanged.
+
+For the authorized one-time historical cleanup, run `node --env-file=<production-env> scripts/retire-automatic-service-fees.cjs --tenant=<tenant-id>` to audit, then add `--apply` after review. The script only removes legacy generated service-fee lines from eligible unsynced drafts, uses optimistic concurrency checks, and records before-values in tenant audit logs. It does not contact QuickBooks or alter invoiced/sent/synced records. Re-running after cleanup is a no-op; do not use it as a scheduled job.
+
 ### Report references
 
 Generated reports use stable public references such as `R-001234`. The database assigns unique numbers to existing and new reports; internal IDs, authorization, and routes remain unchanged. Search by the reference (or an older internal report ID) in Inspections or Inspection Archive. An exact reference search in Inspections includes completed reports unless a status filter is explicitly selected.

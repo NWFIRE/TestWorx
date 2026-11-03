@@ -189,7 +189,7 @@ const adminNavItems: AppNavItem[] = [
   profileNavItem,
   {
     href: "/app/admin/settings",
-    label: "Settings / Service Fees",
+    label: "Settings",
     shortLabel: "Settings",
     abbreviation: "SF",
     icon: "settings",

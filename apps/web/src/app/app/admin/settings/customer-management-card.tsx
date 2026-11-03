@@ -468,13 +468,6 @@ export function CustomerProfileFields({
               <option value="third_party">Third-party payer billing</option>
             </select>
           </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor={`${formIdPrefix}-autoBillingEnabled`}>Review readiness</label>
-            <label className="flex min-h-[52px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700">
-              <input className="h-4 w-4 rounded border-slate-300 text-slateblue focus:ring-slateblue" defaultChecked={initialValues.autoBillingEnabled} id={`${formIdPrefix}-autoBillingEnabled`} name="autoBillingEnabled" type="checkbox" />
-              Mark as eligible for future auto billing
-            </label>
-          </div>
 
           {billingType === "third_party" ? (
             <>

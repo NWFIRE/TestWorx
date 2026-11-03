@@ -15,7 +15,6 @@ import {
   mapInspectionTypeToComplianceReportingDivision,
   resolveComplianceReportingFeeTx
 } from "./compliance-reporting-fees";
-import { resolveInspectionServiceFeeTx } from "./service-fees";
 import {
   resolveMinimumTicketRuleTx,
   type MinimumTicketResolution,
@@ -180,6 +179,8 @@ type PersistedBillingSummary = {
 };
 
 type PersistedBillingSummaryRow = {
+  quickbooksInvoiceId?: string | null;
+  quickbooksSyncedAt?: Date | null;
   id: string;
   tenantId: string;
   inspectionId: string;
@@ -2133,35 +2134,6 @@ async function resolveBillingItemMatchedUnitPrice(tenantId: string, item: Billab
   return catalogState.currentMatch?.unitPrice ?? null;
 }
 
-async function buildInspectionServiceFeeItemTx(tx: TransactionClient, input: {
-  tenantId: string;
-  inspectionId: string;
-}) {
-  const resolvedFee = await resolveInspectionServiceFeeTx(tx, input);
-
-  return {
-    id: `${input.inspectionId}:service-fee`,
-    tenantId: input.tenantId,
-    inspectionId: input.inspectionId,
-    reportId: input.inspectionId,
-    reportType: INSPECTION_LEVEL_REPORT_TYPE,
-    sourceSection: "service-fee",
-    sourceField: "serviceFee",
-    category: "fee" as const,
-    code: resolvedFee.code,
-    description: "Service Fee",
-    quantity: 1,
-    unit: "inspection",
-    unitPrice: resolvedFee.unitPrice,
-    amount: calculateAmount(1, resolvedFee.unitPrice),
-    metadata: {
-      displayGroup: "fee",
-      resolutionSource: resolvedFee.source,
-      serviceFeeRuleId: resolvedFee.ruleId ?? null,
-      serviceFeePriority: resolvedFee.priority ?? null
-    }
-  } satisfies BillableItem;
-}
 
 function normalizeJurisdictionValue(value: string | null | undefined) {
   const trimmed = value?.trim();
@@ -3258,7 +3230,7 @@ async function resolveBillingOutcomeTx(
 
 async function getExistingBillingSummaryRow(tx: TransactionClient, inspectionId: string) {
   const rows = await tx.$queryRaw`
-    SELECT "id", "tenantId", "inspectionId", "customerCompanyId", "siteId", "status", "billingType", "payerType", "payerCustomerId", "payerProviderAccountId", "billingResolutionSnapshotId", "billToAccountId", "billToName", "contractProfileId", "contractProfileName", "routingSnapshot", "pricingSnapshot", "groupingSnapshot", "attachmentSnapshot", "deliverySnapshot", "referenceSnapshot", "items", "subtotal", "notes", "createdAt", "updatedAt"
+    SELECT "id", "tenantId", "inspectionId", "customerCompanyId", "siteId", "status", "billingType", "payerType", "payerCustomerId", "payerProviderAccountId", "billingResolutionSnapshotId", "billToAccountId", "billToName", "contractProfileId", "contractProfileName", "routingSnapshot", "pricingSnapshot", "groupingSnapshot", "attachmentSnapshot", "deliverySnapshot", "referenceSnapshot", "items", "subtotal", "notes", "createdAt", "updatedAt", "quickbooksInvoiceId", "quickbooksSyncedAt"
     FROM "InspectionBillingSummary"
     WHERE "inspectionId" = ${inspectionId}
     LIMIT 1
@@ -3316,7 +3288,6 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
   );
   extracted.push(...await extractBillableItemsFromWorkOrderLineItemsTx(db, input));
 
-  extracted.push(await buildInspectionServiceFeeItemTx(db, input));
   extracted.push(...await buildComplianceReportingFeeItemsTx(db, {
     tenantId: input.tenantId,
     inspectionId: input.inspectionId,
@@ -3326,13 +3297,11 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
   }));
 
   const existing = await getExistingBillingSummaryRow(db, input.inspectionId);
-  if (extracted.length === 0) {
-    await db.$executeRaw`
-  DELETE FROM "InspectionBillingSummary"
-  WHERE "inspectionId" = ${input.inspectionId} AND "tenantId" = ${input.tenantId}
-`;
-    return null;
+  // Retired fee rules must not rewrite historical invoices during report refresh.
+  if (existing && (existing.status === "invoiced" || existing.quickbooksInvoiceId || existing.quickbooksSyncedAt)) {
+    return existing;
   }
+  // Completed work still needs office review even when no billable lines were extracted.
 
   const mergedItems = mergeBillingItems(existing?.items ?? [], extracted);
   const linkedItems = await Promise.all(

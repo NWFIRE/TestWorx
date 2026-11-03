@@ -25,7 +25,6 @@ import { getDefaultQuoteExpirationDate } from "./quote-terms";
 import { inspectionTypeRegistry } from "./report-config";
 import { generateQuotePdf } from "./quote-pdf";
 import { resolveQuoteLineItemCategory } from "./quote-presentation";
-import { resolveServiceFeeForLocationTx } from "./service-fees";
 import {
   resolveQuickBooksItemForBilling,
   saveQuickBooksItemMappingForCode,
@@ -898,65 +897,7 @@ async function normalizeQuoteLineItems(tenantId: string, lineItems: QuoteInput["
   return normalized;
 }
 
-function isAutoManagedQuoteServiceFeeLine(line: QuoteLineItemDraft) {
-  return normalizeNullableString(line.category) === autoQuoteServiceFeeCategory
-    && line.internalCode.trim().toUpperCase().startsWith("SERVICE_FEE");
-}
 
-async function resolveQuoteServiceFeeLocation(input: {
-  tenantId: string;
-  customerCompanyId: string;
-  siteId?: string | null;
-}) {
-  if (input.siteId) {
-    const site = await prisma.site.findFirst({
-      where: {
-        tenantId: input.tenantId,
-        id: input.siteId
-      },
-      select: {
-        id: true,
-        city: true,
-        state: true,
-        postalCode: true
-      }
-    });
-
-    if (site) {
-      return {
-        customerCompanyId: input.customerCompanyId,
-        siteId: site.id,
-        location: {
-          city: site.city,
-          state: site.state,
-          postalCode: site.postalCode
-        }
-      };
-    }
-  }
-
-  const customer = await prisma.customerCompany.findFirst({
-    where: {
-      tenantId: input.tenantId,
-      id: input.customerCompanyId
-    },
-    select: {
-      serviceCity: true,
-      serviceState: true,
-      servicePostalCode: true
-    }
-  });
-
-  return {
-    customerCompanyId: input.customerCompanyId,
-    siteId: null,
-    location: {
-      city: customer?.serviceCity ?? null,
-      state: customer?.serviceState ?? null,
-      postalCode: customer?.servicePostalCode ?? null
-    }
-  };
-}
 
 async function buildQuoteLineItemsForSave(input: {
   tenantId: string;
@@ -964,36 +905,7 @@ async function buildQuoteLineItemsForSave(input: {
   siteId?: string | null;
   lineItems: QuoteInput["lineItems"];
 }) {
-  const baseLineItems = input.lineItems.filter((line) => !isAutoManagedQuoteServiceFeeLine(line));
-  const serviceFeeContext = await resolveQuoteServiceFeeLocation({
-    tenantId: input.tenantId,
-    customerCompanyId: input.customerCompanyId,
-    siteId: input.siteId
-  });
-  const serviceFee = await resolveServiceFeeForLocationTx(prisma, {
-    tenantId: input.tenantId,
-    customerCompanyId: serviceFeeContext.customerCompanyId,
-    siteId: serviceFeeContext.siteId,
-    location: serviceFeeContext.location
-  });
-
-  const quoteLineItems: QuoteInput["lineItems"] = [...baseLineItems];
-
-  if ((serviceFee.unitPrice ?? 0) > 0) {
-    quoteLineItems.push({
-      internalCode: serviceFee.code,
-      title: "Service Fee",
-      description: null,
-      quantity: 1,
-      unitPrice: serviceFee.unitPrice ?? 0,
-      discountAmount: 0,
-      taxable: false,
-      inspectionType: null,
-      category: autoQuoteServiceFeeCategory
-    });
-  }
-
-  return normalizeQuoteLineItems(input.tenantId, quoteLineItems);
+  return normalizeQuoteLineItems(input.tenantId, input.lineItems);
 }
 
 async function buildNextQuoteNumber(tenantId: string) {

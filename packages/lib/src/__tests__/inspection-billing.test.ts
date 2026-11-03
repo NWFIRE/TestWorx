@@ -1430,6 +1430,32 @@ describe("inspection billing persistence and admin review", () => {
     });
   });
 
+  it("keeps an empty completed inspection available for manual billing review", async () => {
+    txMock.inspection.findFirst.mockResolvedValue({ id: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1", site: { city: "Chicago", state: "IL" } });
+    txMock.site.findFirst.mockResolvedValue({ city: "Chicago", state: "IL" });
+    txMock.$queryRaw
+      .mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    txMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
+    const summary = await syncInspectionBillingSummaryTx(txMock as never, { tenantId: "tenant_1", inspectionId: "inspection_1" });
+    expect(summary?.inspectionId).toBe("inspection_1");
+    expect(summary?.items.some((item) => item.sourceSection === "service-fee")).toBe(false);
+    expect(txMock.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(txMock.$executeRaw.mock.calls[0][0].join(" ")).toContain('INSERT INTO "InspectionBillingSummary"');
+  });
+
+  it.each([{ status: "invoiced" }, { status: "reviewed", quickbooksInvoiceId: "qb_1" }, { status: "reviewed", quickbooksSyncedAt: new Date() }])("does not rewrite billed history during report refresh: %j", async (state) => {
+    txMock.site.findFirst.mockResolvedValue({ city: "Chicago", state: "IL" });
+    txMock.$queryRaw.mockResolvedValueOnce([{ inspectionId: "inspection_1", customerCompanyId: "customer_1", siteId: "site_1" }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: "summary_1", tenantId: "tenant_1", inspectionId: "inspection_1", billingType: "standard", payerType: "customer", items: [], ...state }]);
+    txMock.complianceReportingFeeRule.findMany.mockResolvedValue([]);
+    const summary = await syncInspectionBillingSummaryTx(txMock as never, { tenantId: "tenant_1", inspectionId: "inspection_1" });
+    expect(summary?.id).toBe("summary_1");
+    expect(txMock.$executeRaw).not.toHaveBeenCalled();
+  });
+
   it("creates or refreshes one tenant-scoped billing summary for a finalized inspection", async () => {
     const kitchenDraft = buildKitchenDraft();
 
@@ -1485,7 +1511,9 @@ describe("inspection billing persistence and admin review", () => {
 
     expect(summary?.inspectionId).toBe("inspection_1");
     expect(summary?.items).toHaveLength(6);
-    expect(summary?.items.find((item) => item.description === "Service Fee")?.unitPrice).toBe(95);
+    expect(summary?.items.some((item) => item.sourceSection === "minimum-ticket")).toBe(true);
+    expect(summary?.items.some((item) => item.sourceSection === "service-fee")).toBe(false);
+    expect(txMock.serviceFeeRule.findMany).not.toHaveBeenCalled();
     expect(summary?.items.find((item) => item.description === "Compliance Reporting Fee")).toEqual(
       expect.objectContaining({
         code: "COMPLIANCE_REPORTING_FEE_KITCHEN_SUPPRESSION",

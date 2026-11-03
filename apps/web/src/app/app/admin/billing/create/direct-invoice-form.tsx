@@ -245,7 +245,7 @@ export function DirectInvoiceForm({
                     onChange={(event) => setValue((current) => ({ ...current, walkInMode: event.target.checked }))}
                     type="checkbox"
                   />
-                  Treat this invoice as Walk-In and skip automatic service and compliance fees
+                  Treat this invoice as Walk-In and skip automatic compliance fees
                 </label>
               </>
             ) : null}
@@ -440,8 +440,8 @@ export function DirectInvoiceForm({
           </p>
           <p className="mt-3 text-sm text-slate-500">
             {shouldSkipAutomaticFees
-              ? "Walk-in invoices skip automatic service and compliance fee rules."
-              : "Customer invoices apply service-fee and compliance rules during creation when they match the selected customer and invoice type."}
+              ? "Walk-in invoices skip automatic compliance fee rules."
+              : "Customer invoices apply matching compliance reporting rules. Service fees are added only when you select them manually."}
           </p>
           <p className="mt-3 text-sm text-slate-500">TradeWorx assigns the live invoice number at creation time using the yearly TW format, then syncs that number to QuickBooks.</p>
         </section>

@@ -13,7 +13,6 @@ import { reconcileInspectionStatusTx } from "./inspection-status-consistency";
 import { hasWorkOrderLineItemTable } from "./work-order-line-item-table";
 import type { JsonObject, JsonValue } from "./json-types";
 import { assertTenantContext, canAccessProductsServicesWorkspace } from "./permissions";
-import { resolveServiceFeeForLocationTx } from "./service-fees";
 import { getCustomerFacingSiteLabel } from "./scheduling";
 import {
   calculateInvoiceTotalsFromItems,
@@ -2581,42 +2580,6 @@ async function buildDirectInvoiceAutomaticFeeLines(input: {
 }) {
   const lines: Array<ReturnType<typeof toQuickBooksInvoiceLine>> = [];
 
-  const serviceFee = await resolveServiceFeeForLocationTx(prisma, {
-    tenantId: input.tenantId,
-    customerCompanyId: input.customerCompanyId,
-    location: input.location
-  });
-
-  if ((serviceFee.unitPrice ?? 0) > 0) {
-    const resolvedServiceItem = await resolveQuickBooksItemForBilling({
-      tenantId: input.tenantId,
-      integrationId: input.integrationId,
-      billingCode: serviceFee.code,
-      displayName: "Service Fee"
-    });
-
-    if (resolvedServiceItem.status !== "mapped") {
-      throw new Error(buildQuickBooksBillingCodeMappingError({
-        billingCode: serviceFee.code,
-        description: "Service Fee",
-        resolvedReason: resolvedServiceItem.reason,
-        suggestions: resolvedServiceItem.suggestions
-      }));
-    }
-
-    lines.push(toQuickBooksInvoiceLine({
-      amount: Number(serviceFee.unitPrice!.toFixed(2)),
-      description: "Service Fee",
-      quantity: 1,
-      unitPrice: serviceFee.unitPrice!,
-      qbItemId: resolvedServiceItem.qbItemId,
-      qbItemName: resolvedServiceItem.qbItemName,
-      taxable: await resolveMappedCatalogTaxable({
-        tenantId: input.tenantId,
-        quickbooksItemId: resolvedServiceItem.qbItemId
-      })
-    }));
-  }
 
   const complianceDivision = mapDirectInvoiceProposalTypeToComplianceDivision(input.proposalType);
   if (!complianceDivision) {

@@ -673,7 +673,7 @@ function FireAlarmLaborHoursSection({
         </div>
         {Number(normalizedValue) > 0 ? (
           <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">
-            Auto billing
+            Included in billing review
           </span>
         ) : null}
       </div>

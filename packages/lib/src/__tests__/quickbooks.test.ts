@@ -1931,7 +1931,7 @@ describe("quickbooks billing sync hardening", () => {
     expect(result.invoiceNumber).toBe("TW2026-1008");
   });
 
-  it("applies service and compliance fee rules for customer invoices", async () => {
+  it("preserves compliance fees without adding automatic service fees to customer invoices", async () => {
     prismaMock.tenant.findUnique.mockResolvedValue({
       ...buildTenantConnection(),
       defaultServiceFeeCode: "SERVICE_FEE",
@@ -2103,7 +2103,7 @@ describe("quickbooks billing sync hardening", () => {
 
     const createInvoiceBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body ?? "{}"));
     expect(createInvoiceBody.DocNumber).toBe("TW2027-1000");
-    expect(createInvoiceBody.Line).toHaveLength(3);
+    expect(createInvoiceBody.Line).toHaveLength(2);
     expect(prismaMock.tenantInvoiceSequence.upsert).toHaveBeenCalledWith(expect.objectContaining({
       where: {
         tenantId_year: {
@@ -2114,7 +2114,6 @@ describe("quickbooks billing sync hardening", () => {
     }));
     expect(createInvoiceBody.Line.map((line: { Description: string }) => line.Description)).toEqual([
       "Kitchen suppression inspection",
-      "Service Fee",
       "Compliance Reporting Fee"
     ]);
     expect(createInvoiceBody.Line[0]?.SalesItemLineDetail?.TaxCodeRef).toEqual({ value: "NON" });

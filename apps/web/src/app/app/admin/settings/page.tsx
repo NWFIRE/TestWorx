@@ -9,7 +9,6 @@ import {
   getQuickBooksItemMappingSettings,
   getTenantMinimumTicketPricingSettings,
   getTenantWorkOrderLaborTypeSettings,
-  getPaginatedTenantServiceFeeSettings,
   getTenantBillingSettings,
   getTenantBrandingSettings,
   getTenantQuickBooksConnectionSettings
@@ -21,10 +20,8 @@ import { getAppNavItemsForRole } from "../../app-nav-config";
 
 import {
   createComplianceReportingFeeRuleAction,
-  createServiceFeeRuleAction,
   deleteComplianceReportingFeeRuleAction,
   deleteMinimumTicketRuleAction,
-  deleteServiceFeeRuleAction,
   disconnectQuickBooksAction,
   importQuickBooksCustomersAction,
   importQuickBooksCatalogItemsAction,
@@ -36,9 +33,7 @@ import {
   startQuickBooksConnectAction,
   startBillingCheckoutAction,
   updateComplianceReportingFeeRuleAction,
-  updateDefaultServiceFeeAction,
   upsertMinimumTicketRuleAction,
-  updateServiceFeeRuleAction,
   updateWorkOrderLaborTypeAction,
   updateTenantSidebarOrderAction
 } from "./actions";
@@ -46,7 +41,6 @@ import { BillingPlansSection } from "./billing-plans-section";
 import { ComplianceReportingFeeSettingsCard } from "./compliance-reporting-fee-settings-card";
 import { MinimumTicketPricingSettingsCard } from "./minimum-ticket-pricing-settings-card";
 import { QuickBooksItemMappingCard } from "./quickbooks-item-mapping-card";
-import { ServiceFeeSettingsCard } from "./service-fee-settings-card";
 import { QuickBooksSettingsCard } from "./quickbooks-settings-card";
 import { SettingsDisclosureCard } from "./settings-disclosure-card";
 import { SidebarOrderForm } from "./sidebar-order-form";
@@ -154,54 +148,6 @@ function LazySectionCard({
   );
 }
 
-async function ServiceFeesSection({
-  actor,
-  page,
-  activeEditor
-}: {
-  actor: { userId: string; role: string; tenantId: string };
-  page: number;
-  activeEditor: string | null;
-}) {
-  let data: Awaited<ReturnType<typeof getPaginatedTenantServiceFeeSettings>>;
-
-  try {
-    data = await getPaginatedTenantServiceFeeSettings(actor, {
-      page,
-      limit: 10,
-      includeLookups: Boolean(activeEditor)
-    });
-  } catch (error) {
-    return (
-      <LazySectionCard
-        actionHref={buildSettingsHref({ feesOpen: "1" }, { feesOpen: 1 })}
-        actionLabel="Try again"
-        description={error instanceof Error ? error.message : "Unable to load service fee rules right now."}
-        eyebrow="Inspection service fees"
-        title="Service fee rules could not be loaded"
-        tone="error"
-      />
-    );
-  }
-
-  return (
-    <ServiceFeeSettingsCard
-      createRuleAction={createServiceFeeRuleAction}
-      customers={data.customers}
-      defaultValues={{
-        defaultServiceFeeCode: data.tenant.defaultServiceFeeCode ?? "SERVICE_FEE",
-        defaultServiceFeeUnitPrice: data.tenant.defaultServiceFeeUnitPrice
-      }}
-      deleteRuleAction={deleteServiceFeeRuleAction}
-      activeEditor={activeEditor}
-      pagination={data.pagination}
-      rules={data.rules}
-      sites={data.sites}
-      updateDefaultAction={updateDefaultServiceFeeAction}
-      updateRuleAction={updateServiceFeeRuleAction}
-    />
-  );
-}
 
 async function ComplianceReportingFeesSection({
   actor,
@@ -362,8 +308,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   const params = searchParams ? await searchParams : {};
   const actor = { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId };
 
-  const feesPage = readPositiveInt(readSearchParam(params, "feesPage", "1"), 1);
-  const feeEditor = readSearchParam(params, "feeEditor") || null;
   const complianceFeePage = readPositiveInt(readSearchParam(params, "complianceFeePage", "1"), 1);
   const complianceFeeEditor = readSearchParam(params, "complianceFeeEditor") || null;
 
@@ -378,7 +322,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
     : typeof params.quickbooks === "string"
       ? decodeURIComponent(params.quickbooks)
       : null;
-  const feesOpen = isSectionOpen(params, "feesOpen");
   const complianceFeesOpen = isSectionOpen(params, "complianceFeesOpen");
   const minimumTicketOpen = isSectionOpen(params, "minimumTicketOpen");
   const workOrderLaborOpen = isSectionOpen(params, "workOrderLaborOpen");
@@ -419,10 +362,10 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
           value={brandingSettings.branding.legalBusinessName || "TradeWorx"}
         />
         <KPIStatCard
-          label="Service fees"
-          note="Rule and default fee controls stay available below."
-          tone="violet"
-          value={feesOpen ? "Open" : "Ready"}
+          label="Invoicing"
+          note="Admins review Ready to Bill and create invoices manually."
+          tone="slate"
+          value="Manual"
         />
       </section>
       <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_16rem]">
@@ -520,7 +463,7 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
             </Suspense>
           </SettingsDisclosureCard>
           <SettingsDisclosureCard
-            description="Enforce one ticket-level minimum after service fees, compliance fees, labor, parts, and report lines are calculated."
+            description="Enforce one ticket-level minimum after compliance fees, labor, parts, and report lines are calculated."
             eyebrow="Minimum ticket pricing"
             initialOpen={minimumTicketOpen}
             openLabel="Open minimum pricing"
@@ -565,30 +508,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
               }
             >
               <WorkOrderLaborTypesSection actor={actor} />
-            </Suspense>
-          </SettingsDisclosureCard>
-          <SettingsDisclosureCard
-            description="Load service fee rules only when you open the section. Rules stay paginated and keep their own loading, empty, and error states."
-            eyebrow="Inspection service fees"
-            initialOpen={feesOpen}
-            openLabel="Open service fee rules"
-            queryKey="feesOpen"
-            title="Default fee and location rules"
-          >
-            <Suspense
-              key={`fees-${feesPage}`}
-              fallback={
-                <LazySectionCard
-                  actionHref={buildSettingsHref(params, { feesOpen: 1, feesPage })}
-                  actionLabel="Reload section"
-                  description="Loading the current service fee rules page..."
-                  eyebrow="Inspection service fees"
-                  title="Default fee and location rules"
-                  tone="loading"
-                />
-              }
-            >
-              <ServiceFeesSection activeEditor={feeEditor} actor={actor} page={feesPage} />
             </Suspense>
           </SettingsDisclosureCard>
           <SectionCard className="self-start">
