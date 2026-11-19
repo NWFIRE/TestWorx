@@ -18,6 +18,16 @@ beforeEach(() => {
   db.inspection.updateMany.mockResolvedValue({ count: 1 });
 });
 describe("scheduler authorization and dispatch", () => {
+  it("includes the linked customer address in scheduler details without mutating the job", async () => {
+    const site = { ...job.site, name: "General / No Fixed Site", addressLine1: "No fixed service address" };
+    const customerCompany = { name: "Waste Connections", serviceAddressLine1: "38558 S. County Road 270", serviceCity: "Meno", serviceState: "OK", servicePostalCode: "73760" };
+    db.inspection.findFirst.mockResolvedValue({ ...job, site, customerCompany });
+    const result = await getSchedulerJob(actor, "job");
+    expect(serviceDestination(result.serviceLocation, result.customerLocation)).toEqual(serviceDestination(site, customerCompany));
+    expect(result.address).toContain("38558 S. County Road 270");
+    expect(db.inspection.updateMany).not.toHaveBeenCalled();
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
   it("uses the inspection site for directions without writing workflow data", async () => {
     const site = { ...job.site, id: "site", addressLine2: "Entrance B", latitude: 36.4, longitude: -97.9 };
     db.inspection.findFirst.mockResolvedValue({ ...job, site });

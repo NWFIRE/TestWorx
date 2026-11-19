@@ -26,6 +26,7 @@ export function MobileInspectionShell({
   customerName,
   serviceAddress,
   serviceLocation,
+  customerLocation,
   customerContactName,
   customerPhone,
   customerEmail,
@@ -49,6 +50,7 @@ export function MobileInspectionShell({
   customerName?: string | null;
   serviceAddress?: string | null;
   serviceLocation?: import("@testworx/lib/service-directions").ServiceLocation;
+  customerLocation?: import("@testworx/lib/service-directions").CustomerLocation;
   customerContactName?: string | null;
   customerPhone?: string | null;
   customerEmail?: string | null;
@@ -81,7 +83,7 @@ export function MobileInspectionShell({
                 <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">{title}</h1>
                 {siteName ? <p className="mt-2 text-sm font-medium text-slate-700">{siteName}</p> : null}
                 {customerName ? <p className="mt-1 text-sm text-slate-500">{customerName}</p> : null}
-                <ServiceDirections site={serviceLocation} />
+                <ServiceDirections site={serviceLocation} customer={customerLocation} />
                 <p className="mt-2 text-sm text-slate-500">{reportStatus}{currentSectionLabel ? ` • ${currentSectionLabel}` : ""}</p>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-right text-sm font-semibold text-slate-700">

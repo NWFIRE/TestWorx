@@ -3,6 +3,35 @@ import { drivingDirectionsUrl, serviceDestination } from "../service-directions"
 
 const first = { addressLine1: "10 Main St", addressLine2: "Unit 2", city: "Enid", state: "OK", postalCode: "73701" };
 describe("inspection driving directions", () => {
+  const customer = { serviceAddressLine1: "38558 S. County Road 270", serviceCity: "Meno", serviceState: "OK", servicePostalCode: "73760", serviceCountry: "USA", billingAddressLine1: "P. O. Box 169" };
+  it("resolves the reported placeholder-site case from the existing customer relationship", () => {
+    const site = { name: "General / No Fixed Site", addressLine1: "No fixed service address", city: "Unknown" };
+    expect(serviceDestination(site, customer).address).toBe("38558 S. County Road 270, Meno, OK, 73760, USA");
+    expect(serviceDestination(site, customer).destination).not.toContain("Box 169");
+  });
+  it("prefers a different assigned property over the customer default", () => {
+    expect(serviceDestination({ ...first, name: "Other property" }, customer).address).toBe(serviceDestination(first).address);
+  });
+  it("uses the customer default for a generic site even with a stale copied address", () => {
+    expect(serviceDestination({ ...first, name: "General / No Fixed Site" }, customer).address).toContain("38558");
+  });
+  it("uses the listed account address when there is no primary service street", () => {
+    expect(serviceDestination(null, { billingAddressLine1: "20 Oak", billingCity: "Enid" }).address).toBe("20 Oak, Enid");
+  });
+  it("does not let a partial site or service address hide a full customer address", () => {
+    expect(serviceDestination({ city: "Unknown" }, { serviceCity: "Enid", billingAddressLine1: "20 Oak" }).address).toBe("20 Oak");
+  });
+  it("keeps the saved entrance pin with the customer street label", () => {
+    expect(serviceDestination({ latitude: 36.4, longitude: -97.9 }, customer)).toMatchObject({ destination: "36.4,-97.9", hasPin: true, address: "38558 S. County Road 270, Meno, OK, 73760, USA" });
+  });
+  it("reports missing only when both sources have no usable address or pin", () => {
+    expect(serviceDestination({ addressLine1: "No fixed service address" }, { serviceAddressLine1: "Unknown", billingAddressLine1: "" }).destination).toBe("");
+  });
+  it("reflects customer updates without modifying or resaving the inspection", () => {
+    const site = Object.freeze({ name: "General / No Fixed Site" });
+    expect(serviceDestination(site, { serviceAddressLine1: "Old address" }).address).toBe("Old address");
+    expect(serviceDestination(site, { serviceAddressLine1: "New address" }).address).toBe("New address");
+  });
   it("routes existing address-only sites without backfill", () => {
     expect(serviceDestination(first)).toEqual({ address: "10 Main St, Unit 2, Enid, OK, 73701", destination: "10 Main St, Unit 2, Enid, OK, 73701", hasPin: false });
   });

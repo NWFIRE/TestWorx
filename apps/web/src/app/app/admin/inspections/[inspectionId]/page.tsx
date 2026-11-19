@@ -312,7 +312,7 @@ export default async function EditInspectionPage({
               </span>
             </div>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink">{inspectionDisplay.primaryTitle}</h2>
-            <ServiceDirections site={inspection.site} editable />
+            <ServiceDirections site={inspection.site} customer={inspection.customerCompany} editable />
             <p className="mt-2 max-w-4xl text-base text-slate-600">
               {[inspectionTypeLabel, inspectionDisplay.secondaryTitle, format(inspection.scheduledStart, "MMM d, yyyy h:mm a"), technicianLabel].filter(Boolean).join(" · ")}
             </p>

@@ -1,6 +1,6 @@
 # Inspection driving directions
 
-Inspection headers, technician agendas, and Scheduler job details share a site-only destination resolver. Customer billing addresses are never used. A valid saved latitude/longitude pair takes precedence over the assigned site's street address; the street address remains visible. Missing locations display Location needed.
+Inspection headers, technician agendas, and Scheduler job details share a relationship-based destination resolver. A named assigned site with its own street address takes precedence. Otherwise the linked customer's primary service address is used, followed by its listed account/billing address when no primary service street exists. Generic sites prefer the current customer address, not stale placeholder/copy data. This is resolved on read for existing and new inspections without any save or backfill. A valid saved latitude/longitude pair takes precedence for routing; the resolved street address remains visible. Location needed is shown only after the data loads and no usable address or pin exists.
 
 Office and tenant administrators can use Add location / Edit location on an inspection or Scheduler detail. Edits apply to the shared service site, are tenant-scoped, and are audited. Both coordinates must be provided together (latitude -90..90, longitude -180..180); clearing both restores address routing. The additive Site migration must run before deployment.
 

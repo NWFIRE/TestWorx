@@ -373,7 +373,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                       {inspection.isPriority ? <div className="mb-2"><PriorityInspectionBadge compact /></div> : null}
                       <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
                       {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
-                      <ServiceDirections site={inspection.site} />
+                      <ServiceDirections site={inspection.site} customer={inspection.customerCompany} />
                     </div>
                     <span className="rounded-full border border-[color:var(--tenant-primary-border)] bg-[var(--tenant-primary-soft)] px-3 py-1 text-xs font-semibold text-[var(--tenant-primary)]">
                       Open
@@ -389,7 +389,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                       contactName={inspection.customerCompany?.contactName}
                       email={inspection.customerCompany?.billingEmail}
                       phone={inspection.customerCompany?.phone}
-                      serviceAddress={serviceDestination(inspection.site).address}
+                      serviceAddress={serviceDestination(inspection.site, inspection.customerCompany).address}
                     />
                   </div>
                   {hasAttachedPdfs(inspection) ? (
@@ -416,7 +416,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                 {inspection.isPriority ? <div className="mb-2"><PriorityInspectionBadge compact /></div> : null}
                 <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
                 {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
-                <ServiceDirections site={inspection.site} />
+                <ServiceDirections site={inspection.site} customer={inspection.customerCompany} />
                 <p className="mt-3 text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
                 <DispatchNotesCard className="mt-4" compact notes={inspection.notes} />
                 <div className="mt-4">
@@ -425,7 +425,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                     contactName={inspection.customerCompany?.contactName}
                     email={inspection.customerCompany?.billingEmail}
                     phone={inspection.customerCompany?.phone}
-                    serviceAddress={serviceDestination(inspection.site).address}
+                    serviceAddress={serviceDestination(inspection.site, inspection.customerCompany).address}
                   />
                 </div>
                 <div className="mt-4">
@@ -463,7 +463,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                         {inspection.isPriority ? <div className="mb-2"><PriorityInspectionBadge compact /></div> : null}
                         <p className="truncate text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
                         {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
-                        <ServiceDirections site={inspection.site} />
+                        <ServiceDirections site={inspection.site} customer={inspection.customerCompany} />
                       </div>
                       <span className="inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
                         {formatTechnicianWorkTiming(inspection)}
@@ -477,7 +477,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                         contactName={inspection.customerCompany?.contactName}
                         email={inspection.customerCompany?.billingEmail}
                         phone={inspection.customerCompany?.phone}
-                        serviceAddress={serviceDestination(inspection.site).address}
+                        serviceAddress={serviceDestination(inspection.site, inspection.customerCompany).address}
                       />
                     </div>
                     {hasAttachedPdfs(inspection) ? (
@@ -520,7 +520,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                   {inspection.isPriority ? <div className="mb-2"><PriorityInspectionBadge compact /></div> : null}
                   <p className="text-base font-semibold text-slate-950">{inspection.primaryTitle}</p>
                   {inspection.secondaryTitle ? <p className="mt-1 text-sm text-slate-500">{inspection.secondaryTitle}</p> : null}
-                  <ServiceDirections site={inspection.site} />
+                  <ServiceDirections site={inspection.site} customer={inspection.customerCompany} />
                   <p className="mt-3 text-sm text-slate-600">{inspection.tasks.map((task: any) => task.displayLabel ?? task.inspectionType.replaceAll("_", " ")).join(", ")}</p>
                   <DispatchNotesCard className="mt-4" compact notes={inspection.notes} />
                   <div className="mt-4">
@@ -529,7 +529,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
                       contactName={inspection.customerCompany?.contactName}
                       email={inspection.customerCompany?.billingEmail}
                       phone={inspection.customerCompany?.phone}
-                      serviceAddress={serviceDestination(inspection.site).address}
+                      serviceAddress={serviceDestination(inspection.site, inspection.customerCompany).address}
                     />
                   </div>
                   <div className="mt-4">

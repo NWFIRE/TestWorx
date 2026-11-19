@@ -553,6 +553,7 @@ export function MobileFireAlarmReportScreen({
       customerEmail={data.customerEmail}
       customerPhone={data.customerPhone}
       dispatchNotes={data.dispatchNotes}
+      customerLocation={data.customerLocation}
       serviceLocation={data.serviceLocation}
       serviceAddress={data.serviceAddress}
       siteName={data.siteName}
@@ -789,6 +790,7 @@ function MobileReportSummaryBanner({
       customerEmail={data.customerEmail}
       customerPhone={data.customerPhone}
       dispatchNotes={data.dispatchNotes}
+      customerLocation={data.customerLocation}
       serviceLocation={data.serviceLocation}
       serviceAddress={data.serviceAddress}
       siteName={data.siteName}

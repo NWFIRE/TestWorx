@@ -1,5 +1,5 @@
 import { normalizeTenantTimezone } from "./timezone";
-import type { ServiceLocation } from "./service-directions";
+import type { ServiceLocation, CustomerLocation } from "./service-directions";
 
 export function localDateTime(value: string | Date, timezone: string) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: normalizeTenantTimezone(timezone), year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(value));
@@ -40,6 +40,7 @@ export function schedulerRange(day: string, view: "day" | "week", timezone: stri
 
 export type SchedulerJob = {
   serviceLocation?: ServiceLocation;
+  customerLocation?: CustomerLocation;
   id: string; customer: string; site: string; address: string; types: string[]; technicianIds: string[];
   scheduledStart: string; scheduledEnd: string | null; updatedAt: string; status: string;
   sessions: { technicianId: string; startedAt: string; endedAt: string | null; endReason: string | null }[];

@@ -80,6 +80,7 @@ export type TechnicianReportEditorData = {
   siteName: string;
   customerName: string;
   serviceLocation?: import("@testworx/lib/service-directions").ServiceLocation;
+  customerLocation?: import("@testworx/lib/service-directions").CustomerLocation;
   serviceAddress?: string | null;
   customerContactName?: string | null;
   customerPhone?: string | null;
@@ -1086,6 +1087,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
         isPriority={data.isPriority}
         saveState={saveState}
         scheduledDateLabel={data.scheduledDateLabel}
+        customerLocation={data.customerLocation}
         serviceLocation={data.serviceLocation}
         serviceAddress={data.serviceAddress}
         siteName={data.siteName}

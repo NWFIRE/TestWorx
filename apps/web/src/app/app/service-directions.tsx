@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { drivingDirectionsUrl, serviceDestination, type ServiceLocation } from "@testworx/lib/service-directions";
+import { drivingDirectionsUrl, serviceDestination, type ServiceLocation, type CustomerLocation } from "@testworx/lib/service-directions";
 
-export function ServiceDirections({ site, editable = false }: { site?: ServiceLocation | null; editable?: boolean }) {
-  const [location, setLocation] = useState(site);
+export function ServiceDirections({ site, customer, loading = false, editable = false }: { site?: ServiceLocation | null; customer?: CustomerLocation | null; loading?: boolean; editable?: boolean }) {
+  const [saved, setSaved] = useState<{ original: typeof site; value: ServiceLocation } | null>(null);
+  const location = saved && saved.original === site ? saved.value : site;
   const [apple, setApple] = useState(false);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => { setLocation(site); }, [site]);
   useEffect(() => { setApple(/iPhone|iPad|iPod/i.test(navigator.userAgent) || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1)); }, []);
-  const resolved = serviceDestination(location);
+  const resolved = serviceDestination(location, customer);
   async function save(form: HTMLFormElement) {
     if (busy || !site?.id) return;
     const fields = new FormData(form);
@@ -23,10 +23,11 @@ export function ServiceDirections({ site, editable = false }: { site?: ServiceLo
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to save location.");
-      setLocation(result.site); setEditing(false);
+      setSaved({ original: site, value: result.site }); setEditing(false);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to save location."); }
     finally { setBusy(false); }
   }
+  if (loading) return <p className="my-2 text-sm text-slate-500" role="status">Loading location...</p>;
   return <div className="my-2 space-y-2 text-sm" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
     <div className="flex flex-wrap items-center gap-3">
       <span className="min-w-0 break-words text-slate-600">{resolved.address || (resolved.hasPin ? "Service entrance pin" : "Location needed")}</span>

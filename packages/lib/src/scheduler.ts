@@ -17,7 +17,7 @@ async function authorize(actor: Actor) {
 }
 const select = {
   id: true, scheduledStart: true, scheduledEnd: true, updatedAt: true, status: true, archivedAt: true, assignedTechnicianId: true,
-  customerCompany: { select: { name: true } },
+  customerCompany: { select: { id: true, name: true, serviceAddressLine1: true, serviceAddressLine2: true, serviceCity: true, serviceState: true, servicePostalCode: true, serviceCountry: true, billingAddressLine1: true, billingAddressLine2: true, billingCity: true, billingState: true, billingPostalCode: true, billingCountry: true } },
   site: { select: { id: true, name: true, addressLine1: true, addressLine2: true, city: true, state: true, postalCode: true, latitude: true, longitude: true } },
   tasks: { select: { inspectionType: true } }, technicianAssignments: { select: { technicianId: true } },
   jobTimeSessions: { select: { technicianId: true, startedAt: true, endedAt: true, endReason: true } }
@@ -25,7 +25,8 @@ const select = {
 function serialize(job: Prisma.InspectionGetPayload<{ select: typeof select }>): SchedulerJob {
   return { id: job.id, customer: job.customerCompany.name, site: /general.*no fixed|no fixed site/i.test(job.site.name) ? "" : job.site.name,
     serviceLocation: job.site,
-    address: serviceDestination(job.site).address,
+    customerLocation: job.customerCompany,
+    address: serviceDestination(job.site, job.customerCompany).address,
     types: [...new Set(job.tasks.map((t) => t.inspectionType))],
     technicianIds: [...new Set([job.assignedTechnicianId, ...job.technicianAssignments.map((a) => a.technicianId)].filter((id): id is string => Boolean(id)))],
     scheduledStart: job.scheduledStart.toISOString(), scheduledEnd: job.scheduledEnd?.toISOString() ?? null,
