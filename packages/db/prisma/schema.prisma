@@ -1031,6 +1031,7 @@ model Inspection {
       convertedFromQuotes   Quote[]                 @relation("QuoteConvertedInspection")
 
     @@index([tenantId, inspectionClassification])
+    @@index([tenantId, scheduledStart])
     @@index([tenantId, isPriority])
     @@index([tenantId, archivedAt])
     @@index([tenantId, completedAt])

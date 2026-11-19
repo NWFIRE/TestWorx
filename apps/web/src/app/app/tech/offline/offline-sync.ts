@@ -395,7 +395,7 @@ export async function processSyncQueue() {
   return syncInFlight;
 }
 
-export async function queueJobTimeEvent(payload: { inspectionId: string; sessionId: string; userId: string; action: "start" | "pause"; occurredAt: string; offline: boolean }) {
+export async function queueJobTimeEvent(payload: { inspectionId: string; sessionId: string; userId: string; action: "start" | "pause" | "finish"; occurredAt: string; offline: boolean }) {
   await upsertPendingQueueEntry({ id: `job_time:${payload.sessionId}:${payload.action}`, entityType: "job_time", entityId: payload.sessionId, operation: "job_time_event", payload });
   await processSyncQueue();
   // A save already in flight may have taken its queue snapshot before this event.

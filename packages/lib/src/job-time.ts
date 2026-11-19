@@ -48,7 +48,7 @@ export async function assertJobStarted(actor: Actor, inspectionId: string, db: P
 }
 
 export const jobTimeEventSchema = z.object({
-  inspectionId: z.string().min(1), sessionId: z.string().uuid(), action: z.enum(["start", "pause"]),
+  inspectionId: z.string().min(1), sessionId: z.string().uuid(), action: z.enum(["start", "pause", "finish"]),
   occurredAt: z.string().datetime(), offline: z.boolean().default(false), userId: z.string().min(1)
 });
 
@@ -81,15 +81,14 @@ export async function recordJobTimeEvent(actor: Actor, raw: unknown) {
       if (overlap) throw new Error("Pause your current job first. Overlapping job time needs office review.");
       const session = await tx.jobTimeSession.create({ data: { id: event.sessionId, tenantId: actor.tenantId!, inspectionId: event.inspectionId,
         technicianId: actor.userId, startedAt: time, needsReview: delayed } });
-      await tx.inspection.updateMany({ where: { id: event.inspectionId, tenantId: actor.tenantId!, status: { in: ["to_be_completed", "scheduled"] } }, data: { status: "in_progress" } });
       await tx.auditLog.create({ data: { tenantId: actor.tenantId!, actorUserId: actor.userId, action: "job.started", entityType: "Inspection", entityId: event.inspectionId, metadata: { sessionId: session.id, offline: event.offline, occurredAt: time.toISOString() } } });
       return session;
     }
     if (!existing) throw new Error("Job start has not synced yet. Retry syncing before pausing.");
     if (existing.endedAt) return existing;
     if (time < existing.startedAt) throw new Error("Job time needs office review: stop time is before start time.");
-    const session = await tx.jobTimeSession.update({ where: { id: existing.id }, data: { endedAt: time, endReason: "paused", needsReview: existing.needsReview || delayed } });
-    await tx.auditLog.create({ data: { tenantId: actor.tenantId!, actorUserId: actor.userId, action: "job.paused", entityType: "Inspection", entityId: event.inspectionId, metadata: { sessionId: session.id, occurredAt: time.toISOString() } } });
+    const session = await tx.jobTimeSession.update({ where: { id: existing.id }, data: { endedAt: time, endReason: event.action === "finish" ? "field_finished" : "paused", needsReview: existing.needsReview || delayed } });
+    await tx.auditLog.create({ data: { tenantId: actor.tenantId!, actorUserId: actor.userId, action: event.action === "finish" ? "job.field_finished" : "job.paused", entityType: "Inspection", entityId: event.inspectionId, metadata: { sessionId: session.id, occurredAt: time.toISOString() } } });
     return session;
   }).catch(async (error: unknown) => {
     await prisma.auditLog.create({ data: { tenantId: actor.tenantId!, actorUserId: actor.userId, action: "job.time_conflict", entityType: "Inspection", entityId: event.inspectionId,

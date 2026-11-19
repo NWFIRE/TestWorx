@@ -49,10 +49,10 @@ describe("job time", () => {
     await assertJobStarted({ ...actor, role: "office_admin" }, "job");
     expect(db.jobTimeSession.findFirst).not.toHaveBeenCalled();
   });
-  it("starts a job once and advances only a starting status", async () => {
+  it("starts field work without changing inspection or report status", async () => {
     await recordJobTimeEvent(actor, event());
     expect(db.jobTimeSession.create).toHaveBeenCalledOnce();
-    expect(db.inspection.updateMany).toHaveBeenCalledWith({ where: { id: "job", tenantId: "tenant", status: { in: ["to_be_completed", "scheduled"] } }, data: { status: "in_progress" } });
+    expect(db.inspection.updateMany).not.toHaveBeenCalled();
     expect(db.auditLog.create).toHaveBeenCalledOnce();
   });
   it("deduplicates a retried start without reopening a stopped session", async () => {
@@ -88,6 +88,12 @@ describe("job time", () => {
     await recordJobTimeEvent(actor, { ...event(), action: "pause" });
     expect(db.jobTimeSession.update).toHaveBeenCalledWith({ where: { id }, data: expect.objectContaining({ endedAt: expect.any(Date), endReason: "paused" }) });
   });
+  it("finishes field work without finalizing inspection/report status", async () => {
+    db.jobTimeSession.findFirst.mockResolvedValue({ id, tenantId: "tenant", technicianId: "tech", inspectionId: "job", startedAt: new Date(Date.now() - 3600000), endedAt: null });
+    await recordJobTimeEvent(actor, { ...event(), action: "finish" });
+    expect(db.jobTimeSession.update).toHaveBeenCalledWith({ where: { id }, data: expect.objectContaining({ endedAt: expect.any(Date), endReason: "field_finished" }) });
+    expect(db.inspection.updateMany).not.toHaveBeenCalled();
+  });
   it("viewing does not change job status or create time", async () => {
     db.jobTimeSession.findMany.mockResolvedValue([]);
     await getJobTime(actor, "job");
@@ -109,7 +115,7 @@ describe("job time", () => {
     db.inspection.findFirst.mockResolvedValue({ status: "completed", assignedTechnicianId: "tech", technicianAssignments: [], reports: [{ status: "draft", correctionState: "reissued_to_technician" }] });
     await recordJobTimeEvent(actor, event());
     expect(db.jobTimeSession.create).toHaveBeenCalledOnce();
-    expect(db.inspection.updateMany.mock.calls[0]?.[0].where.status.in).not.toContain("completed");
+    expect(db.inspection.updateMany).not.toHaveBeenCalled();
   });
   it("rejects future offline timestamps", async () => {
     await expect(recordJobTimeEvent(actor, { ...event(), offline: true, occurredAt: new Date(Date.now() + 3600000).toISOString() })).rejects.toThrow("office review");

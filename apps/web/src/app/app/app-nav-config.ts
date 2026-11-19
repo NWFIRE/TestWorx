@@ -46,6 +46,7 @@ const partsAndServicesNavItem: AppNavItem = {
 };
 
 const adminNavItems: AppNavItem[] = [
+  { href: "/app/admin/scheduler", label: "Scheduler", shortLabel: "Scheduler", abbreviation: "SC", icon: "calendar", description: "Dispatch and live field progress", tone: "blue", group: "Work" },
   {
     href: "/app/admin/dashboard",
     label: "Dashboard",

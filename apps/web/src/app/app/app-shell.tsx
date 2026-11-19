@@ -1028,7 +1028,7 @@ export function AppShell({
           }}
         >
           <MobilePullToRefresh containerRef={contentRef} drawerOpen={drawerOpen} gestureRef={shellContentRef}>
-            <div className="mx-auto w-full max-w-[1700px] min-w-0">{children}</div>
+            <div className={`mx-auto w-full min-w-0 ${pathname === "/app/admin/scheduler" ? "" : "max-w-[1700px]"}`}>{children}</div>
           </MobilePullToRefresh>
         </main>
       </div>
