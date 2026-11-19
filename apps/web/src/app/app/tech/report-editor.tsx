@@ -1154,7 +1154,6 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0">
               <h3 className="text-lg font-semibold text-ink">Sections</h3>
-              <p className="mt-1 text-sm text-slate-500">Move through the report from the top without shrinking the editing canvas below.</p>
             </div>
             <div className="flex items-center gap-2 self-start md:self-start">
               <button className="min-h-11 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-ink" onClick={() => setShowPreview((current) => !current)} type="button">

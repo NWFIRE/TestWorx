@@ -14,7 +14,7 @@ export default async function MonthlyInspectionsPage({ searchParams }: { searchP
   const invalid = params?.month !== undefined && !/^(19|20|21)\d{2}-(0[1-9]|1[0-2])$/.test(params.month);
   const data = await getMonthlyInspectionList({ userId: session.user.id, tenantId: session.user.tenantId, role: session.user.role }, invalid ? undefined : params?.month);
   return <AppPageShell density="wide">
-    <PageHeader eyebrow="Inspections" title="Monthly inspection list" description="All inspections scheduled in the selected month, including completed and cancelled visits. One row per inspection." actions={<Link href="/app/admin/inspections" className="text-sm font-semibold text-slateblue">Back to inspections</Link>} />
+    <PageHeader eyebrow="Inspections" title="Monthly inspection list"  actions={<Link href="/app/admin/inspections" className="text-sm font-semibold text-slateblue">Back to inspections</Link>} />
     <SectionCard>
       <MonthlyInspectionControls {...data} />
       {invalid ? <p role="alert" className="mt-3 text-sm text-red-700">Invalid month. Showing the current month instead.</p> : null}

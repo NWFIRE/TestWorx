@@ -215,7 +215,6 @@ export default async function AdminBillingPage({
             </Link>
           </div>
         }
-        description="Review quantities, item mappings, services, materials, and fees before QuickBooks creates the final invoice pricing."
         eyebrow="Billing"
         title="Inspection billing summaries"
       />

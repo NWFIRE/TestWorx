@@ -17,7 +17,7 @@ export function FavoriteManualsSection({
       <div className="flex items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--tenant-primary)]">Favorites</p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Fastest way back to the manuals you use most.</h2>
+          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Favorite manuals</h2>
         </div>
         <Link className="text-sm font-semibold text-[var(--tenant-primary)]" href="/app/manuals?favoritesOnly=true">
           View all

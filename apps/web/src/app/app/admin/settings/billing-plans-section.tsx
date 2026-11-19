@@ -43,10 +43,7 @@ export function BillingPlansSection({
       <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel sm:p-7">
         <div className="max-w-3xl">
           <p className="text-sm uppercase tracking-[0.28em] text-slate-500">Plans</p>
-          <h3 className="mt-3 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">Choose the plan that fits how your service business runs now and where it is headed next.</h3>
-          <p className="mt-3 text-sm leading-7 text-slate-500 sm:text-base">
-            TradeWorx is structured to support a clear progression from getting organized, to automating growth, to operating with tighter control and compliance oversight.
-          </p>
+          <h3 className="mt-3 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">Subscription plans</h3>
         </div>
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
           {plans.map((plan) => {
@@ -154,9 +151,6 @@ export function BillingPlansSection({
                   </div>
                 )}
 
-                {plan.contactSales ? (
-                  <p className="mt-3 text-xs leading-6 text-slate-500">Enterprise rollouts include coordination for onboarding, rollout planning, and operational support.</p>
-                ) : null}
               </article>
             );
           })}
@@ -167,10 +161,8 @@ export function BillingPlansSection({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="max-w-2xl">
             <p className="text-sm uppercase tracking-[0.28em] text-slate-500">Add-ons</p>
-            <h4 className="mt-3 text-2xl font-semibold tracking-tight text-ink">Expand the platform as operations become more specialized.</h4>
-            <p className="mt-2 text-sm leading-7 text-slate-500">These modules add depth where your team needs more automation, compliance support, or customer-facing polish.</p>
+            <h4 className="mt-3 text-2xl font-semibold tracking-tight text-ink">Optional modules</h4>
           </div>
-          <p className="text-sm font-medium text-slate-500">Available as optional expansion, not bundled clutter.</p>
         </div>
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {addons.map((addon) => (
@@ -179,9 +171,6 @@ export function BillingPlansSection({
               <p className="mt-2 text-sm leading-7 text-slate-500">{addon.description}</p>
             </div>
           ))}
-        </div>
-        <div className="mt-6 rounded-[1.5rem] border border-slate-200 bg-white/80 px-5 py-4 text-sm leading-7 text-slate-600">
-          Need help deciding? Professional is the right fit for most active field service companies. Enterprise is best when operational control, compliance complexity, and rollout support matter as much as core workflow depth.
         </div>
       </div>
     </section>

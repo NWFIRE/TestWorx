@@ -13,7 +13,7 @@ export function ManualsPageHeader({
             Manuals
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-950 md:text-4xl">
-            Search manuals by system, manufacturer, or model.
+            Manuals
           </h1>
         </div>
         {canManage ? (

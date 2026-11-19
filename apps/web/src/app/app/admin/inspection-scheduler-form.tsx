@@ -799,7 +799,6 @@ export function InspectionSchedulerForm({
         <div className="min-w-0 rounded-[1.25rem] border border-slate-200 p-4 sm:rounded-[1.5rem]">
           <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 sm:text-sm sm:tracking-[0.2em]">Inspection context</p>
           <h4 className="mt-1 text-lg font-semibold text-ink">Inspection Classification</h4>
-          <p className="mt-2 text-sm leading-5 text-slate-500">Identify the nature of the inspection.</p>
           <div className="mt-4 flex flex-wrap gap-3">
             {inspectionClassificationOptions.map((option) => {
               const active = inspectionClassification === option;
@@ -824,7 +823,6 @@ export function InspectionSchedulerForm({
         <div className="min-w-0 rounded-[1.25rem] border border-slate-200 p-4 sm:rounded-[1.5rem]">
           <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 sm:text-sm sm:tracking-[0.2em]">Operational visibility</p>
           <h4 className="mt-1 text-lg font-semibold text-ink">Priority</h4>
-          <p className="mt-2 text-sm leading-5 text-slate-500">Use priority to make the inspection stand out for office staff and technicians.</p>
           <label className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
             <div>
               <p className="text-sm font-semibold text-slate-900">{isPriority ? "Priority on" : "Priority off"}</p>
@@ -1013,7 +1011,7 @@ export function InspectionSchedulerForm({
         <div className="flex flex-col gap-3">
           <div>
             <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 sm:text-sm sm:tracking-[0.2em]">Services on this visit</p>
-            <h4 className="mt-1 text-lg font-semibold text-ink">Schedule for this visit and track future due work</h4>
+            <h4 className="mt-1 text-lg font-semibold text-ink">Service lines</h4>
             <p className="mt-2 text-sm leading-5 text-slate-500">Each service line can have its own technician, due month, optional hard date, and scheduling status.</p>
           </div>
         </div>
@@ -1205,7 +1203,6 @@ export function InspectionSchedulerForm({
         <div className="min-w-0 space-y-4 rounded-[1.25rem] border border-slate-200 p-4 sm:rounded-[1.5rem]">
           <div>
             <p className="text-sm font-medium text-slate-600">External customer PDFs</p>
-            <p className="mt-1 text-sm leading-5 text-slate-500">Optional. Attach customer-provided PDFs while scheduling so they are ready for the field team on day one.</p>
           </div>
           <div>
             <p className="mb-2 block text-sm font-medium text-slate-600" id="externalDocumentsLabel">Upload PDF documents</p>

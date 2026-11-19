@@ -240,14 +240,14 @@ function CustomerFieldGroup({
   children
 }: {
   title: string;
-  description: string;
+  description?: string;
   children: ReactNode;
 }) {
   return (
     <section className="rounded-[1.25rem] border border-slate-200/80 bg-slate-50/70 p-4">
       <div className="mb-4">
         <p className="text-sm font-semibold text-ink">{title}</p>
-        <p className="mt-1 text-sm text-slate-500">{description}</p>
+        {description ? <p className="mt-1 text-sm text-slate-500">{description}</p> : null}
       </div>
       {children}
     </section>
@@ -278,7 +278,6 @@ export function CustomerProfileFields({
     <div className="space-y-4">
       <CustomerFieldGroup
         title="Contact information"
-        description="Core company and contact details used in scheduling, billing, and the customer portal."
       >
         <div className="grid gap-4 md:grid-cols-2">
           <div>
@@ -321,7 +320,6 @@ export function CustomerProfileFields({
 
       <CustomerFieldGroup
         title="Service address"
-        description="This is the operational location technicians and schedulers should see first."
       >
         <div className="grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
@@ -404,7 +402,6 @@ export function CustomerProfileFields({
 
       <CustomerFieldGroup
         title="Billing and payment settings"
-        description="Capture the payment terms technicians and the office team need during scheduling, collection, and invoicing."
       >
         <div className="grid gap-4 md:grid-cols-2">
           <div>
@@ -751,7 +748,6 @@ export function CustomerManagementCard({
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Customer companies</p>
         <h3 className="mt-2 text-2xl font-semibold text-ink">Browse and add customer companies</h3>
-        <p className="mt-2 text-sm text-slate-500">Keep this page focused on discovery, then open the full client profile when you need operational, billing, and account detail.</p>
       </div>
 
       <section className="rounded-[1.5rem] border border-slate-200 p-5">
@@ -763,7 +759,6 @@ export function CustomerManagementCard({
           <div>
             <p className="text-sm uppercase tracking-[0.18em] text-slate-500">New customer</p>
             <h4 className="mt-1 text-lg font-semibold text-ink">Add a customer company</h4>
-            <p className="mt-2 text-sm text-slate-500">Open the intake form only when you need to add a new customer.</p>
           </div>
           <span className="text-sm font-semibold text-slateblue">{isCreateOpen ? "Collapse" : "Expand"}</span>
         </button>

@@ -126,7 +126,6 @@ export default async function InspectionArchivePage({
       <PageHeader
         eyebrow="Inspection archive"
         title="Inspection Archive"
-        description="Search completed inspections across months of history without cluttering the active dispatch and review workflows."
         contentWidth="full"
       />
 

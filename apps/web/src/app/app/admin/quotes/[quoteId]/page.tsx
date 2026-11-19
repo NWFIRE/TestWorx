@@ -76,7 +76,6 @@ export default async function QuoteDetailPage({
         backNavigation={{ label: "Back to quotes", fallbackHref: returnHref }}
         eyebrow="Quotes"
         title={detail.quoteNumber}
-        description="Manage delivery, QuickBooks sync, approval, and operational conversion from one quote workspace."
         contentWidth="full"
         actions={
           <>
@@ -167,7 +166,6 @@ export default async function QuoteDetailPage({
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Deficiency context</p>
                   <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Included deficiencies</h2>
-                  <p className="mt-2 text-sm text-slate-500">Use this context while preparing quote line items, pricing, and customer-facing notes.</p>
                 </div>
                 <StatusBadge label={`${detail.deficiencies.length} linked`} tone="blue" />
               </div>
@@ -213,7 +211,6 @@ export default async function QuoteDetailPage({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Customer approval activity</h2>
-                <p className="mt-2 text-sm text-slate-500">Track hosted-link delivery, customer engagement, and the current response state without leaving the quote workspace.</p>
               </div>
               <StatusBadge label={detail.engagementStatus.replaceAll("_", " ")} tone={detail.engagementStatus === "available" || detail.engagementStatus === "approved" ? "emerald" : detail.engagementStatus === "declined" || detail.engagementStatus === "cancelled" ? "rose" : detail.engagementStatus === "expired" ? "amber" : "slate"} />
             </div>
@@ -269,7 +266,6 @@ export default async function QuoteDetailPage({
 
           <SectionCard>
             <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">QuickBooks item mapping</h2>
-            <p className="mt-2 text-sm text-slate-500">Map each quote line to the correct QuickBooks product or service using the cached QuickBooks item catalog. Sync uses stored QuickBooks item ids, not name guessing.</p>
             <div className="mt-4 space-y-4">
               {detail.lineItems.map((line) => (
                 <div key={line.id} className="rounded-[24px] border border-slate-200/80 bg-slate-50/70 p-4">

@@ -488,7 +488,6 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
               <SectionCard>
                 <SectionHeader
                   title="Account overview"
-                  description="Quick operational and billing context so office staff can understand the customer at a glance."
                 />
                 <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   <SummaryMetric label="Last inspection" note="Most recent completed inspection. Uses the scheduled date only for older completed records without a completion date." value={formatDate(data.overview.lastInspectionAt)} />
@@ -503,7 +502,6 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
               <SectionCard>
                 <SectionHeader
                   title="Sites and service locations"
-                  description="Every location tied to this account, with inspection and asset counts for fast operational context."
                 />
                 <div className="mt-5 space-y-3">
                   {data.sites.length === 0 ? (
@@ -541,7 +539,6 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
               <SectionCard>
                 <SectionHeader
                   title="Contact and billing context"
-                  description="The key account details office staff needs before quoting, dispatching, or invoicing."
                 />
                 <div className="mt-5 space-y-4">
                   <DetailField label="Billing address" value={data.customer.billingAddress || "No billing address saved"} />
@@ -553,7 +550,6 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
               <SectionCard>
                 <SectionHeader
                   title="Recent account activity"
-                  description="The latest cross-functional signals from operational work, billing, and internal admin actions."
                 />
                 <div className="mt-5 space-y-3">
                   {data.activity.slice(0, 8).map((item) => (
@@ -582,7 +578,6 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
         <SectionCard>
           <SectionHeader
             title="Inspection history"
-            description="Completed, in-flight, and archived inspection history with site, technician, result, and report access."
           />
           <div className="mt-5">
             <FilterToolbar
@@ -641,7 +636,6 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
         <SectionCard>
           <SectionHeader
             title="Quote and proposal history"
-            description="Every proposal issued for this customer, including hosted links, expiration visibility, and QuickBooks estimate references."
           />
           <div className="mt-5">
             <FilterToolbar
@@ -697,7 +691,6 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
         <SectionCard>
           <SectionHeader
             title="Work and service history"
-            description="Service-style history tied to work-order tasks or non-inspection operational visits."
           />
           <div className="mt-5">
             <FilterToolbar
@@ -750,7 +743,6 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
         <SectionCard>
           <SectionHeader
             title="Billing and invoice history"
-            description="QuickBooks invoice visibility, balances, payment posture, and invoice access in one customer-specific billing workspace."
           >
             <ActionButton
               onClick={() => {
@@ -871,7 +863,6 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
         <SectionCard>
           <SectionHeader
             title="Documents and files"
-            description="Reports, proposal PDFs, signed documents, and inspection attachments connected to this customer."
           />
           <div className="mt-5">
             <FilterToolbar
@@ -912,7 +903,6 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
           <SectionCard>
             <SectionHeader
               title="Internal notes"
-              description="Persistent internal customer context for dispatch, billing, access, and service instructions."
             />
             <div className="mt-5 rounded-[24px] border border-slate-200/80 bg-slate-50/70 p-5 text-sm leading-7 text-slate-700">
               {sanitizeText(data.notes.customerNotes, "No internal customer notes have been saved yet.")}
@@ -922,7 +912,6 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
           <SectionCard>
             <SectionHeader
               title="Recent note-adjacent activity"
-              description="Recent internal changes and account actions that help explain current context."
             />
             <div className="mt-5 space-y-3">
               {data.notes.recentActivity.length === 0 ? (
@@ -947,7 +936,6 @@ export function ClientProfileWorkspace({ data }: { data: ClientProfileData }) {
         <SectionCard>
           <SectionHeader
             title="Customer activity timeline"
-            description="A unified operational timeline across inspections, quotes, invoices, and internal admin events."
           />
           <div className="mt-5">
             <FilterToolbar

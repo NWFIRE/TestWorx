@@ -303,7 +303,7 @@ function InviteFormCard({
   customerMode = false
 }: {
   title: string;
-  description: string;
+  description?: string;
   customerCompanies: CustomerOption[];
   customerMode?: boolean;
 }) {
@@ -318,7 +318,7 @@ function InviteFormCard({
       <div className="max-w-2xl">
         <p className="text-sm uppercase tracking-[0.24em] text-[color:var(--text-tertiary)]">{customerMode ? "Customer portal access" : "Team invites"}</p>
         <h2 className="mt-2 text-2xl font-semibold text-ink">{title}</h2>
-        <p className="mt-2 text-sm text-[color:var(--text-muted)]">{description}</p>
+        {description ? <p className="mt-2 text-sm text-[color:var(--text-muted)]">{description}</p> : null}
       </div>
       <form action={formAction} className="mt-5 space-y-4">
         <div className="grid gap-4 lg:grid-cols-3">
@@ -606,7 +606,7 @@ function AsyncUserLookupSection({
 }: {
   kind: "internal" | "customer";
   title: string;
-  description: string;
+  description?: string;
   statusFilter?: "all" | "active" | "inactive";
 }) {
   const [open, setOpen] = useState(false);
@@ -769,7 +769,7 @@ function AsyncUserLookupSection({
       <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-panel">
         <p className="text-sm uppercase tracking-[0.24em] text-slate-400">{kind === "internal" ? "Team" : "Customer portal"}</p>
         <h2 className="mt-2 text-2xl font-semibold text-ink">{title}</h2>
-        <p className="mt-2 text-sm text-slate-500">{description}</p>
+        {description ? <p className="mt-2 text-sm text-slate-500">{description}</p> : null}
 
         <div className="mt-5 space-y-3">
           <button
@@ -920,14 +920,12 @@ export function TeamManagementWorkspace({
   return (
     <AppPageShell>
       <PageHeader
-        description="Invite internal users, grant portal access, adjust allowances, and handle account resets from one polished operations workspace."
         eyebrow="Account workspace"
         title="Team and customer portal access"
       />
 
       <FilterBar
         defaultOpen={Boolean(filters.query || filters.status !== "all" || filters.role !== "all")}
-        description="Use lightweight workspace filters while keeping internal team and customer portal access clearly separated."
         title="Filters"
       >
         <form className="grid w-full gap-3 lg:grid-cols-[1.5fr_1fr_1fr_auto]" method="get">
@@ -967,13 +965,11 @@ export function TeamManagementWorkspace({
       <section className="grid gap-6 xl:grid-cols-2">
         <InviteFormCard
           customerCompanies={customerCompanies}
-          description="Invite tenant admins, office admins, and technicians with role-based defaults and scoped feature access."
           title="Invite internal team members"
         />
         <InviteFormCard
           customerCompanies={customerCompanies}
           customerMode
-          description="Grant clean customer portal access linked to the correct customer company, with customer-facing allowances only."
           title="Invite customer portal users"
         />
       </section>
@@ -981,7 +977,6 @@ export function TeamManagementWorkspace({
       <section className="grid gap-6 xl:grid-cols-2">
         <div className="space-y-4">
           <AsyncUserLookupSection
-            description="Search and load internal accounts only when needed, with async lookup and pagination for larger workspaces."
             kind="internal"
             statusFilter={filters.status === "active" || filters.status === "inactive" ? filters.status : "all"}
             title="Internal members"
@@ -989,7 +984,6 @@ export function TeamManagementWorkspace({
           <SectionCard>
             <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Internal invite queue</p>
             <h2 className="mt-2 text-2xl font-semibold text-ink">Pending team invites</h2>
-            <p className="mt-2 text-sm text-slate-500">Pending internal invites stay visible here even when the member lookup is filtered to active or inactive users.</p>
           </SectionCard>
           {pendingTeamInvites.length > 0 ? (
             <>
@@ -1014,7 +1008,6 @@ export function TeamManagementWorkspace({
 
         <div className="space-y-4">
           <AsyncUserLookupSection
-            description="Search and load customer-facing accounts on demand so the portal section stays fast even with large customer user lists."
             kind="customer"
             statusFilter={filters.status === "active" || filters.status === "inactive" ? filters.status : "all"}
             title="Portal access"
@@ -1022,7 +1015,6 @@ export function TeamManagementWorkspace({
           <SectionCard>
             <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Customer invite queue</p>
             <h2 className="mt-2 text-2xl font-semibold text-ink">Pending portal invites</h2>
-            <p className="mt-2 text-sm text-slate-500">Customer portal invites stay visible here with company context while the portal user lookup remains async and lightweight.</p>
           </SectionCard>
           {pendingCustomerInvites.length > 0 ? (
             <>

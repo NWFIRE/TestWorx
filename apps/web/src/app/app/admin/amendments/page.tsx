@@ -93,7 +93,6 @@ export default async function AdminAmendmentsPage({
     <AppPageShell>
       <PageHeader
         backNavigation={{ label: "Back to admin", fallbackHref: "/app/admin" }}
-        description="Action-required visit issues, technician next-step requests, and amendment history without mixing in invoiced work as review-ready."
         eyebrow="Needs attention"
         title="Visit next-step requests"
       />
@@ -127,7 +126,6 @@ export default async function AdminAmendmentsPage({
 
       <FilterBar
         defaultOpen={selectedFilter !== "all"}
-        description="Filter action-required records and linked visit history without treating closed invoices as active review work."
         title="Action filters"
       >
         {reviewOptions.map((option) => (

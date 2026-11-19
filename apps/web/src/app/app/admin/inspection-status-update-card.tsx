@@ -108,9 +108,6 @@ export function InspectionStatusUpdateCard({
         <div>
           <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Status correction</p>
           <h3 className="mt-2 text-2xl font-semibold text-ink">Update inspection status</h3>
-          <p className="mt-2 text-sm text-slate-500">
-            Office staff can correct the inspection status here without changing the normal technician workflow.
-          </p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Current status</p>
@@ -172,9 +169,6 @@ export function InspectionStatusUpdateCard({
         >
           {pending ? "Saving status..." : "Save status"}
         </button>
-        <p className="text-sm text-slate-500">
-          Changes are audited and will update queue visibility after refresh.
-        </p>
       </div>
       {dialog}
     </form>

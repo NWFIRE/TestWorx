@@ -1083,7 +1083,6 @@ function WorkOrderSummarySection({
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Work Performed</p>
         <h3 className="mt-2 text-xl font-semibold text-slate-950">What work was performed?</h3>
-        <p className="mt-2 text-sm leading-6 text-slate-500">Type the work completed on site. Keep it clear and customer-ready.</p>
       </div>
       {visibleFields.map((field) => (
         <FieldControl

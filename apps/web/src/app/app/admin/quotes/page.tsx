@@ -118,7 +118,6 @@ export default async function QuotesPage({
       <PageHeader
         eyebrow="Quotes"
         title="Customer quotes"
-        description="Create, send, approve, sync, and convert quotes without leaving the TradeWorx operations workspace."
         actions={(
           <Link
             className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110"
@@ -136,7 +135,7 @@ export default async function QuotesPage({
         <KPIStatCard label="Sync issues" note="Quotes that still need a QuickBooks fix before sync succeeds." tone="rose" value={quotes.filter((quote) => quote.syncStatus === "sync_error").length} />
       </section>
 
-      <FilterBar defaultOpen={hasActiveQuoteFilters} title="Quote filters" description="Filter by lifecycle, QuickBooks state, and customer context.">
+      <FilterBar defaultOpen={hasActiveQuoteFilters} title="Quote filters" >
         {statusOptions.map((option) => (
           <FilterChipLink
             active={selectedStatus === option.value}
@@ -149,7 +148,6 @@ export default async function QuotesPage({
       </FilterBar>
 
       <SettingsDisclosureCard
-        description="Open the reminder automation settings only when you need to adjust follow-up timing or templates."
         eyebrow="Quote reminders"
         openLabel="Open reminder settings"
         queryKey="quoteRemindersOpen"
@@ -173,7 +171,6 @@ export default async function QuotesPage({
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Quote queue</h2>
-            <p className="mt-1 text-sm text-[color:var(--text-secondary)]">Monitor sent, approved, expired, and converted work without losing QuickBooks context.</p>
           </div>
           <p className="text-sm text-[color:var(--text-muted)]">{quotes.length} quote{quotes.length === 1 ? "" : "s"}</p>
         </div>

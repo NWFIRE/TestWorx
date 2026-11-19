@@ -155,7 +155,6 @@ export default async function CustomerIntakeDetailPage({
       <PageHeader
         eyebrow="Customer intake"
         title={submittedData?.companyName ?? request.recipientEmail}
-        description="Review the submitted customer, billing, site, and service request details before creating operational records."
         actions={<StatusBadge label={titleCase(request.status)} tone={statusTone(request.status)} />}
         backNavigation={{ fallbackHref: "/app/admin/customer-intakes", label: "Customer intakes" }}
         contentWidth="full"

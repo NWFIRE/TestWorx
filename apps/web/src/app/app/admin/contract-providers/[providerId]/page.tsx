@@ -69,7 +69,6 @@ export default async function ProviderContractsPage({
         backNavigation={{ fallbackHref: "/app/admin/contract-providers", label: "Back to contract providers" }}
         eyebrow="Provider contracts"
         title={provider.name}
-        description="Manage the contract profiles and structured pricing rules that the billing resolution engine can explain and apply."
       />
 
       {query.notice ? (
@@ -85,7 +84,6 @@ export default async function ProviderContractsPage({
               <h2 className="text-2xl font-semibold text-ink">Provider account context</h2>
               <StatusBadge label={formatContractProviderAccountStatusLabel(provider.status)} tone={provider.status === "active" ? "emerald" : "slate"} />
             </div>
-            <p className="mt-2 text-sm text-slate-500">Use this as the visible source of truth for who gets billed, who receives invoices, and which contracts are available to sites and work orders.</p>
           </div>
         </div>
         <form action={updateContractProviderAccountAction} className="grid gap-4 md:grid-cols-2">
@@ -116,7 +114,6 @@ export default async function ProviderContractsPage({
         <div className="mb-5">
           <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Add contract profile</p>
           <h2 className="mt-2 text-2xl font-semibold text-ink">Provider contracts and effective dates</h2>
-          <p className="mt-2 text-sm text-slate-500">Every contract stays explicit: pricing strategy, grouping mode, required reference numbers, and effective dates all live here.</p>
         </div>
         <form action={createProviderContractProfileAction} className="grid gap-4 md:grid-cols-2">
           <input name="providerAccountId" type="hidden" value={provider.id} />
@@ -184,7 +181,6 @@ export default async function ProviderContractsPage({
 
             <div className="mt-6 rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4">
               <p className="text-sm font-semibold text-ink">Add pricing rule</p>
-              <p className="mt-1 text-sm text-slate-500">These rows are the explainable pricing source for provider billing. No JSON blobs, no hidden rule engine branches.</p>
               <form action={createProviderContractRateAction} className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <input name="providerContractProfileId" type="hidden" value={contract.id} />
                 <input name="redirectTo" type="hidden" value={redirectTo} />

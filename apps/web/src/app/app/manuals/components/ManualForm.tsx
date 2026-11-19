@@ -119,7 +119,6 @@ export function ManualForm({
       {values?.manualId ? <input name="manualId" type="hidden" value={values.manualId} /> : null}
       <div>
         <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">{heading}</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-500">Upload the document, add clean metadata, and keep the field team focused on the right manual instead of raw files.</p>
       </div>
 
       {state.error ? <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{state.error}</p> : null}

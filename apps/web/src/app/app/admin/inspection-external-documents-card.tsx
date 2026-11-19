@@ -249,7 +249,6 @@ export function InspectionExternalDocumentsCard({
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">External documents</p>
         <h3 className="mt-2 text-2xl font-semibold text-ink">Customer PDFs</h3>
-        <p className="mt-2 text-sm text-slate-500">Upload customer-provided PDFs, track signature status, and preserve the original and signed versions separately.</p>
       </div>
       <form className="space-y-4 rounded-[1.5rem] border border-slate-200 p-4" onSubmit={handleSubmit}>
         <input name="inspectionId" type="hidden" value={inspectionId} />

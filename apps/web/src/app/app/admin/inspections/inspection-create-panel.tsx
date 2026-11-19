@@ -68,9 +68,6 @@ export function InspectionCreatePanel({
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
             Create Inspection
           </p>
-          <p className="mt-2 text-sm text-slate-500">
-            Start a new inspection from the dedicated operations workspace.
-          </p>
         </div>
         {showTrigger ? (
           <button

@@ -117,7 +117,6 @@ export function MobileInspectionShell({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Sections</p>
-                  <p className="mt-1 text-sm text-slate-500">Jump between report sections and keep progress moving.</p>
                 </div>
               </div>
               <div className="mt-3 flex gap-3 overflow-x-auto pb-1">

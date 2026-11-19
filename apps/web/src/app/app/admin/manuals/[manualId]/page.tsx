@@ -44,7 +44,6 @@ export default async function ManualEditPage({
           ) : null
         }
         backNavigation={{ fallbackHref: "/app/admin/manuals", label: "Back to manuals admin" }}
-        description="Update metadata, replace the PDF when needed, and keep favorites and field search clean for technicians."
         eyebrow="Manuals admin"
         title={`Edit ${manual.title}`}
       />

@@ -52,7 +52,6 @@ export function CustomerSiteImportCard({
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Client import</p>
         <h3 className="mt-2 text-2xl font-semibold text-ink">Import customers, sites, and assets</h3>
-        <p className="mt-2 text-sm text-slate-500">Upload a CSV to create or update customer companies, sites, and optional asset records for this tenant.</p>
       </div>
       <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
         <p className="font-semibold text-ink">Start with the template</p>

@@ -218,7 +218,6 @@ export function InspectionPdfUploadCard({
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">PDF delivery</p>
         <h3 className="mt-2 text-2xl font-semibold text-ink">Inspection attachments</h3>
-        <p className="mt-2 text-sm text-slate-500">Upload customer-ready PDFs and keep generated report packets alongside inspection records.</p>
       </div>
       <form className="space-y-4 rounded-[1.5rem] border border-slate-200 p-4" onSubmit={handleSubmit}>
         <input name="inspectionId" type="hidden" value={inspectionId} />

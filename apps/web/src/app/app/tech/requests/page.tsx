@@ -14,7 +14,6 @@ export default async function TechnicianRequestsPage() {
       <header className="rounded-[28px] border border-slate-200 bg-gradient-to-br from-white to-blue-50 p-5 shadow-sm sm:p-7">
         <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-blue-700">Field request</p>
         <h1 className="mt-2 text-3xl font-bold tracking-[-0.04em] text-slate-950">Request office support</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Send the office team the complete field context for a service ticket, work order, follow-up, or quote.</p>
       </header>
       <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
         <FieldRequestForm customers={data.customers} />

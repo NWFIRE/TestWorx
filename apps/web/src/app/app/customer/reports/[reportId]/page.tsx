@@ -170,7 +170,6 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
           backNavigation={{ label: "Back to portal", fallbackHref: `/app/customer/inspections/${detail.report.inspectionId}` }}
           eyebrow="Customer report"
           title={detail.template.label}
-          description="Review inspection results, packet documents, and technician notes from one polished hosted report workspace."
           contentWidth="full"
           actions={(
             <Link
@@ -197,7 +196,6 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
           <AcceptanceReportView model={model} />
           <div className="space-y-6">
             <InspectionPacketCard
-              description="Open hosted reports and download every customer-authorized document tied to this inspection from one place."
               documents={packetDocuments}
               emptyDescription="No hosted reports or customer-authorized packet documents are available for this completed inspection."
               emptyTitle="No packet documents available"
@@ -219,7 +217,6 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
         backNavigation={{ label: "Back to portal", fallbackHref: `/app/customer/inspections/${detail.report.inspectionId}` }}
         eyebrow="Customer report"
         title={detail.template.label}
-        description="Review the hosted inspection report, results, deficiencies, and packet documents from one customer-ready workspace."
         contentWidth="full"
         actions={(
           <Link
@@ -270,7 +267,6 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--tenant-primary)]">Report Summary</p>
                 <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-950">Inspection overview</h2>
-                <p className="mt-3 text-sm leading-7 text-slate-600">This hosted inspection report summarizes customer-visible findings, completion results, and any recorded deficiencies.</p>
               </div>
               <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-5 text-sm text-slate-600">
                 <div className="grid gap-3 sm:grid-cols-3">
@@ -375,7 +371,6 @@ export default async function CustomerReportDetailPage({ params }: { params: Pro
 
         <div className="space-y-6">
           <InspectionPacketCard
-            description="Open hosted reports and download every customer-authorized document tied to the visit from one place."
             documents={packetDocuments}
             emptyDescription="No hosted reports or customer-authorized packet documents are available for this completed inspection."
             emptyTitle="No packet documents available"

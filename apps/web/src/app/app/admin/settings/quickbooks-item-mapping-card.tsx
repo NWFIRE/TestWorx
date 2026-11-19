@@ -238,9 +238,6 @@ function MappingRowCard({
 
           <div className="mt-4 border-t border-slate-200 pt-4">
             <p className="text-sm font-semibold text-ink">Manually map an item</p>
-            <p className="mt-2 text-sm text-slate-500">
-              Choose any active QuickBooks product or service from your synced cache when suggestions are missing or not the right match.
-            </p>
             <form action={saveFormAction} className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
               <input name="internalCode" type="hidden" value={row.internalCode} />
               <input name="internalName" type="hidden" value={row.internalName} />
@@ -322,9 +319,6 @@ export function QuickBooksItemMappingCard({
         <div>
           <p className="text-sm uppercase tracking-[0.25em] text-slate-500">QuickBooks item mappings</p>
           <h3 className="mt-2 text-2xl font-semibold text-ink">Map billable codes to QuickBooks items</h3>
-          <p className="mt-2 max-w-3xl text-sm text-slate-500">
-            Exports now use stored QuickBooks item ids instead of guessing by name. Review unmapped or inactive codes here, then save the correct QuickBooks item once.
-          </p>
         </div>
         <form action={resyncAction}>
           <button

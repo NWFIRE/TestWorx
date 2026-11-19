@@ -111,9 +111,6 @@ export function SidebarOrderForm({
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Sidebar order</p>
         <h3 className="mt-2 text-2xl font-semibold text-ink">Arrange admin sections</h3>
-        <p className="mt-2 text-sm text-slate-500">
-          Move the sections into the order your office uses most. Hidden sections still respect each user&apos;s permissions.
-        </p>
       </div>
 
       <input name="sidebarOrder" type="hidden" value={JSON.stringify(order)} readOnly />

@@ -71,7 +71,6 @@ export function TenantBrandingForm({
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Tenant branding</p>
         <h3 className="mt-2 text-2xl font-semibold text-ink">Brand and business details</h3>
-        <p className="mt-2 text-sm text-slate-500">These values are used in the customer portal and generated inspection PDFs.</p>
       </div>
       {values.logoDataUrl ? <Image alt="Tenant logo preview" className="h-16 w-auto rounded-2xl border border-slate-200 bg-white p-2" height={64} src={values.logoDataUrl} unoptimized width={160} /> : null}
       <div>

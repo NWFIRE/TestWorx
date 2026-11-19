@@ -76,7 +76,6 @@ export default async function CustomerIntakesPage({
       <PageHeader
         eyebrow="Customer intake"
         title="Pending customer setup"
-        description="Send secure branded intake forms, review submitted customer details, and approve new customer records before they enter operations."
         actions={
           <PageBackControl fallbackHref="/app/admin/clients" />
         }
@@ -105,9 +104,6 @@ export default async function CustomerIntakesPage({
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--tenant-primary)]">Send form</p>
             <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-950">New customer intake</h2>
-            <p className="mt-2 text-sm leading-6 text-[color:var(--text-muted)]">
-              Send a secure hosted setup form to a new customer before creating their account.
-            </p>
           </div>
           <form action={sendCustomerIntakeFormAction} className="mt-5 space-y-4">
             <label className="block">

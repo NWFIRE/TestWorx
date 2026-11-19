@@ -52,7 +52,6 @@ export function CreateInspectionForm({ customers, sites, technicians }: { custom
       <div className="space-y-4">
         <div>
           <p className="text-sm font-medium text-slate-600">Inspection types and recurrence</p>
-          <p className="text-sm text-slate-500">Each selected inspection type becomes its own reportable task under one visit.</p>
         </div>
         <div className="grid gap-3">
           {(Object.entries(inspectionTypeRegistry) as Array<[InspectionType, (typeof inspectionTypeRegistry)[InspectionType]]>).map(([inspectionType, inspectionConfig]) => (

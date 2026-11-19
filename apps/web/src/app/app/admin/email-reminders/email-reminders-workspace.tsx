@@ -343,7 +343,6 @@ export function EmailRemindersWorkspace({
 
       <FilterBar
         defaultOpen
-        description="Search customers, refine the current list, and prepare a branded email without leaving the workspace."
         title="Recipient filters"
       >
         <LiveUrlSearchInput
@@ -389,9 +388,6 @@ export function EmailRemindersWorkspace({
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[color:var(--text-secondary)]">Recipients</p>
               <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Email recipient list</h2>
-              <p className="mt-2 text-sm text-[color:var(--text-muted)]">
-                Select customers with prior email activity, or search for a customer to send a new message.
-              </p>
             </div>
             {data.recipients.length > 0 || data.blastEligibleRecipients.length > 0 ? (
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -618,9 +614,6 @@ export function EmailRemindersWorkspace({
               <div className="rounded-[24px] border border-blue-100 bg-blue-50/70 p-4">
                 <div>
                   <p className="text-sm font-semibold text-slate-950">Scheduling details</p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Select the appointment date, time, and service type(s). These values merge into the email automatically.
-                  </p>
                 </div>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <label className="block">

@@ -403,7 +403,6 @@ export function QuoteEditorForm({
       <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.04)]">
           <div className="mb-4">
             <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Line items</h2>
-            <p className="mt-1 text-sm text-slate-500">Choose TradeWorx services or imported QuickBooks products, then refine description, pricing, and quantity.</p>
           </div>
 
           <div className="space-y-4">
@@ -594,10 +593,7 @@ export function QuoteEditorForm({
 
         <section className="rounded-[28px] border border-slate-200/80 bg-[#0f172a] p-6 text-white shadow-[0_16px_44px_rgba(15,23,42,0.14)]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/60">Quote workflow</p>
-          <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">Keep services structured from day one.</h3>
-          <p className="mt-3 text-sm leading-7 text-white/75">
-            Line items use stable internal codes so sending, QuickBooks sync, and operational conversion stay aligned.
-          </p>
+          <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">Quote line items</h3>
           <ActionButton className="mt-6 min-h-12 w-full bg-white text-slate-950 hover:bg-slate-100" pending={pending} pendingLabel={submitPendingLabel ?? "Saving..."} type="submit">
             {submitLabel}
           </ActionButton>

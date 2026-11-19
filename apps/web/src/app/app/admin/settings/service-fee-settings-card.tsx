@@ -180,7 +180,6 @@ export function ServiceFeeSettingsCard({
             <div>
               <p className="text-sm uppercase tracking-[0.18em] text-slate-500">New rule</p>
               <h4 className="mt-1 text-lg font-semibold text-ink">Add location or override pricing</h4>
-              <p className="mt-2 text-sm text-slate-500">Open this editor only when you need to create a new fee rule. Customer and site lookups stay unloaded until then.</p>
             </div>
             <Link className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={openCreateHref}>
               Open new rule

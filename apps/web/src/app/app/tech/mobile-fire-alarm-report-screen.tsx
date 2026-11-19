@@ -899,7 +899,6 @@ function FireAlarmControlPanelSection({
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Monitoring</p>
             <h3 className="mt-1 text-lg font-semibold text-slate-950">Monitoring company information</h3>
-            <p className="mt-1 text-sm text-slate-500">Capture the central station details so they appear near the top of the final fire alarm PDF.</p>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {monitoringFields.map((monitoringField) => (

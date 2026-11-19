@@ -35,7 +35,7 @@ export function InspectionPacketCard({
   showCustomerVisibility = false
 }: {
   title?: string;
-  description: string;
+  description?: string;
   emptyTitle: string;
   emptyDescription: string;
   documents: PacketDocument[];
@@ -48,7 +48,7 @@ export function InspectionPacketCard({
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Documents</p>
         <h3 className="mt-2 text-2xl font-semibold text-ink">{title}</h3>
-        <p className="mt-2 text-sm text-slate-500">{description}</p>
+        {description ? <p className="mt-2 text-sm text-slate-500">{description}</p> : null}
       </div>
       <div className="mt-5 space-y-5">
         {documents.length === 0 ? (

@@ -63,7 +63,6 @@ export default async function CustomerInspectionPacketPage({
       </div>
 
       <InspectionPacketCard
-        description="Open hosted reports and download every customer-authorized inspection document from one place."
         documents={detail.packetDocuments}
         emptyDescription="No hosted reports or customer-authorized packet documents are available for this completed inspection yet."
         emptyTitle="No packet documents available"

@@ -159,7 +159,6 @@ export default async function DeficienciesPage({
             Open scheduling
           </Link>
         }
-        description="Review issues captured from inspection results, update workflow status, and jump back into the originating inspection when dispatch or estimating needs context."
         eyebrow="Deficiency center"
         title="Inspection failures ready for quote or repair follow-up"
       />
@@ -190,7 +189,6 @@ export default async function DeficienciesPage({
       </section>
 
       <FilterBar
-        description="Combine workflow and severity filters to stay focused on the most urgent open issues."
         title="Filters"
       >
         {statusOptions.map((option) => (

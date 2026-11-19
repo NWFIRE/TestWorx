@@ -90,7 +90,6 @@ export default async function PartsAndServicesPage({
           </div>
           ) : null
         }
-        description="Manage the synced QuickBooks catalog used across quotes, billing, and direct invoice creation."
         eyebrow="Parts and services"
         title="QuickBooks products and services"
         contentWidth="full"

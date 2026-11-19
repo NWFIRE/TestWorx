@@ -66,7 +66,6 @@ export default async function AdminReportsQueuePage({
     <AppPageShell>
       <PageHeader
         backNavigation={{ label: "Back to admin", fallbackHref: "/app/admin" }}
-        description="Completed inspections with finalized reports that still require invoice action. Invoiced and closed work stays out of this queue."
         eyebrow="Ready To Bill"
         title="Ready To Bill"
       />
@@ -96,7 +95,6 @@ export default async function AdminReportsQueuePage({
 
       <FilterBar
         defaultOpen={hasActiveQueueFilters}
-        description="Search for a customer or inspection, then switch months only when you need older finalized, non-invoiced work."
         title="Queue filters"
       >
         <ReadyToBillFilters

@@ -177,13 +177,11 @@ export function BillingContractProfileSettingsCard({
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing contract profiles</p>
         <h3 className="mt-2 text-2xl font-semibold text-ink">Effective-dated contract rules</h3>
-        <p className="mt-2 text-sm text-slate-500">Keep phase 1 focused on routing, selected pricing overrides, delivery behavior, attachment requirements, and reference policy snapshots.</p>
       </div>
 
       <form action={formAction} className="space-y-4 rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4">
         <div>
           <p className="text-sm font-semibold text-ink">Add contract profile</p>
-          <p className="mt-1 text-sm text-slate-500">Profiles can be reused across customers and evolve over time through effective dates instead of one-off customer exceptions.</p>
         </div>
         <ContractFields payerOptions={payerOptions} prefix="new-contract" />
         {state.error ? <p className="text-sm text-rose-600">{state.error}</p> : null}
@@ -202,7 +200,6 @@ export function BillingContractProfileSettingsCard({
             <input name="contractProfileId" type="hidden" value={profile.id} />
             <div>
               <p className="text-lg font-semibold text-ink">{profile.name}</p>
-              <p className="mt-1 text-sm text-slate-500">Update effective dates, targeted work-type overrides, and the review/delivery policy this profile contributes to billing snapshots.</p>
             </div>
             <ContractFields payerOptions={payerOptions} prefix={`contract-${profile.id}`} profile={profile} />
             <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue" type="submit">

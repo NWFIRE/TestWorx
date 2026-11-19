@@ -30,7 +30,6 @@ export default async function ManualsAdminListPage() {
             Add manual
           </Link>
         }
-        description="Manage metadata, revisions, active state, and PDF files for the field manuals library."
         eyebrow="Manuals admin"
         title="Manual management"
       />

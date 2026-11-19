@@ -48,7 +48,6 @@ export default async function InspectionArchiveDetailPage({
         backNavigation={{ label: "Back to archive", fallbackHref: returnHref }}
         eyebrow="Inspection archive"
         title={`${detail.snapshot.siteName} • ${detail.inspectionNumber}`}
-        description="Review the archived inspection snapshot, report packet, deficiency outcome, and any linked quote or billing references."
         actions={(
           <div className="flex flex-wrap gap-3">
             <Link
@@ -137,7 +136,6 @@ export default async function InspectionArchiveDetailPage({
           </SectionCard>
 
           <InspectionPacketCard
-            description="Open hosted reports and download signed documents, report PDFs, and archived inspection attachments from one archive packet."
             documents={detail.packetDocuments}
             emptyDescription="No hosted reports or archived packet documents are attached to this inspection yet."
             emptyTitle="No archive packet documents available"

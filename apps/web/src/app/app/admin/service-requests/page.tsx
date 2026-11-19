@@ -22,7 +22,7 @@ export default async function AdminServiceRequestsPage() {
         <KPIStatCard label="Urgent" value={data.counts.urgent} tone="rose" />
       </div>
       <SectionCard>
-        <div className="mb-5"><p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Office queue</p><h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Requests from the field</h2><p className="mt-1 text-sm text-slate-500">Review the technician’s context before creating or dispatching work.</p></div>
+        <div className="mb-5"><p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Office queue</p><h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Requests from the field</h2></div>
         <div className="space-y-4">
           {active.length ? active.map((request) => (
             <article className={request.priority === "urgent" ? "rounded-[24px] border border-amber-300 bg-amber-50/60 p-5" : "rounded-[24px] border border-slate-200 bg-slate-50/70 p-5"} key={request.id}>
@@ -45,7 +45,7 @@ export default async function AdminServiceRequestsPage() {
                 </RequestReviewForm>
               </div>
             </article>
-          )) : <div className="rounded-[24px] border border-dashed border-emerald-300 bg-emerald-50/60 p-7 text-center"><p className="font-semibold text-emerald-900">The field request queue is clear.</p><p className="mt-1 text-sm text-emerald-700">New technician requests will appear here automatically.</p></div>}
+          )) : <div className="rounded-[24px] border border-dashed border-emerald-300 bg-emerald-50/60 p-7 text-center"><p className="font-semibold text-emerald-900">The field request queue is clear.</p></div>}
         </div>
       </SectionCard>
       {history.length ? <SectionCard><details><summary className="cursor-pointer font-semibold text-slate-800">Resolved request history ({history.length})</summary><div className="mt-4 space-y-2">{history.map((request) => <ResolvedRequestDetails key={request.id} request={request} timezone={data.timezone} statusLabel={fieldServiceRequestStatusLabels[request.status]} typeLabel={fieldServiceRequestTypeLabels[request.requestType]} />)}</div></details></SectionCard> : null}

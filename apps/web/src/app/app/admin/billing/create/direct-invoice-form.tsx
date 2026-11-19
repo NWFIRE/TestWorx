@@ -443,7 +443,6 @@ export function DirectInvoiceForm({
               ? "Walk-in invoices skip automatic compliance fee rules."
               : "Customer invoices apply matching compliance reporting rules. Service fees are added only when you select them manually."}
           </p>
-          <p className="mt-3 text-sm text-slate-500">TradeWorx assigns the live invoice number at creation time using the yearly TW format, then syncs that number to QuickBooks.</p>
         </section>
 
         {createdInvoice ? (
@@ -468,10 +467,7 @@ export function DirectInvoiceForm({
 
         <section className="rounded-[28px] border border-slate-200/80 bg-[#0f172a] p-6 text-white shadow-[0_16px_44px_rgba(15,23,42,0.14)]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/60">Direct invoicing</p>
-          <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">Create QuickBooks invoices without an inspection summary.</h3>
-          <p className="mt-3 text-sm leading-7 text-white/75">
-            Use this for walk-in sales, direct billable work, or any customer invoice that should start in accounting instead of the inspection workflow.
-          </p>
+          <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">Direct invoices</h3>
           <ActionButton className="mt-6 min-h-12 w-full bg-white text-slate-950 hover:bg-slate-100" pending={pending} pendingLabel="Creating invoice..." type="submit">
             Create invoice
           </ActionButton>

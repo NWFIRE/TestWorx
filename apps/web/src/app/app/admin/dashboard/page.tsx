@@ -347,7 +347,6 @@ export default async function AdminDashboardPage({
                   <Bell className="h-4 w-4" />
                 </Link>
               }
-              description=""
               eyebrow="Dashboard"
               title={`${greeting}, ${firstName}.`}
               contentWidth="full"
@@ -374,7 +373,6 @@ export default async function AdminDashboardPage({
                   </Link>
                 </>
               }
-              description=""
               eyebrow="Dashboard"
               title={`${greeting}, ${firstName}.`}
               contentWidth="full"
@@ -425,11 +423,8 @@ export default async function AdminDashboardPage({
                       TODAY&apos;S OPERATIONS
                     </div>
                     <h2 className="mt-3 max-w-[14ch] text-[32px] font-semibold leading-[1] tracking-[-0.05em] lg:text-[42px] lg:leading-[1.02]">
-                      Keep field work moving.
+                      Field operations
                     </h2>
-                    <p className="mt-3 text-sm leading-7 text-white/80 lg:mt-4 lg:max-w-2xl lg:text-base">
-                      Move field work, finalize reports, and invoice only the work that still requires action.
-                    </p>
                   </div>
                   <div className="grid grid-cols-2 gap-3 2xl:w-[360px]">
                     <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
@@ -450,9 +445,6 @@ export default async function AdminDashboardPage({
                       <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
                         Today&apos;s field schedule
                       </h3>
-                      <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
-                        Live operational work ordered for quick scanning and action.
-                      </p>
                     </div>
                     <Link
                       className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[color:var(--border-default)] text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-subtle)] lg:h-10 lg:w-auto lg:gap-2 lg:px-3.5 lg:text-sm lg:font-medium"
@@ -559,11 +551,8 @@ export default async function AdminDashboardPage({
                   QUICK ACTIONS
                 </div>
                 <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">
-                  Move the work forward.
+                  Office actions
                 </h3>
-                <p className="mt-2 text-sm leading-7 text-white/72">
-                  Open the tasks that most directly affect delivery and collected revenue.
-                </p>
 
                 <div className="mt-5 space-y-3">
                   {[
@@ -590,9 +579,6 @@ export default async function AdminDashboardPage({
                     <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
                       Revenue pipeline
                     </h3>
-                    <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
-                      Operational work that is closest to billing completion.
-                    </p>
                   </div>
                   <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
                     {readyToBillSummaryCount > 0

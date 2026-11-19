@@ -160,7 +160,6 @@ export function AddReportTypeControl({
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-700">Current visit</p>
                 <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950" id="add-report-title">Add Report to This Inspection</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">Choose the additional report needed for this visit.</p>
               </div>
               <button
                 className="grid min-h-10 min-w-10 place-items-center rounded-full border border-slate-200 bg-white text-lg font-semibold text-slate-700 shadow-sm hover:bg-slate-50"

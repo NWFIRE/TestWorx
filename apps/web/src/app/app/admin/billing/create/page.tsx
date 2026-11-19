@@ -45,7 +45,6 @@ export default async function CreateBillingInvoicePage({
             </Link>
           </div>
         }
-        description="Create a QuickBooks invoice directly for walk-in work, counter sales, or billable items that do not belong to an inspection summary."
         eyebrow="Billing"
         title="Create invoice"
         contentWidth="full"

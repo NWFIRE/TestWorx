@@ -60,7 +60,6 @@ export default async function EmailRemindersPage({
         backNavigation={{ fallbackHref: "/app/admin", label: "Back to admin" }}
         eyebrow="Customer communications"
         title="Email Reminders"
-        description="Prepare, review, and send branded customer emails with premium company presentation."
         contentWidth="full"
       />
       <EmailRemindersWorkspace

@@ -23,7 +23,6 @@ export default async function ManualCreatePage() {
     <AppPageShell>
       <PageHeader
         backNavigation={{ fallbackHref: "/app/admin/manuals", label: "Back to manuals admin" }}
-        description="Create a clean, searchable manual entry that the field team can find quickly by title, manufacturer, model, or tag."
         eyebrow="Manuals admin"
         title="Add manual"
       />

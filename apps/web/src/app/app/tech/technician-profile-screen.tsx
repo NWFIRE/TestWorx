@@ -41,24 +41,20 @@ export function TechnicianProfileScreen({ initialData }: { initialData: any }) {
         <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Pending sync</p>
           <p className="mt-2 text-2xl font-semibold text-slate-950">{pendingCount}</p>
-          <p className="mt-2 text-sm text-slate-500">Drafts and local changes waiting to sync.</p>
         </div>
         <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Saved manuals</p>
           <p className="mt-2 text-2xl font-semibold text-slate-950">{savedManualCount}</p>
-          <p className="mt-2 text-sm text-slate-500">Offline-ready manuals available in the field.</p>
         </div>
         <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Favorites</p>
           <p className="mt-2 text-2xl font-semibold text-slate-950">{favoriteManualCount}</p>
-          <p className="mt-2 text-sm text-slate-500">Pinned references for fast lookup on site.</p>
         </div>
         <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Last manual activity</p>
           <p className="mt-2 text-base font-semibold text-slate-950">
             {lastManualActivity ? `${formatDistanceToNow(new Date(lastManualActivity), { addSuffix: true })}` : "No recent manual opens"}
           </p>
-          <p className="mt-2 text-sm text-slate-500">Recent field reference activity from local mobile data.</p>
         </div>
       </section>
 

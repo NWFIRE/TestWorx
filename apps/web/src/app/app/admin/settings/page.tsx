@@ -337,7 +337,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
   return (
     <AppPageShell density="wide">
       <PageHeader
-        description="Manage billing rules, integrations, and company preferences."
         eyebrow="Tenant settings"
         title="Settings"
         contentWidth="full"
@@ -415,7 +414,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
           />
           </SettingsDisclosureCard>
           <SettingsDisclosureCard
-            description="Review stored QuickBooks item ids for each internal billing code, fix inactive references, and confirm suggested matches without loading the full section until you need it."
             eyebrow="QuickBooks item mappings"
             initialOpen={mappingsOpen}
             openLabel="Open item mappings"
@@ -439,7 +437,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
             </Suspense>
           </SettingsDisclosureCard>
           <SettingsDisclosureCard
-            description="Load jurisdiction-based compliance reporting fees only when needed. Rules stay paginated and automatically drive matching compliance fee lines in billing."
             eyebrow="Compliance reporting fees"
             initialOpen={complianceFeesOpen}
             openLabel="Open compliance reporting fees"
@@ -463,7 +460,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
             </Suspense>
           </SettingsDisclosureCard>
           <SettingsDisclosureCard
-            description="Enforce one ticket-level minimum after compliance fees, labor, parts, and report lines are calculated."
             eyebrow="Minimum ticket pricing"
             initialOpen={minimumTicketOpen}
             openLabel="Open minimum pricing"
@@ -487,7 +483,6 @@ export default async function TenantSettingsPage({ searchParams }: { searchParam
             </Suspense>
           </SettingsDisclosureCard>
           <SettingsDisclosureCard
-            description="Configure the labor categories, hourly rates, taxability, and QuickBooks product/service mappings used by work orders."
             eyebrow="Work order labor billing"
             initialOpen={workOrderLaborOpen}
             openLabel="Open labor rates"

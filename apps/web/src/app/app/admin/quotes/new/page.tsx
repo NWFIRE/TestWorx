@@ -42,7 +42,6 @@ export default async function NewQuotePage({
         backNavigation={{ label: "Back to quotes", fallbackHref: "/app/admin/quotes" }}
         eyebrow="Quotes"
         title="Create quote"
-        description="Build a draft quote with structured line items, branded totals, and the QuickBooks mapping context needed for clean sync."
       />
 
       {params.error ? (

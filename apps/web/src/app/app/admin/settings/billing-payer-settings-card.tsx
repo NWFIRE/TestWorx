@@ -132,13 +132,11 @@ export function BillingPayerSettingsCard({ notice, payers, createAction, updateA
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Bill-to payer accounts</p>
         <h3 className="mt-2 text-2xl font-semibold text-ink">External payer routing</h3>
-        <p className="mt-2 text-sm text-slate-500">Maintain third-party payer entities separately from serviced customers so invoice routing stays contract-driven and tenant-safe.</p>
       </div>
 
       <form action={formAction} className="space-y-4 rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4">
         <div>
           <p className="text-sm font-semibold text-ink">Add payer account</p>
-          <p className="mt-1 text-sm text-slate-500">Use payer accounts for companies like Commercial Fire or Academy Fire without hardcoding customer-name branches.</p>
         </div>
         <PayerFields prefix="new-payer" />
         {state.error ? <p className="text-sm text-rose-600">{state.error}</p> : null}
@@ -157,7 +155,6 @@ export function BillingPayerSettingsCard({ notice, payers, createAction, updateA
             <input name="payerAccountId" type="hidden" value={payer.id} />
             <div>
               <p className="text-lg font-semibold text-ink">{payer.name}</p>
-              <p className="mt-1 text-sm text-slate-500">Update routing, delivery defaults, and QuickBooks linkage for this bill-to payer.</p>
             </div>
             <PayerFields payer={payer} prefix={`payer-${payer.id}`} />
             <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue" type="submit">

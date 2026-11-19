@@ -81,7 +81,6 @@ export default async function ClientProfilePage({
       <PageHeader
         backNavigation={{ label: "Back to clients", fallbackHref: "/app/admin/clients" }}
         contentWidth="full"
-        description="A complete account workspace with operational history, site context, billing visibility, and customer documents."
         eyebrow="Clients"
         title={data.customer.name}
       />
@@ -95,9 +94,6 @@ export default async function ClientProfilePage({
             <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
               Edit customer
             </h2>
-            <p className="mt-2 text-sm text-slate-500">
-              Update contact details, addresses, billing settings, and internal account notes without leaving this customer workspace.
-            </p>
           </div>
           <form action={updateCustomerCompanyProfileAction} className="space-y-4">
             <input name="customerCompanyId" type="hidden" value={data.customer.id} />

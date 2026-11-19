@@ -27,7 +27,6 @@ export function QuoteQuickBooksSyncCard({
   return (
     <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_12px_36px_rgba(15,23,42,0.04)]">
       <h2 className="text-xl font-semibold text-slate-950">QuickBooks sync</h2>
-      <p className="mt-2 text-sm text-slate-500">Sync this quote as a QuickBooks estimate using stored item ids and the cached item catalog.</p>
       <ActionButton
         className="mt-4 w-full"
         onClick={() => startTransition(async () => {

@@ -481,7 +481,6 @@ export default async function EditInspectionPage({
         documents={
           <div className="space-y-5" id="documents">
             <InspectionPacketCard
-              description="Generated reports, uploaded customer PDFs, and internal attachments for this inspection."
               documents={packetDocuments}
               emptyDescription="No generated reports, uploaded PDFs, or inspection attachments are available yet."
               emptyTitle="No documents yet"

@@ -11,7 +11,6 @@ export function ManualViewerPanel({
         <div className="mb-3 flex items-center justify-between gap-3 px-1">
           <div>
             <p className="text-sm font-semibold text-slate-900">Manual viewer</p>
-            <p className="text-xs text-slate-500">Inline PDF preview for quick field reference.</p>
           </div>
           <a className="text-sm font-semibold text-[var(--tenant-primary)]" href={`/api/manuals/${manual.id}/file?disposition=inline`}>
             Open full screen

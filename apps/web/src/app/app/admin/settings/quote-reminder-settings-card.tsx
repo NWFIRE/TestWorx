@@ -45,7 +45,6 @@ export function QuoteReminderSettingsCard({
       <div>
         <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Quote reminders</p>
         <h3 className="mt-2 text-2xl font-semibold text-ink">Automated follow-up</h3>
-        <p className="mt-2 text-sm text-slate-500">Automatically follow up on quotes that were sent, viewed, or are nearing expiration without changing the existing quote lifecycle.</p>
       </div>
 
       <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4">

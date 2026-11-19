@@ -71,7 +71,6 @@ export default async function UpcomingInspectionsPage({
       <PageHeader
         eyebrow="Forward planning"
         title="Upcoming inspections"
-        description="Plan the next several months of inspections with a month-by-month view of what is already scheduled, what still needs assignment, and where new work should be added."
         actions={
           <div className="flex flex-wrap gap-3">
             <Link className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slateblue" href="/app/admin/inspections/monthly">Monthly list / CSV</Link>
@@ -116,7 +115,6 @@ export default async function UpcomingInspectionsPage({
       <FilterBar
         defaultOpen={Boolean(selectedMonth)}
         title="Planning window"
-        description="Jump the planning form and board to a specific starting month without losing the surrounding month-by-month view."
       >
         <PlanningMonthJumpBar initialMonthKey={selectedMonth ?? data.startMonth} months={data.months} />
       </FilterBar>

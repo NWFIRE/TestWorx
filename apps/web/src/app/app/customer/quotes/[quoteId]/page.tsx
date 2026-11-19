@@ -33,7 +33,6 @@ export default async function CustomerQuoteDetailPage({
         backNavigation={{ label: "Back to portal", fallbackHref: "/app/customer" }}
         eyebrow="Customer quote"
         title={quote.quoteNumber}
-        description="Review quoted work, totals, and the current approval state from one place."
         contentWidth="full"
         actions={
           <>

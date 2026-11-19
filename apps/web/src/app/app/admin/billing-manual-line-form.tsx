@@ -90,9 +90,6 @@ export function BillingManualLineForm({
         <div>
           <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Additional line items</p>
           <h2 className="mt-2 text-xl font-semibold text-slate-950">Add billing work not tied to a report</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-            Add parts, labor, services, or fees directly to this inspection invoice. These lines use the products/services catalog and let QuickBooks apply final pricing when synced.
-          </p>
         </div>
       </div>
 

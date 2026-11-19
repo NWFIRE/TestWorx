@@ -114,7 +114,6 @@ export function QuickBooksCatalogManagementCard({
       <div>
         <p className="text-sm uppercase tracking-[0.18em] text-slate-500">Imported QuickBooks products and services</p>
         <h4 className="mt-1 text-lg font-semibold text-ink">{importedItemCount} item{importedItemCount === 1 ? "" : "s"} imported</h4>
-        <p className="mt-2 text-sm text-slate-500">TradeWorx keeps the current view paginated so the page stays responsive as your QuickBooks company grows.</p>
         <p className="mt-2 text-sm text-slate-500">Showing {filteredItemCount} item{filteredItemCount === 1 ? "" : "s"} in the current view.</p>
         {importCatalogAction && !readOnly ? (
           <form action={importFormAction} className="mt-4">

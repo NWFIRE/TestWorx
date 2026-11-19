@@ -125,7 +125,6 @@ export default async function ContractProvidersAdminPage({
         backNavigation={{ fallbackHref: "/app/admin", label: "Back" }}
         eyebrow="Contract provider billing"
         title="Contract providers"
-        description="Keep third-party billing visible and explainable with provider accounts, billing contacts, and direct links into contract pricing."
       />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -159,7 +158,6 @@ export default async function ContractProvidersAdminPage({
         <div className="mb-5">
           <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Existing providers</p>
           <h2 className="mt-2 text-2xl font-semibold text-ink">Billing accounts and contract entry points</h2>
-          <p className="mt-2 text-sm text-slate-500">Nothing here is hidden. Each provider shows status, billing contact, current contract count, and where to manage pricing rules.</p>
         </div>
         <div className="space-y-5">
           {data.providers.length === 0 ? (
