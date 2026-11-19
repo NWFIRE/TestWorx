@@ -164,7 +164,7 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
           <dt>Planned</dt><dd>{localDateTime(current.scheduledStart, timezone).slice(0, 10)} · {planned(current)}</dd><dt>Field progress</dt><dd>{fieldProgress(current, now)}</dd>
           <dt>Report workflow</dt><dd>{labelType(current.status)} (separate from field progress)</dd>
           <dt>Actual work</dt><dd>{current.sessions.length ? current.sessions.map((s, i) => <p key={`${s.technicianId}-${i}`}>{data.technicians.find((t) => t.id === s.technicianId)?.name}: {localDateTime(s.startedAt, timezone).replace("T", " ")} - {s.endedAt ? localDateTime(s.endedAt, timezone).replace("T", " ") : "Running"}</p>) : "Not started"}</dd></dl>
-        <Link className={styles.link} href={`/app/admin/inspections/${current.id}?from=${encodeURIComponent(`/app/admin/scheduler?date=${date}&view=${view}`)}`}>Open inspection</Link>
+        <Link className={styles.link} target="_blank" rel="noopener noreferrer" aria-label="Open inspection (opens in a new tab)" href={`/app/admin/inspections/${current.id}?from=${encodeURIComponent(`/app/admin/scheduler?date=${date}&view=${view}`)}`}>Open inspection</Link>
         {!editing && !["completed", "invoiced", "cancelled"].includes(current.status) && <button type="button" className={styles.primary} onClick={() => edit(current)}>Reschedule / reassign</button>}
         {editing && <form onSubmit={save} onChange={(e) => { if (!(e.target instanceof HTMLInputElement) || e.target.name !== "overlap") { setAllowOverlap(false); setConflicts([]); } }}>
           <p>Only this visit changes. Future recurring visits stay unchanged.</p>

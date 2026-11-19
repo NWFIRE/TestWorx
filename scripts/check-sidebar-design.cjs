@@ -20,7 +20,7 @@ async function main() {
     import { RequestCountBadge } from "./apps/web/src/app/app/request-count-badge";
     const SIMPLIFIED_WORKSPACE_NAV_ENABLED = true;
     const DROPDOWN_NAV_GROUPS = new Set(["Work","Billing","Customers","Operations","Settings"]);
-    function Link({children,prefetch,onClick,onPointerEnter,onFocus,...props}) { return <a {...props} onClick={e=>{e.preventDefault();onClick?.(e)}}>{children}</a> }
+    function Link({children,prefetch,onClick,onPointerEnter,onFocus,...props}) { return <a {...props} onClick={e=>{if(props.target!=="_blank")e.preventDefault();onClick?.(e)}}>{children}</a> }
     function Image({src,alt}) {return <img src={src} alt={alt} style={{width:44,height:44,objectFit:"contain"}}/>}
     ${components}
     window.navigated = []; window.signedOut = 0;
@@ -39,7 +39,7 @@ async function main() {
   try {
     const page = await browser.newPage({viewport:{width:1000,height:900}});
     const errors=[]; page.on("pageerror", e=>errors.push(e.message));
-    await page.route("http://localhost/**", route=>route.request().url().endsWith("/icon.png")
+    await page.context().route("http://localhost/**", route=>route.request().url().endsWith("/icon.png")
       ? route.fulfill({contentType:"image/png",body:fs.readFileSync("apps/web/src/app/icon.png")})
       : route.fulfill({contentType:"text/html",body:'<body style="background:#f1f5f9"><div id="app"></div></body>'}));
     await page.goto("http://localhost/test");
@@ -47,6 +47,18 @@ async function main() {
     const work=page.getByRole("button",{name:/^Work/});
     await work.waitFor({timeout:5000}).catch(async error=>{console.error(errors,await page.locator("body").innerText());throw error}); assert.equal(await work.getAttribute("aria-expanded"),"true");
     assert.equal(await page.getByRole("link",{name:"Inspections",exact:true}).getAttribute("aria-current"),"page");
+    const scheduler=page.getByRole("link",{name:"Scheduler (opens in a new tab)",exact:true});
+    assert.equal(await scheduler.getAttribute("target"),"_blank");
+    assert.match(await scheduler.getAttribute("rel"),/noopener/);
+    const opened=page.waitForEvent("popup");
+    await scheduler.click();
+    const schedulerTab=await opened;
+    await schedulerTab.waitForLoadState();
+    assert.equal(schedulerTab.url(),"http://localhost/app/admin/scheduler");
+    assert.equal(page.url(),"http://localhost/test");
+    assert.deepEqual(await page.evaluate(()=>window.navigated),[],"New-tab links must not trigger same-tab pending navigation");
+    assert.equal(await schedulerTab.evaluate(()=>window.opener),null);
+    await schedulerTab.close();
     await page.getByRole("button",{name:"Billing",exact:true}).click();
     assert.equal(await work.getAttribute("aria-expanded"),"false");
     assert.equal(await work.locator('[aria-label="4 service requests awaiting review"]').count(),1);

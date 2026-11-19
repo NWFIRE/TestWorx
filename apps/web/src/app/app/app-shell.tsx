@@ -252,14 +252,16 @@ function NavItem({
   return (
     <Link
       aria-current={active ? "page" : undefined}
-      aria-label={item.badgeCount ? `${item.label}, ${item.badgeCount} requests awaiting review` : item.label}
+      aria-label={item.openInNewTab ? `${item.label} (opens in a new tab)` : item.badgeCount ? `${item.label}, ${item.badgeCount} requests awaiting review` : item.label}
         className={`group relative flex min-h-12 min-w-0 items-center gap-4 overflow-hidden px-6 py-3 text-sm outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 before:absolute before:bottom-0 before:left-0 before:top-0 before:w-0.5 before:bg-blue-600 before:opacity-0 ${
           active
           ? "bg-blue-50/60 text-blue-700 before:opacity-100"
           : "text-slate-600 hover:bg-slate-50 hover:text-blue-700"
       } ${collapsed ? "justify-center !px-2" : ""} ${compact ? "min-h-[48px]" : ""}`}
       href={item.href}
-      onClick={() => onNavigate?.(item.href)}
+      target={item.openInNewTab ? "_blank" : undefined}
+      rel={item.openInNewTab ? "noopener noreferrer" : undefined}
+      onClick={() => { if (!item.openInNewTab) onNavigate?.(item.href); }}
       onFocus={() => onPrefetch?.(item.href)}
       onPointerEnter={() => onPrefetch?.(item.href)}
       prefetch

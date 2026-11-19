@@ -57,6 +57,9 @@ const bundle = await build({ stdin: { contents: `import React from 'react'; impo
     await page.getByLabel("Tech Beta", { exact: true }).check();
     await page.getByRole("button", { name: "Save schedule" }).click();
     await page.getByRole("button", { name: "Reschedule / reassign" }).waitFor();
+    const inspectionLink = page.getByRole("link", { name: "Open inspection (opens in a new tab)" });
+    assert.equal(await inspectionLink.getAttribute("target"), "_blank");
+    assert.match(await inspectionLink.getAttribute("rel"), /noopener/);
     assert.deepEqual(job.technicianIds, ["b"]);
     await page.getByRole("button", { name: "Close job details" }).click();
     await page.getByLabel("Schedule date").fill("2026-11-26");

@@ -1,6 +1,9 @@
 # Scheduler
 
-Office and tenant administrators open Work > Scheduler. Today opens in Day view;
+Office and tenant administrators open Work > Scheduler in a new browser tab, leaving
+their current page unchanged. Today opens in Day view.
+Opening an inspection from the detail panel also opens a separate tab, keeping
+the live board available.
 Week uses Monday through Sunday in the tenant's configured timezone. Empty team
 rows remain visible. Phones use an agenda; larger screens scroll inside the board.
 
