@@ -1,3 +1,4 @@
+import { serviceDestination } from "@testworx/lib/service-directions";
 import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
@@ -84,7 +85,8 @@ export default async function AdminReportCorrectionPage({ params }: { params: Pr
     customInspectionTypeLabel: report.task.customDisplayLabel ?? null,
     siteName: inspectionDisplay.primaryTitle,
     customerName: inspectionDisplay.secondaryTitle || report.inspection.customerCompany.name,
-    serviceAddress: inspectionDisplay.locationLabel,
+    serviceLocation: report.inspection.site,
+    serviceAddress: serviceDestination(report.inspection.site).address,
     customerContactName: report.inspection.customerCompany.contactName ?? null,
     customerPhone: report.inspection.customerCompany.phone ?? null,
     customerEmail: report.inspection.customerCompany.billingEmail ?? null,

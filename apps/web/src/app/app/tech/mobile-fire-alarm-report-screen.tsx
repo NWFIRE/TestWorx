@@ -553,6 +553,7 @@ export function MobileFireAlarmReportScreen({
       customerEmail={data.customerEmail}
       customerPhone={data.customerPhone}
       dispatchNotes={data.dispatchNotes}
+      serviceLocation={data.serviceLocation}
       serviceAddress={data.serviceAddress}
       siteName={data.siteName}
       stickyFooter={(
@@ -788,6 +789,7 @@ function MobileReportSummaryBanner({
       customerEmail={data.customerEmail}
       customerPhone={data.customerPhone}
       dispatchNotes={data.dispatchNotes}
+      serviceLocation={data.serviceLocation}
       serviceAddress={data.serviceAddress}
       siteName={data.siteName}
       title={data.inspectionTypeLabel}

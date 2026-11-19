@@ -38,6 +38,7 @@ import { PriorityBadge, StatusBadge } from "../../operations-ui";
 import { InspectionPacketCard } from "../../../inspection-packet-card";
 import { InspectionDetailTabs } from "./inspection-detail-tabs";
 import { JobTimeReview } from "../../job-time-review";
+import { ServiceDirections } from "../../../service-directions";
 
 type InspectionType = Parameters<typeof getDefaultInspectionRecurrenceFrequency>[0];
 type RecurrenceFrequency = ReturnType<typeof getDefaultInspectionRecurrenceFrequency>;
@@ -311,6 +312,7 @@ export default async function EditInspectionPage({
               </span>
             </div>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink">{inspectionDisplay.primaryTitle}</h2>
+            <ServiceDirections site={inspection.site} editable />
             <p className="mt-2 max-w-4xl text-base text-slate-600">
               {[inspectionTypeLabel, inspectionDisplay.secondaryTitle, format(inspection.scheduledStart, "MMM d, yyyy h:mm a"), technicianLabel].filter(Boolean).join(" · ")}
             </p>

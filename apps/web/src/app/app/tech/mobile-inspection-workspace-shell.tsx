@@ -1,5 +1,7 @@
 "use client";
 
+import { ServiceDirections } from "../service-directions";
+
 import Link from "next/link";
 
 import {
@@ -53,6 +55,7 @@ export function MobileInspectionWorkspaceShell({
   siteName,
   customerName,
   serviceAddress,
+  serviceLocation,
   customerContactName,
   customerPhone,
   customerEmail,
@@ -66,6 +69,7 @@ export function MobileInspectionWorkspaceShell({
   siteName: string;
   customerName: string;
   serviceAddress?: string | null;
+  serviceLocation?: import("@testworx/lib/service-directions").ServiceLocation;
   customerContactName?: string | null;
   customerPhone?: string | null;
   customerEmail?: string | null;
@@ -87,6 +91,7 @@ export function MobileInspectionWorkspaceShell({
           {isPriority ? <div className="mb-2"><PriorityInspectionBadge compact /></div> : null}
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{modeLabel}</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">{siteName}</h1>
+          <ServiceDirections site={serviceLocation} />
           <p className="mt-2 text-sm text-slate-500">{customerName} • {scheduledDateLabel}</p>
         </div>
         {saveState ? (

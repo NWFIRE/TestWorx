@@ -79,6 +79,7 @@ export type TechnicianReportEditorData = {
   customInspectionTypeLabel?: string | null;
   siteName: string;
   customerName: string;
+  serviceLocation?: import("@testworx/lib/service-directions").ServiceLocation;
   serviceAddress?: string | null;
   customerContactName?: string | null;
   customerPhone?: string | null;
@@ -1085,6 +1086,7 @@ export function ReportEditor({ data }: { data: TechnicianReportEditorData }) {
         isPriority={data.isPriority}
         saveState={saveState}
         scheduledDateLabel={data.scheduledDateLabel}
+        serviceLocation={data.serviceLocation}
         serviceAddress={data.serviceAddress}
         siteName={data.siteName}
         workspace={data.inspectionWorkspace}

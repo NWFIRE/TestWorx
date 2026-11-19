@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const db = vi.hoisted(() => ({ user: { findFirst: vi.fn(), findMany: vi.fn() }, tenant: { findUniqueOrThrow: vi.fn() }, inspection: { findFirst: vi.fn(), findFirstOrThrow: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() }, inspectionTechnicianAssignment: { createMany: vi.fn(), deleteMany: vi.fn() }, auditLog: { create: vi.fn() }, $transaction: vi.fn(), $executeRaw: vi.fn() }));
 vi.mock("@testworx/db", () => ({ prisma: db }));
 import { getScheduler, getSchedulerJob, saveSchedulerJob } from "../scheduler";
+import { serviceDestination } from "../service-directions";
 const actor = { userId: "office", tenantId: "tenant", role: "office_admin" };
 const job = { id: "job", scheduledStart: new Date("2026-11-19T15:00Z"), scheduledEnd: new Date("2026-11-19T16:00Z"), updatedAt: new Date("2026-11-19T12:00Z"), status: "to_be_completed", assignedTechnicianId: "a", technicianAssignments: [{ technicianId: "a" }, { technicianId: "b" }], customerCompany: { name: "Customer" }, site: { name: "Site", addressLine1: "1 Main", city: "Enid", state: "OK", postalCode: "" }, tasks: [{ inspectionType: "fire_alarm" }], jobTimeSessions: [] };
 const input = { inspectionId: "job", updatedAt: job.updatedAt.toISOString(), start: "2026-11-26T09:00", end: "2026-11-26T10:00", technicianIds: ["a", "b"] };
@@ -17,6 +18,15 @@ beforeEach(() => {
   db.inspection.updateMany.mockResolvedValue({ count: 1 });
 });
 describe("scheduler authorization and dispatch", () => {
+  it("uses the inspection site for directions without writing workflow data", async () => {
+    const site = { ...job.site, id: "site", addressLine2: "Entrance B", latitude: 36.4, longitude: -97.9 };
+    db.inspection.findFirst.mockResolvedValue({ ...job, site });
+    const result = await getSchedulerJob(actor, "job");
+    expect(serviceDestination(result.serviceLocation)).toEqual(serviceDestination(site));
+    expect(result.address).toContain("Entrance B");
+    expect(db.inspection.updateMany).not.toHaveBeenCalled();
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
   it.each(["technician", "customer_user", "platform_admin"])("blocks %s", async (role) => {
     await expect(getScheduler({ ...actor, role }, {})).rejects.toThrow("Only office");
     expect(db.inspection.findMany).not.toHaveBeenCalled();

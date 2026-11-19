@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { fieldProgress, localDateTime, scheduleLanes, schedulerRange, shiftSchedulerDate, type SchedulerData, type SchedulerJob } from "@testworx/lib/scheduler-shared";
 import { getInspectionTypeTextColorClass } from "../../inspection-type-inline-list";
 import styles from "./scheduler.module.css";
+import { ServiceDirections } from "../../service-directions";
 
 const labelType = (type: string) => type.replaceAll("_", " ");
 export function SchedulerBoard({ initial, initialView }: { initial: SchedulerData; initialView: "day" | "week" }) {
@@ -151,7 +152,7 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
           </div>;
         })}
       </div>
-      <div className={styles.agenda}>{rows.map((tech) => <section key={tech.id}><h2>{tech.name}</h2>{data.jobs.filter((j) => belongs(j, tech.id)).length ? data.jobs.filter((j) => belongs(j, tech.id)).map((j) => <div key={j.id}><small>{localDateTime(j.scheduledStart, timezone).slice(0, 10)}</small>{card(j, tech.id)}</div>) : <p>No jobs scheduled</p>}</section>)}</div>
+      <div className={styles.agenda}>{rows.map((tech) => <section key={tech.id}><h2>{tech.name}</h2>{data.jobs.filter((j) => belongs(j, tech.id)).length ? data.jobs.filter((j) => belongs(j, tech.id)).map((j) => <div key={j.id}><small>{localDateTime(j.scheduledStart, timezone).slice(0, 10)}</small>{card(j, tech.id)}<ServiceDirections site={j.serviceLocation} /></div>) : <p>No jobs scheduled</p>}</section>)}</div>
     </div>
     {panel && <dialog ref={dialog} className={styles.panel} aria-labelledby="scheduler-panel-title" onCancel={(e) => { if (saving) e.preventDefault(); else setPanel(false); }}>
       <header><h2 id="scheduler-panel-title">{current ? current.customer : "Schedule an existing job"}</h2><button type="button" aria-label="Close job details" disabled={saving} onClick={() => setPanel(false)}>Close</button></header>
@@ -159,7 +160,8 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
         <p role="status">{searching ? "Searching..." : query.trim().length >= 2 && !matches.length ? "No matching open inspections." : "Choose an existing visit; no new inspection is created."}</p>
         {matches.map((job) => <button type="button" key={job.id} className={styles.result} onClick={() => edit(job)}><strong>{job.customer}</strong><span>{job.site} · {localDateTime(job.scheduledStart, timezone).slice(0, 10)} · {job.id.slice(-8)}</span></button>)}
       </> : current && <>
-        <dl><dt>Site</dt><dd>{current.site || current.customer}<br />{current.address}</dd><dt>Job type</dt><dd>{current.types.map(labelType).join(", ")}</dd>
+        <ServiceDirections key={current.id} site={current.serviceLocation} editable />
+        <dl><dt>Site</dt><dd>{current.site || current.customer}</dd><dt>Job type</dt><dd>{current.types.map(labelType).join(", ")}</dd>
           <dt>Assigned</dt><dd>{current.technicianIds.map((id) => data.technicians.find((t) => t.id === id)?.name || "Team member").join(", ") || "Unassigned"}</dd>
           <dt>Planned</dt><dd>{localDateTime(current.scheduledStart, timezone).slice(0, 10)} · {planned(current)}</dd><dt>Field progress</dt><dd>{fieldProgress(current, now)}</dd>
           <dt>Report workflow</dt><dd>{labelType(current.status)} (separate from field progress)</dd>

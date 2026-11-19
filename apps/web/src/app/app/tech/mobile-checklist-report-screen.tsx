@@ -1137,6 +1137,7 @@ export function MobileChecklistReportScreen({
           isPriority={data.isPriority}
           saveState={saveState}
           scheduledDateLabel={data.scheduledDateLabel}
+          serviceLocation={data.serviceLocation}
           serviceAddress={data.serviceAddress}
           siteName={data.siteName}
           workspace={data.inspectionWorkspace}
@@ -1276,6 +1277,7 @@ export function MobileChecklistReportScreen({
         isPriority={data.isPriority}
         saveState={saveState}
         scheduledDateLabel={formatChecklistTimestamp(data.scheduledDateLabel)}
+        serviceLocation={data.serviceLocation}
         serviceAddress={data.serviceAddress}
         siteName={data.siteName}
         workspace={data.inspectionWorkspace}

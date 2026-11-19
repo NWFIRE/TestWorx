@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@testworx/db";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { serviceDestination } from "./service-directions";
 import { normalizeTenantTimezone } from "./timezone";
 import { localDateTime, schedulerInstant, schedulerRange, type SchedulerData, type SchedulerJob } from "./scheduler-shared";
 
@@ -17,13 +18,14 @@ async function authorize(actor: Actor) {
 const select = {
   id: true, scheduledStart: true, scheduledEnd: true, updatedAt: true, status: true, archivedAt: true, assignedTechnicianId: true,
   customerCompany: { select: { name: true } },
-  site: { select: { name: true, addressLine1: true, city: true, state: true, postalCode: true } },
+  site: { select: { id: true, name: true, addressLine1: true, addressLine2: true, city: true, state: true, postalCode: true, latitude: true, longitude: true } },
   tasks: { select: { inspectionType: true } }, technicianAssignments: { select: { technicianId: true } },
   jobTimeSessions: { select: { technicianId: true, startedAt: true, endedAt: true, endReason: true } }
 } satisfies Prisma.InspectionSelect;
 function serialize(job: Prisma.InspectionGetPayload<{ select: typeof select }>): SchedulerJob {
   return { id: job.id, customer: job.customerCompany.name, site: /general.*no fixed|no fixed site/i.test(job.site.name) ? "" : job.site.name,
-    address: [job.site.addressLine1, job.site.city, job.site.state, job.site.postalCode].filter(Boolean).join(", "),
+    serviceLocation: job.site,
+    address: serviceDestination(job.site).address,
     types: [...new Set(job.tasks.map((t) => t.inspectionType))],
     technicianIds: [...new Set([job.assignedTechnicianId, ...job.technicianAssignments.map((a) => a.technicianId)].filter((id): id is string => Boolean(id)))],
     scheduledStart: job.scheduledStart.toISOString(), scheduledEnd: job.scheduledEnd?.toISOString() ?? null,
