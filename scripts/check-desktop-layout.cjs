@@ -2,9 +2,19 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const postcss = require("postcss");
 const tailwind = require("tailwindcss");
+const { buildSync } = require("esbuild");
 
 // Compile the real styles: catches missing utility generation and media scoping.
 async function main() {
+  const compiled = buildSync({ entryPoints: ["apps/web/src/app/search-select-layout.ts"], bundle: true, write: false, platform: "node", format: "cjs" });
+  const mod = { exports: {} };
+  new Function("module", "exports", compiled.outputFiles[0].text)(mod, mod.exports);
+  const layout = mod.exports.getSearchMenuLayout;
+  assert.equal(layout({ top: 180, bottom: 228, viewportWidth: 800, viewportHeight: 450 }).maxHeight, 206);
+  assert.equal(layout({ top: 350, bottom: 398, viewportWidth: 800, viewportHeight: 450, contentTop: 78 }).bottom, "calc(100% + 8px)");
+  assert.equal(layout({ top: 100, bottom: 148, viewportWidth: 1920, viewportHeight: 1080 }).maxHeight, 288);
+  assert.equal(layout({ top: 180, bottom: 228, viewportWidth: 390, viewportHeight: 844 }), undefined);
+  assert.equal(layout({ top: -100, bottom: 450, viewportWidth: 800, viewportHeight: 450 }).maxHeight, 0);
   const css = fs.readFileSync("apps/web/src/app/globals.css", "utf8");
   const result = await postcss([tailwind({
     content: ["apps/web/src/**/*.{ts,tsx}", "packages/ui/src/**/*.{ts,tsx}"],

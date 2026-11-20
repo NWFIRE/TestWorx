@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { getSearchMenuLayout } from "./search-select-layout";
 
 export type SearchSelectOption = {
   value: string;
@@ -90,6 +91,53 @@ export function SearchSelect({
     customValue: string;
   } | null>(null);
   const [open, setOpen] = useState(false);
+  const [menuLayout, setMenuLayout] = useState<ReturnType<typeof getSearchMenuLayout>>();
+
+  useLayoutEffect(() => {
+    if (!open || disabled) return;
+    const anchor = wrapperRef.current?.querySelector('[role="combobox"]')?.parentElement;
+    if (!anchor) return;
+    let frame = 0;
+    const measure = () => {
+      if (window.innerWidth < 768) {
+        setMenuLayout(undefined);
+        return;
+      }
+      const bounds = anchor.getBoundingClientRect();
+      let contentTop = 0;
+      let contentBottom = window.innerHeight;
+      // A picker inside a scrolling form or drawer must fit that surface too.
+      for (let parent = anchor.parentElement; parent; parent = parent.parentElement) {
+        if (!/(auto|scroll|hidden|clip)/.test(getComputedStyle(parent).overflowY)) continue;
+        const clip = parent.getBoundingClientRect();
+        contentTop = Math.max(contentTop, clip.top);
+        contentBottom = Math.min(contentBottom, clip.bottom);
+      }
+      const next = getSearchMenuLayout({
+        top: bounds.top,
+        bottom: bounds.bottom,
+        viewportWidth: window.innerWidth,
+        viewportHeight: contentBottom,
+        contentTop
+      });
+      setMenuLayout(previous => previous?.maxHeight === next?.maxHeight && previous?.bottom === next?.bottom ? previous : next);
+    };
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    };
+    measure();
+    const observer = new ResizeObserver(schedule);
+    observer.observe(anchor);
+    window.addEventListener("resize", schedule);
+    window.addEventListener("scroll", schedule, true);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("resize", schedule);
+      window.removeEventListener("scroll", schedule, true);
+    };
+  }, [open, disabled]);
   const [activeIndex, setActiveIndex] = useState(0);
   const shouldOpenOnFocusRef = useRef(false);
   const query =
@@ -253,6 +301,7 @@ export function SearchSelect({
             className="absolute z-30 mt-2 max-h-72 w-full overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_44px_rgba(15,23,42,0.14)]"
             id={listboxId}
             role="listbox"
+            style={menuLayout}
           >
             {loading ? (
               <div className="rounded-xl px-3 py-3 text-sm text-slate-500">Searching...</div>
