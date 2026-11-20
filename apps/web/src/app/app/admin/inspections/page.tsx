@@ -431,7 +431,6 @@ export default async function AdminInspectionsPage({
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <LiveUrlSelectFilter options={statusOptions} paramKey="status" value={resolveStatusSelectValue(filterData.filters.statuses)} />
               <LiveUrlSelectFilter options={attentionOptions} paramKey="attention" value={attention} />
-              {params.through ? <p className="text-sm text-slate-600">Due through {format(fastManagementWindowEnd, "MMM d, yyyy")} (including overdue)</p> : null}
               <LiveUrlSelectFilter options={typeOptions} paramKey="classification" value={resolveTypeSelectValue(filterData.filters.classifications)} />
               <LiveUrlSelectFilter options={priorityOptions} paramKey="priority" value={filterData.filters.priority} />
               <LiveUrlSelectFilter
@@ -440,6 +439,7 @@ export default async function AdminInspectionsPage({
                 value={filterData.filters.technicianId}
               />
             </div>
+            {params.through ? <p className="text-sm text-slate-600">Due through {format(fastManagementWindowEnd, "MMM d, yyyy")} (including overdue)</p> : null}
           </div>
         </details>
       </SectionCard>

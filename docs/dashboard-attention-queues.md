@@ -4,6 +4,10 @@ Every actionable Needs Attention row is a real Next.js link with whole-row hover
 keyboard focus, and a decorative chevron. Informational deletion notices remain
 plain text. Mobile padding is unchanged.
 
+Attention links retain the Dashboard scroll offset on their own history entry.
+The app shell restores it when returning, including after streamed content loads.
+Modified clicks/new-tab actions do not change that history entry.
+
 Inspection counts and destinations share `attention-queue.ts` predicates, operate
 on the tenant-authorized scheduling queue with no row limit, apply the same due
 window, then deduplicate before applying the attention predicate. The existing
@@ -35,3 +39,21 @@ added. Existing tenant/role guards remain in place.
 Regression checks: `node scripts/check-attention-queues.cjs`, billing-queue and
 field-service-request library tests, plus scheduling tests including explicit
 proof that the read-only stale-work path performs no transaction.
+
+## Live verification (2026-11-20)
+
+Signed-in Office Admin, production browser; no records edited:
+
+| Alert | Dashboard | Destination total |
+| --- | ---: | ---: |
+| Unassigned | 143 | 143 across 4 months |
+| Payment collection | 29 | 29 across 4 months |
+| Ready To Bill | 13 | 13 summaries / 13 review links |
+| Linked visit updates | 1 | 1 across 1 month |
+
+Refresh preserved unassigned and billing totals/filters. Keyboard Enter opened
+the payment queue. The linked-visit row was clicked at 390x844 and matched its
+count. Pending requests were zero: the explicit pending filter displayed zero,
+Clear filters, and the clear-queue empty state. Populated request eligibility
+and the resolved-final-item empty collection are regression-tested; production
+records were not created or resolved just to test a race condition.

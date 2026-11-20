@@ -721,6 +721,24 @@ export function AppShell({
       return;
     }
 
+    const saved = pathname === "/app/admin/dashboard" ? window.history.state?.attentionDashboardScroll : undefined;
+    if (typeof saved === "number" && Number.isFinite(saved) && saved > 0) {
+      // Dashboard content can arrive after the shell through streaming navigation.
+      let frame = 0;
+      const restore = () => {
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(() => {
+          container.scrollTo({ top: saved, behavior: "instant" });
+          if (container.scrollHeight - container.clientHeight >= saved) observer.disconnect();
+        });
+      };
+      const observer = new ResizeObserver(restore);
+      if (container.firstElementChild) observer.observe(container.firstElementChild);
+      restore();
+      const timeout = window.setTimeout(() => observer.disconnect(), 15000);
+      return () => { observer.disconnect(); cancelAnimationFrame(frame); clearTimeout(timeout); };
+    }
+
     container.scrollTo({
       top: 0,
       behavior: "auto"

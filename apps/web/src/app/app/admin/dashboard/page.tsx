@@ -39,6 +39,7 @@ import {
   WorkspaceSplit
 } from "../operations-ui";
 import { DashboardGlobalSearch } from "./dashboard-global-search";
+import { AttentionLink } from "./attention-link";
 import { summarizeDashboardQueue } from "./queue-summary";
 import { filterAttentionQueue, isInAttentionWindow } from "../attention-queue";
 
@@ -147,7 +148,7 @@ function buildAlertItems(inspections: Awaited<ReturnType<typeof getAdminScheduli
   const amendedCount = filterAttentionQueue(inspections, "linked").length;
   if (amendedCount > 0) {
     alerts.push(
-      { label: `${amendedCount} active inspections have linked visit updates (overdue and next 60 days).`, href: "/app/admin/inspections?status=open&attention=linked" }
+      { label: `${amendedCount} active inspection${amendedCount === 1 ? " has" : "s have"} linked visit updates (overdue and next 60 days).`, href: "/app/admin/inspections?status=open&attention=linked" }
     );
   }
 
@@ -536,13 +537,13 @@ export default async function AdminDashboardPage({
                     </div>
                   ) : (
                     alerts.map((alert) => (
-                      alert.href ? <Link
+                      alert.href ? <AttentionLink
                         key={alert.href}
                         href={alert.href}
                         className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/85 p-4 text-sm leading-6 text-slate-800 transition hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2"
                       >
                         <span>{alert.label}</span><ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-amber-700" />
-                      </Link> : <div
+                      </AttentionLink> : <div
                         key={alert.label}
                         className="rounded-2xl border border-amber-200 bg-amber-50/85 p-4 text-sm leading-6 text-slate-800"
                       >
@@ -551,7 +552,6 @@ export default async function AdminDashboardPage({
                     ))
                   )}
                 </div>
-                {fieldRequests > 0 ? <Link className="mt-4 inline-flex min-h-10 items-center rounded-xl border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-900" href="/app/admin/service-requests">Review field requests</Link> : null}
               </SectionCard>
 
               <section className="rounded-[28px] border border-slate-200/80 bg-[#0f172a] p-5 text-white shadow-[0_16px_44px_rgba(15,23,42,0.14)] lg:p-6">
