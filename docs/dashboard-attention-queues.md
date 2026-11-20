@@ -29,6 +29,9 @@ retain the dashboard's date window. The date cutoff and queue are visible in the
 expanded filter section. Clear filters returns to the normal queue. Service
 requests show the pending filter, total and Clear filters; history is excluded
 in that view. No alert is discarded by the former three-alert display limit.
+The redundant invoiced archive beneath Ready To Bill has been removed; the
+existing Invoiced tab and KPI still expose all archived invoices. Every billing
+queue now renders only records matching its selected filter.
 
 Dashboard and inspection-list reads pass `readOnly: true` to the scheduling
 reader. Stale finalized work is still excluded, but browsing does not invoke
@@ -57,3 +60,9 @@ count. Pending requests were zero: the explicit pending filter displayed zero,
 Clear filters, and the clear-queue empty state. Populated request eligibility
 and the resolved-final-item empty collection are regression-tested; production
 records were not created or resolved just to test a race condition.
+The unassigned empty state was also verified live using an empty historical
+date window; Clear filters restored the standard 157-record inspection queue.
+On mobile, keyboard focus showed a visible ring and Back restored the exact
+Dashboard scroll position (4936px). Ctrl-click opened a separate filtered billing
+tab and retained the Dashboard. Final build, lint, TypeScript, 57 targeted library
+tests, and the standalone queue regression script passed.

@@ -199,7 +199,6 @@ export default async function AdminBillingPage({
     searchBillingSummaries(filterBillingSummariesForQueue(summaries, selectedStatus), query),
     selectedSort
   );
-  const sortedInvoicedSummaries = sortBillingSummaries(searchBillingSummaries(invoicedSummaries, query), selectedSort);
 
   return (
     <AppPageShell>
@@ -258,23 +257,13 @@ export default async function AdminBillingPage({
 
       <SummaryQueueSection
         ctaLabel={selectedStatus === "invoiced" ? "View invoice detail" : "Review billing"}
-        description={selectedStatus === "all" ? "Completed, finalized work that is ready for item review, invoice creation, or QuickBooks follow-through. Invoiced work is archived below." : "Billing summaries matching the selected queue."}
+        description={selectedStatus === "all" ? "Completed, finalized work that is ready for item review, invoice creation, or QuickBooks follow-through." : "Billing summaries matching the selected queue."}
         emptyText="No billing summaries match the current queue and search. Clear filters or choose another queue."
         emptyTitle="No billing summaries in this queue"
         summaries={filteredSummaries}
         title={selectedStatus === "all" ? "Ready To Bill queue" : `${statusOptions.find((option) => option.value === selectedStatus)?.label ?? selectedStatus} queue`}
       />
 
-      {selectedStatus === "all" ? (
-        <SummaryQueueSection
-          ctaLabel="View invoice detail"
-          description="Completed billing summaries already marked invoiced."
-          emptyText={query ? "No invoiced summaries match this search." : "No inspections have been marked invoiced yet."}
-          emptyTitle={query ? "No matching invoices" : "No invoiced summaries yet"}
-          summaries={sortedInvoicedSummaries}
-          title="Invoiced archive"
-        />
-      ) : null}
     </AppPageShell>
   );
 }

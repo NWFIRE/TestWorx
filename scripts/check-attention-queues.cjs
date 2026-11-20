@@ -31,6 +31,7 @@ for (const file of [dashboard, list]) {
   assert.match(file, /isInAttentionWindow/);
 }
 assert.match(dashboard, /billing\?status=all/);
+assert.doesNotMatch(readFileSync('apps/web/src/app/app/admin/billing/page.tsx', 'utf8'), /summaries=\{sortedInvoicedSummaries\}/);
 assert.match(dashboard, /service-requests\?status=pending/);
 assert.match(dashboard, /focus-visible:ring-2/);
 assert.doesNotMatch(dashboard, /alerts\.slice/);
