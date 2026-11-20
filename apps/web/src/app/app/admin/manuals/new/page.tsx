@@ -20,7 +20,7 @@ export default async function ManualCreatePage() {
   }
 
   return (
-    <AppPageShell>
+    <AppPageShell className="mx-auto max-w-5xl">
       <PageHeader
         backNavigation={{ fallbackHref: "/app/admin/manuals", label: "Back to manuals admin" }}
         eyebrow="Manuals admin"

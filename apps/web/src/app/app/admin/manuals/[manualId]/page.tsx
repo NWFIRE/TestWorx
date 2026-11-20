@@ -31,7 +31,7 @@ export default async function ManualEditPage({
   );
 
   return (
-    <AppPageShell>
+    <AppPageShell className="mx-auto max-w-5xl">
       <PageHeader
         actions={
           manual.isActive ? (

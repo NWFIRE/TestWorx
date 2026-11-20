@@ -22,8 +22,12 @@ async function main() {
   }
   rule(".inspection-table-scroll", "overflow-x", "auto", "(min-width: 1024px)");
   rule(".inspection-table-scroll > *", "min-width", "1200px", "(min-width: 1024px)");
+  rule(".inspection-table-scroll > :first-child", "padding-inline", "33px", "(min-width: 1024px)");
   assert.doesNotMatch(css, /container(?:-type)?\s*:/, "Do not turn the shell into a containing block for report dialogs");
-  rule(".workspace-page-header", "flex-wrap", "wrap", "(min-width: 1024px)");
+  rule(".workspace-content .workspace-page-header", "flex-wrap", "wrap", "(min-width: 1024px)");
+  rule(".workspace-content .workspace-page-header", "flex-direction", "row", "(min-width: 1024px)");
+  rule(".workspace-content .workspace-page-actions", "width", "auto", "(min-width: 1024px)");
+  rule(".workspace-content .workspace-split", "display", "flex", "(min-width: 1024px)");
   rule(".workspace-split > *", "flex", "1 1 36rem", "(min-width: 1024px)");
   rule(".workspace-line-fields", "grid-template-columns", "repeat(auto-fit, minmax(min(100%, 12rem), 1fr))", "(min-width: 1024px)");
   const inspections = fs.readFileSync("apps/web/src/app/app/admin/inspections/page.tsx", "utf8");
@@ -31,6 +35,8 @@ async function main() {
   assert.match(inspections, /<FastInspectionDeleteButton/);
   const shell = fs.readFileSync("apps/web/src/app/app/app-shell.tsx", "utf8");
   assert.match(shell, /<header className="sticky top-0 z-30 shrink-0/);
-  console.log("Desktop layout CSS regression checks passed (8 assertions). Browser verification is separate.");
+  rule(".md\\:will-change-auto", "will-change", "auto", "(min-width: 768px)");
+  rule(".md\\:backdrop-filter-none", "backdrop-filter", "none", "(min-width: 768px)");
+  console.log("Desktop layout CSS regression checks passed. Browser verification is separate.");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

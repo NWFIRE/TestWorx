@@ -555,7 +555,7 @@ export function MobilePullToRefresh({
       <div className="relative min-h-0 flex-1 overflow-visible">
         <PullIndicator pullDistance={pullDistance} ready={ready} refreshing={refreshing} topOffset={indicatorTopOffset} />
         <div
-          className="min-h-0 flex-1 will-change-transform"
+          className="min-h-0 flex-1 will-change-transform md:will-change-auto"
           style={{
             transform: contentOffset > 0 ? `translateY(${contentOffset}px)` : undefined,
             transition: refreshing || pullDistance === 0 ? "transform 180ms cubic-bezier(0.22, 1, 0.36, 1)" : undefined

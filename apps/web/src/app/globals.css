@@ -145,14 +145,15 @@ body[data-keyboard-open="true"] {
 
   @media (min-width: 1024px) {
     /* Intrinsic wrapping follows available width without containing fixed dialogs. */
-    .workspace-page-header { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; }
-    .workspace-page-actions { width: auto; }
-    .workspace-split { display: flex; flex-wrap: wrap; }
+    .workspace-content .workspace-page-header { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+    .workspace-content .workspace-page-actions { width: auto; }
+    .workspace-content .workspace-split { display: flex; flex-wrap: wrap; }
     .workspace-split > * { flex: 1 1 36rem; }
     .workspace-split-content > :first-child { flex-grow: 1.45; }
     .workspace-split-balanced > :first-child { flex-grow: 1.22; }
     .inspection-table-scroll { overflow-x: auto; }
     .inspection-table-scroll > * { min-width: 1200px; }
+    .inspection-table-scroll > :first-child { padding-inline: 33px; }
     .workspace-line-fields { grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); }
     .workspace-line-fields > * { min-width: 0; }
   }

@@ -293,7 +293,7 @@ function SingleScrollReportWorkflow({
       className="min-h-screen bg-slate-50"
       style={{ paddingBottom: "var(--mobile-report-bottom-clearance, calc(var(--mobile-tab-bar-offset, 5.5rem) + 2rem))" }}
     >
-      <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-3 shadow-[0_10px_28px_rgba(15,23,42,0.08)] backdrop-blur md:px-6">
+      <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-3 shadow-[0_10px_28px_rgba(15,23,42,0.08)] backdrop-blur md:px-6 md:backdrop-filter-none">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <button
             className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm"
@@ -481,7 +481,7 @@ function LegacyGuidedReportWorkflow({
       className="min-h-screen bg-slate-50"
       style={{ paddingBottom: "var(--mobile-report-bottom-clearance, calc(var(--mobile-tab-bar-offset, 5.5rem) + 2rem))" }}
     >
-      <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-3 shadow-[0_10px_28px_rgba(15,23,42,0.08)] backdrop-blur md:px-6">
+      <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-3 shadow-[0_10px_28px_rgba(15,23,42,0.08)] backdrop-blur md:px-6 md:backdrop-filter-none">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <button
             className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm"
