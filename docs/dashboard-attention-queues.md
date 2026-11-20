@@ -66,3 +66,11 @@ On mobile, keyboard focus showed a visible ring and Back restored the exact
 Dashboard scroll position (4936px). Ctrl-click opened a separate filtered billing
 tab and retained the Dashboard. Final build, lint, TypeScript, 57 targeted library
 tests, and the standalone queue regression script passed.
+
+Final billing check confirmed 13 ready-to-bill links and zero unrelated invoice
+links; selecting Invoiced rendered all 439 invoice links. An intermittent existing
+React streamed-response `$RS`/`parentNode` error was observed on billing, and a
+subsequent Clear filters client transition remained pending. This error was also
+documented in the preceding desktop-layout audit. Direct filtered URLs and the
+Dashboard links were verified, but repeated billing filter transitions cannot be
+certified reliable until that separate streaming/hydration issue is resolved.
