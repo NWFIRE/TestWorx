@@ -483,6 +483,7 @@ export default async function AdminInspectionsPage({
                   </span>
                 </summary>
 
+                <div className="inspection-table-scroll" role="region" aria-label={`${group.title} inspections`} tabIndex={0}>
                 <div className="hidden bg-[color:rgb(248_250_252_/_0.86)] px-5 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--text-secondary)] md:px-6 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1.35fr)_0.74fr_0.84fr_0.74fr_0.95fr_0.9fr_0.62fr] lg:gap-5">
                   <span>Customer</span>
                   <span>Location</span>
@@ -595,6 +596,7 @@ export default async function AdminInspectionsPage({
                       </div>
                     );
                   })}
+                </div>
                 </div>
               </details>
             ))}

@@ -968,7 +968,7 @@ export function AppShell({
       ) : null}
 
       <div className="flex h-full min-w-0 flex-1 flex-col" ref={shellContentRef}>
-        <header className="sticky top-0 z-30 border-b border-[color:var(--border-strong)] bg-white/97 shadow-[0_8px_26px_rgba(9,18,32,0.07)] backdrop-blur">
+        <header className="sticky top-0 z-30 shrink-0 border-b border-[color:var(--border-strong)] bg-white/97 shadow-[0_8px_26px_rgba(9,18,32,0.07)] backdrop-blur">
           <div
             className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8"
             style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}

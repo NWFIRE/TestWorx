@@ -83,8 +83,8 @@ export function PageHeader({
 
   return (
     <SectionCard className={className}>
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className={widthClass}>
+      <div className="workspace-page-header flex flex-col gap-3">
+        <div className={cn("min-w-0", widthClass)}>
           {eyebrow ? (
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--tenant-primary)]">
               {eyebrow}
@@ -94,7 +94,7 @@ export function PageHeader({
             {title}
           </h1>
         </div>
-        {actions ? <div className="flex w-full min-w-0 flex-wrap items-center gap-3 xl:w-auto">{actions}</div> : null}
+        {actions ? <div className="workspace-page-actions flex w-full min-w-0 flex-wrap items-center gap-3">{actions}</div> : null}
       </div>
     </SectionCard>
   );
@@ -111,12 +111,12 @@ export function WorkspaceSplit({
 }) {
   const variantClass =
     variant === "content-heavy"
-      ? "2xl:grid-cols-[minmax(0,1.45fr)_minmax(24rem,0.78fr)]"
+      ? "workspace-split-content"
       : variant === "even"
-        ? "2xl:grid-cols-2"
-        : "2xl:grid-cols-[minmax(0,1.22fr)_minmax(24rem,0.88fr)]";
+        ? "workspace-split-even"
+        : "workspace-split-balanced";
 
-  return <section className={cn("grid min-w-0 gap-3", variantClass, className)}>{children}</section>;
+  return <section className={cn("workspace-split grid min-w-0 gap-3", variantClass, className)}>{children}</section>;
 }
 
 export function KPIStatCard({

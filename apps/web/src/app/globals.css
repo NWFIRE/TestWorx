@@ -141,6 +141,28 @@ body[data-keyboard-open="true"] {
     --shadow-crisp: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 5px 16px rgba(9, 18, 32, 0.06);
   }
 
+  /* Use the space left by navigation, not the browser width, for desktop splits. */
+  @container workspace (min-width: 70rem) {
+    .workspace-page-header { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+    .workspace-page-actions { width: auto; }
+  }
+
+  @container workspace (min-width: 78rem) {
+    .workspace-split-content { grid-template-columns: minmax(0, 1.45fr) minmax(24rem, .78fr); }
+    .workspace-split-balanced { grid-template-columns: minmax(0, 1.22fr) minmax(24rem, .88fr); }
+    .workspace-split-even { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  .workspace-split > * { min-width: 0; }
+
+  @media (min-width: 1024px) {
+    .workspace-content { container: workspace / inline-size; }
+    .inspection-table-scroll { overflow-x: auto; }
+    .inspection-table-scroll > * { min-width: 1200px; }
+    .workspace-line-fields { grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); }
+    .workspace-line-fields > * { min-width: 0; }
+  }
+
   .pressable,
   .pressable-icon,
   .pressable-surface,

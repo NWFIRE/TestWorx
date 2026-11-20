@@ -411,7 +411,7 @@ export function QuoteEditorForm({
 
               return (
                 <div key={line.id ?? `${line.internalCode}-${index}`} className="rounded-[24px] border border-slate-200/80 bg-slate-50/70 p-4">
-                  <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_0.7fr_0.7fr_auto]">
+                  <div className="workspace-line-fields grid gap-4">
                     <SearchSelect
                       className="min-w-0"
                       emptyText="No products or services found"

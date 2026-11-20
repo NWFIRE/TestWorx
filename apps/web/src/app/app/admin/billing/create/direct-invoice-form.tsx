@@ -360,7 +360,7 @@ export function DirectInvoiceForm({
           <div className="space-y-4">
             {value.lineItems.map((line, index) => (
               <div key={line.id} className="rounded-[24px] border border-slate-200/80 bg-slate-50/70 p-4">
-                <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr_0.7fr_auto]">
+                <div className="workspace-line-fields grid gap-4">
                   <label className="block">
                     <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Part or service</span>
                     <SearchSelect
