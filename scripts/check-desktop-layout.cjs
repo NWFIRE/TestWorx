@@ -22,9 +22,9 @@ async function main() {
   }
   rule(".inspection-table-scroll", "overflow-x", "auto", "(min-width: 1024px)");
   rule(".inspection-table-scroll > *", "min-width", "1200px", "(min-width: 1024px)");
-  rule(".workspace-content", "container", "workspace / inline-size", "(min-width: 1024px)");
-  rule(".workspace-page-header", "flex-wrap", "wrap", "workspace (min-width: 70rem)");
-  rule(".workspace-split-even", "grid-template-columns", "repeat(2, minmax(0, 1fr))", "workspace (min-width: 78rem)");
+  assert.doesNotMatch(css, /container(?:-type)?\s*:/, "Do not turn the shell into a containing block for report dialogs");
+  rule(".workspace-page-header", "flex-wrap", "wrap", "(min-width: 1024px)");
+  rule(".workspace-split > *", "flex", "1 1 36rem", "(min-width: 1024px)");
   rule(".workspace-line-fields", "grid-template-columns", "repeat(auto-fit, minmax(min(100%, 12rem), 1fr))", "(min-width: 1024px)");
   const inspections = fs.readFileSync("apps/web/src/app/app/admin/inspections/page.tsx", "utf8");
   assert.match(inspections, /inspection-table-scroll.*role="region".*tabIndex=\{0\}/);

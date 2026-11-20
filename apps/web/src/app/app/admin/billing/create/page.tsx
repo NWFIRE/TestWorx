@@ -32,7 +32,7 @@ export default async function CreateBillingInvoicePage({
   const resolvedCustomerId = options.customers.some((customer) => customer.id === requestedCustomerId) ? requestedCustomerId : "";
 
   return (
-    <AppPageShell density="wide">
+    <AppPageShell className="mx-auto max-w-6xl">
       <PageHeader
         backNavigation={{ label: "Back to billing", fallbackHref: "/app/admin/billing" }}
         actions={

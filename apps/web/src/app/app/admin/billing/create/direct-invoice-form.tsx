@@ -155,7 +155,7 @@ export function DirectInvoiceForm({
 
   return (
     <form
-      className="grid gap-6 xl:grid-cols-[1.45fr_0.75fr]"
+      className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,0.75fr)]"
       onSubmit={(event) => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);

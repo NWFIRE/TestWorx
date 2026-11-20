@@ -37,7 +37,7 @@ export default async function NewQuotePage({
   const selectedCustomer = options.customers.find((customer) => customer.id === resolvedCustomerId);
 
   return (
-    <AppPageShell>
+    <AppPageShell className="mx-auto max-w-6xl">
       <PageHeader
         backNavigation={{ label: "Back to quotes", fallbackHref: "/app/admin/quotes" }}
         eyebrow="Quotes"
