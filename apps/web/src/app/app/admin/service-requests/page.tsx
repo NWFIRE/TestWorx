@@ -6,13 +6,14 @@ import { AppPageShell, KPIStatCard, PageHeader, SectionCard } from "../operation
 import { RequestReviewForm } from "./review-form";
 import { ResolvedRequestDetails } from "./resolved-request-details";
 
-export default async function AdminServiceRequestsPage() {
+export default async function AdminServiceRequestsPage({ searchParams }: { searchParams?: Promise<{ status?: string }> }) {
   const session = await auth();
   if (!session?.user?.tenantId) redirect("/login");
   if (!["tenant_admin", "office_admin", "platform_admin"].includes(session.user.role)) redirect("/app");
   const data = await getAdminFieldServiceRequests({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId });
-  const active = data.requests.filter((request) => request.status === "pending" || request.status === "acknowledged");
-  const history = data.requests.filter((request) => request.status === "resolved" || request.status === "declined");
+  const pendingOnly = (await searchParams)?.status === "pending";
+  const active = data.requests.filter((request) => request.status === "pending" || (!pendingOnly && request.status === "acknowledged"));
+  const history = pendingOnly ? [] : data.requests.filter((request) => request.status === "resolved" || request.status === "declined");
 
   return (
     <AppPageShell>
@@ -22,6 +23,7 @@ export default async function AdminServiceRequestsPage() {
         <KPIStatCard label="Urgent" value={data.counts.urgent} tone="rose" />
       </div>
       <SectionCard>
+        {pendingOnly ? <div className="mb-4 flex flex-wrap items-center gap-3 text-sm"><span className="rounded-full bg-amber-50 px-3 py-2 font-semibold text-amber-900">Pending office review: {active.length} requests</span><Link className="text-slateblue underline" href="/app/admin/service-requests">Clear filters</Link></div> : null}
         <div className="mb-5"><p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Office queue</p><h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Requests from the field</h2></div>
         <div className="space-y-4">
           {active.length ? active.map((request) => (

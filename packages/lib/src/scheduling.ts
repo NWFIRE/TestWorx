@@ -5860,6 +5860,7 @@ export async function getAdminSchedulingQueueData(
     limit?: number | null;
     includeCounts?: boolean;
     includeTechnicians?: boolean;
+    readOnly?: boolean;
   }
 ) {
   const parsedActor = parseActor(actor);
@@ -6012,6 +6013,8 @@ export async function getAdminSchedulingQueueData(
       site: true,
       customerCompany: true,
       assignedTechnician: true,
+      amendments: { select: { id: true } },
+      replacementAmendments: { select: { id: true } },
       technicianAssignments: { include: { technician: true } },
       convertedFromQuotes: { select: { id: true }, take: 1 },
       tasks: { include: { recurrence: true, report: true, assignedTechnician: true } }
@@ -6109,7 +6112,7 @@ export async function getAdminSchedulingQueueData(
     .filter((inspection) => !hasIncompleteCurrentVisitWork(inspection))
     .map((inspection) => inspection.id);
 
-  if (staleClosedActiveInspectionIds.length > 0) {
+  if (!input?.readOnly && staleClosedActiveInspectionIds.length > 0) {
     await Promise.all(
       staleClosedActiveInspectionIds.map((inspectionId) =>
         prisma.$transaction((tx) => reconcileInspectionStatusTx(tx, {

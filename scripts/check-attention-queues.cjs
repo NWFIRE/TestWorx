@@ -1,0 +1,37 @@
+const assert = require('node:assert/strict');
+const { transformSync } = require('esbuild');
+const { readFileSync } = require('node:fs');
+const source = readFileSync('apps/web/src/app/app/admin/attention-queue.ts', 'utf8');
+const compiled = transformSync(source, { loader: 'ts', format: 'cjs' }).code;
+const mod = { exports: {} };
+new Function('module', 'exports', compiled)(mod, mod.exports);
+const { filterAttentionQueue, isInAttentionWindow, normalizeAttention, attentionWindowEnd } = mod.exports;
+const base = { status: 'scheduled', scheduledStart: new Date('2026-11-20'), tasks: [], assignedTechnicianNames: [], customerCompany: {} };
+const assigned = { ...base, assignedTechnicianNames: ['Technician'] };
+const payment = { ...assigned, customerCompany: { paymentTermsCode: 'due_on_receipt' } };
+const linked = { ...assigned, amendments: [{ id: 'amendment' }] };
+const incoming = { ...assigned, replacementAmendments: [{ id: 'replacement' }] };
+const rows = [base, assigned, payment, linked, incoming];
+assert.deepEqual(filterAttentionQueue(rows, 'unassigned'), [base]);
+assert.deepEqual(filterAttentionQueue(rows, 'payment'), [payment]);
+assert.deepEqual(filterAttentionQueue(rows, 'linked'), [linked, incoming]);
+assert.deepEqual(filterAttentionQueue([], 'unassigned'), []);
+assert.equal(normalizeAttention('invalid'), '');
+assert.equal(normalizeAttention('unassigned'), 'unassigned');
+const end = new Date('2027-01-19T23:59:59Z');
+assert.equal(attentionWindowEnd('invalid', end), end);
+assert.equal(attentionWindowEnd(end.toISOString(), new Date()).getTime(), end.getTime());
+assert.equal(isInAttentionWindow(base, end), true);
+assert.equal(isInAttentionWindow({ ...base, scheduledStart: new Date('2027-05-01'), tasks: [{ dueMonth: '2026-11' }] }, end), false);
+assert.equal(isInAttentionWindow({ ...base, tasks: [{ dueDate: new Date('2027-05-01') }] }, end), false);
+const dashboard = readFileSync('apps/web/src/app/app/admin/dashboard/page.tsx', 'utf8');
+const list = readFileSync('apps/web/src/app/app/admin/inspections/page.tsx', 'utf8');
+for (const file of [dashboard, list]) {
+  assert.match(file, /readOnly: true/);
+  assert.match(file, /isInAttentionWindow/);
+}
+assert.match(dashboard, /billing\?status=all/);
+assert.match(dashboard, /service-requests\?status=pending/);
+assert.match(dashboard, /focus-visible:ring-2/);
+assert.doesNotMatch(dashboard, /alerts\.slice/);
+console.log('Attention queue eligibility, empty-state and link regression checks passed.');

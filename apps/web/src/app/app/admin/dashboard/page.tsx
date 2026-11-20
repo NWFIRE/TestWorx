@@ -5,6 +5,7 @@ import {
   Bell,
   CalendarDays,
   CircleAlert,
+  ChevronRight,
   ClipboardList,
   FileText,
   ShieldCheck
@@ -24,7 +25,6 @@ import {
   getPendingFieldServiceRequestCount,
   getAdminSchedulingQueueData,
   getInspectionStatusTone,
-  isDueAtTimeOfServiceCustomer,
   isOpenBillingQueueStatus,
   pickEarliestNextDueAt
 } from "@testworx/lib/server/index";
@@ -40,6 +40,7 @@ import {
 } from "../operations-ui";
 import { DashboardGlobalSearch } from "./dashboard-global-search";
 import { summarizeDashboardQueue } from "./queue-summary";
+import { filterAttentionQueue, isInAttentionWindow } from "../attention-queue";
 
 type AdminDashboardData = Awaited<ReturnType<typeof getAdminDashboardData>>;
 type AdminBillingSummary = Awaited<ReturnType<typeof getAdminBillingSummaries>>[number];
@@ -113,48 +114,44 @@ function formatInspectionMetaLine(inspection: DashboardInspection, timezone?: st
     .join(" - ");
 }
 
-function buildAlertItems(data: AdminDashboardData, sharedQueueCount: number, readyToBillCount: number, fieldRequestCount: number, inspectionNotice?: string) {
-  const alerts: string[] = [];
+function buildAlertItems(inspections: Awaited<ReturnType<typeof getAdminSchedulingQueueData>>["inspections"], sharedQueueCount: number, readyToBillCount: number, fieldRequestCount: number, inspectionNotice?: string) {
+  const alerts: { label: string; href?: string }[] = [];
 
   if (inspectionNotice === "deleted") {
-    alerts.push("Inspection deleted successfully.");
+    alerts.push({ label: "Inspection deleted successfully." });
   }
 
-  const dueAtServiceCount = data.activeInspections.filter((inspection) =>
-    isDueAtTimeOfServiceCustomer(inspection.customerCompany)
-  ).length;
+  const dueAtServiceCount = filterAttentionQueue(inspections, "payment").length;
   if (dueAtServiceCount > 0) {
     alerts.push(
-      `${dueAtServiceCount} inspection${dueAtServiceCount === 1 ? "" : "s"} require payment collection on site today.`
+      { label: `${dueAtServiceCount} inspections require payment collection on site (overdue and next 60 days).`, href: "/app/admin/inspections?status=open&attention=payment" }
     );
   }
 
   if (sharedQueueCount > 0) {
     alerts.push(
-      `${sharedQueueCount} unassigned inspection${sharedQueueCount === 1 ? " is" : "s are"} in the shared queue (overdue and next 60 days).`
+      { label: `${sharedQueueCount} unassigned inspection${sharedQueueCount === 1 ? " is" : "s are"} in the shared queue (overdue and next 60 days).`, href: "/app/admin/inspections?status=open&attention=unassigned" }
     );
   }
 
   if (readyToBillCount > 0) {
     alerts.push(
-      `${readyToBillCount} billing summar${readyToBillCount === 1 ? "y is" : "ies are"} Ready To Bill.`
+      { label: `${readyToBillCount} billing summar${readyToBillCount === 1 ? "y is" : "ies are"} Ready To Bill.`, href: "/app/admin/billing?status=all" }
     );
   }
 
   if (fieldRequestCount > 0) {
-    alerts.push(`${fieldRequestCount} field service request${fieldRequestCount === 1 ? " needs" : "s need"} office review.`);
+    alerts.push({ label: `${fieldRequestCount} field service request${fieldRequestCount === 1 ? " needs" : "s need"} office review.`, href: "/app/admin/service-requests?status=pending" });
   }
 
-  const amendedCount = data.activeInspections.filter(
-    (inspection) => inspection.lifecycle === "replacement" || inspection.lifecycle === "amended"
-  ).length;
+  const amendedCount = filterAttentionQueue(inspections, "linked").length;
   if (amendedCount > 0) {
     alerts.push(
-      `${amendedCount} active inspection${amendedCount === 1 ? "" : "s"} ha${amendedCount === 1 ? "s" : "ve"} linked visit updates that should be double-checked before dispatch.`
+      { label: `${amendedCount} active inspections have linked visit updates (overdue and next 60 days).`, href: "/app/admin/inspections?status=open&attention=linked" }
     );
   }
 
-  return alerts.slice(0, 3);
+  return alerts;
 }
 
 function calculateBillingPipeline(
@@ -269,6 +266,7 @@ export default async function AdminDashboardPage({
       tenantId: session.user.tenantId
     }),
     getAdminSchedulingQueueData(actor, {
+      readOnly: true,
       statuses: [...activeOperationalInspectionStatuses],
       dueWindowEnd: fastManagementWindowEnd,
       limit: null,
@@ -289,10 +287,14 @@ export default async function AdminDashboardPage({
 
   const greeting = getGreetingByHour(new Date(), data.timezone);
   const firstName = getGreetingName(session.user.name);
-  const dashboardOperationalInspections = filterSubsetDuplicateOperationalInspections(schedulingQueueData.inspections);
+  const dashboardOperationalInspections = filterSubsetDuplicateOperationalInspections(schedulingQueueData.inspections.filter(row => isInAttentionWindow(row, fastManagementWindowEnd)));
   const { openInspectionCount, sharedQueueCount } = summarizeDashboardQueue(dashboardOperationalInspections);
   const readyToBillSummaryCount = billingSummaries.filter((summary) => isOpenBillingQueueStatus(summary.status)).length;
-  const alerts = buildAlertItems(data, sharedQueueCount, readyToBillSummaryCount, fieldRequests, inspectionNotice);
+  const alerts = buildAlertItems(dashboardOperationalInspections, sharedQueueCount, readyToBillSummaryCount, fieldRequests, inspectionNotice).map(alert => ({
+    ...alert,
+    href: alert.href?.startsWith("/app/admin/inspections?")
+      ? `${alert.href}&through=${encodeURIComponent(fastManagementWindowEnd.toISOString())}` : alert.href
+  }));
   const complianceFlags = deficiencyData.deficiencies.filter(
     (deficiency) => deficiency.severity === "high" || deficiency.severity === "critical"
   ).length;
@@ -534,11 +536,17 @@ export default async function AdminDashboardPage({
                     </div>
                   ) : (
                     alerts.map((alert) => (
-                      <div
-                        key={alert}
+                      alert.href ? <Link
+                        key={alert.href}
+                        href={alert.href}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/85 p-4 text-sm leading-6 text-slate-800 transition hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2"
+                      >
+                        <span>{alert.label}</span><ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-amber-700" />
+                      </Link> : <div
+                        key={alert.label}
                         className="rounded-2xl border border-amber-200 bg-amber-50/85 p-4 text-sm leading-6 text-slate-800"
                       >
-                        {alert}
+                        {alert.label}
                       </div>
                     ))
                   )}

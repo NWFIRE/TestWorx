@@ -37,6 +37,7 @@ import { InspectionCreatePanel } from "./inspection-create-panel";
 import { CreateInspectionTrigger } from "./create-inspection-trigger";
 import { FastInspectionDeleteButton } from "./fast-inspection-delete-button";
 import { deleteInspectionAction } from "../actions";
+import { attentionOptions, attentionWindowEnd, normalizeAttention, filterAttentionQueue, isInAttentionWindow } from "../attention-queue";
 
 const statusOptions = [
   { value: "all", label: "All statuses" },
@@ -147,16 +148,6 @@ function groupInspectionsByDueMonth(inspections: AdminSchedulingInspection[], in
     } satisfies InspectionMonthGroup));
 }
 
-function isInFastManagementWindow(inspection: AdminSchedulingInspection, windowEnd: Date) {
-  if (terminalInspectionStatusesForFastManagement.has(inspection.status)) {
-    return true;
-  }
-
-  const dueDate = getFastManagementDueDate(inspection);
-
-  return dueDate ? dueDate <= windowEnd : false;
-}
-
 function buildInspectionsHref(input: {
   statuses?: string[];
   classifications?: string[];
@@ -164,8 +155,12 @@ function buildInspectionsHref(input: {
   query?: string;
   technicianId?: string;
   create?: boolean;
+  attention?: string;
+  through?: string;
 }) {
   const params = new URLSearchParams();
+  if (input.attention) params.set("attention", input.attention);
+  if (input.through) params.set("through", input.through);
   if (input.statuses?.length) {
     params.set("status", input.statuses.join(","));
   }
@@ -221,6 +216,8 @@ export default async function AdminInspectionsPage({
     customerCompanyId?: string;
     siteId?: string;
     sourceRequestId?: string;
+    attention?: string;
+    through?: string;
   }>;
 }) {
   const session = await auth();
@@ -232,6 +229,7 @@ export default async function AdminInspectionsPage({
   }
 
   const params = searchParams ? await searchParams : {};
+  const attention = normalizeAttention(params.attention);
   const requestedStatuses = normalizeInspectionStatusFilters(typeof params.status === "string" ? params.status : null);
   const effectiveStatuses = requestedStatuses.length ? requestedStatuses : isReportReferenceSearch(typeof params.q === "string" ? params.q : "") ? normalizeInspectionStatusFilters("all") : [...activeOperationalInspectionStatuses];
   const requestedClassifications = normalizeInspectionClassificationFilters(typeof params.classification === "string" ? params.classification : null);
@@ -244,6 +242,8 @@ export default async function AdminInspectionsPage({
     typeof params.customerCompanyId === "string" ? params.customerCompanyId.trim() : "";
   const requestedSiteId = typeof params.siteId === "string" ? params.siteId.trim() : "";
   const currentPath = buildInspectionsHref({
+    attention,
+    through: params.through,
     statuses: requestedStatuses.length ? requestedStatuses : undefined,
     classifications: requestedClassifications,
     priority: requestedPriority,
@@ -256,9 +256,10 @@ export default async function AdminInspectionsPage({
     tenantId: session.user.tenantId
   };
 
-  const fastManagementWindowEnd = endOfDay(addDays(startOfDay(new Date()), FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS));
+  const fastManagementWindowEnd = attentionWindowEnd(params.through, endOfDay(addDays(startOfDay(new Date()), FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS)));
   const [fastQueueData, createOptions] = await Promise.all([
     getAdminSchedulingQueueData(actor, {
+      readOnly: true,
       statuses: effectiveStatuses,
       classifications: requestedClassifications,
       priority: requestedPriority,
@@ -298,11 +299,11 @@ export default async function AdminInspectionsPage({
   const requestUnavailable = createOpen && Boolean(sourceRequestId) && !sourceRequest;
   const requestingTechnicianId = sourceRequest && createOptions.technicians.some((technician) => technician.id === sourceRequest.requestedByUserId)
     ? sourceRequest.requestedByUserId : undefined;
-  const fastManagementInspections = filterSubsetDuplicateOperationalInspections(
+  const fastManagementInspections = filterAttentionQueue(filterSubsetDuplicateOperationalInspections(
     fastQueueData.inspections.filter((inspection) =>
-      isInFastManagementWindow(inspection, fastManagementWindowEnd)
+      isInAttentionWindow(inspection, fastManagementWindowEnd)
     )
-  );
+  ), attention);
   const fastManagementMonthGroups = groupInspectionsByDueMonth(fastManagementInspections, { query });
   const fastManagementCounts = {
     open: fastManagementInspections.filter((inspection) =>
@@ -313,6 +314,8 @@ export default async function AdminInspectionsPage({
     completed: fastManagementInspections.filter((inspection) => inspection.status === "completed").length
   };
   const createInspectionHref = buildInspectionsHref({
+    attention,
+    through: params.through,
     statuses: requestedStatuses.length ? requestedStatuses : undefined,
     classifications: requestedClassifications,
     priority: requestedPriority,
@@ -321,6 +324,8 @@ export default async function AdminInspectionsPage({
     create: true
   });
   const activeInspectionFilterCount = [
+    attention,
+    params.through,
     query,
     requestedStatuses.length ? "status" : "",
     requestedClassifications.length ? "type" : "",
@@ -425,6 +430,8 @@ export default async function AdminInspectionsPage({
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <LiveUrlSelectFilter options={statusOptions} paramKey="status" value={resolveStatusSelectValue(filterData.filters.statuses)} />
+              <LiveUrlSelectFilter options={attentionOptions} paramKey="attention" value={attention} />
+              {params.through ? <p className="text-sm text-slate-600">Due through {format(fastManagementWindowEnd, "MMM d, yyyy")} (including overdue)</p> : null}
               <LiveUrlSelectFilter options={typeOptions} paramKey="classification" value={resolveTypeSelectValue(filterData.filters.classifications)} />
               <LiveUrlSelectFilter options={priorityOptions} paramKey="priority" value={filterData.filters.priority} />
               <LiveUrlSelectFilter
@@ -458,7 +465,7 @@ export default async function AdminInspectionsPage({
               description={hasActiveInspectionFilters
                 ? "Try another search or clear filters."
                 : "This list only shows past due work and inspections due in the next 60 days. Use Upcoming for later inspections."}
-              title={hasActiveInspectionFilters
+              title={attention === "unassigned" && !query && !technicianId && !requestedClassifications.length && requestedPriority === "all" ? "No inspections are currently unassigned in this date range" : hasActiveInspectionFilters
                 ? "No inspections match these filters"
                 : "No past due or near-term inspections match this view"}
             />

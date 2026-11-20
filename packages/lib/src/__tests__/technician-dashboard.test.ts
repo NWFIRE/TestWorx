@@ -501,7 +501,7 @@ describe("technician dashboard inspection access", () => {
     expect(result.inspections.map((inspection) => inspection.id)).toEqual(["a_early", "a_late", "z_late"]);
   });
 
-  it("hides stale active inspections when current report tasks are already finalized", async () => {
+  it.each([false, true])("hides stale active inspections when current report tasks are already finalized (readOnly=%s)", async (readOnly) => {
     const activeInspection = {
       id: "inspection_active",
       tenantId: "tenant_1",
@@ -573,11 +573,12 @@ describe("technician dashboard inspection access", () => {
       userId: "admin_1",
       role: "office_admin",
       tenantId: "tenant_1"
-    });
+    }, { readOnly });
 
     expect(result.inspections.map((inspection) => inspection.id)).toEqual(["inspection_active"]);
     expect(result.counts.open).toBe(1);
     expect(result.counts.sharedQueue).toBe(1);
+    if (readOnly) expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
   it("shows unassigned claimable inspections in the shared queue for technicians", async () => {
