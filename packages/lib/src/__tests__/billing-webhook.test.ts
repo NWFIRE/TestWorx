@@ -43,7 +43,7 @@ describe("billing webhook processing", () => {
 
   beforeEach(() => {
     vi.resetModules();
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     vi.stubEnv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/testworx?schema=public");
     vi.stubEnv("AUTH_SECRET", "replace-with-a-long-random-secret");
     vi.stubEnv("NEXTAUTH_URL", "http://localhost:3000");
@@ -274,6 +274,26 @@ describe("billing webhook processing", () => {
     const result = await handleStripeWebhook({ rawBody: "{}", signature: "sig_123" });
 
     expect(result).toEqual({ duplicate: true, tenantId: "tenant_1", type: "customer.subscription.updated" });
+    expect(prismaMock.tenant.update).not.toHaveBeenCalled();
+    expect(prismaMock.stripeWebhookEvent.upsert.mock.calls[0][0].update).toEqual({
+      deliveryCount: { increment: 1 }
+    });
+  });
+
+  it("does not reset an event completed between the initial read and the claim", async () => {
+    stripeConstructEventMock.mockReturnValue({
+      id: "evt_race", created: 1760000000, type: "customer.subscription.updated",
+      data: { object: { id: "sub_123" } }
+    });
+    prismaMock.stripeWebhookEvent.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ status: "processed", tenantId: "tenant_1", type: "customer.subscription.updated" });
+    prismaMock.stripeWebhookEvent.upsert.mockResolvedValue({});
+    prismaMock.stripeWebhookEvent.updateMany.mockResolvedValue({ count: 0 });
+
+    const { handleStripeWebhook } = await import("../billing");
+    expect(await handleStripeWebhook({ rawBody: "{}", signature: "sig_123" })).toMatchObject({ duplicate: true });
+    expect(prismaMock.stripeWebhookEvent.upsert.mock.calls[0][0].update).toEqual({ deliveryCount: { increment: 1 } });
     expect(prismaMock.tenant.update).not.toHaveBeenCalled();
   });
 });

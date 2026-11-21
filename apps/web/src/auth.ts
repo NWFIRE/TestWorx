@@ -92,21 +92,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           where: { id: token.sub },
           select: {
             name: true,
+            isActive: true,
             role: true,
             tenantId: true,
             allowances: true
           }
         });
 
-        if (currentUser) {
-          token.name = currentUser.name;
-          token.role = currentUser.role;
-          token.tenantId = currentUser.tenantId;
-          token.allowances =
-            currentUser.allowances && typeof currentUser.allowances === "object" && !Array.isArray(currentUser.allowances)
-              ? (currentUser.allowances as Record<string, boolean>)
-              : null;
+        if (!currentUser?.isActive) {
+          return null;
         }
+        token.name = currentUser.name;
+        token.role = currentUser.role;
+        token.tenantId = currentUser.tenantId;
+        token.allowances =
+          currentUser.allowances && typeof currentUser.allowances === "object" && !Array.isArray(currentUser.allowances)
+            ? (currentUser.allowances as Record<string, boolean>)
+            : null;
       }
       return token;
     },

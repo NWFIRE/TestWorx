@@ -622,13 +622,8 @@ export async function handleStripeWebhook(input: { rawBody: string; signature: s
       payload: event as any
     },
     update: {
-      type: event.type,
-      status: "received",
-      deliveryCount: { increment: 1 },
-      stripeCreatedAt,
-      stripeObjectId,
-      payload: event as any,
-      errorMessage: null
+      // A redelivery must not reset another worker's claim or completed result.
+      deliveryCount: { increment: 1 }
     }
   });
 
