@@ -2,6 +2,7 @@ import { format } from "date-fns";
 
 import { formatManualSystemCategory } from "@testworx/lib";
 import type { ManualDetailData } from "../manual-types";
+import banner from "../../page-banner.module.css";
 
 export function ManualDetailHeader({
   manual
@@ -9,17 +10,17 @@ export function ManualDetailHeader({
   manual: ManualDetailData;
 }) {
   return (
-    <section className="rounded-[28px] border border-[color:rgb(203_215_230_/_0.92)] bg-white p-5 shadow-[0_16px_38px_rgba(15,23,42,0.06)] lg:p-6">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--tenant-primary)]">
+    <section className={`${banner.banner} p-4`}>
+      <p className={`${banner.muted} text-[11px] font-bold uppercase tracking-[0.16em]`}>
         {formatManualSystemCategory(manual.systemCategory)}
       </p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-950 md:text-4xl">
+      <h1 className="mt-1">
         {manual.title}
       </h1>
-      <p className="mt-3 text-base text-slate-600">
+      <p className={`${banner.muted} mt-3 text-base`}>
         {[manual.manufacturer, manual.productFamily, manual.model].filter(Boolean).join(" • ")}
       </p>
-      <div className="mt-4 flex flex-wrap gap-2 text-sm text-slate-500">
+      <div className={`${banner.muted} mt-4 flex flex-wrap gap-2 text-sm`}>
         {manual.revisionLabel ? <span>Revision {manual.revisionLabel}</span> : null}
         {manual.revisionDate ? <span>{format(manual.revisionDate, "MMM d, yyyy")}</span> : null}
       </div>

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { fieldProgress, localDateTime, scheduleLanes, schedulerRange, shiftSchedulerDate, type SchedulerData, type SchedulerJob } from "@testworx/lib/scheduler-shared";
 import { getInspectionTypeTextColorClass } from "../../inspection-type-inline-list";
 import styles from "./scheduler.module.css";
+import banner from "../../page-banner.module.css";
 import { ServiceDirections } from "../../service-directions";
 
 const labelType = (type: string) => type.replaceAll("_", " ");
@@ -119,7 +120,7 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
   const range = schedulerRange(data.days[0]!, "day", timezone), from = range.start.getTime(), until = range.end.getTime();
   const hours = Array.from({ length: Math.ceil((until - from) / 3600000) }, (_, i) => new Date(from + i * 3600000));
   return <div className={styles.scheduler}>
-    <header className={styles.toolbar}><div><h1>Scheduler</h1><p>{timezone} · <span role="status">{stale ? "Updates delayed" : loading ? "Updating" : "Live · every 15 seconds"}</span></p></div>
+    <header className={`${styles.toolbar} ${banner.banner} p-4`}><div><h1>Scheduler</h1><p className={banner.muted}>{timezone} · <span role="status">{stale ? "Updates delayed" : loading ? "Updating" : "Live · every 15 seconds"}</span></p></div>
       <div className={styles.controls}>
         <button type="button" aria-label="Previous period" onClick={() => navigate(shiftSchedulerDate(date, view === "day" ? -1 : -7))}>Previous</button>
         <button type="button" onClick={() => navigate(today)}>Today</button>

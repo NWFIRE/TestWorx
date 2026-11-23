@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { fieldServiceRequestStatusLabels, fieldServiceRequestTypeLabels, getFieldServiceRequestFormData } from "@testworx/lib/server/index";
 import { FieldRequestForm } from "./field-request-form";
+import { PageHeader } from "../../admin/operations-ui";
 
 export default async function TechnicianRequestsPage() {
   const session = await auth();
@@ -11,10 +12,7 @@ export default async function TechnicianRequestsPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-5 pb-8">
-      <header className="rounded-[28px] border border-slate-200 bg-gradient-to-br from-white to-blue-50 p-5 shadow-sm sm:p-7">
-        <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-blue-700">Field request</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-[-0.04em] text-slate-950">Request office support</h1>
-      </header>
+      <PageHeader eyebrow="Field request" title="Request office support" />
       <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
         <FieldRequestForm customers={data.customers} />
       </section>

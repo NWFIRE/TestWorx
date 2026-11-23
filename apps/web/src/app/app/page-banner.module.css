@@ -1,0 +1,18 @@
+.banner {
+  border: 1px solid #24558c;
+  border-radius: 20px;
+  background: linear-gradient(110deg, #163d72, #2563a6);
+  box-shadow: 0 6px 18px rgb(22 61 114 / .12);
+  min-width: 0;
+}
+.banner h1 {
+  font-family: inherit;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -.045em;
+  color: #fff;
+  overflow-wrap: anywhere;
+}
+.banner .muted { color: #e2edfa; }
+@media (min-width: 768px) { .banner h1 { font-size: 1.875rem; } }

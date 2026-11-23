@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import banner from "../page-banner.module.css";
 
 type Tone =
   | "slate"
@@ -82,11 +83,11 @@ export function PageHeader({
         : "max-w-3xl";
 
   return (
-    <SectionCard className={className}>
+    <SectionCard className={cn(banner.banner, className)}>
       <div className="workspace-page-header flex flex-col gap-3">
         <div className={cn("min-w-0", widthClass)}>
           {eyebrow ? (
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--tenant-primary)]">
+            <p className={cn("text-[11px] font-bold uppercase tracking-[0.16em]", banner.muted)}>
               {eyebrow}
             </p>
           ) : null}

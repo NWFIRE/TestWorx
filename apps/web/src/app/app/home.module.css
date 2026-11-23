@@ -1,6 +1,6 @@
 .home { container-type: inline-size; }
 .home > * + * { margin-top: 24px; }
-.welcome { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 24px; border: 1px solid #24558c; border-radius: 20px; background: linear-gradient(110deg, #163d72, #2563a6); box-shadow: 0 6px 18px rgb(22 61 114 / .12); }
+.welcome { composes: banner from "./page-banner.module.css"; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 24px; }
 .welcome h1 { font-size: 32px; line-height: 1.15; font-weight: 700; letter-spacing: -.04em; color: #fff; }
 .welcome p { margin-top: 6px; font-size: 15px; color: #e2edfa; }
 .welcomeTools { display: flex; flex-direction: column; gap: 8px; width: min(100%, 420px); }

@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { getOwnUserProfile } from "@testworx/lib/server/index";
 import { updateProfileAction } from "./actions";
 import { ProfileForm } from "./profile-form";
+import { PageHeader } from "../admin/operations-ui";
 
 const roleLabels: Record<string, string> = {
   platform_admin: "Platform administrator", tenant_admin: "Company administrator",
@@ -21,7 +22,7 @@ export default async function ProfilePage() {
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-5">
-      <header><p className="text-xs font-semibold tracking-wide text-blue-700">Your account</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">My profile</h1></header>
+      <PageHeader eyebrow="Your account" title="My profile" />
       <section aria-label="Profile summary" className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-5 rounded-2xl border border-slate-200 bg-gradient-to-r from-blue-50 via-white to-white p-5 sm:p-7 md:grid-cols-[auto_minmax(0,1fr)_auto]">
         <div aria-hidden="true" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-blue-200 bg-white text-xl font-semibold text-blue-700">{initials || "TW"}</div>
         <div className="min-w-0 flex-1"><h2 className="break-words text-xl font-semibold text-slate-900">{profile.name}</h2><p className="mt-1 break-all text-sm text-slate-500">{profile.email}</p></div>
