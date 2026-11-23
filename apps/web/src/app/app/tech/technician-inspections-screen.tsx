@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+import banner from "../page-banner.module.css";
 import { ServiceDirections } from "../service-directions";
 import { serviceDestination } from "@testworx/lib/service-directions";
 import { format } from "date-fns";
@@ -55,12 +56,9 @@ export function TechnicianInspectionsScreen({ initialData }: { initialData: any 
       ) : null}
 
       <section
-        className="rounded-[1.85rem] p-5 text-[var(--tenant-primary-contrast)] shadow-[0_24px_60px_rgb(var(--tenant-primary-rgb)/0.2)]"
-        style={{
-          background: "linear-gradient(180deg, rgb(var(--tenant-primary-rgb) / 0.96), rgb(var(--tenant-primary-rgb) / 0.82))"
-        }}
+        className={`${banner.banner} p-5 text-white`}
       >
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">Inspection workflow</p>
+        <p className={`${banner.muted} text-[11px] font-semibold uppercase tracking-[0.18em]`}>Inspection workflow</p>
         <h2 className="mt-2 text-[28px] font-semibold leading-tight">Continue inspection</h2>
       </section>
 

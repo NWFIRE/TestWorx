@@ -1,9 +1,10 @@
 import Link from "next/link";
+import banner from "../page-banner.module.css";
 import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { buildTenantBrandingCss, formatInspectionTaskSummary, getCustomerFacingSiteLabel, getCustomerPortalData, getCustomerQuoteList, inspectionTypeRegistry, quoteStatusLabels } from "@testworx/lib/server/index";
+import { formatInspectionTaskSummary, getCustomerFacingSiteLabel, getCustomerPortalData, getCustomerQuoteList, inspectionTypeRegistry, quoteStatusLabels } from "@testworx/lib/server/index";
 
 export default async function CustomerPage() {
   const session = await auth();
@@ -16,7 +17,6 @@ export default async function CustomerPage() {
 
   const data = await getCustomerPortalData({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId });
   const quotes = await getCustomerQuoteList({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId });
-  const theme = buildTenantBrandingCss(data.branding);
   const inspectionPackets = data.inspectionPackets as unknown as Array<{
     id: string;
     scheduledStart: Date;
@@ -28,10 +28,10 @@ export default async function CustomerPage() {
 
   return (
     <section className="space-y-6">
-      <div className="rounded-[2rem] p-6 text-white shadow-panel" style={{ background: `linear-gradient(135deg, ${theme["--tenant-primary"]} 0%, ${theme["--tenant-accent"]} 100%)` }}>
-        <p className="text-sm uppercase tracking-[0.25em] text-white/70">Customer portal</p>
-        <h2 className="mt-2 text-3xl font-semibold">{data.branding.legalBusinessName || data.tenantName}</h2>
-        <p className="mt-4 text-sm text-white/75">{[data.branding.phone, data.branding.email, data.branding.website].filter(Boolean).join(" | ")}</p>
+      <div className={`${banner.banner} p-6 text-white`}>
+        <p className={`${banner.muted} text-sm uppercase tracking-[0.25em]`}>Customer portal</p>
+        <h2 className={`${banner.title} mt-2 text-3xl font-semibold`}>{data.branding.legalBusinessName || data.tenantName}</h2>
+        <p className={`${banner.muted} mt-4 text-sm`}>{[data.branding.phone, data.branding.email, data.branding.website].filter(Boolean).join(" | ")}</p>
       </div>
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Sites</p><p className="mt-2 text-3xl font-semibold">{data.siteCount}</p></div>

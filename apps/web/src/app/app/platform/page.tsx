@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@testworx/db";
 
 import { auth } from "@/auth";
+import { PageHeader } from "../admin/operations-ui";
 
 export default async function PlatformPage() {
   const session = await auth();
@@ -21,10 +22,7 @@ export default async function PlatformPage() {
 
   return (
     <section className="space-y-6">
-      <div>
-        <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Platform overview</p>
-        <h2 className="mt-2 text-3xl font-semibold text-ink">Multi-tenant operating picture</h2>
-      </div>
+      <PageHeader eyebrow="Platform overview" title="Multi-tenant operating picture" />
       <div className="grid gap-4 md:grid-cols-3">
         {[["Tenants", tenantCount], ["Users", userCount], ["Inspections", inspectionCount]].map(([label, value]) => (
           <div key={String(label)} className="rounded-3xl bg-white p-6 shadow-panel">

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import banner from "../../page-banner.module.css";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
@@ -47,12 +48,12 @@ export default async function TechnicianTimesheetsPage({
 
   return (
     <main className="space-y-5 pb-6">
-      <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-panel">
-        <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[var(--tenant-primary)]">Timesheets</p>
+      <section className={`${banner.banner} p-5`}>
+        <p className={`${banner.muted} text-[11px] font-bold uppercase tracking-[0.24em]`}>Timesheets</p>
         <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-[-0.04em] text-ink">{timesheet.currentStatus}</h1>
-            <p className="mt-2 text-sm font-semibold text-slate-600">{timesheet.currentTimeLabel}</p>
+            <p className={`${banner.muted} mt-2 text-sm font-semibold`}>{timesheet.currentTimeLabel}</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">

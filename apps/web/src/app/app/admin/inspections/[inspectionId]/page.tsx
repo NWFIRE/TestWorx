@@ -1,4 +1,5 @@
 import Link from "next/link";
+import banner from "../../../page-banner.module.css";
 import { format } from "date-fns";
 import { redirect } from "next/navigation";
 
@@ -297,7 +298,7 @@ export default async function EditInspectionPage({
   const statusTone = getInspectionStatusTone((inspectionView.displayStatus ?? inspection.status) as Parameters<typeof getInspectionStatusTone>[0]);
   return (
     <section className="space-y-5">
-      <div className="rounded-[2rem] border border-[color:rgb(203_215_230_/_0.92)] bg-white p-6 shadow-panel">
+      <div className={`${banner.banner} p-6`}>
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -311,9 +312,9 @@ export default async function EditInspectionPage({
                 {formatLifecycleLabel(inspectionView.lifecycle ?? "original")}
               </span>
             </div>
-            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink">{inspectionDisplay.primaryTitle}</h2>
-            <ServiceDirections site={inspection.site} customer={inspection.customerCompany} editable />
-            <p className="mt-2 max-w-4xl text-base text-slate-600">
+            <h2 className={`${banner.title} mt-4 text-3xl font-semibold tracking-tight`}>{inspectionDisplay.primaryTitle}</h2>
+            <div className={`${banner.actions} mt-3`}><ServiceDirections site={inspection.site} customer={inspection.customerCompany} editable /></div>
+            <p className={`${banner.muted} mt-2 max-w-4xl text-base`}>
               {[inspectionTypeLabel, inspectionDisplay.secondaryTitle, format(inspection.scheduledStart, "MMM d, yyyy h:mm a"), technicianLabel].filter(Boolean).join(" · ")}
             </p>
           </div>
