@@ -1,5 +1,16 @@
 import type { JsonValue } from "./json-types";
 import type { BillableItem } from "./inspection-billing";
+import type { Prisma } from "@prisma/client";
+
+export function billingEditWhere(summary: { id: string; tenantId: string; status: string; items: BillableItem[] }): Prisma.InspectionBillingSummaryWhereUniqueInput {
+  return {
+    id: summary.id,
+    tenantId: summary.tenantId,
+    status: { equals: summary.status, not: "invoiced" },
+    quickbooksInvoiceId: null,
+    items: { equals: summary.items as unknown as Prisma.InputJsonValue }
+  };
+}
 
 export function billingReviewFingerprint(items: BillableItem[]) {
   return JSON.stringify(items.map((item) => ({
