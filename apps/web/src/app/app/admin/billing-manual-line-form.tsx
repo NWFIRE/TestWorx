@@ -94,10 +94,10 @@ export function BillingManualLineForm({
       </div>
 
       <form
-        className="mt-5 grid gap-4 lg:grid-cols-[1.2fr_1fr_0.4fr_auto]"
+        className="mt-5 grid min-w-0 gap-4 md:grid-cols-2"
         onSubmit={(event) => {
           event.preventDefault();
-          if (disabled) {
+          if (disabled || pending) {
             return;
           }
 
@@ -126,10 +126,10 @@ export function BillingManualLineForm({
           customValue={selectedCatalogItem?.name ?? ""}
           disabled={disabled}
           emptyText="No active products or services matched that search."
-          label="Product / service"
+          label="Catalog item (optional)"
           onChange={applyCatalogSelection}
           options={catalogOptions}
-          placeholder="Search catalog"
+          placeholder="Search catalog or enter a custom description"
           value={catalogItemId}
         />
 
@@ -139,6 +139,8 @@ export function BillingManualLineForm({
             className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3 disabled:bg-slate-50"
             disabled={disabled}
             name="description"
+            required
+            maxLength={2000}
             onChange={(event) => setDescription(event.target.value)}
             placeholder="Invoice line description"
             value={description}
@@ -161,10 +163,20 @@ export function BillingManualLineForm({
           />
         </label>
 
+        {!catalogItemId ? <label className="block text-sm text-slate-600">
+          Category
+          <select name="category" disabled={disabled || pending} className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3">
+            <option value="service">Services</option>
+            <option value="material">Materials / equipment</option>
+            <option value="labor">Labor</option>
+            <option value="fee">Fees</option>
+          </select>
+        </label> : null}
+
         <div className="flex items-end">
           <ActionButton
             className="w-full"
-            disabled={disabled || !catalogItemId}
+            disabled={disabled || !description.trim()}
             pending={pending}
             pendingLabel="Adding"
             tone="primary"

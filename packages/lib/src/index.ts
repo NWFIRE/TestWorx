@@ -19,6 +19,7 @@ export * from "./scheduling-shared";
 export * from "./team-management-shared";
 export * from "./timezone";
 export * from "./timesheets";
+export * from "./billing-export";
 
 export type {
   ReportFieldDefinition,

@@ -58,7 +58,7 @@ function formatQuickBooksSummaryStatus(summary: AdminBillingSummary) {
   }
 
   if (summary.metrics.missingPriceCount > 0) {
-    return "Needs setup";
+    return "Setup needed only for sync";
   }
 
   if (summary.quickbooksSyncStatus === "synced" || summary.quickbooksSyncStatus === "sent") {
@@ -228,8 +228,8 @@ export default async function AdminBillingPage({
         />
         <KPIStatCard
           href={buildBillingHref("needs_pricing", selectedSort)}
-          label="Needs setup"
-          note="Ready-to-bill summaries that need QuickBooks billing setup before sync."
+          label="QuickBooks sync setup"
+          note="Optional QuickBooks setup. Does not prevent review or external billing."
           tone="amber"
           value={openSummaries.filter((summary) => summary.metrics.missingPriceCount > 0).length}
         />

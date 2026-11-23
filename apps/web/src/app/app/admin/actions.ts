@@ -1095,8 +1095,8 @@ export async function addBillingSummaryManualLineAction(formData: FormData) {
   const unitPriceRaw = String(formData.get("unitPrice") ?? "");
   const unitPrice = unitPriceRaw.trim().length > 0 ? Number(unitPriceRaw) : null;
 
-  if (!session?.user?.tenantId || !summaryId || !inspectionId || !catalogItemId) {
-    return { ok: false, error: "Select a product or service before adding a line item." };
+  if (!session?.user?.tenantId || !summaryId || !inspectionId) {
+    return { ok: false, error: "Sign in and open a billing summary before adding a line item." };
   }
 
   try {
@@ -1105,8 +1105,9 @@ export async function addBillingSummaryManualLineAction(formData: FormData) {
       {
         summaryId,
         catalogItemId,
+        category: String(formData.get("category") ?? "service"),
         description,
-        quantity: Number.isFinite(quantity) ? quantity : 1,
+        quantity,
         unitPrice: unitPrice !== null && Number.isFinite(unitPrice) ? unitPrice : null
       }
     );
