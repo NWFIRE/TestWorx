@@ -85,7 +85,7 @@ export async function generateInspectionReportPdfV2(input: PdfInput) {
     if (htmlReport && index > 0) {
       const heading = `${branding.legalBusinessName} | ${formatReportReference(input.report)}`;
       const lines = splitTextIntoLines(font, heading, page.getWidth() - 80, 7);
-      lines.forEach((line, lineIndex) => page.drawText(line, { x: 40, y: page.getHeight() - 13 - lineIndex * 8, size: 7, font, color: rgb(.25, .3, .36) }));
+      lines.forEach((line, lineIndex) => page.drawText(line, { x: 40, y: page.getHeight() - 22 - lineIndex * 8, size: 7, font, color: rgb(.25, .3, .36) }));
     }
     const label = `Page ${index + 1} of ${document.getPageCount()}`;
     page.drawText(label, { x: (page.getWidth() - font.widthOfTextAtSize(label, 8)) / 2, y: 16, size: 8, font, color: rgb(.25, .3, .36) });
