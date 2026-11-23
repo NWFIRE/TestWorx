@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { billingReviewFingerprint, excludedBillingItemIds, validateBillingLineEdit, withExcludedBillingItems } from "../billing-review";
+import { billingEditWhere, billingReviewFingerprint, excludedBillingItemIds, validateBillingLineEdit, withExcludedBillingItems } from "../billing-review";
 import type { BillableItem } from "../inspection-billing";
 
 describe("billing review persistence", () => {
+  it("requires the same tenant, items and status and no invoice for every line mutation", () => {
+    expect(billingEditWhere({ id: "summary_1", tenantId: "tenant_1", status: "reviewed", items: [] })).toEqual({
+      id: "summary_1", tenantId: "tenant_1", status: { equals: "reviewed", not: "invoiced" },
+      quickbooksInvoiceId: null, items: { equals: [] }
+    });
+  });
   it("preserves existing snapshot data and deduplicates exclusions", () => {
     const snapshot = withExcludedBillingItems({ invoiceTotals: { subtotal: 10 }, billingReviewExcludedItemIds: ["one"] }, ["one", "two"]);
     expect(snapshot).toEqual({ invoiceTotals: { subtotal: 10 }, billingReviewExcludedItemIds: ["one", "two"] });

@@ -24,6 +24,9 @@ Final prices and taxes remain in QuickBooks. Already-synced line edits are block
 even if a legacy summary still has draft status.
 
 Grouped line edits are audited transactionally and reject concurrent item changes.
+Removal, manual additions and catalog linking/clearing also condition their writes
+on the same tenant, item snapshot and status, with no existing QuickBooks invoice.
+Failed saves retain the user's entered description and quantity for retry.
 Refresh uses an optimistic item comparison to avoid replacing a concurrently edited
 summary. Existing server administrator checks and tenant scope remain in place.
 No database migration, historical invoice repair, or inspection mutation is needed.
@@ -42,6 +45,18 @@ the old version until a forward fix is available. Issued invoices are untouched.
 
 ## Verification and remaining rollout work
 
+- Follow-up release verification: 813 library tests passed, 14 skipped using
+  `--maxWorkers=1 --testTimeout=15000`. The timeout override is only for this run;
+  the repository's test timeout is unchanged. Database integration tests remain
+  skipped because no isolated test database was configured.
+- Follow-up production build, web lint and TypeScript checks passed. The generated
+  production client bundle was checked to include the failed-save preservation fix.
+- Eight browser checks passed: six responsive fixtures plus two tests mounting
+  the actual React billing form with stubbed actions. These reproduced and verified
+  the failed-save input-reset fix and checked save/removal/suggested-quantity intent.
+- Production deployment has NOT been performed. Vercel access was verified, but
+  no authorized staging admin/technician credentials or confirmed QuickBooks
+  sandbox connection were available. Requested test access before promotion.
 - Production build, web lint and TypeScript checks passed. The full library run
   finished with 811 passed, 14 skipped and one PDF-branding timeout at its existing
   five-second limit. Retrying branding plus billing tests passed all 88 executed

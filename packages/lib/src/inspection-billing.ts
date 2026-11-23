@@ -1,7 +1,7 @@
 import { InspectionStatus, Prisma } from "@prisma/client";
 import { prisma } from "@testworx/db";
 import { assertBillingStatusChangeAllowed } from "./billing-queue";
-import { billingReviewFingerprint, excludedBillingItemIds, withExcludedBillingItems, validateBillingLineEdit } from "./billing-review";
+import { billingEditWhere, billingReviewFingerprint, excludedBillingItemIds, withExcludedBillingItems, validateBillingLineEdit } from "./billing-review";
 
 import type { ActorContext, InspectionType, ReportStatus } from "@testworx/types";
 import { actorContextSchema, reportStatuses } from "@testworx/types";
@@ -4312,7 +4312,7 @@ export async function removeBillingSummaryItemGroup(
 
   await prisma.$transaction(async (tx) => {
     await tx.inspectionBillingSummary.update({
-      where: { id: summary.id },
+      where: billingEditWhere(summary),
       data: {
         items: minimumPricedSummary.items as unknown as Prisma.InputJsonValue,
         status: summary.status === "reviewed" ? "draft" : summary.status,
@@ -4465,7 +4465,7 @@ export async function addBillingSummaryManualLine(actor: ActorContext, input: {
 
   await prisma.$transaction(async (tx) => {
     await tx.inspectionBillingSummary.update({
-      where: { id: summary.id },
+      where: billingEditWhere(summary),
       data: {
         items: minimumPricedSummary.items as unknown as Prisma.InputJsonValue,
         status: summary.status === "reviewed" ? "draft" : summary.status,
@@ -4595,7 +4595,7 @@ export async function linkBillingSummaryItemCatalog(
 
   await prisma.$transaction(async (tx) => {
     await tx.inspectionBillingSummary.update({
-      where: { id: summary.id },
+      where: billingEditWhere(summary),
       data: {
         items: minimumPricedSummary.items as unknown as Prisma.InputJsonValue,
         status: summary.status === "reviewed" ? "draft" : summary.status,
@@ -4784,7 +4784,7 @@ export async function linkBillingSummaryItemGroupCatalog(
 
   await prisma.$transaction(async (tx) => {
     await tx.inspectionBillingSummary.update({
-      where: { id: summary.id },
+      where: billingEditWhere(summary),
       data: {
         items: minimumPricedSummary.items as unknown as Prisma.InputJsonValue,
         status: summary.status === "reviewed" ? "draft" : summary.status,
@@ -4939,7 +4939,7 @@ export async function clearBillingSummaryItemCatalogLink(
   const minimumPricedSummary = await applyMinimumTicketPricingToPersistedSummaryItems(prisma, summary, updatedItems);
 
   await prisma.inspectionBillingSummary.update({
-    where: { id: summary.id },
+    where: billingEditWhere(summary),
     data: {
       items: minimumPricedSummary.items as unknown as Prisma.InputJsonValue,
       status: summary.status === "reviewed" ? "draft" : summary.status,
@@ -5014,7 +5014,7 @@ export async function clearBillingSummaryItemGroupCatalogLink(
   const minimumPricedSummary = await applyMinimumTicketPricingToPersistedSummaryItems(prisma, summary, updatedItems);
 
   await prisma.inspectionBillingSummary.update({
-    where: { id: summary.id },
+    where: billingEditWhere(summary),
     data: {
       items: minimumPricedSummary.items as unknown as Prisma.InputJsonValue,
       status: summary.status === "reviewed" ? "draft" : summary.status,
