@@ -4384,7 +4384,8 @@ export async function getBillingManualLineCatalogItems(actor: ActorContext) {
 
 export async function addBillingSummaryManualLine(actor: ActorContext, input: {
   summaryId: string;
-  catalogItemId: string;
+  catalogItemId?: string;
+  category?: string;
   description?: string | null;
   quantity: number;
   unitPrice?: number | null;
@@ -4394,7 +4395,7 @@ export async function addBillingSummaryManualLine(actor: ActorContext, input: {
     throw new Error("Invoiced billing summaries must be moved back to review before adding line items.");
   }
 
-  const catalogItem = await prisma.quickBooksCatalogItem.findFirst({
+  const catalogItem = input.catalogItemId ? await prisma.quickBooksCatalogItem.findFirst({
     where: {
       id: input.catalogItemId,
       tenantId: parsedActor.tenantId as string,
@@ -4410,17 +4411,18 @@ export async function addBillingSummaryManualLine(actor: ActorContext, input: {
       unitPrice: true,
       taxable: true
     }
-  });
+  }) : null;
 
-  if (!catalogItem) {
+  if (input.catalogItemId && !catalogItem) {
     throw new Error("Select an active product or service before adding a manual billing line.");
   }
 
-  const quantity = Number.isFinite(input.quantity) ? Math.max(0.01, Number(input.quantity.toFixed(2))) : 1;
+  const description = input.description?.trim() || catalogItem?.name || "";
+  validateBillingLineEdit(input.quantity, description, input.category);
+  const quantity = Math.max(0.01, Number(input.quantity.toFixed(2)));
   const unitPrice = typeof input.unitPrice === "number" && Number.isFinite(input.unitPrice)
     ? input.unitPrice
-    : catalogItem.unitPrice ?? 0;
-  const description = input.description?.trim() || catalogItem.name;
+    : catalogItem?.unitPrice ?? null;
   const manualItem: BillableItem = {
     id: generateManualBillingLineId(),
     tenantId: summary.tenantId,
@@ -4429,8 +4431,8 @@ export async function addBillingSummaryManualLine(actor: ActorContext, input: {
     reportType: INSPECTION_LEVEL_REPORT_TYPE,
     sourceSection: "manual-billing",
     sourceField: "admin-added",
-    category: mapCatalogItemTypeToBillingCategory(catalogItem.itemType),
-    code: `CATALOG_${catalogItem.quickbooksItemId}`,
+    category: catalogItem ? mapCatalogItemTypeToBillingCategory(catalogItem.itemType) : (input.category ?? "service") as BillableCategory,
+    code: catalogItem ? `CATALOG_${catalogItem.quickbooksItemId}` : undefined,
     description,
     quantity,
     unitPrice,
@@ -4440,16 +4442,16 @@ export async function addBillingSummaryManualLine(actor: ActorContext, input: {
       manualBillingLine: true,
       addedByUserId: parsedActor.userId,
       addedAt: new Date().toISOString(),
-      catalogItemId: catalogItem.id,
-      catalogItemName: catalogItem.name,
-      quickbooksItemId: catalogItem.quickbooksItemId
+      catalogItemId: catalogItem?.id ?? null,
+      catalogItemName: catalogItem?.name ?? null,
+      quickbooksItemId: catalogItem?.quickbooksItemId ?? null
     },
-    linkedCatalogItemId: catalogItem.id,
-    linkedCatalogItemName: catalogItem.name,
-    linkedQuickBooksItemId: catalogItem.quickbooksItemId,
-    linkedMatchMethod: "manual",
-    linkedMatchConfidence: 1,
-    ...buildCatalogTaxSnapshot(catalogItem)
+    linkedCatalogItemId: catalogItem?.id ?? null,
+    linkedCatalogItemName: catalogItem?.name ?? null,
+    linkedQuickBooksItemId: catalogItem?.quickbooksItemId ?? null,
+    linkedMatchMethod: catalogItem ? "manual" : null,
+    linkedMatchConfidence: catalogItem ? 1 : null,
+    ...(catalogItem ? buildCatalogTaxSnapshot(catalogItem) : {})
   };
 
   const minimumPricedSummary = await applyMinimumTicketPricingToSummaryItemsTx(prisma, {
@@ -4493,8 +4495,8 @@ export async function addBillingSummaryManualLine(actor: ActorContext, input: {
         entityId: summary.id,
         metadata: {
           itemId: manualItem.id,
-          catalogItemId: catalogItem.id,
-          catalogItemName: catalogItem.name,
+          catalogItemId: catalogItem?.id ?? null,
+          catalogItemName: catalogItem?.name ?? null,
           description,
           quantity,
           unitPrice

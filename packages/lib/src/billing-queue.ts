@@ -10,7 +10,7 @@ export type BillingQueueSort = (typeof billingQueueSortOptions)[number];
 
 export const billingQueueStatusOptions = [
   { value: "all", label: "Ready To Bill" },
-  { value: "needs_pricing", label: "Needs setup" },
+  { value: "needs_pricing", label: "QuickBooks sync setup (optional)" },
   { value: "billing_review", label: "Needs billing review" },
   { value: "invoiced", label: "Invoiced" }
 ] as const;

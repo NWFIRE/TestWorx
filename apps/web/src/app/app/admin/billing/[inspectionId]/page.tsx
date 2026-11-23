@@ -15,6 +15,7 @@ import { AppPageShell } from "../../operations-ui";
 import { addBillingSummaryManualLineAction, clearBillingSummaryItemCatalogLinkAction, getBillingManualLineCatalogItems, linkBillingSummaryItemCatalogAction, removeBillingSummaryItemGroupAction, searchBillingSummaryItemCatalogMatchesAction, sendQuickBooksInvoiceAction, syncBillingSummaryToQuickBooksAction, updateBillingSummaryItemGroupAction, updateBillingSummaryNotesAction, updateBillingSummaryStatusAction } from "../../actions";
 import { BillingReportPdfReviewPanel } from "./billing-report-pdf-review-panel";
 import { BillingLineForm } from "./billing-line-form";
+import { BillingExportButton } from "./billing-export-button";
 import styles from "./billing-detail.module.css";
 
 type BillingSummaryDetail = NonNullable<Awaited<ReturnType<typeof getAdminBillingSummaryDetail>>>;
@@ -220,7 +221,7 @@ export default async function BillingSummaryDetailPage({
       userId: session.user.id,
       role: session.user.role,
       tenantId: session.user.tenantId
-    }),
+    }).catch(() => null),
     getBillingManualLineCatalogItems({
       userId: session.user.id,
       role: session.user.role,
@@ -235,11 +236,11 @@ export default async function BillingSummaryDetailPage({
   const groupedEntries = (Object.entries(summary.reviewGroupedItems) as Array<[keyof typeof categoryLabels, BillingSummaryLineItem[]]>)
     .map(([category, items]) => [category, sortBillingItemsForDisplay(category, items)] as const);
   const isInvoiced = summary.status === "invoiced" || Boolean(summary.quickbooksInvoiceId);
-  const canUseQuickBooksActions = quickBooksConnection.connection.connected;
+  const canUseQuickBooksActions = quickBooksConnection?.connection.connected ?? false;
   const summaryQuickBooksMode = summary.quickbooksConnectionMode === "sandbox" || summary.quickbooksConnectionMode === "live"
     ? summary.quickbooksConnectionMode
     : null;
-  const summaryModeMismatch = Boolean(summaryQuickBooksMode && summaryQuickBooksMode !== quickBooksConnection.connection.appMode);
+  const summaryModeMismatch = Boolean(quickBooksConnection && summaryQuickBooksMode && summaryQuickBooksMode !== quickBooksConnection.connection.appMode);
   const quickBooksInvoiceLabel = summary.quickbooksInvoiceNumber
     ?? (summary.quickbooksSyncStatus === "synced" || summary.quickbooksSyncStatus === "sent" ? "Synced" : "Not synced");
 
@@ -254,6 +255,7 @@ export default async function BillingSummaryDetailPage({
             <p className="mt-1 text-sm text-slate-500">Reports: {summary.reportTypes.length > 0 ? summary.reportTypes.map((type: BillingSummaryDetail["reportTypes"][number]) => type.replaceAll("_", " ")).join(", ") : "Inspection-level billing only"}</p>
           </div>
           <div className="flex flex-wrap gap-3">
+            <BillingExportButton customerName={summary.customerName} siteName={summary.siteName} inspectionId={summary.inspectionId} items={summary.items} />
             <Link className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={`/app/admin/inspections/${summary.inspectionId}?from=${encodeURIComponent("/app/admin/billing")}`}>
               View inspection
             </Link>
@@ -264,15 +266,15 @@ export default async function BillingSummaryDetailPage({
       <div className={styles.metrics}>
         <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Labor hours</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.laborHoursTotal}</p></div>
         <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Material items</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.materialItemCount}</p></div>
-        <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Billing setup</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.metrics.missingPriceCount > 0 ? `${summary.metrics.missingPriceCount} item${summary.metrics.missingPriceCount === 1 ? "" : "s"}` : "Ready"}</p></div>
-        <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">QuickBooks invoice</p><p className="mt-2 text-3xl font-semibold text-ink">{quickBooksInvoiceLabel}</p></div>
+        <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Billing review</p><p className="mt-2 text-3xl font-semibold text-ink">{summary.status === "reviewed" ? "Reviewed" : isInvoiced ? "Invoiced" : "Needs review"}</p></div>
+        <div className="rounded-3xl bg-white p-5 shadow-panel"><p className="text-sm text-slate-500">Accounting</p><p className="mt-2 text-3xl font-semibold text-ink">{canUseQuickBooksActions || summary.quickbooksInvoiceId ? quickBooksInvoiceLabel : "Manual / export"}</p></div>
       </div>
 
       {summary.customerIsTaxExempt ? (
         <div className="rounded-[2rem] border border-blue-200 bg-blue-50 px-6 py-4 text-sm text-blue-900 shadow-panel">
           <p className="font-semibold text-blue-950">Tax-exempt customer</p>
           <p className="mt-2">
-            Item taxability remains visible for QuickBooks mapping, but QuickBooks should apply the customer exemption when the invoice is synced.
+            Apply this customer&apos;s exemption in your accounting software when preparing the final invoice.
           </p>
         </div>
       ) : null}
@@ -283,13 +285,13 @@ export default async function BillingSummaryDetailPage({
         </div>
       ) : null}
       {!canUseQuickBooksActions ? (
-        <div className="rounded-[2rem] border border-amber-200 bg-amber-50 px-6 py-4 text-sm text-amber-800 shadow-panel">
-          {quickBooksConnection.connection.guidance ?? `Reconnect QuickBooks in ${quickBooksConnection.connection.appModeLabel} mode before syncing or opening invoices from this page.`}
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+          No accounting connection is required. Review your billing lines, export them for your accounting workflow, and mark this work invoiced after billing it externally.
         </div>
       ) : null}
       {summaryModeMismatch ? (
         <div className="rounded-[2rem] border border-amber-200 bg-amber-50 px-6 py-4 text-sm text-amber-800 shadow-panel">
-          This billing summary was synced in QuickBooks {summaryQuickBooksMode === "sandbox" ? "Sandbox" : "Live"}. Re-sync it in {quickBooksConnection.connection.appModeLabel} mode before opening or sending it.
+          This billing summary belongs to QuickBooks {summaryQuickBooksMode === "sandbox" ? "Sandbox" : "Live"}. Connect to that same company and mode to open the existing invoice. Do not create a duplicate invoice.
         </div>
       ) : null}
       <details className="rounded-2xl border border-slate-200 bg-white px-4 py-2">
@@ -363,7 +365,7 @@ export default async function BillingSummaryDetailPage({
                             </div>
                           </details>
                         ) : null}
-                        {item.unitPrice === null || item.unitPrice === undefined ? <p className="text-sm font-semibold text-amber-700">QuickBooks billing setup needed before sync.</p> : null}
+                        {canUseQuickBooksActions && (item.unitPrice === null || item.unitPrice === undefined) ? <p className="text-sm font-semibold text-amber-700">QuickBooks item setup needed only if syncing this line.</p> : null}
                         {item.category === "fee" && !isManualBillingLine(item) ? (
                           <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50/70 px-4 py-4 text-sm text-amber-900">
                             <p className="font-semibold text-amber-950">{isComplianceReportingFeeItem(item) ? "Compliance reporting fee assessed" : "Automatic fee line"}</p>
@@ -374,7 +376,7 @@ export default async function BillingSummaryDetailPage({
                             ) : null}
                             <p className="mt-2">{describeAutomaticFeeSource(item)}</p>
                           </div>
-                        ) : (
+                        ) : canUseQuickBooksActions ? (
                           <BillingItemMatchPanel
                             clearAction={clearBillingSummaryItemCatalogLinkAction}
                             currentMatch={item.currentCatalogMatch ?? null}
@@ -387,7 +389,7 @@ export default async function BillingSummaryDetailPage({
                             suggestedMatches={item.suggestedCatalogMatches ?? []}
                             summaryId={summary.id}
                           />
-                        )}
+                        ) : null}
                       </div>
                       <BillingLineForm saveAction={updateBillingSummaryItemGroupAction} removeAction={removeBillingSummaryItemGroupAction} className={styles.lineControls}>
                         <input name="summaryId" type="hidden" value={summary.id} />
@@ -470,11 +472,11 @@ export default async function BillingSummaryDetailPage({
             <BillingSummaryStatusActions
               key={`${summary.status}:${summary.quickbooksInvoiceId ?? "unsynced"}`}
               canUseQuickBooksActions={canUseQuickBooksActions}
-              connectedCompany={quickBooksConnection.tenant.quickbooksCompanyName}
-              connectedRealm={quickBooksConnection.tenant.quickbooksRealmId}
+              connectedCompany={quickBooksConnection?.tenant.quickbooksCompanyName ?? null}
+              connectedRealm={quickBooksConnection?.tenant.quickbooksRealmId ?? null}
               hasMissingBillingSetup={summary.metrics.missingPriceCount > 0}
               inspectionId={summary.inspectionId}
-              quickbooksAppModeLabel={quickBooksConnection.connection.appModeLabel}
+              quickbooksAppModeLabel={quickBooksConnection?.connection.appModeLabel ?? "Unavailable"}
               quickbooksInvoiceId={summary.quickbooksInvoiceId}
               quickbooksInvoiceNumber={summary.quickbooksInvoiceNumber}
               quickbooksMode={summaryQuickBooksMode}
@@ -498,7 +500,7 @@ export default async function BillingSummaryDetailPage({
             <form action={updateBillingSummaryNotesAction} className="mt-4 space-y-3">
               <input name="summaryId" type="hidden" value={summary.id} />
               <input name="inspectionId" type="hidden" value={summary.inspectionId} />
-              <textarea className="min-h-40 w-full rounded-2xl border border-slate-200 px-4 py-3 disabled:bg-slate-50" defaultValue={summary.notes ?? ""} disabled={isInvoiced} name="notes" placeholder="Missing QuickBooks mapping, customer billing notes, or invoice prep reminders" />
+              <textarea className="min-h-40 w-full rounded-2xl border border-slate-200 px-4 py-3 disabled:bg-slate-50" defaultValue={summary.notes ?? ""} disabled={isInvoiced} name="notes" placeholder="Accounting system, external invoice reference, or billing notes" />
               <button className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue disabled:opacity-50" disabled={isInvoiced} type="submit">
                 {isInvoiced ? "Notes locked" : "Save note"}
               </button>

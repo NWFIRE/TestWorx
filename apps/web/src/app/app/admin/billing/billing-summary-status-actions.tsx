@@ -171,7 +171,8 @@ export function BillingSummaryStatusActions({
 
   return (
     <>
-      <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600">
+      {canUseQuickBooksActions || state.quickbooksInvoiceId ? <details className="mt-4 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600">
+        <summary className="cursor-pointer font-semibold">QuickBooks connection (optional)</summary>
         <p>QuickBooks app mode: <span className="font-semibold text-ink">{quickbooksAppModeLabel}</span></p>
         <p className="mt-2">Connected company: <span className="font-semibold text-ink">{connectedCompany ?? "Not connected"}</span></p>
         <p className="mt-2">Connected realm: <span className="font-semibold text-ink">{connectedRealm ?? "Not connected"}</span></p>
@@ -184,25 +185,25 @@ export function BillingSummaryStatusActions({
         <p className="mt-2">Sent at: <span className="font-semibold text-ink">{state.quickbooksSentAt ? state.quickbooksSentAt.toLocaleString() : "Not sent"}</span></p>
         {state.quickbooksSyncError ? <p className="mt-2 break-words text-rose-700">Last sync error: {state.quickbooksSyncError}</p> : null}
         {state.quickbooksSendError ? <p className="mt-2 break-words text-amber-700">Last send note: {state.quickbooksSendError}</p> : null}
-      </div>
+      </details> : null}
 
       <div className="mt-4 grid gap-3">
         {needsBillingReview ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-semibold">Check prior billing before creating an invoice</p>
-            <p className="mt-2">This work is on hold, not Ready To Bill. Recovered billing records may already have been invoiced outside this summary. Compare prior QuickBooks invoices and service details first. No inspection or invoice has been deleted.</p>
+            <p className="mt-2">This work is on hold, not Ready To Bill. Compare prior invoices in your accounting system and service details first. No inspection or invoice has been deleted.</p>
             <label className="mt-3 flex items-start gap-2">
               <input type="checkbox" checked={confirmedUnbilled} onChange={(event) => setConfirmedUnbilled(event.target.checked)} />
               I checked prior invoices and confirmed this work has not been billed.
             </label>
           </div>
         ) : null}
-        {!hasVerifiedQuickBooksInvoice ? (
+        {canUseQuickBooksActions && !hasVerifiedQuickBooksInvoice ? (
           <p className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-500">
             QuickBooks applies the final item pricing and tax when the invoice is created. Choose Sync Only to create the QuickBooks invoice without emailing the customer. Use Sync and send only when you are ready for QuickBooks to deliver it.
           </p>
         ) : null}
-        <ActionButton
+        {canUseQuickBooksActions ? <ActionButton
           className="w-full"
           disabled={cannotCreateInvoice || hasMissingBillingSetup || !canUseQuickBooksActions}
           onClick={() => runAction("sync", () => {
@@ -222,9 +223,9 @@ export function BillingSummaryStatusActions({
                 ? "Synced - send failed"
                 : "Synced - ready to send"
             : "Sync invoice to QuickBooks"}
-        </ActionButton>
+        </ActionButton> : null}
 
-        {!hasVerifiedQuickBooksInvoice ? (
+        {canUseQuickBooksActions && !hasVerifiedQuickBooksInvoice ? (
           <ActionButton
             className="w-full"
             disabled={cannotCreateInvoice || hasMissingBillingSetup || !canUseQuickBooksActions}

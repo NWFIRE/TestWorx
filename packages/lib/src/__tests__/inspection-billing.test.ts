@@ -4246,6 +4246,33 @@ describe("inspection billing persistence and admin review", () => {
     }));
   });
 
+  it("adds a custom line without an accounting connection or catalog item", async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([{
+      id: "summary_1", tenantId: "tenant_1", inspectionId: "inspection_1",
+      customerCompanyId: "customer_1", siteId: "site_1", status: "reviewed",
+      billingType: "standard", items: [], pricingSnapshot: null, quickbooksInvoiceId: null
+    }]);
+    const line = await addBillingSummaryManualLine(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { summaryId: "summary_1", description: "Replacement part", quantity: 2, category: "material" }
+    );
+    expect(prismaMock.quickBooksCatalogItem.findFirst).not.toHaveBeenCalled();
+    expect(line).toMatchObject({ description: "Replacement part", quantity: 2, category: "material", linkedQuickBooksItemId: null, unitPrice: null, metadata: { manualBillingLine: true } });
+    expect(prismaMock.inspectionBillingSummary.update.mock.calls[0]?.[0].data.status).toBe("draft");
+    expect(mergeBillingItems([line], [])[0]?.id).toBe(line.id);
+  });
+
+  it("rejects an empty custom line rather than silently inventing billable work", async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([{
+      id: "summary_1", tenantId: "tenant_1", inspectionId: "inspection_1", status: "draft", items: [], quickbooksInvoiceId: null
+    }]);
+    await expect(addBillingSummaryManualLine(
+      { userId: "office_1", role: "office_admin", tenantId: "tenant_1" },
+      { summaryId: "summary_1", description: " ", quantity: 1 }
+    )).rejects.toThrow(/description/i);
+    expect(prismaMock.inspectionBillingSummary.update).not.toHaveBeenCalled();
+  });
+
   it("applies the linked catalog price to billing lines", async () => {
     const summaryRow = [
       {
