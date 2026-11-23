@@ -2,230 +2,63 @@
 "use client";
 
 import Link from "next/link";
-import { format } from "date-fns";
-
+import { ChevronRight } from "lucide-react";
+import { isCurrentHomeJob, technicianHomeSchedule } from "@testworx/lib/home-schedule";
+import { formatInspectionStatusLabel } from "@testworx/lib/scheduling-shared";
 import { useSyncSummary } from "./offline/use-sync-summary";
 import { useOfflineScreenSnapshot } from "./offline/use-offline-screen-snapshot";
 import { useTechnicianNotifications } from "./technician-notifications-client";
+import { isTechnicianActionableSchedulingStatus } from "./mobile-inspection-workspace";
 
-function QueueStatusCard({
-  title,
-  count,
-  href,
-  helper,
-  priorityCount = 0
-}: {
-  title: string;
-  count: number;
-  href: string;
-  helper: string;
-  priorityCount?: number;
-}) {
-  const hasPriority = priorityCount > 0;
-
-  return (
-    <Link
-      aria-label={hasPriority ? `${title}: ${count}. ${priorityCount} priority inspection${priorityCount === 1 ? "" : "s"}.` : `${title}: ${count}.`}
-      className={hasPriority
-        ? "relative rounded-[1.4rem] border border-amber-300 bg-amber-50/80 p-4 shadow-[0_16px_38px_rgba(217,119,6,0.12)] transition hover:border-amber-400 hover:bg-amber-100/70"
-        : "rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)] transition hover:border-[color:var(--tenant-primary-border)] hover:bg-[var(--tenant-primary-soft)]"}
-      href={href}
-    >
-      {hasPriority ? (
-        <span className="absolute right-3 top-3 inline-flex min-h-6 items-center rounded-full bg-amber-500 px-2 text-[10px] font-bold uppercase tracking-[0.14em] text-white shadow-sm">
-          Priority
-        </span>
-      ) : null}
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{title}</p>
-      <p className="mt-3 text-3xl font-semibold text-slate-950">{count}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-500">{helper}</p>
-      {hasPriority ? (
-        <p className="mt-2 text-sm font-semibold text-amber-900">
-          {priorityCount} priority inspection{priorityCount === 1 ? "" : "s"} need attention.
-        </p>
-      ) : null}
-    </Link>
-  );
-}
-
-function uniqueInspections<T extends { id?: string | null }>(inspections: T[] = []) {
-  const seen = new Set<string>();
-  return inspections.filter((inspection) => {
-    if (!inspection.id) {
-      return true;
-    }
-    if (seen.has(inspection.id)) {
-      return false;
-    }
-    seen.add(inspection.id);
-    return true;
-  });
-}
-
-function NeedsAttentionCard({
-  eyebrow,
-  title,
-  body,
-  href,
-  tone = "default"
-}: {
-  eyebrow: string;
-  title: string;
-  body: string;
-  href: string;
-  tone?: "default" | "priority" | "warning" | "danger";
-}) {
-  const toneClasses = {
-    default: "border-slate-200 bg-white",
-    priority: "border-amber-200 bg-amber-50/70",
-    warning: "border-orange-200 bg-orange-50/70",
-    danger: "border-rose-200 bg-rose-50/70"
-  } as const;
-
-  return (
-    <Link className={`block rounded-[1.5rem] border p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)] ${toneClasses[tone]}`} href={href}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{eyebrow}</p>
-      <p className="mt-2 text-base font-semibold text-slate-950">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
-    </Link>
-  );
-}
-
-export function TechnicianHomeScreen({
-  initialData,
-  userFirstName
-}: {
-  initialData: any;
-  userFirstName: string | null;
-}) {
+export function TechnicianHomeScreen({ initialData, userFirstName }: { initialData: any; userFirstName: string | null }) {
   const snapshot = useOfflineScreenSnapshot("technician-home", initialData);
-  const syncSummary = useSyncSummary();
+  const sync = useSyncSummary();
   const notifications = useTechnicianNotifications();
-
-  if (!snapshot) {
-    return <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 text-sm text-slate-500">Loading field workspace...</div>;
-  }
-
-  const dashboard = {
-    ...snapshot.dashboard,
-    assigned: uniqueInspections(snapshot.dashboard.assigned ?? []),
-    unassigned: uniqueInspections(snapshot.dashboard.unassigned ?? [])
-  };
-  const assignedOpen = dashboard.assigned.filter((inspection: any) =>
-    inspection.tasks.some((task: any) => task.report?.status !== "finalized")
-  );
-  const priorityAssignedOpen = assignedOpen.filter((inspection: any) => inspection.isPriority);
-  const inProgress = dashboard.assigned.filter((inspection: any) =>
-    inspection.tasks.some((task: any) => task.report?.status === "draft" || task.report?.status === "submitted")
-  );
-
-  const attentionItems = [
-    ...notifications.items
-      .filter((item) => !item.isRead)
-      .slice(0, 5)
-      .map((item) => ({
-        key: item.id,
-        eyebrow:
-          item.type === "priority_inspection_assigned"
-            ? "Priority inspection assigned"
-            : item.type === "inspection_reissued_for_correction"
-              ? "Correction required"
-              : item.type === "work_order_reassigned"
-                ? "Work order reassigned"
-                : item.type === "inspection_overdue"
-                  ? "Overdue inspection"
-                  : "Needs attention",
-        title: item.title,
-        body: item.body,
-        href: item.href,
-        tone:
-          item.priority === "urgent"
-            ? ("priority" as const)
-            : item.type === "inspection_overdue"
-              ? ("danger" as const)
-              : item.type === "inspection_reissued_for_correction"
-                ? ("warning" as const)
-                : ("default" as const)
-      })),
-    (syncSummary.failed > 0 || syncSummary.conflict > 0 || syncSummary.pending > 0)
-      ? {
-          key: "sync-attention",
-          eyebrow: "Save status",
-          title: syncSummary.failed > 0 || syncSummary.conflict > 0 ? "Saved changes need review" : "Changes still pending",
-          body:
-            syncSummary.failed > 0 || syncSummary.conflict > 0
-              ? "Open Profile to review device-saved changes before leaving the job."
-              : `${syncSummary.pending} local change${syncSummary.pending === 1 ? "" : "s"} still need to upload.`,
-          href: "/app/tech/profile",
-          tone: syncSummary.failed > 0 || syncSummary.conflict > 0 ? "danger" as const : "default" as const
-        }
-      : null
-  ].filter(Boolean);
-
-  return (
-    <div className="space-y-6 pb-4">
-      <section
-        className="rounded-[2rem] p-5 text-[var(--tenant-primary-contrast)] shadow-[0_24px_60px_rgb(var(--tenant-primary-rgb)/0.22)]"
-        style={{
-          background: "linear-gradient(180deg, rgb(var(--tenant-primary-rgb) / 0.96), rgb(var(--tenant-primary-rgb) / 0.82))"
-        }}
-      >
-        <p className="text-sm text-white/70">{format(new Date(), "EEEE, MMMM d")}</p>
-        <h2 className="mt-2 text-[28px] font-semibold leading-tight">
-          {userFirstName ? `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${userFirstName}.` : "Ready for the field."}
-        </h2>
+  if (!snapshot) return <p className="p-5 text-sm text-slate-500">Loading Home...</p>;
+  const timezone = snapshot.timezone ?? initialData.timezone ?? "America/Chicago";
+  const assigned: any[] = Array.from(new Map((snapshot.dashboard.assigned ?? []).map((job: any) => [job.id, job])).values()).filter((job: any) => job.tasks.some((task: any) => task.report?.status !== "finalized" && isTechnicianActionableSchedulingStatus(task.schedulingStatus)));
+  const today = technicianHomeSchedule(assigned, timezone);
+  const unread = notifications.items.filter(item => !item.isRead);
+  const claimable = new Set((snapshot.dashboard.unassigned ?? []).map((job: any) => job.id)).size;
+  const saveCount = sync.failed + sync.conflict + sync.pending;
+  const rowClass = "flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2";
+  const cardClass = "min-w-0 rounded-[1.75rem] border border-slate-200 bg-white p-5";
+  return <div className="space-y-5 pb-4">
+    <header><h1 className="text-2xl font-semibold tracking-tight">Home</h1>{userFirstName ? <p className="mt-1 text-sm text-slate-500">Welcome, {userFirstName}.</p> : null}</header>
+    <div className="grid min-w-0 items-start gap-5 xl:grid-cols-2">
+      <section className={cardClass}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold tracking-tight">Today&apos;s Schedule</h2>
+          <Link href="/app/tech/work?filter=today" className="inline-flex min-h-11 items-center text-sm font-medium text-slateblue">View schedule</Link>
+        </div>
+        <div className="mt-3 divide-y divide-slate-100">
+          {today.length ? today.slice(0, 8).map((job: any, index) => {
+            const task = job.tasks.find((item: any) => item.report?.status !== "finalized" && isTechnicianActionableSchedulingStatus(item.schedulingStatus));
+            return <Link key={job.id} href={task ? `/app/tech/reports/${job.id}/${task.id}` : "/app/tech/work?filter=today"} className={rowClass}>
+              <time dateTime={new Date(job.scheduledStart).toISOString()} className="w-20 shrink-0 self-start pt-0.5 text-xs tabular-nums text-slate-600">{new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: timezone }).format(new Date(job.scheduledStart))}</time>
+              <div className="min-w-0 flex-1 break-words">
+                {index === 0 ? <p className="mb-1 text-xs font-medium text-slateblue">{isCurrentHomeJob(job) ? "Current job" : "Next job"}</p> : null}
+                <p className="font-semibold">{job.primaryTitle ?? job.customerCompany?.name ?? job.site?.name}</p>
+                {job.secondaryTitle ? <p className="text-slate-500">{job.secondaryTitle}</p> : null}
+                <p className="mt-1 text-xs text-slate-500">{job.assignedTechnicianNames?.join(", ") || "Assigned to you"}</p>
+                <p className="mt-1 text-xs font-medium text-slate-600">{formatInspectionStatusLabel(job.displayStatus ?? job.status)}</p>
+              </div>
+              <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400" />
+            </Link>;
+          }) : <p className="py-5 text-sm text-slate-500">No jobs scheduled today.</p>}
+        </div>
+        {today.length > 8 ? <p className="mt-3 text-xs text-slate-500">Showing 8 of {today.length} jobs.</p> : null}
       </section>
-
-      <section className="space-y-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Your field queue</p>
-          <h3 className="mt-1 text-xl font-semibold text-slate-950">Current technician workload</h3>
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <QueueStatusCard
-            count={assignedOpen.length}
-            helper="Assigned work that still needs action."
-            href="/app/tech/work?filter=open"
-            priorityCount={priorityAssignedOpen.length}
-            title="Assigned"
-          />
-          <QueueStatusCard
-            count={dashboard.unassigned.length}
-            helper="Shared queue work you can claim."
-            href="/app/tech/work?filter=claimable"
-            title="Ready to Claim"
-          />
-          <QueueStatusCard
-            count={inProgress.length}
-            helper="Inspections already started in the field."
-            href="/app/tech/inspections?filter=active"
-            title="In Progress"
-          />
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Needs attention</p>
-          <h3 className="mt-1 text-xl font-semibold text-slate-950">What needs attention right now</h3>
-        </div>
-        <div className="space-y-3">
-          {attentionItems.length > 0 ? attentionItems.map((item: any) => (
-            <NeedsAttentionCard
-              body={item.body}
-              eyebrow={item.eyebrow}
-              href={item.href}
-              key={item.key}
-              title={item.title}
-              tone={item.tone}
-            />
-          )) : (
-            <div className="rounded-[1.75rem] border border-dashed border-slate-200 bg-white p-5 text-sm text-slate-500">
-              No technician action items need attention right now.
-            </div>
-          )}
+      <section className={cardClass}>
+        <h2 className="text-xl font-semibold tracking-tight">Needs Attention</h2>
+        <div className="mt-4 divide-y divide-slate-100">
+          {assigned.length > 0 ? <Link href="/app/tech/work?filter=open" className={rowClass}><span className="flex-1">Assigned inspections</span><strong className="tabular-nums">{assigned.length}</strong><ChevronRight aria-hidden="true" className="h-4 w-4 text-slate-400" /></Link> : null}
+          {claimable > 0 ? <Link href="/app/tech/work?filter=claimable" className={rowClass}><span className="flex-1">Ready to claim</span><strong className="tabular-nums">{claimable}</strong><ChevronRight aria-hidden="true" className="h-4 w-4 text-slate-400" /></Link> : null}
+          {saveCount > 0 ? <Link href="/app/tech/profile" className={rowClass}><span className="flex-1">{sync.failed || sync.conflict ? "Saved changes need review" : "Changes waiting to sync"}</span><strong>{saveCount}</strong><ChevronRight aria-hidden="true" className="h-4 w-4 text-slate-400" /></Link> : null}
+          {unread.slice(0, 5).map(item => <Link key={item.id} href={item.href} className={rowClass}><span className="min-w-0 flex-1"><span className="block font-medium">{item.title}</span><span className="mt-1 block text-xs text-slate-500">{item.body}</span></span><ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400" /></Link>)}
+          {!assigned.length && !claimable && !saveCount && !unread.length ? <p className="py-5 text-sm text-slate-500">You&apos;re all caught up</p> : null}
         </div>
       </section>
     </div>
-  );
+  </div>;
 }

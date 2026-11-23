@@ -204,7 +204,7 @@ export function FilterBar({
 }
 
 const workQueueItems = [
-  { key: "all", label: "Dashboard", href: "/app/admin/dashboard", tone: "slate" as const },
+  { key: "all", label: "Home", href: "/app/admin/dashboard", tone: "slate" as const },
   {
     key: "open",
     label: "Inspections",

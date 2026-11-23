@@ -6956,6 +6956,10 @@ export async function getTechnicianDashboardData(actor: ActorContext) {
             requestedBy: { select: { id: true, name: true } }
           }
         },
+        jobTimeSessions: {
+          where: { tenantId, technicianId: parsedActor.userId },
+          select: { endedAt: true }
+        },
         convertedFromQuotes: { select: { id: true }, take: 1 },
         tasks: {
           select: technicianDashboardTaskSelect

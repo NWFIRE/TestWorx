@@ -18,6 +18,23 @@ beforeEach(() => {
   db.inspection.updateMany.mockResolvedValue({ count: 1 });
 });
 describe("scheduler authorization and dispatch", () => {
+  it("loads a busy Home day without changing inspection status or progress", async () => {
+    db.inspection.findMany.mockResolvedValue(Array.from({ length: 12 }, (_, index) => ({ ...job, id: `job-${index}` })));
+    const result = await getScheduler(actor, { date: "2026-11-19", view: "day" });
+    expect(result.jobs).toHaveLength(12);
+    expect(result.days).toEqual(["2026-11-19"]);
+    expect(result.jobs[0].status).toBe("to_be_completed");
+    expect(db.inspection.updateMany).not.toHaveBeenCalled();
+    expect(db.auditLog.create).not.toHaveBeenCalled();
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+  it("returns an empty Home day scoped to the selected company", async () => {
+    const result = await getScheduler({ ...actor, tenantId: "other-company" }, { date: "2026-11-19", view: "day" });
+    expect(result.jobs).toEqual([]);
+    expect(db.user.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ tenantId: "other-company", isActive: true }) }));
+    expect(db.inspection.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ tenantId: "other-company" }) }));
+    expect(db.inspection.updateMany).not.toHaveBeenCalled();
+  });
   it("includes the linked customer address in scheduler details without mutating the job", async () => {
     const site = { ...job.site, name: "General / No Fixed Site", addressLine1: "No fixed service address" };
     const customerCompany = { name: "Waste Connections", serviceAddressLine1: "38558 S. County Road 270", serviceCity: "Meno", serviceState: "OK", servicePostalCode: "73760" };

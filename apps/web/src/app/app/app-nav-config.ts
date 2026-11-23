@@ -50,9 +50,9 @@ const adminNavItems: AppNavItem[] = [
   { href: "/app/admin/scheduler", label: "Scheduler", shortLabel: "Scheduler", abbreviation: "SC", icon: "calendar", description: "Dispatch and live field progress", tone: "blue", group: "Work", openInNewTab: true },
   {
     href: "/app/admin/dashboard",
-    label: "Dashboard",
-    shortLabel: "Dashboard",
-    abbreviation: "DB",
+    label: "Home",
+    shortLabel: "Home",
+    abbreviation: "HM",
     icon: "calendar",
     description: "Operational overview, priorities, and work visibility",
     tone: "blue",

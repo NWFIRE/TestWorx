@@ -5,6 +5,8 @@ import Link from "next/link";
 import { ServiceDirections } from "../service-directions";
 import { serviceDestination } from "@testworx/lib/service-directions";
 import { addMonths, format } from "date-fns";
+import { technicianHomeSchedule } from "@testworx/lib/home-schedule";
+import { localDateTime } from "@testworx/lib/scheduler-shared";
 import { useMemo, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -215,6 +217,7 @@ function TechnicianMonthAccordion({
 
 export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
   const snapshot = useOfflineScreenSnapshot("technician-work", initialData);
+  const timezone = snapshot?.timezone ?? initialData.timezone ?? "America/Chicago";
   const searchParams = useSearchParams();
   const router = useRouter();
   const dashboard = useMemo(() => {
@@ -225,10 +228,10 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
     return {
       ...snapshot.dashboard,
       assigned: uniqueInspections(snapshot.dashboard.assigned ?? []),
-      today: uniqueInspections(snapshot.dashboard.today ?? []),
+      today: technicianHomeSchedule(uniqueInspections(snapshot.dashboard.assigned ?? []) as any[], timezone),
       unassigned: uniqueInspections(snapshot.dashboard.unassigned ?? [])
     };
-  }, [snapshot]);
+  }, [snapshot, timezone]);
 
   const filter = (searchParams.get("filter") as WorkFilter | null) ?? "today";
   const query = (searchParams.get("query") ?? "").trim().toLowerCase();
@@ -257,7 +260,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
       };
     }
 
-    const todayKey = format(new Date(), "yyyy-MM-dd");
+    const todayKey = localDateTime(new Date(), timezone).slice(0, 10);
     const assignedSource =
       filter === "today"
         ? dashboard.today
@@ -267,9 +270,9 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
 
     const claimableSource =
       filter === "today"
-        ? dashboard.unassigned.filter((inspection: any) => format(toDateValue(inspection.scheduledStart), "yyyy-MM-dd") === todayKey)
+        ? dashboard.unassigned.filter((inspection: any) => localDateTime(toDateValue(inspection.scheduledStart), timezone).slice(0, 10) === todayKey)
         : filter === "upcoming"
-          ? dashboard.unassigned.filter((inspection: any) => format(toDateValue(inspection.scheduledStart), "yyyy-MM-dd") > todayKey)
+          ? dashboard.unassigned.filter((inspection: any) => localDateTime(toDateValue(inspection.scheduledStart), timezone).slice(0, 10) > todayKey)
           : dashboard.unassigned.filter((inspection: any) => inspection.displayStatus === "past_due");
 
     return {
@@ -277,7 +280,7 @@ export function TechnicianWorkScreen({ initialData }: { initialData: any }) {
       claimable: claimableSource.filter((inspection: any) => matchesQuery(inspection, query)),
       open: []
     };
-  }, [dashboard, filter, query]);
+  }, [dashboard, filter, query, timezone]);
   const assignedMonthGroups = useMemo(() => groupTechnicianInspectionsByMonth(filtered.assigned, query), [filtered.assigned, query]);
   const claimableMonthGroups = useMemo(() => groupTechnicianInspectionsByMonth(filtered.claimable, query), [filtered.claimable, query]);
 

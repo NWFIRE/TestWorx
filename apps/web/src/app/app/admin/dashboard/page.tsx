@@ -1,623 +1,88 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { addDays, endOfDay, startOfDay } from "date-fns";
-import {
-  Bell,
-  CalendarDays,
-  CircleAlert,
-  ChevronRight,
-  ClipboardList,
-  FileText,
-  ShieldCheck
-} from "lucide-react";
-
+import { ChevronRight } from "lucide-react";
 import { auth } from "@/auth";
 import {
-  activeOperationalInspectionStatuses,
-  filterSubsetDuplicateOperationalInspections,
-  formatInspectionTaskSummary,
-  formatInspectionStatusLabel,
-  formatTenantDate,
-  formatTenantDateTime,
-  getAdminDashboardData,
-  getAdminBillingSummaries,
-  getAdminDeficiencyDashboardData,
-  getPendingFieldServiceRequestCount,
-  getAdminSchedulingQueueData,
-  getInspectionStatusTone,
-  isOpenBillingQueueStatus,
-  pickEarliestNextDueAt
+  activeOperationalInspectionStatuses, filterSubsetDuplicateOperationalInspections,
+  getAdminBillingSummaries, getAdminDeficiencyDashboardData,
+  getPendingFieldServiceRequestCount, getAdminSchedulingQueueData, isOpenBillingQueueStatus
 } from "@testworx/lib/server/index";
-
-import {
-  AppPageShell,
-  EmptyState,
-  KPIStatCard,
-  PageHeader,
-  SectionCard,
-  StatusBadge,
-  WorkspaceSplit
-} from "../operations-ui";
+import { getScheduler } from "@testworx/lib/scheduler";
+import { fieldProgress } from "@testworx/lib/scheduler-shared";
+import { AppPageShell, PageHeader, SectionCard } from "../operations-ui";
 import { DashboardGlobalSearch } from "./dashboard-global-search";
 import { AttentionLink } from "./attention-link";
-import { summarizeDashboardQueue } from "./queue-summary";
 import { filterAttentionQueue, isInAttentionWindow } from "../attention-queue";
 
-type AdminDashboardData = Awaited<ReturnType<typeof getAdminDashboardData>>;
-type AdminBillingSummary = Awaited<ReturnType<typeof getAdminBillingSummaries>>[number];
-type CompletedDashboardInspection = AdminDashboardData["completedInspections"][number];
-type ActiveDashboardInspection = AdminDashboardData["activeInspections"][number];
-type DashboardInspection = CompletedDashboardInspection | ActiveDashboardInspection;
-type DashboardTask = DashboardInspection["tasks"][number];
+export const metadata = { title: "Home | TradeWorx" };
 
-const FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS = 60;
-
-function inspectionStatusLabel(status: string) {
-  return formatInspectionStatusLabel(
-    status as
-      | "past_due"
-      | "to_be_completed"
-      | "scheduled"
-      | "in_progress"
-      | "completed"
-      | "invoiced"
-      | "cancelled"
-      | "follow_up_required"
-  );
-}
-
-function getGreetingName(name?: string | null) {
-  return name?.trim().split(/\s+/)[0] || "there";
-}
-
-function getGreetingByHour(date: Date, timezone?: string | null) {
-  let hour = date.getHours();
-
-  if (timezone) {
-    try {
-      const formattedHour = new Intl.DateTimeFormat("en-US", {
-        hour: "numeric",
-        hour12: false,
-        timeZone: timezone
-      }).format(date);
-      const parsedHour = Number(formattedHour);
-      if (Number.isFinite(parsedHour)) {
-        hour = parsedHour;
-      }
-    } catch {
-      // Fall back to the server/runtime hour if the tenant timezone is invalid.
-    }
-  }
-
-  if (hour < 12) {
-    return "Good morning";
-  }
-  if (hour < 18) {
-    return "Good afternoon";
-  }
-  return "Good evening";
-}
-
-function formatScheduleDetail(inspection: DashboardInspection) {
-  const taskSummary = inspection.tasks.length
-    ? formatInspectionTaskSummary(inspection.tasks)
-    : "Inspection workflow";
-  const technicianSummary = inspection.assignedTechnicianNames.length
-    ? `${inspection.assignedTechnicianNames.length} tech${inspection.assignedTechnicianNames.length === 1 ? "" : "s"} assigned`
-    : "Shared queue";
-
-  return `${taskSummary} • ${technicianSummary}`;
-}
-
-function formatInspectionMetaLine(inspection: DashboardInspection, timezone?: string | null) {
-  return [inspection.secondaryTitle, formatTenantDateTime(inspection.scheduledStart, timezone)]
-    .filter(Boolean)
-    .join(" - ");
-}
-
-function buildAlertItems(inspections: Awaited<ReturnType<typeof getAdminSchedulingQueueData>>["inspections"], sharedQueueCount: number, readyToBillCount: number, fieldRequestCount: number, inspectionNotice?: string) {
-  const alerts: { label: string; href?: string }[] = [];
-
-  if (inspectionNotice === "deleted") {
-    alerts.push({ label: "Inspection deleted successfully." });
-  }
-
-  const dueAtServiceCount = filterAttentionQueue(inspections, "payment").length;
-  if (dueAtServiceCount > 0) {
-    alerts.push(
-      { label: `${dueAtServiceCount} inspections require payment collection on site (overdue and next 60 days).`, href: "/app/admin/inspections?status=open&attention=payment" }
-    );
-  }
-
-  if (sharedQueueCount > 0) {
-    alerts.push(
-      { label: `${sharedQueueCount} unassigned inspection${sharedQueueCount === 1 ? " is" : "s are"} in the shared queue (overdue and next 60 days).`, href: "/app/admin/inspections?status=open&attention=unassigned" }
-    );
-  }
-
-  if (readyToBillCount > 0) {
-    alerts.push(
-      { label: `${readyToBillCount} billing summar${readyToBillCount === 1 ? "y is" : "ies are"} Ready To Bill.`, href: "/app/admin/billing?status=all" }
-    );
-  }
-
-  if (fieldRequestCount > 0) {
-    alerts.push({ label: `${fieldRequestCount} field service request${fieldRequestCount === 1 ? " needs" : "s need"} office review.`, href: "/app/admin/service-requests?status=pending" });
-  }
-
-  const amendedCount = filterAttentionQueue(inspections, "linked").length;
-  if (amendedCount > 0) {
-    alerts.push(
-      { label: `${amendedCount} active inspection${amendedCount === 1 ? " has" : "s have"} linked visit updates (overdue and next 60 days).`, href: "/app/admin/inspections?status=open&attention=linked" }
-    );
-  }
-
-  return alerts;
-}
-
-function calculateBillingPipeline(
-  summaries: AdminBillingSummary[]
-): Array<{ label: string; value: number; tone: string }> {
-  const total = summaries.length || 1;
-  const readyToBill = summaries.filter((summary) => isOpenBillingQueueStatus(summary.status)).length;
-  const invoiced = summaries.filter((summary) => summary.status === "invoiced").length;
-
-  return [
-    { label: "Ready To Bill", value: Math.round((readyToBill / total) * 100), tone: "bg-slateblue" },
-    { label: "Invoiced", value: Math.round((invoiced / total) * 100), tone: "bg-violet-500" }
-  ];
-}
-
-function InspectionListCard({
-  title,
-  inspections,
-  emptyText,
-  ctaLabel,
-  detailHrefBase,
-  timezone,
-  emptyTitle = "Nothing is queued here"
-}: {
-  title: string;
-  description?: string;
-  inspections: DashboardInspection[];
-  emptyText: string;
-  ctaLabel: string;
-  detailHrefBase: string;
-  timezone?: string | null;
-  emptyTitle?: string;
-}) {
-  return (
-    <SectionCard>
-      <div>
-        <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
-          {title}
-        </h3>
-      </div>
-
-      <div className="mt-5 space-y-3">
-        {inspections.length === 0 ? (
-          <EmptyState description={emptyText} title={emptyTitle} />
-        ) : (
-          inspections.map((inspection) => {
-            const nextDue = pickEarliestNextDueAt(
-              inspection.tasks.map((task: DashboardTask) => task.recurrence?.nextDueAt)
-            );
-
-            return (
-              <div
-                key={inspection.id}
-                className="rounded-2xl border border-[color:rgb(203_215_230_/_0.92)] bg-[color:rgb(248_250_252_/_0.96)] p-4 transition hover:border-[color:var(--border-strong)] hover:bg-white"
-              >
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-slate-900">
-                      {inspection.primaryTitle ?? inspection.site.name}
-                    </div>
-                    <div className="mt-1 text-sm leading-6 text-[color:var(--text-secondary)]">
-                      {formatInspectionMetaLine(inspection, timezone)}
-                    </div>
-                    <div className="mt-1 text-sm leading-6 text-[color:var(--text-muted)]">
-                      {formatInspectionTaskSummary(inspection.tasks) ||
-                        "Inspection workflow"}
-                    </div>
-                    <div className="mt-1 text-sm leading-6 text-[color:var(--text-muted)]">
-                      Next due: {nextDue ? formatTenantDate(new Date(nextDue), timezone) : "One-time"}
-                  </div>
-                    </div>
-                  <Link
-                    className="inline-flex rounded-2xl border border-[color:var(--border-default)] bg-white px-4 py-2.5 text-sm font-medium text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
-                    href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(detailHrefBase)}`}
-                  >
-                    {ctaLabel}
-                  </Link>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-    </SectionCard>
-  );
-}
-
-export default async function AdminDashboardPage({
-  searchParams
-}: {
+export default async function AdminDashboardPage({ searchParams }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const session = await auth();
-  if (!session?.user?.tenantId) {
-    redirect("/login");
-  }
-  if (!["tenant_admin", "office_admin"].includes(session.user.role)) {
-    redirect("/app");
-  }
-
-  const actor = {
-    userId: session.user.id,
-    role: session.user.role,
-    tenantId: session.user.tenantId
-  };
-  const fastManagementWindowEnd = endOfDay(addDays(startOfDay(new Date()), FAST_INSPECTION_MANAGEMENT_WINDOW_DAYS));
-
-  const [data, schedulingQueueData, billingSummaries, deficiencyData, fieldRequests] = await Promise.all([
-    getAdminDashboardData({
-      userId: session.user.id,
-      role: session.user.role,
-      tenantId: session.user.tenantId
-    }),
-    getAdminSchedulingQueueData(actor, {
-      readOnly: true,
-      statuses: [...activeOperationalInspectionStatuses],
-      dueWindowEnd: fastManagementWindowEnd,
-      limit: null,
-      includeCounts: false,
-      includeTechnicians: false
-    }),
-    getAdminBillingSummaries(actor),
-    getAdminDeficiencyDashboardData(
-      actor,
-      { status: "open" }
-    ),
-    getPendingFieldServiceRequestCount(actor)
+  if (!session?.user?.tenantId) redirect("/login");
+  if (!["tenant_admin", "office_admin"].includes(session.user.role)) redirect("/app");
+  const actor = { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId };
+  const through = endOfDay(addDays(startOfDay(new Date()), 60));
+  const [queue, billing, deficiencies, requests, schedule, params] = await Promise.all([
+    getAdminSchedulingQueueData(actor, { readOnly: true, statuses: [...activeOperationalInspectionStatuses],
+      dueWindowEnd: through, limit: null, includeCounts: false, includeTechnicians: false }),
+    getAdminBillingSummaries(actor), getAdminDeficiencyDashboardData(actor, { status: "open" }),
+    getPendingFieldServiceRequestCount(actor), getScheduler(actor, { view: "day" }), searchParams
   ]);
-  const params = searchParams ? await searchParams : {};
-  const inspectionNotice = Array.isArray(params.inspection)
-    ? params.inspection[0]
-    : params.inspection;
+  const inspections = filterSubsetDuplicateOperationalInspections(queue.inspections.filter(row => isInAttentionWindow(row, through)));
+  const inspectionQueue = (attention: string) => `/app/admin/inspections?status=open&attention=${attention}&through=${encodeURIComponent(through.toISOString())}`;
+  const attention = [
+    { label: "Unassigned inspections", count: filterAttentionQueue(inspections, "unassigned").length, href: inspectionQueue("unassigned") },
+    { label: "Ready to bill", count: billing.filter(row => isOpenBillingQueueStatus(row.status)).length, href: "/app/admin/billing?status=all" },
+    { label: "Service requests", count: requests, href: "/app/admin/service-requests?status=pending" },
+    { label: "Payment collection on site", count: filterAttentionQueue(inspections, "payment").length, href: inspectionQueue("payment") },
+    { label: "Linked visit updates", count: filterAttentionQueue(inspections, "linked").length, href: inspectionQueue("linked") },
+    { label: "High-priority deficiencies", count: deficiencies.deficiencies.filter(row => ["high", "critical"].includes(row.severity)).length, href: "/app/deficiencies?status=open&severity=high,critical" }
+  ].filter(row => row.count > 0);
+  const technicianNames = new Map(schedule.technicians.map(tech => [tech.id, tech.name]));
+  const jobs = schedule.jobs.slice(0, 8);
+  const rowClass = "flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2";
 
-  const greeting = getGreetingByHour(new Date(), data.timezone);
-  const firstName = getGreetingName(session.user.name);
-  const dashboardOperationalInspections = filterSubsetDuplicateOperationalInspections(schedulingQueueData.inspections.filter(row => isInAttentionWindow(row, fastManagementWindowEnd)));
-  const { openInspectionCount, sharedQueueCount } = summarizeDashboardQueue(dashboardOperationalInspections);
-  const readyToBillSummaryCount = billingSummaries.filter((summary) => isOpenBillingQueueStatus(summary.status)).length;
-  const alerts = buildAlertItems(dashboardOperationalInspections, sharedQueueCount, readyToBillSummaryCount, fieldRequests, inspectionNotice).map(alert => ({
-    ...alert,
-    href: alert.href?.startsWith("/app/admin/inspections?")
-      ? `${alert.href}&through=${encodeURIComponent(fastManagementWindowEnd.toISOString())}` : alert.href
-  }));
-  const complianceFlags = deficiencyData.deficiencies.filter(
-    (deficiency) => deficiency.severity === "high" || deficiency.severity === "critical"
-  ).length;
-  const todayItems = data.activeInspections.slice(0, 3);
-  const billingPipeline = calculateBillingPipeline(billingSummaries);
-  const archivedInspectionItems = data.completedInspections.filter(
-    (inspection) => inspection.status === "invoiced" || inspection.billingStatus === "invoiced"
-  );
-
-  const statCards = [
-    {
-      label: "Open inspections",
-      value: openInspectionCount.toString(),
-      change: openInspectionCount
-        ? `${dashboardOperationalInspections.filter((inspection) => inspection.status === "in_progress").length} currently in progress`
-        : "Dispatch queue is clear",
-      icon: ClipboardList,
-      href: "/app/admin/inspections?status=open",
-      tone: "blue" as const
-    },
-    {
-      label: "Ready To Bill",
-      value: readyToBillSummaryCount.toString(),
-      change: readyToBillSummaryCount
-        ? "Finalized work still needs invoice action"
-        : "Ready To Bill queue is clear",
-      icon: FileText,
-      href: "/app/admin/billing",
-      tone: "emerald" as const
-    },
-    {
-      label: "Compliance flags",
-      value: complianceFlags.toString(),
-      change: complianceFlags ? "Open high-priority issues need follow-up" : "No open high-priority flags",
-      icon: ShieldCheck,
-      href: "/app/deficiencies?status=open&severity=high,critical",
-      tone: "amber" as const
-    }
-  ];
-
-  return (
-    <div className="min-h-screen bg-paper text-slate-900">
-      <div className="py-5 lg:py-6">
-        <AppPageShell density="wide">
-          <div className="lg:hidden">
-            <PageHeader
-              actions={
-                <Link
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
-                  href="/app/deficiencies"
-                >
-                  <Bell className="h-4 w-4" />
-                </Link>
-              }
-              eyebrow="Dashboard"
-              title={`${greeting}, ${firstName}.`}
-              contentWidth="full"
-            />
-          </div>
-
-          <div className="hidden lg:block">
-            <PageHeader
-              actions={
-                <>
-                  <DashboardGlobalSearch />
-                  <Link
-                    className="inline-flex h-12 items-center gap-2 rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-medium text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)]"
-                    href="/app/deficiencies"
-                  >
-                    <Bell className="h-4 w-4" />
-                    Alerts
-                  </Link>
-                  <Link
-                    className="inline-flex h-12 items-center rounded-2xl bg-slateblue px-5 text-sm font-semibold text-white shadow-[0_12px_24px_rgb(var(--tenant-primary-rgb)_/_0.2)] transition duration-150 hover:brightness-110 active:scale-[0.99]"
-                    href="/app/admin/inspections?create=1"
-                  >
-                    Open inspections
-                  </Link>
-                </>
-              }
-              eyebrow="Dashboard"
-              title={`${greeting}, ${firstName}.`}
-              contentWidth="full"
-            />
-          </div>
-
-          <div className="lg:hidden">
-            <SectionCard className="space-y-4">
-              <DashboardGlobalSearch />
-              <div className="grid grid-cols-2 gap-3">
-                <Link
-                  className="inline-flex h-12 items-center justify-center rounded-2xl border border-[color:var(--border-default)] bg-white text-sm font-medium text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-subtle)]"
-                  href="/app/deficiencies"
-                >
-                  Alerts
-                </Link>
-                <Link
-                  className="inline-flex h-12 items-center justify-center rounded-2xl bg-slateblue text-sm font-semibold text-white shadow-[0_12px_24px_rgb(var(--tenant-primary-rgb)_/_0.18)] transition hover:brightness-110 active:scale-[0.99]"
-                  href="/app/admin/inspections?create=1"
-                >
-                  Open inspections
-                </Link>
-              </div>
-            </SectionCard>
-          </div>
-
-          <section className="grid gap-3 lg:grid-cols-3 lg:gap-4">
-            {statCards.map(({ label, value, change, icon: Icon, href, tone }) => (
-              <KPIStatCard
-                href={href}
-                icon={<Icon className="h-4 w-4 lg:h-5 lg:w-5" />}
-                key={label}
-                label={label}
-                note={change}
-                tone={tone}
-                value={value}
-              />
-            ))}
-          </section>
-
-          <WorkspaceSplit className="gap-5" variant="content-heavy">
-            <div className="space-y-5 lg:space-y-6">
-              <section className="relative overflow-hidden rounded-[28px] bg-slateblue p-5 text-white shadow-[0_20px_50px_rgb(var(--tenant-primary-rgb)_/_0.18)] lg:px-6 lg:py-6 lg:shadow-[0_22px_60px_rgb(var(--tenant-primary-rgb)_/_0.18)]">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(0,0,0,0.14),transparent_42%)]" />
-                <div className="relative flex flex-col gap-5 2xl:flex-row 2xl:items-end 2xl:justify-between">
-                  <div className="max-w-2xl">
-                    <div className="text-[10px] font-semibold tracking-[0.24em] text-white/70 lg:text-[11px]">
-                      TODAY&apos;S OPERATIONS
-                    </div>
-                    <h2 className="mt-3 max-w-[14ch] text-[32px] font-semibold leading-[1] tracking-[-0.05em] lg:text-[42px] lg:leading-[1.02]">
-                      Field operations
-                    </h2>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 2xl:w-[360px]">
-                    <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-                      <div className="text-xs text-white/70">Techs active</div>
-                      <div className="mt-1 text-2xl font-semibold">{data.technicians.length}</div>
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-                      <div className="text-xs text-white/70">Jobs today</div>
-                      <div className="mt-1 text-2xl font-semibold">{todayItems.length}</div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              <SectionCard>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
-                        Today&apos;s field schedule
-                      </h3>
-                    </div>
-                    <Link
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[color:var(--border-default)] text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-subtle)] lg:h-10 lg:w-auto lg:gap-2 lg:px-3.5 lg:text-sm lg:font-medium"
-                      href="/app/admin/amendments"
-                    >
-                      <CalendarDays className="h-4 w-4" />
-                      <span className="hidden lg:inline">Next-step requests</span>
-                    </Link>
-                  </div>
-
-                  <div className="mt-4 space-y-3">
-                    {todayItems.length === 0 ? (
-                      <EmptyState
-                        description="No active inspections are scheduled right now."
-                        title="Nothing is currently on deck"
-                      />
-                    ) : (
-                      todayItems.map((item) => (
-                        <Link
-                          key={item.id}
-                          href={`/app/admin/inspections/${item.id}?from=${encodeURIComponent("/app/admin/dashboard")}`}
-                          className="block rounded-2xl border border-[color:rgb(203_215_230_/_0.92)] bg-[color:rgb(248_250_252_/_0.96)] p-4 transition hover:border-[color:var(--border-strong)] hover:bg-white"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <div className="text-sm font-semibold text-slate-900">
-                                {item.primaryTitle ?? item.site.name}
-                              </div>
-                              <div className="mt-1 text-sm leading-6 text-[color:var(--text-secondary)]">
-                                {formatScheduleDetail(item)}
-                              </div>
-                            </div>
-                            <div className="text-xs font-medium text-slate-700">
-                              {new Intl.DateTimeFormat("en-US", {
-                                hour: "numeric",
-                                minute: "2-digit",
-                                timeZone: data.timezone
-                              }).format(item.scheduledStart)}
-                            </div>
-                          </div>
-                          <div className="mt-3">
-                            <StatusBadge
-                              label={inspectionStatusLabel(item.displayStatus)}
-                              tone={getInspectionStatusTone(item.displayStatus as Parameters<typeof getInspectionStatusTone>[0])}
-                            />
-                          </div>
-                        </Link>
-                      ))
-                    )}
-                  </div>
-              </SectionCard>
-
-              <section className="grid gap-5 2xl:grid-cols-2">
-                <InspectionListCard
-                  title="Active inspections"
-                  description={`Operational schedule view with ${data.activeInspections.length} inspection${data.activeInspections.length === 1 ? "" : "s"} loaded right now.`}
-                  detailHrefBase="/app/admin/dashboard"
-                  inspections={data.activeInspections}
-                  emptyText="No active inspections are on the board right now."
-                  emptyTitle="No active inspections"
-                  ctaLabel="Open inspection"
-                  timezone={data.timezone}
-                />
-                <InspectionListCard
-                  title="Completed archive"
-                  description="Only fully completed and invoiced work is kept in this archive for office reference and customer delivery."
-                  detailHrefBase="/app/admin/dashboard"
-                  inspections={archivedInspectionItems.slice(0, 6)}
-                  emptyText="No fully completed and invoiced inspections are archived yet."
-                  timezone={data.timezone}
-                  emptyTitle="No completed archive items"
-                  ctaLabel="View inspection"
-                />
-              </section>
+  return <AppPageShell density="wide">
+    <PageHeader title="Home" contentWidth="full" actions={<DashboardGlobalSearch />} />
+    {params?.inspection === "deleted" ? <p role="status" className="text-sm text-slate-600">Inspection deleted successfully.</p> : null}
+    <div className="grid min-w-0 items-start gap-5 xl:grid-cols-2">
+      <SectionCard className="min-w-0">
+        <h2 className="text-xl font-semibold tracking-tight">Needs Attention</h2>
+        <div className="mt-4 divide-y divide-slate-100">
+          {attention.length ? attention.map(row => <AttentionLink key={row.href} href={row.href} className={rowClass}>
+            <span className="min-w-0 flex-1 font-medium">{row.label}</span>
+            <span className="font-semibold tabular-nums text-slate-900">{row.count}</span>
+            <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400" />
+          </AttentionLink>) : <p className="py-5 text-sm text-slate-500">You&apos;re all caught up</p>}
+        </div>
+        <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-slate-100 pt-4 text-sm text-slateblue">
+          <Link href="/app/admin/inspections">Inspections</Link>
+          <Link href="/app/admin/reports">Report review</Link>
+          <Link href="/app/admin/amendments">Visit review</Link>
+        </div>
+      </SectionCard>
+      <SectionCard className="min-w-0">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold tracking-tight">Today&apos;s Schedule</h2>
+          <Link href="/app/admin/scheduler" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm font-medium text-slateblue focus-visible:outline focus-visible:outline-2">View schedule</Link>
+        </div>
+        <div className="mt-3 divide-y divide-slate-100">
+          {jobs.length ? jobs.map(job => <Link key={job.id} href={`/app/admin/inspections/${job.id}?from=${encodeURIComponent("/app/admin/dashboard")}`} className={rowClass}>
+            <time dateTime={job.scheduledStart} className="w-20 shrink-0 self-start pt-0.5 text-xs tabular-nums text-slate-600">{new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: schedule.timezone }).format(new Date(job.scheduledStart))}</time>
+            <div className="min-w-0 flex-1 break-words">
+              <p className="font-semibold">{job.customer}</p>
+              {job.site && job.site !== job.customer ? <p className="text-slate-500">{job.site}</p> : null}
+              <p className="mt-1 text-xs text-slate-500">{job.technicianIds.map(id => technicianNames.get(id) ?? "Team member").join(", ") || "Unassigned"}</p>
+              <p className="mt-1 text-xs font-medium text-slate-600">{fieldProgress(job, new Date(schedule.fetchedAt).getTime())}</p>
             </div>
-
-            <div className="space-y-5 lg:space-y-6">
-              <SectionCard>
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                  <CircleAlert className="h-4 w-4 text-amber-500" />
-                  Needs attention
-                </div>
-                <div className="mt-4 space-y-3">
-                  {alerts.length === 0 ? (
-                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 text-sm leading-6 text-emerald-800">
-                      Nothing urgent is blocking today&apos;s operations.
-                    </div>
-                  ) : (
-                    alerts.map((alert) => (
-                      alert.href ? <AttentionLink
-                        key={alert.href}
-                        href={alert.href}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/85 p-4 text-sm leading-6 text-slate-800 transition hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2"
-                      >
-                        <span>{alert.label}</span><ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-amber-700" />
-                      </AttentionLink> : <div
-                        key={alert.label}
-                        className="rounded-2xl border border-amber-200 bg-amber-50/85 p-4 text-sm leading-6 text-slate-800"
-                      >
-                        {alert.label}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </SectionCard>
-
-              <section className="rounded-[28px] border border-slate-200/80 bg-[#0f172a] p-5 text-white shadow-[0_16px_44px_rgba(15,23,42,0.14)] lg:p-6">
-                <div className="text-[10px] font-semibold tracking-[0.24em] text-white/60">
-                  QUICK ACTIONS
-                </div>
-                <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">
-                  Office actions
-                </h3>
-
-                <div className="mt-5 space-y-3">
-                  {[
-                    { label: "Create invoices for ready work", href: "/app/admin/reports" },
-                    { label: "Review Ready To Bill", href: "/app/admin/billing" },
-                    { label: "Follow up on open deficiencies", href: "/app/deficiencies?status=open" },
-                    { label: "Review field service requests", href: "/app/admin/service-requests" }
-                  ].map((item) => (
-                    <Link
-                      key={item.label}
-                      href={item.href}
-                      className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3.5 text-left text-sm font-medium text-white transition hover:bg-white/10"
-                    >
-                      <span>{item.label}</span>
-                      <span className="text-white/50">→</span>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-
-              <SectionCard>
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950 lg:text-xl">
-                      Revenue pipeline
-                    </h3>
-                  </div>
-                  <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                    {readyToBillSummaryCount > 0
-                      ? "Active"
-                      : "Healthy"}
-                  </div>
-                </div>
-
-                <div className="mt-5 space-y-4">
-                  {billingPipeline.map((bar) => (
-                    <div key={bar.label}>
-                      <div className="mb-2 flex items-center justify-between text-sm">
-                        <span className="font-medium text-slate-700">{bar.label}</span>
-                        <span className="text-[color:var(--text-muted)]">{bar.value}%</span>
-                      </div>
-                      <div className="h-2.5 rounded-full bg-[color:var(--surface-muted)]">
-                        <div
-                          className={`h-2.5 rounded-full ${bar.tone}`}
-                          style={{ width: `${Math.max(bar.value, 4)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </SectionCard>
-
-            </div>
-          </WorkspaceSplit>
-        </AppPageShell>
-      </div>
+            <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400" />
+          </Link>) : <p className="py-5 text-sm text-slate-500">No jobs scheduled today.</p>}
+        </div>
+        {schedule.jobs.length > jobs.length ? <p className="mt-3 text-xs text-slate-500">Showing {jobs.length} of {schedule.jobs.length}{schedule.truncated ? "+" : ""} jobs. View schedule for the full day.</p> : null}
+      </SectionCard>
     </div>
-  );
+  </AppPageShell>;
 }
-
