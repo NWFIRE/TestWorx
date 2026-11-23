@@ -14,6 +14,7 @@ import { BillingItemMatchPanel } from "../../billing-item-match-panel";
 import { AppPageShell } from "../../operations-ui";
 import { addBillingSummaryManualLineAction, clearBillingSummaryItemCatalogLinkAction, getBillingManualLineCatalogItems, linkBillingSummaryItemCatalogAction, removeBillingSummaryItemGroupAction, searchBillingSummaryItemCatalogMatchesAction, sendQuickBooksInvoiceAction, syncBillingSummaryToQuickBooksAction, updateBillingSummaryItemGroupAction, updateBillingSummaryNotesAction, updateBillingSummaryStatusAction } from "../../actions";
 import { BillingReportPdfReviewPanel } from "./billing-report-pdf-review-panel";
+import { BillingLineForm } from "./billing-line-form";
 import styles from "./billing-detail.module.css";
 
 type BillingSummaryDetail = NonNullable<Awaited<ReturnType<typeof getAdminBillingSummaryDetail>>>;
@@ -233,7 +234,7 @@ export default async function BillingSummaryDetailPage({
 
   const groupedEntries = (Object.entries(summary.reviewGroupedItems) as Array<[keyof typeof categoryLabels, BillingSummaryLineItem[]]>)
     .map(([category, items]) => [category, sortBillingItemsForDisplay(category, items)] as const);
-  const isInvoiced = summary.status === "invoiced";
+  const isInvoiced = summary.status === "invoiced" || Boolean(summary.quickbooksInvoiceId);
   const canUseQuickBooksActions = quickBooksConnection.connection.connected;
   const summaryQuickBooksMode = summary.quickbooksConnectionMode === "sandbox" || summary.quickbooksConnectionMode === "live"
     ? summary.quickbooksConnectionMode
@@ -304,6 +305,10 @@ export default async function BillingSummaryDetailPage({
 
       <section className="grid min-w-0 items-start gap-3 2xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
         <div className="min-w-0 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+            <h2 className="text-lg font-semibold text-ink">Suggested billing</h2>
+            <span className="text-sm font-medium text-slate-600">{isInvoiced ? "Invoiced" : summary.status === "reviewed" ? "Reviewed" : "Needs review"}</span>
+          </div>
           {groupedEntries.map(([category, items]) => (
             <div key={category} className="rounded-3xl bg-white p-4 shadow-panel">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -330,6 +335,11 @@ export default async function BillingSummaryDetailPage({
                           </p>
                         </div>
                         <div className="flex flex-wrap gap-x-4 gap-y-1">
+                          {summary.reportPdfs.filter((pdf) => item.sourceItems.some((source) => source.reportId === pdf.inspectionReportId)).map((pdf) => (
+                            <a key={pdf.inspectionReportId} href={pdf.viewUrl} target="_blank" rel="noopener noreferrer" className="min-h-11 content-center text-sm font-medium text-slateblue underline focus-visible:outline focus-visible:outline-2">
+                              Source: {pdf.reportLabel}
+                            </a>
+                          ))}
                           {buildBillingItemContext(item).map((line) => (
                             <p key={line} className="text-sm text-slate-500">{line}</p>
                           ))}
@@ -379,13 +389,34 @@ export default async function BillingSummaryDetailPage({
                           />
                         )}
                       </div>
-                      <form action={updateBillingSummaryItemGroupAction} className={styles.lineControls}>
+                      <BillingLineForm saveAction={updateBillingSummaryItemGroupAction} removeAction={removeBillingSummaryItemGroupAction} className={styles.lineControls}>
                         <input name="summaryId" type="hidden" value={summary.id} />
                         <input name="inspectionId" type="hidden" value={summary.inspectionId} />
                         {item.itemIds.map((sourceItemId) => (
                           <input key={sourceItemId} name="itemIds" type="hidden" value={sourceItemId} />
                         ))}
                         <input name="unitPrice" type="hidden" value={item.unitPrice ?? ""} />
+                        <label className="text-sm text-slate-600 sm:col-span-3">
+                          Description
+                          <input name="description" required maxLength={2000} defaultValue={item.description} disabled={isInvoiced} className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3" />
+                        </label>
+                        <label className="text-sm text-slate-600 sm:col-span-3">
+                          Category
+                          <select name="category" defaultValue={item.category} disabled={isInvoiced} className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3">
+                            <option value="service">Services</option>
+                            <option value="material">Materials / equipment</option>
+                            <option value="labor">Labor</option>
+                            <option value="fee">Fees</option>
+                          </select>
+                        </label>
+                        {item.sourceItems.some((source) => source.metadata?.sourceChanged === true) ? (
+                          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 sm:col-span-3">
+                            <p>{item.sourceItems.some((source) => source.metadata?.sourceMissing === true) ? "This edited line is no longer in the report. Keep it only if still billable, or remove it." : "Report quantities changed. Review this line before billing."}</p>
+                            <button type="submit" name="useSuggestedQuantity" value="true" disabled={isInvoiced || item.sourceItems.some((source) => source.metadata?.sourceMissing === true)} className="mt-2 min-h-11 rounded-lg border border-amber-300 px-3 font-semibold disabled:opacity-50">
+                              Use report quantity ({item.sourceItems.reduce((sum, source) => sum + (typeof source.metadata?.sourceQuantity === "number" ? source.metadata.sourceQuantity : source.quantity), 0)})
+                            </button>
+                          </div>
+                        ) : null}
                         <label className="text-sm text-slate-600">
                           Quantity
                           <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 px-4 py-3" defaultValue={formatEditableQuantity(item.quantity)} disabled={isInvoiced} inputMode="decimal" min="0.01" name="quantity" placeholder="1" step="0.01" type="number" />
@@ -401,13 +432,15 @@ export default async function BillingSummaryDetailPage({
                           <button
                             className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-rose-200 bg-white px-4 py-3 text-sm font-semibold text-rose-700 disabled:opacity-50"
                             disabled={isInvoiced}
-                            formAction={removeBillingSummaryItemGroupAction}
+                            name="intent"
+                            value="remove"
+                            formNoValidate
                             type="submit"
                           >
                             Remove line
                           </button>
                         </div>
-                      </form>
+                      </BillingLineForm>
                     </div>
                   </div>
                 ))}
@@ -435,6 +468,7 @@ export default async function BillingSummaryDetailPage({
             <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Summary status</p>
             <h3 className="mt-1 text-2xl font-semibold text-ink">{formatBillingSummaryStatusLabel(summary.status)}</h3>
             <BillingSummaryStatusActions
+              key={`${summary.status}:${summary.quickbooksInvoiceId ?? "unsynced"}`}
               canUseQuickBooksActions={canUseQuickBooksActions}
               connectedCompany={quickBooksConnection.tenant.quickbooksCompanyName}
               connectedRealm={quickBooksConnection.tenant.quickbooksRealmId}

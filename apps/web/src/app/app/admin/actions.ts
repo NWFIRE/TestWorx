@@ -1056,7 +1056,7 @@ export async function updateBillingSummaryItemGroupAction(formData: FormData) {
   const unitPrice = unitPriceRaw.trim().length > 0 ? Number(unitPriceRaw) : null;
   const taxable = formData.has("taxable");
   if (!session?.user?.tenantId || !summaryId || !inspectionId || itemIds.length === 0) {
-    return;
+    throw new Error("Your session expired or the billing line is unavailable. Refresh and try again.");
   }
 
   try {
@@ -1066,18 +1066,19 @@ export async function updateBillingSummaryItemGroupAction(formData: FormData) {
       itemIds,
       Number.isFinite(quantity) ? quantity : 0,
       unitPrice !== null && Number.isFinite(unitPrice) ? unitPrice : null,
-      taxable
+      taxable,
+      {
+        description: formData.has("description") ? String(formData.get("description")) : undefined,
+        category: formData.has("category") ? String(formData.get("category")) : undefined,
+        useSuggestedQuantity: formData.get("useSuggestedQuantity") === "true"
+      }
     );
   } catch (error) {
     if (!(error instanceof Error) || !/Billing item group not found/i.test(error.message)) {
       throw error;
     }
 
-    console.warn("Billing line save ignored stale item group", {
-      summaryId,
-      inspectionId,
-      itemIds
-    });
+    throw new Error("This billing line changed. Refresh the page before saving again.");
   }
 
   revalidatePath("/app/admin/billing");
@@ -1128,7 +1129,7 @@ export async function removeBillingSummaryItemGroupAction(formData: FormData) {
   const itemIds = formData.getAll("itemIds").map((value) => String(value)).filter(Boolean);
 
   if (!session?.user?.tenantId || !summaryId || !inspectionId || itemIds.length === 0) {
-    return;
+    throw new Error("Your session expired or the billing line is unavailable. Refresh and try again.");
   }
 
   try {
@@ -1141,11 +1142,7 @@ export async function removeBillingSummaryItemGroupAction(formData: FormData) {
       throw error;
     }
 
-    console.warn("Billing line remove ignored stale item group", {
-      summaryId,
-      inspectionId,
-      itemIds
-    });
+    throw new Error("This billing line changed. Refresh the page before removing it.");
   }
 
   revalidatePath("/app/admin/billing");
