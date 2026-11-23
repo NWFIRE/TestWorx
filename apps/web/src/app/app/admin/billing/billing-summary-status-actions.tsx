@@ -284,9 +284,9 @@ export function BillingSummaryStatusActions({
             return formData;
           }, updateBillingSummaryStatusAction)}
           pending={pending && activeAction === "reviewed"}
-          pendingLabel="Confirming Ready To Bill..."
+          pendingLabel="Saving billing review..."
         >
-          {state.summaryStatus === "reviewed" ? "Ready To Bill confirmed" : needsBillingReview ? "Release unbilled work to Ready To Bill" : "Confirm Ready To Bill"}
+          {state.summaryStatus === "reviewed" ? "Billing reviewed" : needsBillingReview ? "Release unbilled work to Ready To Bill" : "Mark billing reviewed"}
         </ActionButton>
 
         <ActionButton

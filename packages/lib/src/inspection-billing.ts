@@ -1,6 +1,7 @@
 import { InspectionStatus, Prisma } from "@prisma/client";
 import { prisma } from "@testworx/db";
 import { assertBillingStatusChangeAllowed } from "./billing-queue";
+import { billingReviewFingerprint, excludedBillingItemIds, withExcludedBillingItems, validateBillingLineEdit } from "./billing-review";
 
 import type { ActorContext, InspectionType, ReportStatus } from "@testworx/types";
 import { actorContextSchema, reportStatuses } from "@testworx/types";
@@ -1601,14 +1602,16 @@ async function extractBillableItemsFromWorkOrderLineItemsTx(tx: TransactionClien
   });
 }
 
-export function mergeBillingItems(existingItems: BillableItem[], nextItems: BillableItem[]) {
+export function mergeBillingItems(existingItems: BillableItem[], nextItems: BillableItem[], excludedIds: string[] = []) {
   const existingById = new Map(existingItems.map((item) => [item.id, item] as const));
+  const excluded = new Set(excludedIds);
+  const uniqueNextItems = [...new Map(nextItems.filter((item) => !excluded.has(item.id)).map((item) => [item.id, item])).values()];
 
-  const mergedItems = nextItems.map((item) => {
+  const mergedItems = uniqueNextItems.map((item) => {
     const existing = existingById.get(item.id);
     const sourceQuantity = item.quantity;
     const existingSourceQuantity = typeof existing?.metadata?.sourceQuantity === "number" ? existing.metadata.sourceQuantity : undefined;
-    const quantity = existing && existingSourceQuantity !== undefined && existing.quantity !== existingSourceQuantity
+    const quantity = existing && (existing.metadata?.quantityOverridden === true || (existingSourceQuantity !== undefined && (existing.quantity !== existingSourceQuantity || sourceQuantity !== existingSourceQuantity)))
       ? existing.quantity
       : item.quantity;
     const unitPrice = existing?.unitPrice ?? item.unitPrice ?? null;
@@ -1639,11 +1642,18 @@ export function mergeBillingItems(existingItems: BillableItem[], nextItems: Bill
       ...item,
       ...manualCatalogLink,
       ...taxableOverride,
+      ...(existing?.metadata?.descriptionOverridden === true ? { description: existing.description } : {}),
+      ...(existing?.metadata?.categoryOverridden === true ? { category: existing.category } : {}),
       quantity,
       unitPrice,
       amount: calculateAmount(quantity, unitPrice),
       metadata: {
         ...(item.metadata ?? {}),
+        ...(existing?.metadata?.descriptionOverridden === true ? { descriptionOverridden: true } : {}),
+        ...(existing?.metadata?.categoryOverridden === true ? { categoryOverridden: true } : {}),
+        ...(existing?.metadata?.quantityOverridden === true ? { quantityOverridden: true } : {}),
+        sourceChanged: existing?.metadata?.sourceChanged === true || (existingSourceQuantity !== undefined && existingSourceQuantity !== sourceQuantity),
+        sourceMissing: false,
         sourceQuantity
       }
     };
@@ -1651,10 +1661,14 @@ export function mergeBillingItems(existingItems: BillableItem[], nextItems: Bill
 
   const nextIds = new Set(nextItems.map((item) => item.id));
   const preservedManualItems = existingItems.filter((item) =>
-    item.metadata?.manualBillingLine === true && !nextIds.has(item.id)
+    item.metadata?.manualBillingLine === true && !nextIds.has(item.id) && !excluded.has(item.id)
   );
+  const missingEditedItems = existingItems.filter((item) => !nextIds.has(item.id) && !excluded.has(item.id)
+    && item.metadata?.manualBillingLine !== true
+    && (item.metadata?.quantityOverridden === true || item.metadata?.descriptionOverridden === true || item.metadata?.categoryOverridden === true))
+    .map((item) => ({ ...item, metadata: { ...item.metadata, sourceMissing: true, sourceChanged: true } }));
 
-  return [...mergedItems, ...preservedManualItems];
+  return [...mergedItems, ...preservedManualItems, ...missingEditedItems];
 }
 
 export function groupBillableItems(items: BillableItem[]) {
@@ -3228,11 +3242,11 @@ async function resolveBillingOutcomeTx(
   };
 }
 
-async function getExistingBillingSummaryRow(tx: TransactionClient, inspectionId: string) {
+async function getExistingBillingSummaryRow(tx: TransactionClient, inspectionId: string, tenantId: string) {
   const rows = await tx.$queryRaw`
     SELECT "id", "tenantId", "inspectionId", "customerCompanyId", "siteId", "status", "billingType", "payerType", "payerCustomerId", "payerProviderAccountId", "billingResolutionSnapshotId", "billToAccountId", "billToName", "contractProfileId", "contractProfileName", "routingSnapshot", "pricingSnapshot", "groupingSnapshot", "attachmentSnapshot", "deliverySnapshot", "referenceSnapshot", "items", "subtotal", "notes", "createdAt", "updatedAt", "quickbooksInvoiceId", "quickbooksSyncedAt"
     FROM "InspectionBillingSummary"
-    WHERE "inspectionId" = ${inspectionId}
+    WHERE "inspectionId" = ${inspectionId} AND "tenantId" = ${tenantId}
     LIMIT 1
   ` as PersistedBillingSummaryRow[];
 
@@ -3296,14 +3310,15 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
     reportTypes: reports.map((report) => report.inspectionType)
   }));
 
-  const existing = await getExistingBillingSummaryRow(db, input.inspectionId);
+  const existing = await getExistingBillingSummaryRow(db, input.inspectionId, input.tenantId);
   // Retired fee rules must not rewrite historical invoices during report refresh.
   if (existing && (existing.status === "invoiced" || existing.quickbooksInvoiceId || existing.quickbooksSyncedAt)) {
     return existing;
   }
   // Completed work still needs office review even when no billable lines were extracted.
 
-  const mergedItems = mergeBillingItems(existing?.items ?? [], extracted);
+  const excludedIds = excludedBillingItemIds(existing?.pricingSnapshot);
+  const mergedItems = mergeBillingItems(existing?.items ?? [], extracted, excludedIds);
   const linkedItems = await Promise.all(
     mergedItems.map(async (item) => {
       if (isRuleControlledFeeItem(item)) {
@@ -3414,7 +3429,9 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
   });
   const pricedItems = minimumPricedSummary.items;
   const subtotal = minimumPricedSummary.subtotal;
-  const pricingSnapshot = minimumPricedSummary.pricingSnapshot;
+  const pricingSnapshot = withExcludedBillingItems(minimumPricedSummary.pricingSnapshot, excludedIds);
+  const nextStatus = existing?.status === "reviewed" && billingReviewFingerprint(existing.items) !== billingReviewFingerprint(pricedItems)
+    ? "draft" : existing?.status ?? "draft";
   const billingResolutionSnapshotId = existingResolvedSummary && existingResolutionSnapshot?.id
     ? existingResolutionSnapshot.id
     : (
@@ -3447,7 +3464,7 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
       ${input.inspectionId},
       ${inspection.customerCompanyId},
       ${inspection.siteId},
-      ${existing?.status ?? "draft"},
+      ${nextStatus},
       ${billingResolution.billingType}::"BillingType",
       ${billingResolution.payerType}::"InvoicePayerType",
       ${billingResolution.payerCustomerId},
@@ -3471,6 +3488,7 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
     )
     ON CONFLICT ("inspectionId")
     DO UPDATE SET
+      "status" = EXCLUDED."status",
       "tenantId" = EXCLUDED."tenantId",
       "customerCompanyId" = EXCLUDED."customerCompanyId",
       "siteId" = EXCLUDED."siteId",
@@ -3493,6 +3511,10 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
       "subtotal" = EXCLUDED."subtotal",
       "notes" = COALESCE("InspectionBillingSummary"."notes", EXCLUDED."notes"),
       "updatedAt" = NOW()
+    WHERE "InspectionBillingSummary"."quickbooksInvoiceId" IS NULL
+      AND "InspectionBillingSummary"."status" <> 'invoiced'
+      AND "InspectionBillingSummary"."status" = ${existing?.status ?? "draft"}
+      AND "InspectionBillingSummary"."items" = ${JSON.stringify(existing?.items ?? [])}::jsonb
   `;
 
   return {
@@ -3501,7 +3523,7 @@ export async function syncInspectionBillingSummaryTx(tx: TransactionClient, inpu
     inspectionId: input.inspectionId,
     customerCompanyId: inspection.customerCompanyId,
     siteId: inspection.siteId,
-    status: existing?.status ?? "draft",
+    status: nextStatus,
     billingType: billingResolution.billingType,
     payerType: billingResolution.payerType,
     payerCustomerId: billingResolution.payerCustomerId,
@@ -4073,7 +4095,7 @@ export async function updateBillingSummaryNotes(actor: ActorContext, summaryId: 
 
 export async function updateBillingSummaryItem(actor: ActorContext, summaryId: string, itemId: string, quantity: number, unitPrice: number | null) {
   const { parsedActor, summary } = await getAuthorizedBillingSummary(actor, summaryId);
-  if (summary.status === "invoiced") {
+  if (summary.status === "invoiced" || summary.quickbooksInvoiceId) {
     throw new Error("Invoiced billing summaries must be moved back to review before editing line items.");
   }
   const items = await Promise.all(
@@ -4132,10 +4154,11 @@ export async function updateBillingSummaryItemGroup(
   itemIds: string[],
   quantity: number,
   unitPrice: number | null,
-  taxable?: boolean
+  taxable?: boolean,
+  edits?: { description?: string; category?: string; useSuggestedQuantity?: boolean }
 ) {
   const { parsedActor, summary } = await getAuthorizedBillingSummary(actor, summaryId);
-  if (summary.status === "invoiced") {
+  if (summary.status === "invoiced" || summary.quickbooksInvoiceId) {
     throw new Error("Invoiced billing summaries must be moved back to review before editing line items.");
   }
 
@@ -4154,7 +4177,13 @@ export async function updateBillingSummaryItemGroup(
     throw new Error("Only identical billing items can be updated as a grouped row.");
   }
 
-  const quantityAssignments = distributeGroupedQuantity(groupedItems, quantity);
+  const requestedQuantity = edits?.useSuggestedQuantity
+    ? groupedItems.reduce((sum, item) => sum + (typeof item.metadata?.sourceQuantity === "number" ? item.metadata.sourceQuantity : item.quantity), 0)
+    : quantity;
+  validateBillingLineEdit(requestedQuantity, edits?.description, edits?.category);
+  const quantityAssignments = edits?.useSuggestedQuantity
+    ? new Map(groupedItems.map((item) => [item.id, typeof item.metadata?.sourceQuantity === "number" ? item.metadata.sourceQuantity : item.quantity]))
+    : distributeGroupedQuantity(groupedItems, requestedQuantity);
   const updatedItems = await Promise.all(
     summary.items.map(async (item) => {
       if (!quantityAssignments.has(item.id)) {
@@ -4170,6 +4199,16 @@ export async function updateBillingSummaryItemGroup(
       return {
         ...item,
         quantity: nextQuantity,
+        ...(edits?.description !== undefined ? { description: edits.description.trim() } : {}),
+        ...(edits?.category !== undefined ? { category: edits.category as BillableCategory } : {}),
+        metadata: {
+          ...item.metadata,
+          sourceQuantity: item.metadata?.sourceQuantity ?? item.quantity,
+          quantityOverridden: !edits?.useSuggestedQuantity,
+          sourceChanged: false,
+          ...(edits?.description !== undefined ? { descriptionOverridden: true } : {}),
+          ...(edits?.category !== undefined ? { categoryOverridden: true } : {})
+        },
         unitPrice: resolvedUnitPrice,
         amount: calculateAmount(nextQuantity, resolvedUnitPrice),
         lineSubtotal: null,
@@ -4203,9 +4242,11 @@ export async function updateBillingSummaryItemGroup(
     items: updatedItems
   });
 
-  await prisma.$executeRaw`
+  await prisma.$transaction(async (tx) => {
+  const updated = await tx.$executeRaw`
     UPDATE "InspectionBillingSummary"
     SET "items" = ${JSON.stringify(minimumPricedSummary.items)}::jsonb,
+        "status" = CASE WHEN "status" = 'reviewed' THEN 'draft' ELSE "status" END,
         "subtotal" = ${minimumPricedSummary.subtotal},
         "pricingSnapshot" = ${JSON.stringify(minimumPricedSummary.pricingSnapshot)}::jsonb,
         "quickbooksSyncStatus" = CASE WHEN "quickbooksInvoiceId" IS NULL THEN COALESCE("quickbooksSyncStatus", 'not_synced') ELSE 'not_synced' END,
@@ -4216,8 +4257,17 @@ export async function updateBillingSummaryItemGroup(
         "quickbooksSyncedAt" = CASE WHEN "quickbooksSyncedAt" IS NULL THEN "quickbooksSyncedAt" ELSE NULL END,
         "quickbooksSyncError" = NULL,
         "updatedAt" = NOW()
-    WHERE "id" = ${summary.id}
+    WHERE "id" = ${summary.id} AND "tenantId" = ${parsedActor.tenantId}
+      AND "items" = ${JSON.stringify(summary.items)}::jsonb
+      AND "quickbooksInvoiceId" IS NULL AND "status" <> 'invoiced'
   `;
+  if (updated === 0) throw new Error("Billing changed while you were editing. Refresh before saving again.");
+  await tx.auditLog.create({ data: {
+    tenantId: parsedActor.tenantId as string, actorUserId: parsedActor.userId,
+    action: "billing.item_group_updated", entityType: "InspectionBillingSummary", entityId: summary.id,
+    metadata: { itemIds: uniqueItemIds, quantity: requestedQuantity, description: edits?.description ?? null, category: edits?.category ?? null }
+  } });
+  });
 }
 
 export async function removeBillingSummaryItemGroup(
@@ -4228,7 +4278,7 @@ export async function removeBillingSummaryItemGroup(
   }
 ) {
   const { parsedActor, summary } = await getAuthorizedBillingSummary(actor, input.summaryId);
-  if (summary.status === "invoiced") {
+  if (summary.status === "invoiced" || summary.quickbooksInvoiceId) {
     throw new Error("Invoiced billing summaries must be moved back to review before removing line items.");
   }
 
@@ -4265,8 +4315,9 @@ export async function removeBillingSummaryItemGroup(
       where: { id: summary.id },
       data: {
         items: minimumPricedSummary.items as unknown as Prisma.InputJsonValue,
+        status: summary.status === "reviewed" ? "draft" : summary.status,
         subtotal: minimumPricedSummary.subtotal,
-        pricingSnapshot: minimumPricedSummary.pricingSnapshot as Prisma.InputJsonValue,
+        pricingSnapshot: withExcludedBillingItems(minimumPricedSummary.pricingSnapshot, uniqueItemIds) as Prisma.InputJsonValue,
         quickbooksSyncStatus: summary.quickbooksInvoiceId ? "not_synced" : summary.quickbooksSyncStatus ?? "not_synced",
         quickbooksInvoiceId: null,
         quickbooksInvoiceNumber: null,
@@ -4339,7 +4390,7 @@ export async function addBillingSummaryManualLine(actor: ActorContext, input: {
   unitPrice?: number | null;
 }) {
   const { parsedActor, summary } = await getAuthorizedBillingSummary(actor, input.summaryId);
-  if (summary.status === "invoiced") {
+  if (summary.status === "invoiced" || summary.quickbooksInvoiceId) {
     throw new Error("Invoiced billing summaries must be moved back to review before adding line items.");
   }
 
@@ -4417,6 +4468,7 @@ export async function addBillingSummaryManualLine(actor: ActorContext, input: {
       where: { id: summary.id },
       data: {
         items: minimumPricedSummary.items as unknown as Prisma.InputJsonValue,
+        status: summary.status === "reviewed" ? "draft" : summary.status,
         subtotal: minimumPricedSummary.subtotal,
         pricingSnapshot: minimumPricedSummary.pricingSnapshot as Prisma.InputJsonValue,
         quickbooksSyncStatus: summary.quickbooksInvoiceId ? "not_synced" : summary.quickbooksSyncStatus ?? "not_synced",
@@ -4491,7 +4543,7 @@ export async function linkBillingSummaryItemCatalog(
   }
 ) {
   const { parsedActor, summary } = await getAuthorizedBillingSummary(actor, input.summaryId);
-  if (summary.status === "invoiced") {
+  if (summary.status === "invoiced" || summary.quickbooksInvoiceId) {
     throw new Error("Invoiced billing summaries must be moved back to review before linking items.");
   }
 
@@ -4546,6 +4598,7 @@ export async function linkBillingSummaryItemCatalog(
       where: { id: summary.id },
       data: {
         items: minimumPricedSummary.items as unknown as Prisma.InputJsonValue,
+        status: summary.status === "reviewed" ? "draft" : summary.status,
         subtotal: minimumPricedSummary.subtotal,
         pricingSnapshot: minimumPricedSummary.pricingSnapshot as Prisma.InputJsonValue,
         quickbooksSyncStatus: summary.quickbooksInvoiceId ? "not_synced" : summary.quickbooksSyncStatus ?? "not_synced",
@@ -4671,7 +4724,7 @@ export async function linkBillingSummaryItemGroupCatalog(
   }
 ) {
   const { parsedActor, summary } = await getAuthorizedBillingSummary(actor, input.summaryId);
-  if (summary.status === "invoiced") {
+  if (summary.status === "invoiced" || summary.quickbooksInvoiceId) {
     throw new Error("Invoiced billing summaries must be moved back to review before linking items.");
   }
 
@@ -4734,6 +4787,7 @@ export async function linkBillingSummaryItemGroupCatalog(
       where: { id: summary.id },
       data: {
         items: minimumPricedSummary.items as unknown as Prisma.InputJsonValue,
+        status: summary.status === "reviewed" ? "draft" : summary.status,
         subtotal: minimumPricedSummary.subtotal,
         pricingSnapshot: minimumPricedSummary.pricingSnapshot as Prisma.InputJsonValue,
         quickbooksSyncStatus: summary.quickbooksInvoiceId ? "not_synced" : summary.quickbooksSyncStatus ?? "not_synced",
@@ -4856,7 +4910,7 @@ export async function clearBillingSummaryItemCatalogLink(
   }
 ) {
   const { parsedActor, summary } = await getAuthorizedBillingSummary(actor, input.summaryId);
-  if (summary.status === "invoiced") {
+  if (summary.status === "invoiced" || summary.quickbooksInvoiceId) {
     throw new Error("Invoiced billing summaries must be moved back to review before clearing links.");
   }
 
@@ -4888,6 +4942,7 @@ export async function clearBillingSummaryItemCatalogLink(
     where: { id: summary.id },
     data: {
       items: minimumPricedSummary.items as unknown as Prisma.InputJsonValue,
+      status: summary.status === "reviewed" ? "draft" : summary.status,
       subtotal: minimumPricedSummary.subtotal,
       pricingSnapshot: minimumPricedSummary.pricingSnapshot as Prisma.InputJsonValue,
       quickbooksSyncStatus: summary.quickbooksInvoiceId ? "not_synced" : summary.quickbooksSyncStatus ?? "not_synced",
@@ -4927,7 +4982,7 @@ export async function clearBillingSummaryItemGroupCatalogLink(
   }
 ) {
   const { parsedActor, summary } = await getAuthorizedBillingSummary(actor, input.summaryId);
-  if (summary.status === "invoiced") {
+  if (summary.status === "invoiced" || summary.quickbooksInvoiceId) {
     throw new Error("Invoiced billing summaries must be moved back to review before clearing links.");
   }
 
@@ -4962,6 +5017,7 @@ export async function clearBillingSummaryItemGroupCatalogLink(
     where: { id: summary.id },
     data: {
       items: minimumPricedSummary.items as unknown as Prisma.InputJsonValue,
+      status: summary.status === "reviewed" ? "draft" : summary.status,
       subtotal: minimumPricedSummary.subtotal,
       pricingSnapshot: minimumPricedSummary.pricingSnapshot as Prisma.InputJsonValue,
       quickbooksSyncStatus: summary.quickbooksInvoiceId ? "not_synced" : summary.quickbooksSyncStatus ?? "not_synced",

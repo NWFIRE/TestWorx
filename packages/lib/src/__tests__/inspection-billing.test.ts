@@ -72,6 +72,7 @@ import {
   linkBillingSummaryItemCatalog,
   linkBillingSummaryItemGroupCatalog,
   mergeBillingItems,
+  removeBillingSummaryItemGroup,
   refreshCompletedInspectionComplianceFees,
   searchBillingSummaryItemCatalogMatches,
   syncInspectionBillingSummaryTx,
@@ -84,6 +85,36 @@ import { mapInspectionTypeToComplianceReportingDivision } from "../compliance-re
 import { buildMinimumTicketResolution, resolveMinimumTicketRuleTx, selectMinimumTicketRule } from "../minimum-ticket-pricing";
 import { resolveInspectionServiceFeeTx, resolveServiceFeeForLocationTx } from "../service-fees";
 import { snapshotInvoiceLines } from "../billing-tax";
+
+describe("suggested billing refresh", () => {
+  const source = {
+    id: "report_1:row_1", tenantId: "tenant_1", inspectionId: "inspection_1",
+    reportId: "report_1", reportType: "fire_extinguisher", category: "service" as const,
+    description: "Inspection", quantity: 3
+  };
+  it("does not restore excluded lines or double count repeated source IDs", () => {
+    expect(mergeBillingItems([], [source, source])).toHaveLength(1);
+    expect(mergeBillingItems([], [source], [source.id])).toEqual([]);
+  });
+  it("preserves explicit edits across repeated refreshes even when the source catches up", () => {
+    const edited = { ...source, quantity: 5, description: "Office description", category: "material" as const,
+      metadata: { sourceQuantity: 3, quantityOverridden: true, descriptionOverridden: true, categoryOverridden: true } };
+    const first = mergeBillingItems([edited], [{ ...source, quantity: 5 }]);
+    const second = mergeBillingItems(first, [{ ...source, quantity: 7 }]);
+    expect(second[0]).toMatchObject({ quantity: 5, description: "Office description", category: "material",
+      metadata: { sourceQuantity: 7, sourceChanged: true } });
+  });
+  it("flags source changes without silently replacing the previously displayed quantity", () => {
+    const first = mergeBillingItems([], [source]);
+    const changed = mergeBillingItems(first, [{ ...source, quantity: 8 }]);
+    expect(changed[0]).toMatchObject({ quantity: 3, metadata: { sourceQuantity: 8, sourceChanged: true } });
+  });
+  it("keeps an edited line for review if its source disappears", () => {
+    const edited = { ...source, metadata: { quantityOverridden: true } };
+    expect(mergeBillingItems([edited], [])[0]).toMatchObject({ id: source.id, metadata: { sourceMissing: true, sourceChanged: true } });
+    expect(mergeBillingItems([edited], [], [source.id])).toEqual([]);
+  });
+});
 
 describe("invoice totals", () => {
   it("splits taxable and non-taxable subtotals and taxes only taxable lines", () => {
@@ -2963,6 +2994,27 @@ describe("inspection billing persistence and admin review", () => {
     await expect(
       updateBillingSummaryItem({ userId: "office_1", role: "office_admin", tenantId: "tenant_1" }, "summary_1", "line_1", 2, 99)
     ).rejects.toThrow(/moved back to review/i);
+  });
+
+  it("rejects technician line edits before querying tenant data", async () => {
+    await expect(updateBillingSummaryItemGroup({ userId: "tech_1", role: "technician", tenantId: "tenant_1" }, "summary_1", ["line_1"], 1, null)).rejects.toThrow(/administrators/i);
+    expect(prismaMock.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing or cross-tenant summaries without writing", async () => {
+    prismaMock.$queryRaw.mockResolvedValueOnce([]);
+    await expect(updateBillingSummaryItemGroup({ userId: "office_1", role: "office_admin", tenantId: "tenant_2" }, "summary_1", ["line_1"], 1, null)).rejects.toThrow(/not found/i);
+    expect(prismaMock.$queryRaw.mock.calls[0]).toContain("tenant_2");
+    expect(prismaMock.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it("blocks edits and removals of synced invoices even if their status is still draft", async () => {
+    prismaMock.$queryRaw.mockResolvedValue([{ id: "summary_1", tenantId: "tenant_1", inspectionId: "inspection_1", status: "draft", quickbooksInvoiceId: "qb_1", items: [] }]);
+    const actor = { userId: "office_1", role: "office_admin" as const, tenantId: "tenant_1" };
+    await expect(updateBillingSummaryItemGroup(actor, "summary_1", ["line_1"], 1, null)).rejects.toThrow(/Invoiced/i);
+    await expect(removeBillingSummaryItemGroup(actor, { summaryId: "summary_1", itemIds: ["line_1"] })).rejects.toThrow(/Invoiced/i);
+    expect(prismaMock.$executeRaw).not.toHaveBeenCalled();
+    expect(prismaMock.inspectionBillingSummary.update).not.toHaveBeenCalled();
   });
 
   it("does not expose catalog matches for service fee lines in admin review", async () => {
