@@ -1,4 +1,5 @@
 import Link from "next/link";
+import banner from "../../../page-banner.module.css";
 import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 
@@ -246,15 +247,15 @@ export default async function BillingSummaryDetailPage({
 
   return (
     <AppPageShell className={styles.detail} density="wide">
-      <div className="rounded-3xl bg-white p-4 shadow-panel">
+      <div className={`${banner.banner} p-4`}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Billing detail</p>
-            <h2 className="mt-1 text-2xl font-semibold text-ink">{summary.customerName}</h2>
-            <p className="mt-2 text-sm text-slate-500">{summary.siteName} | {format(summary.inspectionDate, "MMM d, yyyy h:mm a")} | Technician: {summary.technicianName ?? "Unassigned"}</p>
-            <p className="mt-1 text-sm text-slate-500">Reports: {summary.reportTypes.length > 0 ? summary.reportTypes.map((type: BillingSummaryDetail["reportTypes"][number]) => type.replaceAll("_", " ")).join(", ") : "Inspection-level billing only"}</p>
+            <p className={`${banner.muted} text-sm uppercase tracking-[0.25em]`}>Billing detail</p>
+            <h2 className={`${banner.title} mt-1 text-2xl font-semibold`}>{summary.customerName}</h2>
+            <p className={`${banner.muted} mt-2 text-sm`}>{summary.siteName} | {format(summary.inspectionDate, "MMM d, yyyy h:mm a")} | Technician: {summary.technicianName ?? "Unassigned"}</p>
+            <p className={`${banner.muted} mt-1 text-sm`}>Reports: {summary.reportTypes.length > 0 ? summary.reportTypes.map((type: BillingSummaryDetail["reportTypes"][number]) => type.replaceAll("_", " ")).join(", ") : "Inspection-level billing only"}</p>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className={`${banner.actions} flex flex-wrap gap-3`}>
             <BillingExportButton customerName={summary.customerName} siteName={summary.siteName} inspectionId={summary.inspectionId} items={summary.items} />
             <Link className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slateblue" href={`/app/admin/inspections/${summary.inspectionId}?from=${encodeURIComponent("/app/admin/billing")}`}>
               View inspection

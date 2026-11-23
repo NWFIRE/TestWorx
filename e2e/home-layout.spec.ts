@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
-const css = readFileSync("apps/web/src/app/app/home.module.css", "utf8").replace(/composes:[^;]+;/g, "");
+const css = readFileSync("apps/web/src/app/app/page-banner.module.css", "utf8").replaceAll(".banner", ".welcome") + readFileSync("apps/web/src/app/app/home.module.css", "utf8").replace(/composes:[^;]+;/g, "");
 
 // Presentation fixture uses the shipped stylesheet; no live customer records or mutations.
 for (const width of [390, 800, 1024, 1366, 1440, 1920]) {

@@ -1,8 +1,7 @@
 .home { container-type: inline-size; min-width: 0; }
 .home > * + * { margin-top: 24px; }
-.welcome { composes: banner from "./page-banner.module.css"; position: relative; isolation: isolate; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 28px; border: 1px solid #28578a; border-radius: 24px; background: radial-gradient(ellipse at 80% 0%, #287e98 0%, transparent 58%), linear-gradient(115deg, #102e53, #205d99); box-shadow: 0 12px 32px rgb(16 46 83 / .14); }
+.welcome { composes: banner from "./page-banner.module.css"; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 28px; border-radius: 24px; }
 .welcome > * { min-width: 0; }
-.welcome::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit; background: repeating-linear-gradient(120deg, transparent 0 90px, rgb(255 255 255 / .035) 91px 92px, transparent 93px 180px); }
 .welcome h1 { font-size: 32px; line-height: 1.15; font-weight: 700; letter-spacing: -.04em; color: #fff; }
 .welcome p { margin-top: 6px; font-size: 15px; color: #e2edfa; }
 .welcomeTools { display: flex; flex-direction: column; gap: 8px; width: min(100%, 420px); }

@@ -15,9 +15,14 @@ function contrast(a: string, b: string) {
 }
 describe("page banner contrast", () => {
   it("keeps title and supporting text readable across the full blue gradient", () => {
-    const stops = css.match(/linear-gradient\(110deg, (#[\da-f]{6}), (#[\da-f]{6})\)/i)!;
-    expect(stops).toBeTruthy();
-    for (const background of stops.slice(1)) {
+    const backgroundRule = css.match(/background:\s*([^;]+);/)![1]!;
+    const stops = backgroundRule.match(/#[\da-f]{6}/gi)!;
+    expect(stops).toHaveLength(3);
+    for (const stop of stops) {
+      // Include the brightest decorative stripe over each gradient stop.
+      const background = "#" + stop.slice(1).match(/.{2}/g)!.map(channel =>
+        Math.round(parseInt(channel, 16) * .965 + 255 * .035).toString(16).padStart(2, "0")
+      ).join("");
       expect(contrast("#ffffff", background)).toBeGreaterThanOrEqual(4.5);
       expect(contrast("#e2edfa", background)).toBeGreaterThanOrEqual(4.5);
     }

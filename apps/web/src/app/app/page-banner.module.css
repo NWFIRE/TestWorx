@@ -1,10 +1,22 @@
 .banner {
-  border: 1px solid #24558c;
+  position: relative;
+  isolation: isolate;
+  border: 1px solid #28578a;
   border-radius: 20px;
-  background: linear-gradient(110deg, #163d72, #2563a6);
-  box-shadow: 0 6px 18px rgb(22 61 114 / .12);
+  background: radial-gradient(ellipse at 80% 0%, #246e86 0%, transparent 58%), linear-gradient(115deg, #102e53, #205d99);
+  box-shadow: 0 12px 32px rgb(16 46 83 / .14);
   min-width: 0;
 }
+.banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: repeating-linear-gradient(120deg, transparent 0 90px, rgb(255 255 255 / .035) 91px 92px, transparent 93px 180px);
+}
+.banner .title { color: #fff; overflow-wrap: anywhere; }
 .banner h1 {
   font-family: inherit;
   font-size: 1.5rem;
