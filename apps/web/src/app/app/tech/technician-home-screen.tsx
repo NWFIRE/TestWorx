@@ -27,7 +27,7 @@ export function TechnicianHomeScreen({ initialData, userFirstName }: { initialDa
   return <div className={`${styles.home} pb-4`}>
     <header className={styles.welcome}><div><h1>Home</h1>{userFirstName ? <p>Welcome back, {userFirstName}.</p> : null}</div></header>
     <div className={styles.grid}>
-      <section className={cardClass}>
+      <section className={cardClass} data-home-panel="schedule">
         <div className={styles.panelHeader}>
           <div className={styles.panelTitle}><span className={styles.sectionIcon}><CalendarDays aria-hidden="true" size={20} /></span><h2>Today&apos;s Schedule</h2></div>
           <Link href="/app/tech/work?filter=today" className={styles.scheduleLink}>View schedule<ChevronRight aria-hidden="true" size={14} /></Link>
@@ -50,7 +50,7 @@ export function TechnicianHomeScreen({ initialData, userFirstName }: { initialDa
         </div>
         {today.length > 8 ? <p className="mt-3 text-xs text-slate-500">Showing 8 of {today.length} jobs.</p> : null}
       </section>
-      <section className={cardClass}>
+      <section className={cardClass} data-home-panel="attention">
         <div className={styles.panelHeader}><div className={styles.panelTitle}><span className={styles.sectionIcon}><Inbox aria-hidden="true" size={20} /></span><h2>Needs Attention</h2></div></div>
         <div className="mt-4 divide-y divide-slate-100">
           {assigned.length > 0 ? <Link href="/app/tech/work?filter=open" className={rowClass}><span className="flex-1">Assigned inspections</span><strong className="tabular-nums">{assigned.length}</strong><ChevronRight aria-hidden="true" className="h-4 w-4 text-slate-400" /></Link> : null}

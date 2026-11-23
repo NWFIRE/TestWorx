@@ -38,15 +38,18 @@ export function AppPageShell({
 export function SectionCard({
   children,
   className,
-  id
+  id,
+  homePanel
 }: {
   children: ReactNode;
   className?: string;
   id?: string;
+  homePanel?: "attention" | "schedule";
 }) {
   return (
     <section
       id={id}
+      data-home-panel={homePanel}
       className={cn(
         "enterprise-card min-w-0 rounded-[20px] p-4",
         className
