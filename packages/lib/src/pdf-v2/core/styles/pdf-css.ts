@@ -83,9 +83,14 @@ export const pdfCss = `
   }
   .pdf-header__left { flex: 1.2; }
   .pdf-header__right { flex: 1; align-items: flex-end; text-align: right; }
-  .pdf-header__brand { display: flex; align-items: center; gap: var(--pdf-space-12); }
-  .pdf-header__logo, .pdf-header__logo-fallback { width: 36px; height: 36px; border-radius: var(--pdf-radius-sm); }
-  .pdf-header__logo { object-fit: contain; }
+  .pdf-header__brand { display: flex; flex-direction: column; align-items: flex-start; gap: var(--pdf-space-12); }
+  .pdf-header__logo { width: 2.5in; max-width: 100%; height: .85in; object-fit: contain; object-position: left center; }
+  .pdf-header__logo-fallback { display: none; }
+  .pdf-shell:not(:first-child) .pdf-header__logo { width: 1.1in; height: .35in; }
+  .pdf-shell:not(:first-child) .pdf-header__brand { flex-direction: row; }
+  .pdf-shell:not(:first-child) .pdf-title { font-size: 16px; }
+  .pdf-header__left, .pdf-header__right { min-width: 0; overflow-wrap: anywhere; }
+  .pdf-section-title { break-after: avoid; page-break-after: avoid; }
   .pdf-header__logo-fallback { background: var(--pdf-panel); border: 1px solid var(--pdf-border); }
 
   .pdf-kicker, .pdf-label {
@@ -194,5 +199,5 @@ export const pdfCss = `
   .pdf-signature-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--pdf-space-12); }
   .pdf-signature-grid--single { grid-template-columns: 1fr; }
   .pdf-signature-image { width: 100%; max-height: 78px; object-fit: contain; margin-top: var(--pdf-space-8); border-top: 1px solid var(--pdf-border); padding-top: var(--pdf-space-8); }
-  .pdf-footer { padding-top: var(--pdf-space-8); border-top: 1px solid var(--pdf-border); font-size: ${pdfTokens.fontSize.xs}; color: var(--pdf-muted); break-inside: avoid; page-break-inside: avoid; }
+  .pdf-footer { display: none; }
 `;

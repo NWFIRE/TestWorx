@@ -1,6 +1,7 @@
 import { PDF_V2_TOKENS } from "../tokens";
 import { contentWidth, drawParagraph, drawRect, drawSectionTitle, ensureSpace, measureParagraphHeight, type PageCursor, type PdfV2Runtime } from "../page-shell";
 import type { RenderSection } from "../types";
+import { renderTableSection } from "./table";
 
 type KeyValueItem = Extract<RenderSection, { renderer: "keyValue" }>["items"][number];
 
@@ -16,6 +17,15 @@ export function renderKeyValueSection(runtime: PdfV2Runtime, cursor: PageCursor,
     return cursor;
   }
 
+  // Long records need the table renderer's line-by-line pagination, not oversized cards.
+  if (items.some(item => itemHeight(runtime, item, (contentWidth() - 12) / 2) > 180 || item.label.length > 40)) {
+    return renderTableSection(runtime, cursor, {
+      key: section.key, title: section.title, description: section.description, renderer: "table",
+      columns: [{ key: "label", label: "Item", width: "35%" }, { key: "value", label: "Recorded result", width: "65%" }],
+      rows: items.map(item => ({ label: { text: item.label }, value: { text: item.value } })),
+      repeatHeader: true, emptyMessage: section.emptyMessage
+    });
+  }
   const firstRowHeight = items.length ? Math.max(...items.slice(0, 2).map((item) => itemHeight(runtime, item, (contentWidth() - 12) / 2))) : 30;
   cursor = ensureSpace(runtime, cursor, 70 + firstRowHeight);
   drawSectionTitle(runtime, cursor, section.title, section.description);

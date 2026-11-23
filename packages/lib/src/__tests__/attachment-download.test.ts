@@ -263,7 +263,7 @@ describe("attachment download authorization", () => {
     expect(deleteStoredFileMock).toHaveBeenCalledWith("blob:tenant_1/generated-pdf/report.pdf");
   }, 15000);
 
-  it("regenerates legacy finalized fire extinguisher PDFs through the current renderer before download", async () => {
+  it("preserves issued legacy PDFs byte-for-byte without regenerating on download", async () => {
     prismaMock.attachment.findFirst.mockResolvedValue({
       id: "attachment_report",
       tenantId: "tenant_1",
@@ -399,16 +399,15 @@ describe("attachment download authorization", () => {
     );
 
     expect(result).toEqual({
-      fileName: "rebuilt-report.pdf",
+      storageKey: "blob:tenant_1/generated-pdf/report.pdf",
+      fileName: "report.pdf",
       mimeType: "application/pdf",
-      bytes: new Uint8Array([9, 9, 9])
+      bytes: new Uint8Array([1, 2, 3])
     });
-    expect(buildFileDownloadResponseMock).not.toHaveBeenCalled();
-    expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        action: "report.pdf_regenerated_for_current_renderer",
-        entityId: "report_1"
-      })
-    });
+    expect(buildFileDownloadResponseMock).toHaveBeenCalledOnce();
+    expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+    expect(buildStoredFilePayloadMock).not.toHaveBeenCalled();
+    expect(deleteStoredFileMock).not.toHaveBeenCalled();
+    expect(prismaMock.attachment.updateMany).not.toHaveBeenCalled();
   }, 15000);
 });

@@ -73,7 +73,20 @@ export function splitTextIntoLines(font: PDFFont, text: string, maxWidth: number
       continue;
     }
 
-    const words = normalized.split(/\s+/).filter(Boolean);
+    const words = normalized.split(/\s+/).filter(Boolean).flatMap(word => {
+      if (font.widthOfTextAtSize(word, size) <= maxWidth) return [word];
+      const chunks: string[] = [];
+      let chunk = "";
+      for (const character of word) {
+        if (chunk && font.widthOfTextAtSize(chunk + character, size) > maxWidth) {
+          chunks.push(chunk);
+          chunk = "";
+        }
+        chunk += character;
+      }
+      if (chunk) chunks.push(chunk);
+      return chunks;
+    });
     let currentLine = "";
 
     for (const word of words) {
@@ -150,30 +163,37 @@ function drawHeader(runtime: PdfV2Runtime, page: PDFPage, pageNumber: number) {
   const rightX = leftX + leftWidth + gutter;
   const top = PDF_V2_TOKENS.pageHeight - PDF_V2_TOKENS.margin;
 
+  const firstPage = pageNumber === 1;
+  const logoHeight = firstPage ? 60 : 26;
+  const logoWidth = firstPage ? 180 : 90;
+  let companyY = top - 12;
   if (logoEmbedded) {
     const scaled = logoEmbedded.scale(1);
-    const ratio = Math.min(32 / scaled.width, 32 / scaled.height, 1);
+    const ratio = Math.min(logoWidth / scaled.width, logoHeight / scaled.height);
     page.drawImage(logoEmbedded, {
       x: leftX,
-      y: top - 34,
+      y: top - scaled.height * ratio,
       width: scaled.width * ratio,
       height: scaled.height * ratio
     });
-  } else {
-    drawRect(page, leftX, top - 2, 32, 32, theme.softSurface, theme.line, 1);
+    companyY = top - logoHeight - 16;
+  }
+  drawParagraph(page, boldFont, model.header.companyName, leftX, companyY, leftWidth, 12, theme.ink, 3);
+  let brandY = companyY - measureParagraphHeight(boldFont, model.header.companyName, leftWidth, 12, 3) - 5;
+  for (const line of [model.header.contactLine, model.header.addressLine]) {
+    if (!line) continue;
+    drawParagraph(page, regularFont, line, leftX, brandY, leftWidth, 8, theme.muted, 3);
+    brandY -= measureParagraphHeight(regularFont, line, leftWidth, 8, 3) + 4;
   }
 
-  drawParagraph(page, boldFont, model.header.companyName, leftX + 42, top - 7, leftWidth - 42, 12, theme.ink, 3, 2);
-  drawParagraph(page, regularFont, model.header.contactLine, leftX, top - 43, leftWidth, 7.5, theme.softText, 3, 2);
-  drawParagraph(page, regularFont, model.header.addressLine, leftX, top - 54, leftWidth, 7.5, theme.softText, 3, 2);
-
-  drawParagraph(page, boldFont, model.header.reportTitle, rightX, top - 7, rightWidth, PDF_V2_TYPOGRAPHY.reportTitle, theme.ink, 3, 2);
+  const titleSize = firstPage ? PDF_V2_TYPOGRAPHY.reportTitle : 12;
+  drawParagraph(page, boldFont, model.header.reportTitle, rightX, top - 12, rightWidth, titleSize, theme.ink, 3);
   const metaRows: Array<[string, string]> = [
     ["Report ID", model.header.reportId],
     ["Service Date", model.header.serviceDate],
     ["Page", String(pageNumber)]
   ];
-  let metaY = top - 39;
+  let metaY = top - 20 - measureParagraphHeight(boldFont, model.header.reportTitle, rightWidth, titleSize, 3);
   for (const [label, value] of metaRows) {
     page.drawText(label.toUpperCase(), {
       x: rightX,
@@ -192,12 +212,14 @@ function drawHeader(runtime: PdfV2Runtime, page: PDFPage, pageNumber: number) {
     metaY -= 12;
   }
 
+  const bottom = Math.min(brandY, metaY) - 8;
   page.drawLine({
-    start: { x: PDF_V2_TOKENS.margin, y: top - PDF_V2_TOKENS.headerHeight + 6 },
-    end: { x: PDF_V2_TOKENS.pageWidth - PDF_V2_TOKENS.margin, y: top - PDF_V2_TOKENS.headerHeight + 6 },
+    start: { x: PDF_V2_TOKENS.margin, y: bottom },
+    end: { x: PDF_V2_TOKENS.pageWidth - PDF_V2_TOKENS.margin, y: bottom },
     thickness: 1,
     color: theme.line
   });
+  return bottom - 18;
 }
 
 function drawFooter(runtime: PdfV2Runtime, page: PDFPage, pageNumber: number) {
@@ -230,12 +252,12 @@ function drawFooter(runtime: PdfV2Runtime, page: PDFPage, pageNumber: number) {
 
 export function addPage(runtime: PdfV2Runtime, pageNumber: number): PageCursor {
   const page = runtime.pdfDoc.addPage([PDF_V2_TOKENS.pageWidth, PDF_V2_TOKENS.pageHeight]);
-  drawHeader(runtime, page, pageNumber);
+  const bodyTop = drawHeader(runtime, page, pageNumber);
   drawFooter(runtime, page, pageNumber);
   return {
     page,
     pageNumber,
-    y: contentTop()
+    y: bodyTop
   };
 }
 

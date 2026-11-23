@@ -17,7 +17,7 @@ export async function renderPhotosSection(runtime: PdfV2Runtime, cursor: PageCur
     return cursor;
   }
 
-  cursor = ensureSpace(runtime, cursor, 96);
+  cursor = ensureSpace(runtime, cursor, photoLayout(section.photos.length).cardHeight + 60);
   drawSectionTitle(runtime, cursor, section.title, section.description);
 
   const gap = 12;

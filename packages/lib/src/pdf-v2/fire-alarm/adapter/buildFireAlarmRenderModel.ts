@@ -12,6 +12,19 @@ import { resolveFinalCustomerFacingStatus } from "../../core/formatting/status";
 import { cleanText, cleanTitleLikeText, joinNonEmpty } from "../../core/formatting/text";
 
 import type { FireAlarmReportRenderModel } from "../types/fireAlarmRenderModel";
+import { resolveReportTemplate } from "../../../report-config";
+
+function remainingPanelResults(row: Record<string, unknown>) {
+  const field = resolveReportTemplate({ inspectionType: "fire_alarm" }).sections
+    .find(section => section.id === "control-panel")?.fields.find(field => field.id === "controlPanels");
+  if (field?.type !== "repeater") return [];
+  const displayed = new Set(["assetId", "assetTag", "location", "panelName", "manufacturer", "model", "serialNumber", "communicationPathType"]);
+  return field.rowFields.filter(field => !field.hidden && !displayed.has(field.id)).flatMap(field => {
+    const raw = row[field.id];
+    const value = typeof raw === "boolean" ? formatYesNo(raw) : cleanText(raw);
+    return value ? [`${field.label}: ${value}`] : [];
+  });
+}
 
 function asInput(rawReport: unknown) {
   return rawReport as PdfInput;
@@ -215,7 +228,8 @@ export function buildFireAlarmRenderModel(rawReport: unknown): FireAlarmReportRe
         inspectionSummary: [
           joinNonEmpty(["Communication Path", humanize(row.communicationPathType)], ": "),
           joinNonEmpty(["Model", cleanText(row.model)], ": "),
-          joinNonEmpty(["Serial", cleanText(row.serialNumber)], ": ")
+          joinNonEmpty(["Serial", cleanText(row.serialNumber)], ": "),
+          ...remainingPanelResults(row)
         ].filter((item): item is string => Boolean(item)),
         notes: cleanText(row.comments ?? row.panelPhoto)
       }))
@@ -230,7 +244,7 @@ export function buildFireAlarmRenderModel(rawReport: unknown): FireAlarmReportRe
         functionalTest: humanize(row.functionalTestResult),
         physicalCondition: humanize(row.physicalCondition),
         manufacturer: cleanTitleLikeText(row.manufacturer),
-        notes: joinNonEmpty([cleanText(row.comments), cleanText(row.deficiencyNotes)], " • ")
+        notes: joinNonEmpty([cleanText(row.comments), cleanText(row.deficiencyNotes), row.serialNumber ? `Serial number: ${cleanText(row.serialNumber)}` : undefined, row.deficiencyPhoto ? `Photo reference: ${cleanText(row.deficiencyPhoto)}` : undefined], " • ")
       }))
     },
     notificationAppliancesSection: {
@@ -245,7 +259,7 @@ export function buildFireAlarmRenderModel(rawReport: unknown): FireAlarmReportRe
           quantity: toNumber(row.quantityCustom ?? row.quantity),
           audibleOperation: mode.showAudible ? humanize(row.audibleOperation) : undefined,
           visibleOperation: mode.showVisible ? humanize(row.visualOperation) : undefined,
-          notes: joinNonEmpty([cleanText(row.comments), cleanText(row.deficiencyNotes)], " • ")
+          notes: joinNonEmpty([cleanText(row.comments), cleanText(row.deficiencyNotes), row.deficiencyPhoto ? `Photo reference: ${cleanText(row.deficiencyPhoto)}` : undefined], " • ")
         };
       })
     },

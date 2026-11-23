@@ -1,4 +1,4 @@
-const NULL_EQUIVALENTS = new Set(["", "-", "—", "na", "n/a", "unknown", "unknown unknown"]);
+const NULL_EQUIVALENTS = new Set(["", "-", "—", "unknown", "unknown unknown"]);
 
 export function isNullEquivalent(value: unknown): boolean {
   if (value === null || value === undefined) {
@@ -17,5 +17,6 @@ export function toCleanOptionalString(value: unknown): string | undefined {
     return undefined;
   }
 
-  return String(value).trim().replace(/\s+/g, " ") || undefined;
+  const text = String(value).trim().replace(/\s+/g, " ");
+  return /^(na|n\/a)$/i.test(text) ? "N/A" : text || undefined;
 }

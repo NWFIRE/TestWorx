@@ -7,9 +7,45 @@ import { buildInitialReportDraft } from "../report-engine";
 import { buildFireAlarmRenderModel } from "../pdf-v2/fire-alarm/adapter/buildFireAlarmRenderModel";
 import { FireAlarmReportDocument } from "../pdf-v2/fire-alarm/templates/FireAlarmReportDocument";
 import { renderPdfHtml } from "../pdf-v2/core/renderer/renderHtml";
+import { cleanCustomerFacingText, formatDate } from "../pdf-v2/formatters";
+import { resolveReportTypeConfigV2 } from "../pdf-v2/registry";
+import { buildAcceptanceTestRenderModel } from "../pdf-v2/acceptance-test/adapter/buildAcceptanceTestRenderModel";
 
 const tinyPngBytes = Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII=", "base64"));
 const tinyPngDataUrl = buildDataUrlStorageKey({ mimeType: "image/png", bytes: tinyPngBytes });
+
+describe("report presentation preservation", () => {
+  it("does not suppress recorded N/A, No or zero", () => {
+    expect(cleanCustomerFacingText("N/A")).toBe("N/A");
+    expect(cleanCustomerFacingText("No")).toBe("No");
+    expect(cleanCustomerFacingText(0)).toBe("0");
+    expect(formatDate("2026-11-23", "America/Chicago")).toBe("Nov 23, 2026");
+  });
+
+  it("includes industrial detail fields outside the old summary and checklist maps", () => {
+    const config = resolveReportTypeConfigV2("industrial_suppression");
+    const keys = config.sections.flatMap(section => (section.fields ?? []).map(field => field.key));
+    expect(keys).toContain("technicianNotes");
+    expect(keys).toContain("systemDischargeDetails");
+    expect(keys).toContain("fusibleLinkNotes");
+    expect(keys).not.toContain("systemInstalledPerMfgUl");
+    expect(config.sections.some(section => section.table?.dataset === "hazard-equipment.protectedSystems")).toBe(true);
+  });
+
+  it("does not borrow another company's acceptance-test branding", () => {
+    const input = createBaseInput();
+    const model = buildAcceptanceTestRenderModel({
+      ...input, tenant: { name: "Independent Subscriber", branding: {} },
+      task: { inspectionType: "wet_chemical_acceptance_test" },
+      draft: buildInitialReportDraft({ inspectionType: "wet_chemical_acceptance_test", siteName: "Site", customerName: "Customer", scheduledDate: "2026-11-23", assetCount: 0 })
+    });
+    expect(model.company.name).toBe("Independent Subscriber");
+    expect(model.company.website).toBeUndefined();
+    expect(model.company.phone).toBeUndefined();
+    expect(model.company.cityStateZip).toBeUndefined();
+    expect(model.company.licenseNumber).toBeUndefined();
+  });
+});
 
 function createBaseInput() {
   return {

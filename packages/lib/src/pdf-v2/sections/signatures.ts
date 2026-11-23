@@ -1,5 +1,5 @@
 import { PDF_V2_TOKENS } from "../tokens";
-import { contentWidth, drawParagraph, drawRect, drawSectionTitle, embedImage, ensureSpace, type PageCursor, type PdfV2Runtime } from "../page-shell";
+import { contentWidth, drawParagraph, drawRect, drawSectionTitle, embedImage, ensureSpace, measureParagraphHeight, type PageCursor, type PdfV2Runtime } from "../page-shell";
 import type { RenderSection } from "../types";
 
 export async function renderSignaturesSection(runtime: PdfV2Runtime, cursor: PageCursor, section: Extract<RenderSection, { renderer: "signatures" }>) {
@@ -9,7 +9,8 @@ export async function renderSignaturesSection(runtime: PdfV2Runtime, cursor: Pag
 
   const gap = 12;
   const cardWidth = (contentWidth() - gap) / 2;
-  const cardHeight = 108;
+  const nameHeight = (name: string) => measureParagraphHeight(runtime.regularFont, name || "Not captured", cardWidth - 20, 9, 3);
+  const cardHeight = 96 + Math.max(...section.signatures.map(signature => nameHeight(signature.signerName)));
   cursor = ensureSpace(runtime, cursor, cardHeight + 48);
   drawSectionTitle(runtime, cursor, section.title, section.description);
 
@@ -26,8 +27,8 @@ export async function renderSignaturesSection(runtime: PdfV2Runtime, cursor: Pag
         font: runtime.boldFont,
         color: runtime.theme.softText
       });
-      drawParagraph(cursor.page, runtime.regularFont, signature.signerName || "Not captured", x + 10, cursor.y - 31, cardWidth - 20, 9, runtime.theme.ink, 3, 2);
-      drawParagraph(cursor.page, runtime.regularFont, signature.signedAt || "Not captured", x + 10, cursor.y - 47, cardWidth - 20, 8, runtime.theme.softText, 3, 2);
+      drawParagraph(cursor.page, runtime.regularFont, signature.signerName || "Not captured", x + 10, cursor.y - 31, cardWidth - 20, 9, runtime.theme.ink, 3);
+      drawParagraph(cursor.page, runtime.regularFont, signature.signedAt || "Not captured", x + 10, cursor.y - 35 - nameHeight(signature.signerName), cardWidth - 20, 8, runtime.theme.softText, 3);
       if (signature.imageDataUrl) {
         const image = await embedImage(runtime.pdfDoc, signature.imageDataUrl);
         if (image) {
@@ -35,7 +36,7 @@ export async function renderSignaturesSection(runtime: PdfV2Runtime, cursor: Pag
           const ratio = Math.min((cardWidth - 20) / scaled.width, 38 / scaled.height, 1);
           cursor.page.drawImage(image, {
             x: x + 10,
-            y: cursor.y - 92,
+            y: cursor.y - cardHeight + 12,
             width: scaled.width * ratio,
             height: scaled.height * ratio
           });

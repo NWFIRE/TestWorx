@@ -1,4 +1,4 @@
-import { acceptanceTestDefinitions, acceptanceTestInstallerDefaults } from "../../../acceptance-test-definition";
+import { acceptanceTestDefinitions } from "../../../acceptance-test-definition";
 import { resolveTenantBranding } from "../../../branding";
 import { formatReportReference } from "../../../report-reference";
 import { buildComplianceSection } from "../../../compliance-references";
@@ -177,9 +177,9 @@ export function buildAcceptanceTestRenderModel(rawReport: unknown): AcceptanceTe
       branding.postalCode
     ],
     " "
-  ) ?? acceptanceTestInstallerDefaults.cityState;
+  );
 
-  const installerCompanyName = cleanText(installerFields?.installerCompanyName) ?? branding.legalBusinessName ?? acceptanceTestInstallerDefaults.companyName;
+  const installerCompanyName = cleanText(installerFields?.installerCompanyName) ?? branding.legalBusinessName;
   const installerAddress = joinNonEmpty(
     [
       cleanText(installerFields?.installerAddressLine1) ?? cleanText(branding.addressLine1),
@@ -207,14 +207,14 @@ export function buildAcceptanceTestRenderModel(rawReport: unknown): AcceptanceTe
       generatedAt: input.report.finalizedAt ?? new Date()
     }),
     company: {
-      name: branding.legalBusinessName || acceptanceTestInstallerDefaults.companyName,
+      name: branding.legalBusinessName || input.tenant.name,
       logoUrl: cleanText((input.tenant.branding as Record<string, unknown> | undefined)?.logoDataUrl),
       addressLine1: cleanText(branding.addressLine1),
       cityStateZip: companyCityStateZip,
-      phone: cleanText(branding.phone) ?? acceptanceTestInstallerDefaults.phone,
+      phone: cleanText(branding.phone),
       email: cleanText(branding.email),
-      website: cleanText(branding.website) ?? acceptanceTestInstallerDefaults.website,
-      licenseNumber: readLicense(input.tenant.branding) ?? acceptanceTestInstallerDefaults.licenseNumber
+      website: cleanText(branding.website),
+      licenseNumber: readLicense(input.tenant.branding)
     },
     property: {
       buildingName: cleanText(propertyFields?.buildingName) ?? cleanText(getCustomerFacingSiteLabel(input.site.name)),
@@ -228,13 +228,13 @@ export function buildAcceptanceTestRenderModel(rawReport: unknown): AcceptanceTe
       contactPerson: cleanText(installerFields?.installerContactPerson),
       contactInfo: joinNonEmpty(
         [
-          cleanText(installerFields?.installerPhone) ?? cleanText(branding.phone) ?? acceptanceTestInstallerDefaults.phone,
+          cleanText(installerFields?.installerPhone) ?? cleanText(branding.phone),
           cleanText(installerFields?.installerEmail) ?? cleanText(branding.email),
-          cleanText(installerFields?.installerWebsite) ?? cleanText(branding.website) ?? acceptanceTestInstallerDefaults.website
+          cleanText(installerFields?.installerWebsite) ?? cleanText(branding.website)
         ],
         " | "
       ),
-      licenseNumber: cleanText(installerFields?.installerLicenseNumber) ?? readLicense(input.tenant.branding) ?? acceptanceTestInstallerDefaults.licenseNumber
+      licenseNumber: cleanText(installerFields?.installerLicenseNumber) ?? readLicense(input.tenant.branding)
     },
     system: {
       hazardDescription: cleanText(systemFields?.hazardDescription),

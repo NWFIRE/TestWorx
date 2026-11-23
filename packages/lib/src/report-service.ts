@@ -2926,15 +2926,8 @@ export async function getAuthorizedAttachmentDownload(actor: ActorContext, attac
   assertStorageKeyBelongsToTenant(attachment.storageKey, attachment.tenantId);
   assertStorageKeyCategory(attachment.storageKey, ["generated-pdf", "uploaded-pdf"]);
 
-  if (shouldRefreshGeneratedPdfForCurrentRenderer({
-    attachment,
-    report: relatedReport
-  })) {
-    return rebuildGeneratedReportPdfDownload(parsedActor, {
-      inspectionReportId: attachment.inspectionReportId as string,
-      auditAction: "report.pdf_regenerated_for_current_renderer"
-    });
-  }
+  // Issued PDFs are immutable on read. Renderer upgrades apply to newly generated
+  // documents, never silently to emailed, signed or bookmarked attachment URLs.
 
   try {
     return await buildFileDownloadResponse({

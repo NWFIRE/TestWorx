@@ -179,7 +179,8 @@ export const industrialDryChemicalReportConfigV2: ReportTypeConfig = {
           { key: "condition", label: "Condition", width: "12%", hideIfEmpty: true, renderMode: "stacked" },
           { key: "quantity", label: "Qty", width: "7%", hideIfEmpty: true },
           { key: "result", label: "Result", width: "9%", hideIfEmpty: true, renderMode: "stacked" },
-          { key: "notes", label: "Notes", width: "18%", hideIfEmpty: true }
+          { key: "notes", label: "Notes", width: "18%", hideIfEmpty: true },
+          { key: "photo", label: "Photo reference", hideIfEmpty: true }
         ]
       }
     },

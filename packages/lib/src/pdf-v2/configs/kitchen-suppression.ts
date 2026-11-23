@@ -40,6 +40,7 @@ export const kitchenSuppressionReportConfigV2: ReportTypeConfig = {
         { key: "systemLocation", label: "System Location" },
         { key: "areaProtected", label: "Area Protected" },
         { key: "manufacturer", label: "Manufacturer" },
+        { key: "manufacturerOther", label: "Other Manufacturer", preserveText: true, hideIfEmpty: true },
         { key: "model", label: "Model" },
         { key: "cylinderDates", label: "Cylinder Dates" },
         { key: "lastCylinderHydroDate", label: "Last Cylinder Hydro Date", format: "date" }
@@ -115,6 +116,10 @@ export const kitchenSuppressionReportConfigV2: ReportTypeConfig = {
           { key: "hoodCleanedPerNFPA96", label: "Hood cleaned regularly in accordance with NFPA 96 (2024 Edition)?" }
         ]
       }
+    },
+    {
+      key: "coverage_notes", sourceSectionId: "appliance-coverage", title: "Coverage Notes", renderer: "keyValue",
+      fields: [{ key: "coverageNotes", label: "Coverage notes", preserveText: true, hideIfEmpty: true }]
     },
     {
       key: "agent_tank_service",

@@ -6,7 +6,8 @@ export function formatShortDate(value: unknown, timezone?: string | null): strin
     return undefined;
   }
 
-  return formatTenantDate(date, timezone, "") || undefined;
+  const calendarDate = typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+  return formatTenantDate(date, calendarDate ? "UTC" : timezone, "") || undefined;
 }
 
 export function formatDateTime(value: unknown, timezone?: string | null): string | undefined {

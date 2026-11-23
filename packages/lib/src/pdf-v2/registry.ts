@@ -69,7 +69,7 @@ function buildDefaultReportTypeConfigV2(type: InspectionType): ReportTypeConfig 
           key: field.id,
           label: field.label,
           format: inferFieldFormat(field),
-          preserveText: pdf.fullDetail && (field.type === "text" || field.type === "select" || field.type === "date"),
+          preserveText: field.type === "text" || Boolean(pdf.fullDetail && (field.type === "select" || field.type === "date")),
           hideIfEmpty: true
         }))
       });
@@ -87,7 +87,6 @@ function buildDefaultReportTypeConfigV2(type: InspectionType): ReportTypeConfig 
           emptyMessage: `No ${repeaterField.label.toLowerCase()} recorded`,
           columns: repeaterField.rowFields
             .filter((rowField) => !rowField.hidden)
-            .slice(0, 6)
             .map((rowField, index) => ({
               key: rowField.id,
               label: rowField.label,
@@ -136,7 +135,31 @@ function buildDefaultReportTypeConfigV2(type: InspectionType): ReportTypeConfig 
 }
 
 export function resolveReportTypeConfigV2(type: InspectionType) {
-  return reportTypeRegistryV2[type] ?? buildDefaultReportTypeConfigV2(type);
+  const configured = reportTypeRegistryV2[type];
+  if (!configured) return buildDefaultReportTypeConfigV2(type);
+  // This report uses matching definition/dataset IDs. Retain its specialized
+  // checklists, while including definition fields omitted by the older PDF map.
+  if (type === "industrial_suppression") {
+    const defaults = buildDefaultReportTypeConfigV2(type);
+    const sections = [...configured.sections];
+    for (const section of defaults.sections) {
+      if (section.table && sections.some(existing => existing.table?.dataset === section.table?.dataset)) continue;
+      if (section.fields) {
+        const source = section.sourceSectionId ?? section.key;
+        const covered = new Set(sections.flatMap(existing => {
+          if (existing.checklist?.dataset === source) return existing.checklist.items.map(item => item.key);
+          if ((existing.sourceSectionId ?? existing.key) === source) return (existing.fields ?? []).map(field => field.key);
+          return [];
+        }));
+        const fields = section.fields.filter(field => !covered.has(field.key));
+        if (fields.length) sections.push({ ...section, key: `${section.key}__additional`, sourceSectionId: source, fields });
+      } else if (!sections.some(existing => existing.key === section.key)) {
+        sections.push(section);
+      }
+    }
+    return { ...configured, sections };
+  }
+  return configured;
 }
 
 export function supportsPdfV2(type: InspectionType) {

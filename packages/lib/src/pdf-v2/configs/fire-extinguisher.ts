@@ -54,6 +54,10 @@ export const fireExtinguisherReportConfigV2: ReportTypeConfig = {
           { key: "manufacturer", label: "Manufacturer", width: "12%", hideIfEmpty: true },
           { key: "serialNumber", label: "Serial Number", width: "14%", hideIfEmpty: true },
           { key: "size", label: "Size", width: "10%", hideIfEmpty: true },
+          { key: "mfgDate", label: "Manufacture Date", hideIfEmpty: true },
+          { key: "lastHydro", label: "Last Hydrostatic Test", hideIfEmpty: true },
+          { key: "lastSixYear", label: "Last Six-Year Service", hideIfEmpty: true },
+          { key: "nextHydro", label: "Next Hydrostatic Test", hideIfEmpty: true },
           { key: "serviceStatus", label: "Service Status", width: "12%", format: "badge" },
           { key: "inspectionIndicators", label: "Inspection Indicators", width: "14%", renderMode: "stacked" },
           { key: "notes", label: "Notes", width: "8%", hideIfEmpty: true }
@@ -78,6 +82,7 @@ export const fireExtinguisherReportConfigV2: ReportTypeConfig = {
         ]
       }
     },
+    { key: "jurisdiction_notes", sourceSectionId: "service", title: "Jurisdiction Notes", renderer: "keyValue", fields: [{ key: "jurisdictionNotes", label: "Jurisdiction notes", preserveText: true, hideIfEmpty: true }] },
     { key: "findings", title: "Findings and Deficiencies", renderer: "findings", emptyState: { mode: "show-clean-empty", message: "No deficiencies recorded" } },
     { key: "notes", title: "Notes", renderer: "notes", emptyState: { mode: "show-clean-empty", message: "No notes provided" } }
   ],

@@ -221,7 +221,10 @@ function renderRowsWithColumns(columns: RenderTableColumn[], rows: Array<Record<
       if (column.key === "inspectionIndicators") {
         nextRow[column.key] = toCell(indicatorLines.join(" | "), indicatorLines);
       } else {
-        nextRow[column.key] = toCell(cleanCustomerFacingText(row[column.key]));
+        const value = row[column.key];
+        nextRow[column.key] = toCell(typeof value === "string" && /^(blob:|data:image\/)/i.test(value)
+          ? "Photo attached"
+          : typeof value === "boolean" ? (value ? "Yes" : "No") : cleanCustomerFacingText(value));
       }
     }
     return nextRow;
@@ -262,7 +265,8 @@ function buildTableSection(input: PdfInput, sectionConfig: ReportSectionConfig, 
 function buildChecklistSection(sourceFields: Record<string, unknown>, sectionConfig: ReportSectionConfig) {
   const items: RenderChecklistItem[] = (sectionConfig.checklist?.items ?? [])
     .map((item) => {
-      const value = cleanCustomerFacingText(sourceFields[item.key]);
+      const rawValue = sourceFields[item.key];
+      const value = typeof rawValue === "boolean" ? (rawValue ? "Yes" : "No") : cleanCustomerFacingText(rawValue);
       const normalized = value.toLowerCase();
       return {
         label: item.label,
@@ -292,7 +296,7 @@ function buildFindingsSection(input: PdfInput, preview: ReturnType<typeof buildR
     [item.rowLabel, item.description, item.location].map((part) => cleanCustomerFacingText(part)).filter(Boolean).join(" - ")
   );
   const manualDeficiencies = input.deficiencies.map((item) =>
-    [item.title, item.description, item.location].map((part) => cleanCustomerFacingText(part)).filter(Boolean).join(" - ")
+    [item.title, item.description, item.location, item.notes ? `Corrective action / notes: ${item.notes}` : ""].map((part) => cleanCustomerFacingText(part)).filter(Boolean).join(" - ")
   );
 
   return {
@@ -315,11 +319,15 @@ function buildFindingsSection(input: PdfInput, preview: ReturnType<typeof buildR
 }
 
 function buildNotesSection(input: PdfInput): Extract<RenderSection, { renderer: "notes" }> {
+  const sectionNotes = inspectionTypeRegistry[input.task.inspectionType].sections.flatMap(section => {
+    const note = cleanCustomerFacingText(input.draft.sections[section.id]?.notes);
+    return note ? [`${section.label}: ${note}`] : [];
+  });
   return {
     key: "notes",
     title: "Notes",
     renderer: "notes" as const,
-    body: cleanCustomerFacingText(input.draft.overallNotes || input.inspection.notes) || customerFacingFieldRules.notesFallback
+    body: [cleanCustomerFacingText(input.draft.overallNotes || input.inspection.notes), ...sectionNotes].filter(Boolean).join("\n\n") || customerFacingFieldRules.notesFallback
   };
 }
 

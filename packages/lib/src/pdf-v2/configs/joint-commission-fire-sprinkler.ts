@@ -137,7 +137,8 @@ export const jointCommissionFireSprinklerReportConfigV2: ReportTypeConfig = {
     table("deficiencies", "Deficiencies Noted for the Following Systems", "deficiencies.deficiencyRows", [
       { key: "systemEp", label: "System / EP", width: "24%" },
       { key: "status", label: "Status", width: "30%" },
-      { key: "notes", label: "Notes", width: "46%" }
+      { key: "notes", label: "Notes", width: "46%" },
+      { key: "photo", label: "Photo reference", hideIfEmpty: true }
     ], "Inspection comments are recorded below the deficiency system list."),
     {
       key: "deficiency-comments",

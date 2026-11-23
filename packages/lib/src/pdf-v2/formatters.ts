@@ -2,7 +2,7 @@ import type { ReportPrimitiveValue } from "../report-config";
 import { formatTenantDate, formatTenantDateTime } from "../timezone";
 
 export const customerFacingFieldRules = {
-  suppressValues: [null, undefined, "", "Unknown", "N/A", "--", "—"],
+  suppressValues: [null, undefined, "", "Unknown", "--", "—"],
   addressFallback: "No service address on file",
   notesFallback: "No notes provided",
   findingsFallback: "No service findings recorded",
@@ -15,11 +15,11 @@ export function cleanCustomerFacingText(value: unknown) {
   }
 
   const normalized = String(value).replace(/\s+/g, " ").trim();
-  if (!normalized || /^(undefined|null|unknown|n\/a|na|[-—]+)$/i.test(normalized)) {
+  if (!normalized || /^(undefined|null|unknown|[-—]+)$/i.test(normalized)) {
     return "";
   }
 
-  return normalized;
+  return /^(na|n\/a)$/i.test(normalized) ? "N/A" : normalized;
 }
 
 export function withFallback(value: string | null | undefined, fallback: string) {
@@ -56,7 +56,7 @@ export function formatPdfAddress(input: {
 }
 
 export function formatDate(value: Date | string | null | undefined, timezone?: string | null) {
-  return formatTenantDate(value, timezone, "");
+  return formatTenantDate(value, typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? "UTC" : timezone, "");
 }
 
 export function formatDateTime(value: Date | string | null | undefined, timezone?: string | null) {
