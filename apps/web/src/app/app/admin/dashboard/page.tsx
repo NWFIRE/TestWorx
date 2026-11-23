@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { addDays, endOfDay, startOfDay } from "date-fns";
-import { ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronRight, CircleCheck, Inbox, Users, FileText, CreditCard, GitBranch, ShieldCheck } from "lucide-react";
 import { auth } from "@/auth";
 import {
   activeOperationalInspectionStatuses, filterSubsetDuplicateOperationalInspections,
@@ -10,7 +10,8 @@ import {
 } from "@testworx/lib/server/index";
 import { getScheduler } from "@testworx/lib/scheduler";
 import { fieldProgress } from "@testworx/lib/scheduler-shared";
-import { AppPageShell, PageHeader, SectionCard } from "../operations-ui";
+import { AppPageShell, SectionCard } from "../operations-ui";
+import styles from "../../home.module.css";
 import { DashboardGlobalSearch } from "./dashboard-global-search";
 import { AttentionLink } from "./attention-link";
 import { filterAttentionQueue, isInAttentionWindow } from "../attention-queue";
@@ -43,43 +44,51 @@ export default async function AdminDashboardPage({ searchParams }: {
   ].filter(row => row.count > 0);
   const technicianNames = new Map(schedule.technicians.map(tech => [tech.id, tech.name]));
   const jobs = schedule.jobs.slice(0, 8);
-  const rowClass = "flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2";
+  const attentionIcons = { "Unassigned inspections": Users, "Ready to bill": FileText, "Service requests": Inbox, "Payment collection on site": CreditCard, "Linked visit updates": GitBranch, "High-priority deficiencies": ShieldCheck };
+  const rowClass = `flex items-center rounded-xl text-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slateblue focus-visible:ring-offset-2 ${styles.row}`;
 
-  return <AppPageShell density="wide">
-    <PageHeader title="Home" contentWidth="full" actions={<DashboardGlobalSearch />} />
+  return <AppPageShell density="wide" className={styles.home}>
+    <header className={styles.welcome}>
+      <div><h1>Home</h1><p>Welcome back{session.user.name ? `, ${session.user.name.trim().split(/\s+/)[0]}` : ""}.</p></div>
+      <div className={styles.welcomeTools}>
+        <div className={styles.date}><CalendarDays aria-hidden="true" size={16} />{new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: schedule.timezone }).format(new Date(schedule.fetchedAt))}</div>
+        <DashboardGlobalSearch />
+      </div>
+    </header>
     {params?.inspection === "deleted" ? <p role="status" className="text-sm text-slate-600">Inspection deleted successfully.</p> : null}
-    <div className="grid min-w-0 items-start gap-5 xl:grid-cols-2">
-      <SectionCard className="min-w-0">
-        <h2 className="text-xl font-semibold tracking-tight">Needs Attention</h2>
-        <div className="mt-4 divide-y divide-slate-100">
-          {attention.length ? attention.map(row => <AttentionLink key={row.href} href={row.href} className={rowClass}>
+    <div className={styles.grid}>
+      <SectionCard className={styles.panel}>
+        <div className={styles.panelHeader}><div className={styles.panelTitle}><span className={styles.sectionIcon}><Inbox aria-hidden="true" size={20} /></span><h2>Needs Attention</h2></div></div>
+        <div className="my-3 divide-y divide-slate-100">
+          {attention.length ? attention.map(row => { const Icon = attentionIcons[row.label as keyof typeof attentionIcons]; return <AttentionLink key={row.href} href={row.href} className={rowClass}>
+            <span className={styles.rowIcon}><Icon aria-hidden="true" size={18} /></span>
             <span className="min-w-0 flex-1 font-medium">{row.label}</span>
-            <span className="font-semibold tabular-nums text-slate-900">{row.count}</span>
+            <span className={styles.count}>{row.count}</span>
             <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400" />
-          </AttentionLink>) : <p className="py-5 text-sm text-slate-500">You&apos;re all caught up</p>}
+          </AttentionLink>; }) : <div className={styles.empty}><span className={styles.emptyIcon}><CircleCheck aria-hidden="true" size={30} /></span><p>You&apos;re all caught up</p></div>}
         </div>
-        <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-slate-100 pt-4 text-sm text-slateblue">
+        <div className={styles.footer}>
           <Link href="/app/admin/inspections">Inspections</Link>
           <Link href="/app/admin/reports">Report review</Link>
           <Link href="/app/admin/amendments">Visit review</Link>
         </div>
       </SectionCard>
-      <SectionCard className="min-w-0">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold tracking-tight">Today&apos;s Schedule</h2>
-          <Link href="/app/admin/scheduler" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm font-medium text-slateblue focus-visible:outline focus-visible:outline-2">View schedule</Link>
+      <SectionCard className={styles.panel}>
+        <div className={styles.panelHeader}>
+          <div className={styles.panelTitle}><span className={styles.sectionIcon}><CalendarDays aria-hidden="true" size={20} /></span><h2>Today&apos;s Schedule</h2></div>
+          <Link href="/app/admin/scheduler" target="_blank" rel="noopener noreferrer" className={styles.scheduleLink}>View schedule<ChevronRight aria-hidden="true" size={14} /></Link>
         </div>
-        <div className="mt-3 divide-y divide-slate-100">
+        <div className={`${styles.scheduleBody} divide-y divide-slate-100`}>
           {jobs.length ? jobs.map(job => <Link key={job.id} href={`/app/admin/inspections/${job.id}?from=${encodeURIComponent("/app/admin/dashboard")}`} className={rowClass}>
             <time dateTime={job.scheduledStart} className="w-20 shrink-0 self-start pt-0.5 text-xs tabular-nums text-slate-600">{new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: schedule.timezone }).format(new Date(job.scheduledStart))}</time>
             <div className="min-w-0 flex-1 break-words">
               <p className="font-semibold">{job.customer}</p>
               {job.site && job.site !== job.customer ? <p className="text-slate-500">{job.site}</p> : null}
               <p className="mt-1 text-xs text-slate-500">{job.technicianIds.map(id => technicianNames.get(id) ?? "Team member").join(", ") || "Unassigned"}</p>
-              <p className="mt-1 text-xs font-medium text-slate-600">{fieldProgress(job, new Date(schedule.fetchedAt).getTime())}</p>
+              <p className={styles.status}>{fieldProgress(job, new Date(schedule.fetchedAt).getTime())}</p>
             </div>
             <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400" />
-          </Link>) : <p className="py-5 text-sm text-slate-500">No jobs scheduled today.</p>}
+          </Link>) : <div className={styles.empty}><span className={styles.emptyIcon}><CalendarDays aria-hidden="true" size={30} /></span><p>No jobs scheduled today.</p></div>}
         </div>
         {schedule.jobs.length > jobs.length ? <p className="mt-3 text-xs text-slate-500">Showing {jobs.length} of {schedule.jobs.length}{schedule.truncated ? "+" : ""} jobs. View schedule for the full day.</p> : null}
       </SectionCard>
