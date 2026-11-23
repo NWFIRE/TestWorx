@@ -121,7 +121,7 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
   const hours = Array.from({ length: Math.ceil((until - from) / 3600000) }, (_, i) => new Date(from + i * 3600000));
   return <div className={styles.scheduler}>
     <header className={`${styles.toolbar} ${banner.banner} p-4`}><div><h1>Scheduler</h1><p className={banner.muted}>{timezone} · <span role="status">{stale ? "Updates delayed" : loading ? "Updating" : "Live · every 15 seconds"}</span></p></div>
-      <div className={styles.controls}>
+      <div className={`${styles.controls} ${banner.actions}`}>
         <button type="button" aria-label="Previous period" onClick={() => navigate(shiftSchedulerDate(date, view === "day" ? -1 : -7))}>Previous</button>
         <button type="button" onClick={() => navigate(today)}>Today</button>
         <button type="button" aria-label="Next period" onClick={() => navigate(shiftSchedulerDate(date, view === "day" ? 1 : 7))}>Next</button>

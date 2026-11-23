@@ -95,7 +95,7 @@ export function PageHeader({
             {title}
           </h1>
         </div>
-        {actions ? <div className="workspace-page-actions flex w-full min-w-0 flex-wrap items-center gap-3">{actions}</div> : null}
+        {actions ? <div className={cn("workspace-page-actions flex w-full min-w-0 flex-wrap items-center gap-3", banner.actions)}>{actions}</div> : null}
       </div>
     </SectionCard>
   );
