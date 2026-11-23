@@ -57,7 +57,7 @@ export default async function AdminDashboardPage({ searchParams }: {
     </header>
     {params?.inspection === "deleted" ? <p role="status" className="text-sm text-slate-600">Inspection deleted successfully.</p> : null}
     <div className={styles.grid}>
-      <SectionCard className={styles.panel}>
+      <SectionCard className={styles.panel} homePanel="attention">
         <div className={styles.panelHeader}><div className={styles.panelTitle}><span className={styles.sectionIcon}><Inbox aria-hidden="true" size={20} /></span><h2>Needs Attention</h2></div></div>
         <div className="my-3 divide-y divide-slate-100">
           {attention.length ? attention.map(row => { const Icon = attentionIcons[row.label as keyof typeof attentionIcons]; return <AttentionLink key={row.href} href={row.href} className={rowClass}>
@@ -73,7 +73,7 @@ export default async function AdminDashboardPage({ searchParams }: {
           <Link href="/app/admin/amendments">Visit review</Link>
         </div>
       </SectionCard>
-      <SectionCard className={styles.panel}>
+      <SectionCard className={styles.panel} homePanel="schedule">
         <div className={styles.panelHeader}>
           <div className={styles.panelTitle}><span className={styles.sectionIcon}><CalendarDays aria-hidden="true" size={20} /></span><h2>Today&apos;s Schedule</h2></div>
           <Link href="/app/admin/scheduler" target="_blank" rel="noopener noreferrer" className={styles.scheduleLink}>View schedule<ChevronRight aria-hidden="true" size={14} /></Link>
