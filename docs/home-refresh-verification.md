@@ -1,5 +1,20 @@
 # Home refresh - November 23, 2026
 
+## Visual refinement follow-up
+
+- Commit 0ab2b635 adds a spacious welcome header, subtle brand tint, section icons,
+  aligned count pills, quieter shortcut chips and a balanced schedule empty state.
+- Shared Home-only CSS responds to the available content width; data queries, queue URLs,
+  permissions, job ordering, offline hooks and mutations are unchanged.
+- Production build and web lint passed; all nine Home navigation/schedule tests passed.
+- Deployment test-worx-bg5n01mp3-nw-fire.vercel.app reached Ready and the production aliases.
+- Signed-in office Home visually checked at 1920x1080, 1440x900, 800x720 and 390x844.
+  Main/page scroll widths equaled client widths at each size. Cards stack on narrow screens.
+- Visible counts remained 143 unassigned, 13 ready to bill, 29 payment collection and one
+  linked visit update. Existing queue destinations remained intact in rendered links.
+- Technician signed-in visual testing remains unavailable; the earlier verification limits below
+  still apply. This follow-up did not repeat the prior full queue navigation audit.
+
 ## Implementation
 
 - Renamed office navigation, mobile labels, header context, work-queue navigation,
