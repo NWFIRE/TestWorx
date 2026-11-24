@@ -414,7 +414,7 @@ export function InspectionSchedulerForm({
       assignedTechnicianId: line.assignedTechnicianId || null,
       dueMonth: line.dueMonth || null,
       dueDate: line.dueDate ? `${line.dueDate}T00:00` : null,
-      schedulingStatus: line.schedulingStatus,
+      schedulingStatus: isCreateWorkflow ? "scheduled_now" : line.schedulingStatus,
       notes: line.notes.trim() || null
     }))
   );
@@ -1028,8 +1028,12 @@ export function InspectionSchedulerForm({
         </div>
         <div className="space-y-4">
           {serviceLines.map((line, index) => {
-            const isCurrentVisitLine = line.schedulingStatus === "due_now" || line.schedulingStatus === "scheduled_now";
-            const isFutureLine = line.schedulingStatus === "scheduled_future" || line.schedulingStatus === "not_scheduled";
+            const isCurrentVisitLine = isCreateWorkflow
+              ? !line.dueMonth || line.dueMonth <= inspectionMonth
+              : line.schedulingStatus === "due_now" || line.schedulingStatus === "scheduled_now";
+            const isFutureLine = isCreateWorkflow
+              ? !isCurrentVisitLine
+              : line.schedulingStatus === "scheduled_future" || line.schedulingStatus === "not_scheduled";
 
             return (
               <div
@@ -1040,7 +1044,7 @@ export function InspectionSchedulerForm({
                   <div>
                     <p className="text-sm font-semibold text-ink">Service line {index + 1}</p>
                     <p className="mt-1 text-sm text-slate-500">
-                      {isCurrentVisitLine
+                      {isCreateWorkflow ? (isFutureLine ? `Due ${line.dueMonth}` : "Due now") : isCurrentVisitLine
                         ? "Included in this visit and expected to move through dispatch now."
                         : isFutureLine
                           ? "Captured for future planning so the service is not lost."
@@ -1097,7 +1101,7 @@ export function InspectionSchedulerForm({
                   </div>
                 </div>
 
-                <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                <div className={`mt-4 grid gap-4 ${isCreateWorkflow ? "" : "xl:grid-cols-2"}`}>
                   <div className="min-w-0">
                     <label className="mb-2 block text-sm font-medium text-slate-600">Recurrence</label>
                     <select
@@ -1112,7 +1116,7 @@ export function InspectionSchedulerForm({
                       ))}
                     </select>
                   </div>
-                  <div className="min-w-0">
+                  {!isCreateWorkflow ? <div className="min-w-0">
                     <label className="mb-2 block text-sm font-medium text-slate-600">Scheduling status</label>
                     <select
                       className="block w-full rounded-2xl border border-slate-200 px-4 py-3.5"
@@ -1129,7 +1133,7 @@ export function InspectionSchedulerForm({
                         </option>
                       ))}
                     </select>
-                  </div>
+                  </div> : null}
                 </div>
 
                 <div className="mt-4 grid gap-4 xl:grid-cols-2">
