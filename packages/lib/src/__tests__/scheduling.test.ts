@@ -52,6 +52,26 @@ function setCurrentVisitServiceLine(formData: FormData, overrides?: Partial<{
 }
 
 describe("schedule creation parsing", () => {
+  it.each(["2026-11", "2026-12"])("uses service due month %s rather than a separate scheduling status", (dueMonth) => {
+    const formData = new FormData();
+    formData.set("customerCompanyId", "customer_1");
+    formData.set("siteId", "site_1");
+    formData.set("inspectionMonth", "2026-11");
+    formData.set("scheduledStart", "2026-11-01T09:00");
+    formData.set("serviceLinesJson", JSON.stringify([{
+      inspectionType: "fire_extinguisher", frequency: "ANNUAL", dueMonth,
+      dueDate: null, schedulingStatus: "scheduled_now", assignedTechnicianId: "tech_1"
+    }]));
+    const result = parseCreateInspectionFormData(formData);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.status).toBe("to_be_completed");
+    const plan = buildServiceScheduleInspectionPlan(result.data);
+    expect(plan[0]?.duePeriod).toBe(dueMonth);
+    expect(plan[0]?.isCurrentPeriod).toBe(dueMonth === "2026-11");
+    expect(plan[0]?.tasks[0]?.schedulingStatus).toBe("scheduled_now");
+  });
+
   it("preserves service-line scheduling when creation visit defaults are hidden", () => {
     const formData = new FormData();
     formData.set("customerCompanyId", "customer_1");
