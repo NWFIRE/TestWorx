@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { useRequestBadge } from "./use-request-badge";
@@ -22,6 +22,10 @@ const MOBILE_KEYBOARD_THRESHOLD = 120;
 const EXPANDED_SIDEBAR_BREAKPOINT = 1280;
 const SIMPLIFIED_WORKSPACE_NAV_ENABLED = process.env.NEXT_PUBLIC_SIMPLIFIED_WORKSPACE_NAV !== "0";
 const DROPDOWN_NAV_GROUPS = new Set(["Work", "Billing", "Customers", "Operations", "Settings"]);
+
+// The embedding frame stays fixed for this document; the server has no frame context.
+const subscribeToFrame = () => () => {};
+const isInspectionPopupFrame = () => window.frameElement?.getAttribute("data-inspection-popup") === "true";
 
 function shouldProtectFocusedElementFromKeyboard() {
   if (typeof window === "undefined") {
@@ -530,6 +534,8 @@ export function AppShell({
   const router = useRouter();
   const pathname = usePathname();
   const isScheduler = pathname === "/app/admin/scheduler";
+  const inspectionPopup = useSyncExternalStore(subscribeToFrame, isInspectionPopupFrame, () => false);
+  const standalone = isScheduler || inspectionPopup;
   const isTechnician = role === "technician";
   const pendingRequestCount = useRequestBadge(role, pathname);
   const navItems = useMemo(() => getAppNavItemsForRole(role, allowances, sidebarOrder).map((item) =>
@@ -865,7 +871,7 @@ export function AppShell({
   const shell = (
     <div className="flex min-h-0 overflow-hidden bg-paper" style={{ height: "var(--app-height, 100dvh)" }}>
       {isTechnician ? <TechnicianSyncBootstrap userId={user.id} /> : null}
-      {navItems.length > 0 && !isScheduler ? (
+      {navItems.length > 0 && !standalone ? (
         <aside
           aria-label="Primary navigation"
           className={`hidden shrink-0 overflow-hidden border-r border-slate-200 bg-white transition-[width] duration-200 motion-reduce:transition-none lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col ${
@@ -912,7 +918,7 @@ export function AppShell({
         </aside>
       ) : null}
 
-      {navItems.length > 0 && !isTechnician && !isScheduler ? (
+      {navItems.length > 0 && !isTechnician && !standalone ? (
         <>
           <div
             aria-hidden={!drawerOpen}
@@ -961,7 +967,7 @@ export function AppShell({
       ) : null}
 
       <div className="flex h-full min-w-0 flex-1 flex-col" ref={shellContentRef}>
-        {!isScheduler && isTechnician && <header className="sticky top-0 z-30 shrink-0 border-b border-[color:var(--border-strong)] bg-white/97 backdrop-blur lg:hidden">
+        {!standalone && isTechnician && <header className="sticky top-0 z-30 shrink-0 border-b border-[color:var(--border-strong)] bg-white/97 backdrop-blur lg:hidden">
           <div
             className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8"
             style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
@@ -983,7 +989,7 @@ export function AppShell({
               : "calc(var(--keyboard-offset, 0px) + 7rem + env(safe-area-inset-bottom))"
           }}
         >
-          {!isScheduler && !isTechnician && navItems.length > 0 && <div className="mb-3 lg:hidden">
+          {!standalone && !isTechnician && navItems.length > 0 && <div className="mb-3 lg:hidden">
             <button aria-label="Open navigation" className="pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-[color:var(--border-default)] bg-white px-3 text-sm font-bold text-[color:var(--text-secondary)] shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600" onClick={() => setDrawerOpen(true)} ref={menuButtonRef} type="button">Menu</button>
           </div>}
           <MobilePullToRefresh containerRef={contentRef} drawerOpen={drawerOpen} gestureRef={shellContentRef}>
