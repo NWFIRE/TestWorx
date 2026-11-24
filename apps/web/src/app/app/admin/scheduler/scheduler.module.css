@@ -35,6 +35,7 @@
 }
 .controls button,
 .controls input,
+.controls a.primary,
 .panel button,
 .link {
   min-height: 42px;
@@ -44,6 +45,7 @@
   padding: 8px 12px;
   font-size: 14px;
 }
+.controls a.primary { display: inline-flex; align-items: center; box-sizing: border-box; text-decoration: none; }
 .controls button[aria-pressed="true"] {
   background: #e5effb;
   border-color: #3168a8;
