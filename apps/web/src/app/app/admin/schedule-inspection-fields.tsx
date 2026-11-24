@@ -1,6 +1,7 @@
 "use client";
 
 import { ScheduleDateTime } from "./schedule-date-time";
+import { ScheduleDuration } from "./schedule-duration";
 
 export function ScheduleInspectionFields({ enabled, dateTime, onToggle, onChange, description }: {
   enabled: boolean;
@@ -16,6 +17,7 @@ export function ScheduleInspectionFields({ enabled, dateTime, onToggle, onChange
     </label>
     {enabled ? <div className="mt-3 min-w-0">
       <ScheduleDateTime name="inspectionAppointment" label="Inspection" required value={dateTime} onChange={onChange} />
+      <ScheduleDuration name="appointmentDurationHours" defaultValue="1" required />
       <p className="mt-2 text-sm text-slate-600">{description}</p>
     </div> : null}
   </section>;

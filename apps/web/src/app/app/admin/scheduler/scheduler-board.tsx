@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { fieldProgress, localDateTime, scheduleLanes, schedulerDisplayEnd, schedulerRange, shiftSchedulerDate, type SchedulerData, type SchedulerJob } from "@testworx/lib/scheduler-shared";
+import { fieldProgress, localDateTime, scheduleLanes, schedulerDisplayEnd, schedulerRange, scheduleDurationHours, scheduleEndForDuration, shiftSchedulerDate, type SchedulerData, type SchedulerJob } from "@testworx/lib/scheduler-shared";
 import { getInspectionTypeTextColorClass } from "../../inspection-type-inline-list";
 import styles from "./scheduler.module.css";
 import banner from "../../page-banner.module.css";
 import { ServiceDirections } from "../../service-directions";
 import { ScheduleDateTime } from "../schedule-date-time";
+import { ScheduleDuration } from "../schedule-duration";
 import { ResizeHandle } from "./resize-handle";
 import { openInspectionInOriginalWindow } from "./open-inspection";
 
@@ -23,6 +24,15 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
   const outsidePress = useRef(false);
   const [resizePreview, setResizePreview] = useState<{id: string; end: string} | null>(null);
   const [notice, setNotice] = useState("");
+  const desktop = useRef<HTMLDivElement>(null);
+  const [timelineWidth, setTimelineWidth] = useState(1536);
+  useEffect(() => {
+    const element = desktop.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() => { if (element.clientWidth) setTimelineWidth(Math.max(1, element.clientWidth - 240)); });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => { selectedId.current = panel ? selected?.id ?? null : null; }, [selected?.id, panel]);
   const timezone = data.timezone, today = localDateTime(new Date(now), timezone).slice(0, 10);
   const current = selected ? data.jobs.find((job) => job.id === selected.id) ?? selected : null;
@@ -100,6 +110,14 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
     setEnd(job.scheduledEnd ? localDateTime(job.scheduledEnd, timezone) : ""); setIds(job.technicianIds);
     setSaveError(""); setConflicts([]); setAllowOverlap(false);
   }
+  function changeStart(next: string) {
+    const hours = scheduleDurationHours(start, end, timezone);
+    setStart(next);
+    if (next && hours) {
+      try { setEnd(scheduleEndForDuration(next, Number(hours), timezone)); setSaveError(""); }
+      catch (error) { setSaveError(error instanceof Error ? error.message : "Choose a valid time."); }
+    }
+  }
   function open(job?: SchedulerJob) {
     setSelected(job ?? null); setEditing(!job); setQuery(""); setMatches([]); setSaveError(""); setConflicts([]); setAllowOverlap(false); setPanel(true);
   }
@@ -173,22 +191,22 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
     {resizePreview && <p role="status" className={styles.warning}>New end: {new Intl.DateTimeFormat("en-US", {timeZone: timezone, month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}).format(new Date(resizePreview.end))}</p>}
     <p className={styles.caption}>{data.days[0]}{data.days.length > 1 ? ` through ${data.days[6]}` : ""} · {data.jobs.length} visits</p>
     <div className={styles.board} tabIndex={0} aria-label={`${view} scheduling board`}>
-      <div className={styles.desktop} style={{ minWidth: view === "day" ? 1776 : 1510 }}>
+      <div ref={desktop} className={styles.desktop} style={{ minWidth: view === "day" ? 1776 : 1510 }}>
         <div className={styles.heading}><div className={styles.name}>Technician</div><div className={styles.axis}>
           {view === "day" ? hours.map((hour, i) => <span key={hour.toISOString()} style={{ left: `${i / hours.length * 100}%` }}>{time(hour.toISOString())}</span>)
             : data.days.map((day) => <button type="button" key={day} onClick={() => navigate(day, "day")}>{new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${day}T12:00Z`))}</button>)}
         </div></div>
         {rows.map((tech) => {
           const jobs = data.jobs.filter((j) => belongs(j, tech.id));
-          const lanes = scheduleLanes(jobs, from, until), count = Math.max(1, ...lanes.map((l) => l.lane + 1));
+          const lanes = scheduleLanes(jobs, from, until, 240 / timelineWidth * 100), count = Math.max(1, ...lanes.map((l) => l.lane + 1));
           const tbd = jobs.filter((j) => !onDay(j, data.days[0]!) && j.sessions.some((s) => !s.endedAt));
           return <div key={tech.id} className={styles.row}><div className={styles.name}><strong>{tech.name}</strong><small>{tech.isActive ? `${jobs.length} visits` : "Inactive · existing assignments"}</small></div>
             {view === "week" ? <div className={styles.week}>{data.days.map((day) => <div key={day}>{jobs.filter((j) => onDay(j, day) || (day === today && j.sessions.some((s) => !s.endedAt))).map((job) => <div key={job.id} className={styles.weekJob}>{card(job, tech.id, true)}{resizeHandle(job, true)}</div>)}</div>)}</div>
               : <div className={styles.day}><div className={styles.timeline} data-day-minutes={(until - from) / 60000} style={{ height: count * 94 + 16, backgroundSize: `${100 / hours.length}% 100%` }}>
-                {lanes.map(({ job, lane, left, width }) => <div key={job.id} className={styles.slot} data-scheduled-start={job.scheduledStart} style={{ top: lane * 94 + 8, left: `${left}%`, width: `${Math.max(resizePreview?.id === job.id ? (Math.min(until, +new Date(resizePreview.end)) - Math.max(from, +new Date(job.scheduledStart))) / (until - from) * 100 : width, 0.25)}%` } as CSSProperties}>{card(job, tech.id, true)}{new Date(schedulerDisplayEnd(job)).getTime() <= until && resizeHandle(job)}</div>)}
+                {lanes.map(({ job, lane, left, width }) => <div key={job.id} className={styles.slot} data-scheduled-start={job.scheduledStart} style={{ top: lane * 94 + 8, left: `${left}%`, width: `max(240px, ${Math.max(resizePreview?.id === job.id ? (Math.min(until, +new Date(resizePreview.end)) - Math.max(from, +new Date(job.scheduledStart))) / (until - from) * 100 : width, 0.25)}%)` } as CSSProperties}>{card(job, tech.id, true)}{new Date(schedulerDisplayEnd(job)).getTime() <= until && resizeHandle(job)}</div>)}
                 {!jobs.length && <p className={styles.gap}>No jobs scheduled</p>}
                 {data.days[0] === today && now >= from && now < until && <span aria-label="Current time" className={styles.now} style={{ left: `${(now - from) / (until - from) * 100}%` }} />}
-              </div>{lanes.some((l) => l.width < 12) && <div className={styles.tbd}><span>Visit details</span>{lanes.filter((l) => l.width < 12).map(({ job }) => card(job, tech.id, true))}</div>}{tbd.length > 0 && <div className={styles.tbd}><span>Active outside planned day</span>{tbd.map((j) => card(j, tech.id, true))}</div>}</div>}
+              </div>{tbd.length > 0 && <div className={styles.tbd}><span>Active outside planned day</span>{tbd.map((j) => card(j, tech.id, true))}</div>}</div>}
           </div>;
         })}
       </div>
@@ -213,7 +231,12 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
         {editing && <form onSubmit={save} onChange={(e) => { if (!(e.target instanceof HTMLInputElement) || e.target.name !== "overlap") { setAllowOverlap(false); setConflicts([]); } }}>
           <p>Only this visit changes. Future recurring visits stay unchanged.</p>
           {current.updatedAt !== version && <p className={styles.warning}>This job changed while you were editing. <button type="button" onClick={() => edit(current)}>Reload details</button></p>}
-          <ScheduleDateTime label={`Start (${timezone})`} required value={start} onChange={setStart} />
+          <ScheduleDateTime label={`Start (${timezone})`} required value={start} onChange={changeStart} />
+          <ScheduleDuration value={scheduleDurationHours(start, end, timezone)} onChange={value => {
+            if (!value) { setEnd(""); return; }
+            try { setEnd(scheduleEndForDuration(start, Number(value), timezone)); setSaveError(""); }
+            catch (error) { setSaveError(error instanceof Error ? error.message : "Choose a start time first."); }
+          }} />
           <ScheduleDateTime label="End" required value={end} onChange={setEnd} />
           <fieldset><legend>Assigned technicians</legend>{data.technicians.filter((t) => t.isActive || ids.includes(t.id)).map((tech) => <label key={tech.id} className={styles.check}><input type="checkbox" checked={ids.includes(tech.id)} onChange={(e) => setIds((old) => e.target.checked ? [...old, tech.id] : old.filter((id) => id !== tech.id))} />{tech.name}{!tech.isActive ? " (inactive; remove before saving)" : ""}</label>)}</fieldset>
           {!!conflicts.length && <div className={styles.warning}>Overlaps: {conflicts.join(", ")}<label className={styles.check}><input name="overlap" type="checkbox" checked={allowOverlap} onChange={(e) => setAllowOverlap(e.target.checked)} />Schedule despite these overlaps</label></div>}

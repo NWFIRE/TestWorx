@@ -444,3 +444,10 @@
 .panel::backdrop { background: #13294455; }
 .panel header { border-bottom: 1px solid #b5c7dc; padding-bottom: 16px; }
 .panel dt, .panel p { color: #405571; }
+
+.slot .card { box-sizing: border-box; padding-right: 28px; }
+.slot .card strong { white-space: normal; line-height: 16px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; flex-shrink: 0; }
+.slot .resize { width: 22px; }
+.slot { z-index: 2; }
+.row { isolation: isolate; }
+.row > .name { z-index: 5; }

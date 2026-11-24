@@ -22,6 +22,7 @@ import {
   purchaseOrderInspectionSiteOptionValue,
   pickEarliestNextDueAt,
   scheduleInspectionSchema,
+  scheduledEndForCreatedVisit,
   upcomingServiceScheduleGenerationLimits,
   upcomingServiceScheduleTransactionOptions
 } from "../scheduling";
@@ -76,11 +77,27 @@ describe("schedule creation parsing", () => {
     expect(parseCreateInspectionFormData(data).success).toBe(false);
     data.set("inspectionAppointment", "2026-03-15T10:30");
     expect(parseCreateInspectionFormData(data).success).toBe(true);
+    data.set("appointmentDurationHours", "1.5");
+    const duration = parseCreateInspectionFormData(data);
+    expect(duration.success && duration.data.appointmentDurationHours).toBe(1.5);
+    for (const value of ["", "0", "-1", "0.25", "1.1", "169", "invalid"]) {
+      data.set("appointmentDurationHours", value);
+      expect(parseCreateInspectionFormData(data).success).toBe(false);
+    }
     data.delete("scheduleInspection");
     const unchecked = parseCreateInspectionFormData(data);
     expect(unchecked.success && unchecked.data.appointmentStart).toBeUndefined();
+    expect(unchecked.success && unchecked.data.appointmentDurationHours).toBeUndefined();
     data.set("scheduleInspection", "on"); data.set("inspectionMonth", "2026-02");
     expect(parseCreateInspectionFormData(data).success).toBe(false);
+  });
+
+  it("persists appointment duration only on the current visit, preserving future dates", () => {
+    const start = new Date("2026-03-08T07:30:00Z");
+    const input = {appointmentStart:start, appointmentDurationHours:1.5, scheduledEnd:null};
+    expect(scheduledEndForCreatedVisit(input, {isCurrentPeriod:true, scheduledStart:start})?.toISOString()).toBe("2026-03-08T09:00:00.000Z");
+    expect(scheduledEndForCreatedVisit(input, {isCurrentPeriod:false, scheduledStart:new Date("2026-09-08T09:00:00Z")})).toBeNull();
+    expect(scheduledEndForCreatedVisit({scheduledEnd:null}, {isCurrentPeriod:true, scheduledStart:start})).toBeNull();
   });
 
   it.each(["2026-11", "2026-12"])("uses service due month %s rather than a separate scheduling status", (dueMonth) => {
