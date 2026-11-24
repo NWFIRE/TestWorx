@@ -251,6 +251,39 @@ test("inspection reuses launching tab, then falls back to current tab when it cl
   expect(context.pages()).toHaveLength(1);
 });
 
+test("Add Job opens creation in the launching tab and falls back without extra windows",async({page,context})=>{
+  const requests=await fixture(page);
+  await page.goto('https://scheduler.test/original');
+  const popup=page.waitForEvent('popup');
+  await page.getByText('Launch schedule').click();
+  const scheduler=await popup;
+  await scheduler.getByRole('button',{name:'Week',exact:true}).click();
+  const schedulerUrl=scheduler.url();
+  const add=scheduler.getByRole('link',{name:'Add Job',exact:true});
+  await expect(add).toHaveAttribute('href','/app/admin/inspections?create=1');
+  await expect(scheduler.getByRole('button',{name:'Schedule job',exact:true})).toHaveCount(0);
+  await add.click();
+  await expect(page).toHaveURL('https://scheduler.test/app/admin/inspections?create=1');
+  await expect(scheduler).toHaveURL(schedulerUrl);
+  await expect(scheduler.getByRole('dialog')).toHaveCount(0);
+  expect(context.pages()).toHaveLength(2);
+  expect(requests).toHaveLength(0);
+  await page.close();
+  await add.focus(); await scheduler.keyboard.press('Enter');
+  await expect(scheduler).toHaveURL('https://scheduler.test/app/admin/inspections?create=1');
+  expect(context.pages()).toHaveLength(1);
+  expect(requests).toHaveLength(0);
+});
+
+test("Add Job uses the current tab when Scheduler was opened directly",async({page,context})=>{
+  const requests=await fixture(page);
+  await page.goto('https://scheduler.test/app/admin/scheduler');
+  await page.getByRole('link',{name:'Add Job',exact:true}).click();
+  await expect(page).toHaveURL('https://scheduler.test/app/admin/inspections?create=1');
+  expect(context.pages()).toHaveLength(1);
+  expect(requests).toHaveLength(0);
+});
+
 test("Escape cancels a drag and narrow layouts retain reachable job details",async({page})=>{
   const requests=await fixture(page);
   const errors:string[]=[]; page.on("pageerror",error=>errors.push(error.message));

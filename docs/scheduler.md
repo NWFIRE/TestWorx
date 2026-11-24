@@ -12,7 +12,12 @@ No extra inspection tab is created by a normal click.
 Week uses Monday through Sunday in the tenant's configured timezone. Empty team
 rows remain visible. Phones use an agenda; larger screens scroll inside the board.
 
-Select Schedule job, search an existing inspection, choose all assigned technicians,
+Select Add Job to open the existing Create Inspection form in the same-origin
+TradeWorx tab that launched Scheduler. If that tab is unavailable, the form opens
+in the current tab. No additional window is created. Scheduler date/view remain
+unchanged when the launching tab is reused.
+
+To reschedule an existing job, open its card and select Reschedule / reassign, choose all assigned technicians,
 and enter a start/end or choose Duration (hours) in half-hour increments. Overlaps require explicit acknowledgement. Concurrent edits
 require reloading details. Rescheduling changes only the selected appointment and
 assignments, not recurrence anchors, task due periods, or future inspections.

@@ -48,9 +48,9 @@ const bundle = await build({ stdin: { contents: `import React from 'react'; impo
     }
     await mount();
     assert(await page.getByText("No jobs scheduled", { exact: true }).count() >= 1);
-    await page.getByRole("button", { name: "Schedule job", exact: true }).click();
-    await page.getByRole("textbox", { name: "Find customer, site, or inspection" }).fill("Scheduler");
-    await page.getByRole("button", { name: /Scheduler QA.*Test site/ }).click();
+    assert.equal(await page.getByRole("link", { name: "Add Job", exact: true }).getAttribute("href"), "/app/admin/inspections?create=1");
+    await page.getByRole("button", { name: /Scheduler QA/ }).filter({has:page.locator("strong")}).first().click();
+    await page.getByRole("button", { name: "Reschedule / reassign", exact: true }).click();
     await page.getByLabel("Start (America/Chicago) date", { exact: true }).fill("2026-11-26");
     await page.getByLabel("Start (America/Chicago) hour", { exact: true }).selectOption("9");
     await page.getByLabel("End date", { exact: true }).fill("2026-11-26");
