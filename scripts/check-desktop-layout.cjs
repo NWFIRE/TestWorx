@@ -44,7 +44,8 @@ async function main() {
   assert.match(inspections, /inspection-table-scroll.*role="region".*tabIndex=\{0\}/);
   assert.match(inspections, /<FastInspectionDeleteButton/);
   const shell = fs.readFileSync("apps/web/src/app/app/app-shell.tsx", "utf8");
-  assert.match(shell, /<header className="sticky top-0 z-30 shrink-0/);
+  assert.match(shell, /!isScheduler && isTechnician && <header/);
+  assert.doesNotMatch(shell, /<DesktopBackButton|aria-label="Refresh page"/);
   rule(".md\\:will-change-auto", "will-change", "auto", "(min-width: 768px)");
   rule(".md\\:backdrop-filter-none", "backdrop-filter", "none", "(min-width: 768px)");
   console.log("Desktop layout CSS regression checks passed. Browser verification is separate.");
