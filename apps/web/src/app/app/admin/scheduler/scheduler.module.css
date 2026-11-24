@@ -57,7 +57,8 @@
   outline: 3px solid #3c83ce;
   outline-offset: 2px;
 }
-.scheduler .primary {
+.scheduler .primary,
+.scheduler .controls .primary {
   background: #2f68b2;
   color: #fff;
   border-color: #2f68b2;
