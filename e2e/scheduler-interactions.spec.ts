@@ -292,6 +292,24 @@ test("Add Job uses the current tab when Scheduler was opened directly",async({pa
   expect(requests).toHaveLength(0);
 });
 
+test('Add Job requests foreground focus synchronously before the original window navigates',async({page})=>{
+  await fixture(page);
+  await page.goto('https://scheduler.test/app/admin/scheduler');
+  await page.evaluate(()=>{
+    const calls:string[]=[];
+    const originalLocation={origin:location.origin,href:location.origin+'/original',assign(href:string){
+      calls.push('navigate');
+      setTimeout(()=>{originalLocation.href=href;},150);
+    }};
+    Object.defineProperty(window,'opener',{configurable:true,value:{closed:false,location:originalLocation,focus(){calls.push('focus');}}});
+    (window as unknown as {handoffCalls:string[]}).handoffCalls=calls;
+  });
+  await page.getByRole('link',{name:'Add Job',exact:true}).click();
+  await expect(page.getByRole('status').filter({hasText:'Create Inspection opened'})).toBeVisible();
+  expect(await page.evaluate(()=>(window as unknown as {handoffCalls:string[]}).handoffCalls.slice(0,2))).toEqual(['focus','navigate']);
+  await expect(page).toHaveURL('https://scheduler.test/app/admin/scheduler');
+});
+
 for (const failure of ['ignored', 'throws', 'self'] as const) {
   test(`Add Job falls back when the original window is ${failure}`,async({page,context})=>{
     const requests=await fixture(page);

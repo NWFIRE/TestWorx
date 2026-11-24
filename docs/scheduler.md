@@ -19,6 +19,8 @@ unchanged when the launching tab is reused. The action verifies the original
 window reached the creation URL; if navigation is ignored or blocked, it opens
 the form in the current window after at most two seconds. A normal anchor also
 provides navigation without relying on Next.js client-side routing.
+Foreground focus is requested synchronously during the Add Job click, before
+navigation and its asynchronous verification. Browser/OS focus policies still apply.
 
 To reschedule an existing job, open its card and select Reschedule / reassign, choose all assigned technicians,
 and enter a start/end or choose Duration (hours) in half-hour increments. Overlaps require explicit acknowledgement. Concurrent edits
