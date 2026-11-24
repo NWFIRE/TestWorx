@@ -27,6 +27,7 @@ import {
 import { SearchSelect, type SearchSelectOption } from "@/app/search-select";
 import { useToast } from "@/app/toast-provider";
 import { cloudReferenceDropMessage, getDroppedPdfFiles } from "./pdf-drop-utils";
+import { ScheduleInspectionFields } from "./schedule-inspection-fields";
 
 type InspectionType = keyof typeof inspectionTypeRegistry;
 type RecurrenceFrequency = "ONCE" | "MONTHLY" | "QUARTERLY" | "SEMI_ANNUAL" | "ANNUAL";
@@ -352,6 +353,8 @@ export function InspectionSchedulerForm({
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
   const [purchaseOrderNumber, setPurchaseOrderNumber] = useState(() => extractPurchaseOrderNumber(initialValues?.notes));
   const [startManuallyEdited, setStartManuallyEdited] = useState(Boolean(initialValues?.scheduledStart));
+  const [scheduleInspection, setScheduleInspection] = useState(false);
+  const [inspectionAppointment, setInspectionAppointment] = useState("");
   const [serviceLines, setServiceLines] = useState<ServiceLineDraft[]>(() => buildInitialServiceLines(initialValues));
   const [showProtectedSaveConfirm, setShowProtectedSaveConfirm] = useState(false);
   const [duplicateWarningDismissed, setDuplicateWarningDismissed] = useState(false);
@@ -548,6 +551,8 @@ export function InspectionSchedulerForm({
     setNotes("");
     setPurchaseOrderNumber("");
     setStartManuallyEdited(false);
+    setScheduleInspection(false);
+    setInspectionAppointment("");
     setServiceLines([createServiceLineDraft(defaultMonth)]);
     setExternalDocumentFiles([]);
     setExternalDocumentLabel("");
@@ -587,6 +592,8 @@ export function InspectionSchedulerForm({
     setNotes(initialValues.notes ?? "");
     setPurchaseOrderNumber(extractPurchaseOrderNumber(initialValues.notes));
     setStartManuallyEdited(Boolean(initialValues.scheduledStart));
+    setScheduleInspection(false);
+    setInspectionAppointment("");
     setServiceLines(buildInitialServiceLines(initialValues));
     setShowProtectedSaveConfirm(false);
   }, [autoSelectGenericSiteOnCustomerChange, initialValues, initialValuesSignature, sites]);
@@ -1136,7 +1143,7 @@ export function InspectionSchedulerForm({
                   </div> : null}
                 </div>
 
-                <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                <div className={`mt-4 grid gap-4 ${isCreateWorkflow ? "" : "xl:grid-cols-2"}`}>
                   <div className="min-w-0">
                     <label className="mb-2 block text-sm font-medium text-slate-600">Due month</label>
                     <PickerField
@@ -1154,7 +1161,7 @@ export function InspectionSchedulerForm({
                       value={line.dueMonth}
                     />
                   </div>
-                  <div className="min-w-0">
+                  {!isCreateWorkflow ? <div className="min-w-0">
                     <label className="mb-2 block text-sm font-medium text-slate-600">Hard scheduled date</label>
                     <PickerField
                       id={`serviceLineDueDate-${line.id}`}
@@ -1170,7 +1177,7 @@ export function InspectionSchedulerForm({
                       value={line.dueDate}
                     />
                     <p className="mt-2 text-sm leading-5 text-slate-500">Optional. Leave blank for normal due-month scheduling.</p>
-                  </div>
+                  </div> : null}
                 </div>
 
                 <div className="mt-4">
@@ -1433,6 +1440,13 @@ export function InspectionSchedulerForm({
           </div>
         </div>
       ) : null}
+      {isCreateWorkflow ? <ScheduleInspectionFields
+        enabled={scheduleInspection}
+        dateTime={inspectionAppointment}
+        onToggle={setScheduleInspection}
+        onChange={setInspectionAppointment}
+        description={`Applies to services due ${inspectionMonth}. Other due months and recurring visits stay unchanged. Time uses your company's time zone.`}
+      /> : null}
       {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
       {showInlineSuccess && state.success ? <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{state.success}</p> : null}
       {protectedSaveMode && showProtectedSaveConfirm ? (

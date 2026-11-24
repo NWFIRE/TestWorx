@@ -52,6 +52,37 @@ function setCurrentVisitServiceLine(formData: FormData, overrides?: Partial<{
 }
 
 describe("schedule creation parsing", () => {
+  it.each(["2026-11-01T15:30:00Z", "2026-12-15T16:30:00Z"])("schedules only the current visit at %s without moving future services or recurrence", (dateTime) => {
+    const input = {
+      scheduledStart: new Date("2026-11-01T09:00:00Z"), inspectionMonth: "2026-11",
+      tasks: [
+        {inspectionType: InspectionType.fire_extinguisher, frequency: "ANNUAL" as const, dueMonth:"2026-11", schedulingStatus:"scheduled_now" as const},
+        {inspectionType: InspectionType.kitchen_suppression, frequency: "SEMI_ANNUAL" as const, dueMonth:"2026-12", dueDate: new Date("2026-12-20T09:00:00Z"), schedulingStatus:"scheduled_now" as const}
+      ]
+    };
+    const baseline = buildServiceScheduleInspectionPlan(input);
+    const planned = buildServiceScheduleInspectionPlan({...input, appointmentStart: new Date(dateTime)});
+    expect(planned[0]?.scheduledStart.toISOString()).toBe(dateTime.replace("Z", ".000Z"));
+    expect(planned[0]?.tasks[0]?.recurrenceAnchorScheduledStart).toEqual(input.scheduledStart);
+    expect(planned.filter(group => !group.isCurrentPeriod)).toEqual(baseline.filter(group => !group.isCurrentPeriod));
+  });
+
+  it("validates an enabled appointment and ignores an unchecked appointment", () => {
+    const data = new FormData();
+    data.set("customerCompanyId", "customer_1"); data.set("siteId", "site_1");
+    data.set("inspectionMonth", "2026-03"); data.set("scheduledStart", "2026-03-01T09:00");
+    setCurrentVisitServiceLine(data);
+    data.set("scheduleInspection", "on");
+    expect(parseCreateInspectionFormData(data).success).toBe(false);
+    data.set("inspectionAppointment", "2026-03-15T10:30");
+    expect(parseCreateInspectionFormData(data).success).toBe(true);
+    data.delete("scheduleInspection");
+    const unchecked = parseCreateInspectionFormData(data);
+    expect(unchecked.success && unchecked.data.appointmentStart).toBeUndefined();
+    data.set("scheduleInspection", "on"); data.set("inspectionMonth", "2026-02");
+    expect(parseCreateInspectionFormData(data).success).toBe(false);
+  });
+
   it.each(["2026-11", "2026-12"])("uses service due month %s rather than a separate scheduling status", (dueMonth) => {
     const formData = new FormData();
     formData.set("customerCompanyId", "customer_1");

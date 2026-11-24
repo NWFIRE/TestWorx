@@ -229,6 +229,7 @@ export const scheduleInspectionSchema = z.object({
   isPriority: z.boolean().default(false),
   inspectionMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   scheduledStart: z.coerce.date(),
+  appointmentStart: z.coerce.date().optional(),
   scheduledEnd: z.union([z.null(), z.coerce.date()]).optional(),
   assignedTechnicianIds: z.array(z.string()).default([]),
   status: editableInspectionStatusSchema.default("to_be_completed"),
@@ -245,8 +246,14 @@ export const scheduleInspectionSchema = z.object({
     })
   ).min(1, "Select at least one inspection type.")
 }).superRefine((input, context) => {
-  if (input.scheduledEnd && input.scheduledEnd <= input.scheduledStart) {
+  if (input.scheduledEnd && input.scheduledEnd <= (input.appointmentStart ?? input.scheduledStart)) {
     context.addIssue({ code: z.ZodIssueCode.custom, message: "Scheduled end must be after the scheduled start.", path: ["scheduledEnd"] });
+  }
+
+  if (input.appointmentStart && !input.tasks.some(task =>
+    (task.dueMonth || format(task.dueDate ?? input.scheduledStart, "yyyy-MM")) === (input.inspectionMonth || format(input.scheduledStart, "yyyy-MM"))
+  )) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "No services are due in this visit month. Turn off Schedule Inspection or change a service's due month.", path: ["appointmentStart"] });
   }
 
   input.tasks.forEach((task, index) => {
@@ -848,14 +855,21 @@ export function buildServiceScheduleInspectionPlan(input: {
   tasks: ScheduledInspectionTaskInput[];
   scheduledStart: Date;
   inspectionMonth?: string | null;
+  appointmentStart?: Date;
 }): ServiceScheduleInspectionPlanGroup[] {
   const currentPeriod = input.inspectionMonth ?? format(input.scheduledStart, "yyyy-MM");
   const taskOccurrences: ServiceScheduleInspectionPlanTask[] = [];
 
   input.tasks.forEach((task, sourceTaskIndex) => {
     const duePeriod = getTaskDuePeriod({ task, fallbackScheduledStart: input.scheduledStart });
+    const dueAnchor = getScheduledStartForDuePeriod({
+      duePeriod,
+      baseScheduledStart: input.scheduledStart,
+      dueDate: task.dueDate ?? null
+    });
     taskOccurrences.push({
       ...task,
+      ...(input.appointmentStart && duePeriod === currentPeriod ? { recurrenceAnchorScheduledStart: dueAnchor } : {}),
       assignedTechnicianId: duePeriod === currentPeriod ? task.assignedTechnicianId ?? null : null,
       dueMonth: duePeriod,
       schedulingStatus: "scheduled_now",
@@ -864,11 +878,6 @@ export function buildServiceScheduleInspectionPlan(input: {
       isGeneratedFutureOccurrence: false
     });
 
-    const dueAnchor = getScheduledStartForDuePeriod({
-      duePeriod,
-      baseScheduledStart: input.scheduledStart,
-      dueDate: task.dueDate ?? null
-    });
     const nextDueDate = nextDueFrom(dueAnchor, task.frequency);
     if (nextDueDate && duePeriod === currentPeriod) {
       const nextDuePeriod = format(nextDueDate, "yyyy-MM");
@@ -919,7 +928,7 @@ export function buildServiceScheduleInspectionPlan(input: {
 
     grouped.set(task.duePeriod, {
       duePeriod: task.duePeriod,
-      scheduledStart: getScheduledStartForDuePeriod({
+      scheduledStart: task.duePeriod === currentPeriod && input.appointmentStart ? input.appointmentStart : getScheduledStartForDuePeriod({
         duePeriod: task.duePeriod,
         baseScheduledStart: input.scheduledStart,
         dueDate: task.dueDate ?? null
@@ -1632,6 +1641,7 @@ function parseInspectionFormData(formData: FormData) {
     isPriority,
     inspectionMonth: inspectionMonth || undefined,
     scheduledStart: parseDateTimeInput(scheduledStart) ?? scheduledStart,
+    appointmentStart: formData.get("scheduleInspection") === "on" ? String(formData.get("inspectionAppointment") ?? "") : undefined,
     scheduledEnd: scheduledEndValue ? parseDateTimeInput(scheduledEndValue) ?? scheduledEndValue : null,
     assignedTechnicianIds,
     status,
@@ -1717,7 +1727,8 @@ export async function detectPotentialDuplicateInspections(
   const plannedInspectionGroups = buildServiceScheduleInspectionPlan({
     tasks: input.tasks,
     scheduledStart: input.scheduledStart,
-    inspectionMonth: input.inspectionMonth
+    inspectionMonth: input.inspectionMonth,
+    appointmentStart: input.appointmentStart
   });
   if (!plannedInspectionGroups.length) {
     return { matches: [] };
@@ -3106,7 +3117,8 @@ export async function createInspection(actor: ActorContext, input: z.infer<typeo
         serviceScheduleId: serviceScheduleIdsByTaskIndex.get(index) ?? null
       })),
       scheduledStart: input.scheduledStart,
-      inspectionMonth: input.inspectionMonth
+      inspectionMonth: input.inspectionMonth,
+      appointmentStart: input.appointmentStart
     });
     if (!plannedInspectionGroups.length) {
       throw new Error("Select at least one due service before creating the inspection.");
