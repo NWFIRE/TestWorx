@@ -7,7 +7,12 @@ async function main() {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date());
   const job = { id: "job", customer: "Scheduler QA", site: "Test site", address: "1 Main", types: ["fire_alarm"], technicianIds: ["a"], scheduledStart: `${today}T15:00:00Z`, scheduledEnd: `${today}T16:00:00Z`, updatedAt: new Date().toISOString(), status: "to_be_completed", sessions: [] };
   const data = (days) => ({ timezone: "America/Chicago", days, fetchedAt: new Date().toISOString(), truncated: false, technicians: [{ id: "a", name: "Tech Alpha", isActive: true }, { id: "b", name: "Tech Beta", isActive: true }], jobs: [job] });
-const bundle = await build({ stdin: { contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import {SchedulerBoard} from './apps/web/src/app/app/admin/scheduler/scheduler-board'; createRoot(document.getElementById('app')).render(<SchedulerBoard initial={${JSON.stringify(data([today]))}} initialView="day"/>);`, loader: "tsx", resolveDir: path.resolve(__dirname, "..") }, bundle: true, write: false, outdir: "scheduler-test", jsx: "automatic", tsconfig: "apps/web/tsconfig.json", define: { "process.env.NODE_ENV": '"production"' }, plugins: [{ name: "link-stub", setup(b) { b.onResolve({ filter: /^next\/link$/ }, () => ({ path: "link", namespace: "fixture" })); b.onLoad({ filter: /.*/, namespace: "fixture" }, () => ({ resolveDir: path.resolve(__dirname, ".."), contents: `import React from 'react'; export default function Link(p){return React.createElement('a',p)}` })); } }] });
+const bundle = await build({ stdin: { contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import {SchedulerBoard} from './apps/web/src/app/app/admin/scheduler/scheduler-board'; createRoot(document.getElementById('app')).render(<SchedulerBoard initial={${JSON.stringify(data([today]))}} initialView="day" createOptions={{customers:[],sites:[],technicians:[]}}/>);`, loader: "tsx", resolveDir: path.resolve(__dirname, "..") }, bundle: true, write: false, outdir: "scheduler-test", jsx: "automatic", tsconfig: "apps/web/tsconfig.json", define: { "process.env.NODE_ENV": '"production"' }, plugins: [{ name: "link-stub", setup(b) {
+  b.onResolve({ filter: /^next\/link$/ }, () => ({ path: "link", namespace: "fixture" }));
+  // Creation is covered with the real form in scheduler-interactions.spec.ts.
+  b.onResolve({ filter: /^\.\/create-job-dialog$/ }, () => ({ path: "create", namespace: "fixture" }));
+  b.onLoad({ filter: /.*/, namespace: "fixture" }, args => ({ resolveDir: path.resolve(__dirname, ".."), contents: args.path === 'create' ? 'export const CreateJobDialog=()=>null;' : `import React from 'react'; export default function Link(p){return React.createElement('a',p)}` }));
+} }] });
   const browser = await chromium.launch();
   const errors = [];
   try {
@@ -48,7 +53,7 @@ const bundle = await build({ stdin: { contents: `import React from 'react'; impo
     }
     await mount();
     assert(await page.getByText("No jobs scheduled", { exact: true }).count() >= 1);
-    assert.equal(await page.getByRole("link", { name: "Add Job", exact: true }).getAttribute("href"), "/app/admin/inspections?create=1");
+    assert(await page.getByRole("button", { name: "Add Job", exact: true }).isVisible());
     await page.getByRole("button", { name: /Scheduler QA/ }).filter({has:page.locator("strong")}).first().click();
     await page.getByRole("button", { name: "Reschedule / reassign", exact: true }).click();
     await page.getByLabel("Start (America/Chicago) date", { exact: true }).fill("2026-11-26");

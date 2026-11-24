@@ -1,0 +1,10 @@
+.dialog { width: min(1100px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #b5c7dc; border-radius: 20px; background: #fff; color: #142238; box-shadow: 0 24px 80px #14223840; overflow-y: auto; overscroll-behavior: contain; }
+.dialog::backdrop { background: #13294488; }
+.header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; background: #163e68; color: #fff; }
+.header h2 { margin: 0; font-size: 22px; font-weight: 700; }
+.header button { min-height: 44px; padding: 8px 16px; border: 1px solid #ffffff80; border-radius: 10px; background: #fff; color: #163e68; cursor: pointer; }
+.header button:disabled { opacity: .6; cursor: wait; }
+.header button:focus-visible { outline: 3px solid #8dd9ff; outline-offset: 3px; }
+.content { min-width: 0; padding: 12px; }
+.content a { color: #235b9a; text-decoration: underline; }
+@media (max-width: 600px) { .dialog { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); border-radius: 14px; } .header { padding: 12px 16px; } .content { padding: 4px; } }

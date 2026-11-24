@@ -289,6 +289,10 @@ export function InspectionSchedulerForm({
   autoSelectGenericSiteOnCustomerChange = false,
   allowCustomOneTimeSite = false,
   onSuccess,
+  onBusyChange,
+  onUploadError,
+  stayOnPage = false,
+  initiallyScheduled = false,
   toastResults = true,
   showInlineSuccess = false,
   protectedSaveMode = false,
@@ -311,6 +315,10 @@ export function InspectionSchedulerForm({
   autoSelectGenericSiteOnCustomerChange?: boolean;
   allowCustomOneTimeSite?: boolean;
   onSuccess?: (result: InspectionSchedulerFormState) => void;
+  onBusyChange?: (busy: boolean) => void;
+  onUploadError?: (inspectionId: string, message: string) => void;
+  stayOnPage?: boolean;
+  initiallyScheduled?: boolean;
   toastResults?: boolean;
   showInlineSuccess?: boolean;
   protectedSaveMode?: boolean;
@@ -353,8 +361,8 @@ export function InspectionSchedulerForm({
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
   const [purchaseOrderNumber, setPurchaseOrderNumber] = useState(() => extractPurchaseOrderNumber(initialValues?.notes));
   const [startManuallyEdited, setStartManuallyEdited] = useState(Boolean(initialValues?.scheduledStart));
-  const [scheduleInspection, setScheduleInspection] = useState(false);
-  const [inspectionAppointment, setInspectionAppointment] = useState("");
+  const [scheduleInspection, setScheduleInspection] = useState(initiallyScheduled);
+  const [inspectionAppointment, setInspectionAppointment] = useState(initiallyScheduled ? initialValues?.scheduledStart ?? "" : "");
   const [serviceLines, setServiceLines] = useState<ServiceLineDraft[]>(() => buildInitialServiceLines(initialValues));
   const [showProtectedSaveConfirm, setShowProtectedSaveConfirm] = useState(false);
   const [duplicateWarningDismissed, setDuplicateWarningDismissed] = useState(false);
@@ -636,6 +644,10 @@ export function InspectionSchedulerForm({
     : null;
 
   useEffect(() => {
+    onBusyChange?.(pending || submitLocked || isUploadingExternalDocuments);
+  }, [onBusyChange, pending, submitLocked, isUploadingExternalDocuments]);
+
+  useEffect(() => {
     if (state.error || state.success || state.duplicateWarning) {
       setSubmitLocked(false);
     }
@@ -710,7 +722,8 @@ export function InspectionSchedulerForm({
           tone: "error"
         });
         resetCreateWorkflow();
-        router.push(`/app/admin/inspections/${state.createdInspectionId}`);
+        if (onUploadError) onUploadError(state.createdInspectionId!, message);
+        else router.push(`/app/admin/inspections/${state.createdInspectionId}`);
       } finally {
         setIsUploadingExternalDocuments(false);
       }
@@ -723,6 +736,7 @@ export function InspectionSchedulerForm({
     externalDocumentsRequireSignature,
     isCreateWorkflow,
     onSuccess,
+    onUploadError,
     router,
     showToast,
     state,
@@ -730,12 +744,12 @@ export function InspectionSchedulerForm({
   ]);
 
   useEffect(() => {
-    if (!state.redirectTo) {
+    if (!state.redirectTo || stayOnPage) {
       return;
     }
 
     router.push(state.redirectTo);
-  }, [router, state.redirectTo]);
+  }, [router, state.redirectTo, stayOnPage]);
 
   useEffect(() => {
     if (!duplicateWarning) {
@@ -748,6 +762,7 @@ export function InspectionSchedulerForm({
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        event.preventDefault();
         setDuplicateWarningDismissed(true);
       }
       if (event.key === "Tab") {
