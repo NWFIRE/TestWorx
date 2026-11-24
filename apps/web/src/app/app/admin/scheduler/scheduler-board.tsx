@@ -175,7 +175,7 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
         <button type="button" aria-label="Next period" onClick={() => navigate(shiftSchedulerDate(date, view === "day" ? 1 : 7))}>Next</button>
         <input aria-label="Schedule date" type="date" value={date} onChange={(e) => { if (e.target.value) navigate(e.target.value); }} />
         <div className={styles.viewSwitch} role="group" aria-label="Calendar view"><button type="button" aria-pressed={view === "day"} onClick={() => navigate(date, "day")}>Day</button><button type="button" aria-pressed={view === "week"} onClick={() => navigate(date, "week")}>Week</button></div>
-        <a className={styles.primary} href="/app/admin/inspections?create=1" onClick={event => {
+        <Link className={styles.primary} href="/app/admin/inspections?create=1" onClick={event => {
           if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
           event.preventDefault();
           if (openingJob.current) return;
@@ -184,7 +184,7 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
           void openInspectionWithFallback(event.currentTarget.href).then(reused => {
             if (reused) setNotice("Create Inspection opened in your original TradeWorx window.");
           }).finally(() => { openingJob.current = false; });
-        }}>Add Job</a>
+        }}>Add Job</Link>
       </div>
     </header>
     {stale && <p role="status" className={styles.warning}>{error || "Displayed data may be stale."} Last updated {time(data.fetchedAt)}. <button type="button" onClick={() => refresh.current()}>Retry</button></p>}
