@@ -108,9 +108,10 @@ test("a saved 9 AM start remains on the timeline without an end time or a resave
   const slot = page.locator('[data-scheduled-start="2026-11-24T15:00:00.000Z"]');
   await expect(slot).toHaveCount(1);
   expect(await slot.evaluate(element => element.style.left)).toBe("37.5%");
-  await expect(page.getByText("9:00 AM · End not set", {exact:true}).first()).toBeVisible();
+  await expect(slot.locator('button').first()).toHaveAttribute('title', /9:00 AM · End not set/);
   await expect(slot.locator("strong")).toHaveText("Test Customer");
-  expect((await slot.boundingBox())!.width).toBeGreaterThanOrEqual(240);
+  const timelineWidth = (await page.locator('[data-day-minutes]').first().boundingBox())!.width;
+  expect((await slot.boundingBox())!.width).toBeCloseTo(timelineWidth * 15 / 1440, 0);
   await expect(page.getByText("Visit details",{exact:true})).toHaveCount(0);
   await expect(page.getByRole("button",{name:/Test Customer/}).filter({has:page.locator("strong")})).toHaveCount(1);
   await page.screenshot({path:"output/scheduler-readable-start-only.png",fullPage:true});
@@ -148,7 +149,7 @@ test("duration selector updates end and preserves duration when start changes",a
   expect(requests[0]).toMatchObject({start:"2026-11-24T11:00",end:"2026-11-24T12:30"});
 });
 
-test("nearby short jobs remain readable in separate lanes without duplicate cards",async({page})=>{
+test("adjacent short jobs match their time slots without artificial lanes or duplicate cards",async({page})=>{
   await fixture(page,false,true,true);
   await page.goto("https://scheduler.test/app/admin/scheduler");
   for(const width of [1440,800]) {
@@ -156,8 +157,11 @@ test("nearby short jobs remain readable in separate lanes without duplicate card
     const slots=page.locator("[data-scheduled-start]");
     await expect(slots).toHaveCount(2);
     const first=(await slots.nth(0).boundingBox())!,second=(await slots.nth(1).boundingBox())!;
-    expect(first.width).toBeGreaterThanOrEqual(240);
-    expect(second.y).toBeGreaterThanOrEqual(first.y+first.height);
+    const timeline=(await page.locator('[data-day-minutes]').first().boundingBox())!;
+    expect(first.width).toBeCloseTo(timeline.width*15/1440,0);
+    expect(second.width).toBeCloseTo(timeline.width*30/1440,0);
+    expect(second.y).toBe(first.y);
+    expect(second.x).toBeCloseTo(first.x+first.width,0);
     await expect(page.getByText("Visit details",{exact:true})).toHaveCount(0);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     const board=page.getByLabel("day scheduling board",{exact:true});
@@ -170,6 +174,29 @@ test("nearby short jobs remain readable in separate lanes without duplicate card
   await page.getByLabel("day scheduling board",{exact:true}).evaluate(element=>{element.scrollLeft=500;});
   await expect(page.locator("[data-scheduled-start]").nth(1)).toBeInViewport();
   await page.screenshot({path:"output/scheduler-readable-crowded.png",fullPage:true});
+});
+
+test("timeline widths track saved duration and live resizing while overlaps retain separate lanes",async({page})=>{
+  await fixture(page,false,false,true);
+  await page.goto("https://scheduler.test/app/admin/scheduler");
+  const slots=page.locator('[data-scheduled-start]');
+  const timeline=(await page.locator('[data-day-minutes]').first().boundingBox())!;
+  const first=(await slots.nth(0).boundingBox())!, second=(await slots.nth(1).boundingBox())!;
+  expect(first.width).toBeCloseTo(timeline.width*60/1440,0);
+  expect(second.y).toBeGreaterThanOrEqual(first.y+first.height);
+  expect(await slots.nth(0).locator('strong').evaluate(element=>getComputedStyle(element).fontSize)).toBe('10px');
+  const handle=page.getByRole('button',{name:'Resize Test Customer',exact:true});
+  const box=(await handle.boundingBox())!;
+  const x=box.x+box.width/2,y=box.y+box.height/2;
+  await page.mouse.move(x,y); await page.mouse.down();
+  await page.mouse.move(x+timeline.width*30/1440,y,{steps:6});
+  await expect(page.getByRole('status').filter({hasText:'New end:'})).toBeVisible();
+  const preview=(await slots.nth(0).boundingBox())!;
+  expect(preview.x).toBe(first.x);
+  expect(preview.width).toBeCloseTo(timeline.width*90/1440,0);
+  await page.mouse.up();
+  await expect(page.getByRole('status').filter({hasText:'Scheduled duration updated'})).toBeVisible();
+  expect((await slots.nth(0).boundingBox())!.width).toBeCloseTo(timeline.width*90/1440,0);
 });
 
 test("Week resizing exposes conflicts without silently saving",async({page})=>{

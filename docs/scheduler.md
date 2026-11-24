@@ -15,11 +15,12 @@ require reloading details. Rescheduling changes only the selected appointment an
 assignments, not recurrence anchors, task due periods, or future inspections.
 Visits without a planned end still display their saved start time (including an
 unchanged 9:00 AM default) and "End not set" in Day, Week, and mobile agenda views.
-Day view places one readable card at the saved start, with a minimum visual width
-of 240px and a right-edge resize handle. The extra short-visit card below the
-timeline has been removed. Nearby cards stack into separate lanes based on their
-visible footprint, preventing overlap even when the saved duration is short.
-Minimum display width does not imply or persist a duration. An explicit resize can set the end time. Merely
+Day view places one compact card at the saved start, with width proportional to
+its actual duration and a right-edge resize handle. Smaller type and padding keep
+short slots compact; truncated text is available in the hover title and job details.
+Overlapping appointments stack into separate lanes; adjacent slots share a lane.
+There is no duplicate card below the timeline. Visits without an end use a
+15-minute display marker, which does not persist a duration. An explicit resize can set the end time. Merely
 viewing or refreshing never fills in an end or changes the start. Closed inspections are read-only.
 
 Duration choices run from 0.5 to 24 hours in half-hour increments. Existing custom

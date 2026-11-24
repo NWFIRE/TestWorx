@@ -24,15 +24,6 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
   const outsidePress = useRef(false);
   const [resizePreview, setResizePreview] = useState<{id: string; end: string} | null>(null);
   const [notice, setNotice] = useState("");
-  const desktop = useRef<HTMLDivElement>(null);
-  const [timelineWidth, setTimelineWidth] = useState(1536);
-  useEffect(() => {
-    const element = desktop.current;
-    if (!element) return;
-    const observer = new ResizeObserver(() => { if (element.clientWidth) setTimelineWidth(Math.max(1, element.clientWidth - 240)); });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
   useEffect(() => { selectedId.current = panel ? selected?.id ?? null : null; }, [selected?.id, panel]);
   const timezone = data.timezone, today = localDateTime(new Date(now), timezone).slice(0, 10);
   const current = selected ? data.jobs.find((job) => job.id === selected.id) ?? selected : null;
@@ -165,7 +156,7 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
   }
   function card(job: SchedulerJob, technicianId: string, compact = false) {
     const displayJob = resizePreview?.id === job.id ? {...job, scheduledEnd: resizePreview.end} : job;
-    return <button type="button" key={job.id} className={styles.card} onClick={() => open(job)} title={`${job.customer} · ${job.site} · ${planned(job)} · ${fieldProgress(job, now, technicianId)}`}>
+    return <button type="button" key={job.id} className={styles.card} onClick={() => open(job)} title={`${job.customer} · ${job.site} · ${planned(displayJob)} · ${fieldProgress(job, now, technicianId)}`}>
       <span className={`${styles.accent} ${getInspectionTypeTextColorClass(job.types[0])}`} aria-hidden="true" />
       <strong>{job.customer || job.site}</strong><span>{planned(displayJob)}</span><small>{fieldProgress(job, now, technicianId)}</small>
       {!compact && job.site && job.site !== job.customer && <small>{job.site}</small>}
@@ -190,19 +181,19 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
     <div role="status" aria-atomic="true" className={styles.resizeStatus}>{resizePreview ? `New end: ${new Intl.DateTimeFormat("en-US", {timeZone: timezone, month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}).format(new Date(resizePreview.end))}` : notice}</div>
     <p className={styles.caption}>{data.days[0]}{data.days.length > 1 ? ` through ${data.days[6]}` : ""} · {data.jobs.length} visits</p>
     <div className={styles.board} tabIndex={0} aria-label={`${view} scheduling board`}>
-      <div ref={desktop} className={styles.desktop} style={{ minWidth: view === "day" ? 1776 : 1510 }}>
+      <div className={styles.desktop} style={{ minWidth: view === "day" ? 1776 : 1510 }}>
         <div className={styles.heading}><div className={styles.name}>Technician</div><div className={styles.axis}>
           {view === "day" ? hours.map((hour, i) => <span key={hour.toISOString()} style={{ left: `${i / hours.length * 100}%` }}>{time(hour.toISOString())}</span>)
             : data.days.map((day) => <button type="button" key={day} onClick={() => navigate(day, "day")}>{new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${day}T12:00Z`))}</button>)}
         </div></div>
         {rows.map((tech) => {
           const jobs = data.jobs.filter((j) => belongs(j, tech.id));
-          const lanes = scheduleLanes(jobs, from, until, 240 / timelineWidth * 100), count = Math.max(1, ...lanes.map((l) => l.lane + 1));
+          const lanes = scheduleLanes(jobs, from, until), count = Math.max(1, ...lanes.map((l) => l.lane + 1));
           const tbd = jobs.filter((j) => !onDay(j, data.days[0]!) && j.sessions.some((s) => !s.endedAt));
           return <div key={tech.id} className={styles.row}><div className={styles.name}><strong>{tech.name}</strong><small>{tech.isActive ? `${jobs.length} visits` : "Inactive · existing assignments"}</small></div>
             {view === "week" ? <div className={styles.week}>{data.days.map((day) => <div key={day}>{jobs.filter((j) => onDay(j, day) || (day === today && j.sessions.some((s) => !s.endedAt))).map((job) => <div key={job.id} className={styles.weekJob}>{card(job, tech.id, true)}{resizeHandle(job, true)}</div>)}</div>)}</div>
-              : <div className={styles.day}><div className={styles.timeline} data-day-minutes={(until - from) / 60000} style={{ height: count * 94 + 16, backgroundSize: `${100 / hours.length}% 100%` }}>
-                {lanes.map(({ job, lane, left, width }) => <div key={job.id} className={styles.slot} data-scheduled-start={job.scheduledStart} style={{ top: lane * 94 + 8, left: `${left}%`, width: `max(240px, ${Math.max(resizePreview?.id === job.id ? (Math.min(until, +new Date(resizePreview.end)) - Math.max(from, +new Date(job.scheduledStart))) / (until - from) * 100 : width, 0.25)}%)` } as CSSProperties}>{card(job, tech.id, true)}{new Date(schedulerDisplayEnd(job)).getTime() <= until && resizeHandle(job)}</div>)}
+              : <div className={styles.day}><div className={styles.timeline} data-day-minutes={(until - from) / 60000} style={{ height: count * 72 + 16, backgroundSize: `${100 / hours.length}% 100%` }}>
+                {lanes.map(({ job, lane, left, width }) => <div key={job.id} className={styles.slot} data-scheduled-start={job.scheduledStart} style={{ top: lane * 72 + 8, left: `${left}%`, width: `${resizePreview?.id === job.id ? (Math.min(until, +new Date(resizePreview.end)) - Math.max(from, +new Date(job.scheduledStart))) / (until - from) * 100 : width}%` } as CSSProperties}>{card(job, tech.id, true)}{new Date(schedulerDisplayEnd(job)).getTime() <= until && resizeHandle(job)}</div>)}
                 {!jobs.length && <p className={styles.gap}>No jobs scheduled</p>}
                 {data.days[0] === today && now >= from && now < until && <span aria-label="Current time" className={styles.now} style={{ left: `${(now - from) / (until - from) * 100}%` }} />}
               </div>{tbd.length > 0 && <div className={styles.tbd}><span>Active outside planned day</span>{tbd.map((j) => card(j, tech.id, true))}</div>}</div>}
