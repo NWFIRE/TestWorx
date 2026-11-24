@@ -925,6 +925,15 @@ export function InspectionSchedulerForm({
           </div>
         </div>
       ) : null}
+      {isCreateWorkflow ? (
+        <>
+          <input type="hidden" name="inspectionMonth" value={inspectionMonth} />
+          <input type="hidden" name="scheduledStart" value={scheduledStart} />
+          <input type="hidden" name="scheduledEnd" value={scheduledEnd} />
+          <input type="hidden" name="status" value={status} />
+        </>
+      ) : (
+        <>
       <div className="grid min-w-0 gap-4 md:grid-cols-2">
         <div className="min-w-0">
           <label className="mb-2 block text-sm font-medium text-slate-600" htmlFor="inspectionMonth">Visit month</label>
@@ -1007,6 +1016,8 @@ export function InspectionSchedulerForm({
           </select>
         </div>
       </div>
+        </>
+      )}
       <div className="min-w-0 space-y-4 rounded-[1.25rem] border border-slate-200 p-4 [overflow-anchor:none] sm:rounded-[1.5rem]">
         <div className="flex flex-col gap-3">
           <div>
