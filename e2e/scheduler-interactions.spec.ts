@@ -79,6 +79,14 @@ test("Day and Week remain separated at desktop and phone widths",async({page})=>
     expect(week.x-day.x-day.width).toBeGreaterThanOrEqual(8);
     expect(week.y).toBe(day.y);
     await expect(page.getByRole('link',{name:'Home',exact:true})).toHaveAttribute('href','/app/admin/dashboard');
+    const addJob=page.getByRole('link',{name:'Add Job',exact:true});
+    await expect(addJob).toBeVisible();
+    for(const state of ['default','hover','focus']) {
+      if(state==='hover') await addJob.hover();
+      if(state==='focus') await addJob.focus();
+      const colors=await addJob.evaluate(element=>({text:getComputedStyle(element).color,background:getComputedStyle(element).backgroundColor}));
+      expect(colors).toEqual({text:'rgb(255, 255, 255)',background:'rgb(47, 104, 178)'});
+    }
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   }
 });
