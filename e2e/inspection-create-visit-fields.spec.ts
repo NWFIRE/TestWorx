@@ -7,6 +7,8 @@ const start = source.indexOf("{isCreateWorkflow ? (\n        <>\n          <inpu
 const end = source.indexOf('<div className="min-w-0 space-y-4 rounded-[1.25rem]', start);
 const statusStart = source.indexOf('{!isCreateWorkflow ? <div className="min-w-0">');
 const statusEnd = source.indexOf('</div> : null}', statusStart) + '</div> : null}'.length;
+const dateStart = source.indexOf('{!isCreateWorkflow ? <div className="min-w-0">', statusEnd);
+const dateEnd = source.indexOf('</div> : null}', dateStart) + '</div> : null}'.length;
 
 for (const creating of [true, false]) {
   test(`visit fields are ${creating ? "hidden for creation" : "available for editing"}`, async ({ page }) => {
@@ -18,18 +20,18 @@ for (const creating of [true, false]) {
       const isCreateWorkflow = ${creating};
       const inspectionMonth = "2026-11", scheduledStart = "2026-11-01T09:00", scheduledEnd = "", status = "to_be_completed";
       const statusOptions = [status];
-      const line = {schedulingStatus: "scheduled_now"};
+      const line = {id:"line-1", dueDate:"", schedulingStatus: "scheduled_now"};
       const serviceSchedulingOptions = ["due_now", "scheduled_now", "scheduled_future", "not_scheduled", "completed", "deferred"];
       const formatInspectionTaskSchedulingStatusLabel = value => value;
       const formatInspectionStatusLabel = value => value;
       function PickerField({icon,...props}) {return <input {...props} />;}
-      createRoot(document.getElementById("app")).render(<form>${source.slice(start, end)}${source.slice(statusStart, statusEnd)}</form>);
+      createRoot(document.getElementById("app")).render(<form>${source.slice(start, end)}${source.slice(statusStart, statusEnd)}${source.slice(dateStart, dateEnd)}</form>);
     ` }, bundle: true, write: false, platform: "browser", format: "iife", jsx: "automatic" });
     await page.setContent('<div id="app"></div>');
     await page.addScriptTag({ content: result.outputFiles[0]!.text });
     await expect(page.locator('[name="inspectionMonth"]')).toHaveCount(1);
     if (creating) {
-      for (const label of ["Visit month", "Dispatch anchor", "Visit end", "Visit status", "Scheduling status"]) {
+      for (const label of ["Visit month", "Dispatch anchor", "Visit end", "Visit status", "Scheduling status", "Hard scheduled date"]) {
         await expect(page.getByText(label, {exact:true})).toHaveCount(0);
       }
       expect(await page.locator("form").evaluate(form => Object.fromEntries(new FormData(form as HTMLFormElement))))
@@ -39,6 +41,7 @@ for (const creating of [true, false]) {
       await expect(page.getByLabel("Dispatch anchor")).toBeVisible();
       await expect(page.getByLabel("Visit status")).toBeVisible();
       await expect(page.getByText("Scheduling status", {exact:true})).toBeVisible();
+      await expect(page.getByText("Hard scheduled date", {exact:true})).toBeVisible();
     }
   });
 }

@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { ZodError } from "zod";
+import { prisma } from "@testworx/db";
+import { schedulerInstant } from "@testworx/lib/scheduler-shared";
+import { normalizeTenantTimezone } from "@testworx/lib/timezone";
 
 import { auth } from "@/auth";
 import {
@@ -253,6 +256,10 @@ export async function createInspectionAction(
 
   try {
     const actor = { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId };
+    if (parsed.data.appointmentStart) {
+      const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: session.user.tenantId }, select: { timezone: true } });
+      parsed.data.appointmentStart = schedulerInstant(String(formData.get("inspectionAppointment")), normalizeTenantTimezone(tenant.timezone));
+    }
     const resolvedInput = await resolveInspectionSiteSelection(actor, parsed.data, formData);
     const sourceRequestId = String(formData.get("sourceRequestId") ?? "").trim();
     if (sourceRequestId) {
