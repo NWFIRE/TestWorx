@@ -52,6 +52,26 @@ function setCurrentVisitServiceLine(formData: FormData, overrides?: Partial<{
 }
 
 describe("schedule creation parsing", () => {
+  it("preserves service-line scheduling when creation visit defaults are hidden", () => {
+    const formData = new FormData();
+    formData.set("customerCompanyId", "customer_1");
+    formData.set("siteId", "site_1");
+    formData.set("inspectionMonth", "2026-11");
+    formData.set("scheduledStart", "2026-11-01T09:00");
+    formData.set("scheduledEnd", "");
+    formData.set("status", "to_be_completed");
+    setCurrentVisitServiceLine(formData, { dueMonth: "2026-12", dueDate: "2026-12-15T09:00" });
+    const result = parseCreateInspectionFormData(formData);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.status).toBe("to_be_completed");
+    expect(result.data.scheduledEnd).toBeNull();
+    expect(result.data.tasks[0]).toMatchObject({ dueMonth: "2026-12", frequency: "ANNUAL" });
+    const plan = buildServiceScheduleInspectionPlan(result.data);
+    expect(plan[0]?.scheduledStart.getMonth()).toBe(11);
+    expect(plan[0]?.scheduledStart.getDate()).toBe(15);
+  });
+
   it("keeps upcoming service schedule generation out of Prisma's 5s default transaction timeout", () => {
     expect(upcomingServiceScheduleTransactionOptions.timeout).toBeGreaterThan(5000);
     expect(upcomingServiceScheduleTransactionOptions.maxWait).toBeGreaterThanOrEqual(5000);
