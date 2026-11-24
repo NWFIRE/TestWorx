@@ -18,6 +18,8 @@ export async function openInspectionWithFallback(href: string): Promise<boolean>
   try {
     const original = window.opener as Window | null;
     if (original && original !== window && !original.closed && original.location.origin === destination.origin) {
+      // Request foreground focus during the click, before navigation or an await loses activation.
+      try { original.focus(); } catch { /* Still navigate if the browser declines foreground focus. */ }
       original.location.assign(destination.href);
       const deadline = Date.now() + 2000;
       while (Date.now() < deadline) {
