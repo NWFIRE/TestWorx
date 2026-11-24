@@ -546,6 +546,7 @@ export function AppShell({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const isScheduler = pathname === "/app/admin/scheduler";
   const isTechnician = role === "technician";
   const pendingRequestCount = useRequestBadge(role, pathname);
   const navItems = useMemo(() => getAppNavItemsForRole(role, allowances, sidebarOrder).map((item) =>
@@ -890,7 +891,7 @@ export function AppShell({
   const shell = (
     <div className="flex min-h-0 overflow-hidden bg-paper" style={{ height: "var(--app-height, 100dvh)" }}>
       {isTechnician ? <TechnicianSyncBootstrap userId={user.id} /> : null}
-      {navItems.length > 0 ? (
+      {navItems.length > 0 && !isScheduler ? (
         <aside
           aria-label="Primary navigation"
           className={`hidden shrink-0 overflow-hidden border-r border-slate-200 bg-white transition-[width] duration-200 motion-reduce:transition-none lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col ${
@@ -937,7 +938,7 @@ export function AppShell({
         </aside>
       ) : null}
 
-      {navItems.length > 0 && !isTechnician ? (
+      {navItems.length > 0 && !isTechnician && !isScheduler ? (
         <>
           <div
             aria-hidden={!drawerOpen}
@@ -986,7 +987,7 @@ export function AppShell({
       ) : null}
 
       <div className="flex h-full min-w-0 flex-1 flex-col" ref={shellContentRef}>
-        <header className="sticky top-0 z-30 shrink-0 border-b border-[color:var(--border-strong)] bg-white/97 shadow-[0_8px_26px_rgba(9,18,32,0.07)] backdrop-blur">
+        {!isScheduler && <header className="sticky top-0 z-30 shrink-0 border-b border-[color:var(--border-strong)] bg-white/97 shadow-[0_8px_26px_rgba(9,18,32,0.07)] backdrop-blur">
           <div
             className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8"
             style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
@@ -1032,7 +1033,7 @@ export function AppShell({
               </>
             )}
           </div>
-        </header>
+        </header>}
 
         <main
           className={`workspace-content min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-5 lg:px-6 ${isTechnician ? "pb-28 lg:pb-6" : ""}`}

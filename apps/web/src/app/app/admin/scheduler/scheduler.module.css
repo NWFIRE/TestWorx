@@ -26,6 +26,9 @@
   align-items: center;
   gap: 8px;
 }
+.viewSwitch { display: flex; align-items: center; gap: 8px; }
+.homeLink { padding: 8px 12px; color: #164d8e; font-size: 14px; text-decoration: none; }
+.homeLink:hover { text-decoration: underline; }
 .scheduler button,
 .scheduler input {
   font: inherit;
