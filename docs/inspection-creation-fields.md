@@ -35,6 +35,12 @@ date/time format and server timezone validation are unchanged. Browser component
 tests cover form submission, required dates, time-first entry, midnight/noon,
 mobile resizing, and preservation of existing off-quarter minutes.
 
+Schedule Inspection also includes Duration (hours), defaulting visibly to one
+hour, with half-hour choices. The server validates half-hour increments and computes
+the end from the timezone-resolved start. Only the current visit receives that end;
+future groups do not inherit an appointment duration. Legacy form submissions
+without a duration remain supported. Turning scheduling off submits no duration.
+
 Verification: 77 scheduling/Scheduler tests and three browser fixtures passed. Browser fixtures
 render the actual conditional JSX extracted from the form and verify create/edit
 visibility and submitted hidden values. No production inspection was created as a test.

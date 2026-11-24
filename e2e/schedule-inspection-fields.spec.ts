@@ -17,6 +17,8 @@ test("optional inspection appointment is accessible, required only when enabled,
   expect(await page.locator("form").evaluate(form => (form as HTMLFormElement).checkValidity())).toBe(false);
   await page.getByLabel("Inspection date", {exact:true}).fill("2026-12-15");
   await expect(page.locator('[name="inspectionAppointment"]')).toHaveValue("2026-12-15T09:00");
+  await expect(page.getByLabel("Duration (hours)")).toHaveValue("1");
+  await page.getByLabel("Duration (hours)").selectOption("1.5");
   await page.getByLabel("Inspection date", {exact:true}).fill("");
   await page.getByLabel("Inspection hour", {exact:true}).selectOption("10");
   await page.getByLabel("Inspection minute", {exact:true}).selectOption("30");
@@ -26,7 +28,7 @@ test("optional inspection appointment is accessible, required only when enabled,
   await expect(page.locator('[name="inspectionAppointment"]')).toHaveValue("2026-12-15T10:30");
   expect(await page.locator("form").evaluate(form => (form as HTMLFormElement).checkValidity())).toBe(true);
   expect(await page.locator("form").evaluate(form => Object.fromEntries(new FormData(form as HTMLFormElement))))
-    .toEqual({scheduleInspection:"on",inspectionAppointment:"2026-12-15T10:30"});
+    .toEqual({scheduleInspection:"on",inspectionAppointment:"2026-12-15T10:30",appointmentDurationHours:"1.5"});
   await page.getByLabel("Inspection hour", {exact:true}).selectOption("12");
   await expect(page.locator('[name="inspectionAppointment"]')).toHaveValue("2026-12-15T00:30");
   await page.getByLabel("Inspection AM or PM", {exact:true}).selectOption("PM");

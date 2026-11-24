@@ -18,10 +18,10 @@ test.beforeAll(async () => {
   assets = {js:result.outputFiles.find(file=>file.path.endsWith('.js'))!.text,css:result.outputFiles.find(file=>file.path.endsWith('.css'))!.text};
 });
 
-async function fixture(page:Page, conflict=false, startOnly=false) {
+async function fixture(page:Page, conflict=false, startOnly=false, crowded=false) {
   let current = {...job, scheduledEnd: startOnly ? null : job.scheduledEnd};
   const requests: Record<string,unknown>[] = [];
-  const data = () => ({timezone:"America/Chicago",days:["2026-11-24"],fetchedAt:new Date().toISOString(),truncated:false,technicians:[{id:"tech-1",name:"Technician One",isActive:true}],jobs:[current]});
+  const data = () => ({timezone:"America/Chicago",days:["2026-11-24"],fetchedAt:new Date().toISOString(),truncated:false,technicians:[{id:"tech-1",name:"Technician One",isActive:true}],jobs:[current,...(crowded ? [{...current,id:"visit-2",customer:"Long customer name for nearby scheduled inspection",scheduledStart:"2026-11-24T15:15:00.000Z",scheduledEnd:"2026-11-24T15:45:00.000Z"}] : [])]});
   await page.context().route("https://scheduler.test/**", async route => {
     const url = new URL(route.request().url());
     if (url.pathname === "/api/admin/scheduler") {
@@ -75,7 +75,12 @@ test("a saved 9 AM start remains on the timeline without an end time or a resave
   const slot = page.locator('[data-scheduled-start="2026-11-24T15:00:00.000Z"]');
   await expect(slot).toHaveCount(1);
   expect(await slot.evaluate(element => element.style.left)).toBe("37.5%");
-  await expect(page.getByText("9:00 AM · End not set", {exact:true}).nth(1)).toBeVisible();
+  await expect(page.getByText("9:00 AM · End not set", {exact:true}).first()).toBeVisible();
+  await expect(slot.locator("strong")).toHaveText("Test Customer");
+  expect((await slot.boundingBox())!.width).toBeGreaterThanOrEqual(240);
+  await expect(page.getByText("Visit details",{exact:true})).toHaveCount(0);
+  await expect(page.getByRole("button",{name:/Test Customer/}).filter({has:page.locator("strong")})).toHaveCount(1);
+  await page.screenshot({path:"output/scheduler-readable-start-only.png",fullPage:true});
   await expect(page.getByText(/Time TBD/)).toHaveCount(0);
   await page.reload();
   await expect(slot).toHaveCount(1);
@@ -91,6 +96,47 @@ test("a saved 9 AM start remains on the timeline without an end time or a resave
   await handle.focus(); await page.keyboard.press("ArrowRight");
   await expect.poll(()=>requests.length).toBe(1);
   expect(requests[0]).toMatchObject({start:"2026-11-24T09:00",end:"2026-11-24T09:30",resizeOnly:true});
+});
+
+test("duration selector updates end and preserves duration when start changes",async({page})=>{
+  const requests=await fixture(page);
+  await page.goto("https://scheduler.test/app/admin/scheduler");
+  await page.getByRole("button",{name:/Test Customer/}).filter({has:page.locator("strong")}).first().click();
+  await page.getByRole("button",{name:"Reschedule / reassign"}).click();
+  await expect(page.getByLabel("Duration (hours)")).toHaveValue("1");
+  await page.getByLabel("Duration (hours)").selectOption("1.5");
+  await expect(page.getByLabel("End hour",{exact:true})).toHaveValue("10");
+  await expect(page.getByLabel("End minute",{exact:true})).toHaveValue("30");
+  await page.getByLabel("Start (America/Chicago) hour",{exact:true}).selectOption("11");
+  await expect(page.getByLabel("End hour",{exact:true})).toHaveValue("12");
+  await expect(page.getByLabel("End AM or PM",{exact:true})).toHaveValue("PM");
+  await page.getByRole("button",{name:"Save schedule",exact:true}).click();
+  await expect.poll(()=>requests.length).toBe(1);
+  expect(requests[0]).toMatchObject({start:"2026-11-24T11:00",end:"2026-11-24T12:30"});
+});
+
+test("nearby short jobs remain readable in separate lanes without duplicate cards",async({page})=>{
+  await fixture(page,false,true,true);
+  await page.goto("https://scheduler.test/app/admin/scheduler");
+  for(const width of [1440,800]) {
+    await page.setViewportSize({width,height:900});
+    const slots=page.locator("[data-scheduled-start]");
+    await expect(slots).toHaveCount(2);
+    const first=(await slots.nth(0).boundingBox())!,second=(await slots.nth(1).boundingBox())!;
+    expect(first.width).toBeGreaterThanOrEqual(240);
+    expect(second.y).toBeGreaterThanOrEqual(first.y+first.height);
+    await expect(page.getByText("Visit details",{exact:true})).toHaveCount(0);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    const board=page.getByLabel("day scheduling board",{exact:true});
+    await board.evaluate(element=>{element.scrollLeft=700;});
+    const name=page.getByText("Technician One",{exact:true}).first();
+    const nameBox=(await name.boundingBox())!;
+    expect(await page.evaluate(({x,y})=>document.elementFromPoint(x,y)?.textContent?.includes("Technician One"),{x:nameBox.x+5,y:nameBox.y+5})).toBe(true);
+    await board.evaluate(element=>{element.scrollLeft=0;});
+  }
+  await page.getByLabel("day scheduling board",{exact:true}).evaluate(element=>{element.scrollLeft=500;});
+  await expect(page.locator("[data-scheduled-start]").nth(1)).toBeInViewport();
+  await page.screenshot({path:"output/scheduler-readable-crowded.png",fullPage:true});
 });
 
 test("Week resizing exposes conflicts without silently saving",async({page})=>{

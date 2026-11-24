@@ -230,6 +230,7 @@ export const scheduleInspectionSchema = z.object({
   inspectionMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   scheduledStart: z.coerce.date(),
   appointmentStart: z.coerce.date().optional(),
+  appointmentDurationHours: z.coerce.number().min(0.5).max(168).multipleOf(0.5).optional(),
   scheduledEnd: z.union([z.null(), z.coerce.date()]).optional(),
   assignedTechnicianIds: z.array(z.string()).default([]),
   status: editableInspectionStatusSchema.default("to_be_completed"),
@@ -1642,6 +1643,7 @@ function parseInspectionFormData(formData: FormData) {
     inspectionMonth: inspectionMonth || undefined,
     scheduledStart: parseDateTimeInput(scheduledStart) ?? scheduledStart,
     appointmentStart: formData.get("scheduleInspection") === "on" ? String(formData.get("inspectionAppointment") ?? "") : undefined,
+    appointmentDurationHours: formData.get("scheduleInspection") === "on" && formData.has("appointmentDurationHours") ? formData.get("appointmentDurationHours") : undefined,
     scheduledEnd: scheduledEndValue ? parseDateTimeInput(scheduledEndValue) ?? scheduledEndValue : null,
     assignedTechnicianIds,
     status,
@@ -3085,6 +3087,15 @@ function getReviewCompletionSummary(input: {
   };
 }
 
+export function scheduledEndForCreatedVisit(input: Pick<z.infer<typeof scheduleInspectionSchema>, "appointmentStart" | "appointmentDurationHours" | "scheduledEnd">, group: {isCurrentPeriod: boolean; scheduledStart: Date}) {
+  if (!group.isCurrentPeriod) return null;
+  if (input.appointmentStart && input.appointmentDurationHours !== undefined) {
+    const hours = z.number().min(0.5).max(168).multipleOf(0.5).parse(input.appointmentDurationHours);
+    return new Date(group.scheduledStart.getTime() + hours * 3600000);
+  }
+  return input.scheduledEnd ?? null;
+}
+
 export async function createInspection(actor: ActorContext, input: z.infer<typeof scheduleInspectionSchema>, sourceRequestId?: string) {
   const parsedActor = parseActor(actor);
   if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
@@ -3143,7 +3154,7 @@ export async function createInspection(actor: ActorContext, input: z.infer<typeo
           priorityAssignedAt: groupPriorityState.priorityAssignedAt,
           priorityClearedAt: groupPriorityState.priorityClearedAt,
           scheduledStart: group.scheduledStart,
-          scheduledEnd: group.isCurrentPeriod ? input.scheduledEnd ?? null : null,
+          scheduledEnd: scheduledEndForCreatedVisit(input, group),
           status: group.isCurrentPeriod ? input.status : InspectionStatus.to_be_completed,
           notes: input.notes,
           claimable: groupAssignedTechnicianIds.length === 0

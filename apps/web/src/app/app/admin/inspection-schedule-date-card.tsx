@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { ScheduleDateTime } from "./schedule-date-time";
+import { ScheduleDuration } from "./schedule-duration";
+import { scheduleDurationHours, scheduleEndForDuration } from "@testworx/lib/scheduler-shared";
 
 const initialState = {
   error: null as string | null,
@@ -25,6 +27,8 @@ export function InspectionScheduleDateCard({
   scheduledStart: string;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  const [start, setStart] = useState(scheduledStart);
+  const [end, setEnd] = useState(scheduledEnd);
 
   return (
     <form action={formAction} className="rounded-[2rem] bg-white p-6 shadow-panel">
@@ -40,9 +44,14 @@ export function InspectionScheduleDateCard({
         </div>
       </div>
       <div className="mt-5 grid gap-4 md:grid-cols-2">
-        <ScheduleDateTime label="Scheduled start" defaultValue={scheduledStart} name="scheduledStart" required />
-        <ScheduleDateTime label="Scheduled end" defaultValue={scheduledEnd} name="scheduledEnd" />
+        <ScheduleDateTime label="Scheduled start" value={start} onChange={next => {
+          const hours = scheduleDurationHours(start, end);
+          setStart(next);
+          if (next && hours) setEnd(scheduleEndForDuration(next, Number(hours)));
+        }} name="scheduledStart" required />
+        <ScheduleDateTime label="Scheduled end" value={end} onChange={setEnd} name="scheduledEnd" />
       </div>
+      <ScheduleDuration value={scheduleDurationHours(start, end)} onChange={value => { if (start && value) setEnd(scheduleEndForDuration(start, Number(value))); else if (!value) setEnd(""); }} />
       <p className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
         Saving updates this existing visit, its service due month, and linked recurrence schedule. No new visit is created.
       </p>

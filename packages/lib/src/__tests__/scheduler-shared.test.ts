@@ -1,7 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { fieldProgress, localDateTime, resizedScheduleEnd, scheduleLanes, schedulerInstant, schedulerRange, shiftSchedulerDate, type SchedulerJob } from "../scheduler-shared";
+import { fieldProgress, localDateTime, resizedScheduleEnd, scheduleLanes, scheduleDurationHours, scheduleEndForDuration, schedulerInstant, schedulerRange, shiftSchedulerDate, type SchedulerJob } from "../scheduler-shared";
 const job: SchedulerJob = { id: "one", customer: "Customer", site: "Site", address: "", types: [], technicianIds: ["a"], scheduledStart: "2026-11-19T15:00:00Z", scheduledEnd: "2026-11-19T16:00:00Z", updatedAt: "2026-11-19T12:00:00Z", status: "to_be_completed", sessions: [] };
 describe("scheduler dates and layout", () => {
+  it("stacks readable short cards without changing their actual time intervals", () => {
+    const start = +new Date("2026-11-19T06:00:00Z"), end = start + 86400000;
+    const short = {...job,scheduledEnd:"2026-11-19T15:30:00Z"};
+    const next = {...short,id:"next",scheduledStart:"2026-11-19T15:30:00Z",scheduledEnd:"2026-11-19T16:00:00Z"};
+    expect(scheduleLanes([short,next],start,end,20).map(item=>item.lane)).toEqual([0,1]);
+    expect(scheduleLanes([short,next],start,end).map(item=>item.lane)).toEqual([0,0]);
+  });
+  it("calculates duration ends across midnight and DST using company time", () => {
+    expect(scheduleEndForDuration("2026-11-24T23:30",1.5,"America/Chicago")).toBe("2026-11-25T01:00");
+    expect(scheduleEndForDuration("2026-03-08T01:30",1.5,"America/Chicago")).toBe("2026-03-08T04:00");
+    expect(scheduleDurationHours("2026-03-08T01:30","2026-03-08T04:00","America/Chicago")).toBe("1.5");
+    expect(scheduleDurationHours("2026-11-24T09:00","2026-11-24T09:45","America/Chicago")).toBe("0.75");
+    expect(scheduleDurationHours("2026-11-24T09:00","","America/Chicago")).toBe("");
+    expect(scheduleEndForDuration("2026-11-24T09:00",0.5)).toBe("2026-11-24T09:30");
+    const custom = scheduleDurationHours("2026-11-24T09:00","2026-11-24T09:53","America/Chicago");
+    expect(scheduleEndForDuration("2026-11-24T09:00",Number(custom),"America/Chicago")).toBe("2026-11-24T09:53");
+  });
   it.each(["2026-11-19T15:00:00Z", "2026-11-19T17:45:00Z"])("positions a start-only visit at its saved time %s without changing data", scheduledStart => {
     const startOnly = {...job, scheduledStart, scheduledEnd:null};
     const range = schedulerRange("2026-11-19", "day", "America/Chicago");

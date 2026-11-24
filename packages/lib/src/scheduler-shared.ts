@@ -82,14 +82,32 @@ export function schedulerDisplayEnd(job: SchedulerJob) {
 }
 
 /** Stable interval partitioning: every overlapping appointment gets its own lane. */
-export function scheduleLanes(jobs: SchedulerJob[], start: number, end: number) {
+export function scheduleLanes(jobs: SchedulerJob[], start: number, end: number, minimumWidthPercent = 0) {
   const lanes: number[] = [];
   return jobs.filter((j) => new Date(j.scheduledStart).getTime() < end && (j.scheduledEnd ? new Date(j.scheduledEnd).getTime() > start : new Date(j.scheduledStart).getTime() >= start))
     .sort((a, b) => a.scheduledStart.localeCompare(b.scheduledStart) || a.id.localeCompare(b.id)).map((job) => {
       const from = Math.max(start, new Date(job.scheduledStart).getTime()), to = Math.min(end, new Date(schedulerDisplayEnd(job)).getTime());
       let lane = lanes.findIndex((until) => until <= from);
       if (lane === -1) lane = lanes.length;
-      lanes[lane] = to;
+      // Reserve the readable card footprint as well as its actual time interval.
+      lanes[lane] = Math.max(to, from + (end - start) * minimumWidthPercent / 100);
       return { job, lane, left: (from - start) / (end - start) * 100, width: (to - from) / (end - start) * 100 };
     });
+}
+
+export function scheduleEndForDuration(start: string, hours: number, timezone?: string) {
+  if (!Number.isFinite(hours) || hours <= 0) throw new Error("Choose a positive duration.");
+  const instant = timezone ? schedulerInstant(start, timezone) : new Date(`${start}:00Z`);
+  const end = new Date(instant.getTime() + Math.round(hours * 3600000));
+  return timezone ? localDateTime(end, timezone) : end.toISOString().slice(0, 16);
+}
+
+export function scheduleDurationHours(start: string, end: string, timezone?: string) {
+  if (!start || !end) return "";
+  try {
+    const from = timezone ? schedulerInstant(start, timezone) : new Date(`${start}:00Z`);
+    const until = timezone ? schedulerInstant(end, timezone) : new Date(`${end}:00Z`);
+    const hours = (until.getTime() - from.getTime()) / 3600000;
+    return Number.isFinite(hours) && hours > 0 ? String(hours) : "";
+  } catch { return ""; }
 }

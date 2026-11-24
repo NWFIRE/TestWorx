@@ -10,14 +10,24 @@ Week uses Monday through Sunday in the tenant's configured timezone. Empty team
 rows remain visible. Phones use an agenda; larger screens scroll inside the board.
 
 Select Schedule job, search an existing inspection, choose all assigned technicians,
-and enter a start/end. Overlaps require explicit acknowledgement. Concurrent edits
+and enter a start/end or choose Duration (hours) in half-hour increments. Overlaps require explicit acknowledgement. Concurrent edits
 require reloading details. Rescheduling changes only the selected appointment and
 assignments, not recurrence anchors, task due periods, or future inspections.
 Visits without a planned end still display their saved start time (including an
 unchanged 9:00 AM default) and "End not set" in Day, Week, and mobile agenda views.
-Day view places a small 15-minute visual marker at the saved start; this is not
-a stored or assumed duration. An explicit resize can set the end time. Merely
+Day view places one readable card at the saved start, with a minimum visual width
+of 240px and a right-edge resize handle. The extra short-visit card below the
+timeline has been removed. Nearby cards stack into separate lanes based on their
+visible footprint, preventing overlap even when the saved duration is short.
+Minimum display width does not imply or persist a duration. An explicit resize can set the end time. Merely
 viewing or refreshing never fills in an end or changes the start. Closed inspections are read-only.
+
+Duration choices run from 0.5 to 24 hours in half-hour increments. Existing custom
+or longer durations remain selectable as their current value; nothing is rounded
+on load. The Scheduler's end-time editor remains available for precise changes.
+Changing the start preserves a selected duration using company-timezone arithmetic.
+New inspection appointments visibly default to one hour and persist the calculated
+end only for current-month services. Future recurrence groups remain unchanged.
 
 Drag the right-edge grip of a Day appointment to adjust its end time in 15-minute
 increments. In Week view, drag the bottom grip up/down (16 pixels per quarter hour).
