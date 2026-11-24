@@ -16,11 +16,14 @@ Select Add Job to open the existing Create Inspection form in the same-origin
 TradeWorx tab that launched Scheduler. If that tab is unavailable, the form opens
 in the current tab. No additional window is created. Scheduler date/view remain
 unchanged when the launching tab is reused. The action verifies the original
-window reached the creation URL; if navigation is ignored or blocked, it opens
+window reached the creation URL and its document is visible and focused; if navigation
+or foreground focus is ignored or blocked, it opens
 the form in the current window after at most two seconds. A normal anchor also
 provides navigation without relying on Next.js client-side routing.
 Foreground focus is requested synchronously during the Add Job click, before
-navigation and its asynchronous verification. Browser/OS focus policies still apply.
+navigation and its asynchronous verification. Browser/OS focus policies still apply;
+the automatic current-window fallback ensures no extra click is required when
+the browser refuses to bring the original window forward.
 
 To reschedule an existing job, open its card and select Reschedule / reassign, choose all assigned technicians,
 and enter a start/end or choose Duration (hours) in half-hour increments. Overlaps require explicit acknowledgement. Concurrent edits

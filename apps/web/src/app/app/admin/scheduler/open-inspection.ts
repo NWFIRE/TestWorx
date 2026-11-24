@@ -11,7 +11,7 @@ export function openInspectionInOriginalWindow(href: string) {
   }
 }
 
-/** A window proxy may accept navigation without actually following it (notably in app windows). */
+/** Navigation is not a successful handoff unless the destination also receives focus. */
 export async function openInspectionWithFallback(href: string): Promise<boolean> {
   const destination = new URL(href, window.location.href);
   if (destination.origin !== window.location.origin) return false;
@@ -26,7 +26,8 @@ export async function openInspectionWithFallback(href: string): Promise<boolean>
         if (original.closed) break;
         if (original.location.href === destination.href) {
           try { original.focus(); } catch { /* Focus can be blocked even after a successful navigation. */ }
-          return true;
+          // Installed app windows can navigate in the background while ignoring focus().
+          if (original.document.visibilityState === "visible" && original.document.hasFocus()) return true;
         }
         await new Promise(resolve => window.setTimeout(resolve, 100));
       }

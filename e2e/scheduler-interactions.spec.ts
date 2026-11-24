@@ -37,6 +37,7 @@ async function fixture(page:Page, conflict=false, startOnly=false, crowded=false
       if(url.searchParams.get("view")==="week") result.days = ["2026-11-23","2026-11-24","2026-11-25","2026-11-26","2026-11-27","2026-11-28","2026-11-29"];
       return route.fulfill({json:result});
     }
+    if(url.pathname === "/app/admin/inspections" && url.searchParams.get("create") === "1") return route.fulfill({contentType:"text/html",body:"<h1>Create Inspection</h1>"});
     if(url.pathname.startsWith("/app/admin/inspections/")) return route.fulfill({contentType:"text/html",body:"<h1>Inspection details</h1>"});
     if(url.pathname === "/original") return route.fulfill({contentType:"text/html",body:'<a href="/app/admin/scheduler" target="_blank" rel="opener">Launch schedule</a>'});
     return route.fulfill({contentType:"text/html",body:`<style>body{margin:16px;font:14px Arial}button{cursor:pointer}${assets.css}</style><div id="app"></div><script>window.fixture=${JSON.stringify(data())}</script><script>${assets.js}</script>`});
@@ -272,6 +273,8 @@ test("Add Job opens creation in the launching tab and falls back without extra w
   await expect(scheduler.getByRole('button',{name:'Schedule job',exact:true})).toHaveCount(0);
   await add.click();
   await expect(page).toHaveURL('https://scheduler.test/app/admin/inspections?create=1');
+  await expect(scheduler.getByRole('status').filter({hasText:'Create Inspection opened'})).toBeVisible();
+  expect(await page.evaluate(()=>document.visibilityState === 'visible' && document.hasFocus())).toBe(true);
   await expect(scheduler).toHaveURL(schedulerUrl);
   await expect(scheduler.getByRole('dialog')).toHaveCount(0);
   expect(context.pages()).toHaveLength(2);
@@ -301,7 +304,8 @@ test('Add Job requests foreground focus synchronously before the original window
       calls.push('navigate');
       setTimeout(()=>{originalLocation.href=href;},150);
     }};
-    Object.defineProperty(window,'opener',{configurable:true,value:{closed:false,location:originalLocation,focus(){calls.push('focus');}}});
+    Object.defineProperty(window,'opener',{configurable:true,value:{closed:false,location:originalLocation,
+      document:{visibilityState:'visible',hasFocus:()=>true},focus(){calls.push('focus');}}});
     (window as unknown as {handoffCalls:string[]}).handoffCalls=calls;
   });
   await page.getByRole('link',{name:'Add Job',exact:true}).click();
@@ -310,20 +314,25 @@ test('Add Job requests foreground focus synchronously before the original window
   await expect(page).toHaveURL('https://scheduler.test/app/admin/scheduler');
 });
 
-for (const failure of ['ignored', 'throws', 'self'] as const) {
+for (const failure of ['ignored', 'throws', 'self', 'background', 'hidden'] as const) {
   test(`Add Job falls back when the original window is ${failure}`,async({page,context})=>{
     const requests=await fixture(page);
     await page.goto('https://scheduler.test/app/admin/scheduler');
     await page.evaluate(mode=>{
       const opener=mode==='self' ? window : {
         closed:false,
-        location:{origin:location.origin,href:location.origin+'/original',assign(){if(mode==='throws') throw new Error('Navigation blocked');}},
+        location:{origin:location.origin,href:location.origin+'/original',assign(href:string){
+          if(mode==='throws') throw new Error('Navigation blocked');
+          if(mode==='background' || mode==='hidden') this.href=href;
+        }},
+        document:{visibilityState:mode==='hidden'?'hidden':'visible',hasFocus:()=>mode==='hidden'},
         focus(){}
       };
       Object.defineProperty(window,'opener',{configurable:true,value:opener});
     },failure);
     await page.getByRole('link',{name:'Add Job',exact:true}).click();
     await expect(page).toHaveURL('https://scheduler.test/app/admin/inspections?create=1');
+    await expect(page.getByRole('heading',{name:'Create Inspection',exact:true})).toBeVisible();
     expect(context.pages()).toHaveLength(1);
     expect(requests).toHaveLength(0);
   });
