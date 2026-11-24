@@ -10,7 +10,7 @@ test.beforeAll(async()=>{
   const result=await build({stdin:{loader:'tsx',resolveDir:process.cwd(),contents:`
     import React from 'react'; import {createRoot} from 'react-dom/client';
     import {AppShell} from './apps/web/src/app/app/app-shell';
-    createRoot(document.getElementById('app')).render(<AppShell role="office_admin" user={{id:'office',name:'Office',email:'office@example.test'}} signOutAction={async()=>{}}><h1>Page content</h1><input aria-label="Draft" /></AppShell>);
+    createRoot(document.getElementById('app')).render(<AppShell role={new URLSearchParams(location.search).get('role')||'office_admin'} user={{id:'office',name:'Office',email:'office@example.test'}} signOutAction={async()=>{}}><h1>Page content</h1><input aria-label="Draft" /></AppShell>);
   `},bundle:true,write:false,jsx:'automatic',platform:'browser',alias:{'@testworx/lib':path.resolve('packages/lib/src/permissions.ts')},define:{'process.env':'{"NODE_ENV":"production","NEXT_PUBLIC_SIMPLIFIED_WORKSPACE_NAV":"1"}'},plugins:[{name:'shell-boundaries',setup(plugin){
     plugin.onResolve({filter:/.*/},args=>{
       if(!args.importer.endsWith('app-shell.tsx')) return;
@@ -25,11 +25,30 @@ test.beforeAll(async()=>{
       else if(args.path.includes('use-request-badge')) contents='export const useRequestBadge=()=>0;';
       else if(args.path.includes('use-smart-back')) contents='export const useSmartBack=()=>()=>{};';
       else if(args.path.includes('mobile-pull-to-refresh')) contents='export const MobilePullToRefresh=({children})=>children;';
+      else if(args.path.includes('technician-notifications-client')) contents='export const TechnicianNotificationProvider=({children})=>children; export const TechnicianNotificationQueryBridge=()=>null;';
       else contents=['BrandLoader','NativeTechnicianRouteGuard','TechnicianSyncBootstrap','NativeTechnicianBridge','TechnicianNotificationProvider','TechnicianNotificationQueryBridge','TechnicianMobileHeader','TechnicianMobileTabBar'].map(name=>`export const ${name}=()=>null;`).join('\n');
       return {loader:'jsx',contents,resolveDir:process.cwd()};
     });
   }}]});
   script=result.outputFiles[0].text;
+});
+
+test('shared desktop bar is absent across roles and routed pages',async({page})=>{
+  await page.route('https://shell.test/**',route=>route.fulfill({contentType:'text/html',body:`<style>${css}</style><div id="app"></div><script>${script}</script>`}));
+  await page.setViewportSize({width:1440,height:900});
+  for(const [route,role] of [
+    ['/app/admin/dashboard','office_admin'], ['/app/admin/inspections/visit-1','office_admin'],
+    ['/app/admin/settings','tenant_admin'], ['/app/admin/profile','office_admin'],
+    ['/app/customer','customer_user'], ['/app/platform','platform_admin'], ['/app/tech/work','technician']
+  ]) {
+    await page.goto(`https://shell.test${route}?role=${role}`);
+    await expect(page.getByRole('heading',{name:'Page content'})).toBeVisible();
+    await expect(page.getByRole('button',{name:'Go back',exact:true})).toHaveCount(0);
+    await expect(page.getByRole('button',{name:'Refresh page',exact:true})).toHaveCount(0);
+    await expect(page.getByText('office@example.test',{exact:true})).toHaveCount(0);
+    await expect(page.locator('header:visible')).toHaveCount(0);
+    expect((await page.getByRole('main').boundingBox())!.y).toBe(0);
+  }
 });
 
 test('Scheduler has no surrounding navigation and uses the full viewport',async({page})=>{

@@ -2,14 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-import { BrandLoader } from "@/app/brand-loader";
 import { useRequestBadge } from "./use-request-badge";
 import { RequestCountBadge } from "./request-count-badge";
-import { useSmartBack } from "@/app/use-smart-back";
-import { getAppNavItemsForRole, getCurrentAppNavItem, isAppNavItemActive, type AppNavItem } from "./app-nav-config";
+import { getAppNavItemsForRole, isAppNavItemActive, type AppNavItem } from "./app-nav-config";
 import { MobilePullToRefresh } from "./mobile-pull-to-refresh";
 import { NativeTechnicianRouteGuard } from "./native-technician-route-guard";
 import { TechnicianSyncBootstrap } from "./tech/offline/technician-sync-bootstrap";
@@ -343,21 +341,6 @@ function BrandBlock({
   );
 }
 
-function DesktopBackButton({ fallbackHref }: { fallbackHref?: string | null }) {
-  const smartBack = useSmartBack(fallbackHref);
-
-  return (
-    <button
-      aria-label="Go back"
-      className="pressable hidden h-8 items-center rounded-lg border border-[color:var(--border-default)] bg-white px-2.5 text-xs font-bold text-[color:var(--text-secondary)] shadow-sm transition hover:border-[color:var(--border-strong)] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.28)] lg:inline-flex"
-      onClick={() => smartBack()}
-      type="button"
-    >
-      Back
-    </button>
-  );
-}
-
 function NavSection({
   collapsed,
   compact,
@@ -556,9 +539,6 @@ export function AppShell({
   const activePathname = pendingNavHref && !isAppNavItemActive(pathname, { href: pendingNavHref, label: "", shortLabel: "", abbreviation: "" })
     ? pendingNavHref
     : pathname;
-  const currentItem = useMemo(() => getCurrentAppNavItem(role, activePathname, allowances, sidebarOrder), [activePathname, allowances, role, sidebarOrder]);
-  const desktopBackFallbackHref = role === "customer_user" && pathname !== "/app/customer" ? "/app/customer" : null;
-  const [isRefreshing, startRefreshTransition] = useTransition();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window === "undefined" || window.innerWidth < EXPANDED_SIDEBAR_BREAKPOINT
   );
@@ -596,12 +576,6 @@ export function AppShell({
     document.body.dataset.keyboardOpen = keyboardOffset > 0 ? "true" : "false";
     document.documentElement.dataset.keyboardOpen = keyboardOffset > 0 ? "true" : "false";
   }, []);
-
-  const handleRefresh = useCallback(() => {
-    startRefreshTransition(() => {
-      router.refresh();
-    });
-  }, [router]);
 
   useEffect(() => {
     if (!pendingNavHref) {
@@ -987,51 +961,12 @@ export function AppShell({
       ) : null}
 
       <div className="flex h-full min-w-0 flex-1 flex-col" ref={shellContentRef}>
-        {!isScheduler && <header className="sticky top-0 z-30 shrink-0 border-b border-[color:var(--border-strong)] bg-white/97 shadow-[0_8px_26px_rgba(9,18,32,0.07)] backdrop-blur">
+        {!isScheduler && isTechnician && <header className="sticky top-0 z-30 shrink-0 border-b border-[color:var(--border-strong)] bg-white/97 backdrop-blur lg:hidden">
           <div
             className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8"
             style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
           >
-            {isTechnician ? (
               <TechnicianMobileHeader allowances={allowances} pathname={pathname} userName={user.name} />
-            ) : (
-              <>
-                <div className="flex min-w-0 items-center gap-3">
-                  {navItems.length > 0 ? (
-                <button
-                  aria-label="Open navigation"
-                  className="pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-[color:var(--border-default)] bg-white px-3 text-sm font-bold text-[color:var(--text-secondary)] shadow-sm outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2 lg:hidden"
-                  onClick={() => setDrawerOpen(true)}
-                  ref={menuButtonRef}
-                  type="button"
-                >
-                  Menu
-                </button>
-                  ) : null}
-                  <DesktopBackButton fallbackHref={desktopBackFallbackHref} />
-                  <div className="min-w-0">
-                    <p className="truncate text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--text-muted)]">Workspace</p>
-                    <h1 className="truncate text-lg font-bold text-ink">{currentItem?.label ?? user.name ?? "Workspace"}</h1>
-                  </div>
-                </div>
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="hidden min-w-0 text-right text-sm font-semibold text-[color:var(--text-muted)] sm:block">
-                    <p className="truncate">{user.email}</p>
-                    <p className="truncate capitalize">{role.replaceAll("_", " ")}</p>
-                  </div>
-                  <button
-                    aria-label="Refresh page"
-                    className="pressable hidden min-h-11 min-w-11 items-center justify-center rounded-xl border border-[color:var(--border-default)] bg-white px-3 text-sm font-bold text-[color:var(--text-secondary)] shadow-sm outline-none transition-colors hover:border-[color:rgb(var(--tenant-primary-rgb)/0.34)] hover:text-[var(--tenant-primary)] focus-visible:ring-2 focus-visible:ring-[color:rgb(var(--tenant-primary-rgb)/0.35)] focus-visible:ring-offset-2 lg:inline-flex"
-                    disabled={isRefreshing}
-                    onClick={handleRefresh}
-                    title={isRefreshing ? "Refreshing..." : "Refresh page"}
-                    type="button"
-                  >
-                    <BrandLoader animated={isRefreshing} className={isRefreshing ? "opacity-100" : "opacity-85"} label={isRefreshing ? "Refreshing" : "Refresh page"} size="sm" tone="muted" />
-                  </button>
-                </div>
-              </>
-            )}
           </div>
         </header>}
 
@@ -1042,12 +977,15 @@ export function AppShell({
             paddingBottom: isTechnician
               ? "calc(var(--mobile-tab-bar-offset, 5.5rem) + 1rem + var(--keyboard-offset, 0px))"
               : "calc(max(1.5rem, env(safe-area-inset-bottom)) + var(--keyboard-offset, 0px))",
-            scrollPaddingTop: "calc(var(--mobile-header-offset, 88px) + 1rem)",
+            scrollPaddingTop: "1rem",
             scrollPaddingBottom: isTechnician
               ? "calc(var(--keyboard-offset, 0px) + var(--mobile-tab-bar-offset, 5.5rem) + 2rem)"
               : "calc(var(--keyboard-offset, 0px) + 7rem + env(safe-area-inset-bottom))"
           }}
         >
+          {!isScheduler && !isTechnician && navItems.length > 0 && <div className="mb-3 lg:hidden">
+            <button aria-label="Open navigation" className="pressable inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-[color:var(--border-default)] bg-white px-3 text-sm font-bold text-[color:var(--text-secondary)] shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600" onClick={() => setDrawerOpen(true)} ref={menuButtonRef} type="button">Menu</button>
+          </div>}
           <MobilePullToRefresh containerRef={contentRef} drawerOpen={drawerOpen} gestureRef={shellContentRef}>
             <div className={`mx-auto w-full min-w-0 ${pathname === "/app/admin/scheduler" ? "" : "max-w-[1700px]"}`}>{children}</div>
           </MobilePullToRefresh>
