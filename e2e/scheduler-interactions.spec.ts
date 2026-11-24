@@ -292,6 +292,25 @@ test("Add Job uses the current tab when Scheduler was opened directly",async({pa
   expect(requests).toHaveLength(0);
 });
 
+for (const failure of ['ignored', 'throws', 'self'] as const) {
+  test(`Add Job falls back when the original window is ${failure}`,async({page,context})=>{
+    const requests=await fixture(page);
+    await page.goto('https://scheduler.test/app/admin/scheduler');
+    await page.evaluate(mode=>{
+      const opener=mode==='self' ? window : {
+        closed:false,
+        location:{origin:location.origin,href:location.origin+'/original',assign(){if(mode==='throws') throw new Error('Navigation blocked');}},
+        focus(){}
+      };
+      Object.defineProperty(window,'opener',{configurable:true,value:opener});
+    },failure);
+    await page.getByRole('link',{name:'Add Job',exact:true}).click();
+    await expect(page).toHaveURL('https://scheduler.test/app/admin/inspections?create=1');
+    expect(context.pages()).toHaveLength(1);
+    expect(requests).toHaveLength(0);
+  });
+}
+
 test("Escape cancels a drag and narrow layouts retain reachable job details",async({page})=>{
   const requests=await fixture(page);
   const errors:string[]=[]; page.on("pageerror",error=>errors.push(error.message));

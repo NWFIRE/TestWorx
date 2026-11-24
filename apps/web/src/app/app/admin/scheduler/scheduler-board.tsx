@@ -9,7 +9,7 @@ import { ServiceDirections } from "../../service-directions";
 import { ScheduleDateTime } from "../schedule-date-time";
 import { ScheduleDuration } from "../schedule-duration";
 import { ResizeHandle } from "./resize-handle";
-import { openInspectionInOriginalWindow } from "./open-inspection";
+import { openInspectionInOriginalWindow, openInspectionWithFallback } from "./open-inspection";
 
 const labelType = (type: string) => type.replaceAll("_", " ");
 export function SchedulerBoard({ initial, initialView }: { initial: SchedulerData; initialView: "day" | "week" }) {
@@ -24,6 +24,7 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
   const outsidePress = useRef(false);
   const [resizePreview, setResizePreview] = useState<{id: string; end: string} | null>(null);
   const [notice, setNotice] = useState("");
+  const openingJob = useRef(false);
   useEffect(() => { selectedId.current = panel ? selected?.id ?? null : null; }, [selected?.id, panel]);
   const timezone = data.timezone, today = localDateTime(new Date(now), timezone).slice(0, 10);
   const current = selected ? data.jobs.find((job) => job.id === selected.id) ?? selected : null;
@@ -174,7 +175,16 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
         <button type="button" aria-label="Next period" onClick={() => navigate(shiftSchedulerDate(date, view === "day" ? 1 : 7))}>Next</button>
         <input aria-label="Schedule date" type="date" value={date} onChange={(e) => { if (e.target.value) navigate(e.target.value); }} />
         <div className={styles.viewSwitch} role="group" aria-label="Calendar view"><button type="button" aria-pressed={view === "day"} onClick={() => navigate(date, "day")}>Day</button><button type="button" aria-pressed={view === "week"} onClick={() => navigate(date, "week")}>Week</button></div>
-        <Link className={styles.primary} href="/app/admin/inspections?create=1" onClick={event => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && openInspectionInOriginalWindow(event.currentTarget.href)) event.preventDefault(); }}>Add Job</Link>
+        <a className={styles.primary} href="/app/admin/inspections?create=1" onClick={event => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          if (openingJob.current) return;
+          openingJob.current = true;
+          setNotice("Opening Create Inspection...");
+          void openInspectionWithFallback(event.currentTarget.href).then(reused => {
+            if (reused) setNotice("Create Inspection opened in your original TradeWorx window.");
+          }).finally(() => { openingJob.current = false; });
+        }}>Add Job</a>
       </div>
     </header>
     {stale && <p role="status" className={styles.warning}>{error || "Displayed data may be stale."} Last updated {time(data.fetchedAt)}. <button type="button" onClick={() => refresh.current()}>Retry</button></p>}
