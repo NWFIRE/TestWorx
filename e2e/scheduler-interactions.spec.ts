@@ -69,6 +69,20 @@ test("Day resize saves only the end; outside click dismisses; keyboard works", a
   await page.screenshot({path:"output/scheduler-day-updated.png",fullPage:true});
 });
 
+test("Day and Week remain separated at desktop and phone widths",async({page})=>{
+  await fixture(page);
+  await page.goto("https://scheduler.test/app/admin/scheduler");
+  for(const width of [1920,1440,800,390]) {
+    await page.setViewportSize({width,height:900});
+    const day=(await page.getByRole('button',{name:'Day',exact:true}).boundingBox())!;
+    const week=(await page.getByRole('button',{name:'Week',exact:true}).boundingBox())!;
+    expect(week.x-day.x-day.width).toBeGreaterThanOrEqual(8);
+    expect(week.y).toBe(day.y);
+    await expect(page.getByRole('link',{name:'Home',exact:true})).toHaveAttribute('href','/app/admin/dashboard');
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
+});
+
 for (const view of ["day", "week"] as const) {
   test(`${view} resize feedback never shifts the board or scroll position`, async ({page}) => {
     const requests = await fixture(page);

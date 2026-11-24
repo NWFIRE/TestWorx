@@ -168,11 +168,12 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
   return <div className={styles.scheduler}>
     <header className={`${styles.toolbar} ${banner.banner} p-4`}><div><h1>Scheduler</h1><p className={banner.muted}>{timezone} · <span role="status">{stale ? "Updates delayed" : loading ? "Updating" : "Live · every 15 seconds"}</span></p></div>
       <div className={`${styles.controls} ${banner.actions}`}>
+        <Link href="/app/admin/dashboard" className={styles.homeLink}>Home</Link>
         <button type="button" aria-label="Previous period" onClick={() => navigate(shiftSchedulerDate(date, view === "day" ? -1 : -7))}>Previous</button>
         <button type="button" onClick={() => navigate(today)}>Today</button>
         <button type="button" aria-label="Next period" onClick={() => navigate(shiftSchedulerDate(date, view === "day" ? 1 : 7))}>Next</button>
         <input aria-label="Schedule date" type="date" value={date} onChange={(e) => { if (e.target.value) navigate(e.target.value); }} />
-        <div role="group" aria-label="Calendar view"><button type="button" aria-pressed={view === "day"} onClick={() => navigate(date, "day")}>Day</button><button type="button" aria-pressed={view === "week"} onClick={() => navigate(date, "week")}>Week</button></div>
+        <div className={styles.viewSwitch} role="group" aria-label="Calendar view"><button type="button" aria-pressed={view === "day"} onClick={() => navigate(date, "day")}>Day</button><button type="button" aria-pressed={view === "week"} onClick={() => navigate(date, "week")}>Week</button></div>
         <button type="button" className={styles.primary} onClick={() => open()}>Schedule job</button>
       </div>
     </header>

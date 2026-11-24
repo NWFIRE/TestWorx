@@ -2,6 +2,9 @@
 
 Office and tenant administrators open Work > Scheduler in a new browser tab, leaving
 their current page unchanged. Today opens in Day view.
+The Scheduler uses the full workspace without the shared sidebar or top bar.
+A Home link in its toolbar returns to the main workspace, and Day/Week controls
+have an explicit gap at every viewport size.
 Opening an inspection from the detail panel reuses the same-origin tab that
 launched Scheduler. If that tab was closed or is unavailable (including older
 Scheduler tabs opened without an opener), it navigates the current tab instead.
