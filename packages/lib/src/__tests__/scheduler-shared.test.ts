@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { fieldProgress, localDateTime, scheduleLanes, schedulerInstant, schedulerRange, shiftSchedulerDate, type SchedulerJob } from "../scheduler-shared";
+import { fieldProgress, localDateTime, resizedScheduleEnd, scheduleLanes, schedulerInstant, schedulerRange, shiftSchedulerDate, type SchedulerJob } from "../scheduler-shared";
 const job: SchedulerJob = { id: "one", customer: "Customer", site: "Site", address: "", types: [], technicianIds: ["a"], scheduledStart: "2026-11-19T15:00:00Z", scheduledEnd: "2026-11-19T16:00:00Z", updatedAt: "2026-11-19T12:00:00Z", status: "to_be_completed", sessions: [] };
 describe("scheduler dates and layout", () => {
+  it("snaps resized ends to quarters and bounds duration", () => {
+    expect(resizedScheduleEnd(job.scheduledStart, job.scheduledEnd!, 22)).toBe("2026-11-19T16:15:00.000Z");
+    expect(resizedScheduleEnd(job.scheduledStart, job.scheduledEnd!, -300)).toBe("2026-11-19T15:15:00.000Z");
+    expect(resizedScheduleEnd(job.scheduledStart, job.scheduledEnd!, 20000)).toBe("2026-11-26T15:00:00.000Z");
+  });
   it("uses tenant time rather than browser time", () => {
     expect(schedulerInstant("2026-11-19T09:00", "America/Chicago").toISOString()).toBe(new Date(job.scheduledStart).toISOString());
     expect(localDateTime(job.scheduledStart, "America/Chicago")).toBe("2026-11-19T09:00");

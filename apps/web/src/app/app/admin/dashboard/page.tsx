@@ -76,7 +76,7 @@ export default async function AdminDashboardPage({ searchParams }: {
       <SectionCard className={styles.panel} homePanel="schedule">
         <div className={styles.panelHeader}>
           <div className={styles.panelTitle}><span className={styles.sectionIcon}><CalendarDays aria-hidden="true" size={20} /></span><h2>Today&apos;s Schedule</h2></div>
-          <Link href="/app/admin/scheduler" target="_blank" rel="noopener noreferrer" className={styles.scheduleLink}>View schedule<ChevronRight aria-hidden="true" size={14} /></Link>
+          <Link href="/app/admin/scheduler" target="_blank" rel="opener" className={styles.scheduleLink}>View schedule<ChevronRight aria-hidden="true" size={14} /></Link>
         </div>
         <div className={`${styles.scheduleBody} divide-y divide-slate-100`}>
           {jobs.length ? jobs.map(job => <Link key={job.id} href={`/app/admin/inspections/${job.id}?from=${encodeURIComponent("/app/admin/dashboard")}`} className={rowClass}>

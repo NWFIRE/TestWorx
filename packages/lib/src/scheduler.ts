@@ -30,7 +30,7 @@ function serialize(job: Prisma.InspectionGetPayload<{ select: typeof select }>):
     types: [...new Set(job.tasks.map((t) => t.inspectionType))],
     technicianIds: [...new Set([job.assignedTechnicianId, ...job.technicianAssignments.map((a) => a.technicianId)].filter((id): id is string => Boolean(id)))],
     scheduledStart: job.scheduledStart.toISOString(), scheduledEnd: job.scheduledEnd?.toISOString() ?? null,
-    updatedAt: job.updatedAt.toISOString(), status: job.status,
+    updatedAt: job.updatedAt.toISOString(), status: job.status, archived: Boolean(job.archivedAt),
     sessions: job.jobTimeSessions.map((s) => ({ ...s, startedAt: s.startedAt.toISOString(), endedAt: s.endedAt?.toISOString() ?? null })) };
 }
 
@@ -68,7 +68,8 @@ export async function searchSchedulerJobs(actor: Actor, query: string) {
 }
 
 export const schedulerSaveSchema = z.object({ inspectionId: z.string().min(1), updatedAt: z.string().datetime(),
-  start: z.string(), end: z.string(), technicianIds: z.array(z.string().min(1)).min(1).max(50), allowOverlap: z.boolean().default(false) });
+  start: z.string(), end: z.string(), technicianIds: z.array(z.string().min(1)).max(50), allowOverlap: z.boolean().default(false), resizeOnly: z.boolean().default(false) })
+  .superRefine((input, context) => { if (!input.resizeOnly && !input.technicianIds.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ["technicianIds"], message: "Choose at least one technician." }); });
 
 export async function saveSchedulerJob(actor: Actor, raw: unknown) {
   const tenantId = await authorize(actor), input = schedulerSaveSchema.parse(raw);
@@ -83,17 +84,20 @@ export async function saveSchedulerJob(actor: Actor, raw: unknown) {
     if (!existing) throw new Error("Inspection not found.");
     if (existing.archivedAt || ["completed", "invoiced", "cancelled"].includes(existing.status)) throw new Error("Closed inspections cannot be rescheduled.");
     if (existing.updatedAt.toISOString() !== input.updatedAt) throw new Error("This job changed. Reload its details before saving.");
+    if (input.resizeOnly && (start.getTime() !== existing.scheduledStart.getTime() || JSON.stringify([...ids].sort()) !== JSON.stringify(serialize(existing).technicianIds.sort()))) throw new Error("Resizing can only change the end time. Reload this job.");
     const technicians = await tx.user.findMany({ where: { tenantId, id: { in: ids }, isActive: true, role: { in: [...assignableRoles] } }, select: { id: true } });
-    if (technicians.length !== ids.length) throw new Error("Choose active technicians from your organization.");
+    if (!input.resizeOnly && technicians.length !== ids.length) throw new Error("Choose active technicians from your organization.");
     const conflicts = await tx.inspection.findMany({ where: { tenantId, id: { not: existing.id }, status: { notIn: ["completed", "invoiced", "cancelled"] },
       scheduledStart: { lt: end }, scheduledEnd: { gt: start }, OR: [{ assignedTechnicianId: { in: ids } }, { technicianAssignments: { some: { tenantId, technicianId: { in: ids } } } }]
     }, select: { id: true, customerCompany: { select: { name: true } } }, take: 10 });
     if (conflicts.length && !input.allowOverlap) return { ok: false as const, conflicts: conflicts.map((c) => ({ id: c.id, customer: c.customerCompany.name })) };
     const result = await tx.inspection.updateMany({ where: { tenantId, id: existing.id, updatedAt: new Date(input.updatedAt) },
-      data: { scheduledStart: start, scheduledEnd: end, assignedTechnicianId: ids.includes(existing.assignedTechnicianId ?? "") ? existing.assignedTechnicianId : ids[0], claimable: false } });
+      data: input.resizeOnly ? { scheduledEnd: end } : { scheduledStart: start, scheduledEnd: end, assignedTechnicianId: ids.includes(existing.assignedTechnicianId ?? "") ? existing.assignedTechnicianId : ids[0], claimable: false } });
     if (result.count !== 1) throw new Error("This job changed. Reload its details before saving.");
-    await tx.inspectionTechnicianAssignment.deleteMany({ where: { tenantId, inspectionId: existing.id, technicianId: { notIn: ids } } });
-    await tx.inspectionTechnicianAssignment.createMany({ data: ids.map((technicianId) => ({ tenantId, inspectionId: existing.id, technicianId })), skipDuplicates: true });
+    if (!input.resizeOnly) {
+      await tx.inspectionTechnicianAssignment.deleteMany({ where: { tenantId, inspectionId: existing.id, technicianId: { notIn: ids } } });
+      await tx.inspectionTechnicianAssignment.createMany({ data: ids.map((technicianId) => ({ tenantId, inspectionId: existing.id, technicianId })), skipDuplicates: true });
+    }
     // Preserve task due periods: they identify the recurring occurrence, not its appointment time.
     await tx.auditLog.create({ data: { tenantId, actorUserId: actor.userId, action: "inspection.scheduler_updated", entityType: "Inspection", entityId: existing.id,
       metadata: { before: { start: existing.scheduledStart.toISOString(), end: existing.scheduledEnd?.toISOString() ?? null, technicianIds: serialize(existing).technicianIds },
