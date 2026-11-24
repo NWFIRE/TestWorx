@@ -18,8 +18,8 @@ test.beforeAll(async () => {
   assets = {js:result.outputFiles.find(file=>file.path.endsWith('.js'))!.text,css:result.outputFiles.find(file=>file.path.endsWith('.css'))!.text};
 });
 
-async function fixture(page:Page, conflict=false) {
-  let current = {...job};
+async function fixture(page:Page, conflict=false, startOnly=false) {
+  let current = {...job, scheduledEnd: startOnly ? null : job.scheduledEnd};
   const requests: Record<string,unknown>[] = [];
   const data = () => ({timezone:"America/Chicago",days:["2026-11-24"],fetchedAt:new Date().toISOString(),truncated:false,technicians:[{id:"tech-1",name:"Technician One",isActive:true}],jobs:[current]});
   await page.context().route("https://scheduler.test/**", async route => {
@@ -30,7 +30,7 @@ async function fixture(page:Page, conflict=false) {
         if (conflict) return route.fulfill({status:409,json:{ok:false,conflicts:[{id:"other",customer:"Other Customer"}]}});
         current = {...current,scheduledEnd:payload.end+":00.000Z",updatedAt:new Date().toISOString()};
         // Input uses company wall time, not UTC.
-        current.scheduledEnd = new Date(new Date(current.scheduledEnd).getTime()+6*3600000).toISOString();
+        current.scheduledEnd = new Date(new Date(payload.end+":00.000Z").getTime()+6*3600000).toISOString();
         return route.fulfill({json:{ok:true,job:current}});
       }
       const result = data();
@@ -67,6 +67,30 @@ test("Day resize saves only the end; outside click dismisses; keyboard works", a
   await expect.poll(()=>requests.length).toBe(2);
   expect(requests[1].end).toBe("2026-11-24T10:45");
   await page.screenshot({path:"output/scheduler-day-updated.png",fullPage:true});
+});
+
+test("a saved 9 AM start remains on the timeline without an end time or a resave", async ({page}) => {
+  const requests = await fixture(page, false, true);
+  await page.goto("https://scheduler.test/app/admin/scheduler");
+  const slot = page.locator('[data-scheduled-start="2026-11-24T15:00:00.000Z"]');
+  await expect(slot).toHaveCount(1);
+  expect(await slot.evaluate(element => element.style.left)).toBe("37.5%");
+  await expect(page.getByText("9:00 AM · End not set", {exact:true}).nth(1)).toBeVisible();
+  await expect(page.getByText(/Time TBD/)).toHaveCount(0);
+  await page.reload();
+  await expect(slot).toHaveCount(1);
+  expect(requests).toHaveLength(0);
+  await page.getByRole("button",{name:"Week",exact:true}).click();
+  await expect(page.getByText("9:00 AM · End not set", {exact:true}).first()).toBeVisible();
+  await page.setViewportSize({width:390,height:844});
+  await expect(page.getByText("9:00 AM · End not set", {exact:true}).last()).toBeVisible();
+  expect(requests).toHaveLength(0);
+  await page.setViewportSize({width:1440,height:900});
+  await page.getByRole("button",{name:"Day",exact:true}).click();
+  const handle = page.getByRole("button",{name:"Resize Test Customer",exact:true});
+  await handle.focus(); await page.keyboard.press("ArrowRight");
+  await expect.poll(()=>requests.length).toBe(1);
+  expect(requests[0]).toMatchObject({start:"2026-11-24T09:00",end:"2026-11-24T09:30",resizeOnly:true});
 });
 
 test("Week resizing exposes conflicts without silently saving",async({page})=>{
