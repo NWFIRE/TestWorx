@@ -77,3 +77,22 @@ test('Scheduler has no surrounding navigation and uses the full viewport',async(
   await page.getByRole('button',{name:'Close navigation'}).click();
   await expect(page.getByRole('dialog',{name:'Primary navigation'})).toBeHidden();
 });
+
+test('inspection popup omits navigation only inside its marked frame',async({page})=>{
+  await page.route('https://shell.test/**',route=>{
+    if(new URL(route.request().url()).pathname==='/host') return route.fulfill({contentType:'text/html',body:'<iframe title="Inspection popup" data-inspection-popup="true" src="/app/admin/inspections/visit-1" style="width:100%;height:600px"></iframe>'});
+    return route.fulfill({contentType:'text/html',body:`<style>${css}</style><div id="app"></div><script>${script}</script>`});
+  });
+  await page.setViewportSize({width:1440,height:900});
+  await page.goto('https://shell.test/host');
+  const inspection=page.frameLocator('iframe');
+  await expect(inspection.getByRole('heading',{name:'Page content'})).toBeVisible();
+  await expect(inspection.locator('aside')).toHaveCount(0);
+  await expect(inspection.getByRole('button',{name:'Open navigation'})).toHaveCount(0);
+  await inspection.getByLabel('Draft').fill('Retained');
+  await page.setViewportSize({width:390,height:844});
+  await expect(inspection.getByLabel('Draft')).toHaveValue('Retained');
+  await expect(inspection.getByRole('button',{name:'Open navigation'})).toHaveCount(0);
+  await page.goto('https://shell.test/app/admin/inspections/visit-1');
+  await expect(page.getByRole('button',{name:'Open navigation'})).toBeVisible();
+});

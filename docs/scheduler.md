@@ -5,10 +5,14 @@ their current page unchanged. Today opens in Day view.
 The Scheduler uses the full workspace without the shared sidebar or top bar.
 A Home link in its toolbar returns to the main workspace, and Day/Week controls
 have an explicit gap at every viewport size.
-Opening an inspection from the detail panel reuses the same-origin tab that
-launched Scheduler. If that tab was closed or is unavailable (including older
-Scheduler tabs opened without an opener), it navigates the current tab instead.
-No extra inspection tab is created by a normal click.
+Open inspection displays the existing authenticated inspection page in a modal
+over Scheduler, without opening or navigating another window. Its embedded app
+shell omits the redundant sidebar. Existing permission checks and inspection
+actions are unchanged. Viewing alone never starts or updates a job. Closing the
+modal refreshes the board while preserving its date, view, and selected job.
+Edits trigger a close confirmation reminding staff to finish saving first.
+The fixed close control remains reachable while the inspection scrolls; Escape
+closes the modal unless an inner dialog or menu needs to handle it first.
 Week uses Monday through Sunday in the tenant's configured timezone. Empty team
 rows remain visible. Phones use an agenda; larger screens scroll inside the board.
 

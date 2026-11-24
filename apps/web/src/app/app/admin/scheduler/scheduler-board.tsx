@@ -9,7 +9,7 @@ import { ServiceDirections } from "../../service-directions";
 import { ScheduleDateTime } from "../schedule-date-time";
 import { ScheduleDuration } from "../schedule-duration";
 import { ResizeHandle } from "./resize-handle";
-import { openInspectionInOriginalWindow } from "./open-inspection";
+import { InspectionDialog } from "./inspection-dialog";
 import { CreateJobDialog, type CreateJobOptions } from "./create-job-dialog";
 
 const labelType = (type: string) => type.replaceAll("_", " ");
@@ -26,6 +26,7 @@ export function SchedulerBoard({ initial, initialView, createOptions }: { initia
   const [resizePreview, setResizePreview] = useState<{id: string; end: string} | null>(null);
   const [notice, setNotice] = useState("");
   const [creating, setCreating] = useState(false);
+  const [inspectionPopup, setInspectionPopup] = useState<{id: string; customer: string} | null>(null);
   useEffect(() => { selectedId.current = panel ? selected?.id ?? null : null; }, [selected?.id, panel]);
   const timezone = data.timezone, today = localDateTime(new Date(now), timezone).slice(0, 10);
   const current = selected ? data.jobs.find((job) => job.id === selected.id) ?? selected : null;
@@ -220,7 +221,7 @@ export function SchedulerBoard({ initial, initialView, createOptions }: { initia
           <dt>Planned</dt><dd>{localDateTime(current.scheduledStart, timezone).slice(0, 10)} · {planned(current)}</dd><dt>Field progress</dt><dd>{fieldProgress(current, now)}</dd>
           <dt>Report workflow</dt><dd>{labelType(current.status)} (separate from field progress)</dd>
           <dt>Actual work</dt><dd>{current.sessions.length ? current.sessions.map((s, i) => <p key={`${s.technicianId}-${i}`}>{data.technicians.find((t) => t.id === s.technicianId)?.name}: {localDateTime(s.startedAt, timezone).replace("T", " ")} - {s.endedAt ? localDateTime(s.endedAt, timezone).replace("T", " ") : "Running"}</p>) : "Not started"}</dd></dl>
-        <Link className={styles.link} onClick={event => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && openInspectionInOriginalWindow(event.currentTarget.href)) event.preventDefault(); }} href={`/app/admin/inspections/${current.id}?from=${encodeURIComponent(`/app/admin/scheduler?date=${date}&view=${view}`)}`}>Open inspection</Link>
+        <button type="button" className={styles.link} onClick={() => setInspectionPopup({id: current.id, customer: current.customer || current.site})}>Open inspection</button>
         {!editing && !["completed", "invoiced", "cancelled"].includes(current.status) && <button type="button" className={styles.primary} onClick={() => edit(current)}>Reschedule / reassign</button>}
         {editing && <form onSubmit={save} onChange={(e) => { if (!(e.target instanceof HTMLInputElement) || e.target.name !== "overlap") { setAllowOverlap(false); setConflicts([]); } }}>
           <p>Only this visit changes. Future recurring visits stay unchanged.</p>
@@ -239,5 +240,6 @@ export function SchedulerBoard({ initial, initialView, createOptions }: { initia
       </>}
       {saveError && <p role="alert" className={styles.warning}>{saveError} {selected && <button type="button" onClick={() => { refresh.current(); if (current) edit(current); }}>Reload job details</button>}</p>}
     </dialog>}
+    {inspectionPopup && <InspectionDialog inspectionId={inspectionPopup.id} customer={inspectionPopup.customer} onClose={() => { setInspectionPopup(null); refresh.current(); }} />}
   </div>;
 }

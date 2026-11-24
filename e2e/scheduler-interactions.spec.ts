@@ -51,7 +51,7 @@ async function fixture(page:Page, conflict=false, startOnly=false, crowded=false
       return route.fulfill({json:result});
     }
     if(url.pathname === "/app/admin/inspections" && url.searchParams.get("create") === "1") return route.fulfill({contentType:"text/html",body:"<h1>Create Inspection</h1>"});
-    if(url.pathname.startsWith("/app/admin/inspections/")) return route.fulfill({contentType:"text/html",body:"<h1>Inspection details</h1>"});
+    if(url.pathname.startsWith("/app/admin/inspections/")) return route.fulfill({contentType:"text/html",body:'<h1>Inspection details</h1><label>Notes<input aria-label="Notes"></label><a href="/app/admin/inspections/visit-1?tab=reports">Reports</a><div style="height:1000px">Report content</div>'});
     if(url.pathname === "/original") return route.fulfill({contentType:"text/html",body:'<a href="/app/admin/scheduler" target="_blank" rel="opener">Launch schedule</a>'});
     return route.fulfill({contentType:"text/html",body:`<style>body{margin:16px;font:14px Arial}button{cursor:pointer}${assets.css}</style><div id="app"></div><script>window.fixture=${JSON.stringify(data())}</script><script src="/fixture.js"></script>`});
   });
@@ -256,21 +256,51 @@ test("Week resizing exposes conflicts without silently saving",async({page})=>{
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
-test("inspection reuses launching tab, then falls back to current tab when it closes",async({page,context})=>{
-  await fixture(page);
+test("inspection opens in a popup without navigating either window or mutating the job",async({page,context})=>{
+  const requests=await fixture(page);
   await page.goto("https://scheduler.test/original");
   const popupPromise=page.waitForEvent("popup");
   await page.getByText("Launch schedule").click();
   const scheduler=await popupPromise;
+  await scheduler.getByRole('button',{name:'Week',exact:true}).click();
+  const url=scheduler.url();
   await scheduler.getByRole("button",{name:/Test Customer/}).filter({has:scheduler.locator("strong")}).first().click();
-  await scheduler.getByRole("link",{name:"Open inspection",exact:true}).click();
-  await expect(page).toHaveURL(/\/app\/admin\/inspections\/visit-1/);
+  await scheduler.getByRole("button",{name:"Open inspection",exact:true}).click();
+  const details=scheduler.frameLocator('iframe[title="Inspection for Test Customer"]');
+  await expect(details.getByRole('heading',{name:'Inspection details'})).toBeVisible();
+  await expect(page).toHaveURL('https://scheduler.test/original');
   expect(context.pages()).toHaveLength(2);
-  await expect(scheduler).toHaveURL(/\/app\/admin\/scheduler/);
+  await expect(scheduler).toHaveURL(url);
+  for(const size of [{width:1440,height:900},{width:800,height:500},{width:390,height:844}]) {
+    await scheduler.setViewportSize(size);
+    const popup=scheduler.getByRole('dialog',{name:'Inspection details',exact:true});
+    const box=(await popup.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x+box.width).toBeLessThanOrEqual(size.width);expect(box.y+box.height).toBeLessThanOrEqual(size.height);
+    await expect(scheduler.getByRole('button',{name:'Close inspection',exact:true})).toBeInViewport();
+  }
+  await details.getByRole('link',{name:'Reports'}).click();
+  await expect(details.getByRole('heading')).toBeVisible();
+  await expect(scheduler).toHaveURL(url);
+  const refresh=scheduler.waitForRequest(request=>request.url().includes('/api/admin/scheduler?'));
+  await scheduler.getByRole('button',{name:'Close inspection',exact:true}).click();
+  await refresh;
+  await expect(scheduler.getByRole('dialog',{name:'Inspection details',exact:true})).toHaveCount(0);
+  await expect(scheduler.getByRole('button',{name:'Open inspection',exact:true})).toBeFocused();
+  expect(requests).toHaveLength(0);
   await page.close();
-  await scheduler.getByRole("link",{name:"Open inspection",exact:true}).click();
-  await expect(scheduler).toHaveURL(/\/app\/admin\/inspections\/visit-1/);
+  await scheduler.getByRole("button",{name:"Open inspection",exact:true}).click();
+  await expect(details.getByRole('heading')).toBeVisible();
+  await details.getByLabel('Notes').fill('Unsaved note');
+  scheduler.once('dialog',dialog=>dialog.dismiss());
+  await scheduler.getByRole('button',{name:'Close inspection',exact:true}).click();
+  await expect(details.getByLabel('Notes')).toHaveValue('Unsaved note');
+  scheduler.once('dialog',dialog=>dialog.accept());
+  await details.getByLabel('Notes').press('Escape');
+  await expect(scheduler.getByRole('dialog',{name:'Inspection details',exact:true})).toHaveCount(0);
+  await expect(scheduler).toHaveURL(url);
   expect(context.pages()).toHaveLength(1);
+  expect(requests).toHaveLength(0);
 });
 
 async function fillJob(page: Page) {
