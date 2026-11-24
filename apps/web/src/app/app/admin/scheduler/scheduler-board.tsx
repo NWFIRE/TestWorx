@@ -27,7 +27,8 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
   const timezone = data.timezone, today = localDateTime(new Date(now), timezone).slice(0, 10);
   const current = selected ? data.jobs.find((job) => job.id === selected.id) ?? selected : null;
   const stale = Boolean(error) || now - new Date(data.fetchedAt).getTime() > 45000;
-  const time = (value: string) => new Intl.DateTimeFormat("en-US", { timeZone: timezone, hour: "numeric", minute: "2-digit" }).format(new Date(value));
+  const timeFormatter = new Intl.DateTimeFormat("en-US", { timeZone: timezone, hour: "numeric", minute: "2-digit" });
+  const time = (value: string) => timeFormatter.format(new Date(value));
   const planned = (job: SchedulerJob) => job.scheduledEnd ? `${time(job.scheduledStart)} - ${time(job.scheduledEnd)}` : "Time TBD";
   const belongs = (job: SchedulerJob, id: string) => id === "unassigned" ? !job.technicianIds.length : job.technicianIds.includes(id);
   const dayRanges = new Map(data.days.map((day) => [day, schedulerRange(day, "day", timezone)]));
