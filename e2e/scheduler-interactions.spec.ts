@@ -1,5 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { build } from "esbuild";
+import postcss from 'postcss';
+import tailwind from 'tailwindcss';
+import tailwindConfig from '../apps/web/tailwind.config';
 
 const job = {id:"visit-1",customer:"Test Customer",site:"Main Site",address:"",types:["fire_alarm"],technicianIds:["tech-1"],scheduledStart:"2026-11-24T15:00:00.000Z",scheduledEnd:"2026-11-24T16:00:00.000Z",updatedAt:"2026-11-24T12:00:00.000Z",status:"to_be_completed",sessions:[]};
 let assets: {js:string;css:string};
@@ -7,23 +10,33 @@ test.beforeAll(async () => {
   const result = await build({stdin:{loader:"tsx",resolveDir:process.cwd(),contents:`
     import React from 'react'; import {createRoot} from 'react-dom/client';
     import {SchedulerBoard} from './apps/web/src/app/app/admin/scheduler/scheduler-board';
-    createRoot(document.getElementById('app')).render(<SchedulerBoard initial={window.fixture} initialView="day" />);
-  `},bundle:true,write:false,outdir:"out",platform:"browser",format:"iife",jsx:"automatic",plugins:[{
+    createRoot(document.getElementById('app')).render(<SchedulerBoard initial={window.fixture} initialView="day" createOptions={{customers:[{id:'customer-1',name:'Test Customer'}],sites:[],technicians:[{id:'tech-1',name:'Technician One'}]}} />);
+  `},bundle:true,write:false,outdir:"out",platform:"browser",format:"iife",jsx:"automatic",tsconfig:'apps/web/tsconfig.json',define:{'process.env':'{"NODE_ENV":"production"}',global:'globalThis'},plugins:[{
     name:"fixture-boundaries",setup(plugin){
       plugin.onResolve({filter:/^next\/link$/},()=>({path:"link",namespace:"fixture"}));
+      plugin.onResolve({filter:/^next\/navigation$/},()=>({path:"navigation",namespace:"fixture"}));
+      plugin.onResolve({filter:/^\.\.\/actions$/},()=>({path:"actions",namespace:"fixture"}));
+      plugin.onResolve({filter:/^@\/app\/toast-provider$/},()=>({path:"toast",namespace:"fixture"}));
       plugin.onResolve({filter:/^\.\.\/\.\.\/service-directions$/},()=>({path:"directions",namespace:"fixture"}));
-      plugin.onLoad({filter:/.*/,namespace:"fixture"},args=>({loader:"jsx",resolveDir:process.cwd(),contents:args.path === "link" ? "import React from 'react'; export default function Link(props){return <a {...props}/>;}" : "export function ServiceDirections(){return null;}"}));
+      plugin.onLoad({filter:/.*/,namespace:"fixture"},args=>({loader:"jsx",resolveDir:process.cwd(),contents:
+        args.path === 'navigation' ? 'const router={push(url){location.assign(url)},refresh(){}}; export const useRouter=()=>router;' :
+        args.path === 'actions' ? 'export async function createInspectionAction(_,data){return (await fetch("/fixture/create",{method:"POST",body:data})).json();}' :
+        args.path === 'toast' ? 'const toast={showToast(){}}; export const useToast=()=>toast;' :
+        args.path === "link" ? "import React from 'react'; export default function Link(props){return <a {...props}/>;}" : "export function ServiceDirections(){return null;}"}));
     }
   }]});
   assets = {js:result.outputFiles.find(file=>file.path.endsWith('.js'))!.text,css:result.outputFiles.find(file=>file.path.endsWith('.css'))!.text};
+  assets.css = ':root{--tenant-primary-rgb:47 104 178;--tenant-accent-rgb:47 104 178;}' + (await postcss([tailwind({...tailwindConfig,content:['apps/web/src/app/app/admin/inspection-scheduler-form.tsx','apps/web/src/app/search-select.tsx','apps/web/src/app/app/admin/schedule-*.tsx']})]).process('@tailwind base; @tailwind utilities;',{from:undefined})).css + assets.css;
 });
 
 async function fixture(page:Page, conflict=false, startOnly=false, crowded=false) {
+  page.on('pageerror',error=>console.error('Scheduler fixture error:',error.message));
   let current = {...job, scheduledEnd: startOnly ? null : job.scheduledEnd};
   const requests: Record<string,unknown>[] = [];
   const data = () => ({timezone:"America/Chicago",days:["2026-11-24"],fetchedAt:new Date().toISOString(),truncated:false,technicians:[{id:"tech-1",name:"Technician One",isActive:true}],jobs:[current,...(crowded ? [{...current,id:"visit-2",customer:"Long customer name for nearby scheduled inspection",scheduledStart:"2026-11-24T15:15:00.000Z",scheduledEnd:"2026-11-24T15:45:00.000Z"}] : [])]});
   await page.context().route("https://scheduler.test/**", async route => {
     const url = new URL(route.request().url());
+    if(url.pathname === '/fixture.js') return route.fulfill({contentType:'text/javascript',body:assets.js});
     if (url.pathname === "/api/admin/scheduler") {
       if (route.request().method() === "POST") {
         const payload = route.request().postDataJSON(); requests.push(payload);
@@ -40,7 +53,7 @@ async function fixture(page:Page, conflict=false, startOnly=false, crowded=false
     if(url.pathname === "/app/admin/inspections" && url.searchParams.get("create") === "1") return route.fulfill({contentType:"text/html",body:"<h1>Create Inspection</h1>"});
     if(url.pathname.startsWith("/app/admin/inspections/")) return route.fulfill({contentType:"text/html",body:"<h1>Inspection details</h1>"});
     if(url.pathname === "/original") return route.fulfill({contentType:"text/html",body:'<a href="/app/admin/scheduler" target="_blank" rel="opener">Launch schedule</a>'});
-    return route.fulfill({contentType:"text/html",body:`<style>body{margin:16px;font:14px Arial}button{cursor:pointer}${assets.css}</style><div id="app"></div><script>window.fixture=${JSON.stringify(data())}</script><script>${assets.js}</script>`});
+    return route.fulfill({contentType:"text/html",body:`<style>body{margin:16px;font:14px Arial}button{cursor:pointer}${assets.css}</style><div id="app"></div><script>window.fixture=${JSON.stringify(data())}</script><script src="/fixture.js"></script>`});
   });
   await page.setViewportSize({width:1440,height:900});
   return requests;
@@ -80,7 +93,7 @@ test("Day and Week remain separated at desktop and phone widths",async({page})=>
     expect(week.x-day.x-day.width).toBeGreaterThanOrEqual(8);
     expect(week.y).toBe(day.y);
     await expect(page.getByRole('link',{name:'Home',exact:true})).toHaveAttribute('href','/app/admin/dashboard');
-    const addJob=page.getByRole('link',{name:'Add Job',exact:true});
+    const addJob=page.getByRole('button',{name:'Add Job',exact:true});
     await expect(addJob).toBeVisible();
     for(const state of ['default','hover','focus']) {
       if(state==='hover') await addJob.hover();
@@ -260,83 +273,137 @@ test("inspection reuses launching tab, then falls back to current tab when it cl
   expect(context.pages()).toHaveLength(1);
 });
 
-test("Add Job opens creation in the launching tab and falls back without extra windows",async({page,context})=>{
-  const requests=await fixture(page);
-  await page.goto('https://scheduler.test/original');
-  const popup=page.waitForEvent('popup');
-  await page.getByText('Launch schedule').click();
-  const scheduler=await popup;
-  await scheduler.getByRole('button',{name:'Week',exact:true}).click();
-  const schedulerUrl=scheduler.url();
-  const add=scheduler.getByRole('link',{name:'Add Job',exact:true});
-  await expect(add).toHaveAttribute('href','/app/admin/inspections?create=1');
-  await expect(scheduler.getByRole('button',{name:'Schedule job',exact:true})).toHaveCount(0);
-  await add.click();
-  await expect(page).toHaveURL('https://scheduler.test/app/admin/inspections?create=1');
-  await expect(scheduler.getByRole('status').filter({hasText:'Create Inspection opened'})).toBeVisible();
-  expect(await page.evaluate(()=>document.visibilityState === 'visible' && document.hasFocus())).toBe(true);
-  await expect(scheduler).toHaveURL(schedulerUrl);
-  await expect(scheduler.getByRole('dialog')).toHaveCount(0);
-  expect(context.pages()).toHaveLength(2);
-  expect(requests).toHaveLength(0);
-  await page.close();
-  await add.focus(); await scheduler.keyboard.press('Enter');
-  await expect(scheduler).toHaveURL('https://scheduler.test/app/admin/inspections?create=1');
-  expect(context.pages()).toHaveLength(1);
-  expect(requests).toHaveLength(0);
-});
+async function fillJob(page: Page) {
+  await page.getByRole('button',{name:'Add Job',exact:true}).click();
+  await page.getByPlaceholder('Search customers').fill('Test');
+  await page.getByRole('option',{name:'Test Customer',exact:true}).click();
+}
 
-test("Add Job uses the current tab when Scheduler was opened directly",async({page,context})=>{
-  const requests=await fixture(page);
+test('Add Job creates in a popup, closes on success, and preserves Scheduler date and view',async({page,context})=>{
+  await fixture(page);
+  let submissions=0;
+  await page.route('**/fixture/create',async route=>{
+    submissions++;
+    expect(route.request().postData()).toContain('2026-11-24T09:00');
+    await route.fulfill({json:{error:null,success:'Inspection created.',createdInspectionId:'new-job'}});
+  });
   await page.goto('https://scheduler.test/app/admin/scheduler');
-  await page.getByRole('link',{name:'Add Job',exact:true}).click();
-  await expect(page).toHaveURL('https://scheduler.test/app/admin/inspections?create=1');
+  await page.getByRole('button',{name:'Week',exact:true}).click();
+  const url=page.url();
+  await fillJob(page);
+  await expect(page.getByLabel('Inspection date',{exact:true})).toHaveValue('2026-11-24');
+  const refresh=page.waitForRequest(request=>request.url().includes('/api/admin/scheduler?'));
+  await page.getByRole('button',{name:'Create inspection',exact:true}).click();
+  await refresh;
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page).toHaveURL(url);
+  await expect(page.getByRole('button',{name:'Week',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByRole('button',{name:'Add Job',exact:true})).toBeFocused();
+  expect(await page.evaluate(()=>document.body.style.overflow)).not.toBe('hidden');
+  expect(submissions).toBe(1);
   expect(context.pages()).toHaveLength(1);
-  expect(requests).toHaveLength(0);
 });
 
-test('Add Job requests foreground focus synchronously before the original window navigates',async({page})=>{
+test('creation errors preserve the popup and entered values; saving blocks dismissal',async({page})=>{
+  await fixture(page);
+  let release!:()=>void;
+  const pending=new Promise<void>(resolve=>{release=resolve;});
+  await page.route('**/fixture/create',async route=>{
+    await pending;
+    await route.fulfill({json:{error:'Please try again.',success:null}});
+  });
+  await page.goto('https://scheduler.test/app/admin/scheduler');
+  await fillJob(page);
+  const request=page.waitForRequest('**/fixture/create');
+  await page.getByRole('button',{name:'Create inspection',exact:true}).click();
+  await request;
+  await expect(page.getByRole('button',{name:'Close',exact:true})).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  release();
+  await expect(page.getByRole('button',{name:'Create inspection',exact:true})).toBeEnabled();
+  await expect(page.getByPlaceholder('Search customers')).toHaveValue('Test Customer');
+  page.once('dialog',dialog=>dialog.dismiss());
+  await page.getByRole('button',{name:'Close',exact:true}).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  page.once('dialog',dialog=>dialog.accept());
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('creation popup fits short and mobile windows without losing entered values',async({page})=>{
   await fixture(page);
   await page.goto('https://scheduler.test/app/admin/scheduler');
-  await page.evaluate(()=>{
-    const calls:string[]=[];
-    const originalLocation={origin:location.origin,href:location.origin+'/original',assign(href:string){
-      calls.push('navigate');
-      setTimeout(()=>{originalLocation.href=href;},150);
-    }};
-    Object.defineProperty(window,'opener',{configurable:true,value:{closed:false,location:originalLocation,
-      document:{visibilityState:'visible',hasFocus:()=>true},focus(){calls.push('focus');}}});
-    (window as unknown as {handoffCalls:string[]}).handoffCalls=calls;
-  });
-  await page.getByRole('link',{name:'Add Job',exact:true}).click();
-  await expect(page.getByRole('status').filter({hasText:'Create Inspection opened'})).toBeVisible();
-  expect(await page.evaluate(()=>(window as unknown as {handoffCalls:string[]}).handoffCalls.slice(0,2))).toEqual(['focus','navigate']);
-  await expect(page).toHaveURL('https://scheduler.test/app/admin/scheduler');
+  await fillJob(page);
+  for(const size of [{width:1440,height:720},{width:800,height:500},{width:390,height:844}]) {
+    await page.setViewportSize(size);
+    const dialog=page.getByRole('dialog');
+    const box=(await dialog.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x+box.width).toBeLessThanOrEqual(size.width);expect(box.y+box.height).toBeLessThanOrEqual(size.height);
+    await expect(page.getByPlaceholder('Search customers')).toHaveValue('Test Customer');
+    await page.getByRole('button',{name:'Create inspection',exact:true}).scrollIntoViewIfNeeded();
+    await expect(page.getByRole('button',{name:'Create inspection',exact:true})).toBeInViewport();
+    expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+    await page.screenshot({path:test.info().outputPath(`create-popup-${size.width}.png`)});
+  }
 });
 
-for (const failure of ['ignored', 'throws', 'self', 'background', 'hidden'] as const) {
-  test(`Add Job falls back when the original window is ${failure}`,async({page,context})=>{
-    const requests=await fixture(page);
-    await page.goto('https://scheduler.test/app/admin/scheduler');
-    await page.evaluate(mode=>{
-      const opener=mode==='self' ? window : {
-        closed:false,
-        location:{origin:location.origin,href:location.origin+'/original',assign(href:string){
-          if(mode==='throws') throw new Error('Navigation blocked');
-          if(mode==='background' || mode==='hidden') this.href=href;
-        }},
-        document:{visibilityState:mode==='hidden'?'hidden':'visible',hasFocus:()=>mode==='hidden'},
-        focus(){}
-      };
-      Object.defineProperty(window,'opener',{configurable:true,value:opener});
-    },failure);
-    await page.getByRole('link',{name:'Add Job',exact:true}).click();
-    await expect(page).toHaveURL('https://scheduler.test/app/admin/inspections?create=1');
-    await expect(page.getByRole('heading',{name:'Create Inspection',exact:true})).toBeVisible();
-    expect(context.pages()).toHaveLength(1);
-    expect(requests).toHaveLength(0);
+for(const uploadFails of [false,true]) test(`creation waits for PDF uploads and handles failure=${uploadFails} without navigating`,async({page})=>{
+  await fixture(page);
+  let submissions=0;
+  await page.route('**/fixture/create',route=>{submissions++;return route.fulfill({json:{error:null,success:'Inspection created.',createdInspectionId:'new-job'}});});
+  let release!:()=>void;
+  const pending=new Promise<void>(resolve=>{release=resolve;});
+  await page.route('**/api/inspections/new-job/documents/upload',async route=>{
+    await pending;
+    await route.fulfill({status:uploadFails?500:200,json:uploadFails?{error:'Upload unavailable.'}:{success:'Uploaded'}});
   });
-}
+  await page.goto('https://scheduler.test/app/admin/scheduler');
+  await fillJob(page);
+  await page.locator('#externalDocuments').setInputFiles({name:'report.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.4\nfixture')});
+  const uploading=page.waitForRequest('**/api/inspections/new-job/documents/upload');
+  await page.getByRole('button',{name:'Create inspection',exact:true}).click();
+  await uploading;
+  await expect(page.getByRole('button',{name:'Close',exact:true})).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  release();
+  if(uploadFails) {
+    await expect(page.getByRole('alert')).toContainText('Inspection created; PDFs need attention');
+    await expect(page.getByRole('link',{name:'Open created inspection'})).toHaveAttribute('href','/app/admin/inspections/new-job');
+    await expect(page.getByRole('button',{name:'Create inspection',exact:true})).toHaveCount(0);
+    await page.getByRole('button',{name:'Close',exact:true}).click();
+  }
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page).toHaveURL('https://scheduler.test/app/admin/scheduler');
+  expect(submissions).toBe(1);
+});
+
+test('duplicate review remains inside creation and adding to an existing inspection does not navigate',async({page})=>{
+  await fixture(page);
+  let submissions=0;
+  await page.route('**/fixture/create',route=>{
+    submissions++;
+    if(submissions===3) expect(route.request().postData()).toContain('add_to_existing');
+    return route.fulfill({json:submissions<3?{error:null,success:null,duplicateWarning:{matches:[{
+      id:'existing',status:'to_be_completed',inspectionClassification:'standard',customerName:'Test Customer',siteName:'Site',
+      scheduledStart:job.scheduledStart,reportTypes:[],assignedTechnicians:[],duplicateReasons:[],missingReportTypes:[{inspectionType:'fire_alarm',label:'Fire alarm'}],canAddReportTypesToExisting:true
+    }]}}:{error:null,success:'Report type added.',createdInspectionId:'existing',redirectTo:'/app/admin/inspections/existing'}});
+  });
+  await page.goto('https://scheduler.test/app/admin/scheduler');
+  await fillJob(page);
+  await page.getByRole('button',{name:'Create inspection',exact:true}).click();
+  await expect(page.getByRole('dialog',{name:'Potential Duplicate Inspection Detected'})).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog',{name:'Create inspection',exact:true})).toBeVisible();
+  await expect(page.getByRole('dialog',{name:'Potential Duplicate Inspection Detected'})).toHaveCount(0);
+  await page.getByRole('button',{name:'Create inspection',exact:true}).click();
+  await page.getByRole('button',{name:'Add Fire alarm To Existing Inspection'}).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(await page.evaluate(()=>document.body.style.overflow)).not.toBe('hidden');
+  await expect(page).toHaveURL('https://scheduler.test/app/admin/scheduler');
+});
 
 test("Escape cancels a drag and narrow layouts retain reachable job details",async({page})=>{
   const requests=await fixture(page);

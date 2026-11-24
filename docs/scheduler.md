@@ -12,18 +12,16 @@ No extra inspection tab is created by a normal click.
 Week uses Monday through Sunday in the tenant's configured timezone. Empty team
 rows remain visible. Phones use an agenda; larger screens scroll inside the board.
 
-Select Add Job to open the existing Create Inspection form in the same-origin
-TradeWorx tab that launched Scheduler. If that tab is unavailable, the form opens
-in the current tab. No additional window is created. Scheduler date/view remain
-unchanged when the launching tab is reused. The action verifies the original
-window reached the creation URL and its document is visible and focused; if navigation
-or foreground focus is ignored or blocked, it opens
-the form in the current window after at most two seconds. A normal anchor also
-provides navigation without relying on Next.js client-side routing.
-Foreground focus is requested synchronously during the Add Job click, before
-navigation and its asynchronous verification. Browser/OS focus policies still apply;
-the automatic current-window fallback ensures no extra click is required when
-the browser refuses to bring the original window forward.
+Select Add Job to open the shared Create Inspection form in a modal over Scheduler.
+It defaults to the selected date at 9:00 AM, with an editable appointment and duration.
+Customers, sites, and technicians use the same company-scoped options and creation
+action as the Inspections page. No other window or tab is opened or navigated.
+After creation and any PDF uploads succeed, the modal closes and the board refreshes
+without changing its date or Day/Week view. Errors leave the form open. Closing a
+changed form asks before discarding it; saving/uploading blocks dismissal. A failed
+PDF upload shows the saved inspection link without creating another inspection or
+automatically navigating away. The modal scrolls within short/mobile windows and
+returns keyboard focus to Add Job when closed.
 
 To reschedule an existing job, open its card and select Reschedule / reassign, choose all assigned technicians,
 and enter a start/end or choose Duration (hours) in half-hour increments. Overlaps require explicit acknowledgement. Concurrent edits
