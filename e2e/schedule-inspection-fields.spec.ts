@@ -15,6 +15,9 @@ test("optional inspection appointment is accessible, required only when enabled,
   await expect(page.getByLabel("Inspection date", {exact:true})).toHaveCount(0);
   await page.getByRole("checkbox", {name:"Schedule Inspection"}).check();
   expect(await page.locator("form").evaluate(form => (form as HTMLFormElement).checkValidity())).toBe(false);
+  await page.getByLabel("Inspection date", {exact:true}).fill("2026-12-15");
+  await expect(page.locator('[name="inspectionAppointment"]')).toHaveValue("2026-12-15T09:00");
+  await page.getByLabel("Inspection date", {exact:true}).fill("");
   await page.getByLabel("Inspection hour", {exact:true}).selectOption("10");
   await page.getByLabel("Inspection minute", {exact:true}).selectOption("30");
   await expect(page.getByLabel("Inspection minute", {exact:true}).locator("option")).toHaveText(["00", "15", "30", "45"]);

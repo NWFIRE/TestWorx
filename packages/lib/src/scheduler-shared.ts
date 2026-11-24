@@ -76,12 +76,17 @@ export function fieldProgress(job: SchedulerJob, now: number, technicianId?: str
   return latest ? "Paused" : "Not started";
 }
 
+/** A start-only visit gets a small visual marker, not a persisted duration. */
+export function schedulerDisplayEnd(job: SchedulerJob) {
+  return job.scheduledEnd ?? new Date(new Date(job.scheduledStart).getTime() + 15 * 60000).toISOString();
+}
+
 /** Stable interval partitioning: every overlapping appointment gets its own lane. */
 export function scheduleLanes(jobs: SchedulerJob[], start: number, end: number) {
   const lanes: number[] = [];
-  return jobs.filter((j) => j.scheduledEnd && new Date(j.scheduledStart).getTime() < end && new Date(j.scheduledEnd).getTime() > start)
+  return jobs.filter((j) => new Date(j.scheduledStart).getTime() < end && (j.scheduledEnd ? new Date(j.scheduledEnd).getTime() > start : new Date(j.scheduledStart).getTime() >= start))
     .sort((a, b) => a.scheduledStart.localeCompare(b.scheduledStart) || a.id.localeCompare(b.id)).map((job) => {
-      const from = Math.max(start, new Date(job.scheduledStart).getTime()), to = Math.min(end, new Date(job.scheduledEnd!).getTime());
+      const from = Math.max(start, new Date(job.scheduledStart).getTime()), to = Math.min(end, new Date(schedulerDisplayEnd(job)).getTime());
       let lane = lanes.findIndex((until) => until <= from);
       if (lane === -1) lane = lanes.length;
       lanes[lane] = to;

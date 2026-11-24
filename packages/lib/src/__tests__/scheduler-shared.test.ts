@@ -2,6 +2,21 @@ import { describe, expect, it } from "vitest";
 import { fieldProgress, localDateTime, resizedScheduleEnd, scheduleLanes, schedulerInstant, schedulerRange, shiftSchedulerDate, type SchedulerJob } from "../scheduler-shared";
 const job: SchedulerJob = { id: "one", customer: "Customer", site: "Site", address: "", types: [], technicianIds: ["a"], scheduledStart: "2026-11-19T15:00:00Z", scheduledEnd: "2026-11-19T16:00:00Z", updatedAt: "2026-11-19T12:00:00Z", status: "to_be_completed", sessions: [] };
 describe("scheduler dates and layout", () => {
+  it.each(["2026-11-19T15:00:00Z", "2026-11-19T17:45:00Z"])("positions a start-only visit at its saved time %s without changing data", scheduledStart => {
+    const startOnly = {...job, scheduledStart, scheduledEnd:null};
+    const range = schedulerRange("2026-11-19", "day", "America/Chicago");
+    const lanes = scheduleLanes([startOnly], +range.start, +range.end);
+    expect(lanes).toHaveLength(1);
+    expect(lanes[0].left).toBe((+new Date(scheduledStart) - +range.start) / (+range.end - +range.start) * 100);
+    expect(lanes[0].job.scheduledEnd).toBeNull();
+    expect(startOnly.scheduledStart).toBe(scheduledStart);
+    expect(scheduleLanes([startOnly], +range.end, +range.end + 86400000)).toEqual([]);
+  });
+  it("keeps start-only markers separate from overlapping appointments", () => {
+    const range = schedulerRange("2026-11-19", "day", "America/Chicago");
+    const lanes = scheduleLanes([job, {...job,id:"start-only",scheduledEnd:null}], +range.start, +range.end);
+    expect(lanes.map(lane => lane.lane)).toEqual([0,1]);
+  });
   it("snaps resized ends to quarters and bounds duration", () => {
     expect(resizedScheduleEnd(job.scheduledStart, job.scheduledEnd!, 22)).toBe("2026-11-19T16:15:00.000Z");
     expect(resizedScheduleEnd(job.scheduledStart, job.scheduledEnd!, -300)).toBe("2026-11-19T15:15:00.000Z");

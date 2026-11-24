@@ -13,7 +13,11 @@ Select Schedule job, search an existing inspection, choose all assigned technici
 and enter a start/end. Overlaps require explicit acknowledgement. Concurrent edits
 require reloading details. Rescheduling changes only the selected appointment and
 assignments, not recurrence anchors, task due periods, or future inspections.
-Missing planned end times display Time TBD. Closed inspections are read-only.
+Visits without a planned end still display their saved start time (including an
+unchanged 9:00 AM default) and "End not set" in Day, Week, and mobile agenda views.
+Day view places a small 15-minute visual marker at the saved start; this is not
+a stored or assumed duration. An explicit resize can set the end time. Merely
+viewing or refreshing never fills in an end or changes the start. Closed inspections are read-only.
 
 Drag the right-edge grip of a Day appointment to adjust its end time in 15-minute
 increments. In Week view, drag the bottom grip up/down (16 pixels per quarter hour).

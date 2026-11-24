@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { fieldProgress, localDateTime, scheduleLanes, schedulerRange, shiftSchedulerDate, type SchedulerData, type SchedulerJob } from "@testworx/lib/scheduler-shared";
+import { fieldProgress, localDateTime, scheduleLanes, schedulerDisplayEnd, schedulerRange, shiftSchedulerDate, type SchedulerData, type SchedulerJob } from "@testworx/lib/scheduler-shared";
 import { getInspectionTypeTextColorClass } from "../../inspection-type-inline-list";
 import styles from "./scheduler.module.css";
 import banner from "../../page-banner.module.css";
@@ -29,7 +29,7 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
   const stale = Boolean(error) || now - new Date(data.fetchedAt).getTime() > 45000;
   const timeFormatter = new Intl.DateTimeFormat("en-US", { timeZone: timezone, hour: "numeric", minute: "2-digit" });
   const time = (value: string) => timeFormatter.format(new Date(value));
-  const planned = (job: SchedulerJob) => job.scheduledEnd ? `${time(job.scheduledStart)} - ${time(job.scheduledEnd)}` : "Time TBD";
+  const planned = (job: SchedulerJob) => job.scheduledEnd ? `${time(job.scheduledStart)} - ${time(job.scheduledEnd)}` : `${time(job.scheduledStart)} · End not set`;
   const belongs = (job: SchedulerJob, id: string) => id === "unassigned" ? !job.technicianIds.length : job.technicianIds.includes(id);
   const dayRanges = new Map(data.days.map((day) => [day, schedulerRange(day, "day", timezone)]));
   const onDay = (job: SchedulerJob, day: string) => {
@@ -128,8 +128,8 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
     finally { saveBusy.current = false; setSaving(false); }
   }
   function resizeHandle(job: SchedulerJob, vertical = false) {
-    if (!job.scheduledEnd || job.archived || ["completed", "invoiced", "cancelled"].includes(job.status)) return null;
-    return <ResizeHandle start={job.scheduledStart} end={job.scheduledEnd} label={job.customer || job.site} vertical={vertical} disabled={saving}
+    if (job.archived || ["completed", "invoiced", "cancelled"].includes(job.status)) return null;
+    return <ResizeHandle start={job.scheduledStart} end={schedulerDisplayEnd(job)} label={job.customer || job.site} vertical={vertical} disabled={saving}
       onPreview={end => setResizePreview(end ? {id: job.id, end} : null)} onCommit={end => void resize(job, end)} />;
   }
   async function save(event: React.FormEvent) {
@@ -171,7 +171,7 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
     {data.truncated && <p className={styles.warning}>This range exceeds 2,000 visits. Use Day view to see a smaller range.</p>}
     {notice && <p role="status" className={styles.warning}>{notice}</p>}
     {resizePreview && <p role="status" className={styles.warning}>New end: {new Intl.DateTimeFormat("en-US", {timeZone: timezone, month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}).format(new Date(resizePreview.end))}</p>}
-    <p className={styles.caption}>{data.days[0]}{data.days.length > 1 ? ` through ${data.days[6]}` : ""} · {data.jobs.length} visits · Unplanned durations appear as Time TBD.</p>
+    <p className={styles.caption}>{data.days[0]}{data.days.length > 1 ? ` through ${data.days[6]}` : ""} · {data.jobs.length} visits</p>
     <div className={styles.board} tabIndex={0} aria-label={`${view} scheduling board`}>
       <div className={styles.desktop} style={{ minWidth: view === "day" ? 1776 : 1510 }}>
         <div className={styles.heading}><div className={styles.name}>Technician</div><div className={styles.axis}>
@@ -181,14 +181,14 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
         {rows.map((tech) => {
           const jobs = data.jobs.filter((j) => belongs(j, tech.id));
           const lanes = scheduleLanes(jobs, from, until), count = Math.max(1, ...lanes.map((l) => l.lane + 1));
-          const tbd = jobs.filter((j) => !j.scheduledEnd || (!onDay(j, data.days[0]!) && j.sessions.some((s) => !s.endedAt)));
+          const tbd = jobs.filter((j) => !onDay(j, data.days[0]!) && j.sessions.some((s) => !s.endedAt));
           return <div key={tech.id} className={styles.row}><div className={styles.name}><strong>{tech.name}</strong><small>{tech.isActive ? `${jobs.length} visits` : "Inactive · existing assignments"}</small></div>
             {view === "week" ? <div className={styles.week}>{data.days.map((day) => <div key={day}>{jobs.filter((j) => onDay(j, day) || (day === today && j.sessions.some((s) => !s.endedAt))).map((job) => <div key={job.id} className={styles.weekJob}>{card(job, tech.id, true)}{resizeHandle(job, true)}</div>)}</div>)}</div>
               : <div className={styles.day}><div className={styles.timeline} data-day-minutes={(until - from) / 60000} style={{ height: count * 94 + 16, backgroundSize: `${100 / hours.length}% 100%` }}>
-                {lanes.map(({ job, lane, left, width }) => <div key={job.id} className={styles.slot} style={{ top: lane * 94 + 8, left: `${left}%`, width: `${Math.max(resizePreview?.id === job.id ? (Math.min(until, +new Date(resizePreview.end)) - Math.max(from, +new Date(job.scheduledStart))) / (until - from) * 100 : width, 0.25)}%` } as CSSProperties}>{card(job, tech.id, true)}{new Date(job.scheduledEnd!).getTime() <= until && resizeHandle(job)}</div>)}
+                {lanes.map(({ job, lane, left, width }) => <div key={job.id} className={styles.slot} data-scheduled-start={job.scheduledStart} style={{ top: lane * 94 + 8, left: `${left}%`, width: `${Math.max(resizePreview?.id === job.id ? (Math.min(until, +new Date(resizePreview.end)) - Math.max(from, +new Date(job.scheduledStart))) / (until - from) * 100 : width, 0.25)}%` } as CSSProperties}>{card(job, tech.id, true)}{new Date(schedulerDisplayEnd(job)).getTime() <= until && resizeHandle(job)}</div>)}
                 {!jobs.length && <p className={styles.gap}>No jobs scheduled</p>}
                 {data.days[0] === today && now >= from && now < until && <span aria-label="Current time" className={styles.now} style={{ left: `${(now - from) / (until - from) * 100}%` }} />}
-              </div>{lanes.some((l) => l.width < 12) && <div className={styles.tbd}><span>Short visits</span>{lanes.filter((l) => l.width < 12).map(({ job }) => card(job, tech.id, true))}</div>}{tbd.length > 0 && <div className={styles.tbd}><span>Time TBD / active outside planned day</span>{tbd.map((j) => card(j, tech.id, true))}</div>}</div>}
+              </div>{lanes.some((l) => l.width < 12) && <div className={styles.tbd}><span>Visit details</span>{lanes.filter((l) => l.width < 12).map(({ job }) => card(job, tech.id, true))}</div>}{tbd.length > 0 && <div className={styles.tbd}><span>Active outside planned day</span>{tbd.map((j) => card(j, tech.id, true))}</div>}</div>}
           </div>;
         })}
       </div>
