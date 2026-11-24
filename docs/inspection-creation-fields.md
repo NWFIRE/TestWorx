@@ -27,6 +27,14 @@ the Scheduler's existing DST-safe conversion. Duplicate detection and creation u
 the same appointment-aware visit plan. The first day of a month is treated as an
 explicit appointment, not mistaken for the automatic month anchor.
 
+Appointment creation, Scheduler start/end editing, and the inspection's Change
+scheduled date card share a date field with hour, 15-minute, and AM/PM selectors.
+New minute choices are 00, 15, 30, and 45. Existing off-quarter saved times remain
+visible and unchanged until the user selects a replacement. The submitted local
+date/time format and server timezone validation are unchanged. Browser component
+tests cover form submission, required dates, time-first entry, midnight/noon,
+mobile resizing, and preservation of existing off-quarter minutes.
+
 Verification: 77 scheduling/Scheduler tests and three browser fixtures passed. Browser fixtures
 render the actual conditional JSX extracted from the form and verify create/edit
 visibility and submitted hidden values. No production inspection was created as a test.

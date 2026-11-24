@@ -6,6 +6,7 @@ import { getInspectionTypeTextColorClass } from "../../inspection-type-inline-li
 import styles from "./scheduler.module.css";
 import banner from "../../page-banner.module.css";
 import { ServiceDirections } from "../../service-directions";
+import { ScheduleDateTime } from "../schedule-date-time";
 
 const labelType = (type: string) => type.replaceAll("_", " ");
 export function SchedulerBoard({ initial, initialView }: { initial: SchedulerData; initialView: "day" | "week" }) {
@@ -172,8 +173,8 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
         {editing && <form onSubmit={save} onChange={(e) => { if (!(e.target instanceof HTMLInputElement) || e.target.name !== "overlap") { setAllowOverlap(false); setConflicts([]); } }}>
           <p>Only this visit changes. Future recurring visits stay unchanged.</p>
           {current.updatedAt !== version && <p className={styles.warning}>This job changed while you were editing. <button type="button" onClick={() => edit(current)}>Reload details</button></p>}
-          <label>Start ({timezone})<input type="datetime-local" required value={start} onChange={(e) => setStart(e.target.value)} /></label>
-          <label>End<input type="datetime-local" required value={end} onChange={(e) => setEnd(e.target.value)} /></label>
+          <ScheduleDateTime label={`Start (${timezone})`} required value={start} onChange={setStart} />
+          <ScheduleDateTime label="End" required value={end} onChange={setEnd} />
           <fieldset><legend>Assigned technicians</legend>{data.technicians.filter((t) => t.isActive || ids.includes(t.id)).map((tech) => <label key={tech.id} className={styles.check}><input type="checkbox" checked={ids.includes(tech.id)} onChange={(e) => setIds((old) => e.target.checked ? [...old, tech.id] : old.filter((id) => id !== tech.id))} />{tech.name}{!tech.isActive ? " (inactive; remove before saving)" : ""}</label>)}</fieldset>
           {!!conflicts.length && <div className={styles.warning}>Overlaps: {conflicts.join(", ")}<label className={styles.check}><input name="overlap" type="checkbox" checked={allowOverlap} onChange={(e) => setAllowOverlap(e.target.checked)} />Schedule despite these overlaps</label></div>}
           <button type="submit" className={styles.primary} disabled={saving || !ids.length || current.updatedAt !== version}>{saving ? "Saving..." : "Save schedule"}</button>

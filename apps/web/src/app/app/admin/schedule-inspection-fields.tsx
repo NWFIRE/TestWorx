@@ -1,5 +1,7 @@
 "use client";
 
+import { ScheduleDateTime } from "./schedule-date-time";
+
 export function ScheduleInspectionFields({ enabled, dateTime, onToggle, onChange, description }: {
   enabled: boolean;
   dateTime: string;
@@ -13,8 +15,7 @@ export function ScheduleInspectionFields({ enabled, dateTime, onToggle, onChange
       Schedule Inspection
     </label>
     {enabled ? <div className="mt-3 min-w-0">
-      <label htmlFor="inspectionAppointment" className="mb-2 block text-sm font-medium text-slate-600">Inspection date and time</label>
-      <input id="inspectionAppointment" name="inspectionAppointment" type="datetime-local" required value={dateTime} onChange={event => onChange(event.target.value)} className="block min-h-11 w-full min-w-0 max-w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900" />
+      <ScheduleDateTime name="inspectionAppointment" label="Inspection" required value={dateTime} onChange={onChange} />
       <p className="mt-2 text-sm text-slate-600">{description}</p>
     </div> : null}
   </section>;

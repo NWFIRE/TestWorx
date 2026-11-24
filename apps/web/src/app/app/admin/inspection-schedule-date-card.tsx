@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { ScheduleDateTime } from "./schedule-date-time";
 
 const initialState = {
   error: null as string | null,
@@ -39,25 +40,8 @@ export function InspectionScheduleDateCard({
         </div>
       </div>
       <div className="mt-5 grid gap-4 md:grid-cols-2">
-        <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Scheduled start</span>
-          <input
-            className="mt-2 min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-slateblue focus:ring-4 focus:ring-slateblue/10"
-            defaultValue={scheduledStart}
-            name="scheduledStart"
-            required
-            type="datetime-local"
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Scheduled end</span>
-          <input
-            className="mt-2 min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-slateblue focus:ring-4 focus:ring-slateblue/10"
-            defaultValue={scheduledEnd}
-            name="scheduledEnd"
-            type="datetime-local"
-          />
-        </label>
+        <ScheduleDateTime label="Scheduled start" defaultValue={scheduledStart} name="scheduledStart" required />
+        <ScheduleDateTime label="Scheduled end" defaultValue={scheduledEnd} name="scheduledEnd" />
       </div>
       <p className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
         Saving updates this existing visit, its service due month, and linked recurrence schedule. No new visit is created.
