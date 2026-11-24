@@ -269,6 +269,25 @@
 .warning button {
   text-decoration: underline;
 }
+.resizeStatus {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 20;
+  max-width: min(440px, calc(100vw - 48px));
+  box-sizing: border-box;
+  border: 1px solid #91a9c5;
+  border-radius: 10px;
+  background: #203f66;
+  color: #fff;
+  padding: 10px 14px;
+  font-size: 13px;
+  box-shadow: 0 4px 18px #14223826;
+  pointer-events: none;
+}
+.resizeStatus:empty {
+  opacity: 0;
+}
 .panel {
   position: fixed;
   inset: 0 0 0 auto;

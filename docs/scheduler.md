@@ -41,6 +41,8 @@ report status, and field progress. No schema migration is needed.
 Click outside the detail panel or press Escape to close it. Unsaved edits prompt
 before dismissal; saves in progress cannot be dismissed. The board now uses a
 darker time header, stronger row/grid dividers, and shaded appointment cards.
+Resize previews and save feedback use a non-interactive fixed status overlay,
+so showing or clearing feedback does not move the board or its drag handles.
 
 The visible range refreshes every 15 seconds while the page is visible, and on
 focus/reconnect. Delayed updates are indicated after 45 seconds or a failed fetch.

@@ -69,6 +69,39 @@ test("Day resize saves only the end; outside click dismisses; keyboard works", a
   await page.screenshot({path:"output/scheduler-day-updated.png",fullPage:true});
 });
 
+for (const view of ["day", "week"] as const) {
+  test(`${view} resize feedback never shifts the board or scroll position`, async ({page}) => {
+    const requests = await fixture(page);
+    await page.setViewportSize({width:800,height:720});
+    await page.goto("https://scheduler.test/app/admin/scheduler");
+    if (view === "week") await page.getByRole("button",{name:"Week",exact:true}).click();
+    const board = page.getByLabel(`${view} scheduling board`,{exact:true});
+    const handle = page.getByRole("button",{name:"Resize Test Customer",exact:true});
+    await handle.scrollIntoViewIfNeeded();
+    const snapshot = () => board.evaluate(element => ({top:element.getBoundingClientRect().top,height:element.getBoundingClientRect().height,left:element.scrollLeft,scroll:element.scrollTop,page:window.scrollY}));
+    const before = await snapshot();
+    const box = (await handle.boundingBox())!;
+    const x = box.x+box.width/2, y = box.y+box.height/2;
+    await page.mouse.move(x,y); await page.mouse.down();
+    await page.mouse.move(x+(view === "day" ? 32 : 0),y+(view === "week" ? 32 : 0),{steps:6});
+    await expect(page.getByRole("status").filter({hasText:"New end:"})).toBeVisible();
+    expect(await snapshot()).toEqual(before);
+    await page.mouse.up();
+    await expect(page.getByRole("status").filter({hasText:"Scheduled duration updated"})).toBeVisible();
+    expect(await snapshot()).toEqual(before);
+    expect(requests).toHaveLength(1);
+    const next = (await handle.boundingBox())!;
+    await page.mouse.move(next.x+next.width/2,next.y+next.height/2); await page.mouse.down();
+    await page.mouse.move(next.x+next.width/2+32,next.y+next.height/2+32,{steps:4});
+    await expect(page.getByRole("status").filter({hasText:"New end:"})).toBeVisible();
+    expect(await snapshot()).toEqual(before);
+    await page.keyboard.press("Escape"); await page.mouse.up();
+    await expect(page.getByText(/New end:/)).toHaveCount(0);
+    expect(await snapshot()).toEqual(before);
+    expect(requests).toHaveLength(1);
+  });
+}
+
 test("a saved 9 AM start remains on the timeline without an end time or a resave", async ({page}) => {
   const requests = await fixture(page, false, true);
   await page.goto("https://scheduler.test/app/admin/scheduler");

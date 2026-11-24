@@ -187,8 +187,7 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
     </header>
     {stale && <p role="status" className={styles.warning}>{error || "Displayed data may be stale."} Last updated {time(data.fetchedAt)}. <button type="button" onClick={() => refresh.current()}>Retry</button></p>}
     {data.truncated && <p className={styles.warning}>This range exceeds 2,000 visits. Use Day view to see a smaller range.</p>}
-    {notice && <p role="status" className={styles.warning}>{notice}</p>}
-    {resizePreview && <p role="status" className={styles.warning}>New end: {new Intl.DateTimeFormat("en-US", {timeZone: timezone, month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}).format(new Date(resizePreview.end))}</p>}
+    <div role="status" aria-atomic="true" className={styles.resizeStatus}>{resizePreview ? `New end: ${new Intl.DateTimeFormat("en-US", {timeZone: timezone, month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}).format(new Date(resizePreview.end))}` : notice}</div>
     <p className={styles.caption}>{data.days[0]}{data.days.length > 1 ? ` through ${data.days[6]}` : ""} · {data.jobs.length} visits</p>
     <div className={styles.board} tabIndex={0} aria-label={`${view} scheduling board`}>
       <div ref={desktop} className={styles.desktop} style={{ minWidth: view === "day" ? 1776 : 1510 }}>
