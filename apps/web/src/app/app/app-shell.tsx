@@ -260,7 +260,7 @@ function NavItem({
       } ${collapsed ? "justify-center !px-2" : ""} ${compact ? "min-h-[48px]" : ""}`}
       href={item.href}
       target={item.openInNewTab ? "_blank" : undefined}
-      rel={item.openInNewTab ? "noopener noreferrer" : undefined}
+      rel={item.openInNewTab ? (item.href === "/app/admin/scheduler" ? "opener" : "noopener noreferrer") : undefined}
       onClick={() => { if (!item.openInNewTab) onNavigate?.(item.href); }}
       onFocus={() => onPrefetch?.(item.href)}
       onPointerEnter={() => onPrefetch?.(item.href)}

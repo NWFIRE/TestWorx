@@ -18,6 +18,30 @@ beforeEach(() => {
   db.inspection.updateMany.mockResolvedValue({ count: 1 });
 });
 describe("scheduler authorization and dispatch", () => {
+  it("resizes an unassigned visit without assigning, claiming, or changing its start/status", async () => {
+    db.inspection.findFirst.mockResolvedValue({...job, assignedTechnicianId:null, technicianAssignments:[]});
+    await saveSchedulerJob(actor, {...input, start:"2026-11-19T09:00", end:"2026-11-19T11:15", technicianIds:[], resizeOnly:true});
+    expect(db.inspection.updateMany).toHaveBeenCalledWith({where:{tenantId:"tenant", id:"job", updatedAt:job.updatedAt},data:{scheduledEnd:new Date("2026-11-19T17:15:00Z")}});
+    expect(db.inspectionTechnicianAssignment.deleteMany).not.toHaveBeenCalled();
+    expect(db.inspectionTechnicianAssignment.createMany).not.toHaveBeenCalled();
+  });
+  it("does not allow resize requests to change assignments or start", async () => {
+    await expect(saveSchedulerJob(actor, {...input, resizeOnly:true})).rejects.toThrow("only change the end");
+    await expect(saveSchedulerJob(actor, {...input, start:"2026-11-19T09:00", end:"2026-11-19T11:00", resizeOnly:true, technicianIds:["a"]})).rejects.toThrow("only change the end");
+    expect(db.inspection.updateMany).not.toHaveBeenCalled();
+  });
+  it("keeps overlap, version and closed-record checks for resizing", async () => {
+    const resize = {...input, start:"2026-11-19T09:00", end:"2026-11-19T11:15", resizeOnly:true};
+    db.inspection.findMany.mockResolvedValue([{id:"other", customerCompany:{name:"Other"}}]);
+    expect((await saveSchedulerJob(actor, resize)).ok).toBe(false);
+    await expect(saveSchedulerJob(actor, {...resize,updatedAt:"2026-11-18T12:00:00Z"})).rejects.toThrow("changed");
+    db.inspection.findFirst.mockResolvedValue({...job,archivedAt:new Date()});
+    await expect(saveSchedulerJob(actor, resize)).rejects.toThrow("Closed");
+    expect(db.inspection.updateMany).not.toHaveBeenCalled();
+  });
+  it("still requires assignments for normal schedule saves", async () => {
+    await expect(saveSchedulerJob(actor, {...input, technicianIds:[]})).rejects.toThrow("Choose at least one");
+  });
   it("loads a busy Home day without changing inspection status or progress", async () => {
     db.inspection.findMany.mockResolvedValue(Array.from({ length: 12 }, (_, index) => ({ ...job, id: `job-${index}` })));
     const result = await getScheduler(actor, { date: "2026-11-19", view: "day" });

@@ -7,6 +7,8 @@ import styles from "./scheduler.module.css";
 import banner from "../../page-banner.module.css";
 import { ServiceDirections } from "../../service-directions";
 import { ScheduleDateTime } from "../schedule-date-time";
+import { ResizeHandle } from "./resize-handle";
+import { openInspectionInOriginalWindow } from "./open-inspection";
 
 const labelType = (type: string) => type.replaceAll("_", " ");
 export function SchedulerBoard({ initial, initialView }: { initial: SchedulerData; initialView: "day" | "week" }) {
@@ -18,6 +20,9 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
   const [saveError, setSaveError] = useState(""), [conflicts, setConflicts] = useState<string[]>([]), [allowOverlap, setAllowOverlap] = useState(false), [saving, setSaving] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null), refresh = useRef<() => void>(() => {}), saveBusy = useRef(false);
   const selectedId = useRef<string | null>(null);
+  const outsidePress = useRef(false);
+  const [resizePreview, setResizePreview] = useState<{id: string; end: string} | null>(null);
+  const [notice, setNotice] = useState("");
   useEffect(() => { selectedId.current = panel ? selected?.id ?? null : null; }, [selected?.id, panel]);
   const timezone = data.timezone, today = localDateTime(new Date(now), timezone).slice(0, 10);
   const current = selected ? data.jobs.find((job) => job.id === selected.id) ?? selected : null;
@@ -97,6 +102,35 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
   function open(job?: SchedulerJob) {
     setSelected(job ?? null); setEditing(!job); setQuery(""); setMatches([]); setSaveError(""); setConflicts([]); setAllowOverlap(false); setPanel(true);
   }
+  function closePanel() {
+    if (saveBusy.current) return;
+    const dirty = editing && selected && (start !== localDateTime(selected.scheduledStart, timezone) || end !== (selected.scheduledEnd ? localDateTime(selected.scheduledEnd, timezone) : "") || JSON.stringify(ids) !== JSON.stringify(selected.technicianIds));
+    if (dirty && !window.confirm("Discard unsaved schedule changes?")) return;
+    setPanel(false);
+  }
+  async function resize(job: SchedulerJob, nextEnd: string) {
+    if (saveBusy.current) return;
+    saveBusy.current = true; setSaving(true); setNotice("Saving duration...");
+    try {
+      const response = await fetch("/api/admin/scheduler", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inspectionId: job.id, updatedAt: job.updatedAt, start: localDateTime(job.scheduledStart, timezone), end: localDateTime(nextEnd, timezone), technicianIds: job.technicianIds, resizeOnly: true }) });
+      const result = await response.json();
+      if (result.conflicts) {
+        edit(job); setEnd(localDateTime(nextEnd, timezone)); setPanel(true);
+        setConflicts(result.conflicts.map((conflict: {customer: string}) => conflict.customer));
+        setNotice("Duration not saved: review the scheduling overlap."); return;
+      }
+      if (!response.ok) throw new Error(result.error || "Duration could not be saved.");
+      setData(old => ({...old, jobs: old.jobs.map(existing => existing.id === result.job.id ? result.job : existing)}));
+      setNotice("Scheduled duration updated."); refresh.current();
+    } catch (caught) { setNotice(caught instanceof Error ? caught.message : "Unable to save duration. Try again."); refresh.current(); }
+    finally { saveBusy.current = false; setSaving(false); }
+  }
+  function resizeHandle(job: SchedulerJob, vertical = false) {
+    if (!job.scheduledEnd || job.archived || ["completed", "invoiced", "cancelled"].includes(job.status)) return null;
+    return <ResizeHandle start={job.scheduledStart} end={job.scheduledEnd} label={job.customer || job.site} vertical={vertical} disabled={saving}
+      onPreview={end => setResizePreview(end ? {id: job.id, end} : null)} onCommit={end => void resize(job, end)} />;
+  }
   async function save(event: React.FormEvent) {
     event.preventDefault(); if (!selected || saveBusy.current) return;
     saveBusy.current = true; setSaving(true); setSaveError("");
@@ -111,9 +145,10 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
     finally { saveBusy.current = false; setSaving(false); }
   }
   function card(job: SchedulerJob, technicianId: string, compact = false) {
+    const displayJob = resizePreview?.id === job.id ? {...job, scheduledEnd: resizePreview.end} : job;
     return <button type="button" key={job.id} className={styles.card} onClick={() => open(job)} title={`${job.customer} · ${job.site} · ${planned(job)} · ${fieldProgress(job, now, technicianId)}`}>
       <span className={`${styles.accent} ${getInspectionTypeTextColorClass(job.types[0])}`} aria-hidden="true" />
-      <strong>{job.customer || job.site}</strong><span>{planned(job)}</span><small>{fieldProgress(job, now, technicianId)}</small>
+      <strong>{job.customer || job.site}</strong><span>{planned(displayJob)}</span><small>{fieldProgress(job, now, technicianId)}</small>
       {!compact && job.site && job.site !== job.customer && <small>{job.site}</small>}
     </button>;
   }
@@ -133,6 +168,8 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
     </header>
     {stale && <p role="status" className={styles.warning}>{error || "Displayed data may be stale."} Last updated {time(data.fetchedAt)}. <button type="button" onClick={() => refresh.current()}>Retry</button></p>}
     {data.truncated && <p className={styles.warning}>This range exceeds 2,000 visits. Use Day view to see a smaller range.</p>}
+    {notice && <p role="status" className={styles.warning}>{notice}</p>}
+    {resizePreview && <p role="status" className={styles.warning}>New end: {new Intl.DateTimeFormat("en-US", {timeZone: timezone, month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}).format(new Date(resizePreview.end))}</p>}
     <p className={styles.caption}>{data.days[0]}{data.days.length > 1 ? ` through ${data.days[6]}` : ""} · {data.jobs.length} visits · Unplanned durations appear as Time TBD.</p>
     <div className={styles.board} tabIndex={0} aria-label={`${view} scheduling board`}>
       <div className={styles.desktop} style={{ minWidth: view === "day" ? 1776 : 1510 }}>
@@ -145,9 +182,9 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
           const lanes = scheduleLanes(jobs, from, until), count = Math.max(1, ...lanes.map((l) => l.lane + 1));
           const tbd = jobs.filter((j) => !j.scheduledEnd || (!onDay(j, data.days[0]!) && j.sessions.some((s) => !s.endedAt)));
           return <div key={tech.id} className={styles.row}><div className={styles.name}><strong>{tech.name}</strong><small>{tech.isActive ? `${jobs.length} visits` : "Inactive · existing assignments"}</small></div>
-            {view === "week" ? <div className={styles.week}>{data.days.map((day) => <div key={day}>{jobs.filter((j) => onDay(j, day) || (day === today && j.sessions.some((s) => !s.endedAt))).map((j) => card(j, tech.id, true))}</div>)}</div>
-              : <div className={styles.day}><div className={styles.timeline} style={{ height: count * 94 + 16 }}>
-                {lanes.map(({ job, lane, left, width }) => <div key={job.id} className={styles.slot} style={{ top: lane * 94 + 8, left: `${left}%`, width: `${Math.max(width, 0.25)}%` } as CSSProperties}>{card(job, tech.id, true)}</div>)}
+            {view === "week" ? <div className={styles.week}>{data.days.map((day) => <div key={day}>{jobs.filter((j) => onDay(j, day) || (day === today && j.sessions.some((s) => !s.endedAt))).map((job) => <div key={job.id} className={styles.weekJob}>{card(job, tech.id, true)}{resizeHandle(job, true)}</div>)}</div>)}</div>
+              : <div className={styles.day}><div className={styles.timeline} data-day-minutes={(until - from) / 60000} style={{ height: count * 94 + 16, backgroundSize: `${100 / hours.length}% 100%` }}>
+                {lanes.map(({ job, lane, left, width }) => <div key={job.id} className={styles.slot} style={{ top: lane * 94 + 8, left: `${left}%`, width: `${Math.max(resizePreview?.id === job.id ? (Math.min(until, +new Date(resizePreview.end)) - Math.max(from, +new Date(job.scheduledStart))) / (until - from) * 100 : width, 0.25)}%` } as CSSProperties}>{card(job, tech.id, true)}{new Date(job.scheduledEnd!).getTime() <= until && resizeHandle(job)}</div>)}
                 {!jobs.length && <p className={styles.gap}>No jobs scheduled</p>}
                 {data.days[0] === today && now >= from && now < until && <span aria-label="Current time" className={styles.now} style={{ left: `${(now - from) / (until - from) * 100}%` }} />}
               </div>{lanes.some((l) => l.width < 12) && <div className={styles.tbd}><span>Short visits</span>{lanes.filter((l) => l.width < 12).map(({ job }) => card(job, tech.id, true))}</div>}{tbd.length > 0 && <div className={styles.tbd}><span>Time TBD / active outside planned day</span>{tbd.map((j) => card(j, tech.id, true))}</div>}</div>}
@@ -156,8 +193,10 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
       </div>
       <div className={styles.agenda}>{rows.map((tech) => <section key={tech.id}><h2>{tech.name}</h2>{data.jobs.filter((j) => belongs(j, tech.id)).length ? data.jobs.filter((j) => belongs(j, tech.id)).map((j) => <div key={j.id}><small>{localDateTime(j.scheduledStart, timezone).slice(0, 10)}</small>{card(j, tech.id)}<ServiceDirections site={j.serviceLocation} customer={j.customerLocation} /></div>) : <p>No jobs scheduled</p>}</section>)}</div>
     </div>
-    {panel && <dialog ref={dialog} className={styles.panel} aria-labelledby="scheduler-panel-title" onCancel={(e) => { if (saving) e.preventDefault(); else setPanel(false); }}>
-      <header><h2 id="scheduler-panel-title">{current ? current.customer : "Schedule an existing job"}</h2><button type="button" aria-label="Close job details" disabled={saving} onClick={() => setPanel(false)}>Close</button></header>
+    {panel && <dialog ref={dialog} className={styles.panel} aria-labelledby="scheduler-panel-title" onCancel={(e) => { e.preventDefault(); closePanel(); }}
+      onPointerDown={event => { const rect = event.currentTarget.getBoundingClientRect(); outsidePress.current = event.target === event.currentTarget && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom); }}
+      onClick={event => { const rect = event.currentTarget.getBoundingClientRect(); if (outsidePress.current && event.target === event.currentTarget && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) closePanel(); outsidePress.current = false; }}>
+      <header><h2 id="scheduler-panel-title">{current ? current.customer : "Schedule an existing job"}</h2><button type="button" aria-label="Close job details" disabled={saving} onClick={closePanel}>Close</button></header>
       {!selected ? <><label>Find customer, site, or inspection<input autoComplete="off" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Type at least two characters" /></label>
         <p role="status">{searching ? "Searching..." : query.trim().length >= 2 && !matches.length ? "No matching open inspections." : "Choose an existing visit; no new inspection is created."}</p>
         {matches.map((job) => <button type="button" key={job.id} className={styles.result} onClick={() => edit(job)}><strong>{job.customer}</strong><span>{job.site} · {localDateTime(job.scheduledStart, timezone).slice(0, 10)} · {job.id.slice(-8)}</span></button>)}
@@ -168,7 +207,7 @@ export function SchedulerBoard({ initial, initialView }: { initial: SchedulerDat
           <dt>Planned</dt><dd>{localDateTime(current.scheduledStart, timezone).slice(0, 10)} · {planned(current)}</dd><dt>Field progress</dt><dd>{fieldProgress(current, now)}</dd>
           <dt>Report workflow</dt><dd>{labelType(current.status)} (separate from field progress)</dd>
           <dt>Actual work</dt><dd>{current.sessions.length ? current.sessions.map((s, i) => <p key={`${s.technicianId}-${i}`}>{data.technicians.find((t) => t.id === s.technicianId)?.name}: {localDateTime(s.startedAt, timezone).replace("T", " ")} - {s.endedAt ? localDateTime(s.endedAt, timezone).replace("T", " ") : "Running"}</p>) : "Not started"}</dd></dl>
-        <Link className={styles.link} target="_blank" rel="noopener noreferrer" aria-label="Open inspection (opens in a new tab)" href={`/app/admin/inspections/${current.id}?from=${encodeURIComponent(`/app/admin/scheduler?date=${date}&view=${view}`)}`}>Open inspection</Link>
+        <Link className={styles.link} onClick={event => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && openInspectionInOriginalWindow(event.currentTarget.href)) event.preventDefault(); }} href={`/app/admin/inspections/${current.id}?from=${encodeURIComponent(`/app/admin/scheduler?date=${date}&view=${view}`)}`}>Open inspection</Link>
         {!editing && !["completed", "invoiced", "cancelled"].includes(current.status) && <button type="button" className={styles.primary} onClick={() => edit(current)}>Reschedule / reassign</button>}
         {editing && <form onSubmit={save} onChange={(e) => { if (!(e.target instanceof HTMLInputElement) || e.target.name !== "overlap") { setAllowOverlap(false); setConflicts([]); } }}>
           <p>Only this visit changes. Future recurring visits stay unchanged.</p>

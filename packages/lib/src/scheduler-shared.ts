@@ -39,12 +39,21 @@ export function schedulerRange(day: string, view: "day" | "week", timezone: stri
 }
 
 export type SchedulerJob = {
+  archived?: boolean;
   serviceLocation?: ServiceLocation;
   customerLocation?: CustomerLocation;
   id: string; customer: string; site: string; address: string; types: string[]; technicianIds: string[];
   scheduledStart: string; scheduledEnd: string | null; updatedAt: string; status: string;
   sessions: { technicianId: string; startedAt: string; endedAt: string | null; endReason: string | null }[];
 };
+
+/** Resize elapsed duration without shifting the visit start or recurrence. */
+export function resizedScheduleEnd(start: string, end: string, deltaMinutes: number) {
+  const from = new Date(start).getTime(), original = new Date(end).getTime();
+  const quarter = 15 * 60000;
+  const next = Math.round((original + deltaMinutes * 60000) / quarter) * quarter;
+  return new Date(Math.max(from + quarter, Math.min(from + 7 * 86400000, next))).toISOString();
+}
 export type SchedulerData = { timezone: string; days: string[]; fetchedAt: string; truncated: boolean;
   technicians: { id: string; name: string; isActive: boolean }[]; jobs: SchedulerJob[] };
 
