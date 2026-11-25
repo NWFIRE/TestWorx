@@ -1,0 +1,462 @@
+[
+  {
+    "name": "Inspection",
+    "route": "/app/admin/inspections/perf-0-i-1-0",
+    "profile": "desktop",
+    "visit": "first",
+    "usableMs": 474,
+    "inspectionInteractiveMs": 552,
+    "status": 200,
+    "ttfbMs": 45,
+    "htmlBytes": 25276,
+    "lcpMs": 428,
+    "overflow": false,
+    "resources": [
+      {
+        "path": "/_next/static/chunks/2578-406cd58714629ed2.js",
+        "ms": 50,
+        "bytes": 58900
+      },
+      {
+        "path": "/_next/static/chunks/1596-ba5a6e681e3b9bc0.js",
+        "ms": 40,
+        "bytes": 36027
+      },
+      {
+        "path": "/_next/static/chunks/app/app/layout-6ead5de1d9060557.js",
+        "ms": 40,
+        "bytes": 16588
+      },
+      {
+        "path": "/_next/static/chunks/8318-bdba263c573e3e36.js",
+        "ms": 39,
+        "bytes": 4312
+      },
+      {
+        "path": "/_next/static/chunks/489-a499c80da8ff4945.js",
+        "ms": 36,
+        "bytes": 5476
+      },
+      {
+        "path": "/_next/static/chunks/3063-168b702622647a8f.js",
+        "ms": 29,
+        "bytes": 7410
+      },
+      {
+        "path": "/_next/static/chunks/87c73c54-09e1ba5c70e60a51.js",
+        "ms": 28,
+        "bytes": 54662
+      },
+      {
+        "path": "/_next/static/chunks/18-132e76309d7c167e.js",
+        "ms": 25,
+        "bytes": 46809
+      },
+      {
+        "path": "/_next/static/chunks/app/layout-2d514eee3d41801c.js",
+        "ms": 25,
+        "bytes": 4325
+      },
+      {
+        "path": "/_next/static/chunks/9664-bbf55e28a0306eec.js",
+        "ms": 25,
+        "bytes": 3700
+      },
+      {
+        "path": "/_next/static/chunks/main-app-aa7723840f0d9253.js",
+        "ms": 20,
+        "bytes": 1026
+      },
+      {
+        "path": "/_next/static/chunks/webpack-acd331efa46b4ae3.js",
+        "ms": 17,
+        "bytes": 2845
+      },
+      {
+        "path": "/_next/static/css/8413be8ea316c743.css",
+        "ms": 16,
+        "bytes": 17009
+      },
+      {
+        "path": "/api/admin/service-requests/count",
+        "ms": 14,
+        "bytes": 311
+      },
+      {
+        "path": "/_next/static/css/8f0919752d56811a.css",
+        "ms": 12,
+        "bytes": 2886
+      },
+      {
+        "path": "/_next/static/chunks/app/app/admin/inspections/%5BinspectionId%5D/page-f4a5ff86feb442d9.js",
+        "ms": 12,
+        "bytes": 21223
+      },
+      {
+        "path": "/_next/static/chunks/1120-44d1457504056cba.js",
+        "ms": 11,
+        "bytes": 14410
+      },
+      {
+        "path": "/_next/image",
+        "ms": 9,
+        "bytes": 786
+      },
+      {
+        "path": "/app/admin/reports/perf-0-i-1-0/perf-0-i-1-0-task",
+        "ms": 6,
+        "bytes": 481
+      }
+    ]
+  },
+  {
+    "name": "Inspection",
+    "route": "/app/admin/inspections/perf-0-i-1-0",
+    "profile": "desktop",
+    "visit": "repeat",
+    "usableMs": 369,
+    "inspectionInteractiveMs": 423,
+    "status": 200,
+    "ttfbMs": 27,
+    "htmlBytes": 25297,
+    "lcpMs": 388,
+    "overflow": false,
+    "resources": [
+      {
+        "path": "/api/admin/service-requests/count",
+        "ms": 15,
+        "bytes": 311
+      },
+      {
+        "path": "/app/admin/reports/perf-0-i-1-0/perf-0-i-1-0-task",
+        "ms": 5,
+        "bytes": 481
+      },
+      {
+        "path": "/_next/static/css/8413be8ea316c743.css",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/image",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/css/8f0919752d56811a.css",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/webpack-acd331efa46b4ae3.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/87c73c54-09e1ba5c70e60a51.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/18-132e76309d7c167e.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/main-app-aa7723840f0d9253.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/app/layout-2d514eee3d41801c.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/9664-bbf55e28a0306eec.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/3063-168b702622647a8f.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/1596-ba5a6e681e3b9bc0.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/489-a499c80da8ff4945.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/2578-406cd58714629ed2.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/8318-bdba263c573e3e36.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/app/app/layout-6ead5de1d9060557.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/1120-44d1457504056cba.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/app/app/admin/inspections/%5BinspectionId%5D/page-f4a5ff86feb442d9.js",
+        "ms": 0,
+        "bytes": 0
+      }
+    ]
+  },
+  {
+    "name": "Customer search (beyond first page)",
+    "profile": "desktop",
+    "usableMs": 354
+  },
+  {
+    "name": "Scheduler next day",
+    "profile": "desktop",
+    "usableMs": 447
+  },
+  {
+    "name": "Inspection",
+    "route": "/app/admin/inspections/perf-0-i-1-0",
+    "profile": "slow-phone",
+    "visit": "first",
+    "usableMs": 2203,
+    "inspectionInteractiveMs": 2696,
+    "status": 200,
+    "ttfbMs": 75,
+    "htmlBytes": 25299,
+    "lcpMs": 1144,
+    "overflow": false,
+    "resources": [
+      {
+        "path": "/_next/static/chunks/2578-406cd58714629ed2.js",
+        "ms": 1712,
+        "bytes": 58900
+      },
+      {
+        "path": "/_next/static/chunks/app/app/admin/inspections/%5BinspectionId%5D/page-f4a5ff86feb442d9.js",
+        "ms": 1609,
+        "bytes": 21223
+      },
+      {
+        "path": "/_next/static/chunks/1120-44d1457504056cba.js",
+        "ms": 1461,
+        "bytes": 14410
+      },
+      {
+        "path": "/_next/static/chunks/1596-ba5a6e681e3b9bc0.js",
+        "ms": 1405,
+        "bytes": 36027
+      },
+      {
+        "path": "/_next/static/chunks/87c73c54-09e1ba5c70e60a51.js",
+        "ms": 1380,
+        "bytes": 54662
+      },
+      {
+        "path": "/_next/static/chunks/app/app/layout-6ead5de1d9060557.js",
+        "ms": 1324,
+        "bytes": 16588
+      },
+      {
+        "path": "/_next/static/chunks/18-132e76309d7c167e.js",
+        "ms": 1253,
+        "bytes": 46809
+      },
+      {
+        "path": "/_next/static/chunks/app/layout-2d514eee3d41801c.js",
+        "ms": 1079,
+        "bytes": 4325
+      },
+      {
+        "path": "/_next/static/chunks/8318-bdba263c573e3e36.js",
+        "ms": 793,
+        "bytes": 4312
+      },
+      {
+        "path": "/_next/static/chunks/489-a499c80da8ff4945.js",
+        "ms": 701,
+        "bytes": 5476
+      },
+      {
+        "path": "/_next/static/chunks/3063-168b702622647a8f.js",
+        "ms": 529,
+        "bytes": 7410
+      },
+      {
+        "path": "/_next/static/chunks/9664-bbf55e28a0306eec.js",
+        "ms": 463,
+        "bytes": 3700
+      },
+      {
+        "path": "/_next/static/css/8413be8ea316c743.css",
+        "ms": 445,
+        "bytes": 17009
+      },
+      {
+        "path": "/_next/static/chunks/main-app-aa7723840f0d9253.js",
+        "ms": 375,
+        "bytes": 1026
+      },
+      {
+        "path": "/_next/static/chunks/webpack-acd331efa46b4ae3.js",
+        "ms": 236,
+        "bytes": 2845
+      },
+      {
+        "path": "/_next/image",
+        "ms": 224,
+        "bytes": 3528
+      },
+      {
+        "path": "/_next/static/css/8f0919752d56811a.css",
+        "ms": 206,
+        "bytes": 2886
+      },
+      {
+        "path": "/api/admin/service-requests/count",
+        "ms": 173,
+        "bytes": 311
+      },
+      {
+        "path": "/app/admin/reports/perf-0-i-1-0/perf-0-i-1-0-task",
+        "ms": 169,
+        "bytes": 481
+      }
+    ]
+  },
+  {
+    "name": "Inspection",
+    "route": "/app/admin/inspections/perf-0-i-1-0",
+    "profile": "slow-phone",
+    "visit": "repeat",
+    "usableMs": 794,
+    "inspectionInteractiveMs": 961,
+    "status": 200,
+    "ttfbMs": 30,
+    "htmlBytes": 25299,
+    "lcpMs": 708,
+    "overflow": false,
+    "resources": [
+      {
+        "path": "/api/admin/service-requests/count",
+        "ms": 174,
+        "bytes": 311
+      },
+      {
+        "path": "/app/admin/reports/perf-0-i-1-0/perf-0-i-1-0-task",
+        "ms": 163,
+        "bytes": 481
+      },
+      {
+        "path": "/_next/static/css/8413be8ea316c743.css",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/image",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/css/8f0919752d56811a.css",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/webpack-acd331efa46b4ae3.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/87c73c54-09e1ba5c70e60a51.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/18-132e76309d7c167e.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/main-app-aa7723840f0d9253.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/9664-bbf55e28a0306eec.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/3063-168b702622647a8f.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/1596-ba5a6e681e3b9bc0.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/489-a499c80da8ff4945.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/2578-406cd58714629ed2.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/8318-bdba263c573e3e36.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/app/app/layout-6ead5de1d9060557.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/app/layout-2d514eee3d41801c.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/1120-44d1457504056cba.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/app/app/admin/inspections/%5BinspectionId%5D/page-f4a5ff86feb442d9.js",
+        "ms": 0,
+        "bytes": 0
+      }
+    ]
+  },
+  {
+    "name": "Customer search (beyond first page)",
+    "profile": "slow-phone",
+    "usableMs": 959
+  },
+  {
+    "name": "Scheduler next day",
+    "profile": "slow-phone",
+    "usableMs": 1428
+  }
+]

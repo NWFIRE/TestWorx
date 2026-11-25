@@ -1,0 +1,914 @@
+[
+  {
+    "name": "Technician work",
+    "route": "/app/tech/work",
+    "profile": "desktop",
+    "visit": "first",
+    "usableMs": 1676,
+    "status": 200,
+    "ttfbMs": 174,
+    "htmlBytes": 96678,
+    "lcpMs": 1508,
+    "overflow": false,
+    "resources": [
+      {
+        "path": "/_next/static/chunks/2578-406cd58714629ed2.js",
+        "ms": 667,
+        "bytes": 58900
+      },
+      {
+        "path": "/_next/static/chunks/app/app/layout-d49c00f8f99e5cfe.js",
+        "ms": 626,
+        "bytes": 16323
+      },
+      {
+        "path": "/_next/static/chunks/1596-ba5a6e681e3b9bc0.js",
+        "ms": 624,
+        "bytes": 36027
+      },
+      {
+        "path": "/_next/static/chunks/8318-bdba263c573e3e36.js",
+        "ms": 624,
+        "bytes": 4312
+      },
+      {
+        "path": "/_next/static/chunks/489-a499c80da8ff4945.js",
+        "ms": 613,
+        "bytes": 5476
+      },
+      {
+        "path": "/_next/static/chunks/87c73c54-09e1ba5c70e60a51.js",
+        "ms": 611,
+        "bytes": 54662
+      },
+      {
+        "path": "/_next/static/chunks/18-3ce15d1c40878474.js",
+        "ms": 611,
+        "bytes": 46810
+      },
+      {
+        "path": "/_next/static/chunks/3063-168b702622647a8f.js",
+        "ms": 609,
+        "bytes": 7410
+      },
+      {
+        "path": "/_next/static/chunks/app/layout-2d514eee3d41801c.js",
+        "ms": 585,
+        "bytes": 4325
+      },
+      {
+        "path": "/_next/static/chunks/9664-bbf55e28a0306eec.js",
+        "ms": 583,
+        "bytes": 3700
+      },
+      {
+        "path": "/_next/static/chunks/main-app-e6a3c093cf0556ea.js",
+        "ms": 577,
+        "bytes": 870
+      },
+      {
+        "path": "/_next/static/css/8413be8ea316c743.css",
+        "ms": 207,
+        "bytes": 17009
+      },
+      {
+        "path": "/_next/static/chunks/app/app/tech/work/page-53b11059c345af85.js",
+        "ms": 41,
+        "bytes": 9751
+      },
+      {
+        "path": "/_next/static/chunks/1581-9fff2af4e7fdfd34.js",
+        "ms": 40,
+        "bytes": 3617
+      },
+      {
+        "path": "/_next/static/chunks/5686-7975bceea7447939.js",
+        "ms": 39,
+        "bytes": 3845
+      },
+      {
+        "path": "/api/tech/notifications",
+        "ms": 38,
+        "bytes": 838
+      },
+      {
+        "path": "/_next/image",
+        "ms": 37,
+        "bytes": 786
+      },
+      {
+        "path": "/_next/static/chunks/webpack-713fce9cf9c7943f.js",
+        "ms": 37,
+        "bytes": 2845
+      },
+      {
+        "path": "/_next/static/chunks/8838-045f80d991efc23a.js",
+        "ms": 37,
+        "bytes": 3179
+      },
+      {
+        "path": "/_next/static/chunks/73.763c8780a03cab41.js",
+        "ms": 8,
+        "bytes": 3607
+      }
+    ]
+  },
+  {
+    "name": "Technician work",
+    "route": "/app/tech/work",
+    "profile": "desktop",
+    "visit": "repeat",
+    "usableMs": 877,
+    "status": 200,
+    "ttfbMs": 73,
+    "htmlBytes": 96680,
+    "lcpMs": 860,
+    "overflow": false,
+    "resources": [
+      {
+        "path": "/api/tech/notifications",
+        "ms": 327,
+        "bytes": 838
+      },
+      {
+        "path": "/_next/static/css/8413be8ea316c743.css",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/image",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/webpack-713fce9cf9c7943f.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/87c73c54-09e1ba5c70e60a51.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/18-3ce15d1c40878474.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/main-app-e6a3c093cf0556ea.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/9664-bbf55e28a0306eec.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/app/app/tech/error-58a4fb9088fb5e2b.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/3063-168b702622647a8f.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/1596-ba5a6e681e3b9bc0.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/489-a499c80da8ff4945.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/2578-406cd58714629ed2.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/8318-bdba263c573e3e36.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/app/app/layout-d49c00f8f99e5cfe.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/app/layout-2d514eee3d41801c.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/73.763c8780a03cab41.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/1105.9bba8494c030d70c.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/8219.c3e48198b595f666.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/8838-045f80d991efc23a.js",
+        "ms": 0,
+        "bytes": 0
+      }
+    ]
+  },
+  {
+    "name": "Technician report",
+    "route": "/app/tech/reports/perf-0-i-1-0/perf-0-i-1-0-task",
+    "profile": "desktop",
+    "visit": "first",
+    "usableMs": 591,
+    "status": 200,
+    "ttfbMs": 229,
+    "htmlBytes": 13067,
+    "lcpMs": 600,
+    "overflow": false,
+    "resources": [
+      {
+        "path": "/_next/static/chunks/2578-406cd58714629ed2.js",
+        "ms": 88,
+        "bytes": 58900
+      },
+      {
+        "path": "/_next/static/chunks/91-6c3aaf8c55199a92.js",
+        "ms": 87,
+        "bytes": 22895
+      },
+      {
+        "path": "/_next/static/chunks/app/app/tech/reports/%5BinspectionId%5D/%5BtaskId%5D/page-25357deedcec62f0.js",
+        "ms": 85,
+        "bytes": 519
+      },
+      {
+        "path": "/_next/static/chunks/5420-e48e0de018cdf17c.js",
+        "ms": 81,
+        "bytes": 3937
+      },
+      {
+        "path": "/_next/static/chunks/1581-9fff2af4e7fdfd34.js",
+        "ms": 79,
+        "bytes": 3617
+      },
+      {
+        "path": "/_next/static/chunks/app/layout-2d514eee3d41801c.js",
+        "ms": 73,
+        "bytes": 4325
+      },
+      {
+        "path": "/_next/static/chunks/1596-ba5a6e681e3b9bc0.js",
+        "ms": 72,
+        "bytes": 36027
+      },
+      {
+        "path": "/_next/static/chunks/app/app/layout-d49c00f8f99e5cfe.js",
+        "ms": 72,
+        "bytes": 16323
+      },
+      {
+        "path": "/_next/static/chunks/8318-bdba263c573e3e36.js",
+        "ms": 67,
+        "bytes": 4312
+      },
+      {
+        "path": "/_next/static/chunks/489-a499c80da8ff4945.js",
+        "ms": 65,
+        "bytes": 5476
+      },
+      {
+        "path": "/api/tech/notifications",
+        "ms": 61,
+        "bytes": 838
+      },
+      {
+        "path": "/_next/static/chunks/18-3ce15d1c40878474.js",
+        "ms": 58,
+        "bytes": 46810
+      },
+      {
+        "path": "/_next/static/chunks/87c73c54-09e1ba5c70e60a51.js",
+        "ms": 52,
+        "bytes": 54662
+      },
+      {
+        "path": "/_next/static/chunks/3063-168b702622647a8f.js",
+        "ms": 51,
+        "bytes": 7410
+      },
+      {
+        "path": "/_next/static/chunks/app/app/tech/error-58a4fb9088fb5e2b.js",
+        "ms": 48,
+        "bytes": 3229
+      },
+      {
+        "path": "/_next/static/chunks/9664-bbf55e28a0306eec.js",
+        "ms": 47,
+        "bytes": 3700
+      },
+      {
+        "path": "/_next/static/chunks/main-app-e6a3c093cf0556ea.js",
+        "ms": 43,
+        "bytes": 870
+      },
+      {
+        "path": "/api/tech/job-time",
+        "ms": 40,
+        "bytes": 389
+      },
+      {
+        "path": "/_next/static/chunks/webpack-713fce9cf9c7943f.js",
+        "ms": 32,
+        "bytes": 2845
+      },
+      {
+        "path": "/_next/static/css/8413be8ea316c743.css",
+        "ms": 11,
+        "bytes": 17009
+      }
+    ]
+  },
+  {
+    "name": "Technician report",
+    "route": "/app/tech/reports/perf-0-i-1-0/perf-0-i-1-0-task",
+    "profile": "desktop",
+    "visit": "repeat",
+    "usableMs": 264,
+    "status": 200,
+    "ttfbMs": 30,
+    "htmlBytes": 13067,
+    "lcpMs": 252,
+    "overflow": false,
+    "resources": [
+      {
+        "path": "/api/tech/notifications",
+        "ms": 44,
+        "bytes": 838
+      },
+      {
+        "path": "/api/tech/job-time",
+        "ms": 32,
+        "bytes": 389
+      },
+      {
+        "path": "/_next/static/css/8413be8ea316c743.css",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/image",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/webpack-713fce9cf9c7943f.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/87c73c54-09e1ba5c70e60a51.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/18-3ce15d1c40878474.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/main-app-e6a3c093cf0556ea.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/9664-bbf55e28a0306eec.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/app/app/tech/error-58a4fb9088fb5e2b.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/3063-168b702622647a8f.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/1596-ba5a6e681e3b9bc0.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/489-a499c80da8ff4945.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/2578-406cd58714629ed2.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/8318-bdba263c573e3e36.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/app/app/layout-d49c00f8f99e5cfe.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/app/layout-2d514eee3d41801c.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/1581-9fff2af4e7fdfd34.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/5420-e48e0de018cdf17c.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/91-6c3aaf8c55199a92.js",
+        "ms": 0,
+        "bytes": 0
+      }
+    ]
+  },
+  {
+    "name": "Technician work",
+    "route": "/app/tech/work",
+    "profile": "slow-phone",
+    "visit": "first",
+    "usableMs": 3173,
+    "status": 200,
+    "ttfbMs": 217,
+    "htmlBytes": 96683,
+    "lcpMs": 1176,
+    "overflow": false,
+    "resources": [
+      {
+        "path": "/_next/static/chunks/2578-406cd58714629ed2.js",
+        "ms": 2338,
+        "bytes": 58900
+      },
+      {
+        "path": "/_next/static/chunks/app/app/layout-d49c00f8f99e5cfe.js",
+        "ms": 1969,
+        "bytes": 16323
+      },
+      {
+        "path": "/_next/static/chunks/app/layout-2d514eee3d41801c.js",
+        "ms": 1903,
+        "bytes": 4325
+      },
+      {
+        "path": "/_next/static/chunks/1596-ba5a6e681e3b9bc0.js",
+        "ms": 1880,
+        "bytes": 36027
+      },
+      {
+        "path": "/_next/static/chunks/87c73c54-09e1ba5c70e60a51.js",
+        "ms": 1804,
+        "bytes": 54662
+      },
+      {
+        "path": "/_next/static/chunks/18-3ce15d1c40878474.js",
+        "ms": 1670,
+        "bytes": 46810
+      },
+      {
+        "path": "/_next/static/chunks/8318-bdba263c573e3e36.js",
+        "ms": 1444,
+        "bytes": 4312
+      },
+      {
+        "path": "/_next/static/chunks/489-a499c80da8ff4945.js",
+        "ms": 1160,
+        "bytes": 5476
+      },
+      {
+        "path": "/_next/static/chunks/3063-168b702622647a8f.js",
+        "ms": 997,
+        "bytes": 7410
+      },
+      {
+        "path": "/_next/static/chunks/app/app/tech/error-58a4fb9088fb5e2b.js",
+        "ms": 867,
+        "bytes": 3229
+      },
+      {
+        "path": "/_next/static/chunks/9664-bbf55e28a0306eec.js",
+        "ms": 784,
+        "bytes": 3700
+      },
+      {
+        "path": "/_next/static/css/8413be8ea316c743.css",
+        "ms": 720,
+        "bytes": 17009
+      },
+      {
+        "path": "/_next/static/chunks/main-app-e6a3c093cf0556ea.js",
+        "ms": 623,
+        "bytes": 870
+      },
+      {
+        "path": "/_next/static/chunks/webpack-713fce9cf9c7943f.js",
+        "ms": 558,
+        "bytes": 2845
+      },
+      {
+        "path": "/_next/image",
+        "ms": 455,
+        "bytes": 3528
+      },
+      {
+        "path": "/_next/static/chunks/app/app/tech/work/page-53b11059c345af85.js",
+        "ms": 426,
+        "bytes": 9751
+      },
+      {
+        "path": "/_next/static/chunks/1581-9fff2af4e7fdfd34.js",
+        "ms": 299,
+        "bytes": 3617
+      },
+      {
+        "path": "/_next/static/chunks/5686-7975bceea7447939.js",
+        "ms": 268,
+        "bytes": 3845
+      },
+      {
+        "path": "/_next/static/chunks/73.763c8780a03cab41.js",
+        "ms": 228,
+        "bytes": 3607
+      },
+      {
+        "path": "/_next/static/chunks/8838-045f80d991efc23a.js",
+        "ms": 214,
+        "bytes": 3179
+      }
+    ]
+  },
+  {
+    "name": "Technician work",
+    "route": "/app/tech/work",
+    "profile": "slow-phone",
+    "visit": "repeat",
+    "usableMs": 3133,
+    "status": 200,
+    "ttfbMs": 30,
+    "htmlBytes": 96683,
+    "lcpMs": 2944,
+    "overflow": false,
+    "resources": [
+      {
+        "path": "/app/tech/profile",
+        "ms": 310,
+        "bytes": 443
+      },
+      {
+        "path": "/api/tech/notifications",
+        "ms": 180,
+        "bytes": 838
+      },
+      {
+        "path": "/app/tech/requests",
+        "ms": 177,
+        "bytes": 444
+      },
+      {
+        "path": "/app/manuals",
+        "ms": 172,
+        "bytes": 439
+      },
+      {
+        "path": "/app/tech",
+        "ms": 165,
+        "bytes": 428
+      },
+      {
+        "path": "/app/tech/inspections",
+        "ms": 162,
+        "bytes": 446
+      },
+      {
+        "path": "/_next/static/css/8413be8ea316c743.css",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/image",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/webpack-713fce9cf9c7943f.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/87c73c54-09e1ba5c70e60a51.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/18-3ce15d1c40878474.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/main-app-e6a3c093cf0556ea.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/9664-bbf55e28a0306eec.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/app/app/tech/error-58a4fb9088fb5e2b.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/3063-168b702622647a8f.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/1596-ba5a6e681e3b9bc0.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/489-a499c80da8ff4945.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/2578-406cd58714629ed2.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/8318-bdba263c573e3e36.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/app/app/layout-d49c00f8f99e5cfe.js",
+        "ms": 0,
+        "bytes": 0
+      }
+    ]
+  },
+  {
+    "name": "Technician report",
+    "route": "/app/tech/reports/perf-0-i-1-0/perf-0-i-1-0-task",
+    "profile": "slow-phone",
+    "visit": "first",
+    "usableMs": 2596,
+    "status": 200,
+    "ttfbMs": 28,
+    "htmlBytes": 13067,
+    "lcpMs": 2548,
+    "overflow": false,
+    "resources": [
+      {
+        "path": "/_next/static/chunks/2578-406cd58714629ed2.js",
+        "ms": 1688,
+        "bytes": 58900
+      },
+      {
+        "path": "/_next/static/chunks/91-6c3aaf8c55199a92.js",
+        "ms": 1660,
+        "bytes": 22895
+      },
+      {
+        "path": "/_next/static/chunks/app/app/tech/reports/%5BinspectionId%5D/%5BtaskId%5D/page-25357deedcec62f0.js",
+        "ms": 1478,
+        "bytes": 519
+      },
+      {
+        "path": "/_next/static/chunks/5420-e48e0de018cdf17c.js",
+        "ms": 1426,
+        "bytes": 3937
+      },
+      {
+        "path": "/_next/static/chunks/1596-ba5a6e681e3b9bc0.js",
+        "ms": 1387,
+        "bytes": 36027
+      },
+      {
+        "path": "/_next/static/chunks/1581-9fff2af4e7fdfd34.js",
+        "ms": 1344,
+        "bytes": 3617
+      },
+      {
+        "path": "/_next/static/chunks/app/app/layout-d49c00f8f99e5cfe.js",
+        "ms": 1323,
+        "bytes": 16323
+      },
+      {
+        "path": "/_next/static/chunks/87c73c54-09e1ba5c70e60a51.js",
+        "ms": 1291,
+        "bytes": 54662
+      },
+      {
+        "path": "/_next/static/chunks/app/layout-2d514eee3d41801c.js",
+        "ms": 1254,
+        "bytes": 4325
+      },
+      {
+        "path": "/_next/static/chunks/18-3ce15d1c40878474.js",
+        "ms": 1124,
+        "bytes": 46810
+      },
+      {
+        "path": "/_next/static/chunks/8318-bdba263c573e3e36.js",
+        "ms": 986,
+        "bytes": 4312
+      },
+      {
+        "path": "/_next/static/chunks/489-a499c80da8ff4945.js",
+        "ms": 762,
+        "bytes": 5476
+      },
+      {
+        "path": "/_next/static/chunks/3063-168b702622647a8f.js",
+        "ms": 717,
+        "bytes": 7410
+      },
+      {
+        "path": "/_next/static/chunks/app/app/tech/error-58a4fb9088fb5e2b.js",
+        "ms": 556,
+        "bytes": 3229
+      },
+      {
+        "path": "/_next/static/chunks/9664-bbf55e28a0306eec.js",
+        "ms": 469,
+        "bytes": 3700
+      },
+      {
+        "path": "/_next/static/css/8413be8ea316c743.css",
+        "ms": 428,
+        "bytes": 17009
+      },
+      {
+        "path": "/_next/static/chunks/main-app-e6a3c093cf0556ea.js",
+        "ms": 393,
+        "bytes": 870
+      },
+      {
+        "path": "/app/manuals",
+        "ms": 293,
+        "bytes": 439
+      },
+      {
+        "path": "/app/tech/inspections",
+        "ms": 291,
+        "bytes": 446
+      },
+      {
+        "path": "/app/tech/requests",
+        "ms": 283,
+        "bytes": 444
+      }
+    ]
+  },
+  {
+    "name": "Technician report",
+    "route": "/app/tech/reports/perf-0-i-1-0/perf-0-i-1-0-task",
+    "profile": "slow-phone",
+    "visit": "repeat",
+    "usableMs": 913,
+    "status": 200,
+    "ttfbMs": 25,
+    "htmlBytes": 13067,
+    "lcpMs": 880,
+    "overflow": false,
+    "resources": [
+      {
+        "path": "/api/tech/job-time",
+        "ms": 246,
+        "bytes": 389
+      },
+      {
+        "path": "/app/tech/profile",
+        "ms": 189,
+        "bytes": 443
+      },
+      {
+        "path": "/app/tech/inspections",
+        "ms": 175,
+        "bytes": 446
+      },
+      {
+        "path": "/app/tech/requests",
+        "ms": 175,
+        "bytes": 444
+      },
+      {
+        "path": "/app/manuals",
+        "ms": 173,
+        "bytes": 439
+      },
+      {
+        "path": "/api/tech/notifications",
+        "ms": 170,
+        "bytes": 838
+      },
+      {
+        "path": "/app/tech",
+        "ms": 170,
+        "bytes": 428
+      },
+      {
+        "path": "/app/tech/work",
+        "ms": 167,
+        "bytes": 441
+      },
+      {
+        "path": "/_next/static/css/8413be8ea316c743.css",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/image",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/webpack-713fce9cf9c7943f.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/87c73c54-09e1ba5c70e60a51.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/18-3ce15d1c40878474.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/main-app-e6a3c093cf0556ea.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/9664-bbf55e28a0306eec.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/app/app/tech/error-58a4fb9088fb5e2b.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/3063-168b702622647a8f.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/1596-ba5a6e681e3b9bc0.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/489-a499c80da8ff4945.js",
+        "ms": 0,
+        "bytes": 0
+      },
+      {
+        "path": "/_next/static/chunks/2578-406cd58714629ed2.js",
+        "ms": 0,
+        "bytes": 0
+      }
+    ]
+  }
+]

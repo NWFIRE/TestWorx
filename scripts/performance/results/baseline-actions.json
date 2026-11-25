@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Customer search (beyond first page)",
+    "profile": "desktop",
+    "usableMs": 13257
+  },
+  {
+    "name": "Scheduler next day",
+    "profile": "desktop",
+    "usableMs": 263
+  },
+  {
+    "name": "Customer search (beyond first page)",
+    "profile": "slow-phone",
+    "usableMs": 5790
+  },
+  {
+    "name": "Scheduler next day",
+    "profile": "slow-phone",
+    "usableMs": 1271
+  }
+]

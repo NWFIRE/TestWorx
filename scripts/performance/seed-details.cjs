@@ -1,0 +1,31 @@
+// Additional isolated fixtures for route coverage, applied AFTER timing comparisons.
+const { PrismaClient } = require('@prisma/client');
+const { PDFDocument } = require('pdf-lib');
+const { createHash } = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
+const fixture = require('./results/fixture.json');
+const db = new PrismaClient({datasources:{db:{url:'postgresql://perf@127.0.0.1:55439/tradeworx_perf'}}});
+(async()=>{
+  const a=fixture.companies[0], tenantId=a.tenantId;
+  const office=await db.user.findUniqueOrThrow({where:{email:a.officeEmail}});
+  const customer=await db.user.findFirstOrThrow({where:{tenantId,role:'customer_user'}});
+  const site=await db.site.findFirstOrThrow({where:{tenantId,customerCompanyId:customer.customerCompanyId}});
+  const source=await db.inspectionReport.findUniqueOrThrow({where:{id:a.reportId}});
+  const inspectionId='perf-route-completed';
+  await db.inspection.upsert({where:{id:inspectionId},update:{},create:{id:inspectionId,tenantId,createdByUserId:office.id,customerCompanyId:customer.customerCompanyId,siteId:site.id,status:'invoiced',scheduledStart:new Date('2026-11-01T15:00:00Z'),completedAt:new Date('2026-11-01T16:00:00Z'),archivedAt:new Date('2026-11-02T16:00:00Z')}});
+  await db.inspectionTask.upsert({where:{id:'perf-route-task'},update:{},create:{id:'perf-route-task',tenantId,inspectionId,inspectionType:'fire_extinguisher',status:'completed'}});
+  await db.inspectionReport.upsert({where:{id:'perf-route-report'},update:{},create:{id:'perf-route-report',tenantId,inspectionId,inspectionTaskId:'perf-route-task',status:'finalized',contentJson:source.contentJson,finalizedAt:new Date('2026-11-01T16:00:00Z')}});
+  await db.inspectionBillingSummary.upsert({where:{inspectionId},update:{},create:{tenantId,inspectionId,customerCompanyId:customer.customerCompanyId,siteId:site.id,status:'invoiced',items:[]}});
+  const quoteToken='local-performance-quote-token-only';
+  await db.quote.upsert({where:{id:'perf-route-quote'},update:{},create:{id:'perf-route-quote',tenantId,customerCompanyId:customer.customerCompanyId,siteId:site.id,quoteNumber:'PERF-ROUTE-001',createdByUserId:office.id,updatedByUserId:office.id,quoteAccessToken:quoteToken,quoteAccessTokenExpiresAt:new Date('2028-01-01'),remindersEnabled:false,lineItems:{create:{tenantId,internalCode:'PERF-SERVICE',title:'Inspection service',category:'service',quantity:1,unitPrice:95,total:95}}}});
+  await db.contractProviderAccount.upsert({where:{id:'perf-route-provider'},update:{},create:{id:'perf-route-provider',organizationId:tenantId,name:'Isolated test provider',billingContactName:'Test office',billingEmail:'provider@example.test',billingPhone:'555-0100',remittanceAddressLine1:'123 Test St',remittanceCity:'Test City',remittanceState:'OK',remittancePostalCode:'73001',paymentTerms:'Net 30'}});
+  const intakeToken='local-performance-intake-token-only';
+  await db.customerIntakeRequest.upsert({where:{id:'perf-route-intake'},update:{},create:{id:'perf-route-intake',organizationId:tenantId,tokenHash:createHash('sha256').update(intakeToken).digest('hex'),recipientEmail:'intake@example.test',expiresAt:new Date('2028-01-01'),createdByUserId:office.id}});
+  await db.quote.update({where:{id:'perf-route-quote'},data:{status:'sent'}});
+  await db.customerIntakeRequest.update({where:{id:'perf-route-intake'},data:{status:'sent'}});
+  const pdf=await PDFDocument.create(); pdf.addPage().drawText('Isolated performance test document');
+  const bytes=await pdf.save();
+  await db.inspectionDocument.upsert({where:{id:'perf-route-document'},update:{},create:{id:'perf-route-document',tenantId,inspectionId:a.inspectionId,fileName:'test-document.pdf',mimeType:'application/pdf',fileSize:bytes.length,originalStorageKey:'data:application/pdf;base64,'+Buffer.from(bytes).toString('base64')}});
+  fs.writeFileSync(path.join(__dirname,'results/detail-fixture.json'),JSON.stringify({inspectionId,reportId:'perf-route-report',quoteId:'perf-route-quote',providerId:'perf-route-provider',intakeId:'perf-route-intake',documentId:'perf-route-document',quoteToken,intakeToken},null,2));
+})().finally(()=>db.$disconnect()).catch(error=>{console.error(error);process.exitCode=1;});

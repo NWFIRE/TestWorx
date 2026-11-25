@@ -1,0 +1,46 @@
+[
+  {
+    "name": "Visit review and upcoming month pagination retain full totals and reach distinct records",
+    "passed": true
+  },
+  {
+    "name": "Empty customer-search focus issues no directory request",
+    "passed": true
+  },
+  {
+    "name": "Latest search wins even when the older server response arrives last",
+    "passed": true
+  },
+  {
+    "name": "Home attention count equals the full filtered inspection count, not just one page",
+    "passed": true
+  },
+  {
+    "name": "Inspection paging retains filters and reaches beyond the first fifty rows",
+    "passed": true
+  },
+  {
+    "name": "Scheduler defers creation options until Add Job and retains its date behind the popup",
+    "passed": true
+  },
+  {
+    "name": "Company-scoped search, creation options, scheduler detail and direct inspection access",
+    "passed": true
+  },
+  {
+    "name": "Stored PDF download is company isolated and read-only",
+    "passed": true
+  },
+  {
+    "name": "Technician report viewing is read-only and billing options stay restricted",
+    "passed": true
+  },
+  {
+    "name": "Phone layouts remain within the viewport",
+    "passed": true
+  },
+  {
+    "name": "PDF selection supports browse and drag/drop without submitting or changing status",
+    "passed": true
+  }
+]

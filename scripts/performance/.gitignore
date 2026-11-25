@@ -1,0 +1,16 @@
+results/*
+!results/route-inventory.json
+!results/baseline.json
+!results/baseline-actions.json
+!results/baseline-tech.json
+!results/baseline-tech-report.json
+!results/final.json
+!results/final-tech.json
+!results/verified-desktop-routes.json
+!results/verified-phone-routes.json
+!results/verification.json
+!results/save-verification.json
+!results/release-tech.json
+!results/usable-inspection.json
+!results/pre-pagination-desktop-routes.json
+!results/pre-pagination-phone-routes.json
