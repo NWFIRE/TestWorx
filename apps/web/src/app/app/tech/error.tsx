@@ -51,6 +51,7 @@ export default function TechnicianAppError({
         </p>
       ) : null}
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        {process.env.NEXT_PUBLIC_SUBSCRIBER_FEATURES_ENABLED === "true" ? <Link className="flex min-h-12 items-center justify-center rounded-2xl border bg-white px-4 py-3 text-sm font-semibold text-blue-700" href={`/app/help/new?error=${encodeURIComponent(error.digest ?? "")}&from=${encodeURIComponent(typeof window === "undefined" ? "/app/tech" : window.location.pathname)}`}>Report a problem</Link> : null}
         <button
           className="min-h-12 rounded-2xl bg-[var(--tenant-primary)] px-4 py-3 text-sm font-semibold text-[var(--tenant-primary-contrast)]"
           onClick={reset}

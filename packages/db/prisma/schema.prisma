@@ -403,6 +403,13 @@ model SubscriptionPlan {
 }
 
 model Tenant {
+  supportTickets SupportTicket[]
+  reportDeliveries ReportDelivery[]
+  subscriptionManaged Boolean @default(false)
+  checkoutSessionId String?
+  checkoutAttemptId String?
+  checkoutAttemptAt DateTime?
+  paymentFailedAt DateTime?
   jobTimeSessions JobTimeSession[]
   id                        String                 @id @default(cuid())
   slug                      String                 @unique
@@ -1386,6 +1393,7 @@ model ReportCorrectionEvent {
 }
 
 model Attachment {
+  reportDeliveries ReportDelivery[]
   id                 String            @id @default(cuid())
   tenantId           String
   inspectionId       String?
@@ -2012,6 +2020,91 @@ model AccountInvitation {
   @@index([tenantId, status])
   @@index([tenantId, email])
   @@index([tenantId, customerCompanyId])
+}
+
+model SupportTicket {
+  id String @id @default(cuid())
+  number Int @unique @default(autoincrement())
+  tenantId String
+  requesterId String
+  requesterRole String
+  title String
+  description String
+  blocked Boolean @default(false)
+  status String @default("open")
+  pagePath String
+  appVersion String
+  errorReference String?
+  reportId String?
+  assignedOperatorId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  messages SupportMessage[]
+  screenshot SupportScreenshot?
+  @@index([tenantId, requesterId, updatedAt])
+  @@index([status, blocked, updatedAt])
+}
+
+model SupportMessage {
+  id String @id @default(cuid())
+  ticketId String
+  authorId String
+  authorName String
+  internal Boolean @default(false)
+  body String
+  createdAt DateTime @default(now())
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  @@index([ticketId, createdAt])
+}
+
+model SupportScreenshot {
+  id String @id @default(cuid())
+  ticketId String @unique
+  mimeType String
+  bytes Bytes
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+}
+
+model CapturedEmail {
+  id String @id @default(cuid())
+  dedupeKey String? @unique
+  recipient String
+  subject String
+  html String
+  attachmentNames String[]
+  createdAt DateTime @default(now())
+}
+
+model WorkspaceSignup {
+  id String @id @default(cuid())
+  email String @unique
+  name String
+  companyName String
+  passwordHash String
+  tokenHash String @unique
+  expiresAt DateTime
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+}
+
+model ReportDelivery {
+  id String @id @default(cuid())
+  tenantId String
+  reportId String
+  attachmentId String?
+  recipient String
+  status String @default("pending")
+  failureCode String?
+  providerMessageId String?
+  attemptedAt DateTime?
+  sentAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  attachment Attachment? @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
+  @@unique([attachmentId, recipient])
+  @@index([tenantId, reportId, status])
 }
 
 model PasswordResetToken {

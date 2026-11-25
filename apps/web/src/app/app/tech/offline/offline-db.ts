@@ -21,14 +21,38 @@ const OFFLINE_CHANGE_EVENT = "tradeworx-offline-change";
 const SCREEN_CHANGE_EVENT = "tradeworx-screen-change";
 
 let databasePromise: Promise<IDBDatabase> | null = null;
+let databaseName = DATABASE_NAME;
+let workspaceScope: string | null = null;
+
+export async function configureOfflineWorkspace(scope: string) {
+  if (workspaceScope === scope) return;
+  if (databasePromise) {
+    const previous = await databasePromise;
+    await new Promise<void>((resolve, reject) => {
+      const transaction = previous.transaction(SCREEN_SNAPSHOT_STORE, "readwrite");
+      transaction.objectStore(SCREEN_SNAPSHOT_STORE).clear();
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+    previous.close();
+  }
+  databasePromise = null;
+  workspaceScope = scope;
+  databaseName = `${DATABASE_NAME}:${encodeURIComponent(scope)}`;
+}
+
+export function getOfflineWorkspaceScope() { return workspaceScope; }
 
 function openDatabase() {
+  if (process.env.NEXT_PUBLIC_SUBSCRIBER_FEATURES_ENABLED === "true" && !workspaceScope) {
+    return Promise.reject(new Error("Offline workspace is not initialized."));
+  }
   if (databasePromise) {
     return databasePromise;
   }
 
   databasePromise = new Promise((resolve, reject) => {
-    const request = window.indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
+    const request = window.indexedDB.open(databaseName, DATABASE_VERSION);
 
     request.onupgradeneeded = () => {
       const database = request.result;

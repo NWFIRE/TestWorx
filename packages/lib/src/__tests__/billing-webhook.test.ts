@@ -44,6 +44,8 @@ describe("billing webhook processing", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    // These legacy contract mocks exercise the rollout-disabled path.
+    vi.stubEnv("SUBSCRIBER_FEATURES_ENABLED", "false");
     vi.stubEnv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/testworx?schema=public");
     vi.stubEnv("AUTH_SECRET", "replace-with-a-long-random-secret");
     vi.stubEnv("NEXTAUTH_URL", "http://localhost:3000");
@@ -275,5 +277,13 @@ describe("billing webhook processing", () => {
 
     expect(result).toEqual({ duplicate: true, tenantId: "tenant_1", type: "customer.subscription.updated" });
     expect(prismaMock.tenant.update).not.toHaveBeenCalled();
+  });
+  it("does not reset an in-flight event to received on retry", async () => {
+    stripeConstructEventMock.mockReturnValue({ id: "evt_race", created: 1760000000, type: "customer.subscription.updated", data: { object: { id: "sub_123" } } });
+    prismaMock.stripeWebhookEvent.findUnique.mockResolvedValue({ status: "processing", type: "customer.subscription.updated" });
+    prismaMock.stripeWebhookEvent.updateMany.mockResolvedValue({ count: 0 });
+    const { handleStripeWebhook } = await import("../billing");
+    await handleStripeWebhook({ rawBody: "{}", signature: "sig_123" });
+    expect(prismaMock.stripeWebhookEvent.upsert.mock.calls[0]?.[0].update).not.toHaveProperty("status");
   });
 });

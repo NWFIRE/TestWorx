@@ -456,6 +456,11 @@ export function stopTechnicianSyncEngine() {
   syncStarted = false;
 }
 
+export async function drainTechnicianSyncEngine() {
+  stopTechnicianSyncEngine();
+  await syncInFlight?.catch(() => undefined);
+}
+
 export async function queueReportDraftSync(input: {
   reportId: string;
   inspectionReportId: string;

@@ -9,7 +9,7 @@ function isStaleSessionError(error: unknown) {
 }
 
 export default async function AppLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const session = await auth();
+  const session = await auth({ subscriptionRecovery: true });
   if (!session?.user) {
     redirect("/login");
   }

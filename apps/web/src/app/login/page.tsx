@@ -40,6 +40,7 @@ export default function LoginPage() {
                 </p>
               </div>
               <LoginForm />
+              {process.env.SUPPORT_EMAIL && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(process.env.SUPPORT_EMAIL) ? <a className="mt-5 inline-flex min-h-11 items-center text-sm text-blue-700 underline" href={`mailto:${process.env.SUPPORT_EMAIL}`}>Contact support</a> : null}
             </div>
           </section>
         </div>

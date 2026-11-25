@@ -1,11 +1,12 @@
 import { Resend } from "resend";
+import { prisma } from "@testworx/db";
 
 import { getOptionalEmailEnv } from "./env";
 import { buildQuoteEmailDefaultMessage, buildQuoteEmailGreeting } from "./quote-email";
 
 export type TransactionalEmailDeliveryResult = {
   sent: boolean;
-  provider: "resend";
+  provider: "resend" | "capture";
   messageId: string | null;
   error: string | null;
   reason: "sent" | "missing_config" | "provider_error";
@@ -220,14 +221,25 @@ function buildShell({
   });
 }
 
-async function sendWithResend(input: {
+export async function sendWithResend(input: {
   to: string;
   cc?: string[];
   subject: string;
   html: string;
   attachments?: EmailAttachment[];
   from?: string | null;
+  idempotencyKey?: string;
 }): Promise<TransactionalEmailDeliveryResult> {
+  if (process.env.EMAIL_DRIVER === "capture") {
+    if (process.env.APP_ENV !== "staging") throw new Error("Email capture requires isolated staging.");
+    const data = { recipient: input.to, subject: input.subject, html: input.html,
+      attachmentNames: input.attachments?.map(file => file.fileName) ?? [], dedupeKey: input.idempotencyKey };
+    const capture = input.idempotencyKey
+      ? await prisma.capturedEmail.upsert({ where: { dedupeKey: input.idempotencyKey }, create: data, update: {} })
+      : await prisma.capturedEmail.create({ data });
+    return { sent: true, provider: "capture", messageId: capture.id, error: null, reason: "sent" };
+  }
+  if (process.env.APP_ENV === "staging") throw new Error("Staging outbound email must be captured.");
   const env = getOptionalEmailEnv();
   const fromEmail = input.from?.trim() || null;
   if (!env.RESEND_API_KEY || !fromEmail) {
@@ -243,7 +255,7 @@ async function sendWithResend(input: {
   const resend = new Resend(env.RESEND_API_KEY);
 
   try {
-    const result = await resend.emails.send({
+    const message = {
       from: fromEmail,
       to: input.to,
       cc: input.cc,
@@ -253,7 +265,10 @@ async function sendWithResend(input: {
         filename: attachment.fileName,
         content: attachment.content
       }))
-    });
+    };
+    const result = input.idempotencyKey
+      ? await resend.emails.send(message, { idempotencyKey: input.idempotencyKey })
+      : await resend.emails.send(message);
 
     if (result.error) {
       return {

@@ -184,6 +184,12 @@ async function main() {
   await prisma.quote.deleteMany();
   await prisma.emailReminderSendLog.deleteMany();
   await prisma.accountInvitation.deleteMany();
+  await prisma.supportScreenshot.deleteMany();
+  await prisma.supportMessage.deleteMany();
+  await prisma.supportTicket.deleteMany();
+  await prisma.reportDelivery.deleteMany();
+  await prisma.workspaceSignup.deleteMany();
+  await prisma.capturedEmail.deleteMany();
   await prisma.passwordResetToken.deleteMany();
   await prisma.technicianDeviceRegistration.deleteMany();
   await prisma.technicianNotification.deleteMany();

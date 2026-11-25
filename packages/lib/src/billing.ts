@@ -7,6 +7,8 @@ import { actorContextSchema } from "@testworx/types";
 
 import { getOptionalStripeEnv, getServerEnv } from "./env";
 import { assertTenantContext } from "./permissions";
+import { subscriberFeaturesEnabled } from "./subscriber-policy";
+import { createSubscriberCheckout } from "./subscriber-checkout";
 
 const billingPlanCodeSchema = z.enum(["starter", "professional", "enterprise"]);
 const billingFeatureSchema = z.enum(["advancedRecurrence", "uploadedInspectionPdfs"]);
@@ -193,6 +195,7 @@ function getStripeClient() {
   if (!secretKey) {
     return null;
   }
+  if (process.env.APP_ENV === "staging" && !secretKey.startsWith("sk_test_")) throw new Error("Staging requires Stripe test mode.");
 
   return new Stripe(secretKey, { apiVersion: "2026-02-25.clover" });
 }
@@ -366,6 +369,8 @@ export async function createBillingCheckoutSession(actor: ActorContext, input: {
     throw new Error("Selected plan is not configured for checkout.");
   }
 
+  if (subscriberFeaturesEnabled()) return createSubscriberCheckout(stripe, parsedActor, { ...input, priceId: plan.stripePriceId });
+
   const customer = tenant.stripeCustomerId
     ? tenant.stripeCustomerId
     : (await stripe.customers.create({
@@ -480,7 +485,7 @@ export async function syncTenantSubscriptionFromStripe(input: {
   metadataPlanCode?: string | null;
   stripeEventId?: string | null;
   stripeEventCreatedAt?: Date | null;
-}): Promise<StripeWebhookProcessingResult> {
+}, attempt = 0): Promise<StripeWebhookProcessingResult> {
   const tenant = input.tenantId
     ? await prisma.tenant.findFirst({ where: { id: input.tenantId }, include: { subscriptionPlan: true } })
     : await prisma.tenant.findFirst({
@@ -495,6 +500,10 @@ export async function syncTenantSubscriptionFromStripe(input: {
 
   if (!tenant) {
     throw new Error("Tenant for Stripe subscription could not be resolved.");
+  }
+  if (subscriberFeaturesEnabled() && tenant.stripeCustomerId && input.stripeCustomerId && tenant.stripeCustomerId !== input.stripeCustomerId) throw new Error("Subscription customer does not match this company.");
+  if (subscriberFeaturesEnabled() && tenant.stripeSubscriptionId && tenant.stripeSubscriptionId !== input.stripeSubscriptionId && !["canceled", "incomplete_expired"].includes(tenant.stripeSubscriptionStatus ?? "")) {
+    return { tenantId: tenant.id, planCode: normalizePlanCode(tenant.subscriptionPlan?.code), ignored: true, reason: "different_subscription" };
   }
 
   const currentEventCreatedAt = tenant.stripeSubscriptionEventCreatedAt;
@@ -521,13 +530,12 @@ export async function syncTenantSubscriptionFromStripe(input: {
 
   const planCode = resolvePlanCodeFromStripePriceId(input.stripePriceId) ?? normalizePlanCode(input.metadataPlanCode);
   const plan = await getTenantPlanRecord(planCode);
-  const updated = await prisma.tenant.update({
-    where: { id: tenant.id },
-    data: {
+  const updateData = {
       subscriptionPlanId: plan?.id ?? tenant.subscriptionPlanId,
       stripeCustomerId: input.stripeCustomerId ?? tenant.stripeCustomerId,
       stripeSubscriptionId: input.stripeSubscriptionId,
       stripeSubscriptionStatus: input.subscriptionStatus ?? tenant.stripeSubscriptionStatus,
+      paymentFailedAt: input.subscriptionStatus === "past_due" ? tenant.paymentFailedAt ?? input.stripeEventCreatedAt ?? new Date() : null,
       stripePriceId: input.stripePriceId ?? tenant.stripePriceId,
       stripeCurrentPeriodEndsAt: input.currentPeriodEndsAt ?? null,
       stripeCancelAtPeriodEnd: input.cancelAtPeriodEnd ?? false,
@@ -535,8 +543,18 @@ export async function syncTenantSubscriptionFromStripe(input: {
       stripeSubscriptionEventCreatedAt: input.stripeEventCreatedAt ?? tenant.stripeSubscriptionEventCreatedAt,
       stripeSubscriptionEventId: input.stripeEventId ?? tenant.stripeSubscriptionEventId,
       status: mapSubscriptionStatusToTenantStatus(input.subscriptionStatus)
+  };
+  let updated;
+  if (subscriberFeaturesEnabled()) {
+    const changed = await prisma.tenant.updateMany({ where: { id: tenant.id, stripeSubscriptionEventCreatedAt: tenant.stripeSubscriptionEventCreatedAt, stripeSubscriptionId: tenant.stripeSubscriptionId }, data: updateData });
+    if (!changed.count) {
+      if (attempt >= 3) throw new Error("Subscription changed concurrently. Retry the billing event.");
+      return syncTenantSubscriptionFromStripe(input, attempt + 1);
     }
-  });
+    updated = await prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id } });
+  } else {
+    updated = await prisma.tenant.update({ where: { id: tenant.id }, data: updateData });
+  }
 
   await prisma.auditLog.create({
     data: {
@@ -623,12 +641,11 @@ export async function handleStripeWebhook(input: { rawBody: string; signature: s
     },
     update: {
       type: event.type,
-      status: "received",
       deliveryCount: { increment: 1 },
       stripeCreatedAt,
       stripeObjectId,
       payload: event as any,
-      errorMessage: null
+      // Never reset a claimed or processed event when Stripe retries concurrently.
     }
   });
 

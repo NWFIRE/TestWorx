@@ -1,5 +1,6 @@
 const CACHE_VERSION = "tradeworx-pwa-v2";
 const APP_SHELL_CACHE = `${CACHE_VERSION}:app-shell`;
+let workspaceGeneration = 0;
 const ASSET_CACHE = `${CACHE_VERSION}:assets`;
 const LAST_TECH_NAVIGATION_KEY = "last-tech-navigation";
 const TECH_NAVIGATION_FALLBACKS = [
@@ -133,11 +134,13 @@ async function cacheFirstAsset(request) {
 }
 
 async function networkFirstTechnicianNavigation(request) {
+  const generation = workspaceGeneration;
   try {
     const response = await fetch(request);
     if (isCacheablePage(response)) {
       try {
         const cache = await caches.open(APP_SHELL_CACHE);
+        if (generation !== workspaceGeneration) return response;
         await cache.put(request, response.clone());
         await rememberLastTechnicianNavigation(request);
       } catch {
@@ -170,6 +173,7 @@ async function networkFirstTechnicianNavigation(request) {
 }
 
 async function warmTechnicianCache(urls) {
+  const generation = workspaceGeneration;
   const cache = await caches.open(APP_SHELL_CACHE).catch(() => null);
   if (!cache) return;
   for (const pathname of urls) {
@@ -181,6 +185,7 @@ async function warmTechnicianCache(urls) {
         headers: { "X-TradeWorx-Prefetch": "technician-offline" }
       });
       const response = await fetch(request);
+      if (generation !== workspaceGeneration) return;
       if (isCacheablePage(response)) {
         await cache.put(request, response.clone());
       }
@@ -191,6 +196,11 @@ async function warmTechnicianCache(urls) {
 }
 
 self.addEventListener("message", (event) => {
+  if (event.data?.type === "TRADEWORX_RESET_WORKSPACE") {
+    workspaceGeneration += 1;
+    event.waitUntil(caches.delete(APP_SHELL_CACHE));
+    return;
+  }
   if (event.data?.type === "TRADEWORX_WARM_TECH_CACHE" && Array.isArray(event.data.urls)) {
     event.waitUntil(warmTechnicianCache(event.data.urls));
   }

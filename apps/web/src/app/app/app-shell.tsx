@@ -519,6 +519,8 @@ function NavSection({
   );
 }
 
+import { OfflineWorkspaceBoundary } from "./tech/offline/offline-workspace-boundary";
+
 export function AppShell({
   children,
   role,
@@ -988,7 +990,7 @@ export function AppShell({
     return shell;
   }
 
-  return (
+  const technicianShell = (
     <TechnicianNotificationProvider key={`${user.tenantId}:${user.id}`} scope={`${user.tenantId}:${user.id}`}>
       <NativeTechnicianRouteGuard allowances={allowances} role={role} />
       <TechnicianNotificationQueryBridge />
@@ -996,4 +998,7 @@ export function AppShell({
       {shell}
     </TechnicianNotificationProvider>
   );
+  return process.env.NEXT_PUBLIC_SUBSCRIBER_FEATURES_ENABLED === "true"
+    ? <OfflineWorkspaceBoundary key={`${user.tenantId}:${user.id}`} scope={`${user.tenantId}:${user.id}`}>{technicianShell}</OfflineWorkspaceBoundary>
+    : technicianShell;
 }

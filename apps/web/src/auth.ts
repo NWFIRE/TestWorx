@@ -1,6 +1,9 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { z } from "zod";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { subscriberFeaturesEnabled, subscriptionAccess } from "@testworx/lib/src/subscriber-policy";
 
 import { prisma } from "@testworx/db";
 import { assertEnvForFeature, comparePassword } from "@testworx/lib/server/index";
@@ -10,7 +13,7 @@ const loginSchema = z.object({
   password: z.string().min(8)
 });
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
+const nextAuth = NextAuth({
   secret: process.env.AUTH_SECRET,
   trustHost: true,
   session: { strategy: "jwt" },
@@ -92,11 +95,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           where: { id: token.sub },
           select: {
             name: true,
+            isActive: true,
             role: true,
             tenantId: true,
             allowances: true
           }
         });
+
+        if (!currentUser?.isActive) return null;
 
         if (currentUser) {
           token.name = currentUser.name;
@@ -124,5 +130,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }
   }
 });
+
+export const { handlers, signIn, signOut } = nextAuth;
+
+export async function auth(options: { subscriptionRecovery?: boolean } = {}) {
+  const session = await nextAuth.auth();
+  if (!session?.user?.tenantId || !subscriberFeaturesEnabled() || session.user.role === "platform_admin") return session;
+  const tenant = await prisma.tenant.findUnique({ where: { id: session.user.tenantId }, select: {
+    subscriptionManaged: true, stripeSubscriptionStatus: true, stripeCurrentPeriodEndsAt: true, paymentFailedAt: true
+  } });
+  if (!tenant) return null;
+  if (subscriptionAccess(tenant)) return session;
+  const requestHeaders = await headers();
+  const path = requestHeaders.get("x-tradeworx-request-path") ?? "";
+  // Server actions can be posted to a different page. Recovery is an explicit server-only capability.
+  if (requestHeaders.has("next-action") && !options.subscriptionRecovery) return null;
+  const allowed = ["/app/help", "/api/support", "/app/admin/settings/subscription", "/app/subscription-required", "/api/auth"];
+  if (allowed.some(prefix => path === prefix || path.startsWith(`${prefix}/`))) return session;
+  if (path.startsWith("/api/")) return null;
+  if (path.startsWith("/app")) redirect(session.user.role === "tenant_admin" ? "/app/admin/settings/subscription" : "/app/subscription-required");
+  return session;
+}
 
 

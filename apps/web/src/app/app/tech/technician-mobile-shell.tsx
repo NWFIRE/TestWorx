@@ -175,10 +175,10 @@ export function TechnicianMobileHeader({
         <p className="truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
           {userName ? `${userName.split(" ")[0]}'s workspace` : "Technician workspace"}
         </p>
-        <h1 className="mt-1 truncate text-xl font-semibold text-slate-950">{activeTab.label}</h1>
-        <p className="mt-1 text-sm text-slate-500">{subtitleByTab[activeTab.label]}</p>
+        <h1 className="mt-1 truncate text-xl font-semibold text-slate-950">{pathname.startsWith("/app/help") ? "Help" : activeTab.label}</h1>
+        <p className="mt-1 text-sm text-slate-500">{pathname.startsWith("/app/help") ? "Support requests" : subtitleByTab[activeTab.label]}</p>
       </div>
-      <TechnicianSyncPill />
+      <div className="flex items-center gap-2">{process.env.NEXT_PUBLIC_SUBSCRIBER_FEATURES_ENABLED === "true" ? <Link className="inline-flex min-h-11 items-center rounded-xl border bg-white px-3 text-sm text-blue-700" href={`/app/help/new?from=${encodeURIComponent(pathname)}`}>Help</Link> : null}<TechnicianSyncPill /></div>
     </div>
   );
 }

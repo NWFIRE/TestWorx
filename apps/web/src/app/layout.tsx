@@ -7,6 +7,7 @@ import { GlobalBackButton } from "./global-back-button";
 import { NavigationHistoryTracker } from "./navigation-history-tracker";
 import { PwaServiceWorkerRegistration } from "./pwa-service-worker-registration";
 import { ToastProvider } from "./toast-provider";
+import { SessionAccessBoundary } from "./app/session-access-boundary";
 
 const BRAND_PRIMARY_COOKIE = "tradeworx_brand_primary";
 const BRAND_ACCENT_COOKIE = "tradeworx_brand_accent";
@@ -34,7 +35,7 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const cookieStore = await cookies();
-  const session = await auth().catch(() => null);
+  const session = await auth({ subscriptionRecovery: true }).catch(() => null);
   let theme: React.CSSProperties | undefined;
 
   if (session?.user?.tenantId) {
@@ -65,6 +66,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     <html lang="en">
       <body style={theme}>
         <ToastProvider>
+          {process.env.SUBSCRIBER_FEATURES_ENABLED === "true" ? <SessionAccessBoundary userId={session?.user?.id} tenantId={session?.user?.tenantId} role={session?.user?.role ?? ""} /> : null}
           <PwaServiceWorkerRegistration canWarmTechnicianCache={session?.user?.role === "technician"} />
           <NavigationHistoryTracker />
           <GlobalBackButton />

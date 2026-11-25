@@ -369,6 +369,10 @@ function applyAdminSidebarOrder(role: string, items: AppNavItem[], sidebarOrder?
 
 export function getAppNavItemsForRole(role: string, allowances?: InternalAllowances, sidebarOrder?: string[] | null) {
   let baseItems = navByRole[role] ?? [];
+  if (process.env.NEXT_PUBLIC_SUBSCRIBER_FEATURES_ENABLED === "true") {
+    baseItems = [...baseItems, { href: role === "platform_admin" ? "/app/platform/support" : "/app/help", label: role === "platform_admin" ? "Platform Support" : "Help", shortLabel: "Help", abbreviation: "HP", icon: "mail", group: "Settings" }];
+    if (role === "tenant_admin") baseItems.push({ href: "/app/admin/settings/subscription", label: "Subscription", shortLabel: "Subscription", abbreviation: "SB", icon: "dollar", group: "Settings" });
+  }
 
   if (role === "technician" && canAccessQuoteWorkspace(role, allowances)) {
     const profileItem = baseItems.find((item) => item.href === "/app/tech/profile");
