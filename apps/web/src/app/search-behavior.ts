@@ -1,2 +1,2 @@
-// Match the Clients directory: allow natural pauses without interrupting typing.
-export const SEARCH_DEBOUNCE_MS = 1200;
+// Leave room for the request and rendering within the 500 ms search budget.
+export const SEARCH_DEBOUNCE_MS = 200;

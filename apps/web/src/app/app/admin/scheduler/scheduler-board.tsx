@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { fieldProgress, localDateTime, scheduleLanes, schedulerDisplayEnd, schedulerRange, scheduleDurationHours, scheduleEndForDuration, shiftSchedulerDate, type SchedulerData, type SchedulerJob } from "@testworx/lib/scheduler-shared";
 import { getInspectionTypeTextColorClass } from "../../inspection-type-inline-list";
@@ -10,10 +11,11 @@ import { ScheduleDateTime } from "../schedule-date-time";
 import { ScheduleDuration } from "../schedule-duration";
 import { ResizeHandle } from "./resize-handle";
 import { InspectionDialog } from "./inspection-dialog";
-import { CreateJobDialog, type CreateJobOptions } from "./create-job-dialog";
+import type { CreateJobOptions } from "./create-job-dialog";
+const CreateJobDialog = dynamic(() => import("./create-job-dialog").then(module => module.CreateJobDialog));
 
 const labelType = (type: string) => type.replaceAll("_", " ");
-export function SchedulerBoard({ initial, initialView, createOptions }: { initial: SchedulerData; initialView: "day" | "week"; createOptions: CreateJobOptions }) {
+export function SchedulerBoard({ initial, initialView, createOptions }: { initial: SchedulerData; initialView: "day" | "week"; createOptions?: CreateJobOptions }) {
   const [data, setData] = useState(initial), [date, setDate] = useState(initial.days[0]!), [view, setView] = useState(initialView);
   const [now, setNow] = useState(() => Date.now()), [error, setError] = useState(""), [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<SchedulerJob | null>(null), [panel, setPanel] = useState(false), [editing, setEditing] = useState(false);
@@ -26,6 +28,7 @@ export function SchedulerBoard({ initial, initialView, createOptions }: { initia
   const [resizePreview, setResizePreview] = useState<{id: string; end: string} | null>(null);
   const [notice, setNotice] = useState("");
   const [creating, setCreating] = useState(false);
+  const initialRefresh = useRef(true);
   const [inspectionPopup, setInspectionPopup] = useState<{id: string; customer: string} | null>(null);
   useEffect(() => { selectedId.current = panel ? selected?.id ?? null : null; }, [selected?.id, panel]);
   const timezone = data.timezone, today = localDateTime(new Date(now), timezone).slice(0, 10);
@@ -71,7 +74,10 @@ export function SchedulerBoard({ initial, initialView, createOptions }: { initia
       } catch (caught) { if (!disposed && !request.signal.aborted) setError(caught instanceof Error ? caught.message : "Connection lost."); }
       finally { if (!disposed && !request.signal.aborted) setLoading(false); }
     }
-    refresh.current = () => void run(); void run();
+    refresh.current = () => void run();
+    // The server has already loaded this range; do not request it again on mount.
+    if (initialRefresh.current) initialRefresh.current = false;
+    else void run();
     const tick = window.setInterval(() => { setNow(Date.now()); void run(); }, 15000);
     const reconnect = () => void run();
     window.addEventListener("online", reconnect); window.addEventListener("focus", reconnect); document.addEventListener("visibilitychange", reconnect);

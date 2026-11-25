@@ -823,7 +823,11 @@ export function CustomerManagementCard({
         <div className="rounded-[1.5rem] border border-slate-200 p-4">
           <SearchInput
             busy={isLoadingResults}
-            onChange={(event) => setQueryInput(event.target.value)}
+            onChange={(event) => {
+              // Invalidate an older response immediately, not after the debounce.
+              cancelPendingCustomerSearch();
+              setQueryInput(event.target.value);
+            }}
             onClear={clearSearch}
             onBlur={() => {
               if (queryInput.trim() !== activeQuery) {

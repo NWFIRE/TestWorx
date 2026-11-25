@@ -3,7 +3,6 @@
 import { useRef, useState, useTransition } from "react";
 import type { DragEvent } from "react";
 import { useRouter } from "next/navigation";
-import { upload } from "@vercel/blob/client";
 import { cloudReferenceDropMessage, getDroppedPdfFiles } from "./pdf-drop-utils";
 
 const MAX_INSPECTION_PDF_UPLOAD_BYTES = 50 * 1024 * 1024;
@@ -146,8 +145,9 @@ export function InspectionPdfUploadCard({
     }
 
     startUploadTransition(() => {
-      void (async () => {
+      return (async () => {
         try {
+          const { upload } = await import("@vercel/blob/client");
           const uploadStartedAt = Date.now();
           const safeInspectionId = sanitizePathSegment(inspectionId);
           const uploadResults = [];

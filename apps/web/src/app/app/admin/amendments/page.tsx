@@ -69,7 +69,7 @@ function getRelationshipSummary(item: ReviewItem) {
 export default async function AdminAmendmentsPage({
   searchParams
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; page?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -81,13 +81,18 @@ export default async function AdminAmendmentsPage({
 
   const params = await searchParams;
   const selectedFilter = reviewOptions.some((option) => option.value === params.filter) ? params.filter : "all";
-  const currentPath = selectedFilter === "all"
+  const filterPath = selectedFilter === "all"
     ? "/app/admin/amendments"
     : `/app/admin/amendments?filter=${selectedFilter}`;
   const data = await getAdminAmendmentManagementData(
     { userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId },
     { filter: selectedFilter as "all" | "needs_review" | "pending_follow_up_request" | "approved_created" | "dismissed" | "has_amendment_linkage" }
   );
+  const pageSize = 25;
+  const pageCount = Math.max(1, Math.ceil(data.items.length / pageSize));
+  const page = Math.min(pageCount, Math.max(1, Math.floor(Number(params.page) || 1)));
+  const pageHref = (next: number) => `${filterPath}${filterPath.includes("?") ? "&" : "?"}page=${next}`;
+  const currentPath = pageHref(page);
 
   return (
     <AppPageShell>
@@ -161,7 +166,7 @@ export default async function AdminAmendmentsPage({
               title="No action records match these filters"
             />
           ) : (
-            data.items.map((inspection) => {
+            data.items.slice((page - 1) * pageSize, page * pageSize).map((inspection) => {
               const relationship = getRelationshipSummary(inspection);
 
               return (
@@ -284,6 +289,7 @@ export default async function AdminAmendmentsPage({
                     </div>
                     <div className="flex min-w-56 flex-col gap-3">
                       <Link
+                        prefetch={false}
                         className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slateblue px-4 py-3 text-sm font-semibold text-white"
                         href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}&mode=review`}
                       >
@@ -291,6 +297,7 @@ export default async function AdminAmendmentsPage({
                       </Link>
                       {relationship ? (
                         <Link
+                          prefetch={false}
                           className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
                           href={`${relationship.href}?from=${encodeURIComponent(currentPath)}&mode=review`}
                         >
@@ -304,6 +311,11 @@ export default async function AdminAmendmentsPage({
             })
           )}
         </div>
+        {pageCount > 1 ? <nav aria-label="Visit review pages" className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+          {page > 1 ? <Link prefetch={false} href={pageHref(page - 1)} className="rounded-xl border px-4 py-3">Previous page</Link> : <span />}
+          <span>Page {page} of {pageCount} · {data.items.length} matching records</span>
+          {page < pageCount ? <Link prefetch={false} href={pageHref(page + 1)} className="rounded-xl border px-4 py-3">Next page</Link> : <span />}
+        </nav> : null}
       </SectionCard>
     </AppPageShell>
   );

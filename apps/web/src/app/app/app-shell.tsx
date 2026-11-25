@@ -6,6 +6,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExtern
 import { usePathname, useRouter } from "next/navigation";
 
 import { useRequestBadge } from "./use-request-badge";
+import { NavigationRecovery } from "./navigation-recovery";
 import { RequestCountBadge } from "./request-count-badge";
 import { getAppNavItemsForRole, isAppNavItemActive, type AppNavItem } from "./app-nav-config";
 import { MobilePullToRefresh } from "./mobile-pull-to-refresh";
@@ -26,6 +27,12 @@ const DROPDOWN_NAV_GROUPS = new Set(["Work", "Billing", "Customers", "Operations
 // The embedding frame stays fixed for this document; the server has no frame context.
 const subscribeToFrame = () => () => {};
 const isInspectionPopupFrame = () => window.frameElement?.getAttribute("data-inspection-popup") === "true";
+const sidebarViewportSnapshot = () => window.innerWidth < EXPANDED_SIDEBAR_BREAKPOINT;
+function subscribeToSidebarViewport(notify: () => void) {
+  const query = window.matchMedia(`(min-width: ${EXPANDED_SIDEBAR_BREAKPOINT}px)`);
+  query.addEventListener("change", notify);
+  return () => query.removeEventListener("change", notify);
+}
 
 function shouldProtectFocusedElementFromKeyboard() {
   if (typeof window === "undefined") {
@@ -266,7 +273,7 @@ function NavItem({
       onClick={() => { if (!item.openInNewTab) onNavigate?.(item.href); }}
       onFocus={() => onPrefetch?.(item.href)}
       onPointerEnter={() => onPrefetch?.(item.href)}
-      prefetch
+      prefetch={false}
       title={collapsed ? `${item.label}${item.badgeCount ? ` (${item.badgeCount} awaiting review)` : ""}` : undefined}
     >
       <span
@@ -526,6 +533,7 @@ export function AppShell({
   sidebarOrder?: string[] | null;
   user: {
     id?: string;
+    tenantId?: string | null;
     name: string | null;
     email: string | null;
   };
@@ -545,9 +553,9 @@ export function AppShell({
   const activePathname = pendingNavHref && !isAppNavItemActive(pathname, { href: pendingNavHref, label: "", shortLabel: "", abbreviation: "" })
     ? pendingNavHref
     : pathname;
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    () => typeof window === "undefined" || window.innerWidth < EXPANDED_SIDEBAR_BREAKPOINT
-  );
+  const responsiveCollapsed = useSyncExternalStore(subscribeToSidebarViewport, sidebarViewportSnapshot, () => true);
+  const [sidebarPreference, setSidebarCollapsed] = useState<boolean | null>(null);
+  const sidebarCollapsed = sidebarPreference ?? responsiveCollapsed;
   const [drawerOpen, setDrawerOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const drawerRef = useRef<HTMLDivElement | null>(null);
@@ -560,12 +568,11 @@ export function AppShell({
   }, [router]);
 
   const handleSidebarNavigate = useCallback((href: string) => {
-    prefetchNavHref(href);
     if (href !== pathname) {
       setPendingNavHref(href);
     }
     setDrawerOpen(false);
-  }, [pathname, prefetchNavHref]);
+  }, [pathname]);
 
   const updateViewportMetrics = useCallback(() => {
     if (typeof window === "undefined" || typeof document === "undefined") {
@@ -604,31 +611,6 @@ export function AppShell({
       }
     };
   }, [pendingNavHref]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || navItems.length === 0) {
-      return;
-    }
-
-    const uniqueHrefs = Array.from(new Set(navItems.map((item) => item.href)));
-    const browserWindow = window as Window & typeof globalThis & {
-      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
-      cancelIdleCallback?: (handle: number) => void;
-    };
-    const warmRoutes = () => {
-      for (const href of uniqueHrefs) {
-        router.prefetch(href);
-      }
-    };
-
-    if (browserWindow.requestIdleCallback && browserWindow.cancelIdleCallback) {
-      const idleId = browserWindow.requestIdleCallback(warmRoutes, { timeout: 1800 });
-      return () => browserWindow.cancelIdleCallback?.(idleId);
-    }
-
-    const timeoutId = globalThis.setTimeout(warmRoutes, 250);
-    return () => globalThis.clearTimeout(timeoutId);
-  }, [navItems, router]);
 
   const keepFocusedElementVisible = useCallback((target: HTMLElement) => {
     const container = contentRef.current;
@@ -870,6 +852,7 @@ export function AppShell({
 
   const shell = (
     <div className="flex min-h-0 overflow-hidden bg-paper" style={{ height: "var(--app-height, 100dvh)" }}>
+      <NavigationRecovery />
       {isTechnician ? <TechnicianSyncBootstrap userId={user.id} /> : null}
       {navItems.length > 0 && !standalone ? (
         <aside
@@ -1006,7 +989,7 @@ export function AppShell({
   }
 
   return (
-    <TechnicianNotificationProvider>
+    <TechnicianNotificationProvider key={`${user.tenantId}:${user.id}`} scope={`${user.tenantId}:${user.id}`}>
       <NativeTechnicianRouteGuard allowances={allowances} role={role} />
       <TechnicianNotificationQueryBridge />
       <NativeTechnicianBridge />

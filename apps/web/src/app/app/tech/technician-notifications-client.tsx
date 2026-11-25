@@ -70,17 +70,17 @@ function recalculateCounts(items: TechnicianNotificationItem[]) {
   };
 }
 
-function persistSummary(summary: TechnicianNotificationSummary) {
+function persistSummary(summary: TechnicianNotificationSummary, storageKey: string) {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(summary));
+    window.localStorage.setItem(storageKey, JSON.stringify(summary));
   } catch {
     // Ignore storage failures so field workflow keeps moving.
   }
 }
 
-function readStoredSummary() {
+function readStoredSummary(storageKey: string) {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey);
     if (!raw) {
       return null;
     }
@@ -96,6 +96,8 @@ function readStoredSummary() {
   }
 }
 
+class NotificationAccessError extends Error {}
+
 async function loadSummary(): Promise<TechnicianNotificationSummary> {
   const response = await fetch("/api/tech/notifications", {
     method: "GET",
@@ -103,6 +105,7 @@ async function loadSummary(): Promise<TechnicianNotificationSummary> {
     credentials: "same-origin"
   });
 
+  if (response.status === 401 || response.status === 403) throw new NotificationAccessError("Notification access ended.");
   if (!response.ok) {
     throw new Error("Unable to load technician notifications.");
   }
@@ -126,29 +129,32 @@ async function postNotificationMutation(path: string, notificationId: string) {
 }
 
 export function TechnicianNotificationProvider({
-  children
+  children,
+  scope
 }: {
   children: React.ReactNode;
+  scope: string;
 }) {
-  const [summary, setSummary] = useState<TechnicianNotificationSummary>(() => {
-    if (typeof window === "undefined") {
-      return emptySummary;
-    }
-
-    return readStoredSummary() ?? emptySummary;
-  });
+  const storageKey = `${STORAGE_KEY}:${scope}`;
+  // Match server HTML; restore only this membership's cache after hydration.
+  const [summary, setSummary] = useState<TechnicianNotificationSummary>(emptySummary);
   const refresh = useCallback(async () => {
     try {
       const next = await loadSummary();
       setSummary(next);
-      persistSummary(next);
-    } catch {
-      const stored = readStoredSummary();
+      persistSummary(next, storageKey);
+    } catch (error) {
+      if (error instanceof NotificationAccessError) {
+        try { window.localStorage.removeItem(storageKey); } catch { /* Storage may be unavailable. */ }
+        setSummary(emptySummary);
+        return;
+      }
+      const stored = readStoredSummary(storageKey);
       if (stored) {
         setSummary(stored);
       }
     }
-  }, []);
+  }, [storageKey]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -167,7 +173,7 @@ export function TechnicianNotificationProvider({
         counts: recalculateCounts(items),
         lastUpdatedAt: new Date().toISOString()
       };
-      persistSummary(next);
+      persistSummary(next, storageKey);
       return next;
     });
 
@@ -177,7 +183,7 @@ export function TechnicianNotificationProvider({
     } catch {
       // Keep optimistic state. A later refresh will reconcile.
     }
-  }, [refresh]);
+  }, [refresh, storageKey]);
 
   const dismiss = useCallback(async (notificationId: string) => {
     setSummary((current) => {
@@ -188,7 +194,7 @@ export function TechnicianNotificationProvider({
         counts: recalculateCounts(items),
         lastUpdatedAt: new Date().toISOString()
       };
-      persistSummary(next);
+      persistSummary(next, storageKey);
       return next;
     });
 
@@ -198,7 +204,7 @@ export function TechnicianNotificationProvider({
     } catch {
       // Keep optimistic state. A later refresh will reconcile.
     }
-  }, [refresh]);
+  }, [refresh, storageKey]);
 
   const value = useMemo<TechnicianNotificationContextValue>(() => ({
     ...summary,

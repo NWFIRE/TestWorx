@@ -14,7 +14,7 @@ export type CreateJobOptions = {
 };
 
 export function CreateJobDialog({ options, date, onClose, onCreated }: {
-  options: CreateJobOptions;
+  options?: CreateJobOptions;
   date: string;
   onClose: () => void;
   onCreated: (message: string) => void;
@@ -22,6 +22,20 @@ export function CreateJobDialog({ options, date, onClose, onCreated }: {
   const dialog = useRef<HTMLDialogElement>(null);
   const dirty = useRef(false);
   const [busy, setBusy] = useState(false);
+  const [loadedOptions, setLoadedOptions] = useState(options ?? null);
+  const [optionsError, setOptionsError] = useState("");
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    if (options) return;
+    const controller = new AbortController();
+    void fetch("/api/admin/inspections/create-options", { signal: controller.signal, cache: "no-store" })
+      .then(async response => {
+        if (!response.ok) throw new Error("Unable to load inspection options. Please retry.");
+        const value = await response.json() as CreateJobOptions;
+        if (!controller.signal.aborted) setLoadedOptions(value);
+      }).catch(error => { if (!controller.signal.aborted) setOptionsError(error.message); });
+    return () => controller.abort();
+  }, [options, retry]);
   const [uploadFailure, setUploadFailure] = useState<{ id: string; message: string } | null>(null);
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
@@ -53,8 +67,11 @@ export function CreateJobDialog({ options, date, onClose, onCreated }: {
         <p>{uploadFailure.message}</p>
         <p>Your inspection was saved. Do not create it again. Upload the PDFs from its details.</p>
         <Link href={`/app/admin/inspections/${uploadFailure.id}`}>Open created inspection</Link>
+      </div> : !loadedOptions ? <div role={optionsError ? "alert" : "status"}>
+        {optionsError || "Loading inspection options..."}
+        {optionsError ? <button type="button" onClick={() => { setOptionsError(""); setRetry(value => value + 1); }}>Retry</button> : null}
       </div> : <InspectionSchedulerForm
-        {...options} action={createInspectionAction} title="Create inspection" submitLabel="Create inspection"
+        {...loadedOptions} action={createInspectionAction} title="Create inspection" submitLabel="Create inspection"
         allowCustomOneTimeSite allowDocumentUpload autoSelectGenericSiteOnCustomerChange
         initiallyScheduled stayOnPage
         initialValues={{ inspectionMonth: date.slice(0, 7), scheduledStart: `${date}T09:00` }}

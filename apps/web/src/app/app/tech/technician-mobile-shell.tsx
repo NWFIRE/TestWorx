@@ -216,6 +216,7 @@ export function TechnicianMobileTabBar({
               return (
                 <Link
                   key={tab.href}
+                  prefetch={false}
                   className={active
                     ? "relative flex min-h-[64px] flex-col items-center justify-center rounded-2xl bg-[var(--tenant-primary-soft)] px-2 py-2 text-[11px] font-semibold text-[var(--tenant-primary)]"
                     : "relative flex min-h-[64px] flex-col items-center justify-center rounded-2xl px-2 py-2 text-[11px] font-medium text-slate-500"}

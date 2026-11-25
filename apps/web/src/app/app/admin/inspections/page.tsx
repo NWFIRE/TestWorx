@@ -218,6 +218,7 @@ export default async function AdminInspectionsPage({
     sourceRequestId?: string;
     attention?: string;
     through?: string;
+    page?: string;
   }>;
 }) {
   const session = await auth();
@@ -241,7 +242,7 @@ export default async function AdminInspectionsPage({
   const requestedCustomerId =
     typeof params.customerCompanyId === "string" ? params.customerCompanyId.trim() : "";
   const requestedSiteId = typeof params.siteId === "string" ? params.siteId.trim() : "";
-  const currentPath = buildInspectionsHref({
+  const filterPath = buildInspectionsHref({
     attention,
     through: params.through,
     statuses: requestedStatuses.length ? requestedStatuses : undefined,
@@ -304,7 +305,14 @@ export default async function AdminInspectionsPage({
       isInAttentionWindow(inspection, fastManagementWindowEnd)
     )
   ), attention);
-  const fastManagementMonthGroups = groupInspectionsByDueMonth(fastManagementInspections, { query });
+  const allMonthGroups = groupInspectionsByDueMonth(fastManagementInspections, { query });
+  const pageSize = 50;
+  const pageCount = Math.max(1, Math.ceil(fastManagementInspections.length / pageSize));
+  const page = Math.min(pageCount, Math.max(1, Math.floor(Number(params.page) || 1)));
+  const pageHref = (next: number) => `${filterPath}${filterPath.includes("?") ? "&" : "?"}page=${next}`;
+  const currentPath = pageHref(page);
+  const pageIds = new Set(allMonthGroups.flatMap(group => group.inspections).slice((page - 1) * pageSize, page * pageSize).map(row => row.id));
+  const fastManagementMonthGroups = allMonthGroups.map(group => ({ ...group, inspections: group.inspections.filter(row => pageIds.has(row.id)) })).filter(group => group.inspections.length);
   const fastManagementCounts = {
     open: fastManagementInspections.filter((inspection) =>
       activeOperationalInspectionStatuses.includes(inspection.status as (typeof activeOperationalInspectionStatuses)[number])
@@ -423,6 +431,7 @@ export default async function AdminInspectionsPage({
             ) : null}
 
             <LiveUrlSearchInput
+              resetPageKeys={["page"]}
               initialValue={filterData.filters.query}
               paramKey="q"
               placeholder="Search report ID, customer, location, address, city, reference, technician, type, priority, or status"
@@ -455,7 +464,7 @@ export default async function AdminInspectionsPage({
             </h2>
           </div>
           <p className="text-sm font-semibold text-[color:var(--text-secondary)]">
-            {fastManagementInspections.length} inspection{fastManagementInspections.length === 1 ? "" : "s"} found across {fastManagementMonthGroups.length} month{fastManagementMonthGroups.length === 1 ? "" : "s"}
+            {fastManagementInspections.length} inspection{fastManagementInspections.length === 1 ? "" : "s"} found across {allMonthGroups.length} month{allMonthGroups.length === 1 ? "" : "s"}
           </p>
         </div>
 
@@ -531,6 +540,7 @@ export default async function AdminInspectionsPage({
                         <div className="min-w-0">
                           <Link
                             className="block truncate text-base font-semibold tracking-[-0.02em] text-slate-950 transition group-hover/row:text-slateblue"
+                            prefetch={false}
                             href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`}
                             title={customerLabel}
                           >
@@ -588,6 +598,7 @@ export default async function AdminInspectionsPage({
                         <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
                           <Link
                             className="inline-flex min-h-10 items-center rounded-2xl border border-[color:var(--border-default)] bg-white px-4 text-sm font-semibold text-[color:var(--text-secondary)] transition hover:border-[color:var(--border-strong)] hover:bg-[color:var(--surface-subtle)] group-hover/row:border-[color:rgb(var(--tenant-primary-rgb)/0.34)]"
+                            prefetch={false}
                             href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(currentPath)}`}
                           >
                             Open
@@ -609,6 +620,11 @@ export default async function AdminInspectionsPage({
             ))}
           </div>
         )}
+        {pageCount > 1 ? <nav aria-label="Inspection pages" className="mt-4 flex items-center justify-between gap-3 text-sm">
+          {page > 1 ? <Link prefetch={false} href={pageHref(page - 1)} className="rounded-xl border px-4 py-3">Previous page</Link> : <span />}
+          <span>Page {page} of {pageCount} · {fastManagementInspections.length} matching inspections</span>
+          {page < pageCount ? <Link prefetch={false} href={pageHref(page + 1)} className="rounded-xl border px-4 py-3">Next page</Link> : <span />}
+        </nav> : null}
       </SectionCard>
     </AppPageShell>
   );

@@ -14,7 +14,7 @@ test.beforeAll(async()=>{
   `},bundle:true,write:false,jsx:'automatic',platform:'browser',alias:{'@testworx/lib':path.resolve('packages/lib/src/permissions.ts')},define:{'process.env':'{"NODE_ENV":"production","NEXT_PUBLIC_SIMPLIFIED_WORKSPACE_NAV":"1"}'},plugins:[{name:'shell-boundaries',setup(plugin){
     plugin.onResolve({filter:/.*/},args=>{
       if(!args.importer.endsWith('app-shell.tsx')) return;
-      if(args.path==='react'||args.path.startsWith('react/')||args.path==='./app-nav-config'||args.path==='./request-count-badge') return;
+      if(args.path==='react'||args.path.startsWith('react/')||args.path==='./app-nav-config'||args.path==='./request-count-badge'||args.path==='./navigation-recovery') return;
       return {path:args.path,namespace:'fixture'};
     });
     plugin.onLoad({filter:/.*/,namespace:'fixture'},args=>{

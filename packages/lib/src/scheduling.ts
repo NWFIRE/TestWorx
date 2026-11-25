@@ -1153,25 +1153,19 @@ export function filterSubsetDuplicateOperationalInspections<T extends {
     recurrence?: { seriesId?: string | null } | null;
   }>;
 }>(inspections: T[]) {
+  // Compare only records in the same scope, calculating each period once.
+  // Preserve original indexes so exact duplicates keep the same winning row.
+  const scopes = new Map<string, Array<{ inspection: T; index: number }>>();
+  const keys = inspections.map((inspection, index) => {
+    const key = [inspection.customerCompanyId ?? "unknown_customer", inspection.siteId ?? "unknown_site", getClaimableInspectionPeriodKey(inspection)].join("|");
+    const group = scopes.get(key) ?? [];
+    group.push({ inspection, index });
+    scopes.set(key, group);
+    return key;
+  });
   return inspections.filter((inspection, inspectionIndex) => {
-    const duplicateScopeKey = [
-      inspection.customerCompanyId ?? "unknown_customer",
-      inspection.siteId ?? "unknown_site",
-      getClaimableInspectionPeriodKey(inspection)
-    ].join("|");
-
-    return !inspections.some((other, otherIndex) => {
+    return !scopes.get(keys[inspectionIndex]!)!.some(({ inspection: other, index: otherIndex }) => {
       if (other.id === inspection.id) {
-        return false;
-      }
-
-      const otherScopeKey = [
-        other.customerCompanyId ?? "unknown_customer",
-        other.siteId ?? "unknown_site",
-        getClaimableInspectionPeriodKey(other)
-      ].join("|");
-
-      if (duplicateScopeKey !== otherScopeKey) {
         return false;
       }
 
@@ -5364,7 +5358,7 @@ export async function getAdminDashboardData(actor: ActorContext) {
   };
 }
 
-export async function getAdminInspectionCreateOptions(actor: ActorContext) {
+export async function getAdminInspectionCreateOptions(actor: ActorContext, options?: { includeInactiveTechnicians?: boolean }) {
   const parsedActor = parseActor(actor);
   if (!["tenant_admin", "office_admin"].includes(parsedActor.role)) {
     throw new Error("Only tenant and office administrators can create inspections.");
@@ -5386,7 +5380,7 @@ export async function getAdminInspectionCreateOptions(actor: ActorContext) {
       where: {
         tenantId,
         role: { in: [...assignableInspectionUserRoles] },
-        isActive: true
+        ...(options?.includeInactiveTechnicians ? {} : { isActive: true })
       },
       select: { id: true, name: true },
       orderBy: { name: "asc" }
@@ -6017,7 +6011,8 @@ export async function getAdminSchedulingQueueData(
     requestedStatuses.every((status) => isActiveOperationalInspectionStatus(status as InspectionStatus));
   const andFilters = [
     shouldApplyActiveConsistencyFilter ? activeInspectionQueueConsistencyFilter() : null,
-    dueWindowFilter
+    dueWindowFilter,
+    technicianFilter
   ].filter((filter): filter is Prisma.InspectionWhereInput => Boolean(filter));
 
   const queueWhere: Prisma.InspectionWhereInput = {
@@ -6026,8 +6021,7 @@ export async function getAdminSchedulingQueueData(
     ...(andFilters.length ? { AND: andFilters } : {}),
     ...(classificationFilter ? { inspectionClassification: classificationFilter } : {}),
     ...(typeof priorityFilter === "boolean" ? { isPriority: priorityFilter } : {}),
-    ...(searchFilter ? searchFilter : {}),
-    ...(technicianFilter ? technicianFilter : {})
+    ...(searchFilter ? searchFilter : {})
   };
 
   const inspectionsQuery = prisma.inspection.findMany({
@@ -6040,7 +6034,7 @@ export async function getAdminSchedulingQueueData(
       replacementAmendments: { select: { id: true } },
       technicianAssignments: { include: { technician: true } },
       convertedFromQuotes: { select: { id: true }, take: 1 },
-      tasks: { include: { recurrence: true, report: true, assignedTechnician: true } }
+      tasks: { include: { recurrence: true, report: { select: { id: true, status: true, finalizedAt: true } }, assignedTechnician: true } }
     },
     orderBy: [{ customerCompany: { name: "asc" } }, { site: { name: "asc" } }, { scheduledStart: "asc" }, { id: "asc" }],
     ...(limit ? { take: limit } : {})

@@ -9,7 +9,9 @@ const { prismaMock } = vi.hoisted(() => ({
     },
     user: {
       findMany: vi.fn()
-    }
+    },
+    customerCompany: { findMany: vi.fn() },
+    site: { findMany: vi.fn() }
   }
 }));
 
@@ -19,6 +21,7 @@ vi.mock("@testworx/db", () => ({
 
 import {
   filterSubsetDuplicateOperationalInspections,
+  getAdminInspectionCreateOptions,
   getAdminSchedulingQueueData,
   getTechnicianDashboardData,
   inspectionFilterStatuses,
@@ -32,10 +35,23 @@ describe("technician dashboard inspection access", () => {
     vi.clearAllMocks();
     prismaMock.$transaction.mockResolvedValue(null);
     prismaMock.user.findMany.mockResolvedValue([]);
+    prismaMock.customerCompany.findMany.mockResolvedValue([]);
+    prismaMock.site.findMany.mockResolvedValue([]);
   });
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("limits new assignments to active staff but preserves legacy edit options within the tenant", async () => {
+    const actor = { userId: "admin_1", role: "office_admin" as const, tenantId: "tenant_1" };
+    await getAdminInspectionCreateOptions(actor);
+    expect(prismaMock.user.findMany).toHaveBeenLastCalledWith(expect.objectContaining({ where: expect.objectContaining({ tenantId: "tenant_1", isActive: true }) }));
+    await getAdminInspectionCreateOptions(actor, { includeInactiveTechnicians: true });
+    const where = prismaMock.user.findMany.mock.lastCall?.[0].where;
+    expect(where.tenantId).toBe("tenant_1");
+    expect(where.isActive).toBeUndefined();
+    await expect(getAdminInspectionCreateOptions({ ...actor, role: "technician" })).rejects.toThrow();
   });
 
   it("excludes completed inspections from technician dashboard results", async () => {
@@ -348,6 +364,22 @@ describe("technician dashboard inspection access", () => {
         ])
       })
     }));
+  });
+
+  it("intersects technician assignment with the search instead of overwriting its OR clause", async () => {
+    prismaMock.inspection.findMany.mockResolvedValueOnce([]);
+    await getAdminSchedulingQueueData({ userId: "admin_1", role: "office_admin", tenantId: "tenant_1" }, {
+      query: "Monroe", technicianId: "tech_1", includeCounts: false, includeTechnicians: false, readOnly: true
+    });
+    expect(prismaMock.inspection.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({
+      tenantId: "tenant_1",
+      OR: expect.arrayContaining([{ customerCompany: { name: { contains: "Monroe", mode: "insensitive" } } }]),
+      AND: expect.arrayContaining([{ OR: [
+        { assignedTechnicianId: "tech_1" },
+        { technicianAssignments: { some: { technicianId: "tech_1" } } },
+        { tasks: { some: { assignedTechnicianId: "tech_1" } } }
+      ] }])
+    }) }));
   });
 
   it("calculates admin inspection KPI counts from the full matching queue instead of the capped display rows", async () => {

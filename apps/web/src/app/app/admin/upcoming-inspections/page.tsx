@@ -40,7 +40,7 @@ function taskDueLabel(task: { dueDate?: Date | null; dueMonth?: string | null })
 export default async function UpcomingInspectionsPage({
   searchParams
 }: {
-  searchParams?: Promise<{ month?: string; customerCompanyId?: string; siteId?: string }>;
+  searchParams?: Promise<{ month?: string; customerCompanyId?: string; siteId?: string; pageMonth?: string; page?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.tenantId) {
@@ -65,6 +65,8 @@ export default async function UpcomingInspectionsPage({
     }
   );
   const currentMonthKey = format(new Date(), "yyyy-MM");
+  const pageSize = 25;
+  const monthPageHref = (monthKey: string, page: number) => `/app/admin/upcoming-inspections?month=${data.startMonth}&pageMonth=${monthKey}&page=${page}#planning-month-${monthKey}`;
 
   return (
     <AppPageShell density="wide">
@@ -121,9 +123,12 @@ export default async function UpcomingInspectionsPage({
 
       <WorkspaceSplit variant="content-heavy">
         <div className="space-y-6">
-          {data.months.map((month) => (
+          {data.months.map((month) => {
+            const pageCount = Math.max(1, Math.ceil(month.inspections.length / pageSize));
+            const page = params.pageMonth === month.monthKey ? Math.min(pageCount, Math.max(1, Math.floor(Number(params.page) || 1))) : 1;
+            return (
             <SectionCard className="scroll-mt-24" key={month.monthKey} id={`planning-month-${month.monthKey}`}>
-              <details open={month.monthKey === currentMonthKey || month.monthKey === data.startMonth}>
+              <details open={month.monthKey === currentMonthKey || month.monthKey === data.startMonth || month.monthKey === params.pageMonth}>
                 <summary className="flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
@@ -158,7 +163,7 @@ export default async function UpcomingInspectionsPage({
                       description="Use the scheduling panel to add inspections directly into this month."
                     />
                   ) : (
-                    month.inspections.map((inspection) => {
+                    month.inspections.slice((page - 1) * pageSize, page * pageSize).map((inspection) => {
                       const nextDue = pickEarliestNextDueAt(
                         inspection.tasks.map((task) => task.recurrence?.nextDueAt)
                       );
@@ -220,8 +225,9 @@ export default async function UpcomingInspectionsPage({
                             </div>
                             <div className="flex min-w-56 flex-col gap-3">
                               <Link
+                                prefetch={false}
                                 className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                                href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(`/app/admin/upcoming-inspections?month=${data.startMonth}`)}`}
+                                href={`/app/admin/inspections/${inspection.id}?from=${encodeURIComponent(monthPageHref(month.monthKey, page))}`}
                               >
                                 Open inspection
                               </Link>
@@ -232,9 +238,14 @@ export default async function UpcomingInspectionsPage({
                     })
                   )}
                 </div>
+                {pageCount > 1 ? <nav aria-label={`${month.monthLabel} pages`} className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+                  {page > 1 ? <Link prefetch={false} href={monthPageHref(month.monthKey, page - 1)} className="rounded-xl border px-4 py-3">Previous page</Link> : <span />}
+                  <span>Page {page} of {pageCount} · {month.inspectionCount} inspections</span>
+                  {page < pageCount ? <Link prefetch={false} href={monthPageHref(month.monthKey, page + 1)} className="rounded-xl border px-4 py-3">Next page</Link> : <span />}
+                </nav> : null}
               </details>
             </SectionCard>
-          ))}
+          ); })}
         </div>
 
       </WorkspaceSplit>

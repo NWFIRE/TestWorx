@@ -12,7 +12,7 @@ import {
   formatInspectionStatusLabel,
   formatInspectionTaskTypeLabel,
   allowsMultipleInspectionTasks,
-  getAdminDashboardData,
+  getAdminInspectionCreateOptions,
   getAdminInspectionPdfAttachments,
   getDefaultInspectionRecurrenceFrequency,
   getInspectionClassificationTone,
@@ -125,7 +125,7 @@ export default async function EditInspectionPage({
   const mode = resolveInspectionMode(typeof rawSearchParams.mode === "string" ? rawSearchParams.mode : undefined);
   const isReviewMode = mode === "review";
   const [dashboardData, inspection] = await Promise.all([
-    getAdminDashboardData({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }),
+    getAdminInspectionCreateOptions({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, { includeInactiveTechnicians: true }),
     getInspectionForEdit({ userId: session.user.id, role: session.user.role, tenantId: session.user.tenantId }, inspectionId)
   ]);
 
