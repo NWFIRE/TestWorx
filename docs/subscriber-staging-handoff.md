@@ -50,7 +50,7 @@ Generated evidence stays in `scripts/staging/results/` and is deliberately exclu
 ## Verification evidence
 
 - Production build includes Next.js lint/type validation; separate TypeScript check passed.
-- Library regression run: 846 passed, 17 skipped. The skipped legacy PostgreSQL integration suite is not represented as passing.
+- Final normal library regression run: 849 passed, 17 skipped (`npm run test --workspace=@testworx/lib -- --maxWorkers=2`). The skipped legacy PostgreSQL integration suite is not represented as passing. Final production build, lint and type checks passed; both targeted real-database subscriber contract tests passed separately.
 - Real staging database tests pass for support ownership/private notes/revoked users/concurrent delivery and subscription checkout/recovery contracts.
 - Billing provider tests use a fake Stripe client plus real database. They are NOT actual hosted Checkout, portal or renewal tests.
 - Final browser run: 11 of 11 checks passed. Coverage includes mobile ticket creation/screenshot, cross-company ticket and attachment denial, operator recovery/reply/resolve, technician reopening, own-company search, invitations to both companies, branded PDF downloads, owner-only billing, read-only inspection viewing, deactivation, new empty-workspace signup, billing-blocked support submission/reply, and shared-browser cache isolation. A stuck support-submission navigation was found and fixed during this run.
@@ -74,12 +74,46 @@ Use Stripe CLI forwarding or a protected reachable staging webhook; the loopback
 ## Remaining release blockers
 
 1. Actual Stripe test checkout/renewal/failure/recovery/cancel/repeated-click tests, including event reordering and recovery of events stranded in processing.
-2. Complete first-subscriber field journey: schedule a new inspection, complete it on mobile, verify Pending-on-edit and second-session scheduler progress, and deliver its report. Fixture-generated finalized PDFs do not prove this journey.
+2. Complete paid first-subscriber journey after actual Stripe activation. The signed-in seeded-company field journey now passes through UI creation, mobile editing/signatures/finalization, draft billing, and captured report delivery; this does not substitute for hosted Checkout activation or external email delivery.
 3. Broader tenant-boundary audit for all exports, Home counts, recurring jobs, file stores and background tasks, with positive and negative assertions per surface.
 4. Protected hosted staging, distributed signup rate limiting, operational monitoring and a support escalation/retention policy.
 5. Approved sanitized current-business snapshot rehearsal, ownership exceptions reviewed, saved links/issued PDFs/staff access reconciled.
 6. All existing field devices synced or unsent drafts explicitly recovered before changing offline namespaces. Do not simply delete the old database.
 7. Provider reconciliation for ambiguous email outcomes and stalled checkout/webhook processing; no blind resend/recharge.
+
+## Follow-up staging verification, November 25
+
+All work remained in the isolated local staging worktree/database. No hosted staging or production release occurred.
+
+Fixed defects:
+
+- A delayed Checkout event could overwrite newer subscription state. Feature-gated handling now verifies the saved checkout/customer, links only the matching subscription, and leaves subscription events responsible for status and plan updates. Real-database provider-contract tests cover stale checkout and mismatched customer/subscription events.
+- Asset-linked report validation could silently replace a technician's edited equipment location with its original asset value. Validation now preserves recorded nonempty overrides; explicitly selecting another asset still applies its defaults. Regression and signed-in autosave tests cover both paths.
+- PDF table headings did not wrap and long words could exceed cell boundaries. Shared table rendering now reserves wrapped header height and breaks oversized words without discarding characters. New tests and a rendered visual fixture verify the behavior. This is not an all-template PDF audit.
+
+Running-browser evidence:
+
+- The original 11 subscriber checks passed again in Chromium (1440x900 office, 390x844 technician).
+- `verify-field-journey.cjs` creates an inspection through the office UI, schedules and assigns it, and starts it through the technician UI.
+- `verify-field-completion.cjs` confirms read-only viewing, retained input during a simulated autosave failure, recovered save and location override persistence, Pending-on-work-note edit, progress visible to a second office session, drawn technician/customer signatures, successful finalization, generated PDF, and draft billing summary. Delivery goes only to captured staging email and leaves the finalized report unchanged.
+- `verify-boundaries.cjs` passes five grouped checks: cross-company scheduler access, report autosave/finalize denial, two-company monthly CSV exports, Home/search ownership, and unauthorized cron denial. This is selected coverage, not a complete route audit or numerical reconciliation of every Home count.
+- The completed field report's three pages were visually inspected, including both signatures. Two-company PDF branding/text checks also pass. The table-wrapping correction was verified in a separate generated fixture, without replacing issued files to test the renderer.
+
+Evidence files are in ignored `scripts/staging/results/`: `field-completion.json`, `boundaries.json`, `report-branding.json`, browser screenshots, and PDFs. Field scripts create synthetic records; run creation before completion and do not rerun completion on an already finalized report.
+
+Test-run caveat: running the entire legacy unit suite with the staging capture-mail environment enabled exposed mock incompatibilities, outdated PostgreSQL fixtures, and timeouts while a build competed for resources. That run is not a pass. Run the normal library suite separately; run the targeted `subscriber-*.staging.test.ts` contract tests with the isolated helper. The older PostgreSQL integration suite still needs modernization before it can be a release gate.
+
+## Exactly what is needed for Stripe testing
+
+1. Identify a Stripe sandbox/test account and authorize test-only product, price, customer, subscription, and test-clock creation. No live account changes or real card details are needed.
+2. Securely configure `TEST_STRIPE_SECRET_KEY` (`sk_test_...`) and `TEST_STRIPE_PUBLISHABLE_KEY` (`pk_test_...`) on this machine or the protected staging secret store. Do not paste secrets into chat or commit them.
+3. Provide same-sandbox monthly `TEST_STRIPE_PRICE_STARTER` and `TEST_STRIPE_PRICE_PROFESSIONAL` price IDs, or authorize creating temporary test prices. Confirm whether staging should use no trial and seven days' grace (the current defaults), or different values.
+4. Allow Stripe CLI authorization for this sandbox or a protected reachable staging webhook. We can configure forwarding to `/api/stripe/webhook` and securely set its generated signing secret as `TEST_STRIPE_WEBHOOK_SECRET`. Stripe cannot call localhost directly. Some Stripe accounts require an administrator to enable CLI access.
+5. Allow configuration of the test customer portal for payment method updates, invoice history, and cancellation at period end.
+
+After those inputs, build/start with `--stripe-test` and exercise actual Checkout, repeated attempts, verified webhook activation, renewal, failed payment/grace/recovery, portal access, cancellation/paid-through access, and reactivation. Test-mode results do not authorize production activation.
+
+References: https://docs.stripe.com/cli and https://docs.stripe.com/customer-management/configure-portal.
 
 ## Migration and rollback
 

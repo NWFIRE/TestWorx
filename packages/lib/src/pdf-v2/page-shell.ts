@@ -77,6 +77,21 @@ export function splitTextIntoLines(font: PDFFont, text: string, maxWidth: number
     let currentLine = "";
 
     for (const word of words) {
+      if (font.widthOfTextAtSize(word, size) > maxWidth) {
+        if (currentLine) {
+          lines.push(currentLine);
+          currentLine = "";
+        }
+        for (const character of word) {
+          if (currentLine && font.widthOfTextAtSize(currentLine + character, size) > maxWidth) {
+            lines.push(currentLine);
+            currentLine = "";
+          }
+          if (maxLines && lines.length >= maxLines) return lines.slice(0, maxLines);
+          currentLine += character;
+        }
+        continue;
+      }
       const candidate = currentLine ? `${currentLine} ${word}` : word;
       if (font.widthOfTextAtSize(candidate, size) > maxWidth && currentLine) {
         lines.push(currentLine);

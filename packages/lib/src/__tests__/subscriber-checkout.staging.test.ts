@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "@testworx/db";
 import { createSubscriberCheckout } from "../subscriber-checkout";
-import { syncTenantSubscriptionFromStripe } from "../billing";
+import { processStripeWebhookEvent, syncTenantSubscriptionFromStripe } from "../billing";
 import { subscriptionAccess } from "../subscriber-policy";
 
 const staging = process.env.APP_ENV === "staging" && process.env.DATABASE_URL === "postgresql://perf@127.0.0.1:55439/tradeworx_subscriber";
@@ -34,6 +34,12 @@ describe.skipIf(!staging)("subscriber billing database and provider contract", (
       await expect(checkout()).rejects.toThrow("already has a subscription");
       const base = { tenantId: tenant.id, stripeCustomerId: `cus_contract_${tenant.id}`, stripeSubscriptionId: subscriptionId, metadataPlanCode: "professional", currentPeriodEndsAt: new Date("2027-01-25T12:00:00Z") };
       await syncTenantSubscriptionFromStripe({ ...base, subscriptionStatus: "active", stripeEventCreatedAt: new Date("2026-11-25T12:00:00Z") });
+      const checkoutEvent = (id: string, subscription: string, customer = base.stripeCustomerId) => ({ type: "checkout.session.completed", data: { object: { id, customer, subscription, metadata: { tenantId: tenant.id, planCode: "professional" } } } });
+      const beforeDelayed = await prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id } });
+      expect((await processStripeWebhookEvent(checkoutEvent("old_checkout", "sub_old") as any))?.ignored).toBe(true);
+      expect((await processStripeWebhookEvent(checkoutEvent("cs_contract", "sub_other") as any))?.ignored).toBe(true);
+      expect((await processStripeWebhookEvent(checkoutEvent("cs_contract", subscriptionId, "cus_other") as any))?.ignored).toBe(true);
+      expect(await prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id } })).toEqual(beforeDelayed);
       expect(subscriptionAccess(await prisma.tenant.findUniqueOrThrow({where:{id:tenant.id}}),new Date("2026-11-26"))).toBe(true);
       await syncTenantSubscriptionFromStripe({ ...base, subscriptionStatus: "past_due", stripeEventCreatedAt: new Date("2026-11-26T12:00:00Z") });
       let state=await prisma.tenant.findUniqueOrThrow({where:{id:tenant.id}});

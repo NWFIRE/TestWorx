@@ -452,6 +452,21 @@ async function updateTenantFromCheckoutSession(session: Stripe.Checkout.Session)
   }
 
   const plan = await getTenantPlanRecord(planCode);
+  if (subscriberFeaturesEnabled()) {
+    const current = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+    const customerId = typeof session.customer === "string" ? session.customer : null;
+    const subscriptionId = typeof session.subscription === "string" ? session.subscription : null;
+    if (!customerId || !subscriptionId || current.stripeCustomerId !== customerId || current.checkoutSessionId !== session.id) {
+      return { tenantId, planCode, ignored: true, reason: "unmatched_checkout" };
+    }
+    // Subscription events own the subscription state; a delayed checkout cannot replace it.
+    const changed = await prisma.tenant.updateMany({
+      where: { id: tenantId, checkoutSessionId: session.id, stripeCustomerId: customerId,
+        OR: [{ stripeSubscriptionId: null }, { stripeSubscriptionId: subscriptionId }] },
+      data: { stripeSubscriptionId: subscriptionId }
+    });
+    return { tenantId, planCode, ignored: changed.count === 0, reason: changed.count === 0 ? "different_subscription" : undefined };
+  }
   const tenant = await prisma.tenant.update({
     where: { id: tenantId },
     data: {

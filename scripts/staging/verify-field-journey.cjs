@@ -1,0 +1,31 @@
+const {chromium,expect}=require('@playwright/test');
+const {PrismaClient}=require('@prisma/client');
+const fs=require('node:fs'),path=require('node:path');
+const db=new PrismaClient({datasources:{db:{url:'postgresql://perf@127.0.0.1:55439/tradeworx_subscriber'}}});
+const base='http://localhost:3340',a=require('./results/fixtures.json').companies[0];
+const result={};
+async function login(browser,email,mobile=false){const context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1440,height:900},serviceWorkers:'block'});const page=await context.newPage();await page.goto(base+'/login');await page.getByLabel(/work email/i).fill(email);await page.getByLabel(/password/i).fill('Password123!');await page.getByRole('button',{name:/sign in/i}).click();await page.waitForURL(/\/app/);return {context,page};}
+(async()=>{const browser=await chromium.launch();let page;try{
+ const office=await login(browser,a.officeEmail);page=office.page;
+ const marker='STAGING FIELD JOURNEY '+Date.now();
+ await page.goto(base+'/app/admin/inspections');await page.getByRole('button',{name:'+ Create Inspection',exact:true}).click();
+ await page.getByPlaceholder('Search customers').fill('Pinecrest');await page.getByRole('option').filter({hasText:'Pinecrest Commons'}).click();
+ await page.getByPlaceholder('Search sites').fill('Pinecrest Tower');await page.getByRole('option').filter({hasText:'Pinecrest Tower'}).click();
+ const form=page.locator('form').filter({has:page.locator('input[name="serviceLinesJson"]')});
+ await form.locator('select').nth(1).selectOption(a.techId);await form.locator('select').nth(2).selectOption('ONCE');
+ await form.locator('textarea[name="notes"]').fill(marker);await form.getByLabel('Schedule Inspection',{exact:true}).check();
+ await form.getByLabel('Inspection date',{exact:true}).fill('2026-11-25');
+ await form.locator('select[name="appointmentDurationHours"]').selectOption('1');
+ await form.getByRole('button',{name:'Create inspection',exact:true}).click();
+ await expect.poll(()=>db.inspection.count({where:{tenantId:a.tenantId,notes:marker}}),{timeout:30000}).toBe(1);
+ const inspection=await db.inspection.findFirstOrThrow({where:{tenantId:a.tenantId,notes:marker},include:{tasks:true}});
+ result.createdThroughOfficeUI=inspection.id;result.scheduledStart=inspection.scheduledStart;
+ const tech=await login(browser,a.techEmail,true);page=tech.page;
+ await page.goto(base+`/app/tech/reports/${inspection.id}/${inspection.tasks[0].id}`);
+ await page.getByRole('button',{name:'Start job',exact:true}).click();await expect(page.getByRole('button',{name:'Pause job',exact:true})).toBeVisible();
+ result.startedJobThroughMobileUI=true;
+ fs.writeFileSync(path.join(__dirname,'results/field-ui.txt'),await page.locator('body').innerText());
+ console.log(await page.locator('body').innerText());
+ result.inspectionId=inspection.id;result.taskId=inspection.tasks[0].id;
+ result.reportId=(await db.inspectionReport.findFirstOrThrow({where:{inspectionTaskId:inspection.tasks[0].id}})).id;
+}catch(error){result.error=error.message;process.exitCode=1;if(page)fs.writeFileSync(path.join(__dirname,'results/field-debug.txt'),await page.locator('body').innerText());}finally{fs.writeFileSync(path.join(__dirname,'results/field-journey.json'),JSON.stringify(result,null,2));console.log(result);await browser.close();await db.$disconnect();}})();

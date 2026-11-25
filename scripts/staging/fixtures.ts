@@ -15,8 +15,9 @@ export async function prepareSubscriberFixtures() {
     const customer = await db.customerCompany.findFirstOrThrow({ where: { tenantId: tenant.id } });
     await db.customerCompany.update({ where: { id: customer.id }, data: { name: "Pinecrest Commons", contactEmails: `reports-${initials.toLowerCase()}@example.test` } });
     const office = await db.user.findFirstOrThrow({ where: { tenantId: tenant.id, role: "tenant_admin" } });
-    const tech = await db.user.findFirstOrThrow({ where: { tenantId: tenant.id, role: "technician" } });
-    const report = await db.inspectionReport.findFirstOrThrow({ where: { tenantId: tenant.id }, orderBy: { finalizedAt: { sort: "desc", nulls: "last" } } });
+    const tech = await db.user.findFirstOrThrow({ where: { tenantId: tenant.id, role: "technician", email: slug === "evergreen-fire" ? "tech1@evergreenfire.com" : "tech@northshorelife.com" } });
+    // Reuse seeded records rather than newly invited users or field-journey reports.
+    const report = await db.inspectionReport.findFirstOrThrow({ where: { tenantId: tenant.id }, orderBy: { createdAt: "asc" } });
     await db.inspectionReport.update({ where: { id: report.id }, data: { status: "finalized", finalizedAt: report.finalizedAt ?? new Date() } });
     await db.inspection.update({ where: { id: report.inspectionId }, data: { assignedTechnicianId: tech.id } });
     await regenerateFinalizedReportPdf({ userId: office.id, tenantId: tenant.id, role: office.role }, { inspectionReportId: report.id });

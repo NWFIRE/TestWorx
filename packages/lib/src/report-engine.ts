@@ -594,7 +594,7 @@ function normalizeRepeaterRows(field: Extract<ReportFieldDefinition, { type: "re
       copyRepeaterMetadata(normalizedRow, row);
       return applyRepeaterRowEnhancements(
         field.rowFields,
-        applyFieldMappings(field.rowFields, normalizedRow, field.rowFields.map((rowField) => rowField.id))
+        applyFieldMappings(field.rowFields, normalizedRow, field.rowFields.map((rowField) => rowField.id), { preserveAssetOverrides: true })
       );
     });
 }
@@ -1054,7 +1054,8 @@ export function buildRepeaterRowDefaults(
 export function applyFieldMappings(
   fieldDefinitions: Array<Exclude<ReportFieldDefinition, { type: "repeater" }>>,
   values: ReportRepeaterRow,
-  changedFieldIds: string[] | string
+  changedFieldIds: string[] | string,
+  options: { preserveAssetOverrides?: boolean } = {}
 ) {
   const nextValues = { ...values };
   const changedIds = Array.isArray(changedFieldIds) ? changedFieldIds : [changedFieldIds];
@@ -1076,6 +1077,8 @@ export function applyFieldMappings(
       }
 
       for (const target of mapping.targets) {
+        // Validation is not a new asset selection. Preserve technicians' recorded overrides.
+        if (options.preserveAssetOverrides && changedField.optionProvider === "assetSelect" && !isEmptyValue(nextValues[target.fieldId])) continue;
         const nextValue = option.metadata[target.sourceKey];
         if (nextValue === undefined) {
           continue;

@@ -8,6 +8,7 @@ results = []
 for filename, expected, other in [
     ("evergreen-report.pdf", "Evergreen", "Northshore"),
     ("northshore-report.pdf", "Northshore", "Evergreen"),
+    ("field-completed-report.pdf", "Evergreen", "Northshore"),
 ]:
     document = pdfium.PdfDocument(directory / filename)
     reader = PdfReader(directory / filename)

@@ -2,7 +2,6 @@ import { PDF_V2_TOKENS, PDF_V2_TYPOGRAPHY } from "../tokens";
 import { contentBottom, contentWidth, drawParagraph, drawRect, drawSectionTitle, drawTextLines, ensureSpace, remainingContentHeight, splitTextIntoLines, type PageCursor, type PdfV2Runtime } from "../page-shell";
 import type { RenderSection } from "../types";
 
-const HEADER_HEIGHT = 22;
 const BODY_SIZE = PDF_V2_TYPOGRAPHY.tableBody;
 const LINE_GAP = 3;
 const LINE_HEIGHT = BODY_SIZE + LINE_GAP;
@@ -37,8 +36,14 @@ export function renderTableSection(runtime: PdfV2Runtime, cursor: PageCursor, se
   const totalWidth = contentWidth();
   const visibleColumns = section.columns.length > 0 ? section.columns : [{ key: "value", label: "Details" }];
   const widths = visibleColumns.map((column) => resolveColumnWidth(column.width, totalWidth, visibleColumns.length));
+  const headerLines = visibleColumns.map((column, index) => splitTextIntoLines(
+    runtime.boldFont, column.label.toUpperCase(),
+    Math.max(1, widths[index]! - PDF_V2_TOKENS.tableCellPaddingX * 2), PDF_V2_TYPOGRAPHY.tableHeader
+  ));
+  const headerHeight = Math.max(22, Math.max(...headerLines.map((lines) => lines.length)) *
+    (PDF_V2_TYPOGRAPHY.tableHeader + LINE_GAP) + PDF_V2_TOKENS.tableCellPaddingY * 2);
 
-  cursor = ensureSpace(runtime, cursor, 72);
+  cursor = ensureSpace(runtime, cursor, Math.max(72, headerHeight + 50));
   if (section.title) {
     drawSectionTitle(runtime, cursor, section.title, section.description);
   }
@@ -49,21 +54,18 @@ export function renderTableSection(runtime: PdfV2Runtime, cursor: PageCursor, se
 
   const drawHeader = () => {
     let x = PDF_V2_TOKENS.margin;
-    drawRect(cursor.page, PDF_V2_TOKENS.margin, cursor.y, totalWidth, HEADER_HEIGHT, runtime.theme.softSurface, runtime.theme.line, 1);
+    drawRect(cursor.page, PDF_V2_TOKENS.margin, cursor.y, totalWidth, headerHeight, runtime.theme.softSurface, runtime.theme.line, 1);
     visibleColumns.forEach((column, index) => {
-      cursor.page.drawText(column.label.toUpperCase(), {
-        x: x + PDF_V2_TOKENS.tableCellPaddingX,
-        y: cursor.y - 15,
-        size: PDF_V2_TYPOGRAPHY.tableHeader,
-        font: runtime.boldFont,
-        color: runtime.theme.softText
-      });
+      drawTextLines(cursor.page, runtime.boldFont, headerLines[index]!,
+        x + PDF_V2_TOKENS.tableCellPaddingX,
+        cursor.y - PDF_V2_TOKENS.tableCellPaddingY - PDF_V2_TYPOGRAPHY.tableHeader,
+        PDF_V2_TYPOGRAPHY.tableHeader, runtime.theme.softText, LINE_GAP);
       x += widths[index] ?? 0;
     });
-    cursor.y -= HEADER_HEIGHT;
+    cursor.y -= headerHeight;
   };
 
-  cursor = ensureSpace(runtime, cursor, HEADER_HEIGHT + 28);
+  cursor = ensureSpace(runtime, cursor, headerHeight + 28);
   drawHeader();
 
   for (const row of section.rows) {
@@ -112,7 +114,7 @@ export function renderTableSection(runtime: PdfV2Runtime, cursor: PageCursor, se
 
       pendingLines = pendingLines.map((lines) => lines.slice(chunkLineCount));
       if (pendingLines.some((lines) => lines.length > 0)) {
-        cursor = ensureSpace(runtime, cursor, HEADER_HEIGHT + 28);
+        cursor = ensureSpace(runtime, cursor, headerHeight + 28);
         if (section.repeatHeader) {
           drawHeader();
         }
