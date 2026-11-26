@@ -4,6 +4,7 @@ import { z } from "zod";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { subscriberFeaturesEnabled, subscriptionAccess } from "@testworx/lib/src/subscriber-policy";
+import { permitsStagingPassword } from "@testworx/lib/src/staging-safety";
 
 import { prisma } from "@testworx/db";
 import { assertEnvForFeature, comparePassword } from "@testworx/lib/server/index";
@@ -32,6 +33,7 @@ const nextAuth = NextAuth({
         if (!parsed.success) {
           return null;
         }
+        if (!permitsStagingPassword(parsed.data.password)) return null;
         try {
           const user = await prisma.user.findUnique({
             where: { email: parsed.data.email.toLowerCase() },

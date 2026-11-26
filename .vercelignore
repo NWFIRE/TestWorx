@@ -1,0 +1,12 @@
+.vercel
+.git
+node_modules
+**/node_modules
+**/.next
+.env*
+**/.env*
+output
+scripts/staging/results
+test-results
+crawl-results
+coverage

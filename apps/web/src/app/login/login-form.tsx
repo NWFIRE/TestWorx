@@ -1,18 +1,26 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useState, useTransition } from "react";
+import { useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
+
+const subscribeToHydration = () => () => {};
+const clientReady = () => true;
+const serverReady = () => false;
 
 export function LoginForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [helper, setHelper] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const hydrated = useSyncExternalStore(subscribeToHydration, clientReady, serverReady);
+  const inFlight = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!hydrated || inFlight.current) return;
     setError(null);
     setHelper(null);
 
@@ -24,25 +32,34 @@ export function LoginForm() {
       return;
     }
 
-    const result = await signIn("credentials", {
+    inFlight.current = true;
+    setSubmitting(true);
+    try {
+      const result = await signIn("credentials", {
       email,
       password,
       redirect: false
-    });
+      });
 
-    if (!result || result.error) {
-      setError("Invalid email or password.");
-      return;
+      if (!result || result.error) {
+        setError("Invalid email or password.");
+        return;
+      }
+
+      startTransition(() => {
+        router.push("/app");
+        router.refresh();
+      });
+    } catch {
+      setError("Unable to sign in right now. Please try again.");
+    } finally {
+      inFlight.current = false;
+      setSubmitting(false);
     }
-
-    startTransition(() => {
-      router.push("/app");
-      router.refresh();
-    });
   }
 
   return (
-    <form onSubmit={(event) => void handleSubmit(event)} className="mt-8">
+    <form method="post" onSubmit={(event) => void handleSubmit(event)} className="mt-8">
       <div className="space-y-5">
         <label className="block" htmlFor="email">
           <span className="mb-2.5 block text-sm font-medium text-slate-700">
@@ -90,11 +107,11 @@ export function LoginForm() {
 
       <button
         className="mt-7 inline-flex h-14 w-full items-center justify-center rounded-2xl bg-slateblue text-base font-semibold text-white transition-all duration-150 ease-out hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={pending}
+        disabled={!hydrated || submitting || pending}
         style={{ boxShadow: "0 12px 24px rgb(var(--tenant-primary-rgb) / 0.25)" }}
         type="submit"
       >
-        {pending ? "Signing in..." : "Sign in"}
+        {submitting || pending ? "Signing in..." : "Sign in"}
       </button>
 
       <div className="mt-5 flex items-center gap-2 text-sm text-slate-500">

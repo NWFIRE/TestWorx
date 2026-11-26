@@ -2076,6 +2076,14 @@ model CapturedEmail {
   createdAt DateTime @default(now())
 }
 
+model SignupRateLimit {
+  key String @id
+  windowStart DateTime
+  expiresAt DateTime
+  hits Int
+  @@index([expiresAt])
+}
+
 model WorkspaceSignup {
   id String @id @default(cuid())
   email String @unique

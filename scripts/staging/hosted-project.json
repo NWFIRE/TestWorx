@@ -1,0 +1,7 @@
+{
+  "framework": "nextjs",
+  "rootDirectory": "apps/web",
+  "nodeVersion": "24.x",
+  "buildCommand": "node ../../scripts/staging/check-hosted-config.cjs && npm run vercel-build",
+  "ssoProtection": { "deploymentType": "all" }
+}

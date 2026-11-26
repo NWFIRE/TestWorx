@@ -44,6 +44,9 @@ function requireDatabaseUrl() {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is required before running db:seed. Copy .env.example to .env and point it at a local PostgreSQL database.");
   }
+  if (process.env.VERCEL || !["localhost", "127.0.0.1", "[::1]"].includes(new URL(process.env.DATABASE_URL).hostname)) {
+    throw new Error("Demo seed credentials are restricted to local databases. Provision hosted staging users with unique credentials instead.");
+  }
 }
 
 function buildPdfStorageKey() {

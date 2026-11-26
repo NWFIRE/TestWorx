@@ -17,6 +17,16 @@ export async function requireSupportOperator(userId: string) {
   return actor;
 }
 
+export async function listDeliveryDiagnostics(userId: string, query = "") {
+  await requireSupportOperator(userId);
+  const q = query.trim().slice(0, 100);
+  return prisma.reportDelivery.findMany({ where: {
+    OR: [{ status: { in: ["failed", "uncertain"] } }, { status: "sending", attemptedAt: { lt: new Date(Date.now() - 5 * 60 * 1000) } }],
+    ...(q ? { AND: [{ OR: [{ id: q }, { reportId: q }, { tenant: { name: { contains: q, mode: "insensitive" as const } } }] }] } : {})
+  }, select: { id: true, reportId: true, status: true, failureCode: true, providerMessageId: true,
+    attemptedAt: true, attachmentId: true, tenant: { select: { name: true } } }, orderBy: { updatedAt: "desc" }, take: 100 });
+}
+
 export async function getSupportTicket(userId: string, id: string) {
   const actor = await supportActor(userId);
   const operator = actor.role === "platform_admin";

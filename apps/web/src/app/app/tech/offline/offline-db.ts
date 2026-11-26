@@ -97,7 +97,11 @@ function runTransaction<T>(
   return openDatabase().then((database) => new Promise<T>((resolve, reject) => {
     const transaction = database.transaction(storeName, mode);
     const store = transaction.objectStore(storeName);
-    executor(store, resolve, reject);
+    let result: T;
+    // Request success is not durability: a later request or quota failure can abort the transaction.
+    transaction.oncomplete = () => resolve(result);
+    transaction.onabort = () => reject(transaction.error ?? new Error("Offline database transaction was aborted. Your work has not been confirmed saved."));
+    executor(store, (value) => { result = value; }, reject);
     transaction.onerror = () => reject(transaction.error ?? new Error("Offline database transaction failed."));
   }));
 }
