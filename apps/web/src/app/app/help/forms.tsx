@@ -1,17 +1,25 @@
 "use client";
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { submitProblem, replyToProblem, retryDeliveryAction } from "./actions";
 
 const field = "mt-2 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm text-slate-900";
 const button = "min-h-11 rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50";
+const subscribeToHydration = () => () => {};
+const clientReady = () => true;
+const serverReady = () => false;
+function useFormReady() {
+  return useSyncExternalStore(subscribeToHydration, clientReady, serverReady);
+}
 
 export function RetryDeliveryForm({ ticketId, deliveryId }: { ticketId: string; deliveryId: string }) {
+  const ready = useFormReady();
   const [state, action, pending] = useActionState(retryDeliveryAction, { error: "" });
-  return <form action={action} className="space-y-3"><input type="hidden" name="ticketId" value={ticketId} /><input type="hidden" name="deliveryId" value={deliveryId} /><button disabled={pending} className={button}>{pending ? "Checking delivery..." : "Retry failed delivery"}</button>{state.error ? <p role="alert">{state.error}</p> : "saved" in state && state.saved ? <p role="status">Delivery confirmed.</p> : null}</form>;
+  return <form action={action} className="space-y-3"><input type="hidden" name="ticketId" value={ticketId} /><input type="hidden" name="deliveryId" value={deliveryId} /><button disabled={!ready || pending} className={button}>{pending ? "Checking delivery..." : "Retry failed delivery"}</button>{state.error ? <p role="alert">{state.error}</p> : "saved" in state && state.saved ? <p role="status">Delivery confirmed.</p> : null}</form>;
 }
 
 export function ProblemForm({ pagePath, errorReference, reportId }: { pagePath: string; errorReference: string; reportId: string }) {
+  const ready = useFormReady();
   const router = useRouter();
   const [state, action, pending] = useActionState(submitProblem, { error: "" });
   const ticketId = "ticketId" in state ? state.ticketId : null;
@@ -27,24 +35,28 @@ export function ProblemForm({ pagePath, errorReference, reportId }: { pagePath: 
     <label className="block text-sm font-medium">Screenshot (optional, PNG or JPEG up to 2 MB)<input name="screenshot" type="file" accept="image/png,image/jpeg" className={field} /></label>
     <p className="text-xs text-slate-500">Company, role, page, time, and application version are included automatically. Screenshots are visible only to you and TradeWorx support.</p>
     {state.error ? <p role="alert" className="text-sm text-red-700">{state.error}</p> : null}
-    <button className={button} disabled={pending || !!ticketId}>{pending ? "Sending..." : ticketId ? "Request sent" : "Send request"}</button>
+    <button className={button} disabled={!ready || pending || !!ticketId}>{pending ? "Sending..." : ticketId ? "Request sent" : "Send request"}</button>
   </form>;
 }
 
 export function ReplyForm({ id, operator, resolved, operators, assigned }: { id: string; operator: boolean; resolved: boolean; operators: { id: string; name: string }[]; assigned: string | null }) {
-  const router = useRouter();
+  const ready = useFormReady();
   const [state, action, pending] = useActionState(replyToProblem, { error: "" });
+  const saved = "saved" in state && state.saved;
+  const busy = !ready || pending || !!saved;
   useEffect(() => {
-    if ("saved" in state && state.saved) router.refresh();
-  }, [router, state]);
+    // A fresh GET avoids intermittent stale recovery-page trees after an action.
+    // Never navigate on failure: the user's unsaved message must remain available.
+    if (saved) window.location.reload();
+  }, [saved]);
   return <form action={action} className="space-y-4">
     <input type="hidden" name="ticketId" value={id} />
     <label className="block text-sm font-medium">Message<textarea className={field} name="body" rows={4} maxLength={6000} /></label>
     {operator ? <label className="block text-sm">Assigned operator<select className={field} name="assigneeId" defaultValue={assigned ?? ""}><option value="">Unassigned</option>{operators.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label> : null}
     <div className="flex flex-wrap gap-3">
-      <button name="action" value="reply" className={button} disabled={pending}>Send reply</button>
-      {operator ? <><button name="action" value="note" className={button} disabled={pending}>Internal note</button><button name="action" value="assign" className={button} disabled={pending}>Assign</button></> : null}
-      {(operator || resolved) ? <button name="action" value={resolved ? "reopen" : "resolve"} className={button} disabled={pending}>{resolved ? "Reopen request" : "Mark resolved"}</button> : null}
+      <button name="action" value="reply" className={button} disabled={busy}>Send reply</button>
+      {operator ? <><button name="action" value="note" className={button} disabled={busy}>Internal note</button><button name="action" value="assign" className={button} disabled={busy}>Assign</button></> : null}
+      {(operator || resolved) ? <button name="action" value={resolved ? "reopen" : "resolve"} className={button} disabled={busy}>{resolved ? "Reopen request" : "Mark resolved"}</button> : null}
     </div>
     {state.error ? <p role="alert" className="text-red-700">{state.error}</p> : "saved" in state && state.saved ? <p role="status" className="text-green-800">Request updated.</p> : null}
   </form>;

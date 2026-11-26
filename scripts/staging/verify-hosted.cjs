@@ -1,4 +1,5 @@
-const {chromium,expect}=require('@playwright/test');
+const {chromium,expect:baseExpect}=require('@playwright/test');
+const expect=baseExpect.configure({timeout:30000});
 const {randomBytes}=require('node:crypto');
 const {spawnSync}=require('node:child_process');
 const fs=require('node:fs'),path=require('node:path');
@@ -22,7 +23,6 @@ function cleanupTestAccess(){
   const project=JSON.parse(response.stdout);
   for(const [secret,info] of Object.entries(project.protectionBypass||{}))if(info.note==='Temporary subscriber sandbox smoke test')protection({revoke:{secret,regenerate:false}});
 }
-expect.configure({timeout:30000});
 (async()=>{
   if(process.argv.includes('--cleanup-only')){cleanupTestAccess();console.log('Temporary sandbox test access revoked.');return;}
   await check('Anonymous visitors cannot access the sandbox app or files',async()=>{
@@ -77,6 +77,31 @@ expect.configure({timeout:30000});
     });
     await check('Operator can find delivery diagnostics and the captured-only email inbox',async()=>{
       const operator=await login('platform@nwfiredemo.com');await operator.page.goto(base+'/app/platform/support');await expect(operator.page.getByRole('heading',{name:'Report delivery operations'})).toBeVisible();await operator.page.getByRole('link',{name:'Staging email inbox'}).click();await expect(operator.page).toHaveURL(/\/support\/mail/);
+    });
+    await check('Hosted support replies and technician reopening update without manual refresh',async()=>{
+      const tech=await login(a.techEmail,true);
+      await tech.page.goto(base+'/app/help/new');
+      await tech.page.getByLabel('Subject',{exact:true}).fill('Hosted sample verification '+Date.now());
+      await tech.page.getByLabel('What happened?',{exact:true}).fill('Synthetic staging check of confirmed replies and reopening. No customer action is required.');
+      await tech.page.getByRole('button',{name:'Send request',exact:true}).click();
+      await tech.page.waitForURL(/\/app\/help\/(?!new)[^/?]+$/);
+      const ticketUrl=tech.page.url();
+      for(let n=1;n<=3;n++){
+        const text='Hosted verification reply '+n;
+        await tech.page.getByLabel('Message',{exact:true}).fill(text);
+        await tech.page.getByRole('button',{name:'Send reply',exact:true}).click();
+        await expect(tech.page.getByText(text,{exact:true})).toBeVisible();
+      }
+      const operator=await login('platform@nwfiredemo.com');
+      await operator.page.goto(ticketUrl);
+      await operator.page.getByRole('button',{name:'Mark resolved',exact:true}).click();
+      await expect(operator.page.getByRole('button',{name:'Reopen request',exact:true})).toBeVisible();
+      await tech.page.goto(ticketUrl);
+      await tech.page.getByRole('button',{name:'Reopen request',exact:true}).click();
+      await expect(tech.page.getByRole('button',{name:'Reopen request',exact:true})).toHaveCount(0);
+      await operator.page.goto(ticketUrl);
+      await operator.page.getByRole('button',{name:'Mark resolved',exact:true}).click();
+      await expect(operator.page.getByRole('button',{name:'Reopen request',exact:true})).toBeVisible();
     });
     await check('Local demo password is rejected on hosted staging',async()=>{
       const context=await browser.newContext({extraHTTPHeaders:{'x-vercel-protection-bypass':token}});const csrf=await (await context.request.get(base+'/api/auth/csrf')).json();const response=await context.request.post(base+'/api/auth/callback/credentials',{form:{csrfToken:csrf.csrfToken,email:a.officeEmail,password:'Password123!',callbackUrl:base+'/app'},headers:{'X-Auth-Return-Redirect':'1'}});expect(await response.text()).toMatch(/CredentialsSignin|error/);await context.close();

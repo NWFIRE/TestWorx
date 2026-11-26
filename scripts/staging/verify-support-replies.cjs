@@ -7,6 +7,7 @@ const db = new PrismaClient({ datasources: { db: { url: 'postgresql://perf@127.0
   const browser = await chromium.launch();
   const page = await browser.newPage();
   const results = [];
+  let activePage=page, activeTicketId;
   try {
     const user = await db.user.findFirstOrThrow({ where: { name: 'Staging Owner', email: { startsWith: 'owner-', endsWith: '@example.test' } }, orderBy: { createdAt: 'desc' } });
     const ticket = await db.supportTicket.findFirstOrThrow({ where: { requesterId: user.id }, orderBy: { createdAt: 'desc' } });
@@ -28,6 +29,7 @@ const db = new PrismaClient({ datasources: { db: { url: 'postgresql://perf@127.0
     const technicianTicket = await db.supportTicket.findFirstOrThrow({ where: { requesterId: a.techId, title: 'Staging report delivery problem' }, orderBy: { createdAt: 'desc' } });
     await db.supportTicket.update({ where: { id: technicianTicket.id }, data: { status: 'resolved' } });
     const tech = await browser.newPage();
+    activePage=tech;activeTicketId=technicianTicket.id;
     await tech.goto(base + '/login');
     await tech.getByLabel(/work email/i).fill(a.techEmail);
     await tech.getByLabel(/password/i).fill('Password123!');
@@ -37,6 +39,6 @@ const db = new PrismaClient({ datasources: { db: { url: 'postgresql://perf@127.0
     await tech.getByRole('button', { name: 'Reopen request', exact: true }).click();
     await expect(tech.getByRole('button', { name: 'Reopen request', exact: true })).toHaveCount(0, { timeout: 15000 });
     results.push({ technicianReopenVisibleWithoutReload: true });
-  } catch (error) { results.push({ passed: false, error: error.message, url: page.url(), body: await page.locator('body').innerText() }); process.exitCode = 1; }
+  } catch (error) { results.push({ passed: false, error: error.message, url: activePage.url(), body: await activePage.locator('body').innerText(), ticket:activeTicketId?await db.supportTicket.findUnique({where:{id:activeTicketId},select:{status:true}}):null }); process.exitCode = 1; }
   finally { fs.writeFileSync(path.join(__dirname, 'results/support-replies.json'), JSON.stringify(results, null, 2)); console.log(results); await browser.close(); await db.$disconnect(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

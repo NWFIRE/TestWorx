@@ -1,5 +1,5 @@
-const { chromium, expect } = require('@playwright/test');
-expect.configure({ timeout: 15000 });
+const { chromium, expect: baseExpect } = require('@playwright/test');
+const expect = baseExpect.configure({ timeout: 15000 });
 const { PrismaClient } = require('@prisma/client');
 const fs = require('node:fs');
 const path = require('node:path');
