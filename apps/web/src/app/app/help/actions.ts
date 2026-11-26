@@ -28,9 +28,8 @@ export async function replyToProblem(_state: { error: string }, form: FormData) 
   try {
     await updateSupportTicket(session.user.id, id, { action: String(form.get("action") ?? "reply"), body: String(form.get("body") ?? ""),
       assigneeId: String(form.get("assigneeId") ?? "") });
-    revalidatePath(`/app/help/${id}`);
-    revalidatePath("/app/help");
-    revalidatePath("/app/platform/support");
+    // Refresh with a normal navigation request after this recovery action returns.
+    // In-action tree revalidation can stall the restricted subscriber's response.
     return { error: "", saved: true };
   } catch { return { error: "Unable to update this request. Your message has been preserved." }; }
 }

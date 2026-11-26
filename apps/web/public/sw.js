@@ -62,8 +62,7 @@ function isCacheablePage(response) {
     response.headers.get("content-type")?.includes("text/html");
 }
 
-async function rememberLastTechnicianNavigation(request) {
-  const cache = await caches.open(APP_SHELL_CACHE);
+async function rememberLastTechnicianNavigation(request, cache) {
   await cache.put(LAST_TECH_NAVIGATION_KEY, new Response(new URL(request.url).pathname, {
     headers: { "content-type": "text/plain; charset=utf-8" }
   }));
@@ -142,16 +141,20 @@ async function networkFirstTechnicianNavigation(request) {
         const cache = await caches.open(APP_SHELL_CACHE);
         if (generation !== workspaceGeneration) return response;
         await cache.put(request, response.clone());
-        await rememberLastTechnicianNavigation(request);
+        if (generation !== workspaceGeneration) return response;
+        // Keep this write on the original cache handle; never reopen a reset workspace cache.
+        await rememberLastTechnicianNavigation(request, cache);
       } catch {
         // Cache quota or unavailable storage must not replace a live page.
       }
     }
     return response;
   } catch {
+    if (generation !== workspaceGeneration) return offlineFallbackResponse();
     try {
       const cache = await caches.open(APP_SHELL_CACHE);
       const exact = await cache.match(request);
+      if (generation !== workspaceGeneration) return offlineFallbackResponse();
       if (exact) {
         return exact;
       }
@@ -163,6 +166,7 @@ async function networkFirstTechnicianNavigation(request) {
           method: "GET",
           credentials: "same-origin"
         }));
+        if (generation !== workspaceGeneration) return offlineFallbackResponse();
         if (cached) return cached;
       }
     } catch {

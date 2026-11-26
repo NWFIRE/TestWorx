@@ -23,7 +23,16 @@ export async function requestWorkspaceSignup(raw: z.input<typeof signupSchema>) 
   const passwordHash = await hashPassword(input.password);
   const data = { email: input.email, name: input.name, companyName: input.companyName, passwordHash,
     tokenHash: digest(token), expiresAt: new Date(Date.now() + 86400000), usedAt: null, createdAt: new Date() };
-  await prisma.workspaceSignup.upsert({ where: { email: input.email }, create: data, update: data });
+  const accepted = await prisma.$transaction(async tx => {
+    // Coordinate requests across server instances, not just within one process.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('workspace-signup'), hashtext(${input.email}))`;
+    if (await tx.user.findUnique({ where: { email: input.email }, select: { id: true } })) return false;
+    const latest = await tx.workspaceSignup.findUnique({ where: { email: input.email } });
+    if (latest && latest.createdAt.getTime() > Date.now() - 60000) return false;
+    await tx.workspaceSignup.upsert({ where: { email: input.email }, create: data, update: data });
+    return true;
+  });
+  if (!accepted) return;
   const url = new URL(`/signup/verify?token=${token}`, process.env.APP_URL).href;
   const delivery = await sendWithResend({ to: input.email, from: process.env.RESEND_FROM_EMAIL,
     subject: "Verify your TradeWorx workspace", html: `<p>Confirm your email to create your private workspace.</p><p><a href="${url}">Verify email and continue</a></p><p>This link expires in 24 hours. No payment is taken by confirming.</p>` });
@@ -34,6 +43,9 @@ export async function verifyWorkspaceSignup(token: string) {
   assertSignupEnabled();
   if (!/^[a-f0-9]{64}$/.test(token)) throw new Error("Invalid verification link.");
   return prisma.$transaction(async tx => {
+    const identity = await tx.workspaceSignup.findUnique({ where: { tokenHash: digest(token) }, select: { email: true } });
+    if (!identity) throw new Error("This link has expired or was already used. Sign in or request a new link.");
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('workspace-signup'), hashtext(${identity.email}))`;
     const signup = await tx.workspaceSignup.findUnique({ where: { tokenHash: digest(token) } });
     if (!signup || signup.usedAt || signup.expiresAt <= new Date()) throw new Error("This link has expired or was already used. Sign in or request a new link.");
     const claimed = await tx.workspaceSignup.updateMany({ where: { id: signup.id, usedAt: null }, data: { usedAt: new Date() } });

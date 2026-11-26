@@ -32,7 +32,11 @@ export function ProblemForm({ pagePath, errorReference, reportId }: { pagePath: 
 }
 
 export function ReplyForm({ id, operator, resolved, operators, assigned }: { id: string; operator: boolean; resolved: boolean; operators: { id: string; name: string }[]; assigned: string | null }) {
+  const router = useRouter();
   const [state, action, pending] = useActionState(replyToProblem, { error: "" });
+  useEffect(() => {
+    if ("saved" in state && state.saved) router.refresh();
+  }, [router, state]);
   return <form action={action} className="space-y-4">
     <input type="hidden" name="ticketId" value={id} />
     <label className="block text-sm font-medium">Message<textarea className={field} name="body" rows={4} maxLength={6000} /></label>

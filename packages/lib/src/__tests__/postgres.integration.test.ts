@@ -2,9 +2,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaClient, RecurrenceFrequency } from "@prisma/client";
 import { reportStatuses } from "@testworx/types";
 import { hash } from "bcryptjs";
+import { randomUUID } from "node:crypto";
 
-import { buildInitialReportDraft, createInspectionAmendment, finalizeInspectionReport, claimInspection, regenerateFinalizedReportPdf, reopenCompletedReportForCorrection } from "..";
+import { buildInitialReportDraft, createInspectionAmendment, finalizeInspectionReport, claimInspection, regenerateFinalizedReportPdf, reopenCompletedReportForCorrection } from "../server/index";
 import { inspectionTypeRegistry } from "../report-config";
+import { recordJobTimeEvent } from "../job-time";
 
 const prisma = new PrismaClient();
 const hasDatabase = Boolean(process.env.DATABASE_URL);
@@ -16,6 +18,8 @@ function uniqueValue(prefix: string) {
 }
 
 async function cleanupTenant(tenantId: string) {
+  await prisma.inspectionBillingSummary.deleteMany({ where: { tenantId } });
+  await prisma.billingResolutionSnapshot.deleteMany({ where: { organizationId: tenantId } });
   await prisma.stripeWebhookEvent.deleteMany({ where: { tenantId } });
   await prisma.inspectionAmendment.deleteMany({ where: { tenantId } });
   await prisma.auditLog.deleteMany({ where: { tenantId } });
@@ -137,9 +141,11 @@ async function createInspectionFixture(input: {
 }) {
   const inspectionType = input.inspectionType ?? "fire_extinguisher";
   const scheduledStart = input.scheduledStart ?? new Date(Date.now() + 86_400_000);
+  const inspectionId = uniqueValue("integration-inspection");
 
   const inspection = await prisma.inspection.create({
     data: {
+      id: inspectionId,
       tenantId: input.tenantId,
       customerCompanyId: input.customerCompanyId,
       siteId: input.siteId,
@@ -168,6 +174,7 @@ async function createInspectionFixture(input: {
             report: {
               create: {
                 tenantId: input.tenantId,
+                inspectionId,
                 technicianId: input.assignedTechnicianId ?? null,
                 status: reportStatuses.draft,
                 contentJson: { narrative: "" }
@@ -182,6 +189,10 @@ async function createInspectionFixture(input: {
     }
   });
 
+  if (input.assignedTechnicianId) {
+    await recordJobTimeEvent({ userId: input.assignedTechnicianId, role: "technician", tenantId: input.tenantId },
+      { inspectionId, action: "start", sessionId: randomUUID(), occurredAt: new Date().toISOString(), userId: input.assignedTechnicianId });
+  }
   return {
     inspection,
     task: inspection.tasks[0]!,
@@ -198,6 +209,18 @@ function buildFinalizableDraft(input: { inspectionType: keyof typeof inspectionT
     assetCount: 1,
     priorReportSummary: ""
   });
+
+  if (input.inspectionType === "fire_extinguisher") {
+    draft.sections.inventory!.fields.extinguishers = [{ location: "Lobby", extinguisherType: "5_lb_abc", manufacturer: "Amerex", servicePerformed: "annual_inspection", gaugeStatus: "pass", mountingSecure: "pass" }];
+  } else if (input.inspectionType === "kitchen_suppression") {
+    draft.sections["appliance-coverage"]!.fields.hoods = [{ hoodName: "Hood 1", hoodSize: "12 ft", ductSize: "18 x 18", ductQuantity: "1", ductNozzleQuantity: "1", ductNozzleType: "1W" }];
+    draft.sections["appliance-coverage"]!.fields.hoodAppliances = [{ hoodName: "Hood 1", appliance: "Fryer", size: "36 in", applianceNozzleQuantity: "2", applianceNozzleType: "2N" }];
+  } else if (input.inspectionType === "fire_alarm") {
+    draft.sections["control-panel"]!.fields.controlPanels = [{ panelName: "Panel", manufacturer: "Notifier", model: "NFS2-3030", serialNumber: "P-1", location: "Electrical room", communicationPathType: "dual_path" }];
+    draft.sections["initiating-devices"]!.fields.initiatingDevices = [{ deviceType: "pull_station", location: "Lobby", serialNumber: "Zone 1", functionalTestResult: "pass", physicalCondition: "good" }];
+    draft.sections.notification!.fields.notificationAppliances = [{ applianceType: "horn_strobe", location: "Lobby", quantity: "1", audibleOperation: "pass", visualOperation: "pass" }];
+  }
+  if (draft.sections["tag-status"]) draft.sections["tag-status"].fields.tagStatus = "green";
 
   return {
     ...draft,
@@ -386,7 +409,8 @@ describeIfDatabase("postgres-backed integration flows", () => {
     expect(finalizedReport.task.status).toBe("completed");
     expect(finalizedReport.inspection.status).toBe("completed");
     expect(finalizedReport.inspection.completedAt).not.toBeNull();
-    expect(finalizedReport.inspection.archivedAt).not.toBeNull();
+    // Finalization creates a reviewable bill; it does not administratively archive the job.
+    expect(await prisma.inspectionBillingSummary.findUnique({ where: { inspectionId: inspection.id } })).not.toBeNull();
 
     await cleanupTenant(fixture.tenant.id);
     createdTenantIds.delete(fixture.tenant.id);
@@ -435,7 +459,8 @@ describeIfDatabase("postgres-backed integration flows", () => {
       where: { id: inspection.id }
     });
 
-    expect(refreshedInspection.status).toBe("scheduled");
+    expect(refreshedInspection.status).toBe("to_be_completed");
+    expect(refreshedInspection.completedAt).toBeNull();
 
     await cleanupTenant(fixture.tenant.id);
     createdTenantIds.delete(fixture.tenant.id);
@@ -494,6 +519,8 @@ describeIfDatabase("postgres-backed integration flows", () => {
     expect(reopenedReport.inspection.status).toBe("in_progress");
     expect(reopenedReport.correctionEvents.some((event) => event.actionType === "REISSUE_TO_TECHNICIAN")).toBe(true);
 
+    await recordJobTimeEvent({ userId: fixture.technicianA.id, role: "technician", tenantId: fixture.tenant.id },
+      { inspectionId: inspection.id, action: "start", sessionId: randomUUID(), occurredAt: new Date().toISOString(), userId: fixture.technicianA.id });
     await finalizeInspectionReport(
       { userId: fixture.technicianA.id, role: "technician", tenantId: fixture.tenant.id },
       { inspectionReportId: report.id, contentJson: draft }

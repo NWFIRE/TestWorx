@@ -11,11 +11,26 @@ function setup() {
   const caches = { open: vi.fn().mockResolvedValue(cache), match: vi.fn().mockResolvedValue(undefined) };
   const fetch = vi.fn().mockResolvedValue(html());
   const context = { Request, Response, URL, caches, fetch, self: { location: { origin: "https://tradeworx.test" }, addEventListener: vi.fn() } };
-  const worker = runInNewContext(`${source}\n({networkFirstTechnicianNavigation, cacheFirstAsset, warmTechnicianCache, isTechnicianNavigation})`, context);
+  const worker = runInNewContext(`${source}\n({networkFirstTechnicianNavigation, cacheFirstAsset, warmTechnicianCache, isTechnicianNavigation, resetGeneration: () => { workspaceGeneration += 1; }})`, context);
   return { worker, cache, caches, fetch };
 }
 
 describe("production service worker", () => {
+  it("does not reopen the old workspace cache after an in-flight write", async () => {
+    const { worker, cache, caches } = setup();
+    cache.put.mockImplementationOnce(async () => { worker.resetGeneration(); });
+    await worker.networkFirstTechnicianNavigation(request);
+    expect(caches.open).toHaveBeenCalledTimes(1);
+    expect(cache.put).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not return a previous workspace page when reset races an offline read", async () => {
+    const { worker, cache, fetch } = setup();
+    fetch.mockRejectedValue(new Error("offline"));
+    cache.match.mockImplementationOnce(async () => { worker.resetGeneration(); return html(); });
+    expect(await (await worker.networkFirstTechnicianNavigation(request)).text()).toContain("Offline mode");
+  });
+
   it("caches successful technician HTML", async () => {
     const { worker, cache } = setup();
     expect(await (await worker.networkFirstTechnicianNavigation(request)).text()).toBe("inspection");

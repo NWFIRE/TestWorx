@@ -50,7 +50,7 @@ Generated evidence stays in `scripts/staging/results/` and is deliberately exclu
 ## Verification evidence
 
 - Production build includes Next.js lint/type validation; separate TypeScript check passed.
-- Final normal library regression run: 849 passed, 17 skipped (`npm run test --workspace=@testworx/lib -- --maxWorkers=2`). The skipped legacy PostgreSQL integration suite is not represented as passing. Final production build, lint and type checks passed; both targeted real-database subscriber contract tests passed separately.
+- Final normal library regression run: 851 passed, 18 skipped (`npm run test --workspace=@testworx/lib -- --maxWorkers=2`). All eight PostgreSQL integration checks and the signup concurrency test passed separately against isolated staging. Final production build, lint and type checks passed. Earlier provider-contract tests remain simulated; no Stripe provider testing was performed in the non-Stripe follow-up.
 - Real staging database tests pass for support ownership/private notes/revoked users/concurrent delivery and subscription checkout/recovery contracts.
 - Billing provider tests use a fake Stripe client plus real database. They are NOT actual hosted Checkout, portal or renewal tests.
 - Final browser run: 11 of 11 checks passed. Coverage includes mobile ticket creation/screenshot, cross-company ticket and attachment denial, operator recovery/reply/resolve, technician reopening, own-company search, invitations to both companies, branded PDF downloads, owner-only billing, read-only inspection viewing, deactivation, new empty-workspace signup, billing-blocked support submission/reply, and shared-browser cache isolation. A stuck support-submission navigation was found and fixed during this run.
@@ -101,7 +101,38 @@ Running-browser evidence:
 
 Evidence files are in ignored `scripts/staging/results/`: `field-completion.json`, `boundaries.json`, `report-branding.json`, browser screenshots, and PDFs. Field scripts create synthetic records; run creation before completion and do not rerun completion on an already finalized report.
 
-Test-run caveat: running the entire legacy unit suite with the staging capture-mail environment enabled exposed mock incompatibilities, outdated PostgreSQL fixtures, and timeouts while a build competed for resources. That run is not a pass. Run the normal library suite separately; run the targeted `subscriber-*.staging.test.ts` contract tests with the isolated helper. The older PostgreSQL integration suite still needs modernization before it can be a release gate.
+Test-run caveat: running the entire legacy unit suite with the staging capture-mail environment enabled exposed mock incompatibilities, outdated PostgreSQL fixtures, and timeouts while a build competed for resources. That run is not a pass. Run the normal library suite separately; run targeted database tests with the isolated helper. The PostgreSQL fixture problems were subsequently repaired and all eight integration tests now pass, as recorded below.
+
+## Non-Stripe follow-up
+
+Stripe configuration, provider integration changes, and production deployment were explicitly deferred. Work stayed in the same private local staging environment.
+
+Additional fixes:
+
+- Signup requests now coordinate through a PostgreSQL transaction lock keyed by normalized email. Concurrent requests cannot overwrite each other's verification token or bypass the existing per-email cooldown. Verification uses the same lock, so resend and verification cannot race. This is cross-instance concurrency protection, not a replacement for IP-level distributed abuse protection.
+- Service-worker navigation no longer reopens a deleted workspace cache after an in-flight write. Offline reads also check workspace generation before returning cached HTML, preventing a reset race from returning the previous company's page. Static asset caching and existing offline drafts remain intact.
+- Support reply actions return their save result before requesting a normal client refresh. A focused browser reproduction found replies persisted but the action response/view could stall for an owner awaiting activation during in-action tree revalidation. This change does not bypass subscription restrictions or alter ticket visibility.
+- Modernized PostgreSQL integration fixtures: explicit inspection/report relationship, server entry-point imports, current required report data, start/resume job-time events, and cleanup of billing relationships. Assertions now reflect the existing manual billing/archive workflow; production business rules were not weakened to make tests pass.
+
+Additional verification:
+
+- All eight PostgreSQL integration tests pass: seeded roles, simultaneous claims, multi-service claims, finalization/PDF/billing persistence, unsigned required document behavior, correction/reissue/re-finalization audits, PDF regeneration without reopening, and replacement-visit audit history.
+- Real database signup test passes: five simultaneous requests produce exactly one email; concurrent verification creates exactly one empty workspace and owner; replay and existing-account signup cannot create another workspace.
+- Service-worker tests cover the two reset races. `verify-offline.cjs` runs Chromium at 390x844 with service workers enabled: company A cache is cleared on login to company B, B's inspection list loads offline, prior-company marker does not appear, and reconnect reload succeeds. This is not proof of every offline upload/sync race or a real iOS device test.
+- `verify-attention.cjs` creates temporary records for all six Home categories in each company, verifies all 12 row counts against displayed queue totals, and tests Enter, refresh, and Back. It asserts inspection status/updatedAt remain unchanged during navigation and removes only its temporary records afterward. It is not a large-volume pagination benchmark or a concurrent-final-item-resolution test.
+- Build, lint, and type checks passed after the application changes. Normal regression: 851 passed, 18 skipped. The nine database tests above passed separately; they are intentionally skipped in the normal no-database run. The five expanded company-boundary browser checks also passed again.
+- Focused support-reply browser test passes for a new owner awaiting activation: three consecutive replies appear without manual reload and each creates exactly one message. The test first reproduced a saved-but-invisible reply before the fix.
+- Final full browser run passes all 11 scenarios, including technician reopening, invitations, isolated signup, company boundaries, branded PDFs, deactivation, and shared-browser switching. The functional assertion timeout is 15 seconds after a broader run encountered a refresh timeout; this is not a performance-target pass.
+
+Commands from this isolated worktree:
+
+```powershell
+node scripts/staging/local.cjs test src/__tests__/postgres.integration.test.ts src/__tests__/workspace-signup.staging.test.ts --maxWorkers=1
+node scripts/staging/verify-offline.cjs
+node scripts/staging/verify-attention.cjs
+```
+
+Remaining non-Stripe gates are still explicit: protected hosted staging and monitoring; a broader authorization/background-job audit beyond the tested surfaces; signup abuse throttling across different emails; current-business sanitized migration rehearsal; recovery/sign-off for unsent drafts on real field devices; provider reconciliation for ambiguous email delivery; and operational support/retention decisions. No credentials or production data were requested or used for this follow-up.
 
 ## Exactly what is needed for Stripe testing
 
